@@ -76,58 +76,53 @@
   (org-node-butler-mode)
   (org-node-cache-mode))
 
-(defcustom org-node-slug-fn #'org-node--roam-slugify-with-timestamp
+(defcustom org-node-slug-fn #'org-node-slugify-as-url
   "Function to transform title into a filename.
 
 Built-in choices:
-- `org-node--slugify'
-- `org-node--roam-slugify-just-title'
-- `org-node--roam-slugify-with-timestamp'
+- `org-node-slugify-as-url'
+- `org-node-slugify-like-roam'
 "
   :group 'org-node
   :type 'function)
 
-(defcustom org-node-create-and-visit-fn #'org-node--roam-capture-and-visit
-  "Function called by `org-node-find' to create a node and visit it.
-Called with one argument, the title of a new node.
+(defcustom org-node-creation-fn #'org-node-create-basic
+  "Function called by `org-node-find', and `org-node-insert-link' to
+create a node.  During execution, two variables are set:
+`org-node-proposed-title' and `org-node-proposed-id'.
 
 Some options
-- `org-node--basic-create-and-visit'
-- `org-node--roam-capture-and-visit'
+- `org-node-create-basic'
+- `org-node-create-by-roam-capture'
 - `org-capture'
 "
   :group 'org-node
   :type 'function)
 
-(defcustom org-node-create-and-insert-fn #'org-node--roam-capture-and-insert
-  "Function called by `org-node-insert-link' to insert a link at
-point to a node that does not exist, and create that node.
-
-Built-in choices:
-- `org-node--basic-create-and-insert'
-- `org-node--roam-capture-and-insert'
-
-Called with 1-2 arguments:
-1. new node title
-2. (optional) cons cell of two markers, (MARKER1 . MARKER2)
-
-If the optional argument is provided (not nil), that means the
-user has a region active and wants to linkify it.  These
-markers show its boundaries.
-
-Whether or not the function should open a buffer showing the newly
-created node is up to you."
-  :group 'org-node
-  :type 'function)
-
-(defcustom org-node-insert-link-hook (list)
+(defcustom org-node-insert-link-hook ()
   "Hook run after inserting a link to an Org-ID node.
 
 Two arguments provided: the ID and the link description.
 
-Your functions should not leave point outside the link."
+Functions here should not leave point outside the link."
   :group 'org-node
   :type 'hook)
+
+(defcustom org-node-creation-hook '(org-node-put-created)
+  "Hook run with point in the newly created buffer or entry.
+
+Applied only by `org-node-creator-backend-basic',
+`org-node-create-subtree' and `org-node-extract-subtree'.
+
+For `org-node-creator-backend-by-roam-capture', you want the
+hook `org-roam-capture-new-node-hook' instead.
+
+A good member for this hook is `org-node-put-created', especially
+since the default `org-node-slug-fn' does not put a timestamp in
+the filename.
+"
+  :type 'hook
+  :group 'org-node)
 
 
 ;;; Plumbing
@@ -135,9 +130,9 @@ Your functions should not leave point outside the link."
 (defvar org-node-hist nil
   "Minibuffer history.")
 
-(defun org-node--get-true-heading (node)
+(defun org-node--visit-get-true-heading (node)
   "Visit subtree NODE and get the heading, in a way that's aware of
-buffer-local #+todo settings so the keyword is not taken as part
+buffer-local #+todo settings so the todo state is not taken as part
 of the heading."
   (unless (plist-get node :is-subtree)
     (error "Not a subtree node %s" node))
@@ -148,42 +143,8 @@ of the heading."
         (forward-line (plist-get node :line-number))
         (nth 4 (org-heading-components))))))
 
-(defun org-node--roam-capture-and-visit (title)
-  "Call org-roam-capture the way `org-roam-node-find' does."
-  (unless (fboundp #'org-roam-capture-)
-    (org-node-die "Didn't create node! Either install org-roam or %s"
-                  "configure `org-node-create-and-visit-fn'"))
-  (require 'org-roam)
-  (org-roam-capture-
-   :node (org-roam-node-create :title title)
-   :props '(:finalize find-file)))
-
-(defun org-node--roam-capture-and-insert (title &optional markers)
-  "Call org-roam-capture the way `org-roam-node-insert' does."
-  (unless (fboundp #'org-roam-capture-)
-    (org-node-die "Didn't create node! Either install org-roam or %s"
-                  "configure `org-node-create-and-insert-fn'"))
-  (require 'org-roam)
-  (atomic-change-group
-    (org-roam-capture-
-     :node (org-roam-node-create :title title)
-     :props (append (when markers
-                      (list :region markers))
-                    (list :link-description title
-                          :finalize 'insert-link)))))
-
-(defun org-node--roam-slugify-just-title (title)
-  "Try to slugify TITLE like org-roam does.
-See also `org-node--roam-slugify-with-timestamp'."
-  (unless (fboundp #'org-roam-node-slug)
-    (user-error
-     "Didn't create node! Install org-roam or configure `org-node-slug-fn'"))
-  (require 'org-roam-node)
-  (concat (org-roam-node-slug (org-roam-node-create :title title))
-          ".org"))
-
-(defun org-node--roam-slugify-with-timestamp (title)
-  "Try to slugify TITLE like the org-roam defaults does."
+(defun org-node-slugify-like-roam (title)
+  "From TITLE, make a filename in the default org-roam style."
   (unless (fboundp #'org-roam-node-slug)
     (user-error
      "Didn't create node! Install org-roam or configure `org-node-slug-fn'"))
@@ -192,18 +153,20 @@ See also `org-node--roam-slugify-with-timestamp'."
           (org-roam-node-slug (org-roam-node-create :title title))
           ".org"))
 
-(defun org-node--slugify (title)
-  "Transform TITLE into a filename suitable as URL component.
+(defun org-node-slugify-as-url (title)
+  "From TITLE, make a filename suitable as URL component.
 
 A title like \"Löb's Theorem\" becomes \"lobs-theorem.org\".
+Note that it retains Unicode symbols classified as alphabetic
+or numeric, so for example kanji and Greek letters remain.
 
 As a surprise, it does NOT preface the name with a timestamp like
-many other zettelkasten packages do.  If you want that, you can
-use a small wrapper such as:
+many zettelkasten packages do.  If you want that, you can use
+a small wrapper such as:
 
 (setq org-node-slug-fn (lambda (title)
                         (concat (format-time-string \"%Y%m%d%H%M%S-\")
-                                (org-node--slugify title))))"
+                                (org-node-slugify-as-url title))))"
   (concat
    (thread-last title
                 (string-glyph-decompose)
@@ -223,17 +186,26 @@ use a small wrapper such as:
 
 ;; Some useful test cases if you want to hack on the above function!
 
-;; (org-node--slugify "A/B testing")
-;; (org-node--slugify "\"But there's still a chance, right?\"")
-;; (org-node--slugify "Löb's Theorem")
-;; (org-node--slugify "How to convince me that 2 + 2 = 3")
-;; (org-node--slugify "C. S. Peirce")
-;; (org-node--slugify "Amnesic recentf, org-id-locations? Solution: Run kill-emacs-hook periodically.")
-;; (org-node--slugify "Slimline/\"pizza box\" computer chassis")
-;; (org-node--slugify "#emacs")
+;; (org-node-slugify-as-url "A/B testing")
+;; (org-node-slugify-as-url "\"But there's still a chance, right?\"")
+;; (org-node-slugify-as-url "Löb's Theorem")
+;; (org-node-slugify-as-url "How to convince me that 2 + 2 = 3")
+;; (org-node-slugify-as-url "C. S. Peirce")
+;; (org-node-slugify-as-url "Amnesic recentf, org-id-locations? Solution: Run kill-emacs-hook periodically.")
+;; (org-node-slugify-as-url "Slimline/\"pizza box\" computer chassis")
+;; (org-node-slugify-as-url "#emacs")
 
-(defun org-node--basic-create-and-visit (title)
-  "Creae a file-level node with TITLE and ask where to save it."
+(defun org-node-create-by-roam-capture ()
+  "Call `org-roam-capture-' with predetermined arguments."
+  (unless (fboundp #'org-roam-capture-)
+    (org-node-die "Didn't create node! Either install org-roam or %s"
+                  "configure `org-node-creation-fn'"))
+  (require 'org-roam)
+  (org-roam-capture- :node (org-roam-node-create :title org-node-proposed-title
+                                                 :id    org-node-proposed-id)))
+
+(defun org-node-create-basic (title)
+  "Create a file-level node with TITLE and ask where to save it."
   (let* ((dir (read-directory-name
                "Where to create the node? "
                (car (org-node--root-dirs (hash-table-values org-id-locations)))))
@@ -241,56 +213,12 @@ use a small wrapper such as:
     (if (file-exists-p path-to-write)
         (message "A file already exists named %s"
                  (file-name-nondirectory path-to-write))
-      (find-file path-to-write)
-      (insert ":PROPERTIES:"
-              "\n:ID:       " (org-id-new)
-              "\n:END:"
-              "\n#+title: " title)
-      (run-hooks 'org-node-creation-hook))))
-
-(defcustom org-node-creation-hook (list)
-  "Hook run with the newly created buffer current.
-
-Applied only by `org-node--basic-create-and-insert' and
-`org-node--basic-create-and-visit'.  For the Roam variants, see
-`org-roam-capture-new-node-hook'."
-  :type 'hook
-  :group 'org-node)
-
-(defun org-node--basic-create-and-insert (title &optional markers)
-  "Create a file-level node with TITLE and ask where to save it.
-Then insert a link to that node.
-
-With MARKERS, linkify the active region."
-  (let* ((dir (read-directory-name
-               "Where to create the node? "
-               (car (org-node--root-dirs (hash-table-values org-id-locations)))))
-         (path-to-write (file-name-concat dir (funcall org-node-slug-fn title)))
-         (new-id (org-id-new)))
-    (if (file-exists-p path-to-write)
-        (message "A file already exists named %s"
-                 (file-name-nondirectory path-to-write))
       (with-temp-file path-to-write
         (insert ":PROPERTIES:"
-                "\n:ID:       " new-id
+                "\n:ID:       " (org-id-new)
                 "\n:END:"
                 "\n#+title: " title)
-        (with-demoted-errors "Error during `org-node-creation-hook': %s"
-          (run-hooks 'org-node-creation-hook)))
-      (atomic-change-group
-        (when markers
-          (when delete-selection-mode
-            (deactivate-mark))
-          (let ((beg (marker-position (car markers)))
-                (end (marker-position (cdr markers))))
-            (set-marker (car markers) nil)
-            (set-marker (cdr markers) nil)
-            (setq title (org-link-display-format
-                         (buffer-substring-no-properties beg end)))
-            (delete-region beg end)))
-        (insert (org-link-make-string (concat "id:" new-id) title))
-        (forward-char -1)
-        (run-hook-with-args 'org-node-insert-link-hook id title)))))
+        (run-hooks 'org-node-creation-hook)))))
 
 
 ;;; Shim for the org-roam buffer
@@ -315,11 +243,11 @@ Some of the fields are blank."
 (defun org-node--fabricate-roam-backlinks (roam-object &rest _)
   "Return org-roam-backlink objects targeting ROAM-OBJECT.
 
-Drop the UNIQUE argument to the original
-`org-roam-backlinks-get', because org-node does not track
-multiple backlinks from the same node anyway: literally all the
+A drop-in replacement for `org-roam-backlinks-get', but ignores
+its UNIQUE argument because org-node does not track multiple
+backlinks from the same node anyway: literally all the
 information comes from the CACHED_BACKLINKS property, which is
-deduplicated.  It's as if :unique t."
+deduplicated, as if :unique t."
   (require 'org-roam)
   (let ((node (gethash (org-roam-node-id roam-object) org-nodes)))
     (when node
@@ -358,8 +286,8 @@ deduplicated.  It's as if :unique t."
   "Select and visit one of your ID nodes.
 
 To behave like `org-roam-node-find' when creating new nodes, set
-`org-node-create-and-visit-fn' to
-`org-node--roam-capture-and-visit'."
+`org-node-creation-fn' to
+`org-node-create-by-roam-capture'."
   (interactive)
   (org-node-cache-ensure-fresh)
   (let* ((input (completing-read "Node: " org-node-collection
@@ -371,22 +299,27 @@ To behave like `org-roam-node-find' when creating new nodes, set
           (widen)
           (goto-char 1)
           (forward-line (1- (plist-get node :line-number))))
-      (funcall org-node-create-and-visit-fn input))))
+      (setq org-node-proposed-title input)
+      (setq org-node-proposed-id (org-id-new))
+      (funcall org-node-creation-fn))))
+
+(defvar org-node-proposed-title nil)
+(defvar org-node-proposed-id nil)
 
 ;;;###autoload
 (defun org-node-insert-link ()
   "Insert a link to one of your ID nodes.
 
 To behave like `org-roam-node-insert' when creating new nodes,
-set `org-node-create-and-insert-fn' to
-`org-node--roam-capture-and-insert'.
+set `org-node-creation-fn' to
+`org-node-create-by-roam-capture'.
 
 If you find the behavior different, perhaps you have something in
 `org-roam-post-node-insert-hook'.  Then perhaps copy it to
 `org-node-insert-link-hook'."
   (interactive nil org-mode)
   (unless (derived-mode-p 'org-mode)
-    (error "Only works in org-mode buffers"))
+    (user-error "Only works in org-mode buffers"))
   (org-node-cache-ensure-fresh)
   (let* ((beg nil)
          (end nil)
@@ -403,23 +336,35 @@ If you find the behavior different, perhaps you have something in
          (input (completing-read "Node: " org-node-collection
                                  () () () 'org-node-hist))
          (node (gethash input org-node-collection))
-         (id (plist-get node :id))
+         (id (or (plist-get node :id) (org-id-new)))
          (link-desc (or region-text (plist-get node :title))))
-    (if node
-        (atomic-change-group
-          (if region-text
-              (delete-region beg end)
-            ;; Try to strip the todo keyword, whatever counts as todo syntax
-            ;; in the target file.  Fail silently because it matters little.
-            (ignore-errors
-              (setq link-desc (org-node--get-true-heading node))))
-          (insert (org-link-make-string (concat "id:" id) link-desc))
-          (run-hook-with-args 'org-node-insert-link-hook id link-desc))
-      (funcall org-node-create-and-insert-fn
-               input
-               (when region-text
-                 (cons (set-marker (make-marker) beg)
-                       (set-marker (make-marker) end)))))))
+    (atomic-change-group
+      (if region-text
+          (delete-region beg end)
+        ;; Try to strip the todo keyword, looking up what counts as todo syntax
+        ;; in the target file.  Fail silently because it matters little.
+        (ignore-errors
+          (setq link-desc (org-node--visit-get-true-heading node))))
+      (insert (org-link-make-string (concat "id:" id) link-desc))
+      (run-hook-with-args 'org-node-insert-link-hook id link-desc))
+    ;; Node doesn't exist yet, create it
+
+    ;; TODO: Maybe let the creater change the proposed-id, and insert the link
+    ;; after
+    (unless node
+      ;; In the event someone's creation-fn moves point
+      (save-excursion
+        (setq org-node-proposed-title input)
+        (setq org-node-proposed-id id)
+        (condition-case err
+            (funcall org-node-creation-fn)
+          ((t debug error)
+           (setq org-node-proposed-title nil)
+           (setq org-node-proposed-id nil)
+           (signal (car err) (cdr err)))
+          (:success
+           (setq org-node-proposed-title nil)
+           (setq org-node-proposed-id nil)))))))
 
 ;;;###autoload
 (defun org-node-insert-transclusion-as-subtree ()
@@ -480,7 +425,7 @@ adding keywords to the things to exclude:
   "Insert an #+include: referring to a node."
   (interactive nil org-mode)
   (unless (derived-mode-p 'org-mode)
-    (error "Only works in org-mode buffers"))
+    (user-error "Only works in org-mode buffers"))
   (org-node-cache-ensure-fresh)
   (let ((node (gethash (completing-read "Node: " org-node-collection
                                         () () () 'org-node-hist)
@@ -498,6 +443,8 @@ adding keywords to the things to exclude:
 (defun org-node-insert-transclusion ()
   "Insert a #+transclude: referring to a node."
   (interactive nil org-mode)
+  (unless (derived-mode-p 'org-mode)
+    (user-error "Only works in org-mode buffers"))
   (org-node-cache-ensure-fresh)
   (let ((node (gethash (completing-read "Node: " org-node-collection
                                         () () () 'org-node-hist)
@@ -518,6 +465,8 @@ adding keywords to the things to exclude:
   "Rename the current file according to `org-node-slug-fn'.
 Can also operate on a file at given PATH."
   (interactive nil org-mode)
+  (unless (derived-mode-p 'org-mode)
+    (user-error "Only works in org-mode buffers"))
   (unless path
     (setq path (buffer-file-name)))
   (unless (equal "org" (file-name-extension path))
@@ -552,8 +501,9 @@ Can also operate on a file at given PATH."
                 (when visiting-on-window
                   (set-window-buffer visiting-on-window buf))))))))))
 
-;; (defface org-node-rewrite-links-face '((t :inverse-video nil))
-;;   "Face for use in `org-node-rewrite-links-ask'.")
+(defface org-node-rewrite-links-face
+  '((t :inherit 'org-link))
+  "Face for use in `org-node-rewrite-links-ask'.")
 
 ;;;###autoload
 (defun org-node-rewrite-links-ask ()
@@ -562,6 +512,12 @@ Prompt the user for each one."
   (interactive)
   (require 'ol)
   (org-node-cache-ensure-fresh)
+  ;; (set-face-attribute 'org-node-rewrite-links-face nil
+  ;;                     :inverse-video (face-inverse-video-p 'org-link)
+  ;;                     :foreground (face-background 'default)
+  ;;                     :background (face-foreground 'org-link))
+  (set-face-inverse-video 'org-node-rewrite-links-face
+                          (not (face-inverse-video-p 'org-link)))
   (when auto-save-visited-mode
     (when (yes-or-no-p "Disable auto-save-visited-mode? (recommended)")
       (auto-save-visited-mode 0)))
@@ -590,8 +546,8 @@ Prompt the user for each one."
             (switch-to-buffer (current-buffer))
             (org-reveal)
             (recenter)
-            ;; (highlight-regexp "regexp" 'org-node-rewrite-links-face)
-            (highlight-regexp (rx (literal link)))
+            (highlight-regexp (rx (literal link)) 'org-node-rewrite-links-face)
+            ;; (highlight-regexp (rx (literal link)))
             (unwind-protect
                 (setq answered-yes (y-or-n-p
                                     (format "Rewrite link? Will become: \"%s\""
@@ -608,17 +564,22 @@ Prompt the user for each one."
   (when (yes-or-no-p "Save the edited buffers?")
     (save-some-buffers)))
 
+;;;###autoload
 (defun org-node-extract-subtree ()
   "Extract subtree at point into a file of its own.
+Leave a link in the source file, and show the newly created buffer.
 
-You may find it a common situation that the subtree has not yet
+You may find it a common situation that the subtree had not yet
 been assigned an ID or any other property that you normally
-assign.  Thus, this creates an ID for you, and here is an example
-advice to inherit a \"CREATED\" property just before extraction:
+assign.  Thus, this creates an ID for you, copies over
+any inherited tags, and runs `org-node-creation-hook'.
+
+Adding to that, here is an example advice to copy any inherited
+\"CREATED\" property, if an ancestor has such a property:
 
 (advice-add 'org-node-extract-subtree :around
-            (lambda (fn &rest args)
-              (let ((parent-creation
+            (defun my-inherit-creation-date (fn &rest args)
+              (let ((inherited-creation-date
                      (save-excursion
                        (while (not (or (org-entry-get nil \"CREATED\")
                                        (bobp)))
@@ -626,10 +587,12 @@ advice to inherit a \"CREATED\" property just before extraction:
                        (org-entry-get nil \"CREATED\"))))
                 (apply fn args)
                 (org-entry-put nil \"CREATED\"
-                               (or parent-creation
+                               (or inherited-creation-date
                                    (format-time-string \"[%F]\")))))))
 "
-  (interactive)
+  (interactive nil org-mode)
+  (unless (derived-mode-p 'org-mode)
+    (user-error "Only works in org-mode buffers"))
   (org-node--init-org-id-locations-or-die)
   (let ((dir (read-directory-name
               "Where to create the node? "
@@ -680,11 +643,15 @@ advice to inherit a \"CREATED\" property just before extraction:
              "")
            "\n#+title: " title
            "\n")
+          (run-hooks 'org-node-creation-hook)
           (save-buffer))))))
 
+;; FIXME WIP
+;;;###autoload
 (defun org-node-rename-asset-and-rewrite-links ()
   (interactive)
   (require 'dash)
+  (require 'wgrep)
   (when (or (equal default-directory org-roam-directory)
             (when (yes-or-no-p "Not in org-roam-directory, go there?")
               (find-file org-roam-directory)
@@ -715,6 +682,26 @@ advice to inherit a \"CREATED\" property just before extraction:
              (rename-file filename new)
              (message "File renamed from %s to %s" filename new)))))
       (message "Waiting for rgrep to populate buffer..."))))
+
+;;;###autoload
+(defun org-node-create-subtree ()
+  (interactive nil org-mode)
+  (org-insert-heading)
+  (org-node-nodeify-entry))
+
+;;;###autoload
+(defun org-node-nodeify-entry ()
+  "Add an ID to entry at point and run `org-node-creation-hook'."
+  (interactive nil org-mode)
+  (org-id-get-create)
+  (run-hooks 'org-node-creation-hook))
+
+;;;###autoload
+(defun org-node-put-created ()
+  "Add a CREATED property to entry at point, if none already."
+  (interactive nil org-mode)
+  (unless (org-entry-get nil "CREATED")
+    (org-entry-put nil "CREATED" (format-time-string "[%F]"))))
 
 (provide 'org-node)
 
