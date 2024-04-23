@@ -69,14 +69,17 @@ This involves:
   (let ((ctr-open 0)
         bufs)
     (dolist (file files)
-      (message "Pre-opening buffers... (%d/%d)" (cl-incf ctr-open) total)
+      (message
+       "Pre-opening buffers... (%d/%d) (you may cancel and resume anytime)"
+       (cl-incf ctr-open)
+       total)
       (push (delay-mode-hooks
               (find-file-noselect file))
             bufs))
     bufs))
 
 (defun org-node--consent-to-problematic-modes-for-mass-op ()
-  (--all-p (if (auto-minor-mode-enabled-p it)
+  (--all-p (if (and (boundp it) (symbol-value it))
                (y-or-n-p
                 (format "%S is active - proceed anyway?" it))
              t)
@@ -85,6 +88,7 @@ This involves:
              git-auto-commit-mode)))
 
 (defvar org-node-butler--fixed (list))
+(defvar org-node-butler--had-work (list))
 
 (defun org-node-butler-fix-all ()
   "Thoroughly check every file in `org-id-locations'.
@@ -111,6 +115,7 @@ cleaning."
             (after-save-hook nil)
             (before-save-hook nil)
             (org-agenda-files nil)
+            (auto-save-default nil)
             (org-inhibit-startup t)
             (gc-cons-threshold (max gc-cons-threshold 2000000000)))
         (setq org-node-butler--progress-total-worked 0
@@ -127,6 +132,10 @@ cleaning."
                 (unless (member buf org-node-butler--fixed)
                   (with-current-buffer buf
                     (setq org-node-butler--progress-file (buffer-file-name))
+                    (and (not (member buf org-node-butler--had-work))
+                         (not (eq t buffer-undo-list))
+                         (not (null buffer-undo-list))
+                         (push buf org-node-butler--had-work))
                     (widen)
                     (org-node-butler--fix-findable-backlinks t)
                     (push buf org-node-butler--fixed))))
@@ -144,7 +153,10 @@ cleaning."
            (setq org-node-butler--fixed nil)
            (when (yes-or-no-p "Fixed all buffers!  Save them?")
              (dolist (buf bufs)
-               (save-buffer)))
+               (with-current-buffer buf
+                 (save-buffer buf)
+                 (unless (member buf org-node-butler--had-work)
+                   (kill-buffer buf)))))
            (org-node-butler-mode)
            (when org-node-butler--fails
              (delete-dups org-node-butler--fails)
@@ -195,7 +207,7 @@ Meant as an autoformatter, perhaps on `before-save-hook'."
     (and
      (derived-mode-p 'org-mode)
      (goto-char (point-min))
-     (search-forward "\n#+" nil t)
+     (re-search-forward "^#\\+" nil t)
      ;; Rough check that we are in the front matter and not e.g. #+begin_src in
      ;; a file without front matter.  There may be other things in the front
      ;; matter but if there is no #+title, then it's not a proper node and there
@@ -203,9 +215,9 @@ Meant as an autoformatter, perhaps on `before-save-hook'."
      (org-get-title)
      (let* ((beg (line-beginning-position))
             (end (save-excursion
-                   (when-let ((far (re-search-forward "^$\\|^[^#]" nil t)))
+                   (let ((far (re-search-forward "^$\\|^[^#]" nil t)))
                      (goto-char beg)
-                     (while (search-forward "\n#+" far t))
+                     (while (re-search-forward "^#\\+" far t))
                      (line-end-position))))
             (prop-lines nil))
        (when (not end)
@@ -385,10 +397,12 @@ later."
                                              "]]\f[["
                                              (string-trim backlinks-string))
                                             "\f" t))))
-                     ;; TODO: Ensure this works
                      (dolist (id-dup (--filter (string-search src-id it) ls))
                        (setq ls (delete id-dup ls)))
                      (push src-link ls)
+                     ;; Prevent unnecessary work from putting the most recent
+                     ;; link in front even if it was already in the list
+                     (sort ls #'string-lessp)
                      ;; Two spaces between links help them look distinct
                      (setq new-value (string-join ls "  ")))
                  (setq new-value src-link))
