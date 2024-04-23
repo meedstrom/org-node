@@ -76,8 +76,8 @@ peek on keys instead."
             (puthash (funcall org-node-format-candidate-fn node title)
                      node
                      org-node-collection))
-        (plist-put node :exclude t)))
-    (message "org-node: Recorded %d files and %d subtrees in %.2fs"
+        (plist-put node :is-excluded t)))
+    (message "org-node: recorded %d files and %d subtrees in %.2fs"
              sum-files
              sum-subtrees
              (float-time (time-since then)))
