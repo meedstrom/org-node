@@ -256,33 +256,6 @@ deduplicated, as if :unique t."
 
 ;;; Commands
 
-;;;###autoload
-(defun org-node-find ()
-  "Select and visit one of your ID nodes.
-
-To behave like `org-roam-node-find' when creating new nodes, set
-`org-node-creation-fn' to
-`org-node-creator-backend-by-roam-capture'."
-  (interactive)
-  (org-node-cache-ensure-fresh)
-  (let* ((input (completing-read "Node: " org-node-collection
-                                 () () () 'org-node-hist))
-         (node (gethash input org-node-collection)))
-    (if node
-        (progn
-          (find-file (plist-get node :file-path))
-          (widen)
-          (goto-char 1)
-          (forward-line (1- (plist-get node :line-number)))
-          (recenter 5))
-      (setq org-node-proposed-title input)
-      (setq org-node-proposed-id (org-id-new))
-      (let ((result (funcall org-node-creation-fn)))
-        (when (bufferp result)
-          (switch-to-buffer result)))
-      (setq org-node-proposed-title nil)
-      (setq org-node-proposed-id nil))))
-
 (defvar org-node-proposed-title nil)
 (defvar org-node-proposed-id nil)
 
@@ -332,6 +305,45 @@ To behave like `org-roam-node-find' when creating new nodes, set
           (save-buffer))
         buf))))
 
+(defun org-node-random (node)
+  (interactive)
+  (org-node--init-org-id-locations-or-die)
+  (org-node--goto (nth (random (hash-table-count org-nodes))
+                       (hash-table-values org-nodes))))
+
+(defun org-node--goto (node)
+  "Visit NODE."
+  (find-file (plist-get node :file-path))
+  (widen)
+  (goto-char 1)
+  (forward-line (1- (plist-get node :line-number)))
+  (recenter 5))
+
+;;;###autoload
+(defun org-node-find ()
+  "Select and visit one of your ID nodes.
+
+To behave like `org-roam-node-find' when creating new nodes, set
+`org-node-creation-fn' to
+`org-node-creator-backend-by-roam-capture'."
+  (interactive)
+  (org-node-cache-ensure-fresh)
+  (let* ((input (completing-read "Node: " org-node-collection
+                                 () () () 'org-node-hist))
+         (node (gethash input org-node-collection)))
+    (if node
+        (org-node--goto node)
+      (setq org-node-proposed-title input)
+      (setq org-node-proposed-id (org-id-new))
+      (condition-case err
+          (let ((result (funcall org-node-creation-fn)))
+            (when (bufferp result)
+              (switch-to-buffer result)))
+        ((t debug error :success)
+         (setq org-node-proposed-title nil)
+         (setq org-node-proposed-id nil)
+         (signal (car err) (cdr err)))))))
+
 ;;;###autoload
 (defun org-node-insert-link ()
   "Insert a link to one of your ID nodes.
@@ -374,23 +386,18 @@ If you find the behavior different, perhaps you have something in
       (insert (org-link-make-string (concat "id:" id) link-desc))
       (run-hook-with-args 'org-node-insert-link-hook id link-desc))
     ;; Node doesn't exist yet, create it
-
-    ;; TODO: Maybe let the creater change the proposed-id, and insert the link
-    ;; after
+    ;; TODO: Delete the link if a node was not created
     (unless node
-      ;; In the event someone's creation-fn moves point
-      (save-excursion
-        (setq org-node-proposed-title input)
-        (setq org-node-proposed-id id)
-        (condition-case err
-            (funcall org-node-creation-fn)
-          ((t debug error)
-           (setq org-node-proposed-title nil)
-           (setq org-node-proposed-id nil)
-           (signal (car err) (cdr err)))
-          (:success
-           (setq org-node-proposed-title nil)
-           (setq org-node-proposed-id nil)))))))
+      (setq org-node-proposed-title input)
+      (setq org-node-proposed-id id)
+      (condition-case err
+          (let ((result (funcall org-node-creation-fn)))
+            (when (bufferp result)
+              (switch-to-buffer result)))
+        ((t debug error :success)
+         (setq org-node-proposed-title nil)
+         (setq org-node-proposed-id nil)
+         (signal (car err) (cdr err)))))))
 
 ;;;###autoload
 (defun org-node-insert-transclusion-as-subtree ()
@@ -729,6 +736,10 @@ Adding to that, here is an example advice to copy any inherited
   (interactive nil org-mode)
   (unless (org-entry-get nil "CREATED")
     (org-entry-put nil "CREATED" (format-time-string "[%F]"))))
+
+(defun org-node-random ()
+  (org-node--init-org-id-locations-or-die)
+  (nth (hash-table-count org-nodes) (hash-table-values org-nodes)))
 
 (provide 'org-node)
 
