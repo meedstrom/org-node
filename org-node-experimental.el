@@ -1,41 +1,41 @@
-;;; org-id-node-experimental.el -*- lexical-binding: t; -*-
+;;; org-node-experimental.el -*- lexical-binding: t; -*-
 
 ;;; Commentary:
 ;;
-;; Advices that instruct org-id-node to collect outline paths.  They make it
+;; Advices that instruct org-node to collect outline paths.  They make it
 ;; about 50% slower to rebuild the cache.
 ;;
 ;; To enable:
 ;;
-;; (advice-add 'org-id-node-cache--scan :override #'org-id-node-experimental--scan)
-;; (advice-add 'org-id-node-cache-reset :before #'org-id-node-experimental--clear-extra-hash-tables)
+;; (advice-add 'org-node-cache--scan :override #'org-node-experimental--scan)
+;; (advice-add 'org-node-cache-reset :before #'org-node-experimental--clear-extra-hash-tables)
 
 ;;; Code:
 
-(defvar org-id-node-experimental--files-with-file-level-nodes
+(defvar org-node-experimental--files-with-file-level-nodes
   (make-hash-table :size 4000 :test #'equal)
   "Table keyed on filepaths, where each value is t.")
 
-(defvar org-id-node-experimental--files
+(defvar org-node-experimental--files
   (make-hash-table :size 4000 :test #'equal)
   "Table keyed on filepaths, where each value is an alist of the form:
 ((LINE-NUM . ID)
  (LINE-NUM . ID)
  ...)")
 
-(defvar org-id-node-experimental--file-outlines
+(defvar org-node-experimental--file-outlines
   (make-hash-table :size 4000 :test #'equal)
   "Table keyed on filepaths, where each value is an alist of the form:
 ((LINE-NUM . OUTLINE-LEVEL)
  (LINE-NUM . OUTLINE-LEVEL)
  ...)
 
-Used by `org-id-node-experimental--line->olpath'.")
+Used by `org-node-experimental--line->olpath'.")
 
-(defun org-id-node-experimental--collect-file-level-nodes (target)
+(defun org-node-experimental--collect-file-level-nodes (target)
   "Scan TARGET (a file or directory) for file-level ID nodes."
   (let ((rg-result
-         (apply #'org-id-node-cache--program-output "rg"
+         (apply #'org-node-cache--program-output "rg"
                 `("--multiline"
                   "--ignore-case"
                   "--with-filename"
@@ -44,8 +44,8 @@ Used by `org-id-node-experimental--line->olpath'.")
                   "--only-matching"
                   "--replace"
                   "\f$1\f$2\f$3\f$4\f$5\f$6\f$7--veryIntelligentSeparator--"
-                  ,@org-id-node-cache-extra-rg-args
-                  ,org-id-node-cache--file-level-re
+                  ,@org-node-cache-extra-rg-args
+                  ,org-node-cache--file-level-re
                   ,target))))
     (dolist (file-head (string-split rg-result "--veryIntelligentSeparator--\n" t))
       (let ((splits (string-split file-head "\f")))
@@ -64,23 +64,23 @@ Used by `org-id-node-experimental--line->olpath'.")
                             :tags (string-split $6 ":" t)
                             :file-path (car file:lnum)
                             :id $2
-                            :aliases (org-id-node-cache--aliases->list $3)
+                            :aliases (org-node-cache--aliases->list $3)
                             :roam-refs (string-split $5 " " t)
-                            :backlink-ids (org-id-node-cache--backlinks->list $1))))
+                            :backlink-ids (org-node-cache--backlinks->list $1))))
             (push (cons 1 (plist-get node :id))
-                  (gethash (car file:lnum) org-id-node-experimental--files))
-            (puthash $2 node org-id-nodes))
+                  (gethash (car file:lnum) org-node-experimental--files))
+            (puthash $2 node org-nodes))
           (puthash (car file:lnum) t
-                   org-id-node-experimental--files-with-file-level-nodes))))))
+                   org-node-experimental--files-with-file-level-nodes))))))
 
-(defun org-id-node-experimental--calc-file-outlines (target)
+(defun org-node-experimental--calc-file-outlines (target)
   "Must run after collect-file-level-nodes."
   (let ((file nil)
-        (rg-result (apply #'org-id-node-cache--program-output "rg"
+        (rg-result (apply #'org-node-cache--program-output "rg"
                           `("--with-filename"
                             "--line-number"
                             "--only-matching"
-                            ,@org-id-node-cache-extra-rg-args
+                            ,@org-node-cache-extra-rg-args
                             "^\\*+ "
                             ,target))))
     (dolist (line (split-string rg-result "\n" t))
@@ -90,26 +90,26 @@ Used by `org-id-node-experimental--line->olpath'.")
           (unless (equal file (nth 0 parts))
             (setq file (nth 0 parts))
             ;; If the file has a file level node, add level 0
-            (when (gethash file org-id-node-experimental--files-with-file-level-nodes)
+            (when (gethash file org-node-experimental--files-with-file-level-nodes)
               (push (cons 1 0)
-                    (gethash file org-id-node-experimental--file-outlines))))
+                    (gethash file org-node-experimental--file-outlines))))
           (push (cons lnum level)
-                (gethash file org-id-node-experimental--file-outlines)))))))
+                (gethash file org-node-experimental--file-outlines)))))))
 
-;; (org-id-node-cache-peek org-id-node-experimental--file-outlines)
+;; (org-node-cache-peek org-node-experimental--file-outlines)
 
-(defun org-id-node-experimental--collect-subtree-nodes (target)
+(defun org-node-experimental--collect-subtree-nodes (target)
   "Scan TARGET (a file or directory) for subtree ID nodes."
   (let ((rg-result
-         (apply #'org-id-node-cache--program-output "rg"
+         (apply #'org-node-cache--program-output "rg"
                 `("--multiline"
                   "--with-filename"
                   "--line-number"
                   "--only-matching"
                   "--replace"
                   "\f$1\f$2\f$3\f$4\f$5\f$6\f$7\f$8\f$9--veryIntelligentSeparator--"
-                  ,@org-id-node-cache-extra-rg-args
-                  ,(org-id-node-cache--calc-subtree-re)
+                  ,@org-node-cache-extra-rg-args
+                  ,(org-node-cache--calc-subtree-re)
                   ,target))))
     (dolist (subtree (string-split rg-result "--veryIntelligentSeparator--\n" t))
       (let ((splits (string-split subtree "\f")))
@@ -126,9 +126,9 @@ Used by `org-id-node-experimental--line->olpath'.")
           (let ((node (list :title $3
                             :is-subtree t
                             :pseudo-olpath
-                            (org-id-node-experimental--line->olpath
+                            (org-node-experimental--line->olpath
                              (gethash (car file:lnum)
-                                      org-id-node-experimental--file-outlines)
+                                      org-node-experimental--file-outlines)
                              (string-to-number (cadr file:lnum)))
                             :level (length $1)
                             :line-number (string-to-number (cadr file:lnum))
@@ -137,14 +137,14 @@ Used by `org-id-node-experimental--line->olpath'.")
                             :todo (unless (string-blank-p $2) $2)
                             :file-path (car file:lnum)
                             :id $6
-                            :aliases (org-id-node-cache--aliases->list $7)
+                            :aliases (org-node-cache--aliases->list $7)
                             :roam-refs (string-split $9 " " t)
-                            :backlink-ids (org-id-node-cache--backlinks->list $5))))
+                            :backlink-ids (org-node-cache--backlinks->list $5))))
             (push (cons (plist-get node :line-number) (plist-get node :id))
-                  (gethash (car file:lnum) org-id-node-experimental--files))
-            (puthash $6 node org-id-nodes)))))))
+                  (gethash (car file:lnum) org-node-experimental--files))
+            (puthash $6 node org-nodes)))))))
 
-(defun org-id-node-experimental--line->olpath (outline-tree-as-alist line)
+(defun org-node-experimental--line->olpath (outline-tree-as-alist line)
   "Given LINE number, return a list of line numbers corresponding to
 where the ancestor subtrees are.  The current subtree is included.
 
@@ -174,24 +174,24 @@ line."
     path))
 
 ;; TODO: Use this to infer inherited tags, properties, all that good stuff
-(defun org-id-node-experimental--olpath->ids (file pseudo-olpath)
-  "Operating on a PSEUDO-OLPATH as generated by `org-id-node-experimental--line->olpath',
+(defun org-node-experimental--olpath->ids (file pseudo-olpath)
+  "Operating on a PSEUDO-OLPATH as generated by `org-node-experimental--line->olpath',
 transform it into a list of IDs in FILE."
-  (let ((nodes-in-file (gethash file org-id-node-experimental--files)))
+  (let ((nodes-in-file (gethash file org-node-experimental--files)))
     (cl-loop for lnum in pseudo-olpath
              as known = (assoc lnum nodes-in-file)
              when known collect (cdr known))))
 
-(defun org-id-node-experimental--clear-extra-hash-tables ()
-  (clrhash org-id-node-experimental--file-outlines)
-  (clrhash org-id-node-experimental--files-with-file-level-nodes)
-  (clrhash org-id-node-experimental--files))
+(defun org-node-experimental--clear-extra-hash-tables ()
+  (clrhash org-node-experimental--file-outlines)
+  (clrhash org-node-experimental--files-with-file-level-nodes)
+  (clrhash org-node-experimental--files))
 
-(defun org-id-node-experimental--scan (target)
-  (org-id-node-experimental--collect-file-level-nodes target)
-  (org-id-node-experimental--calc-file-outlines target)
-  (org-id-node-experimental--collect-subtree-nodes target))
+(defun org-node-experimental--scan (target)
+  (org-node-experimental--collect-file-level-nodes target)
+  (org-node-experimental--calc-file-outlines target)
+  (org-node-experimental--collect-subtree-nodes target))
 
-(provide 'org-id-node-experimental)
+(provide 'org-node-experimental)
 
-;;; org-id-node-experimental.el ends here
+;;; org-node-experimental.el ends here
