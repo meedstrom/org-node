@@ -119,23 +119,23 @@ Commands:
 - =org-node-butler-regret=
   - In case you regret using this package -- remove all =CACHED_BACKLINKS=
 
-For config options, type =M-x customize-group RET org-node RET=.  The defaults are aimed at org-roam users.
+For config options, type =M-x customize-group RET org-node RET=.
 
-*Initial setup*
+** Getting started with backlinks
 
-The basic commands should just work, but not backlinks until you run =M-x org-node-butler-mass-fix=.
+The basic commands should just work, but you see no backlinks until you run =M-x org-node-butler-mass-fix=.
 
 If you run into any issues, let me know!  Either here on Github or just [[mailto:meedstrom@runbox.eu][email me]] 💝
 
 # Mention taking ownership of org-id
 
-*Known issues*
+*** Known issues with the mass-fix
 
-- "couldn't open /dev/stderr: too many files open" during =org-node-butler-mass-fix=
+- "couldn't open /dev/stderr: too many files open"
   - Appears after about 1000 files for me.  It's not an error, just scary.  Interrupt the command and start again; it picks up where it left off, with no further complaint.
   - Two reasons the command opens all files before beginning its work -- first, it's faster that way.  For each link found, it visits the target, so any given file gets visited many times anyway.  Second, it means you can stop and resume at any time.  Very convenient when a problem comes up.
 
-*** Acquiring an org-roam-buffer
+*** Enabling org-roam-buffer
 
 To borrow the power of =M-x org-roam-buffer-toggle=, first eval an advice:
 
@@ -147,6 +147,14 @@ Check it out, it works!  See for yourself that it isn't using the DB, by evallin
 
 The behavior is slightly clobbered.  I don't know what sorts of advanced things people do with the org-roam-buffer but here, the position and properties of each link are gone.  It behaves as if the :unique parameter is t and :point is equal to that of the node heading.
 
+** For you who use Org-roam
+
+Some user options to feel at home
+
+- Set =org-node-creation-fn= to ='org-node-creator-backend-by-roam-capture=
+- Set =org-node-slug-fn= to ='org-node-slugify-like-roam=
+- Set =org-node-creation-hook= to =nil=
+  
 ** Limitations
 *** Excluding nodes
 The =org-node-filter-fn= works well for ignoring TODO items that happen to have an ID, and ignoring org-drill items and that sort of thing, but beyond that, it has limited utility because unlike org-roam, *child ID nodes of an excluded node are not excluded!*
