@@ -71,7 +71,7 @@ When I first ran across that concept in [[https://github.com/toshism/org-super-l
 
 But that's not true, it's rock-solid!  It's very clever to cache backlinks directly in the file like this, because:
 
-1. Our =org-id= system allows nested nodes (subtree nodes inside other subtrees), the best thing since sliced bread.  They make resolving backlinks a huge optimization challenge.  Not only do you have to parse the file where the link is, you have to open and parse all the targets to find out which subtree they are in.  A naive implementation will easily run at O(N^{2}) or worse.  
+1. Our =org-id= system allows nested nodes (subtree nodes inside other subtrees).  They make resolving backlinks a huge optimization challenge.  Not only do you have to parse the file where the link is, you have to open and parse all the targets to find out which subtree they are in.  A naive implementation will easily run at O(N^{2}) or worse.  
 
 2. As some of you nerds know, you get the best performance out of =rg= by executing it once for a whole directory.  One run, one regexp.  If we've cached the backlinks together with the subtrees, it can just grab them while it grabs everything else, leaving zero work to do.
 
@@ -129,30 +129,33 @@ If you run into any issues, let me know!  Either here on Github or just [[mailto
 
 # Mention taking ownership of org-id
 
-*** Known issues with the mass-fix
+**** Known issues with the mass-fix
 
 - "couldn't open /dev/stderr: too many files open"
   - Appears after about 1000 files for me.  It's not an error, just scary.  Interrupt the command and start again; it picks up where it left off, with no further complaint.
   - Two reasons the command opens all files before beginning its work -- first, it's faster that way.  For each link found, it visits the target, so any given file gets visited many times anyway.  Second, it means you can stop and resume at any time.  Very convenient when a problem comes up.
 
-*** Enabling org-roam-buffer
+**** Enabling org-roam-buffer
 
 To borrow the power of =M-x org-roam-buffer-toggle=, first eval an advice:
 
 #+begin_src elisp
-(advice-add 'org-roam-backlinks-get :override #'org-node--fabricate-roam-backlinks)
+(advice-add 'org-roam-backlinks-get :override
+            #'org-node--fabricate-roam-backlinks)
 #+end_src
 
-Check it out, it works!  See for yourself that it isn't using the DB, by evalling =(delete-file org-roam-db-location)=.
+Check it out, it works!  You can see for yourself that it isn't using org-roam's DB, by evalling =(delete-file org-roam-db-location)=.
 
 The behavior is slightly clobbered.  I don't know what sorts of advanced things people do with the org-roam-buffer but here, the position and properties of each link are gone.  It behaves as if the :unique parameter is t and :point is equal to that of the node heading.
+
+Finally, the occasional =org-roam-db-sync= is still needed to see reflinks.
 
 ** For you who use Org-roam
 
 Some user options to feel at home
 
-- Set =org-node-creation-fn= to ='org-node-creator-backend-by-roam-capture=
-- Set =org-node-slug-fn= to ='org-node-slugify-like-roam=
+- Set =org-node-creation-fn= to =org-node-creator-backend-by-roam-capture=
+- Set =org-node-slug-fn= to =org-node-slugify-like-roam=
 - Set =org-node-creation-hook= to =nil=
   
 ** Limitations
@@ -242,7 +245,7 @@ You'll notice that org-node "API" is not much of an API, because I try to expose
 | Get org-roam-reflink objects    | =(org-roam-reflinks-get NODE)=    |                                                                              |
 | Ensure fresh data               | =(org-roam-db-sync)=              | =(org-node-cache-ensure-fresh)=                                                |
 
-As you might infer, all the stuff in an org-node plist was collected by Ripgrep, and for the rest, a "visit-get" function like =org-node--visit-get-properties= has to visit the target.  It's a bad idea to call a "visit-get" from your =org-node-filter-fn= or =org-node-format-candidate-fn=, as that horribly slows down the cache rebuilds -- to the speed of an =(org-roam-db-sync 'force)=, in fact.
+As you might infer, all the stuff in an org-node plist was already collected by Ripgrep, but the "visit-get" functions like =org-node--visit-get-properties= have to visit the target.  It's a bad idea to call a "visit-get" from your =org-node-filter-fn= or =org-node-format-candidate-fn=, as that horribly slows down the cache rebuilds -- to the speed of an =(org-roam-db-sync 'force)=, in fact.
 
 ** Appendix II: Pros of org-roam
 
@@ -254,7 +257,7 @@ As you might infer, all the stuff in an org-node plist was collected by Ripgrep,
 
    - It does make the org-roam source code a slower read.  You scratch your head and ask "Why is it made that way?"  Then you see, and you say "Ah, but /I/ don't need that!"  Well, maybe someone does.
 
-3. Take the variable =org-roam-node-display-templates=.  At least, others may consider this a pro, but for my tastes no.  I try to let people customize with little lambdas and provide examples of how they'd get some result or other.  This instead has the dream UI where you can just set the variable to a string ="${olp} -> ${title}"= and be done with it.  Problem is it's a new mini-DSL (domain-specific language), and when you learn it you miss out on an elisp lesson.  Convenient for beginners but also /keeps/ them beginners.
+3. Take the variable =org-roam-node-display-templates=.  At least, others may consider this a pro, but for my tastes no.  I try to let people customize with little lambdas and provide examples of how they'd get some result or other.  This instead has the dream UI where you can just set the variable to a string "${olp} ${tags} ${title}" or some such and be done with it.  Problem is it's a new mini-DSL (domain-specific language), and when you learn it you miss out on an elisp lesson.  Convenient for beginners but also /keeps/ them beginners.
 
 ** Appendix III: Other bonus fixes
 

@@ -192,6 +192,23 @@ transform it into a list of IDs in FILE."
   (org-node-experimental--calc-file-outlines target)
   (org-node-experimental--collect-subtree-nodes target))
 
+;; Alternative approach using affixation/annotation
+;; (defun org-node-experimental--read ()
+;;   (let ((completion-extra-properties
+;;          (list :affixation-function
+;;                (lambda (completions)
+;;                  (cl-loop
+;;                   for c in completions
+;;                   for node = (gethash c org-node-collection)
+;;                   collect (list c
+;;                                 (concat (plist-get node :file-path) " -> ")
+;;                                 nil))))))
+;;     (gethash (completing-read "Node: " org-node-collection
+;;                               () () () 'org-node-hist)
+;;              org-node-collection)))
+;; ;; (org-node-read)
+
+
 (provide 'org-node-experimental)
 
 ;;; org-node-experimental.el ends here

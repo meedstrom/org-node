@@ -49,6 +49,7 @@
 ;; TODO Ensure that ROAM_ALIASES are always wrapped in quotes
 ;; TODO Test each user commmand again
 ;; TODO Annotations for completion
+;; TODO Completion category https://github.com/alphapapa/org-ql/issues/299
 
 ;; Other todos
 ;;
@@ -63,6 +64,7 @@
 
 ;; Stretch todos
 ;;
+;; TODO Use fundamental-mode in `org-node-butler-fix-all'
 ;; TODO Command to explore feedback arc sets
 ;; TODO Bit of a test suite
 
@@ -254,13 +256,14 @@ deduplicated, as if :unique t."
                             () () () 'org-node-hist)
            org-node-collection))
 
+
 
 ;;; Commands
 
 (defvar org-node-proposed-title nil)
 (defvar org-node-proposed-id nil)
 
-;; Just an example...
+;; Just an example... untested
 (defun org-node-capture-target ()
   "Can be used as TARGET in `org-capture-templates'."
   (let* ((dir (read-directory-name
