@@ -1,4 +1,4 @@
-* org-id-node
+* org-node
 
 How to describe this package... If you know [[https://github.com/org-roam/org-roam][org-roam]], it's like that.  It shares the on-disk format: "notes" are identified by their org-id and you can nest notes.   It even lets you use some org-roam stuff, notably your capture templates and the rich backlinks buffer, without syncing its SQLite DB!
 
@@ -8,7 +8,7 @@ My [[https://github.com/meedstrom/quickroam][quickroam]] package was the initial
 
 Let me get out the door that the package imposes nothing new.  You don't need to "migrate".
 
-Even org-roam imposed no house rules, aside from org-id, which if you're a certain sort of person, you would be using anyway.  You might have thought of it as "the org-roam format" due to lack of competition, but both org-roam and org-id-node are really just search engines for *the org-id format!*
+Even org-roam imposed no house rules, aside from org-id, which if you're a certain sort of person, you would be using anyway.  You might have thought of it as "the org-roam format" due to lack of competition, but both org-roam and org-node are really just search engines for *the org-id format!*
 
 In pursuit of being "just org-id", this package has no equivalent setting to =org-roam-directory= -- it just looks up =org-id-locations=.
 
@@ -16,7 +16,7 @@ In pursuit of being "just org-id", this package has no equivalent setting to =or
 
 For your pleasure, here's a comparison of three similar notetaking systems: all permitting org-id as first-class citizen and not locking you into an "one-note-per-file" concept.
 
-|                                   | org-roam    | org-id-node         | [[https://github.com/toshism/org-super-links][org-super-links]]      |
+|                                   | org-roam    | org-node         | [[https://github.com/toshism/org-super-links][org-super-links]]      |
 |-----------------------------------+-------------+------------------+----------------------|
 | Backlinks                         | yes         | yes              | yes                  |
 | org-roam-capture integration      | yes         | yes              | no                   |
@@ -34,12 +34,12 @@ For your pleasure, here's a comparison of three similar notetaking systems: all 
 | Can configure rich completions    | yes         | limited          | not applicable       |
 | Support =roam:= links               | yes         | no               | no                   |
 | Read :BACKLINKS: as data          | no          | no               | yes                  |
-| Some query-able cache             | org-roam-db | org-id-nodes        | no                   |
+| Some query-able cache             | org-roam-db | org-nodes        | no                   |
 | Cache mandatory                   | yes         | no               | no                   |
 |-----------------------------------+-------------+------------------+----------------------|
 | Time to rebuild the cache         | 2m 48s      | < 1s             | not applicable       |
 
-This isn't a totally fair comparison; org-roam has an advantage in the details, see Appendix II.  With org-id-node I've made what I would've liked to hack on, so it's more simplistic on many aspects.
+This isn't a totally fair comparison; org-roam has an advantage in the details, see Appendix II.  With org-node I've made what I would've liked to hack on, so it's more simplistic on many aspects.
 
 ** Butler wanted
 
@@ -51,9 +51,9 @@ May just be my elisp, but it turns out ~5 times faster if I arrange all property
 
 Finally!  A reason to alphabetize stuff, beyond base librarian impulses!
 
-Enable =org-id-node-butler-mode=, which alphabetizes all property drawers when you save an Org buffer.
+Enable =org-node-butler-mode=, which alphabetizes all property drawers when you save an Org buffer.
 
-(NB: Without =org-id-node-butler-mode=, lots of data fields in =org-id-nodes= are blank, and it takes longer to rebuild the cache, but the find and insert commands still work.)
+(NB: Without =org-node-butler-mode=, lots of data fields in =org-nodes= are blank, and it takes longer to rebuild the cache, but the find and insert commands still work.)
 
 *** Segue
 
@@ -65,7 +65,7 @@ To collect such data without rendering Emacs inoperable for three minutes, we'd 
 
 *** The butler, he's a spy!
 
-I'll warn you now about =org-id-node-butler-mode=: it adds a property to many of your nodes' property drawers.  The property is =CACHED_BACKLINKS=.  It's his little spy book.
+I'll warn you now about =org-node-butler-mode=: it adds a property to many of your nodes' property drawers.  The property is =CACHED_BACKLINKS=.  It's his little spy book.
 
 When I first ran across that concept in [[https://github.com/toshism/org-super-links][org-super-links]], I didn't like it.  It seemed like clutter, and possibly easy to break.
 
@@ -92,38 +92,38 @@ Well... Now they're right there.
 Install [[https://github.com/BurntSushi/ripgrep][ripgrep]], then add an init snippet like this (assuming [[https://github.com/radian-software/straight.el][straight.el]]):
 
 #+begin_src elisp
-(use-package org-id-node
-  :straight (org-id-node :type git :host github :repo "meedstrom/org-id-node")
-  :hook (org-mode . org-id-node-enable))
+(use-package org-node
+  :straight (org-node :type git :host github :repo "meedstrom/org-node")
+  :hook (org-mode . org-node-enable))
 #+end_src
 
 Commands:
 
-- =org-id-node-find=
+- =org-node-find=
   - Counterpart to =org-roam-node-find=
-- =org-id-node-insert-link=
+- =org-node-insert-link=
   - Counterpart to =org-roam-node-insert=
-- =org-id-node-insert-include=
-- =org-id-node-insert-transclusion=
-- =org-id-node-insert-transclusion-as-subtree=
-- =org-id-node-nodeify-entry=
-- =org-id-node-create-subtree=
-- =org-id-node-extract-subtree=
+- =org-node-insert-include=
+- =org-node-insert-transclusion=
+- =org-node-insert-transclusion-as-subtree=
+- =org-node-nodeify-entry=
+- =org-node-create-subtree=
+- =org-node-extract-subtree=
   - Bizarro counterpart to =org-roam-extract-subtree=
-- =org-id-node-rewrite-links-ask=
+- =org-node-rewrite-links-ask=
   - Look for link descriptions that got out of sync with the current node title, then prompt at each link to update it
-- =org-id-node-rename-file-by-title=
+- =org-node-rename-file-by-title=
   - Auto-rename the file based on the current #+title
-- =org-id-node-butler-mass-fix=
+- =org-node-butler-mass-fix=
   - Good first thing to do, to add =CACHED_BACKLINKS= everywhere
-- =org-id-node-butler-regret=
+- =org-node-butler-regret=
   - In case you regret using this package -- remove all =CACHED_BACKLINKS=
 
-For config options, type =M-x customize-group RET org-id-node RET=.
+For config options, type =M-x customize-group RET org-node RET=.
 
 ** Getting started with backlinks
 
-The basic commands should just work, but you see no backlinks until you run =M-x org-id-node-butler-mass-fix=.
+The basic commands should just work, but you see no backlinks until you run =M-x org-node-butler-mass-fix=.
 
 If you run into any issues, let me know!  Either here on Github or just [[mailto:meedstrom@runbox.eu][email me]] 💝
 
@@ -140,7 +140,7 @@ If you run into any issues, let me know!  Either here on Github or just [[mailto
 To borrow the power of =M-x org-roam-buffer-toggle=, first eval an advice:
 
 #+begin_src elisp
-(advice-add 'org-roam-backlinks-get :override #'org-id-node--fabricate-roam-backlinks)
+(advice-add 'org-roam-backlinks-get :override #'org-node--fabricate-roam-backlinks)
 #+end_src
 
 Check it out, it works!  See for yourself that it isn't using the DB, by evalling =(delete-file org-roam-db-location)=.
@@ -151,20 +151,20 @@ The behavior is slightly clobbered.  I don't know what sorts of advanced things 
 
 Some user options to feel at home
 
-- Set =org-id-node-creation-fn= to ='org-id-node-creator-backend-by-roam-capture=
-- Set =org-id-node-slug-fn= to ='org-id-node-slugify-like-roam=
-- Set =org-id-node-creation-hook= to =nil=
+- Set =org-node-creation-fn= to ='org-node-creator-backend-by-roam-capture=
+- Set =org-node-slug-fn= to ='org-node-slugify-like-roam=
+- Set =org-node-creation-hook= to =nil=
   
 ** Limitations
 *** Excluding nodes
-The =org-id-node-filter-fn= works well for ignoring TODO items that happen to have an ID, and ignoring org-drill items and that sort of thing, but beyond that, it has limited utility because unlike org-roam, *child ID nodes of an excluded node are not excluded!*
+The =org-node-filter-fn= works well for ignoring TODO items that happen to have an ID, and ignoring org-drill items and that sort of thing, but beyond that, it has limited utility because unlike org-roam, *child ID nodes of an excluded node are not excluded!*
 
 So let's say you have a big archive file, fulla IDs, and you want to exclude all of it.  Putting a =:ROAM_EXCLUDE: t= atop won't do it.  As it stands, what I'd suggest is unfortunately, look at the file name.
 
 The whole point of org-id was to avoid dependence on filenames, but it's often pragmatic to let up on purism just a bit :-) It works well for me to filter out any file or directory that happens to contain "archive" in the name:
 
 #+begin_src elisp
-(setq org-id-node-filter-fn
+(setq org-node-filter-fn
       (lambda (node)
         (and (not (plist-get node :exclude))
              (not (plist-get node :todo))
@@ -181,21 +181,21 @@ We can do something similar, though our pseudo-outline path does not include sub
 (Actually I have an idea about switching out ripgrep for org-ql, but that's a research project... first need to benchmark...)
 
 #+begin_src elisp
-(require 'org-id-node-experimental)
-(advice-add 'org-id-node-cache--scan :override
-            #'org-id-node-experimental--scan)
-(advice-add 'org-id-node-cache-reset :before
-            #'org-id-node-experimental--clear-extra-hash-tables)
-(setq org-id-node-format-candidate-fn 
+(require 'org-node-experimental)
+(advice-add 'org-node-cache--scan :override
+            #'org-node-experimental--scan)
+(advice-add 'org-node-cache-reset :before
+            #'org-node-experimental--clear-extra-hash-tables)
+(setq org-node-format-candidate-fn 
       (defun my-format-with-olp (node title)
         (concat
          (cl-loop
-          for id in (org-id-node-experimental--olpath->ids
+          for id in (org-node-experimental--olpath->ids
                      (plist-get node :file-path)
                      (plist-get node :pseudo-olpath))
-          concat (concat (plist-get (gethash id org-id-nodes) :title) " -> "))
+          concat (concat (plist-get (gethash id org-nodes) :title) " -> "))
          title))
-(org-id-node-cache-reset)
+(org-node-cache-reset)
 #+end_src
 
 ** Appendix 0: Command equivalents :noexport:
@@ -209,16 +209,16 @@ Things you may as well just use from org-roam.  No vanilla org-mode equivalent, 
 
 ** Appendix I: Rosetta stone
 
-API comparison between org-roam and org-id-node.
+API comparison between org-roam and org-node.
 
-You'll notice that org-id-node "API" is not much of an API, because I try to expose the plumbing:
+You'll notice that org-node "API" is not much of an API, because I try to expose the plumbing:
 
-| Action                          | org-roam                        | org-id-node                                                                     |
+| Action                          | org-roam                        | org-node                                                                     |
 |---------------------------------+---------------------------------+------------------------------------------------------------------------------|
 | Get ID at point                 | =(org-roam-id-at-point)=          | =(org-id-get nil nil nil t)=                                                   |
-| Get node at point               | =(org-roam-node-at-point)=        | =(gethash (org-id-get nil nil nil t) org-id-nodes)=                               |
+| Get node at point               | =(org-roam-node-at-point)=        | =(gethash (org-id-get nil nil nil t) org-nodes)=                               |
 | Get list of files               | =(org-roam-list-files)=           | =(seq-uniq (hash-table-values org-id-locations))=                              |
-| Prompt user to pick a node      | =(org-roam-node-read)=            | =(gethash (completing-read "Node: " org-id-node-collection) org-id-node-collection)= |
+| Prompt user to pick a node      | =(org-roam-node-read)=            | =(gethash (completing-read "Node: " org-node-collection) org-node-collection)= |
 | Get backlink IDs                |                                 | =(plist-get NODE :backlink-ids)=                                               |
 | Get org-roam-backlink objects   | =(org-roam-backlinks-get NODE)=   |                                                                              |
 | Get title                       | =(org-roam-node-title NODE)=      | =(plist-get NODE :title)=                                                      |
@@ -231,18 +231,18 @@ You'll notice that org-id-node "API" is not much of an API, because I try to exp
 | Get =ROAM_REFS=                   | =(org-roam-node-refs NODE)=       |                                                                              |
 | Get =ROAM_EXCLUDE=                |                                 | =(plist-get NODE :exclude)=, doesn't inherit parent excludes!                  |
 | Get line number                 |                                 | =(plist-get NODE :line-number)=                                                |
-| Get char position               | =(org-roam-node-point NODE)=      | =(org-id-node--visit-get-pos NODE)=                                               |
-| Get :PROPERTIES:                | =(org-roam-node-properties NODE)= | =(org-id-node--visit-get-properties NODE)=                                        |
-| Get title of file where NODE is | =(org-roam-node-file-title NODE)= | =(org-id-node--visit-get-file-title NODE)=                                        |
-| Get subtree heading sans TODO   | =(org-roam-node-title NODE)=      | =(org-id-node--visit-get-true-heading NODE)=                                      |
+| Get char position               | =(org-roam-node-point NODE)=      | =(org-node--visit-get-pos NODE)=                                               |
+| Get :PROPERTIES:                | =(org-roam-node-properties NODE)= | =(org-node--visit-get-properties NODE)=                                        |
+| Get title of file where NODE is | =(org-roam-node-file-title NODE)= | =(org-node--visit-get-file-title NODE)=                                        |
+| Get subtree heading sans TODO   | =(org-roam-node-title NODE)=      | =(org-node--visit-get-true-heading NODE)=                                      |
 | Get outline-path                | =(org-roam-node-olp NODE)=        |                                                                              |
 | Get subtree priority            | =(org-roam-node-priority NODE)=   |                                                                              |
 | Get subtree SCHEDULED           | =(org-roam-node-scheduled NODE)=  |                                                                              |
 | Get subtree DEADLINE            | =(org-roam-node-deadline NODE)=   |                                                                              |
 | Get org-roam-reflink objects    | =(org-roam-reflinks-get NODE)=    |                                                                              |
-| Ensure fresh data               | =(org-roam-db-sync)=              | =(org-id-node-cache-ensure-fresh)=                                                |
+| Ensure fresh data               | =(org-roam-db-sync)=              | =(org-node-cache-ensure-fresh)=                                                |
 
-As you might infer, all the stuff in an org-id-node plist was collected by Ripgrep, and for the rest, a "visit-get" function like =org-node--visit-get-properties= has to visit the target.  It's a bad idea to call a "visit-get" from your =org-node-filter-fn= or =org-node-format-candidate-fn=, as that horribly slows down the cache rebuilds -- to the speed of an =(org-roam-db-sync 'force)=, in fact.
+As you might infer, all the stuff in an org-node plist was collected by Ripgrep, and for the rest, a "visit-get" function like =org-node--visit-get-properties= has to visit the target.  It's a bad idea to call a "visit-get" from your =org-node-filter-fn= or =org-node-format-candidate-fn=, as that horribly slows down the cache rebuilds -- to the speed of an =(org-roam-db-sync 'force)=, in fact.
 
 ** Appendix II: Pros of org-roam
 

@@ -1,4 +1,4 @@
-;;; org-id-node.el --- Use org-id locations as a big pile of notes -*- lexical-binding: t; -*-
+;;; org-node.el --- Use org-id locations as a big pile of notes -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2024 Martin Edström
 ;;
@@ -19,7 +19,7 @@
 ;; Created:          2024-04-13
 ;; Keywords:         org, hypermedia
 ;; Package-Requires: ((emacs "29.1") (pcre2el "1.12") (dash "2.19.1"))
-;; URL:              https://github.com/meedstrom/org-id-node
+;; URL:              https://github.com/meedstrom/org-node
 
 ;; This file is not part of GNU Emacs.
 
@@ -33,13 +33,13 @@
 ;;
 ;; The main commands can use your org-roam-capture-templates if configured:
 ;;
-;; - `org-id-node-find'
-;; - `org-id-node-insert-link'
+;; - `org-node-find'
+;; - `org-node-insert-link'
 ;;
-;; To make these commands as fast as can be, enable `org-id-node-cache-mode'.
+;; To make these commands as fast as can be, enable `org-node-cache-mode'.
 ;;
 ;; Later on, AFTER you read and understood the readme, there is also
-;; `org-id-node-butler-mode'.  Read the readme to know what it does.
+;; `org-node-butler-mode'.  Read the readme to know what it does.
 
 ;;; Code:
 
@@ -65,72 +65,72 @@
 ;; TODO Command to explore feedback arc sets
 ;; TODO Bit of a test suite
 
-(require 'org-id-node-common)
-(require 'org-id-node-cache)
+(require 'org-node-common)
+(require 'org-node-cache)
 
 ;;;###autoload
-(defun org-id-node-enable ()
+(defun org-node-enable ()
   "Designed for `org-mode-hook' and will remove itself."
-  (require 'org-id-node-butler)
-  (remove-hook 'org-mode-hook #'org-id-node-enable)
-  (org-id-node-butler-mode)
-  (org-id-node-cache-mode))
+  (require 'org-node-butler)
+  (remove-hook 'org-mode-hook #'org-node-enable)
+  (org-node-butler-mode)
+  (org-node-cache-mode))
 
-(defcustom org-id-node-slug-fn #'org-id-node-slugify-as-url
+(defcustom org-node-slug-fn #'org-node-slugify-as-url
   "Function to transform title into a filename.
 
 Built-in choices:
-- `org-id-node-slugify-as-url'
-- `org-id-node-slugify-like-roam'
+- `org-node-slugify-as-url'
+- `org-node-slugify-like-roam'
 "
-  :group 'org-id-node
+  :group 'org-node
   :type 'function)
 
-(defcustom org-node-creation-fn #'org-node-creator-backend-basic
-  "Function called by `org-id-node-find', and `org-id-node-insert-link' to
+(defcustom org-node-creation-fn #'org-node-create-basic
+  "Function called by `org-node-find', and `org-node-insert-link' to
 create a node.  During execution, two variables are set:
-`org-id-node-proposed-title' and `org-id-node-proposed-id'.
+`org-node-proposed-title' and `org-node-proposed-id'.
 
 Some options
-- `org-node-creator-backend-basic'
-- `org-node-creator-backend-by-roam-capture'
+- `org-node-create-basic'
+- `org-node-create-by-roam-capture'
 - `org-capture'
 "
-  :group 'org-id-node
+  :group 'org-node
   :type 'function)
 
-(defcustom org-id-node-insert-link-hook ()
+(defcustom org-node-insert-link-hook ()
   "Hook run after inserting a link to an Org-ID node.
 
 Two arguments provided: the ID and the link description.
 
 Functions here should not leave point outside the link."
-  :group 'org-id-node
+  :group 'org-node
   :type 'hook)
 
-(defcustom org-id-node-creation-hook '(org-id-node-put-created)
+(defcustom org-node-creation-hook '(org-node-put-created)
   "Hook run with point in the newly created buffer or entry.
 
-Applied only by `org-id-node-creator-backend-basic',
-`org-id-node-create-subtree' and `org-id-node-extract-subtree'.
+Applied only by `org-node-creator-backend-basic',
+`org-node-create-subtree' and `org-node-extract-subtree'.
 
-For `org-id-node-creator-backend-by-roam-capture', you want the
+For `org-node-creator-backend-by-roam-capture', you want the
 hook `org-roam-capture-new-node-hook' instead.
 
-A good member for this hook is `org-id-node-put-created', especially
-since the default `org-id-node-slug-fn' does not put a timestamp in
+A good member for this hook is `org-node-put-created', especially
+since the default `org-node-slug-fn' does not put a timestamp in
 the filename.
 "
   :type 'hook
-  :group 'org-id-node)
+  :group 'org-node)
 
 
 ;;; Plumbing
 
-(defvar org-id-node-hist nil
+(defvar org-node-hist nil
   "Minibuffer history.")
 
-(defun org-id-node--visit-get-true-heading (node)
+(defun org-node--visit-get-true-heading (node)
   "Visit subtree NODE and get the heading, in a way that's aware of
 buffer-local #+todo settings so the todo state is not taken as part
 of the heading."
@@ -143,17 +143,17 @@ of the heading."
         (forward-line (plist-get node :line-number))
         (nth 4 (org-heading-components))))))
 
-(defun org-id-node-slugify-like-roam (title)
+(defun org-node-slugify-like-roam (title)
   "From TITLE, make a filename in the default org-roam style."
   (unless (fboundp #'org-roam-node-slug)
     (user-error
-     "Didn't create node! Install org-roam or configure `org-id-node-slug-fn'"))
+     "Didn't create node! Install org-roam or configure `org-node-slug-fn'"))
   (require 'org-roam-node)
   (concat (format-time-string "%Y%m%d%H%M%S-")
           (org-roam-node-slug (org-roam-node-create :title title))
           ".org"))
 
-(defun org-id-node-slugify-as-url (title)
+(defun org-node-slugify-as-url (title)
   "From TITLE, make a filename suitable as URL component.
 
 A title like \"Löb's Theorem\" becomes \"lobs-theorem.org\".
@@ -164,9 +164,9 @@ As a surprise, it does NOT preface the name with a timestamp like
 many zettelkasten packages do.  If you want that, you can use
 a small wrapper such as:
 
-(setq org-id-node-slug-fn (lambda (title)
+(setq org-node-slug-fn (lambda (title)
                         (concat (format-time-string \"%Y%m%d%H%M%S-\")
-                                (org-id-node-slugify-as-url title))))"
+                                (org-node-slugify-as-url title))))"
   (concat
    (thread-last title
                 (string-glyph-decompose)
@@ -186,24 +186,24 @@ a small wrapper such as:
 
 ;; Some useful test cases if you want to hack on the above function!
 
-;; (org-id-node-slugify-as-url "A/B testing")
-;; (org-id-node-slugify-as-url "\"But there's still a chance, right?\"")
-;; (org-id-node-slugify-as-url "Löb's Theorem")
-;; (org-id-node-slugify-as-url "How to convince me that 2 + 2 = 3")
-;; (org-id-node-slugify-as-url "C. S. Peirce")
-;; (org-id-node-slugify-as-url "Amnesic recentf, org-id-locations? Solution: Run kill-emacs-hook periodically.")
-;; (org-id-node-slugify-as-url "Slimline/\"pizza box\" computer chassis")
-;; (org-id-node-slugify-as-url "#emacs")
+;; (org-node-slugify-as-url "A/B testing")
+;; (org-node-slugify-as-url "\"But there's still a chance, right?\"")
+;; (org-node-slugify-as-url "Löb's Theorem")
+;; (org-node-slugify-as-url "How to convince me that 2 + 2 = 3")
+;; (org-node-slugify-as-url "C. S. Peirce")
+;; (org-node-slugify-as-url "Amnesic recentf, org-id-locations? Solution: Run kill-emacs-hook periodically.")
+;; (org-node-slugify-as-url "Slimline/\"pizza box\" computer chassis")
+;; (org-node-slugify-as-url "#emacs")
 
 
 ;;; Shim for the org-roam buffer
 
 ;; To make `org-roam-buffer-toggle' work, eval this:
-;; (advice-add 'org-roam-backlinks-get :override #'org-id-node--fabricate-roam-backlinks)
+;; (advice-add 'org-roam-backlinks-get :override #'org-node--fabricate-roam-backlinks)
 
-(defun org-id-node--fabricate-roam-object (node)
+(defun org-node--fabricate-roam-object (node)
   "Construct an org-roam-node object from NODE.
-This just uses information in org-id-node's own `org-id-nodes'.
+This just uses information in org-node's own `org-nodes'.
 Some of the fields are blank."
   (require 'org-roam)
   (org-roam-node-create
@@ -213,25 +213,25 @@ Some of the fields are blank."
    :title (plist-get node :title)
    :tags (plist-get node :tags)
    :aliases (plist-get node :aliases)
-   :point (org-id-node--visit-get-pos node)))
+   :point (org-node--visit-get-pos node)))
 
-(defun org-id-node--fabricate-roam-backlinks (roam-object &rest _)
+(defun org-node--fabricate-roam-backlinks (roam-object &rest _)
   "Return org-roam-backlink objects targeting ROAM-OBJECT.
 
 A drop-in replacement for `org-roam-backlinks-get', but ignores
-its UNIQUE argument because org-id-node does not track multiple
+its UNIQUE argument because org-node does not track multiple
 backlinks from the same node anyway: literally all the
 information comes from the CACHED_BACKLINKS property, which is
 deduplicated, as if :unique t."
   (require 'org-roam)
-  (let ((node (gethash (org-roam-node-id roam-object) org-id-nodes)))
+  (let ((node (gethash (org-roam-node-id roam-object) org-nodes)))
     (when node
       (cl-loop
        for backlink-id in (plist-get node :backlink-ids)
-       as node-that-contains-link = (gethash backlink-id org-id-nodes)
+       as node-that-contains-link = (gethash backlink-id org-nodes)
        when node-that-contains-link
        collect (let ((roam-object-that-contains-link
-                      (org-id-node--fabricate-roam-object node-that-contains-link)))
+                      (org-node--fabricate-roam-object node-that-contains-link)))
                  (org-roam-backlink-create
                   :target-node roam-object
                   :source-node roam-object-that-contains-link
@@ -245,29 +245,29 @@ deduplicated, as if :unique t."
 ;;; API extras
 ;; Conveniences for users. Avoided inside this package.
 
-(defun org-id-node-at-point (&optional _point)
-  (gethash (org-id-get nil nil nil t) org-id-nodes))
+(defun org-node-at-point (&optional _point)
+  (gethash (org-id-get nil nil nil t) org-nodes))
 
-(defun org-id-node-read ()
-  (gethash (completing-read "Node: " org-id-node-collection
-                            () () () 'org-id-node-hist)
-           org-id-node-collection))
+(defun org-node-read ()
+  (gethash (completing-read "Node: " org-node-collection
+                            () () () 'org-node-hist)
+           org-node-collection))
 
 
 ;;; Commands
 
 ;;;###autoload
-(defun org-id-node-find ()
+(defun org-node-find ()
   "Select and visit one of your ID nodes.
 
 To behave like `org-roam-node-find' when creating new nodes, set
-`org-id-node-creation-fn' to
-`org-node-creator-backend-by-roam-capture'."
+`org-node-creation-fn' to
+`org-node-create-by-roam-capture'."
   (interactive)
-  (org-id-node-cache-ensure-fresh)
-  (let* ((input (completing-read "Node: " org-id-node-collection
-                                 () () () 'org-id-node-hist))
-         (node (gethash input org-id-node-collection)))
+  (org-node-cache-ensure-fresh)
+  (let* ((input (completing-read "Node: " org-node-collection
+                                 () () () 'org-node-hist))
+         (node (gethash input org-node-collection)))
     (if node
         (progn
           (find-file (plist-get node :file-path))
@@ -275,48 +275,48 @@ To behave like `org-roam-node-find' when creating new nodes, set
           (goto-char 1)
           (forward-line (1- (plist-get node :line-number)))
           (recenter 5))
-      (setq org-id-node-proposed-title input)
-      (setq org-id-node-proposed-id (org-id-new))
-      (let ((result (funcall org-id-node-creation-fn)))
+      (setq org-node-proposed-title input)
+      (setq org-node-proposed-id (org-id-new))
+      (let ((result (funcall org-node-creation-fn)))
         (when (bufferp result)
           (switch-to-buffer result)))
-      (setq org-id-node-proposed-title nil)
-      (setq org-id-node-proposed-id nil))))
+      (setq org-node-proposed-title nil)
+      (setq org-node-proposed-id nil))))
 
-(defvar org-id-node-proposed-title nil)
-(defvar org-id-node-proposed-id nil)
+(defvar org-node-proposed-title nil)
+(defvar org-node-proposed-id nil)
 
 ;; Just an example...
-(defun org-id-node-capture-target ()
+(defun org-node-capture-target ()
   "Can be used as TARGET in `org-capture-templates'."
   (let* ((dir (read-directory-name
                "Where to create the node? "
-               (car (org-id-node--root-dirs (hash-table-values org-id-locations)))))
-         (path-to-write (file-name-concat dir (funcall org-id-node-slug-fn
-                                                       org-id-node-proposed-title))))
+               (car (org-node--root-dirs (hash-table-values org-id-locations)))))
+         (path-to-write (file-name-concat dir (funcall org-node-slug-fn
+                                                       org-node-proposed-title))))
     (find-file path-to-write)
     (goto-char (point-max))
     (if (org-entry-get nil "ID")
         (user-error "Already an ID in this location")
-      (org-entry-put nil "ID" org-id-node-proposed-id))
-    (run-hooks 'org-id-node-creation-hook)))
+      (org-entry-put nil "ID" org-node-proposed-id))
+    (run-hooks 'org-node-creation-hook)))
 
-(defun org-id-node-creator-backend-by-roam-capture ()
+(defun org-node-creator-backend-by-roam-capture ()
   "Call `org-roam-capture-' with predetermined arguments."
   (unless (fboundp #'org-roam-capture-)
-    (org-id-node-die "Didn't create node! Either install org-roam or %s"
-                     "configure `org-id-node-creation-fn'"))
+    (org-node-die "Didn't create node! Either install org-roam or %s"
+                  "configure `org-node-creation-fn'"))
   (require 'org-roam)
-  (org-roam-capture- :node (org-roam-node-create :title org-id-node-proposed-title
-                                                 :id    org-id-node-proposed-id)))
+  (org-roam-capture- :node (org-roam-node-create :title org-node-proposed-title
+                                                 :id    org-node-proposed-id)))
 
-(defun org-id-node-creator-backend-basic ()
+(defun org-node-creator-backend-basic ()
   "Create a file-level node and ask where to save it."
   (let* ((dir (read-directory-name
                "Where to create the node? "
-               (car (org-id-node--root-dirs (hash-table-values org-id-locations)))))
-         (path-to-write (file-name-concat dir (funcall org-id-node-slug-fn
-                                                       org-id-node-proposed-title))))
+               (car (org-node--root-dirs (hash-table-values org-id-locations)))))
+         (path-to-write (file-name-concat dir (funcall org-node-slug-fn
+                                                       org-node-proposed-title))))
     (if (or (file-exists-p path-to-write)
             (find-buffer-visiting path-to-write))
         (message "A file or buffer already exists for path %s"
@@ -324,29 +324,29 @@ To behave like `org-roam-node-find' when creating new nodes, set
       (let ((buf (find-file-noselect path-to-write)))
         (with-current-buffer buf
           (insert ":PROPERTIES:"
-                  "\n:ID:       " org-id-node-proposed-id
+                  "\n:ID:       " org-node-proposed-id
                   "\n:END:"
-                  "\n#+title: " org-id-node-proposed-title
+                  "\n#+title: " org-node-proposed-title
                   "\n")
-          (run-hooks 'org-id-node-creation-hook)
+          (run-hooks 'org-node-creation-hook)
           (save-buffer))
         buf))))
 
 ;;;###autoload
-(defun org-id-node-insert-link ()
+(defun org-node-insert-link ()
   "Insert a link to one of your ID nodes.
 
 To behave like `org-roam-node-insert' when creating new nodes,
-set `org-id-node-creation-fn' to
-`org-id-node-create-by-roam-capture'.
+set `org-node-creation-fn' to
+`org-node-create-by-roam-capture'.
 
 If you find the behavior different, perhaps you have something in
 `org-roam-post-node-insert-hook'.  Then perhaps copy it to
-`org-id-node-insert-link-hook'."
+`org-node-insert-link-hook'."
   (interactive nil org-mode)
   (unless (derived-mode-p 'org-mode)
     (user-error "Only works in org-mode buffers"))
-  (org-id-node-cache-ensure-fresh)
+  (org-node-cache-ensure-fresh)
   (let* ((beg nil)
          (end nil)
          (region-text (when (region-active-p)
@@ -359,9 +359,9 @@ If you find the behavior different, perhaps you have something in
                         (setq end (point))
                         (org-link-display-format
                          (buffer-substring-no-properties beg end))))
-         (input (completing-read "Node: " org-id-node-collection
-                                 () () () 'org-id-node-hist))
-         (node (gethash input org-id-node-collection))
+         (input (completing-read "Node: " org-node-collection
+                                 () () () 'org-node-hist))
+         (node (gethash input org-node-collection))
          (id (or (plist-get node :id) (org-id-new)))
          (link-desc (or region-text (plist-get node :title) input)))
     (atomic-change-group
@@ -370,9 +370,9 @@ If you find the behavior different, perhaps you have something in
         ;; Try to strip the todo keyword, looking up what counts as todo syntax
         ;; in the target file.  Fail silently because it matters little.
         (ignore-errors
-          (setq link-desc (org-id-node--visit-get-true-heading node))))
+          (setq link-desc (org-node--visit-get-true-heading node))))
       (insert (org-link-make-string (concat "id:" id) link-desc))
-      (run-hook-with-args 'org-id-node-insert-link-hook id link-desc))
+      (run-hook-with-args 'org-node-insert-link-hook id link-desc))
     ;; Node doesn't exist yet, create it
 
     ;; TODO: Maybe let the creater change the proposed-id, and insert the link
@@ -380,20 +380,20 @@ If you find the behavior different, perhaps you have something in
     (unless node
       ;; In the event someone's creation-fn moves point
       (save-excursion
-        (setq org-id-node-proposed-title input)
-        (setq org-id-node-proposed-id id)
+        (setq org-node-proposed-title input)
+        (setq org-node-proposed-id id)
         (condition-case err
-            (funcall org-id-node-creation-fn)
+            (funcall org-node-creation-fn)
           ((t debug error)
-           (setq org-id-node-proposed-title nil)
-           (setq org-id-node-proposed-id nil)
+           (setq org-node-proposed-title nil)
+           (setq org-node-proposed-id nil)
            (signal (car err) (cdr err)))
           (:success
-           (setq org-id-node-proposed-title nil)
-           (setq org-id-node-proposed-id nil)))))))
+           (setq org-node-proposed-title nil)
+           (setq org-node-proposed-id nil)))))))
 
 ;;;###autoload
-(defun org-id-node-insert-transclusion-as-subtree ()
+(defun org-node-insert-transclusion-as-subtree ()
   "Insert a link and a transclusion.
 
 Result will basically look like:
@@ -410,10 +410,10 @@ adding keywords to the things to exclude:
   (interactive nil org-mode)
   (unless (derived-mode-p 'org-mode)
     (error "Only works in org-mode buffers"))
-  (org-id-node-cache-ensure-fresh)
-  (let ((node (gethash (completing-read "Node: " org-id-node-collection
-                                        () () () 'org-id-node-hist)
-                       org-id-node-collection)))
+  (org-node-cache-ensure-fresh)
+  (let ((node (gethash (completing-read "Node: " org-node-collection
+                                        () () () 'org-node-hist)
+                       org-node-collection)))
     (let ((id (plist-get node :id))
           (title (plist-get node :title))
           (level (or (org-current-level) 0))
@@ -444,18 +444,18 @@ adding keywords to the things to exclude:
 
       (goto-char (marker-position m1))
       (set-marker m1 nil)
-      (run-hook-with-args 'org-id-node-insert-link-hook id title))))
+      (run-hook-with-args 'org-node-insert-link-hook id title))))
 
 ;;;###autoload
-(defun org-id-node-insert-include ()
+(defun org-node-insert-include ()
   "Insert an #+include: referring to a node."
   (interactive nil org-mode)
   (unless (derived-mode-p 'org-mode)
     (user-error "Only works in org-mode buffers"))
-  (org-id-node-cache-ensure-fresh)
-  (let ((node (gethash (completing-read "Node: " org-id-node-collection
-                                        () () () 'org-id-node-hist)
-                       org-id-node-collection)))
+  (org-node-cache-ensure-fresh)
+  (let ((node (gethash (completing-read "Node: " org-node-collection
+                                        () () () 'org-node-hist)
+                       org-node-collection)))
     (let ((id (plist-get node :id))
           (title (plist-get node :title))
           (level (or (org-current-level) 0)))
@@ -463,18 +463,18 @@ adding keywords to the things to exclude:
       (goto-char (line-beginning-position))
       (insert "#+include: ")
       (forward-char 1)
-      (run-hook-with-args 'org-id-node-insert-link-hook id title))))
+      (run-hook-with-args 'org-node-insert-link-hook id title))))
 
 ;;;###autoload
-(defun org-id-node-insert-transclusion ()
+(defun org-node-insert-transclusion ()
   "Insert a #+transclude: referring to a node."
   (interactive nil org-mode)
   (unless (derived-mode-p 'org-mode)
     (user-error "Only works in org-mode buffers"))
-  (org-id-node-cache-ensure-fresh)
-  (let ((node (gethash (completing-read "Node: " org-id-node-collection
-                                        () () () 'org-id-node-hist)
-                       org-id-node-collection)))
+  (org-node-cache-ensure-fresh)
+  (let ((node (gethash (completing-read "Node: " org-node-collection
+                                        () () () 'org-node-hist)
+                       org-node-collection)))
     (let ((id (plist-get node :id))
           (title (plist-get node :title))
           (level (or (org-current-level) 0)))
@@ -484,11 +484,11 @@ adding keywords to the things to exclude:
       (goto-char (line-end-position))
       (insert " :level " (number-to-string (+ 1 level)))
       (forward-char -10)
-      (run-hook-with-args 'org-id-node-insert-link-hook id title))))
+      (run-hook-with-args 'org-node-insert-link-hook id title))))
 
 ;;;###autoload
-(defun org-id-node-rename-file-by-title (&optional path)
-  "Rename the current file according to `org-id-node-slug-fn'.
+(defun org-node-rename-file-by-title (&optional path)
+  "Rename the current file according to `org-node-slug-fn'.
 Can also operate on a file at given PATH."
   (interactive nil org-mode)
   (unless (derived-mode-p 'org-mode)
@@ -500,7 +500,7 @@ Can also operate on a file at given PATH."
   (let* ((title (org-get-title))
          (name (file-name-nondirectory path))
          (new-path (concat (file-name-directory path)
-                           (funcall org-id-node-slug-fn title)
+                           (funcall org-node-slug-fn title)
                            ".org"))
          (visiting (find-buffer-visiting path))
          (visiting-on-window (and visiting (get-buffer-window visiting))))
@@ -527,22 +527,22 @@ Can also operate on a file at given PATH."
                 (when visiting-on-window
                   (set-window-buffer visiting-on-window buf))))))))))
 
-(defface org-id-node-rewrite-links-face
+(defface org-node-rewrite-links-face
   '((t :inherit 'org-link))
-  "Face for use in `org-id-node-rewrite-links-ask'.")
+  "Face for use in `org-node-rewrite-links-ask'.")
 
 ;;;###autoload
-(defun org-id-node-rewrite-links-ask ()
+(defun org-node-rewrite-links-ask ()
   "Look for links to update to match the current title.
 Prompt the user for each one."
   (interactive)
   (require 'ol)
-  (org-id-node-cache-ensure-fresh)
-  ;; (set-face-attribute 'org-id-node-rewrite-links-face nil
+  (org-node-cache-ensure-fresh)
+  ;; (set-face-attribute 'org-node-rewrite-links-face nil
   ;;                     :inverse-video (face-inverse-video-p 'org-link)
   ;;                     :foreground (face-background 'default)
   ;;                     :background (face-foreground 'org-link))
-  (set-face-inverse-video 'org-id-node-rewrite-links-face
+  (set-face-inverse-video 'org-node-rewrite-links-face
                           (not (face-inverse-video-p 'org-link)))
   (when auto-save-visited-mode
     (when (yes-or-no-p "Disable auto-save-visited-mode? (recommended)")
@@ -561,7 +561,7 @@ Prompt the user for each one."
                (id (when (string-prefix-p "id:" target)
                      (substring target 3)))
                (node (when id
-                       (gethash id org-id-nodes)))
+                       (gethash id org-nodes)))
                (true-title (when node
                              (plist-get node :title)))
                (answered-yes nil))
@@ -572,7 +572,7 @@ Prompt the user for each one."
             (switch-to-buffer (current-buffer))
             (org-reveal)
             (recenter)
-            (highlight-regexp (rx (literal link)) 'org-id-node-rewrite-links-face)
+            (highlight-regexp (rx (literal link)) 'org-node-rewrite-links-face)
             ;; (highlight-regexp (rx (literal link)))
             (unwind-protect
                 (setq answered-yes (y-or-n-p
@@ -591,19 +591,19 @@ Prompt the user for each one."
     (save-some-buffers)))
 
 ;;;###autoload
-(defun org-id-node-extract-subtree ()
+(defun org-node-extract-subtree ()
   "Extract subtree at point into a file of its own.
 Leave a link in the source file, and show the newly created buffer.
 
 You may find it a common situation that the subtree had not yet
 been assigned an ID or any other property that you normally
 assign.  Thus, this creates an ID for you, copies over
-any inherited tags, and runs `org-id-node-creation-hook'.
+any inherited tags, and runs `org-node-creation-hook'.
 
 Adding to that, here is an example advice to copy any inherited
 \"CREATED\" property, if an ancestor has such a property:
 
-(advice-add 'org-id-node-extract-subtree :around
+(advice-add 'org-node-extract-subtree :around
             (defun my-inherit-creation-date (fn &rest args)
               (let ((inherited-creation-date
                      (save-excursion
@@ -619,10 +619,10 @@ Adding to that, here is an example advice to copy any inherited
   (interactive nil org-mode)
   (unless (derived-mode-p 'org-mode)
     (user-error "Only works in org-mode buffers"))
-  (org-id-node--init-org-id-locations-or-die)
+  (org-node--init-org-id-locations-or-die)
   (let ((dir (read-directory-name
               "Where to create the node? "
-              (car (org-id-node--root-dirs (hash-table-values org-id-locations))))))
+              (car (org-node--root-dirs (hash-table-values org-id-locations))))))
     (save-excursion
       (org-back-to-heading t)
       (save-buffer)
@@ -639,7 +639,7 @@ Adding to that, here is an example advice to copy any inherited
              (properties (--filter (not (equal "CATEGORY" (car it)))
                                    (org-entry-properties nil 'standard)))
              (path-to-write (file-name-concat
-                             dir (funcall org-id-node-slug-fn title))))
+                             dir (funcall org-node-slug-fn title))))
         (if (file-exists-p path-to-write)
             (message "A file already exists named %s"
                      (file-name-nondirectory path-to-write))
@@ -669,12 +669,12 @@ Adding to that, here is an example advice to copy any inherited
              "")
            "\n#+title: " title
            "\n")
-          (run-hooks 'org-id-node-creation-hook)
+          (run-hooks 'org-node-creation-hook)
           (save-buffer))))))
 
 ;; FIXME WIP
 ;;;###autoload
-(defun org-id-node-rename-asset-and-rewrite-links ()
+(defun org-node-rename-asset-and-rewrite-links ()
   (interactive)
   (require 'dash)
   (require 'wgrep)
@@ -710,26 +710,26 @@ Adding to that, here is an example advice to copy any inherited
       (message "Waiting for rgrep to populate buffer..."))))
 
 ;;;###autoload
-(defun org-id-node-create-subtree ()
+(defun org-node-create-subtree ()
   (interactive nil org-mode)
   (org-insert-heading)
-  (org-id-node-nodeify-entry))
+  (org-node-nodeify-entry))
 
 ;;;###autoload
-(defun org-id-node-nodeify-entry ()
-  "Add an ID to entry at point and run `org-id-node-creation-hook'."
+(defun org-node-nodeify-entry ()
+  "Add an ID to entry at point and run `org-node-creation-hook'."
   (interactive nil org-mode)
-  (org-id-node--init-org-id-locations-or-die)
+  (org-node--init-org-id-locations-or-die)
   (org-id-get-create)
-  (run-hooks 'org-id-node-creation-hook))
+  (run-hooks 'org-node-creation-hook))
 
 ;;;###autoload
-(defun org-id-node-put-created ()
+(defun org-node-put-created ()
   "Add a CREATED property to entry at point, if none already."
   (interactive nil org-mode)
   (unless (org-entry-get nil "CREATED")
     (org-entry-put nil "CREATED" (format-time-string "[%F]"))))
 
-(provide 'org-id-node)
+(provide 'org-node)
 
-;;; org-id-node.el ends here
+;;; org-node.el ends here

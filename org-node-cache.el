@@ -1,25 +1,25 @@
-;;; org-id-node-cache.el --- The heart -*- lexical-binding: t; -*-
+;;; org-node-cache.el --- The heart -*- lexical-binding: t; -*-
 
 (require 'pcre2el)
-(require 'org-id-node-common)
+(require 'org-node-common)
 
 ;;;###autoload
-(define-minor-mode org-id-node-cache-mode
+(define-minor-mode org-node-cache-mode
   "Instruct on-save hooks and such things to update the cache.
-While the mode is active, commands such as `org-id-node-find' and
-`org-id-node-insert-link' do not need to update the cache every
+While the mode is active, commands such as `org-node-find' and
+`org-node-insert-link' do not need to update the cache every
 time."
   :global t
-  (if org-id-node-cache-mode
+  (if org-node-cache-mode
       (progn
-        (add-hook 'after-save-hook #'org-id-node-cache-file)
-        (advice-add #'rename-file :after #'org-id-node-cache-file)
-        (advice-add #'delete-file :before #'org-id-node-cache--schedule-reset-maybe))
-    (remove-hook 'after-save-hook #'org-id-node-cache-file)
-    (advice-remove #'rename-file #'org-id-node-cache-file)
-    (advice-remove #'delete-file #'org-id-node-cache--schedule-reset-maybe)))
+        (add-hook 'after-save-hook #'org-node-cache-file)
+        (advice-add #'rename-file :after #'org-node-cache-file)
+        (advice-add #'delete-file :before #'org-node-cache--schedule-reset-maybe))
+    (remove-hook 'after-save-hook #'org-node-cache-file)
+    (advice-remove #'rename-file #'org-node-cache-file)
+    (advice-remove #'delete-file #'org-node-cache--schedule-reset-maybe)))
 
-(defcustom org-id-node-cache-extra-rg-args
+(defcustom org-node-cache-extra-rg-args
   '("--glob" "**/*.org"
     "--glob" "!**/logseq/bak/**"
     "--glob" "!**/logseq/version-files/**"
@@ -40,55 +40,55 @@ need to shell-escape characters.  If you have a filename with a
 space, it's fine (I think).  Do not pass several arguments in a
 single string, it will not work."
   :type '(repeat string)
-  :group 'org-id-node)
+  :group 'org-node)
 
-(defun org-id-node-cache-peek (&optional ht keys)
-  "For debugging: peek on some values of `org-id-nodes'.
+(defun org-node-cache-peek (&optional ht keys)
+  "For debugging: peek on some values of `org-nodes'.
 When called from Lisp, peek on any hash table HT.  With KEYS t,
 peek on keys instead."
   (interactive)
-  (let ((rows (if keys (hash-table-keys (or ht org-id-nodes))
-                (hash-table-values (or ht org-id-nodes)))))
+  (let ((rows (if keys (hash-table-keys (or ht org-nodes))
+                (hash-table-values (or ht org-nodes)))))
     (dotimes (_ 4)
       (print (nth (random (length rows)) rows)))))
 
-(defun org-id-node-cache-reset ()
+(defun org-node-cache-reset ()
   "Wipe and rebuild the cache."
   (interactive)
   (unless (executable-find "rg")
-    (user-error "Install ripgrep to use org-id-node"))
+    (user-error "Install ripgrep to use org-node"))
   (let ((sum-files 0)
         (sum-subtrees 0)
         (then (current-time)))
     ;; Wipe
-    (clrhash org-id-nodes)
-    (clrhash org-id-node-collection)
-    ;; Rebuild `org-id-nodes'
-    (org-id-node--init-org-id-locations-or-die)
-    (dolist (dir (org-id-node--root-dirs (hash-table-values org-id-locations)))
-      (org-id-node-cache--scan dir))
-    ;; Rebuild `org-id-node-collection'
-    (dolist (node (hash-table-values org-id-nodes))
+    (clrhash org-nodes)
+    (clrhash org-node-collection)
+    ;; Rebuild `org-nodes'
+    (org-node--init-org-id-locations-or-die)
+    (dolist (dir (org-node--root-dirs (hash-table-values org-id-locations)))
+      (org-node-cache--scan dir))
+    ;; Rebuild `org-node-collection'
+    (dolist (node (hash-table-values org-nodes))
       (cl-incf (if (plist-get node :is-subtree) sum-subtrees sum-files))
-      (if (funcall org-id-node-filter-fn node)
+      (if (funcall org-node-filter-fn node)
           (dolist (title (cons (plist-get node :title)
                                (plist-get node :aliases)))
-            (puthash (funcall org-id-node-format-candidate-fn node title)
+            (puthash (funcall org-node-format-candidate-fn node title)
                      node
-                     org-id-node-collection))
+                     org-node-collection))
         (plist-put node :exclude t)))
-    (message "org-id-node: Recorded %d files and %d subtrees in %.2fs"
+    (message "org-node: Recorded %d files and %d subtrees in %.2fs"
              sum-files
              sum-subtrees
              (float-time (time-since then)))
-    (run-hooks 'org-id-node-cache-hook)))
+    (run-hooks 'org-node-cache-hook)))
 
-;; Overridden by a thing in org-id-node-experimental.el
-(defun org-id-node-cache--scan (target)
-  (org-id-node-cache--collect-file-level-nodes target)
-  (org-id-node-cache--collect-subtree-nodes target))
+;; Overridden by a thing in org-node-experimental.el
+(defun org-node-cache--scan (target)
+  (org-node-cache--collect-file-level-nodes target)
+  (org-node-cache--collect-subtree-nodes target))
 
-(defun org-id-node-cache-file (&rest args)
+(defun org-node-cache-file (&rest args)
   "Grep for nodes in a single file."
   ;; If triggered by `rename-file' advice, the second argument is NEWNAME.  The
   ;; new name may not be that of the current buffer, e.g. it may be called from
@@ -97,31 +97,31 @@ peek on keys instead."
          (file (if (and arg2 (stringp arg2) (file-exists-p arg2))
                    arg2
                  (buffer-file-name))))
-    (org-id-node-cache--scan file))
-  (run-hooks 'org-id-node-cache-hook))
+    (org-node-cache--scan file))
+  (run-hooks 'org-node-cache-hook))
 
-(defvar org-id-node-cache-hook (list))
+(defvar org-node-cache-hook (list))
 
-(defun org-id-node-cache-ensure-fresh ()
-  (when (or (not org-id-node-cache-mode) (not (hash-table-p org-id-nodes)) (hash-table-empty-p org-id-node-collection))
-    (org-id-node-cache-reset)
+(defun org-node-cache-ensure-fresh ()
+  (when (or (not org-node-cache-mode) (not (hash-table-p org-nodes)) (hash-table-empty-p org-node-collection))
+    (org-node-cache-reset)
     ;; In practice, this message delivered once per emacs session
-    (message "To speed up this command, turn on `org-id-node-cache-mode'")))
+    (message "To speed up this command, turn on `org-node-cache-mode'")))
 
 (let ((this-timer (timer-create)))
-  (defun org-id-node-cache--schedule-reset-maybe (&rest _)
+  (defun org-node-cache--schedule-reset-maybe (&rest _)
     "If inside an org file now, reset cache after a few seconds.
 
 This is intended to trigger prior to file deletion, and the delay
 avoids bothering the user who may be trying to delete many files."
     (when (derived-mode-p 'org-mode)
       (cancel-timer this-timer)
-      (setq this-timer (run-with-idle-timer 6 nil #'org-id-node-cache-reset)))))
+      (setq this-timer (run-with-idle-timer 6 nil #'org-node-cache-reset)))))
 
 
 ;;; Plumbing
 
-(defun org-id-node-cache--make-todo-regexp ()
+(defun org-node-cache--make-todo-regexp ()
   "Make a regexp based on global value of `org-todo-keywords',
 that will match any of the keywords."
   (require 'org)
@@ -134,7 +134,7 @@ that will match any of the keywords."
 
 ;; Optimized for one purpose, do not reuse
 (let ((regexp (rx "[[id:" (group (+? nonl)) "][" (+? nonl) "]]")))
-  (defun org-id-node-cache--backlinks->list (backlinks-string)
+  (defun org-node-cache--backlinks->list (backlinks-string)
     "Take substrings looking like [[id:abcd][Description]] in
 BACKLINKS-STRING, and collect the \"abcd\" parts into a list.
 
@@ -144,14 +144,14 @@ not check."
     (string-split (replace-regexp-in-string regexp "\\1" backlinks-string)
                   "  " t)))
 
-(defun org-id-node-cache--aliases->list (aliases-string)
+(defun org-node-cache--aliases->list (aliases-string)
   "Turn ALIASES-STRING into a list.
 Assumes that each alias comes wrapped in double-quotes."
   (declare (pure t) (side-effect-free t))
   (string-split (string-replace "\" \"" "\"\f\"" aliases-string)
                 "\f" t))
 
-(defun org-id-node-cache--program-output (program &rest args)
+(defun org-node-cache--program-output (program &rest args)
   "Like `shell-command-to-string', but skip the shell intermediary.
 
 Arguments PROGRAM and ARGS as in `call-process'.  Each argument
@@ -165,7 +165,7 @@ hand, you get no shell magic such as globs or envvars."
 
 ;;; More fun plumbing
 
-(defconst org-id-node-cache--file-level-re
+(defconst org-node-cache--file-level-re
   (rxt-elisp-to-pcre
    (rx bol ":PROPERTIES:" (* space)
        (*? "\n:" (not space) (* nonl))
@@ -187,11 +187,11 @@ hand, you get no shell magic such as globs or envvars."
   "Regexp to match file-level nodes.")
 
 ;; How do people live without `rx'?
-(defun org-id-node-cache--calc-subtree-re ()
-  "Construct new regexp for the variable `org-id-node-cache--subtree-re'."
+(defun org-node-cache--calc-subtree-re ()
+  "Construct new regexp for the variable `org-node-cache--subtree-re'."
   (rxt-elisp-to-pcre
    (rx bol (group (+ "*")) (+ space)
-       (? (group (regexp (org-id-node-cache--make-todo-regexp))) (+ space)) ; TODO
+       (? (group (regexp (org-node-cache--make-todo-regexp))) (+ space)) ; TODO
        (group (+? nonl))                                     ; Heading title
        (? (+ space) (group ":" (+? nonl) ":")) (* space)     ; :tags:
        (? "\n" (* space) (not (any " *")) (* nonl))          ; CLOSED/SCHEDULED
@@ -212,10 +212,10 @@ hand, you get no shell magic such as globs or envvars."
        (*? "\n" (* space) ":" (not space) (+ nonl))
        "\n" (* space) (or ":END:" ":end:"))))
 
-(defun org-id-node-cache--collect-file-level-nodes (target)
+(defun org-node-cache--collect-file-level-nodes (target)
   "Scan TARGET (a file or directory) for file-level ID nodes."
   (let ((rg-result
-         (apply #'org-id-node-cache--program-output "rg"
+         (apply #'org-node-cache--program-output "rg"
                 `("--multiline"
                   "--ignore-case"
                   "--with-filename"
@@ -224,8 +224,8 @@ hand, you get no shell magic such as globs or envvars."
                   "--only-matching"
                   "--replace"
                   "\f$1\f$2\f$3\f$4\f$5\f$6\f$7--veryIntelligentSeparator--"
-                  ,@org-id-node-cache-extra-rg-args
-                  ,org-id-node-cache--file-level-re
+                  ,@org-node-cache-extra-rg-args
+                  ,org-node-cache--file-level-re
                   ,target))))
     (dolist (file-head (string-split rg-result "--veryIntelligentSeparator--\n" t))
       (let ((splits (string-split file-head "\f")))
@@ -244,23 +244,23 @@ hand, you get no shell magic such as globs or envvars."
                             :tags (string-split $6 ":" t)
                             :file-path (car file:lnum)
                             :id $2
-                            :aliases (org-id-node-cache--aliases->list $3)
+                            :aliases (org-node-cache--aliases->list $3)
                             :roam-refs (string-split $5 " " t)
-                            :backlink-ids (org-id-node-cache--backlinks->list $1))
-                   org-id-nodes))))))
+                            :backlink-ids (org-node-cache--backlinks->list $1))
+                   org-nodes))))))
 
-(defun org-id-node-cache--collect-subtree-nodes (target)
+(defun org-node-cache--collect-subtree-nodes (target)
   "Scan TARGET (a file or directory) for subtree ID nodes."
   (let ((rg-result
-         (apply #'org-id-node-cache--program-output "rg"
+         (apply #'org-node-cache--program-output "rg"
                 `("--multiline"
                   "--with-filename"
                   "--line-number"
                   "--only-matching"
                   "--replace"
                   "\f$1\f$2\f$3\f$4\f$5\f$6\f$7\f$8\f$9--veryIntelligentSeparator--"
-                  ,@org-id-node-cache-extra-rg-args
-                  ,(org-id-node-cache--calc-subtree-re)
+                  ,@org-node-cache-extra-rg-args
+                  ,(org-node-cache--calc-subtree-re)
                   ,target))))
     (dolist (subtree (string-split rg-result "--veryIntelligentSeparator--\n" t))
       (let ((splits (string-split subtree "\f")))
@@ -283,11 +283,11 @@ hand, you get no shell magic such as globs or envvars."
                             :todo (unless (string-blank-p $2) $2)
                             :file-path (car file:lnum)
                             :id $6
-                            :aliases (org-id-node-cache--aliases->list $7)
+                            :aliases (org-node-cache--aliases->list $7)
                             :roam-refs (string-split $9 " " t)
-                            :backlink-ids (org-id-node-cache--backlinks->list $5))
-                   org-id-nodes))))))
+                            :backlink-ids (org-node-cache--backlinks->list $5))
+                   org-nodes))))))
 
-(provide 'org-id-node-cache)
+(provide 'org-node-cache)
 
-;;; org-id-node-cache.el ends here
+;;; org-node-cache.el ends here
