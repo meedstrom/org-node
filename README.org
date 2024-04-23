@@ -154,7 +154,7 @@ Finally, the occasional =org-roam-db-sync= is still needed to see reflinks.
 
 Some user options to feel at home
 
-- Set =org-node-creation-fn= to =org-node-creator-backend-by-roam-capture=
+- Set =org-node-creation-fn= to =org-node-creation-fn-roam-capture=
 - Set =org-node-slug-fn= to =org-node-slugify-like-roam=
 - Set =org-node-creation-hook= to =nil=
   
