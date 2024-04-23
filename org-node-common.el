@@ -99,13 +99,16 @@ Because not everyone has `debug-on-error' t."
   ;; Sometimes `org-id-locations' decides to be an alist instead of a hash
   ;; table...  and interestingly, when it's an alist, the filename is car, but
   ;; when it's hash table, the filename is not the key but the value...
-  (and (or (null org-id-locations)
-           (if (hash-table-p org-id-locations)
-               (hash-table-empty-p org-id-locations)))
-       ;; Load, and guarantee a hash-table from now on
-       (org-id-locations-load)
-       (hash-table-empty-p org-id-locations)
-       (org-node-die "org-id-locations empty%s" org-node--standard-tip)))
+  (if (or (null org-id-locations)
+          (if (hash-table-p org-id-locations)
+              (hash-table-empty-p org-id-locations)))
+      ;; Load, and guarantee a hash-table from now on
+      (org-id-locations-load)
+    (when (listp org-id-locations)
+      ;; This /should/ make it a hash table...
+      (org-id-update-id-locations)))
+  (when (hash-table-empty-p org-id-locations)
+    (org-node-die "org-id-locations empty%s" org-node--standard-tip)))
 
 (defun org-node--root-dirs (file-list)
   "Given FILE-LIST, infer the most base root directories.

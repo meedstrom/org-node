@@ -53,6 +53,7 @@
 ;; Other todos
 ;;
 ;; TODO Test with plain org-capture
+;; TODO Write example capture template
 ;; TODO Maybe move user commands into a -commands.el and minimize the core
 ;; TODO Command to grep across all files (then deprecate the regret command, and teach the user wgrep)
 ;; TODO Command to visit a random node
@@ -195,31 +196,6 @@ a small wrapper such as:
 ;; (org-node-slugify-as-url "Slimline/\"pizza box\" computer chassis")
 ;; (org-node-slugify-as-url "#emacs")
 
-(defun org-node-create-by-roam-capture ()
-  "Call `org-roam-capture-' with predetermined arguments."
-  (unless (fboundp #'org-roam-capture-)
-    (org-node-die "Didn't create node! Either install org-roam or %s"
-                  "configure `org-node-creation-fn'"))
-  (require 'org-roam)
-  (org-roam-capture- :node (org-roam-node-create :title org-node-proposed-title
-                                                 :id    org-node-proposed-id)))
-
-(defun org-node-create-basic (title)
-  "Create a file-level node with TITLE and ask where to save it."
-  (let* ((dir (read-directory-name
-               "Where to create the node? "
-               (car (org-node--root-dirs (hash-table-values org-id-locations)))))
-         (path-to-write (file-name-concat dir (funcall org-node-slug-fn title))))
-    (if (file-exists-p path-to-write)
-        (message "A file already exists named %s"
-                 (file-name-nondirectory path-to-write))
-      (with-temp-file path-to-write
-        (insert ":PROPERTIES:"
-                "\n:ID:       " (org-id-new)
-                "\n:END:"
-                "\n#+title: " title)
-        (run-hooks 'org-node-creation-hook)))))
-
 
 ;;; Shim for the org-roam buffer
 
@@ -298,13 +274,64 @@ To behave like `org-roam-node-find' when creating new nodes, set
           (find-file (plist-get node :file-path))
           (widen)
           (goto-char 1)
-          (forward-line (1- (plist-get node :line-number))))
+          (forward-line (1- (plist-get node :line-number)))
+          (recenter 5))
       (setq org-node-proposed-title input)
       (setq org-node-proposed-id (org-id-new))
-      (funcall org-node-creation-fn))))
+      (let ((result (funcall org-node-creation-fn)))
+        (when (bufferp result)
+          (switch-to-buffer result)))
+      (setq org-node-proposed-title nil)
+      (setq org-node-proposed-id nil))))
 
 (defvar org-node-proposed-title nil)
 (defvar org-node-proposed-id nil)
+
+;; Just an example...
+(defun org-node-capture-target ()
+  "Can be used as TARGET in `org-capture-templates'."
+  (let* ((dir (read-directory-name
+               "Where to create the node? "
+               (car (org-node--root-dirs (hash-table-values org-id-locations)))))
+         (path-to-write (file-name-concat dir (funcall org-node-slug-fn
+                                                       org-node-proposed-title))))
+    (find-file path-to-write)
+    (goto-char (point-max))
+    (if (org-entry-get nil "ID")
+        (user-error "Already an ID in this location")
+      (org-entry-put nil "ID" org-node-proposed-id))
+    (run-hooks 'org-node-creation-hook)))
+
+(defun org-node-creator-backend-by-roam-capture ()
+  "Call `org-roam-capture-' with predetermined arguments."
+  (unless (fboundp #'org-roam-capture-)
+    (org-node-die "Didn't create node! Either install org-roam or %s"
+                  "configure `org-node-creation-fn'"))
+  (require 'org-roam)
+  (org-roam-capture- :node (org-roam-node-create :title org-node-proposed-title
+                                                 :id    org-node-proposed-id)))
+
+(defun org-node-creator-backend-basic ()
+  "Create a file-level node and ask where to save it."
+  (let* ((dir (read-directory-name
+               "Where to create the node? "
+               (car (org-node--root-dirs (hash-table-values org-id-locations)))))
+         (path-to-write (file-name-concat dir (funcall org-node-slug-fn
+                                                       org-node-proposed-title))))
+    (if (or (file-exists-p path-to-write)
+            (find-buffer-visiting path-to-write))
+        (message "A file or buffer already exists for path %s"
+                 (file-name-nondirectory path-to-write))
+      (let ((buf (find-file-noselect path-to-write)))
+        (with-current-buffer buf
+          (insert ":PROPERTIES:"
+                  "\n:ID:       " org-node-proposed-id
+                  "\n:END:"
+                  "\n#+title: " org-node-proposed-title
+                  "\n")
+          (run-hooks 'org-node-creation-hook)
+          (save-buffer))
+        buf))))
 
 ;;;###autoload
 (defun org-node-insert-link ()
@@ -337,7 +364,7 @@ If you find the behavior different, perhaps you have something in
                                  () () () 'org-node-hist))
          (node (gethash input org-node-collection))
          (id (or (plist-get node :id) (org-id-new)))
-         (link-desc (or region-text (plist-get node :title))))
+         (link-desc (or region-text (plist-get node :title) input)))
     (atomic-change-group
       (if region-text
           (delete-region beg end)
@@ -693,6 +720,7 @@ Adding to that, here is an example advice to copy any inherited
 (defun org-node-nodeify-entry ()
   "Add an ID to entry at point and run `org-node-creation-hook'."
   (interactive nil org-mode)
+  (org-node--init-org-id-locations-or-die)
   (org-id-get-create)
   (run-hooks 'org-node-creation-hook))
 

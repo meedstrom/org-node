@@ -100,13 +100,16 @@ Install [[https://github.com/BurntSushi/ripgrep][ripgrep]], then add an init sni
 Commands:
 
 - =org-node-find=
-  - Equivalent to =org-roam-node-find=
+  - Counterpart to =org-roam-node-find=
 - =org-node-insert-link=
-  - Equivalent to =org-roam-node-insert=
+  - Counterpart to =org-roam-node-insert=
 - =org-node-insert-include=
 - =org-node-insert-transclusion=
 - =org-node-insert-transclusion-as-subtree=
+- =org-node-nodeify-entry=
+- =org-node-create-subtree=
 - =org-node-extract-subtree=
+  - Bizarro counterpart to =org-roam-extract-subtree=
 - =org-node-rewrite-links-ask=
   - Look for link descriptions that got out of sync with the current node title, then prompt at each link to update it
 - =org-node-rename-file-by-title=
@@ -132,15 +135,15 @@ If you run into any issues, let me know!  Either here on Github or just [[mailto
   - Appears after about 1000 files for me.  It's not an error, just scary.  Interrupt the command and start again; it picks up where it left off, with no further complaint.
   - Two reasons the command opens all files before beginning its work -- first, it's faster that way.  For each link found, it visits the target, so any given file gets visited many times anyway.  Second, it means you can stop and resume at any time.  Very convenient when a problem comes up.
 
-*** Getting the org-roam-buffer back
+*** Acquiring an org-roam-buffer
 
-To have =M-x org-roam-buffer-toggle= do the right thing, first eval an advice:
+To borrow the power of =M-x org-roam-buffer-toggle=, first eval an advice:
 
 #+begin_src elisp
 (advice-add 'org-roam-backlinks-get :override #'org-node--fabricate-roam-backlinks)
 #+end_src
 
-Check it out, it works!!!  See for yourself that it isn't using the DB, by evalling =(delete-file org-roam-db-location)=.
+Check it out, it works!  See for yourself that it isn't using the DB, by evalling =(delete-file org-roam-db-location)=.
 
 The behavior is slightly clobbered.  I don't know what sorts of advanced things people do with the org-roam-buffer but here, the position and properties of each link are gone.  It behaves as if the :unique parameter is t and :point is equal to that of the node heading.
 
@@ -165,7 +168,9 @@ The whole point of org-id was to avoid dependence on filenames, but it's often p
 
 In org-roam you could get a node's outline path (=org-roam-node-olp=), which can be used to enrich the completion candidates.
 
-We can do something similar, though our pseudo-outline path does not include the subtrees without IDs... only those with, and it makes cache rebuild 50% slower.  It works well, but I'm marking it experimental because I'm not sure how much further to go before I'm just reinventing org-ql.
+We can do something similar, though our pseudo-outline path does not include subtrees without IDs... only those with, and it makes cache rebuild 50% slower.  It works well, but I'm marking it experimental because I'm not sure how much further I can generalize the code before I've just reinvented org-ql.
+
+(Actually I have an idea about switching out ripgrep for org-ql, but that's a research project... first need to benchmark...)
 
 #+begin_src elisp
 (require 'org-node-experimental)
@@ -221,16 +226,15 @@ You'll notice that org-node "API" is not much of an API, because I try to expose
 | Get char position               | =(org-roam-node-point NODE)=      | =(org-node--visit-get-pos NODE)=                                               |
 | Get :PROPERTIES:                | =(org-roam-node-properties NODE)= | =(org-node--visit-get-properties NODE)=                                        |
 | Get title of file where NODE is | =(org-roam-node-file-title NODE)= | =(org-node--visit-get-file-title NODE)=                                        |
+| Get subtree heading sans TODO   | =(org-roam-node-title NODE)=      | =(org-node--visit-get-true-heading NODE)=                                      |
 | Get outline-path                | =(org-roam-node-olp NODE)=        |                                                                              |
 | Get subtree priority            | =(org-roam-node-priority NODE)=   |                                                                              |
 | Get subtree SCHEDULED           | =(org-roam-node-scheduled NODE)=  |                                                                              |
 | Get subtree DEADLINE            | =(org-roam-node-deadline NODE)=   |                                                                              |
 | Get org-roam-reflink objects    | =(org-roam-reflinks-get NODE)=    |                                                                              |
-| Ensure fresh data               | =(org-roam-db-sync)=            | =(org-node-cache-ensure-fresh)=                                              |
+| Ensure fresh data               | =(org-roam-db-sync)=              | =(org-node-cache-ensure-fresh)=                                                |
 
-As you might infer, all the stuff in an org-node plist was collected by Ripgrep, and for the rest, a "visit-get" function like =org-node--visit-get-properties= has to visit the target.  It's a bad idea to call a "visit-get" from your custom =org-node-filter-fn=, as that horribly slows down the cache rebuilds -- to the speed of an =(org-roam-db-sync 'force)=, in fact.
-
-# For an overview of what org-roam-db persists to disk, see its EmacSQL table schemata at [[https://github.com/org-roam/org-roam/blob/v2.2.2/org-roam-db.el#L229][org-roam-db--table-schemata]].
+As you might infer, all the stuff in an org-node plist was collected by Ripgrep, and for the rest, a "visit-get" function like =org-node--visit-get-properties= has to visit the target.  It's a bad idea to call a "visit-get" from your =org-node-filter-fn= or =org-node-format-candidate-fn=, as that horribly slows down the cache rebuilds -- to the speed of an =(org-roam-db-sync 'force)=, in fact.
 
 ** Appendix II: Pros of org-roam
 
