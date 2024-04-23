@@ -1,4 +1,4 @@
-;;; org-node-common.el -*- lexical-binding: t; -*-
+;;; org-id-node-common.el -*- lexical-binding: t; -*-
 
 (require 'cl-lib)
 (require 'subr-x)
@@ -9,34 +9,34 @@
 ;; https://debbugs.gnu.org/cgi/bugreport.cgi?bug=46958
 (require 'org-macs)
 
-(defgroup org-node nil
+(defgroup org-id-node nil
   "Support a zettelkasten of org-id files and subtrees."
   :group 'org)
 
-(defcustom org-node-format-candidate-fn
+(defcustom org-id-node-format-candidate-fn
   (lambda (_node title) title)
   "Function to return what string should represent this node.
-Affects how selections are displayed during e.g. `org-node-find'.
+Affects how selections are displayed during e.g. `org-id-node-find'.
 
 Called with two arguments: the node data and the title.
 
 The node data is a plist which form you can observe in examples
-from \\[org-node-cache-peek].  The title may in fact be one of
+from \\[org-id-node-cache-peek].  The title may in fact be one of
 the aliases and not the real title, because the function runs
 again for every alias.
 
 This example shows the file name in addition to the title:
 
-(setq org-node-format-candidate-fn
+(setq org-id-node-format-candidate-fn
       (lambda (node title)
         (concat (file-name-nondirectory (plist-get node :file-path))
                 \" -- \"
                 title)))
 "
-  :group 'org-node
+  :group 'org-id-node
   :type 'function)
 
-(defcustom org-node-filter-fn
+(defcustom org-id-node-filter-fn
   (lambda (node)
     (and (not (plist-get node :roam-exclude))
          (not (plist-get node :todo))))
@@ -44,22 +44,22 @@ This example shows the file name in addition to the title:
 
 This function is applied once for every Org-ID node found, and
 receives the node data as a single argument: a plist which form
-you can observe in examples from \\[org-node-cache-peek].
+you can observe in examples from \\[org-id-node-cache-peek].
 
-This function is called after fully building the `org-nodes'
+This function is called after fully building the `org-id-nodes'
 table, so you may query it as needed.
 
 See the following example for a way to filter out nodes tagged
 :drill: and all files with a substring \"archive\" in the name.
 
-(setq org-node-filter-fn
+(setq org-id-node-filter-fn
       (lambda (node)
         (and (not (plist-get node :roam-exclude))
              (not (plist-get node :todo))
              (not (member \"drill\" (plist-get node :tags)))
              (not (string-search \"archive\" (plist-get node :file-path))))))
 
-(setq org-node-filter-fn
+(setq org-id-node-filter-fn
       (lambda (node)
        (and (not (plist-get node :roam-exclude))
             (not (plist-get node :todo)))))
@@ -67,34 +67,34 @@ See the following example for a way to filter out nodes tagged
 If you have an expensive filter slowing things down, a tip is
 make a defun, not a lambda, and byte-compile that init file:
 
-(setq org-node-filter-fn #'my-filter)
+(setq org-id-node-filter-fn #'my-filter)
 (defun my-filter (node)
   (some expensive calculations)
   (phew!))
 "
   :type 'function
-  :group 'org-node)
+  :group 'org-id-node)
 
-(defvar org-nodes (make-hash-table :test #'equal :size 4000)
+(defvar org-id-nodes (make-hash-table :test #'equal :size 4000)
   "Table associating ids with cached file/subtree data.
-To peek on the contents, try \\[org-node-cache-peek] a few times, which
+To peek on the contents, try \\[org-id-node-cache-peek] a few times, which
 should suffice to demonstrate the data format.")
 
-(defvar org-node-collection (make-hash-table :test #'equal :size 4000)
-  "Filtered `org-nodes', keyed not on ids but formatted titles.
+(defvar org-id-node-collection (make-hash-table :test #'equal :size 4000)
+  "Filtered `org-id-nodes', keyed not on ids but formatted titles.
 This allows direct use with `completing-read'.")
 
-(defun org-node-die (format-string &rest args)
+(defun org-id-node-die (format-string &rest args)
   "Like `error' but make sure the user sees it.
 Because not everyone has `debug-on-error' t."
   (let ((err-string (apply #'format format-string args)))
-    (display-warning 'org-node err-string :error)
+    (display-warning 'org-id-node err-string :error)
     (error "%s" err-string)))
 
-(defconst org-node--standard-tip
+(defconst org-id-node--standard-tip
   ", try `org-id-update-id-locations' or `org-roam-update-org-id-locations'")
 
-(defun org-node--init-org-id-locations-or-die ()
+(defun org-id-node--init-org-id-locations-or-die ()
   (require 'org-id)
   ;; Sometimes `org-id-locations' decides to be an alist instead of a hash
   ;; table...  and interestingly, when it's an alist, the filename is car, but
@@ -108,9 +108,9 @@ Because not everyone has `debug-on-error' t."
       ;; This /should/ make it a hash table...
       (org-id-update-id-locations)))
   (when (hash-table-empty-p org-id-locations)
-    (org-node-die "org-id-locations empty%s" org-node--standard-tip)))
+    (org-id-node-die "org-id-locations empty%s" org-id-node--standard-tip)))
 
-(defun org-node--root-dirs (file-list)
+(defun org-id-node--root-dirs (file-list)
   "Given FILE-LIST, infer the most base root directories.
 
 In many cases, if passed the `hash-table-values' of
@@ -143,18 +143,18 @@ first element."
 
 ;;; Visit-getters
 
-(defun org-node--visit-get-pos (node)
+(defun org-id-node--visit-get-pos (node)
   "Visit NODE and return the char position where it starts."
   (with-temp-buffer
     (insert-file-contents (plist-get node :file-path))
     (forward-line (1- (plist-get node :line-number)))
     (point)))
 
-(defun org-node--visit-get-file-title (node)
+(defun org-id-node--visit-get-file-title (node)
   (org-with-file-buffer (plist-get node :file)
     (org-get-title)))
 
-(defun org-node--visit-get-properties (node)
+(defun org-id-node--visit-get-properties (node)
   (org-with-file-buffer (plist-get node :file)
     (save-excursion
       (without-restriction
@@ -162,6 +162,6 @@ first element."
         (forward-line (plist-get node :line-number))
         (org-entry-properties)))))
 
-(provide 'org-node-common)
+(provide 'org-id-node-common)
 
-;;; org-node-common.el ends here
+;;; org-id-node-common.el ends here
