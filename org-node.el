@@ -88,14 +88,14 @@ Built-in choices:
   :group 'org-node
   :type 'function)
 
-(defcustom org-node-creation-fn #'org-node-creator-backend-basic
+(defcustom org-node-creation-fn #'org-node-creation-fn-basic
   "Function called by `org-node-find', and `org-node-insert-link' to
 create a node.  During execution, two variables are set:
 `org-node-proposed-title' and `org-node-proposed-id'.
 
 Some options
-- `org-node-creator-backend-basic'
-- `org-node-creator-backend-by-roam-capture'
+- `org-node-creation-fn-basic'
+- `org-node-creation-fn-roam-capture'
 - `org-capture'
 "
   :group 'org-node
@@ -113,10 +113,10 @@ Functions here should not leave point outside the link."
 (defcustom org-node-creation-hook '(org-node-put-created)
   "Hook run with point in the newly created buffer or entry.
 
-Applied only by `org-node-creator-backend-basic',
+Applied only by `org-node-creation-fn-basic',
 `org-node-create-subtree' and `org-node-extract-subtree'.
 
-For `org-node-creator-backend-by-roam-capture', you want the
+For `org-node-creation-fn-roam-capture', you want the
 hook `org-roam-capture-new-node-hook' instead.
 
 A good member for this hook is `org-node-put-created', especially
@@ -277,7 +277,7 @@ deduplicated, as if :unique t."
       (org-entry-put nil "ID" org-node-proposed-id))
     (run-hooks 'org-node-creation-hook)))
 
-(defun org-node-creator-backend-by-roam-capture ()
+(defun org-node-creation-fn-roam-capture ()
   "Call `org-roam-capture-' with predetermined arguments."
   (unless (fboundp #'org-roam-capture-)
     (org-node-die "Didn't create node! Either install org-roam or %s"
@@ -286,7 +286,7 @@ deduplicated, as if :unique t."
   (org-roam-capture- :node (org-roam-node-create :title org-node-proposed-title
                                                  :id    org-node-proposed-id)))
 
-(defun org-node-creator-backend-basic ()
+(defun org-node-creation-fn-basic ()
   "Create a file-level node and ask where to save it."
   (let* ((dir (read-directory-name
                "Where to create the node? "
@@ -328,7 +328,7 @@ deduplicated, as if :unique t."
 
 To behave like `org-roam-node-find' when creating new nodes, set
 `org-node-creation-fn' to
-`org-node-creator-backend-by-roam-capture'."
+`org-node-creation-fn-roam-capture'."
   (interactive)
   (org-node-cache-ensure-fresh)
   (let* ((input (completing-read "Node: " org-node-collection
@@ -353,7 +353,7 @@ To behave like `org-roam-node-find' when creating new nodes, set
 
 To behave like `org-roam-node-insert' when creating new nodes,
 set `org-node-creation-fn' to
-`org-node-creator-backend-by-roam-capture'.
+`org-node-creation-fn-roam-capture'.
 
 If you find the behavior different, perhaps you have something in
 `org-roam-post-node-insert-hook'.  Then perhaps copy it to
