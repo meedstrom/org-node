@@ -87,14 +87,14 @@ Built-in choices:
   :group 'org-node
   :type 'function)
 
-(defcustom org-node-creation-fn #'org-node-create-basic
+(defcustom org-node-creation-fn #'org-node-creator-backend-basic
   "Function called by `org-node-find', and `org-node-insert-link' to
 create a node.  During execution, two variables are set:
 `org-node-proposed-title' and `org-node-proposed-id'.
 
 Some options
-- `org-node-create-basic'
-- `org-node-create-by-roam-capture'
+- `org-node-creator-backend-basic'
+- `org-node-creator-backend-by-roam-capture'
 - `org-capture'
 "
   :group 'org-node
@@ -263,7 +263,7 @@ deduplicated, as if :unique t."
 
 To behave like `org-roam-node-find' when creating new nodes, set
 `org-node-creation-fn' to
-`org-node-create-by-roam-capture'."
+`org-node-creator-backend-by-roam-capture'."
   (interactive)
   (org-node-cache-ensure-fresh)
   (let* ((input (completing-read "Node: " org-node-collection
@@ -339,7 +339,7 @@ To behave like `org-roam-node-find' when creating new nodes, set
 
 To behave like `org-roam-node-insert' when creating new nodes,
 set `org-node-creation-fn' to
-`org-node-create-by-roam-capture'.
+`org-node-creator-backend-by-roam-capture'.
 
 If you find the behavior different, perhaps you have something in
 `org-roam-post-node-insert-hook'.  Then perhaps copy it to
