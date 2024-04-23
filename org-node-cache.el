@@ -70,11 +70,13 @@ peek on keys instead."
     ;; Rebuild `org-node-collection'
     (dolist (node (hash-table-values org-nodes))
       (cl-incf (if (plist-get node :is-subtree) sum-subtrees sum-files))
-      (when (funcall org-node-filter-fn node)
-        (dolist (title (cons (plist-get node :title) (plist-get node :aliases)))
-          (puthash (funcall org-node-format-candidate-fn node title)
-                   node
-                   org-node-collection))))
+      (if (funcall org-node-filter-fn node)
+          (dolist (title (cons (plist-get node :title)
+                               (plist-get node :aliases)))
+            (puthash (funcall org-node-format-candidate-fn node title)
+                     node
+                     org-node-collection))
+        (plist-put node :exclude t)))
     (message "org-node: Recorded %d files and %d subtrees in %.2fs"
              sum-files
              sum-subtrees
@@ -101,7 +103,7 @@ peek on keys instead."
 (defvar org-node-cache-hook (list))
 
 (defun org-node-cache-ensure-fresh ()
-  (when (or (not org-node-cache-mode) (hash-table-empty-p org-node-collection))
+  (when (or (not org-node-cache-mode) (not (hash-table-p org-nodes)) (hash-table-empty-p org-node-collection))
     (org-node-cache-reset)
     ;; In practice, this message delivered once per emacs session
     (message "To speed up this command, turn on `org-node-cache-mode'")))
