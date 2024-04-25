@@ -171,17 +171,7 @@ hand, you get no shell magic such as globs or envvars."
 (defconst org-node-cache--file-level-re
   (rxt-elisp-to-pcre
    (rx bol ":PROPERTIES:" (* space)
-       (*? "\n:" (not space) (* nonl))
-       (?  "\n:CACHED_BACKLINKS:" (+ space) (group (+ nonl)))
-       (*? "\n:" (not space) (* nonl))
-       "\n:ID:"                   (+ space) (group (+? nonl))
-       (*? "\n:" (not space) (* nonl))
-       (?  "\n:ROAM_ALIASES:"     (+ space) (group (+ nonl)))
-       (*? "\n:" (not space) (* nonl))
-       (?  "\n:ROAM_EXCLUDE:"     (+ space) (group (+ nonl)))
-       (*? "\n:" (not space) (* nonl))
-       (?  "\n:ROAM_REFS:"        (+ space) (group (+ nonl)))
-       (*? "\n:" (not space) (* nonl))
+       (group (*? "\n:" (not space) (* nonl)))
        "\n:END:" (* space)
        (*? "\n" (* nonl))
        (? "\n#+filetags:" (* space) (group (+ nonl)))
@@ -216,37 +206,52 @@ hand, you get no shell magic such as globs or envvars."
                   "--max-count" "1"
                   "--only-matching"
                   "--replace"
-                  "\f$1\f$2\f$3\f$4\f$5\f$6\f$7--veryIntelligentSeparator--"
+                  "\f$1\f$2\f$3--veryIntelligentSeparator--"
                   ,@org-node-cache-extra-rg-args
                   ,org-node-cache--file-level-re
                   ,target))))
-    (dolist (file-head (string-split rg-result "--veryIntelligentSeparator--\n" t))
-      (let ((splits (string-split file-head "\f")))
-        (let ((file:lnum (string-split (nth 0 splits) ":" t))
-              ($1 (nth 1 splits))
-              ($2 (nth 2 splits))
-              ($3 (nth 3 splits))
-              ($4 (nth 4 splits))
-              ($5 (nth 5 splits))
-              ($6 (nth 6 splits))
-              ($7 (nth 7 splits)))
-          (puthash $2 (list :title $7
-                            :level 0
-                            :line-number 1
-                            :exclude (not (string-blank-p $4))
-                            :tags (string-split $6 ":" t)
-                            :file-path (car file:lnum)
-                            :id $2
-                            :aliases (org-node-cache--aliases->list $3)
-                            :roam-refs (string-split $5 " " t)
-                            :backlink-ids (org-node-cache--backlinks->list $1))
-                   org-nodes))))))
-
-(defvar org-node-cache--raw-subtree-matches nil)
+    (with-temp-buffer
+      (dolist (file-head (string-split rg-result "--veryIntelligentSeparator--\n" t))
+        (let ((splits (string-split file-head "\f")))
+          (let ((file:lnum (string-split (nth 0 splits) ":" t))
+                ($1 (nth 1 splits))
+                ($2 (nth 2 splits))
+                ($3 (nth 3 splits))
+                (props nil))
+            (erase-buffer)
+            (insert $1)
+            (goto-char (point-min))
+            (while (not (eobp))
+              (dotimes (_ 3) (search-forward ":"))
+              (push (cons (upcase (buffer-substring-no-properties
+                                   (point) (1- (search-forward ":"))))
+                          (string-trim (buffer-substring-no-properties
+                                        (point) (line-end-position))))
+                    props)
+              (forward-line 1))
+            (let ((id (cdr (assoc "ID" props))))
+              (when id
+                (puthash id (list
+                             :title $3
+                             :level 0
+                             :line-number 1
+                             :tags (string-split $2 ":" t)
+                             :file-path (car file:lnum)
+                             :id id
+                             :exclude (cdr (assoc "ROAM_EXCLUDE" props))
+                             :aliases
+                             (org-node-cache--aliases->list
+                              (cdr (assoc "ROAM_ALIASES" props)))
+                             :roam-refs
+                             (when-let ((refs (cdr (assoc "ROAM_REFS" props))))
+                               (string-split refs " " t))
+                             :backlink-ids
+                             (org-node-cache--backlinks->list
+                              (cdr (assoc "CACHED_BACKLINKS" props))))
+                         org-nodes)))))))))
 
 (defun org-node-cache--collect-subtree-nodes (target)
   "Scan TARGET (a file or directory) for subtree ID nodes."
-  (setq org-node-cache--raw-subtree-matches nil)
   (let ((rg-result
          (apply #'org-node-cache--program-output "rg"
                 `("--multiline"
@@ -266,38 +271,42 @@ hand, you get no shell magic such as globs or envvars."
                 ($2 (nth 2 splits))
                 ($3 (nth 3 splits))
                 ($4 (nth 4 splits))
-                ($5 (nth 5 splits)))
+                ($5 (nth 5 splits))
+                (props nil))
             (erase-buffer)
             (insert $5)
             (goto-char (point-min))
-            (let ((props nil))
-              (while (not (eobp))
-                (search-forward ":")
-                (search-forward ":")
-                (search-forward ":")
-                (push (cons (upcase (buffer-substring-no-properties
-                                     (point) (1- (search-forward ":"))))
-                            (string-trim (buffer-substring-no-properties
-                                          (point) (line-end-position))))
-                      props)
-                (forward-line 1))
-              (puthash $3 (list :title $3
-                                :is-subtree t
-                                :level (length $1)
-                                :line-number (string-to-number (cadr file:lnum))
-                                :tags (string-split $4 ":" t)
-                                :todo (unless (string-blank-p $2) $2)
-                                :file-path (car file:lnum)
-                                :properties props
-                                :id (cdr (assoc "ID" props))
-                                :exclude (cdr (assoc "ROAM_EXCLUDE" props))
-                                :aliases (org-node-cache--aliases->list
-                                          (cdr (assoc "ROAM_ALIASES" props)))
-                                :roam-refs (when-let ((refs (cdr (assoc "ROAM_REFS" props))))
-                                             (string-split refs " " t))
-                                :backlink-ids (org-node-cache--backlinks->list
-                                               (cdr (assoc "CACHED_BACKLINKS" props))))
-                       org-nodes))))))))
+            (while (not (eobp))
+              (dotimes (_ 3) (search-forward ":"))
+              (push (cons (upcase (buffer-substring-no-properties
+                                   (point) (1- (search-forward ":"))))
+                          (string-trim (buffer-substring-no-properties
+                                        (point) (line-end-position))))
+                    props)
+              (forward-line 1))
+            (let ((id (cdr (assoc "ID" props))))
+              (when id
+                (puthash $3 (list
+                             :title $3
+                             :is-subtree t
+                             :level (length $1)
+                             :line-number (string-to-number (cadr file:lnum))
+                             :tags (string-split $4 ":" t)
+                             :todo (unless (string-blank-p $2) $2)
+                             :file-path (car file:lnum)
+                             :properties props
+                             :id (cdr (assoc "ID" props))
+                             :exclude (cdr (assoc "ROAM_EXCLUDE" props))
+                             :aliases
+                             (org-node-cache--aliases->list
+                              (cdr (assoc "ROAM_ALIASES" props)))
+                             :roam-refs
+                             (when-let ((refs (cdr (assoc "ROAM_REFS" props))))
+                               (string-split refs " " t))
+                             :backlink-ids
+                             (org-node-cache--backlinks->list
+                              (cdr (assoc "CACHED_BACKLINKS" props))))
+                         org-nodes)))))))))
 
 (provide 'org-node-cache)
 
