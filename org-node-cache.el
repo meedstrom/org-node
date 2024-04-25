@@ -10,6 +10,7 @@ While the mode is active, commands such as `org-node-find' and
 `org-node-insert-link' do not need to update the cache every
 time."
   :global t
+  :group 'org-node
   (if org-node-cache-mode
       (progn
         (add-hook 'after-save-hook #'org-node-cache-file)
