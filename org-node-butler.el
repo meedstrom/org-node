@@ -1,9 +1,9 @@
-;;; org-node-butler.el -*- lexical-binding: t; -*-
+;;; org-node-backlink.el -*- lexical-binding: t; -*-
 
 (require 'org-node-common)
 
 ;;;###autoload
-(define-minor-mode org-node-butler-mode
+(define-minor-mode org-node-backlink-mode
   "Keep Org buffers in good state to be grepped.
 This involves:
 
@@ -12,60 +12,47 @@ This involves:
 - updating the :CACHED_BACKLINKS: properties"
   :global t
   :group 'org-node
-  (if org-node-butler-mode
+  (if org-node-backlink-mode
       (progn
         ;; hate the UX of before-save-hook, should probably hard depend on
         ;; apheleia or such system
-        (add-hook 'before-save-hook #'org-node-butler-fix-buffer)
-        (add-hook 'org-roam-post-node-insert-hook #'org-node-butler--add-backlink-to-here-in-target-a -99)
-        (add-hook 'org-node-insert-link-hook #'org-node-butler--add-backlink-to-here-in-target-a -99)
-        (advice-add 'org-insert-link :after #'org-node-butler--add-backlink-to-here-in-target-a))
-    (remove-hook 'before-save-hook #'org-node-butler-fix-buffer)
-    (remove-hook 'org-roam-post-node-insert-hook #'org-node-butler--add-backlink-to-here-in-target-a)
-    (remove-hook 'org-node-insert-link-hook #'org-node-butler--add-backlink-to-here-in-target-a)
-    (advice-remove 'org-insert-link #'org-node-butler--add-backlink-to-here-in-target-a)))
-
-(defcustom org-node-butler-upcase-properties t
-  "Whether to upcase or downcase all :PROPERTIES:."
-  :group 'org-node
-  :type 'boolean)
-
-(defcustom org-node-butler-upcase-keywords nil
-  "Whether to upcase or downcase file keywords such as #+title."
-  :group 'org-node
-  :type 'boolean)
+        (add-hook 'before-save-hook #'org-node-backlink-check-buffer)
+        (add-hook 'org-roam-post-node-insert-hook #'org-node-backlink--add-to-here-in-target-a -99)
+        (add-hook 'org-node-insert-link-hook #'org-node-backlink--add-to-here-in-target-a -99)
+        (advice-add 'org-insert-link :after #'org-node-backlink--add-to-here-in-target-a))
+    (remove-hook 'before-save-hook #'org-node-backlink-check-buffer)
+    (remove-hook 'org-roam-post-node-insert-hook #'org-node-backlink--add-to-here-in-target-a)
+    (remove-hook 'org-node-insert-link-hook #'org-node-backlink--add-to-here-in-target-a)
+    (advice-remove 'org-insert-link #'org-node-backlink--add-to-here-in-target-a)))
 
 ;; Anything on `before-save-hook' MUST fail gracefully...
-(defun org-node-butler-fix-buffer ()
+(defun org-node-backlink-check-buffer ()
   "Designed for `before-save-hook'."
   (condition-case err
-      (progn
-        (org-node-butler--fix-findable-backlinks)
-        (org-node-butler--sort-properties)
-        (org-node-butler--sort-keywords))
+      (org-node-backlink--fix-findable-backlinks)
     ((t error debug)
-     (message "org-node-butler failed with message %s %s" (car err) (cdr err)))))
+     (message "org-node-backlink failed with message %s %s" (car err) (cdr err)))))
 
-(defvar org-node-butler--progress-total 0)
-(defvar org-node-butler--progress-total-backlinks 0)
-(defvar org-node-butler--progress-total-stale 0)
-(defvar org-node-butler--progress-file nil)
-(defvar org-node-butler--progress-total-worked 0)
-(defvar org-node-butler--progress-total-files 0)
+(defvar org-node-backlink--progress-total 0)
+(defvar org-node-backlink--progress-total-backlinks 0)
+(defvar org-node-backlink--progress-total-stale 0)
+(defvar org-node-backlink--progress-file nil)
+(defvar org-node-backlink--progress-total-worked 0)
+(defvar org-node-backlink--progress-total-files 0)
 
-(defun org-node-butler--progress-print-message ()
+(defun org-node-backlink--progress-print-message ()
   (message
    "Checking... (file %d/%d) link %d, added %d backlinks, removed %d stale, current file %s"
-   org-node-butler--progress-total-worked
-   org-node-butler--progress-total-files
-   org-node-butler--progress-total
-   org-node-butler--progress-total-backlinks
-   org-node-butler--progress-total-stale
-   org-node-butler--progress-file)
+   org-node-backlink--progress-total-worked
+   org-node-backlink--progress-total-files
+   org-node-backlink--progress-total
+   org-node-backlink--progress-total-backlinks
+   org-node-backlink--progress-total-stale
+   org-node-backlink--progress-file)
   (redisplay))
 
 ;; Separate function so the debugger don't have to step thru 2000 items
-(defun org-node-butler--pre-open (files total)
+(defun org-node-backlink--pre-open (files total)
   (let ((ctr-open 0)
         bufs)
     (dolist (file files)
@@ -87,22 +74,22 @@ This involves:
              auto-save-visited-mode
              git-auto-commit-mode)))
 
-(defvar org-node-butler--fixed (list))
-(defvar org-node-butler--had-work (list))
+(defvar org-node-backlink--fixed (list))
+(defvar org-node-backlink--had-work (list))
 
-(defun org-node-butler-fix-all ()
+(defun org-node-backlink-fix-all ()
   "Thoroughly check every file in `org-id-locations'.
 
 This ensures that all have up-to-date backlinks, and that
 org-node can collect other metadata.
 
 This command is not expected to ever be necessary if you always
-have `org-node-butler-mode' active.  Think of it as a spring
+have `org-node-backlink-mode' active.  Think of it as a spring
 cleaning."
   (interactive)
   (when current-prefix-arg
-    (setq org-node-butler--fixed nil))
-  (org-node-butler-mode 0)
+    (setq org-node-backlink--fixed nil))
+  (org-node-backlink-mode 0)
   (org-node--init-org-id-locations-or-die)
   (let* ((files (-uniq (hash-table-values org-id-locations)))
          (total (length files)))
@@ -118,62 +105,56 @@ cleaning."
             (auto-save-default nil)
             (org-inhibit-startup t)
             (gc-cons-threshold (max gc-cons-threshold 2000000000)))
-        (setq org-node-butler--progress-total-worked 0
-              org-node-butler--progress-total-files total
-              org-node-butler--progress-total 0
-              org-node-butler--progress-total-backlinks 0
-              org-node-butler--progress-total-stale 0)
+        (setq org-node-backlink--progress-total-worked 0
+              org-node-backlink--progress-total-files total
+              org-node-backlink--progress-total 0
+              org-node-backlink--progress-total-backlinks 0
+              org-node-backlink--progress-total-stale 0)
         ;; Pre-open all files, not just for performance, also correctness.
-        (setq bufs (org-node-butler--pre-open files total))
+        (setq bufs (org-node-backlink--pre-open files total))
         (condition-case err
             (progn
               (dolist (buf bufs)
-                (cl-incf org-node-butler--progress-total-worked)
-                (unless (member buf org-node-butler--fixed)
+                (cl-incf org-node-backlink--progress-total-worked)
+                (unless (member buf org-node-backlink--fixed)
                   (with-current-buffer buf
-                    (setq org-node-butler--progress-file (buffer-file-name))
-                    (and (not (member buf org-node-butler--had-work))
+                    (setq org-node-backlink--progress-file (buffer-file-name))
+                    (and (not (member buf org-node-backlink--had-work))
                          (not (eq t buffer-undo-list))
                          (not (null buffer-undo-list))
-                         (push buf org-node-butler--had-work))
+                         (push buf org-node-backlink--had-work))
                     (widen)
-                    (org-node-butler--fix-findable-backlinks t)
-                    (push buf org-node-butler--fixed))))
-              ;; Sort all files' properties only after all files have fixed each
-              ;; other's backlinks, ensuring no wasted work
-              (dolist (buf bufs)
-                (with-current-buffer buf
-                  (org-node-butler--sort-properties)
-                  (org-node-butler--sort-keywords))))
+                    (org-node-backlink--fix-findable-backlinks t)
+                    (push buf org-node-backlink--fixed)))))
           ((t error debug)
-           (when (> org-node-butler--progress-total-worked 10)
+           (when (> org-node-backlink--progress-total-worked 10)
              (message "Many buffers left unsaved"))
            (signal (car err) (cdr err)))
           (:success
-           (setq org-node-butler--fixed nil)
+           (setq org-node-backlink--fixed nil)
            (when (yes-or-no-p "Fixed all buffers!  Save them?")
              (dolist (buf bufs)
                (with-current-buffer buf
                  (save-buffer buf)
-                 (unless (member buf org-node-butler--had-work)
+                 (unless (member buf org-node-backlink--had-work)
                    (kill-buffer buf)))))
-           (org-node-butler-mode)
-           (when org-node-butler--fails
-             (delete-dups org-node-butler--fails)
+           (org-node-backlink-mode)
+           (when org-node-backlink--fails
+             (delete-dups org-node-backlink--fails)
              (org-node-die "All done, but couldn't find these IDs: \n%s%s"
-                           (string-join org-node-butler--fails "\n")
+                           (string-join org-node-backlink--fails "\n")
                            ;; In case it's a stupid-long warning
-                           (if (> (length org-node-butler--fails) 15)
+                           (if (> (length org-node-backlink--fails) 15)
                                "--- End warning ---"
                              "")))
-           (setq org-node-butler--fails nil)
+           (setq org-node-backlink--fails nil)
            (when (yes-or-no-p "Fixed all files!  Kill their buffers?")
              (dolist (buf bufs)
                (kill-buffer buf)))))))))
 
 ;; TODO: Much faster: just collect grep buffer of all the org-id-locations and
 ;;       suggest the user do wgrep + search and replace.
-(defun org-node-butler-regret (dir)
+(defun org-node-backlink-regret (dir)
   "Remove :CACHED_BACKLINKS: from all files under DIR."
   (interactive "DWipe :CACHED_BACKLINKS: from Org files under directory: ")
   (let ((ctr 0))
@@ -195,122 +176,12 @@ cleaning."
 
 ;;; Plumbing
 
-(defun org-node-butler--sort-keywords ()
-  "Rearrange file-level keywords like #+title alphabetically.
 
-This allows simple regular expressions to capture any set of
-keywords, meaning you can use grep instead of depending on the
-org element parser.
 
-Meant as an autoformatter, perhaps on `before-save-hook'."
-  (save-excursion
-    (and
-     (derived-mode-p 'org-mode)
-     (goto-char (point-min))
-     (re-search-forward "^#\\+" nil t)
-     ;; Rough check that we are in the front matter and not e.g. #+begin_src in
-     ;; a file without front matter.  There may be other things in the front
-     ;; matter but if there is no #+title, then it's not a proper node and there
-     ;; is no need to sort.
-     (org-get-title)
-     (let* ((beg (line-beginning-position))
-            (end (save-excursion
-                   (let ((far (re-search-forward "^$\\|^[^#]" nil t)))
-                     (goto-char beg)
-                     (while (re-search-forward "^#\\+" far t))
-                     (line-end-position))))
-            (prop-lines nil))
-       (when (not end)
-         (error "Something odd about keywords in %s" (current-buffer)))
-       (with-restriction beg end
-         (goto-char (point-min))
-         (while (not (eobp))
-           (if org-node-butler-upcase-keywords
-               (upcase-region (point) (search-forward ":"))
-             (downcase-region (point) (search-forward ":")))
-           (push (string-trim-right (buffer-substring-no-properties
-                                     (line-beginning-position)
-                                     (line-end-position)))
-                 prop-lines)
-           (forward-line 1))
-         (setq prop-lines (nreverse prop-lines))
-         (let ((sorted-lines (-sort #'string-lessp prop-lines)))
-           ;; If wasn't in alphabetic order, replace the region
-           (unless (equal sorted-lines prop-lines)
-             (atomic-change-group
-               (delete-region (point-min) (point-max))
-               (insert (string-join sorted-lines "\n"))))))))))
-
-;; TODO: Also ensure:
-;; - No initial whitespace before file-level properties
-;; - That single-word members of ROAM_ALIASES are still wrapped in quotes
-(defun org-node-butler--sort-properties ()
-  "Rearrange all Org property drawers alphabetically.
-
-This allows simple regular expressions to capture any set of
-properties, meaning you can use grep instead of depending on the
-org element parser.
-
-Meant as an autoformatter, perhaps on `before-save-hook'."
-  (when (derived-mode-p 'org-mode)
-    (save-excursion
-      (goto-char (point-min))
-      (let ((case-fold-search t))
-        (while (re-search-forward "^[ \t]*:properties:" nil t)
-          (unless (looking-at-p " *$")
-            (user-error "Text after :PROPERTIES: at %s" (point)))
-          (delete-horizontal-space)
-          (if org-node-butler-upcase-properties
-              (upcase-region (line-beginning-position) (line-end-position))
-            (downcase-region (line-beginning-position) (line-end-position)))
-          (let ((beg (1+ (point)))
-                (end (progn
-                       (re-search-forward "^[ \t]*:end:")
-                       (unless (looking-at-p " *$")
-                         (user-error "Text after :END: at %s" (point)))
-                       (delete-horizontal-space)
-                       (1- (line-beginning-position))))
-                (prop-lines nil))
-            (if org-node-butler-upcase-properties
-                (upcase-region (line-beginning-position) (line-end-position))
-              (downcase-region (line-beginning-position) (line-end-position)))
-            (with-restriction beg end
-              (goto-char (point-min))
-              (when (search-forward "\f" nil t)
-                ;; We reserve these chars to split matches from grep
-                (user-error
-                 "Form-feed characters in property drawer near %s" (point)))
-              (while (not (eobp))
-                (if org-node-butler-upcase-properties
-                    (upcase-region (search-forward ":") (search-forward ":"))
-                  (downcase-region (search-forward ":") (search-forward ":")))
-                (push (string-trim-right (buffer-substring-no-properties
-                                          (line-beginning-position)
-                                          (line-end-position)))
-                      prop-lines)
-                (forward-line 1))
-              (setq prop-lines (nreverse prop-lines))
-              (dolist (line prop-lines)
-                (unless (string-match-p "^[ \t]*:[[:alpha:]]" line)
-                  (org-node-die "Drawer looks strange at %d in %s%s"
-                                (point) (buffer-file-name)
-                                ", can be a missing :END: or some such")))
-              (let* ((sorted-lines (-sort #'string-lessp prop-lines)))
-                ;; If wasn't in alphabetic order, replace the region
-                (unless (equal sorted-lines prop-lines)
-                  (atomic-change-group
-                    (delete-region (point-min) (point-max))
-                    (insert (string-join sorted-lines "\n"))))))
-            ;; https://github.com/meedstrom/quickroam/issues/1
-            (search-forward ":end:")
-            (forward-line 1)
-            (when (looking-at-p "\\*")
-              (open-line 1))))))))
-
-(defvar org-node-butler--fails nil
+(defvar org-node-backlink--fails nil
   "List of IDs that could not be resolved.")
 
-(defun org-node-butler--target-has-link-to-here-p ()
+(defun org-node-backlink--target-has-link-to-here-p ()
   "Visit link at point and check if it has a backlink to here."
   ;; NB: Do not use `org-element-property' because it ignores links on property
   ;; lines.  That's also why org-roam won't double-count our backlinks, because
@@ -340,16 +211,16 @@ Meant as an autoformatter, perhaps on `before-save-hook'."
                                        (not (org-at-comment-p)))
                              return t)))))))))))
 
-(defun org-node-butler--add-backlink-to-here-in-target-a (&rest _)
+(defun org-node-backlink--add-to-here-in-target-a (&rest _)
   "Meant as advice after commands that insert a link.
-See `org-node-butler--add-backlink-to-here-in-target', this is
+See `org-node-backlink--add-backlink-to-here-in-target', this is
 merely a wrapper that drops the input."
-  (org-node-butler--add-backlink-to-here-in-target))
+  (org-node-backlink--add-backlink-to-here-in-target))
 
-(defun org-node-butler--add-backlink-to-here-in-target (&optional part-of-mass-op)
+(defun org-node-backlink--add-backlink-to-here-in-target (&optional part-of-mass-op)
   "Visit the link under point and leave a backlink.
 
-Then call `org-node-butler--sort-properties' (in the target file) to ensure the
+Then call `org-node-backlink--sort-properties' (in the target file) to ensure the
 backlink is in the correct place.  That's an expensive operation
 if repeated many times, so with optional argument
 PART-OF-MASS-OP, do not do that and assume the caller will do it
@@ -368,7 +239,7 @@ later."
               (src-link (concat "[[id:" src-id "][" src-title "]]"))
               (target-file (or (org-id-find-id-file target-id)
                                (progn
-                                 (push target-id org-node-butler--fails)
+                                 (push target-id org-node-backlink--fails)
                                  (user-error "ID not found \"%s\"%s"
                                              target-id
                                              org-node--standard-tip)))))
@@ -383,7 +254,7 @@ later."
            (if (not (re-search-forward
                      (concat "^[ \t]*:id: +" (regexp-quote target-id))
                      nil t))
-               (push target-id org-node-butler--fails)
+               (push target-id org-node-backlink--fails)
              (let ((backlinks-string (org-entry-get nil "CACHED_BACKLINKS"))
                    new-value)
                (if backlinks-string
@@ -408,27 +279,26 @@ later."
                  (setq new-value src-link))
                (unless (equal backlinks-string new-value)
                  (org-entry-put nil "CACHED_BACKLINKS" new-value)
-                 (cl-incf org-node-butler--progress-total-backlinks)
+                 (cl-incf org-node-backlink--progress-total-backlinks)
                  (unless part-of-mass-op
-                   (org-node-butler--sort-properties)
                    (and org-file-buffer-created
                         (buffer-modified-p)
                         (save-buffer))))
                (when otm (org-transclusion-mode))))))))))
 
-(defvar org-node-butler--last-warnings nil)
+(defvar org-node-backlink--last-warnings nil)
 
-(defun org-node-butler--fix-findable-backlinks (&optional part-of-mass-op)
+(defun org-node-backlink--fix-findable-backlinks (&optional part-of-mass-op)
   "Visit all [[id:... links and give the targets a backlink.
 Also clean current file's own backlinks, by visiting them and
 checking whether they still have a reference to the current file.
 
 Note what that means.  This never generates new backlinks in the
 current buffer, as that would require searching the world!  That
-is why `org-node-butler-mode' advises link-insertion commands,
+is why `org-node-backlink-mode' advises link-insertion commands,
 taking care of the other side of the equation.
 
-To do a mass fix, try \\[org-node-butler-fix-all].
+To do a mass fix, try \\[org-node-backlink-fix-all].
 
 Optional argument PART-OF-MASS-OP means skip some cleanup."
   ;; INFO For all the link regexps see `org-link-make-regexps' in org-el
@@ -438,7 +308,7 @@ Optional argument PART-OF-MASS-OP means skip some cleanup."
       (while (re-search-forward org-link-bracket-re nil t)
         (let ((beg (match-beginning 0))
               (end (match-end 0)))
-          (cl-incf org-node-butler--progress-total)
+          (cl-incf org-node-backlink--progress-total)
           (cond
            ;; On a # comment or #+keyword, ignore
            ((save-excursion
@@ -453,10 +323,10 @@ Optional argument PART-OF-MASS-OP means skip some cleanup."
                     (and (looking-at org-property-re)
                          (string-equal-ignore-case (match-string 2)
                                                    "CACHED_BACKLINKS"))))
-                (org-node-butler--in-backlinks-drawer-p))
+                (org-node-backlink--in-backlinks-drawer-p))
             ;; REVIEW: ensure it works
-            (unless (org-node-butler--target-has-link-to-here-p)
-              (cl-incf org-node-butler--progress-total-stale)
+            (unless (org-node-backlink--target-has-link-to-here-p)
+              (cl-incf org-node-backlink--progress-total-stale)
               (kill-region beg end)
               ;; Delete when there's nothing left
               (let ((prop (org-entry-get nil "CACHED_BACKLINKS")))
@@ -464,19 +334,19 @@ Optional argument PART-OF-MASS-OP means skip some cleanup."
                   (org-entry-delete nil "CACHED_BACKLINKS")))))
            ;; Not a backlink, so it's a regular forward-link - add a backlink
            (t
-            (org-node-butler--add-backlink-to-here-in-target part-of-mass-op))))
+            (org-node-backlink--add-backlink-to-here-in-target part-of-mass-op))))
         (when part-of-mass-op
-          (org-node-butler--progress-print-message))))
+          (org-node-backlink--progress-print-message))))
     (and (not part-of-mass-op)
-         org-node-butler--fails
-         (not (equal org-node-butler--fails org-node-butler--last-warnings))
+         org-node-backlink--fails
+         (not (equal org-node-backlink--fails org-node-backlink--last-warnings))
          (message "Sought backlinks but couldn't find these IDs: %s"
-                  (string-join org-node-butler--fails "\n"))
-         (setq org-node-butler--last-warnings org-node-butler--fails)
-         (setq org-node-butler--fails nil))))
+                  (string-join org-node-backlink--fails "\n"))
+         (setq org-node-backlink--last-warnings org-node-backlink--fails)
+         (setq org-node-backlink--fails nil))))
 
 ;; Can't find an Org builtin to check if we are inside a drawer
-(defun org-node-butler--in-backlinks-drawer-p ()
+(defun org-node-backlink--in-backlinks-drawer-p ()
   (save-match-data
     (let ((case-fold-search t))
       (let ((drawer-beg-above
@@ -493,4 +363,4 @@ Optional argument PART-OF-MASS-OP means skip some cleanup."
 
 (provide 'org-node-butler)
 
-;;; org-node-butler.el ends here
+;;; org-node-backlink.el ends here

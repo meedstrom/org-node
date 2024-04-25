@@ -68,7 +68,7 @@
   "Designed for `org-mode-hook' and will remove itself."
   (require 'org-node-butler)
   (remove-hook 'org-mode-hook #'org-node-enable)
-  (org-node-butler-mode)
+  (org-node-backlink-mode)
   (org-node-cache-mode))
 
 (defcustom org-node-slug-fn #'org-node-slugify-as-url
