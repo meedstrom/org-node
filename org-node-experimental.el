@@ -192,7 +192,13 @@ transform it into a list of IDs in FILE."
   (org-node-experimental--calc-file-outlines target)
   (org-node-experimental--collect-subtree-nodes target))
 
-;; Alternative approach using affixation/annotation
+;; Alternative approach using affixation/annotation...  OK, I get it. If we want
+;; to allow duplicate titles, there must be some extra string inside the
+;; candidate to uniquify it (so added already at the format-candidate-fn stage).
+;; Then we can either use that info in the :affixation-function, or just skip
+;; this step and add text properties to the info substring already in the
+;; format-candidate-fn.
+;;
 ;; (defun org-node-experimental--read ()
 ;;   (let ((completion-extra-properties
 ;;          (list :affixation-function
