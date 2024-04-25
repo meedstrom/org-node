@@ -335,10 +335,13 @@ To behave like `org-roam-node-find' when creating new nodes, set
           (let ((result (funcall org-node-creation-fn)))
             (when (bufferp result)
               (switch-to-buffer result)))
-        ((t debug error :success)
+        ((t debug error)
          (setq org-node-proposed-title nil)
          (setq org-node-proposed-id nil)
-         (signal (car err) (cdr err)))))))
+         (signal (car err) (cdr err)))
+        (:success
+         (setq org-node-proposed-title nil)
+         (setq org-node-proposed-id nil))))))
 
 ;;;###autoload
 (defun org-node-insert-link ()
@@ -390,10 +393,13 @@ If you find the behavior different, perhaps you have something in
           (let ((result (funcall org-node-creation-fn)))
             (when (bufferp result)
               (switch-to-buffer result)))
-        ((t debug error :success)
+        ((t debug error)
          (setq org-node-proposed-title nil)
          (setq org-node-proposed-id nil)
-         (signal (car err) (cdr err)))))))
+         (signal (car err) (cdr err)))
+        (:success
+         (setq org-node-proposed-title nil)
+         (setq org-node-proposed-id nil))))))
 
 ;;;###autoload
 (defun org-node-insert-transclusion-as-subtree ()
