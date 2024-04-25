@@ -361,6 +361,6 @@ Optional argument PART-OF-MASS-OP means skip some cleanup."
              (if drawer-end-above (> drawer-end-above drawer-beg-above) t)
              (if drawer-beg-below (> drawer-end-below drawer-beg-below) t))))))
 
-(provide 'org-node-butler)
+(provide 'org-node-backlink)
 
 ;;; org-node-backlink.el ends here
