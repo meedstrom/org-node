@@ -39,7 +39,7 @@
 ;; To make these commands as fast as can be, enable `org-node-cache-mode'.
 ;;
 ;; Later on, AFTER you read and understood the readme, there is also
-;; `org-node-butler-mode'.  Read the readme to know what it does.
+;; `org-node-backlink-mode'.  Read the readme to know what it does.
 
 ;;; Code:
 
@@ -55,7 +55,7 @@
 ;; TODO Command to grep across all files (then deprecate the regret command, and teach the user wgrep)
 ;; TODO Command to insert link into :BACKLINKS:
 ;; TODO React to any org-element-cache error (they're common) and disable the cache during fix-all
-;; TODO Use fundamental-mode in `org-node-butler-fix-all'
+;; TODO Use fundamental-mode in `org-node-backlink-fix-all'
 ;; TODO Command to explore feedback arc sets
 ;; TODO Bit of a test suite
 
@@ -65,7 +65,7 @@
 ;;;###autoload
 (defun org-node-enable ()
   "Designed for `org-mode-hook' and will remove itself."
-  (require 'org-node-butler)
+  (require 'org-node-backlink)
   (remove-hook 'org-mode-hook #'org-node-enable)
   (org-node-backlink-mode)
   (org-node-cache-mode))
