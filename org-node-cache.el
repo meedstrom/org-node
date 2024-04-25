@@ -171,12 +171,10 @@ hand, you get no shell magic such as globs or envvars."
 (defconst org-node-cache--file-level-re
   (rxt-elisp-to-pcre
    (rx bol ":PROPERTIES:" (* space)
-       (group (*? "\n:" (not space) (* nonl)))
+       (group (+? "\n:" (not space) (* nonl)))
        "\n:END:" (* space)
        (*? "\n" (* nonl))
-       (? "\n#+filetags:" (* space) (group (+ nonl)))
-       (*? "\n" (* nonl))
-       "\n#+title:" (* space) (group (+ nonl))))
+       (group (+ "\n#+" (* nonl)))))
   "Regexp to match file-level nodes.")
 
 ;; How do people live without `rx'?
@@ -187,6 +185,7 @@ hand, you get no shell magic such as globs or envvars."
        (? (group (regexp (org-node-cache--make-todo-regexp))) (+ space)) ; TODO
        (group (+? nonl))                                     ; Heading title
        (? (+ space) (group ":" (+? nonl) ":")) (* space)     ; :tags:
+       ;; TODO Maybe clearer to formulate elisp to process the whole line than a regexp
        ;; (? "\n" (* space) (group "DEADLINE: " (+ (not (any ">]"))))  (not (any " *")) (* nonl))
        (? "\n" (* space) (not (any " *")) (* nonl))          ; CLOSED/SCHEDULED
        ;; We needed to set case-sensitivity to catch todo keywords, so now we
@@ -197,7 +196,8 @@ hand, you get no shell magic such as globs or envvars."
 
 (defun org-node-cache--collect-file-level-nodes (target)
   "Scan TARGET (a file or directory) for file-level ID nodes."
-  (let ((rg-result
+  (let ((case-fold-search t)
+        (rg-result
          (apply #'org-node-cache--program-output "rg"
                 `("--multiline"
                   "--ignore-case"
@@ -216,8 +216,7 @@ hand, you get no shell magic such as globs or envvars."
           (let ((file:lnum (string-split (nth 0 splits) ":" t))
                 ($1 (nth 1 splits))
                 ($2 (nth 2 splits))
-                ($3 (nth 3 splits))
-                (props nil))
+                props id title tags)
             (erase-buffer)
             (insert $1)
             (goto-char (point-min))
@@ -229,26 +228,37 @@ hand, you get no shell magic such as globs or envvars."
                                         (point) (line-end-position))))
                     props)
               (forward-line 1))
-            (let ((id (cdr (assoc "ID" props))))
-              (when id
-                (puthash id (list
-                             :title $3
-                             :level 0
-                             :line-number 1
-                             :tags (string-split $2 ":" t)
-                             :file-path (car file:lnum)
-                             :id id
-                             :exclude (cdr (assoc "ROAM_EXCLUDE" props))
-                             :aliases
-                             (org-node-cache--aliases->list
-                              (cdr (assoc "ROAM_ALIASES" props)))
-                             :roam-refs
-                             (when-let ((refs (cdr (assoc "ROAM_REFS" props))))
-                               (string-split refs " " t))
-                             :backlink-ids
-                             (org-node-cache--backlinks->list
-                              (cdr (assoc "CACHED_BACKLINKS" props))))
-                         org-nodes)))))))))
+            (let ((beg (point)))
+              (insert $2)
+              (goto-char beg)
+              (when (search-forward "#+title: " nil t)
+                (setq title (string-trim (buffer-substring-no-properties
+                                          (point) (line-end-position)))))
+              (goto-char beg)
+              (when (search-forward "#+filetags: " nil t)
+                (setq tags (string-trim (buffer-substring-no-properties
+                                         (point) (line-end-position))))))
+            (setq id (cdr (assoc "ID" props)))
+            (when (and id title)
+              (puthash id (list
+                           :title title
+                           :level 0
+                           :line-number 1
+                           :file-path (car file:lnum)
+                           :id id
+                           :tags (and tags (string-split tags ":" t))
+                           :exclude
+                           (let ((exclude (cdr (assoc "ROAM_EXCLUDE" props))))
+                             (and exclude (not (string-blank-p exclude))))
+                           :aliases (org-node-cache--aliases->list
+                                     (cdr (assoc "ROAM_ALIASES" props)))
+                           :roam-refs
+                           (let ((refs (cdr (assoc "ROAM_REFS" props))))
+                             (and refs (string-split refs " " t)))
+                           :backlink-origins
+                           (org-node-cache--backlinks->list
+                            (cdr (assoc "CACHED_BACKLINKS" props))))
+                       org-nodes))))))))
 
 (defun org-node-cache--collect-subtree-nodes (target)
   "Scan TARGET (a file or directory) for subtree ID nodes."
@@ -272,7 +282,8 @@ hand, you get no shell magic such as globs or envvars."
                 ($3 (nth 3 splits))
                 ($4 (nth 4 splits))
                 ($5 (nth 5 splits))
-                (props nil))
+                (props nil)
+                (id nil))
             (erase-buffer)
             (insert $5)
             (goto-char (point-min))
@@ -284,29 +295,26 @@ hand, you get no shell magic such as globs or envvars."
                                         (point) (line-end-position))))
                     props)
               (forward-line 1))
-            (let ((id (cdr (assoc "ID" props))))
-              (when id
-                (puthash $3 (list
-                             :title $3
-                             :is-subtree t
-                             :level (length $1)
-                             :line-number (string-to-number (cadr file:lnum))
-                             :tags (string-split $4 ":" t)
-                             :todo (unless (string-blank-p $2) $2)
-                             :file-path (car file:lnum)
-                             :properties props
-                             :id (cdr (assoc "ID" props))
-                             :exclude (cdr (assoc "ROAM_EXCLUDE" props))
-                             :aliases
-                             (org-node-cache--aliases->list
-                              (cdr (assoc "ROAM_ALIASES" props)))
-                             :roam-refs
-                             (when-let ((refs (cdr (assoc "ROAM_REFS" props))))
-                               (string-split refs " " t))
-                             :backlink-ids
-                             (org-node-cache--backlinks->list
-                              (cdr (assoc "CACHED_BACKLINKS" props))))
-                         org-nodes)))))))))
+            (setq id (cdr (assoc "ID" props)))
+            (puthash
+             (or id (format-time-string "%N"))
+             (list :title $3
+                   :is-subtree t
+                   :level (length $1)
+                   :line-number (string-to-number (cadr file:lnum))
+                   :tags (string-split $4 ":" t)
+                   :todo (unless (string-blank-p $2) $2)
+                   :file-path (car file:lnum)
+                   :properties props
+                   :id (cdr (assoc "ID" props))
+                   :exclude (cdr (assoc "ROAM_EXCLUDE" props))
+                   :aliases (org-node-cache--aliases->list
+                             (cdr (assoc "ROAM_ALIASES" props)))
+                   :roam-refs (when-let ((refs (cdr (assoc "ROAM_REFS" props))))
+                                (string-split refs " " t))
+                   :backlink-ids (org-node-cache--backlinks->list
+                                  (cdr (assoc "CACHED_BACKLINKS" props))))
+             org-nodes)))))))
 
 (provide 'org-node-cache)
 
