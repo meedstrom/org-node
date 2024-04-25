@@ -43,26 +43,18 @@
 
 ;;; Code:
 
-;; Good to do soon
-;;
 ;; TODO Ensure that ROAM_ALIASES are always wrapped in quotes
 ;; TODO Test each user commmand again
 ;; TODO Annotations for completion
 ;; TODO Completion category https://github.com/alphapapa/org-ql/issues/299
-
-;; Other todos
-;;
+;; TODO Allow inserting link to alias and keep the alias as link description
+;;      (requires the format-fn not to alter the completion)
 ;; TODO Test with plain org-capture
 ;; TODO Write example capture template
 ;; TODO Maybe move user commands into a -commands.el and minimize the core
 ;; TODO Command to grep across all files (then deprecate the regret command, and teach the user wgrep)
-;; TODO Command to visit a random node
 ;; TODO Command to insert link into :BACKLINKS:
-;; TODO Avoid double-counting links inside :BACKLINKS:
 ;; TODO React to any org-element-cache error (they're common) and disable the cache during fix-all
-
-;; Stretch todos
-;;
 ;; TODO Use fundamental-mode in `org-node-butler-fix-all'
 ;; TODO Command to explore feedback arc sets
 ;; TODO Bit of a test suite
