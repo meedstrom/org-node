@@ -145,10 +145,12 @@ first element."
 
 (defun org-node--visit-get-pos (node)
   "Visit NODE and return the char position where it starts."
-  (with-temp-buffer
-    (insert-file-contents (plist-get node :file-path))
-    (forward-line (1- (plist-get node :line-number)))
-    (point)))
+  (if (plist-get node :is-subtree)
+      (with-temp-buffer
+        (insert-file-contents (plist-get node :file-path))
+        (forward-line (1- (plist-get node :line-number)))
+        (point))
+    1))
 
 (defun org-node--visit-get-file-title (node)
   (org-with-file-buffer (plist-get node :file)

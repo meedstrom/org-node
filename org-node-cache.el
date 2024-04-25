@@ -324,8 +324,9 @@ hand, you get no shell magic such as globs or envvars."
                    :properties props
                    :id (cdr (assoc "ID" props))
                    :exclude (cdr (assoc "ROAM_EXCLUDE" props))
-                   :aliases (org-node-cache--aliases->list
-                             (cdr (assoc "ROAM_ALIASES" props)))
+                   :aliases
+                   (let ((aliases (cdr (assoc "ROAM_ALIASES" props))))
+                     (and aliases (split-string-and-unquote aliases)))
                    :roam-refs (when-let ((refs (cdr (assoc "ROAM_REFS" props))))
                                 (string-split refs " " t))
                    :backlink-origins (org-node-cache--backlinks->list
