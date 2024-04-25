@@ -142,15 +142,17 @@ BACKLINKS-STRING, and collect the \"abcd\" parts into a list.
 At least if its assumptions about STR are correct, which it does
 not check."
     (declare (pure t) (side-effect-free t))
-    (string-split (replace-regexp-in-string regexp "\\1" backlinks-string)
-                  "  " t)))
+    (if backlinks-string
+        (string-split (replace-regexp-in-string regexp "\\1" backlinks-string)
+                      "  " t))))
 
 (defun org-node-cache--aliases->list (aliases-string)
   "Turn ALIASES-STRING into a list.
 Assumes that each alias comes wrapped in double-quotes."
   (declare (pure t) (side-effect-free t))
-  (string-split (string-replace "\" \"" "\"\f\"" aliases-string)
-                "\f" t))
+  (if aliases-string
+      (string-split (string-replace "\" \"" "\"\f\"" aliases-string)
+                    "\f" t)))
 
 (defun org-node-cache--program-output (program &rest args)
   "Like `shell-command-to-string', but skip the shell intermediary.
@@ -195,22 +197,12 @@ hand, you get no shell magic such as globs or envvars."
        (? (group (regexp (org-node-cache--make-todo-regexp))) (+ space)) ; TODO
        (group (+? nonl))                                     ; Heading title
        (? (+ space) (group ":" (+? nonl) ":")) (* space)     ; :tags:
+       ;; (? "\n" (* space) (group "DEADLINE: " (+ (not (any ">]"))))  (not (any " *")) (* nonl))
        (? "\n" (* space) (not (any " *")) (* nonl))          ; CLOSED/SCHEDULED
        ;; We needed to set case-sensitivity to catch todo keywords, so now we
        ;; fake insensitivity
        "\n" (* space) (or ":PROPERTIES:" ":properties:")
-       (*? "\n" (* space) ":" (not space) (+ nonl))
-       (?  "\n" (* space) (or ":CACHED_BACKLINKS:" ":cached_backlinks:") (+ space) (group (+ nonl)))
-       (*? "\n" (* space) ":" (not space) (+ nonl))
-       ;; Other properties are optional, but ID is mandatory
-       "\n" (* space) (or ":ID:" ":id:")                                 (+ space) (group (+ nonl))
-       (*? "\n" (* space) ":" (not space) (+ nonl))
-       (?  "\n" (* space) (or ":ROAM_ALIASES:" ":roam_aliases:")         (+ space) (group (+ nonl)))
-       (*? "\n" (* space) ":" (not space) (+ nonl))
-       (?  "\n" (* space) (or ":ROAM_EXCLUDE:" ":roam_exclude:")         (+ space) (group (+ nonl)))
-       (*? "\n" (* space) ":" (not space) (+ nonl))
-       (?  "\n" (* space) (or ":ROAM_REFS:" ":roam_refs:")               (+ space) (group (+ nonl)))
-       (*? "\n" (* space) ":" (not space) (+ nonl))
+       (group (+? "\n" (* space) ":" (not space) (+ nonl)))
        "\n" (* space) (or ":END:" ":end:"))))
 
 (defun org-node-cache--collect-file-level-nodes (target)
@@ -250,8 +242,11 @@ hand, you get no shell magic such as globs or envvars."
                             :backlink-ids (org-node-cache--backlinks->list $1))
                    org-nodes))))))
 
+(defvar org-node-cache--raw-subtree-matches nil)
+
 (defun org-node-cache--collect-subtree-nodes (target)
   "Scan TARGET (a file or directory) for subtree ID nodes."
+  (setq org-node-cache--raw-subtree-matches nil)
   (let ((rg-result
          (apply #'org-node-cache--program-output "rg"
                 `("--multiline"
@@ -259,35 +254,50 @@ hand, you get no shell magic such as globs or envvars."
                   "--line-number"
                   "--only-matching"
                   "--replace"
-                  "\f$1\f$2\f$3\f$4\f$5\f$6\f$7\f$8\f$9--veryIntelligentSeparator--"
+                  "\f$1\f$2\f$3\f$4\f$5--veryIntelligentSeparator--"
                   ,@org-node-cache-extra-rg-args
                   ,(org-node-cache--calc-subtree-re)
                   ,target))))
-    (dolist (subtree (string-split rg-result "--veryIntelligentSeparator--\n" t))
-      (let ((splits (string-split subtree "\f")))
-        (let ((file:lnum (string-split (nth 0 splits) ":" t))
-              ($1 (nth 1 splits))
-              ($2 (nth 2 splits))
-              ($3 (nth 3 splits))
-              ($4 (nth 4 splits))
-              ($5 (nth 5 splits))
-              ($6 (nth 6 splits))
-              ($7 (nth 7 splits))
-              ($8 (nth 8 splits))
-              ($9 (nth 9 splits)))
-          (puthash $6 (list :title $3
-                            :is-subtree t
-                            :level (length $1)
-                            :line-number (string-to-number (cadr file:lnum))
-                            :exclude (not (string-blank-p $8))
-                            :tags (string-split $4 ":" t)
-                            :todo (unless (string-blank-p $2) $2)
-                            :file-path (car file:lnum)
-                            :id $6
-                            :aliases (org-node-cache--aliases->list $7)
-                            :roam-refs (string-split $9 " " t)
-                            :backlink-ids (org-node-cache--backlinks->list $5))
-                   org-nodes))))))
+    (with-temp-buffer
+      (dolist (subtree (string-split rg-result "--veryIntelligentSeparator--\n" t))
+        (let ((splits (string-split subtree "\f")))
+          (let ((file:lnum (string-split (nth 0 splits) ":" t))
+                ($1 (nth 1 splits))
+                ($2 (nth 2 splits))
+                ($3 (nth 3 splits))
+                ($4 (nth 4 splits))
+                ($5 (nth 5 splits)))
+            (erase-buffer)
+            (insert $5)
+            (goto-char (point-min))
+            (let ((props nil))
+              (while (not (eobp))
+                (search-forward ":")
+                (search-forward ":")
+                (search-forward ":")
+                (push (cons (upcase (buffer-substring-no-properties
+                                     (point) (1- (search-forward ":"))))
+                            (string-trim (buffer-substring-no-properties
+                                          (point) (line-end-position))))
+                      props)
+                (forward-line 1))
+              (puthash $3 (list :title $3
+                                :is-subtree t
+                                :level (length $1)
+                                :line-number (string-to-number (cadr file:lnum))
+                                :tags (string-split $4 ":" t)
+                                :todo (unless (string-blank-p $2) $2)
+                                :file-path (car file:lnum)
+                                :properties props
+                                :id (cdr (assoc "ID" props))
+                                :exclude (cdr (assoc "ROAM_EXCLUDE" props))
+                                :aliases (org-node-cache--aliases->list
+                                          (cdr (assoc "ROAM_ALIASES" props)))
+                                :roam-refs (when-let ((refs (cdr (assoc "ROAM_REFS" props))))
+                                             (string-split refs " " t))
+                                :backlink-ids (org-node-cache--backlinks->list
+                                               (cdr (assoc "CACHED_BACKLINKS" props))))
+                       org-nodes))))))))
 
 (provide 'org-node-cache)
 
