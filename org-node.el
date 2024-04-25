@@ -235,6 +235,112 @@ deduplicated, as if :unique t."
                   :point (org-roam-node-point roam-object-that-contains-link)
                   :properties nil))))))
 
+(defun org-node-feed-roam-db ()
+  (require 'org-roam)
+  (org-node-cache-ensure-fresh)
+  (org-roam-db--close)
+  (org-roam-db-clear-all)
+  ;; (emacsql-with-transaction
+  (emacsql-with-connection (db (org-roam-db))
+    (emacsql db [:begin :transaction])
+    (cl-loop
+     with ctr = 0
+     with max = (hash-table-count org-nodes)
+     for node being the hash-values of org-nodes
+     do (let ((id (plist-get node :id))
+              (file-path (plist-get node :file-path))
+              (tags (plist-get node :tags))
+              (aliases (plist-get node :aliases))
+              (roam-refs (plist-get node :roam-refs))
+              (title (plist-get node :title))
+              (properties (plist-get node :properties))
+              (backlink-origins (plist-get node :backlink-origins))
+              (is-subtree (plist-get node :is-subtree))
+              (pos (org-node--visit-get-pos node)))
+          (when (= 0 (% (cl-incf ctr) 20))
+            (message "Inserting into SQL DB... %d/%d" ctr max))
+          ;; `org-roam-db-insert-file'
+          (emacsql db
+                   [:insert :into files
+                    :values $v1]
+                   (list (vector file-path nil "" "" "")))
+          ;; `org-roam-db-insert-aliases'
+          (when aliases
+            (emacsql db
+                     [:insert :into aliases
+                      :values $v1]
+                     (mapcar (lambda (alias)
+                               (vector id alias))
+                             aliases)))
+          ;; `org-roam-db-insert-tags'
+          (when tags
+            (emacsql db
+                     [:insert :into tags
+                      :values $v1]
+                     (mapcar (lambda (tag)
+                               (vector id tag))
+                             tags)))
+          ;; `org-roam-db-insert-node-data'
+          ;; TODO actually sposed to insert formatted title, see src
+          (when is-subtree
+            (let ((file file-path)
+                  (todo (plist-get node :todo))
+                  (priority nil)
+                  (level (plist-get node :level))
+                  (scheduled (when-let ((scheduled (plist-get node :scheduled)))
+                               (format-time-string
+                                "%FT%T%z"
+                                (encode-time (org-parse-time-string scheduled)))))
+                  (deadline (when-let ((deadline (plist-get node :deadline)))
+                              (format-time-string
+                               "%FT%T%z"
+                               (encode-time (org-parse-time-string deadline)))))
+                  (olp nil))
+              (emacsql db
+                       [:insert :into nodes
+                        :values $v1]
+                       (vector id file level pos todo priority
+                               scheduled deadline title properties olp))))
+          ;; `org-roam-db-insert-file-node'
+          (when (not is-subtree)
+            (let ((file file-path)
+                  (pos 1)
+                  (todo nil)
+                  (priority nil)
+                  (scheduled nil)
+                  (deadline nil)
+                  (level 0)
+                  (tags tags) ;; meaning is a bit off
+                  (olp nil))
+              (emacsql db
+                       [:insert :into nodes
+                        :values $v1]
+                       (vector id file level pos todo priority
+                               scheduled deadline title properties olp))))
+          ;; `org-roam-db-insert-refs'
+          ;; TODO much more features...
+          (when roam-refs
+            (emacsql db
+                     [:insert :into refs
+                      :values $v1]
+                     (mapcar (lambda (ref)
+                               (vector id
+                                       (org-link-encode ref '(#x20))
+                                       (url-type (url-generic-parse-url ref))))
+                             roam-refs)))
+          ;; `org-roam-db-insert-link'
+          ;; TODO real pos and outline, once we have that info
+          (when backlink-origins
+            (dolist (backlink backlink-origins)
+              (emacsql db
+                       [:insert :into links
+                        :values $v1]
+                       (vector pos backlink id "id" (list :outline nil)))))
+          ;; `org-roam-db-insert-citation'
+          ;; TODO once we have that info
+          ))
+    (emacsql db [:end :transaction])))
+
 
 ;;; API extras
 ;; Conveniences for users. Avoided inside this package.
