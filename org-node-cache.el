@@ -185,9 +185,9 @@ hand, you get no shell magic such as globs or envvars."
        (? (group (regexp (org-node-cache--make-todo-regexp))) (+ space)) ; TODO
        (group (+? nonl))                                     ; Heading title
        (? (+ space) (group ":" (+? nonl) ":")) (* space)     ; :tags:
-       ;; TODO Maybe clearer to formulate elisp to process the whole line than a regexp
+       ;; TODO formulate elisp to process the whole line
        ;; (? "\n" (* space) (group "DEADLINE: " (+ (not (any ">]"))))  (not (any " *")) (* nonl))
-       (? "\n" (* space) (not (any " *")) (* nonl))          ; CLOSED/SCHEDULED
+       (group (? "\n" (* space) (not (any " *")) (* nonl)))          ; CLOSED/SCHEDULED
        ;; We needed to set case-sensitivity to catch todo keywords, so now we
        ;; fake insensitivity
        "\n" (* space) (or ":PROPERTIES:" ":properties:")
@@ -233,8 +233,8 @@ hand, you get no shell magic such as globs or envvars."
               (goto-char beg)
               (when (search-forward "#+title: " nil t)
                 (setq title (string-trim (buffer-substring-no-properties
-                                          (point) (line-end-position)))))
-              (goto-char beg)
+                                          (point) (line-end-position))))
+                (goto-char beg))
               (when (search-forward "#+filetags: " nil t)
                 (setq tags (string-trim (buffer-substring-no-properties
                                          (point) (line-end-position))))))
@@ -247,6 +247,7 @@ hand, you get no shell magic such as globs or envvars."
                            :file-path (car file:lnum)
                            :id id
                            :tags (and tags (string-split tags ":" t))
+                           :properties props
                            :exclude
                            (let ((exclude (cdr (assoc "ROAM_EXCLUDE" props))))
                              (and exclude (not (string-blank-p exclude))))
@@ -269,7 +270,7 @@ hand, you get no shell magic such as globs or envvars."
                   "--line-number"
                   "--only-matching"
                   "--replace"
-                  "\f$1\f$2\f$3\f$4\f$5--veryIntelligentSeparator--"
+                  "\f$1\f$2\f$3\f$4\f$5\f$6--veryIntelligentSeparator--"
                   ,@org-node-cache-extra-rg-args
                   ,(org-node-cache--calc-subtree-re)
                   ,target))))
@@ -282,10 +283,10 @@ hand, you get no shell magic such as globs or envvars."
                 ($3 (nth 3 splits))
                 ($4 (nth 4 splits))
                 ($5 (nth 5 splits))
-                (props nil)
-                (id nil))
+                ($6 (nth 6 splits))
+                props id scheduled deadline)
             (erase-buffer)
-            (insert $5)
+            (insert $6)
             (goto-char (point-min))
             (while (not (eobp))
               (dotimes (_ 3) (search-forward ":"))
@@ -296,7 +297,20 @@ hand, you get no shell magic such as globs or envvars."
                     props)
               (forward-line 1))
             (setq id (cdr (assoc "ID" props)))
+            (let ((beg (point)))
+              (insert $5)
+              (goto-char beg)
+              (when (search-forward "SCHEDULED: " nil t)
+                (setq scheduled
+                      (string-trim (buffer-substring-no-properties
+                                    (point) (1+ (re-search-forward "[^]>]*")))))
+                (goto-char beg))
+              (when (search-forward "DEADLINE: " nil t)
+                (setq deadline
+                      (string-trim (buffer-substring-no-properties
+                                    (point) (1+ (re-search-forward "[^]>]*")))))))
             (puthash
+             ;; Record it even if it hasn't an ID
              (or id (format-time-string "%N"))
              (list :title $3
                    :is-subtree t
@@ -305,6 +319,8 @@ hand, you get no shell magic such as globs or envvars."
                    :tags (string-split $4 ":" t)
                    :todo (unless (string-blank-p $2) $2)
                    :file-path (car file:lnum)
+                   :scheduled scheduled
+                   :deadline deadline
                    :properties props
                    :id (cdr (assoc "ID" props))
                    :exclude (cdr (assoc "ROAM_EXCLUDE" props))
