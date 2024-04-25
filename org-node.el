@@ -222,7 +222,7 @@ deduplicated, as if :unique t."
   (let ((node (gethash (org-roam-node-id roam-object) org-nodes)))
     (when node
       (cl-loop
-       for backlink-id in (plist-get node :backlink-ids)
+       for backlink-id in (plist-get node :backlink-origins)
        as node-that-contains-link = (gethash backlink-id org-nodes)
        when node-that-contains-link
        collect (let ((roam-object-that-contains-link
