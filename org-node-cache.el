@@ -206,7 +206,7 @@ hand, you get no shell magic such as globs or envvars."
                   "--max-count" "1"
                   "--only-matching"
                   "--replace"
-                  "\f$1\f$2\f$3--veryIntelligentSeparator--"
+                  "\f$1\f$2--veryIntelligentSeparator--"
                   ,@org-node-cache-extra-rg-args
                   ,org-node-cache--file-level-re
                   ,target))))
@@ -312,8 +312,8 @@ hand, you get no shell magic such as globs or envvars."
                              (cdr (assoc "ROAM_ALIASES" props)))
                    :roam-refs (when-let ((refs (cdr (assoc "ROAM_REFS" props))))
                                 (string-split refs " " t))
-                   :backlink-ids (org-node-cache--backlinks->list
-                                  (cdr (assoc "CACHED_BACKLINKS" props))))
+                   :backlink-origins (org-node-cache--backlinks->list
+                                      (cdr (assoc "CACHED_BACKLINKS" props))))
              org-nodes)))))))
 
 (provide 'org-node-cache)
