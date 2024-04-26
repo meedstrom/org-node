@@ -145,7 +145,7 @@ cleaning."
                            (string-join org-node-backlink--fails "\n")
                            ;; In case it's a stupid-long warning
                            (if (> (length org-node-backlink--fails) 15)
-                               "--- End warning ---"
+                               "\n--- End warning ---"
                              "")))
            (setq org-node-backlink--fails nil)
            (when (yes-or-no-p "Fixed all files!  Kill their buffers?")
@@ -176,8 +176,6 @@ cleaning."
 
 ;;; Plumbing
 
-
-
 (defvar org-node-backlink--fails nil
   "List of IDs that could not be resolved.")
 
@@ -192,59 +190,75 @@ cleaning."
           (case-fold-search t))
       (save-excursion
         (goto-char (car bounds))
-        (when (looking-at-p "\\[\\[id:")
-          ;; NOTE: If a bug has created malformed ids [[id:][abcdef]], this fails
-          (re-search-forward "id:\\([^\]]+\\)" (cdr bounds))
-          (let* ((target-id (match-string-no-properties 1))
-                 (target-file (org-id-find-id-file target-id)))
-            (when (and src-id target-file)
-              (org-with-file-buffer target-file
-                (save-excursion
-                  (without-restriction
-                    (goto-char (point-min))
-                    (re-search-forward (concat "^[ \t]*:id: +" target-id))
-                    ;; TODO Bound the-file level node
-                    (unless (org-before-first-heading-p)
-                      (org-narrow-to-subtree))
-                    (cl-loop while (search-forward src-id nil t)
-                             when (and (not (org-at-property-p))
-                                       (not (org-at-comment-p)))
-                             return t)))))))))))
+        (let (target-id target-file)
+          (if (looking-at-p "\\[\\[id:")
+              ;; Backlink
+              (progn
+                (re-search-forward "id:\\([^\]]+\\)" (cdr bounds))
+                (setq target-id (match-string-no-properties 1)))
+            ;; Reflink
+            (re-search-forward (rx (+ (not (any "][")))) (cdr bounds))
+            (setq target-id (gethash (match-string-no-properties 0)
+                                     org-node--refs-table)))
+          ;; Gotcha: (org-id-find-id-file nil) actually returns something!
+          ;; So many ways org-id.el unsafe.  Should write an org-id2.el.
+          (setq target-file (gethash target-id org-id-locations))
+          (when (and src-id target-file)
+            (org-with-file-buffer target-file
+              (save-excursion
+                (without-restriction
+                  (goto-char (point-min))
+                  (re-search-forward (concat "^[ \t]*:id: +" target-id))
+                  ;; TODO Bound the-file level node
+                  (unless (org-before-first-heading-p)
+                    (org-narrow-to-subtree))
+                  (cl-loop while (search-forward src-id nil t)
+                           when (and (not (org-at-property-p))
+                                     (not (org-at-comment-p)))
+                           return t))))))))))
 
 (defun org-node-backlink--add-to-here-in-target-a (&rest _)
-  "Meant as advice after commands that insert a link.
-See `org-node-backlink--add-backlink-to-here-in-target', this is
+  "Meant as advice after any command that inserts a link.
+See `org-node-backlink--add-to-here-in-target' - this is
 merely a wrapper that drops the input."
-  (org-node-backlink--add-backlink-to-here-in-target))
+  (org-node--init-org-id-locations-or-die)
+  (org-node-backlink--add-to-here-in-target))
 
-(defun org-node-backlink--add-backlink-to-here-in-target (&optional part-of-mass-op)
-  "Visit the link under point and leave a backlink.
-
-Then call `org-node-backlink--sort-properties' (in the target file) to ensure the
-backlink is in the correct place.  That's an expensive operation
-if repeated many times, so with optional argument
-PART-OF-MASS-OP, do not do that and assume the caller will do it
-later."
+(defun org-node-backlink--add-to-here-in-target (&optional part-of-mass-op)
+  "For known link at point, leave a backlink in the ref node."
   (unless (derived-mode-p 'org-mode)
     (user-error "Only works in org-mode buffers"))
-  (when-let* ((case-fold-search t)
-              (elm (org-element-context))
-              (target-id (and (equal "id" (org-element-property :type elm))
-                              (org-element-property :path elm)))
-              (src-id (org-id-get nil nil nil t))
-              (src-title (save-excursion
-                           (re-search-backward (concat "^[ \t]*:id: +" src-id))
-                           (or (org-get-heading t t t t)
-                               (org-get-title))))
-              (src-link (concat "[[id:" src-id "][" src-title "]]"))
-              (target-file (or (org-id-find-id-file target-id)
-                               (progn
-                                 (push target-id org-node-backlink--fails)
-                                 (user-error "ID not found \"%s\"%s"
-                                             target-id
-                                             org-node--standard-tip)))))
+  (let ((elm (org-element-context)))
+    (let ((path (org-element-property :path elm))
+          (type (org-element-property :type elm))
+          id file)
+      (when (and path type)
+        (if (equal "id" type)
+            ;; Classic backlink
+            (progn
+              (setq id path)
+              (setq file (org-id-find-id-file id))
+              (unless file
+                (push id org-node-backlink--fails)
+                (user-error "ID not found \"%s\"%s"
+                            id
+                            org-node--standard-tip)))
+          ;; "Reflink"
+          (setq id (gethash (concat type ":" path) org-node--refs-table))
+          (setq file (plist-get (gethash id org-nodes) :file-path)))
+        (when (and id file)
+          (org-node-backlink--add-to-here-in-target-1 file id part-of-mass-op))))))
+
+(defun org-node-backlink--add-to-here-in-target-1 (target-file target-id &optional part-of-mass-op)
+  (let* ((case-fold-search t)
+         (src-id (org-id-get nil nil nil t))
+         (src-title (save-excursion
+                      (re-search-backward (concat "^[ \t]*:id: +" src-id))
+                      (or (org-get-heading t t t t)
+                          (org-get-title))))
+         (src-link (concat "[[id:" src-id "][" src-title "]]")))
     (if (not src-id)
-        (message "Unable to find ID in file, so it won't get backlinks %s"
+        (message "Unable to find ID in file, so it won't get backlinks: %s"
                  (buffer-file-name))
       (org-with-file-buffer target-file
         (org-with-wide-buffer
@@ -303,9 +317,10 @@ To do a mass fix, try \\[org-node-backlink-fix-all].
 Optional argument PART-OF-MASS-OP means skip some cleanup."
   ;; INFO For all the link regexps see `org-link-make-regexps' in org-el
   (when (derived-mode-p 'org-mode)
+    (org-node--init-org-id-locations-or-die)
     (save-excursion
       (goto-char (point-min))
-      (while (re-search-forward org-link-bracket-re nil t)
+      (while (re-search-forward org-link-plain-re nil t)
         (let ((beg (match-beginning 0))
               (end (match-end 0)))
           (cl-incf org-node-backlink--progress-total)
@@ -318,23 +333,25 @@ Optional argument PART-OF-MASS-OP means skip some cleanup."
            ;; On a CACHED_BACKLINKS property or in :BACKLINKS:...:END: drawer,
            ;; delete link if it's stale
            ((or (save-excursion
-                  (save-match-data
-                    (forward-line 0)
-                    (and (looking-at org-property-re)
-                         (string-equal-ignore-case (match-string 2)
-                                                   "CACHED_BACKLINKS"))))
+                  (forward-line 0)
+                  (and (looking-at org-property-re)
+                       (string-equal-ignore-case (match-string 2)
+                                                 "CACHED_BACKLINKS")))
                 (org-node-backlink--in-backlinks-drawer-p))
             ;; REVIEW: ensure it works
             (unless (org-node-backlink--target-has-link-to-here-p)
               (cl-incf org-node-backlink--progress-total-stale)
-              (kill-region beg end)
+              (goto-char beg)
+              (if (looking-back "\\[\\[")
+                  (kill-region (- (point) 2) (search-forward "]]"))
+                (kill-region (point) end))
               ;; Delete when there's nothing left
               (let ((prop (org-entry-get nil "CACHED_BACKLINKS")))
                 (when (and prop (string-blank-p prop))
                   (org-entry-delete nil "CACHED_BACKLINKS")))))
            ;; Not a backlink, so it's a regular forward-link - add a backlink
            (t
-            (org-node-backlink--add-backlink-to-here-in-target part-of-mass-op))))
+            (org-node-backlink--add-to-here-in-target part-of-mass-op))))
         (when part-of-mass-op
           (org-node-backlink--progress-print-message))))
     (and (not part-of-mass-op)

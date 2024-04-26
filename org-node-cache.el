@@ -64,13 +64,19 @@ peek on keys instead."
     ;; Wipe
     (clrhash org-nodes)
     (clrhash org-node-collection)
+    (clrhash org-node--refs-table)
     ;; Rebuild `org-nodes'
     (org-node--init-org-id-locations-or-die)
     (dolist (dir (org-node--root-dirs (hash-table-values org-id-locations)))
       (org-node-cache--scan dir))
-    ;; Rebuild `org-node-collection'
     (dolist (node (hash-table-values org-nodes))
       (cl-incf (if (plist-get node :is-subtree) sum-subtrees sum-files))
+      ;; Rebuild `org-node--refs-table'
+      (dolist (ref (plist-get node :roam-refs))
+        (puthash ref (plist-get node :id) org-node--refs-table)
+        ;; Let refs work as aliases :-)
+        (puthash ref node org-node-collection))
+      ;; Rebuild `org-node-collection'
       (if (funcall org-node-filter-fn node)
           (dolist (title (cons (plist-get node :title)
                                (plist-get node :aliases)))
@@ -121,6 +127,8 @@ avoids bothering the user who may be trying to delete many files."
 
 
 ;;; Plumbing
+
+(defvar org-node--refs-table (make-hash-table :size 1000 :test #'equal))
 
 (defun org-node-cache--make-todo-regexp ()
   "Make a regexp based on global value of `org-todo-keywords',
@@ -255,7 +263,7 @@ hand, you get no shell magic such as globs or envvars."
                                      (cdr (assoc "ROAM_ALIASES" props)))
                            :roam-refs
                            (let ((refs (cdr (assoc "ROAM_REFS" props))))
-                             (and refs (string-split refs " " t)))
+                             (and refs (split-string-and-unquote refs)))
                            :backlink-origins
                            (org-node-cache--backlinks->list
                             (cdr (assoc "CACHED_BACKLINKS" props))))

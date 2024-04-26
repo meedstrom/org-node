@@ -16,28 +16,28 @@ In pursuit of being "just org-id", this package has no equivalent setting to =or
 
 For your pleasure, here's a comparison of three similar notetaking systems: all permitting org-id as first-class citizen and not locking you into an "one-note-per-file" concept.
 
-|                                   | org-roam    | org-node         | [[https://github.com/toshism/org-super-links][org-super-links]]      |
-|-----------------------------------+-------------+------------------+----------------------|
-| Backlinks                         | yes         | yes              | yes                  |
-| org-roam-capture integration      | yes         | yes              | no                   |
-| Node search and insert            | yes         | yes              | no (suggests org-ql) |
-| Node aliases                      | yes         | yes              | not applicable       |
-| Rich backlinks buffer             | yes         | yes (org-roam's) | no                   |
-| Reflinks                          | yes         | yes (org-roam's) | no                   |
-| Ref search and insert             | yes         | yes (org-roam's) | no                   |
-| Extract subtree to new file       | yes         | yes              | no                   |
-| Backlinks in same window          | no          | yes              | yes                  |
-| Avoid double-counting :BACKLINKS: | no          | yes              | yes                  |
-| Read =:CACHED_BACKLINKS:= as data   | no          | yes              | no                   |
-| Warn about dead links             | no          | yes              | no                   |
-| Node exclusion                    | yes         | limited          | not applicable       |
-| Can configure rich completions    | yes         | limited          | not applicable       |
-| Support =roam:= links               | yes         | no               | no                   |
-| Read :BACKLINKS: as data          | no          | no               | yes                  |
-| Some query-able cache             | org-roam-db | org-nodes        | no                   |
-| Cache mandatory                   | yes         | no               | no                   |
-|-----------------------------------+-------------+------------------+----------------------|
-| Time to rebuild the cache         | 2m 48s      | < 1s             | not applicable       |
+|                                   | org-roam    | org-node           | [[https://github.com/toshism/org-super-links][org-super-links]]      |
+|-----------------------------------+-------------+--------------------+----------------------|
+| Backlinks                         | yes         | yes                | yes                  |
+| org-roam-capture integration      | yes         | yes                | no                   |
+| Node search and insert            | yes         | yes                | no (suggests org-ql) |
+| Node aliases                      | yes         | yes                | not applicable       |
+| Rich backlinks buffer             | yes         | yes (org-roam's)   | no                   |
+| Reflinks                          | yes         | yes (as backlinks) | no                   |
+| Ref search                        | yes         | yes (as aliases)   | no                   |
+| Extract subtree to new file       | yes         | yes                | no                   |
+| Backlinks in same window          | no          | yes                | yes                  |
+| Avoid double-counting :BACKLINKS: | no          | yes                | yes                  |
+| Read =:CACHED_BACKLINKS:= as data   | no          | yes                | no                   |
+| Warn about dead links             | no          | yes                | no                   |
+| Node exclusion                    | yes         | limited            | not applicable       |
+| Can configure rich completions    | yes         | limited            | not applicable       |
+| Support =roam:= links               | yes         | no                 | no                   |
+| Read :BACKLINKS: as data          | no          | no                 | yes                  |
+| Some query-able cache             | org-roam-db | org-nodes          | no                   |
+| Cache mandatory                   | yes         | no                 | no                   |
+|-----------------------------------+-------------+--------------------+----------------------|
+| Time to rebuild the cache         | 2m 48s      | < 1s               | not applicable       |
 
 This isn't a totally fair comparison; org-roam has an advantage in the details, see Appendix II.  With org-node I've made what I would've liked to hack on, so it's more simplistic on many aspects.
 
@@ -137,20 +137,34 @@ If you run into any issues, let me know!  Either here on Github or just [[mailto
 
 **** Enabling org-roam-buffer
 
-To borrow the power of =M-x org-roam-buffer-toggle=, first eval an advice:
+You have two ways to borrow the power of =M-x org-roam-buffer-toggle=.  But first, both ways have the same limitations:
+
+- Reflinks are represented as backlinks -- no separate reflinks heading
+- It behaves as if the :unique parameter is t and :point is equal to that of the node heading.
+
+The first way is cutting out the org-roam DB entirely:
 
 #+begin_src elisp
+(require 'org-node-roam)
 (advice-add 'org-roam-backlinks-get :override
             #'org-node--fabricate-roam-backlinks)
 #+end_src
 
-Check it out, it works!  You can see for yourself that it isn't using org-roam's DB, by evalling =(delete-file org-roam-db-location)=.
+The second way (experimental) is translating the info org-node has into a form suitable for the org-roam DB.  This reveals just how much of the slowness of =org-roam-db-sync= comes from EmacSQL/SQLite itself!
 
-The behavior is slightly clobbered.  I don't know what sorts of advanced things people do with the org-roam-buffer but here, the position and properties of each link are gone.  It behaves as if the :unique parameter is t and :point is equal to that of the node heading.
+#+begin_src elisp
+;; eval once
+(org-node-cache-reset)
+(org-node-feed-roam-db) ;; slow, maybe 1/5 of an (org-roam-db-sync 'force)
 
-Finally, the occasional =org-roam-db-sync= is still needed to see reflinks.
+;; init snippet
+(require 'org-node-roam)
+(add-hook 'org-node-cache-file-hook #'org-node-feed-file-to-roam-db)
+#+end_src
 
-** For you who use Org-roam
+This second method has more potential, of course, unlocking all of org-roam, but does not yet send all the data that org-roam wants, and given that it's slow anyway you may as well continue using the real =org-roam-db-sync=.
+
+** For you who use Org-roam at the same time
 
 Some user options to feel at home
 
@@ -200,6 +214,10 @@ We can do something similar, though our pseudo-outline path does not include sub
          title))
 (org-node-cache-reset)
 #+end_src
+
+*** Ref format
+
+Don't insert =[[http...][description]]= in the =ROAM_REFS= field.  Just the raw URL.
 
 ** Appendix 0: Command equivalents :noexport:
 
