@@ -250,55 +250,55 @@ merely a wrapper that drops the input."
           (org-node-backlink--add-to-here-in-target-1 file id part-of-mass-op))))))
 
 (defun org-node-backlink--add-to-here-in-target-1 (target-file target-id &optional part-of-mass-op)
-  (let* ((case-fold-search t)
-         (src-id (org-id-get nil nil nil t))
-         (src-title (save-excursion
-                      (re-search-backward (concat "^[ \t]*:id: +" src-id))
-                      (or (org-get-heading t t t t)
-                          (org-get-title))))
-         (src-link (concat "[[id:" src-id "][" src-title "]]")))
+  (let ((case-fold-search t)
+        (src-id (org-id-get nil nil nil t)))
     (if (not src-id)
         (message "Unable to find ID in file, so it won't get backlinks: %s"
                  (buffer-file-name))
-      (org-with-file-buffer target-file
-        (org-with-wide-buffer
-         (let ((otm (bound-and-true-p org-transclusion-mode)))
-           (when otm (org-transclusion-mode 0))
-           (goto-char (point-min))
-           (if (not (re-search-forward
-                     (concat "^[ \t]*:id: +" (regexp-quote target-id))
-                     nil t))
-               (push target-id org-node-backlink--fails)
-             (let ((backlinks-string (org-entry-get nil "CACHED_BACKLINKS"))
-                   new-value)
-               (if backlinks-string
-                   ;; Build a temp list to check we don't add the same link
-                   ;; twice. To use the builtin
-                   ;; `org-entry-add-to-multivalued-property', the link
-                   ;; descriptions would have to be free of spaces.
-                   (let ((ls (delete-dups
-                              (string-split (replace-regexp-in-string
-                                             "]][[:space:]]+\\[\\["
-                                             "]]\f[["
-                                             (string-trim backlinks-string))
-                                            "\f" t))))
-                     (dolist (id-dup (--filter (string-search src-id it) ls))
-                       (setq ls (delete id-dup ls)))
-                     (push src-link ls)
-                     ;; Prevent unnecessary work from putting the most recent
-                     ;; link in front even if it was already in the list
-                     (sort ls #'string-lessp)
-                     ;; Two spaces between links help them look distinct
-                     (setq new-value (string-join ls "  ")))
-                 (setq new-value src-link))
-               (unless (equal backlinks-string new-value)
-                 (org-entry-put nil "CACHED_BACKLINKS" new-value)
-                 (cl-incf org-node-backlink--progress-total-backlinks)
-                 (unless part-of-mass-op
-                   (and org-file-buffer-created
-                        (buffer-modified-p)
-                        (save-buffer))))
-               (when otm (org-transclusion-mode))))))))))
+      (let* ((src-title (save-excursion
+                          (re-search-backward (concat "^[ \t]*:id: +" src-id))
+                          (or (org-get-heading t t t t)
+                              (org-get-title))))
+             (src-link (concat "[[id:" src-id "][" src-title "]]")))
+        (org-with-file-buffer target-file
+          (org-with-wide-buffer
+           (let ((otm (bound-and-true-p org-transclusion-mode)))
+             (when otm (org-transclusion-mode 0))
+             (goto-char (point-min))
+             (if (not (re-search-forward
+                       (concat "^[ \t]*:id: +" (regexp-quote target-id))
+                       nil t))
+                 (push target-id org-node-backlink--fails)
+               (let ((backlinks-string (org-entry-get nil "CACHED_BACKLINKS"))
+                     new-value)
+                 (if backlinks-string
+                     ;; Build a temp list to check we don't add the same link
+                     ;; twice. To use the builtin
+                     ;; `org-entry-add-to-multivalued-property', the link
+                     ;; descriptions would have to be free of spaces.
+                     (let ((ls (delete-dups
+                                (string-split (replace-regexp-in-string
+                                               "]][[:space:]]+\\[\\["
+                                               "]]\f[["
+                                               (string-trim backlinks-string))
+                                              "\f" t))))
+                       (dolist (id-dup (--filter (string-search src-id it) ls))
+                         (setq ls (delete id-dup ls)))
+                       (push src-link ls)
+                       ;; Prevent unnecessary work from putting the most recent
+                       ;; link in front even if it was already in the list
+                       (sort ls #'string-lessp)
+                       ;; Two spaces between links help them look distinct
+                       (setq new-value (string-join ls "  ")))
+                   (setq new-value src-link))
+                 (unless (equal backlinks-string new-value)
+                   (org-entry-put nil "CACHED_BACKLINKS" new-value)
+                   (cl-incf org-node-backlink--progress-total-backlinks)
+                   (unless part-of-mass-op
+                     (and org-file-buffer-created
+                          (buffer-modified-p)
+                          (save-buffer))))
+                 (when otm (org-transclusion-mode)))))))))))
 
 (defvar org-node-backlink--last-warnings nil)
 
