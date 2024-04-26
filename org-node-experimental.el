@@ -18,10 +18,17 @@
 
 (defvar org-node-experimental--files
   (make-hash-table :size 4000 :test #'equal)
-  "Table keyed on filepaths, where each value is an alist of the form:
+  "Table keyed on filepaths, where the value is a plist:
+:file-level-node t/nil
+:lnums-ids
 ((LINE-NUM . ID)
  (LINE-NUM . ID)
- ...)")
+ ...)
+:lnums-levels
+((LINE-NUM . OUTLINE-LEVEL)
+ (LINE-NUM . OUTLINE-LEVEL)
+ ...)
+")
 
 (defvar org-node-experimental--file-outlines
   (make-hash-table :size 4000 :test #'equal)
@@ -67,11 +74,11 @@ Used by `org-node-experimental--line->olpath'.")
                             :aliases (org-node-cache--aliases->list $3)
                             :roam-refs (string-split $5 " " t)
                             :backlink-ids (org-node-cache--backlinks->list $1))))
-            (push (cons 1 (plist-get node :id))
-                  (gethash (car file:lnum) org-node-experimental--files))
-            (puthash $2 node org-nodes))
-          (puthash (car file:lnum) t
-                   org-node-experimental--files-with-file-level-nodes))))))
+            (puthash (car file:lnum)
+                     (list :file-level-node t
+                           :lnums-ids (list `(1 . ,$2)))
+                     org-node-experimental--files)
+            (puthash $2 node org-nodes)))))))
 
 (defun org-node-experimental--calc-file-outlines (target)
   "Must run after collect-file-level-nodes."
