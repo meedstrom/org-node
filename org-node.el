@@ -48,8 +48,6 @@
 ;; TODO Test each user commmand again
 ;; TODO Annotations for completion
 ;; TODO Completion category https://github.com/alphapapa/org-ql/issues/299
-;; TODO Allow inserting link to alias and keep the alias as link description
-;;      (requires the format-fn not to alter the completion)
 ;; TODO Maybe move user commands into a -commands.el and minimize the core
 ;; TODO Command to grep across all files (then deprecate the regret command, and teach the user wgrep)
 ;; TODO Command to insert link into :BACKLINKS:
@@ -327,7 +325,7 @@ If you find the behavior different, perhaps you have something in
                                  () () () 'org-node-hist))
          (node (gethash input org-node-collection))
          (id (or (plist-get node :id) (org-id-new)))
-         (link-desc (or region-text (plist-get node :title) input)))
+         (link-desc (or region-text input)))
     (atomic-change-group
       (if region-text
           (delete-region beg end)
