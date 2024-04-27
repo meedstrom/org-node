@@ -180,20 +180,14 @@ hand, you get no shell magic such as globs or envvars."
        (group (+ "\n#+" (* nonl)))))
   "Regexp to match file-level nodes.")
 
-;; How do people live without `rx'?
-(defun org-node-cache--calc-subtree-re ()
-  "Construct new regexp for the variable `org-node-cache--subtree-re'."
+(defvar org-node-cache--subtree-re
   (rxt-elisp-to-pcre
-   (rx bol (group (+ "*")) (+ space)
-       (? (group (regexp (org-node-cache--make-todo-regexp))) (+ space)) ; TODO
-       (group (+ nonl))                                     ; Heading title
-       (? (+ space) (group ":" (+? nonl) ":")) (* space)     ; :tags:
-       ;; TODO formulate elisp to process the whole line
-       ;; (? "\n" (* space) (group "DEADLINE: " (+ (not (any ">]"))))  (not (any " *")) (* nonl))
-       (group (? "\n" (* space) (not (any " *")) (* nonl)))          ; CLOSED/SCHEDULED
-       (? "\n" (* space) (or ":PROPERTIES:" ":properties:")
-          (group (+? "\n" (* space) ":" (not space) (+ nonl)))
-          "\n" (* space) (or ":END:" ":end:")))))
+   (rx bol (+ "*") (+ space) (+ nonl)
+       (? "\n" (* space) (>= 5 upper-case) (* nonl)) ; CLOSED/SCHEDULED/DEADLINE
+       (? "\n" (* space) ":properties:"
+          (+? "\n" (* space) ":" (not space) (+ nonl))
+          "\n" (* space) ":end:")))
+  "Regexp to match subtrees and their property drawers.")
 
 (defun org-node-cache--collect-file-level-nodes (target)
   "Scan TARGET (a file or directory) for file-level ID nodes."
@@ -285,58 +279,61 @@ hand, you get no shell magic such as globs or envvars."
 (defun org-node-cache--collect-subtree-nodes (target)
   "Scan TARGET (a file or directory) for subtree ID nodes."
   (let ((workaround-counter 0)
+        (case-fold-search t)
         (rg-result
          (apply #'org-node-cache--program-output "rg"
                 `("--multiline"
                   "--with-filename"
                   "--line-number"
-                  "--only-matching"
-                  "--replace"
-                  "\f$1\f$2\f$3\f$4\f$5\f$6--sophisticatedSeparator--"
                   ,@org-node-cache-extra-rg-args
-                  ,(org-node-cache--calc-subtree-re)
+                  ,org-node-cache--subtree-re
                   ,target))))
     (with-temp-buffer
-      ;; TODO: boost perf by grouping some operations by file
-      (dolist (subtree (string-split rg-result "--sophisticatedSeparator--\n" t))
-        (let ((splits (string-split subtree "\f")))
-          (let* ((file:lnum (string-split (nth 0 splits) ":" t))
-                 ($1 (nth 1 splits))
-                 ($2 (nth 2 splits))
-                 ($3 (nth 3 splits))
-                 ($4 (nth 4 splits))
-                 ($5 (nth 5 splits))
-                 ($6 (nth 6 splits))
-                 (file (car file:lnum))
-                 (lnum (string-to-number (cadr file:lnum)))
-                 (file-data (gethash file org-node-cache--files))
-                 (file-title (car (last file-data)))
-                 (outline-data (butlast file-data))
-                 props id scheduled deadline)
-            ;; Workaround https://github.com/BurntSushi/ripgrep/issues/2779
-            ;; Bug will still occur if you have headings separated by just 2+
-            ;; newlines (and no property drawer)
+      (insert rg-result)
+      (goto-char (point-min))
+      (let ((file (buffer-substring (point) (1- (search-forward ":"))))
+            beg end)
+        (setq beg (point))
+        (while (search-forward file nil t))
+        (forward-line 1)
+        (setq end (point))
+        (goto-char beg)
 
-            (if (and (assoc lnum outline-data)
-                     (not (stringp (car (alist-get lnum outline-data)))))
-                (setq workaround-counter 0)
-              (cl-incf lnum workaround-counter))
-            (while (or (null (assoc lnum outline-data))
-                       (stringp (car (alist-get lnum outline-data))))
-              (cl-incf lnum)
-              (cl-incf workaround-counter))
+        )
 
-            ;; (if (stringp (car (alist-get lnum outline-data)))
-            ;;     (cl-incf lnum (cl-incf workaround-counter))
-            ;;   (setq workaround-counter 0))
-            ;; add this heading title to the outline data, for use next iter.
-            (push $3 (alist-get lnum (gethash file org-node-cache--files)))
-            ;; (let )
-            ;; (setq foo '(a b c))
-            ;; (push nil foo)
-            (erase-buffer)
-            (insert $6)
-            (goto-char (point-min))
+      ;; subtree
+      (while (not (eobp))
+      (let (beg end title level file-path lnum tags todo scheduled deadline props id)
+        (setq file-path (buffer-substring (point) (1- (search-forward ":"))))
+        (setq lnum (string-to-number
+                    (buffer-substring (point) (1- (search-forward ":")))))
+        (setq level (skip-chars-forward "*"))
+        (skip-chars-forward " ")
+        (setq beg (point))
+        ;; ASSUMPTION: noone writes :* in the heading or props (lint this)
+        (setq end (or (and (search-forward ":*" nil t)
+                           (line-beginning-position))
+                      (point-max)))
+        (goto-char beg)
+        (if (re-search-forward " +\(:.+:\) *$" (line-end-position) t)
+            (progn
+              (setq tags (string-split (match-string 1) ":" t))
+              (setq title (buffer-substring beg (match-beginning 0))))
+          (setq title (buffer-substring beg (line-end-position))))
+        (when (re-search-forward "[\n ]SCHEDULED: " end t)
+          (setq scheduled
+                (buffer-substring (point) (re-search-forward "[>]]"))))
+        (goto-char beg)
+        (when (re-search-forward "[\n ]DEADLINE: " end t)
+          (setq deadline
+                (buffer-substring (point) (re-search-forward "[>]]"))))
+        (when (search-forward ":properties:" end t)
+          (forward-line 1)
+          (setq beg (point))
+          (search-forward ":end:" end)
+          (setq end (line-beginning-position))
+          (goto-char beg)
+          (with-restriction beg end
             (while (not (eobp))
               (dotimes (_ 3) (search-forward ":"))
               (push (cons (upcase (buffer-substring-no-properties
@@ -344,44 +341,67 @@ hand, you get no shell magic such as globs or envvars."
                           (string-trim (buffer-substring-no-properties
                                         (point) (line-end-position))))
                     props)
-              (forward-line 1))
-            (setq id (cdr (assoc "ID" props)))
-            (let ((beg (point)))
-              (insert $5)
-              (goto-char beg)
-              (when (search-forward "SCHEDULED: " nil t)
-                (setq scheduled
-                      (string-trim (buffer-substring-no-properties
-                                    (point) (1+ (re-search-forward "[^]>]*")))))
-                (goto-char beg))
-              (when (search-forward "DEADLINE: " nil t)
-                (setq deadline
-                      (string-trim (buffer-substring-no-properties
-                                    (point) (1+ (re-search-forward "[^]>]*")))))))
-            (puthash
-             ;; Record it even if it hasn't an ID
-             (or id (format-time-string "%N"))
-             (list :title $3
-                   :is-subtree t
-                   :level (length $1)
-                   :line-number lnum
-                   :tags (string-split $4 ":" t)
-                   :todo (unless (string-blank-p $2) $2)
-                   :file-path file
-                   :scheduled scheduled
-                   :deadline deadline
-                   :file-title file-title
-                   :olp (org-node-cache--line->olp outline-data lnum)
-                   :properties props
-                   :id (cdr (assoc "ID" props))
-                   :exclude (equal "t" (cdr (assoc "ROAM_EXCLUDE" props)))
-                   :aliases (split-string-and-unquote
-                             (or (cdr (assoc "ROAM_ALIASES" props)) ""))
-                   :roam-refs (when-let ((refs (cdr (assoc "ROAM_REFS" props))))
-                                (split-string-and-unquote refs))
-                   :backlink-origins (org-node-cache--backlinks->list
-                                      (cdr (assoc "CACHED_BACKLINKS" props))))
-             org-nodes)))))))
+              (forward-line 1))))
+        (setq id (cdr (assoc "ID" props)))
+        (goto-char end)
+        (puthash
+         ;; Record subtree even if it has no ID
+         (or id (format-time-string "%N"))
+         (list :title title
+               :is-subtree t
+               :level level
+               :line-number lnum
+               :tags tags
+               :todo nil
+               :file-path file-path
+               :scheduled scheduled
+               :deadline deadline
+               :file-title file-title
+               ;; :olp (org-node-cache--line->olp outline-data lnum)
+               :properties props
+               :id id
+               :exclude (equal "t" (cdr (assoc "ROAM_EXCLUDE" props)))
+               :aliases (split-string-and-unquote
+                         (or (cdr (assoc "ROAM_ALIASES" props)) ""))
+               :roam-refs (when-let ((refs (cdr (assoc "ROAM_REFS" props))))
+                            (split-string-and-unquote refs))
+               :backlink-origins (org-node-cache--backlinks->list
+                                  (cdr (assoc "CACHED_BACKLINKS" props))))
+         org-nodes))
+
+        )
+
+
+      ;; TODO: boost perf by grouping some operations by file
+
+      ;; add this heading title to the outline data, for use next iter.
+      (push $3 (alist-get lnum (gethash file org-node-cache--files)))
+
+      (erase-buffer)
+      (insert $6)
+      (goto-char (point-min))
+      (while (not (eobp))
+        (dotimes (_ 3) (search-forward ":"))
+        (push (cons (upcase (buffer-substring-no-properties
+                             (point) (1- (search-forward ":"))))
+                    (string-trim (buffer-substring-no-properties
+                                  (point) (line-end-position))))
+              props)
+        (forward-line 1))
+      (setq id (cdr (assoc "ID" props)))
+      (let ((beg (point)))
+        (insert $5)
+        (goto-char beg)
+        (when (search-forward "SCHEDULED: " nil t)
+          (setq scheduled
+                (string-trim (buffer-substring-no-properties
+                              (point) (1+ (re-search-forward "[^]>]*")))))
+          (goto-char beg))
+        (when (search-forward "DEADLINE: " nil t)
+          (setq deadline
+                (string-trim (buffer-substring-no-properties
+                              (point) (1+ (re-search-forward "[^]>]*")))))))
+      )))
 
 (defvar org-node-cache--files
   (make-hash-table :size 3000 :test #'equal)
