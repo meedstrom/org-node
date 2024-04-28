@@ -18,7 +18,7 @@
 ;; Author:           Martin Edström <meedstrom91@gmail.com>
 ;; Created:          2024-04-13
 ;; Keywords:         org, hypermedia
-;; Package-Requires: ((emacs "29.1") (pcre2el "1.12") (dash "2.19.1"))
+;; Package-Requires: ((emacs "29.1") (dash "2.19.1"))
 ;; URL:              https://github.com/meedstrom/org-node
 
 ;; This file is not part of GNU Emacs.
@@ -250,7 +250,8 @@ type the name of a node that does not exist:
       ;; Node does not exist; capture into new file-level node
       (let* ((dir (read-directory-name
                    "Where to create the node? "
-                   (car (org-node--root-dirs (hash-table-values org-id-locations)))))
+                   (car (org-node--root-dirs
+                         (hash-table-values org-id-locations)))))
              (path-to-write (file-name-concat
                              dir (funcall org-node-slug-fn title))))
         (if (or (file-exists-p path-to-write)

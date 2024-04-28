@@ -20,10 +20,11 @@
     (remove-hook 'org-node-insert-link-hook #'org-node-backlink--add-to-here-in-target)
     (advice-remove 'org-insert-link #'org-node-backlink--add-to-here-in-target)))
 
-;; TODO Large files would still be slow to save (now we disable it if there
-;;      are too many links), so instead of checking the entire file on
+;; TODO Large files would still be slow to save (now we disable it if there are
+;;      too many links), so instead of checking the entire file on
 ;;      before-save-hook, try to just check the most local subtree on every
-;;      auto-save, and maybe on some other infrequent hooks
+;;      auto-save, and maybe on some other infrequent hooks.  Also, leave the
+;;      target file buffers open (but buried).
 (defun org-node-backlink-check-buffer ()
   "Designed for `before-save-hook'."
   (let ((n-links
@@ -308,6 +309,7 @@ merely a wrapper that drops the input."
 
 (defvar org-node-backlink--last-warnings nil)
 
+;; TODO Rewrite to avoid org-mode
 (defun org-node-backlink--fix-findable-backlinks (&optional part-of-mass-op)
   "Visit all [[id:... links and give the targets a backlink.
 Also clean current file's own backlinks, by visiting them and

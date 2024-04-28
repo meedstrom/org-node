@@ -42,7 +42,7 @@ peek on keys instead."
     (org-node--init-org-id-locations-or-die)
     (let ((files (-uniq (hash-table-values org-id-locations))))
       (org-node-cache--collect-nodes files)
-      (message "org-node: scanned %d files and %d subtrees from scratch in %.2fs"
+      (message "org-node: scanned %d files and %d subtrees in %.2fs"
                (length files)
                (cl-loop for node being the hash-values of org-nodes
                         count (plist-get node :is-subtree))
@@ -145,130 +145,135 @@ it does not check."
         (forward-line 1)))
     res))
 
-;; TODO profile dolist instead of cl-loop in this situation
 (defun org-node-cache--collect-nodes (files)
   "Scan FILES for id-nodes, adding them to `org-nodes'."
   (with-temp-buffer
-    (cl-loop
-     with todo-re = (org-node-cache--make-todo-regexp)
-     with not-a-full-reset = (not (hash-table-empty-p org-nodes))
-     with case-fold-search = t
-     with gc-cons-threshold = (* 1000 1000 1000)
-     for file in files
-     ;; Example situation: someone deletes a file with shell commands, then
-     ;; comes back to Emacs.
-     if (not (file-exists-p file))
-     do
-     (org-node-cache--forget-id-location file)
-     (org-id-update-id-locations)
-     else do
-     (erase-buffer)
-     (insert-file-contents-literally file)
-     (let (;; Position of first content (a line not starting with # or :)
-           (far (or (re-search-forward "^ *?[^#:]" nil t) (point-max)))
-           props file-title file-tags
-           outline-data)
-       (goto-char 1)
-       (when (re-search-forward "^ *:properties:" far t)
-         (forward-line 1)
-         (setq props (org-node-cache--collect-properties
-                      (point) (and (re-search-forward "^ *:end:")
-                                   (line-beginning-position)))))
-       (goto-char 1)
-       (when (re-search-forward "^#\\+filetags: " far t)
-         (setq file-tags (split-string
-                          (decode-coding-string (buffer-substring
-                                                 (point) (line-end-position))
-                                                'utf-8)
-                          ":" t)))
-       (goto-char 1)
-       (if (re-search-forward "^#\\+title: " far t)
-           (setq file-title (decode-coding-string (buffer-substring
-                                                   (point) (line-end-position))
-                                                  'utf-8))
-         ;; File nodes dont strictly need #+title, fall back on filename
-         (setq file-title (file-name-nondirectory file)))
-       (let ((id (cdr (assoc "ID" props))))
-         (when not-a-full-reset
-           (when id (org-id-add-location id file)))
-         (org-node-cache--add-node-to-tables
-          (list
-           :title file-title
-           :level 0
-           :tags file-tags
-           :file-path file
-           :pos 1
-           :file-title file-title
-           :properties props
-           :id id
-           :exclude (cdr (assoc "ROAM_EXCLUDE" props))
-           :aliases (split-string-and-unquote
-                     (or (cdr (assoc "ROAM_ALIASES" props)) ""))
-           :roam-refs (let ((refs (cdr (assoc "ROAM_REFS" props))))
-                        (and refs (split-string-and-unquote refs)))
-           :backlink-origins (org-node-cache--backlinks->list
-                              (cdr (assoc "CACHED_BACKLINKS" props))))))
-       ;; Loop over the file's subtrees
-       (while (re-search-forward "^\\*+ " nil t)
-         (let ((pos (goto-char (line-beginning-position)))
-               (level (skip-chars-forward "*"))
-               here todo title line2-end tags todo scheduled deadline props id)
-           (skip-chars-forward " ")
-           (setq here (point))
-           ;; NOTE: The todo-regexp prolly won't match unicode todo keywords
-           (when (looking-at todo-re)
-             (setq todo (buffer-substring (point) (match-end 0)))
-             (goto-char (1+ (match-end 0)))
-             (setq here (point)))
-           (if (re-search-forward " +\\(:.+:\\) *$" (line-end-position) t)
-               (progn
-                 (setq title (decode-coding-string (buffer-substring
-                                                    here (match-beginning 0))
-                                                   'utf-8))
-                 (setq tags (string-split (decode-coding-string (match-string 1)
-                                                                'utf-8)
-                                          ":" t)))
-             (setq title (decode-coding-string (buffer-substring
-                                                here (line-end-position))
-                                               'utf-8)))
-           (setq here (point))
-           (setq line2-end (and (forward-line 2) (point)))
-           (goto-char here)
-           (when (re-search-forward "[\n\s]SCHEDULED: " line2-end t)
-             (setq scheduled
-                   (decode-coding-string
-                    (buffer-substring
-                     ;; \n just there for safety
-                     (point) (+ 1 (point) (skip-chars-forward "^]>\n")))
-                    'utf-8))
-             (goto-char here))
-           (when (re-search-forward "[\n\s]DEADLINE: " line2-end t)
-             (setq deadline
-                   (decode-coding-string
-                    (buffer-substring
-                     (point) (+ 1 (point) (skip-chars-forward "^]>\n")))
-                    'utf-8)))
-           (setq here (point))
-           (setq line2-end (and (forward-line 2) (point)))
-           (goto-char here)
-           (when (re-search-forward "^ *:properties:" line2-end t)
-             (forward-line 1)
-             (setq props (org-node-cache--collect-properties
-                          (point) (and (re-search-forward "^ *:end:")
-                                       (line-beginning-position)))))
-           (setq id (cdr (assoc "ID" props)))
-           (when not-a-full-reset
-             (when id (org-id-add-location id file)))
-           (push (list pos title level) outline-data)
-           (org-node-cache--add-node-to-tables
-            (list :title title
+    (let ((todo-re (org-node-cache--make-todo-regexp))
+          (not-a-full-reset (not (hash-table-empty-p org-nodes)))
+          (case-fold-search t)
+          (gc-cons-threshold (* 1000 1000 1000)))
+      (dolist (file files)
+        (if (not (file-exists-p file))
+            ;; Example situation: user renamed/deleted a file using shell
+            ;; commands, outside Emacs.  So org-id references a file that
+            ;; doesn't exist.  Our solution: just skip.  If the file was
+            ;; renamed to a new location, it'll have to be picked up by org-id
+            ;; in its usual ways.
+            ;;
+            ;; This is a good time to do `org-id-update-id-locations' just
+            ;; because, but it won't pick up the new file path.
+            (progn
+              (org-node-cache--forget-id-location file)
+              (org-id-update-id-locations))
+          (erase-buffer)
+          (insert-file-contents-literally file)
+          (let (;; Position of first "content": a line not starting with # or :
+                (far (or (re-search-forward "^ *?[^#:]" nil t) (point-max)))
+                props file-title file-tags outline-data)
+            (goto-char 1)
+            (when (re-search-forward "^ *:properties:" far t)
+              (forward-line 1)
+              (setq props (org-node-cache--collect-properties
+                           (point) (and (re-search-forward "^ *:end:")
+                                        (line-beginning-position)))))
+            (goto-char 1)
+            (when (re-search-forward "^#\\+filetags: " far t)
+              (setq file-tags (split-string
+                               (decode-coding-string
+                                (buffer-substring (point) (line-end-position))
+                                'utf-8)
+                               ":" t)))
+            (goto-char 1)
+            (if (re-search-forward "^#\\+title: " far t)
+                (setq file-title (decode-coding-string
+                                  (buffer-substring (point) (line-end-position))
+                                  'utf-8))
+              ;; File nodes dont strictly need #+title, fall back on filename
+              (setq file-title (file-name-nondirectory file)))
+            (let ((id (cdr (assoc "ID" props))))
+              (when not-a-full-reset
+                (when id (org-id-add-location id file)))
+              (org-node-cache--add-node-to-tables
+               (list
+                :title file-title
+                :level 0
+                :tags file-tags
+                :file-path file
+                :pos 1
+                :file-title file-title
+                :properties props
+                :id id
+                :exclude (cdr (assoc "ROAM_EXCLUDE" props))
+                :aliases (split-string-and-unquote
+                          (or (cdr (assoc "ROAM_ALIASES" props)) ""))
+                :roam-refs (let ((refs (cdr (assoc "ROAM_REFS" props))))
+                             (and refs (split-string-and-unquote refs)))
+                :backlink-origins (org-node-cache--backlinks->list
+                                   (cdr (assoc "CACHED_BACKLINKS" props))))))
+            ;; Loop over the file's subtrees
+            (while (re-search-forward "^\\*+ " nil t)
+              (let ((pos (goto-char (line-beginning-position)))
+                    (level (skip-chars-forward "*"))
+                    here todo title line+2 tags todo sched deadline props id)
+                (skip-chars-forward " ")
+                (setq here (point))
+                ;; TODO Allow unicode todo keywords
+                (when (looking-at todo-re)
+                  (setq todo (buffer-substring (point) (match-end 0)))
+                  (goto-char (1+ (match-end 0)))
+                  (setq here (point)))
+                (if (re-search-forward " +\\(:.+:\\) *$" (line-end-position) t)
+                    (progn
+                      (setq title (decode-coding-string
+                                   (buffer-substring
+                                    here (match-beginning 0))
+                                   'utf-8))
+                      (setq tags (string-split
+                                  (decode-coding-string (match-string 1)
+                                                        'utf-8)
+                                  ":" t)))
+                  (setq title (decode-coding-string (buffer-substring
+                                                     here (line-end-position))
+                                                    'utf-8)))
+                (setq here (point))
+                (setq line+2 (and (forward-line 2) (point)))
+                (goto-char here)
+                (when (re-search-forward "[\n\s]SCHEDULED: " line+2 t)
+                  (setq sched
+                        (decode-coding-string
+                         (buffer-substring
+                          ;; \n just there for safety
+                          (point) (+ 1 (point) (skip-chars-forward "^]>\n")))
+                         'utf-8))
+                  (goto-char here))
+                (when (re-search-forward "[\n\s]DEADLINE: " line+2 t)
+                  (setq deadline
+                        (decode-coding-string
+                         (buffer-substring
+                          (point) (+ 1 (point) (skip-chars-forward "^]>\n")))
+                         'utf-8)))
+                (setq here (point))
+                (setq line+2 (and (forward-line 2) (point)))
+                (goto-char here)
+                (when (re-search-forward "^ *:properties:" line+2 t)
+                  (forward-line 1)
+                  (setq props (org-node-cache--collect-properties
+                               (point) (and (re-search-forward "^ *:end:")
+                                            (line-beginning-position)))))
+                (setq id (cdr (assoc "ID" props)))
+                (when not-a-full-reset
+                  (when id (org-id-add-location id file)))
+                (push (list pos title level) outline-data)
+                (org-node-cache--add-node-to-tables
+                 (list
+                  :title title
                   :is-subtree t
                   :level level
                   :pos pos
                   :tags tags
                   :todo todo
                   :file-path file
-                  :scheduled scheduled
+                  :scheduled sched
                   :deadline deadline
                   :file-title file-title
                   :olp (org-node-cache--pos->olp outline-data pos)
@@ -280,7 +285,7 @@ it does not check."
                   :roam-refs (let ((refs (cdr (assoc "ROAM_REFS" props))))
                                (and refs (split-string-and-unquote refs)))
                   :backlink-origins (org-node-cache--backlinks->list
-                                     (cdr (assoc "CACHED_BACKLINKS" props)))))))))))
+                                     (cdr (assoc "CACHED_BACKLINKS" props)))))))))))))
 
 ;; I feel like this could be easier to read...
 (defun org-node-cache--add-node-to-tables (node)
