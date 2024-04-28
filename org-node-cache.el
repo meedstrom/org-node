@@ -76,8 +76,10 @@ peek on keys instead."
     ;; This message delivers once per emacs session
     (message "To speed up this command, turn on `org-node-cache-mode'")))
 
+;; TODO Also have an alternative way to react if the file was deleted outside
+;;      Emacs or something
 (let ((this-timer (timer-create)))
-  (defun org-node-cache--handle-delete (&rest _)
+  (defun org-node-cache--handle-delete (&rest args)
     "Update org-id and org-node after an Org file is deleted.
 
 First remove references in `org-id-locations', as oddly, upstream does
@@ -86,25 +88,25 @@ not do that.
 Then rebuild the org-node caches after a few idle seconds.  The delay
 avoids bothering the user who may be trying to delete many files in a
 short time."
-    (when (derived-mode-p 'org-mode)
-      (cl-loop for id being the hash-keys of org-id-locations
-               using (hash-values file)
-               when (file-equal-p file (buffer-file-name))
-               do (remhash id org-id-locations))
-      ;; (let ((ids-in-file
-      ;;        (save-excursion
-      ;;          (without-restriction
-      ;;            (goto-char 1)
-      ;;            (cl-loop while (re-search-forward "^[\s\t]*:ID: *\\(.+?\\) *$"
-      ;;                                              nil t)
-      ;;                     collect (match-string 1))))))
-      ;;   (dolist (id ids-in-file)
-      ;;     (remhash id org-id-locations)))
-      (cancel-timer this-timer)
-      (setq this-timer (run-with-idle-timer 6 nil #'org-node-cache-reset)))))
+    (let ((file-being-deleted (if (file-exists-p (car args))
+                                  (car args)
+                                (buffer-file-name))))
+      (when (member (file-name-extension file-being-deleted)
+                    '("org" "org_archive" "gpg"))
+        (org-node--init-org-id-locations-or-die)
+        (org-node-cache--forget-file file-being-deleted)
+        (cancel-timer this-timer)
+        (setq this-timer (run-with-idle-timer
+                          (1+ auto-save-visited-interval) nil #'org-node-cache-reset))))))
 
 
 ;;; Plumbing
+
+(defun org-node-cache--forget-file (file)
+  (cl-loop for id being the hash-keys of org-id-locations
+           using (hash-values file-on-record)
+           when (file-equal-p file file-on-record)
+           do (remhash id org-id-locations)))
 
 (defun org-node-cache--make-todo-regexp ()
   "Make a regexp based on global value of `org-todo-keywords',
@@ -149,6 +151,7 @@ it does not check."
         (forward-line 1)))
     res))
 
+;; TODO profile dolist vs cl-loop in this situation
 (defun org-node-cache--collect-nodes (files)
   "Scan FILES for id-nodes, adding them to `org-nodes'."
   (with-temp-buffer
@@ -156,12 +159,17 @@ it does not check."
     (cl-flet ((unicode (str) (decode-coding-string str 'utf-8)))
       (cl-loop
        with todo-re = (org-node-cache--make-todo-regexp)
-       with single-file-being-scanned = (not (hash-table-empty-p org-nodes))
+       with not-a-full-reset = (not (hash-table-empty-p org-nodes))
        with case-fold-search = t
-       with gc-cons-threshold = (* 3 1000 1000 1000)
+       with gc-cons-threshold = (* 1000 1000 1000)
        for file in files
-       when (--none-p (string-search it file) '("/logseq/"))
+       ;; Example situation: someone deletes a file with shell commands, then
+       ;; comes back to Emacs.
+       if (not (file-exists-p file))
        do
+       (org-node-cache--forget-file file)
+       (org-id-update-id-locations)
+       else do
        (erase-buffer)
        (insert-file-contents-literally file)
        (let (;; Position of first content (a line not starting with # or :)
@@ -204,9 +212,8 @@ it does not check."
                                     (and refs (split-string-and-unquote refs)))
                        :backlink-origins (org-node-cache--backlinks->list
                                           (cdr (assoc "CACHED_BACKLINKS" props))))))
-           (puthash id node org-nodes)
-           (org-node-cache--populate-other-tables node)
-           (when single-file-being-scanned
+           (org-node-cache--populate-tables node)
+           (when not-a-full-reset
              (when id (org-id-add-location id file))))
          ;; Loop over the file's subtrees
          (while (re-search-forward "^\\*+ " nil t)
@@ -275,14 +282,16 @@ it does not check."
                                   (split-string-and-unquote refs))
                      :backlink-origins (org-node-cache--backlinks->list
                                         (cdr (assoc "CACHED_BACKLINKS" props))))))
-               (when single-file-being-scanned
+               (when not-a-full-reset
                  (when id (org-id-add-location id file)))
-               ;; Record subtree even if it has no ID
-               (puthash (or id (format-time-string "%N")) node org-nodes)
-               (org-node-cache--populate-other-tables node)))))))))
+               (org-node-cache--populate-tables node)))))))))
 
-(defun org-node-cache--populate-other-tables (node)
-  ;; Add to  `org-node--refs-table' and `org-node-collection'
+(defun org-node-cache--populate-tables (node)
+  ;; Record to `org-nodes' even if it has no ID
+  (puthash (or (plist-get node :id) (format-time-string "%N"))
+           node
+           org-nodes)
+  ;; Add to `org-node--refs-table' and `org-node-collection'
   (when (or (not org-node-only-show-subtrees-with-id)
             (plist-get node :id))
     (dolist (ref (plist-get node :roam-refs))
@@ -299,10 +308,6 @@ it does not check."
           (dolist (ref (plist-get node :roam-refs))
             (puthash ref node org-node-collection)))
       (plist-put node :is-excluded t))))
-
-;; (cl-loop for node in (hash-table-values org-nodes)
-;;          for todo = (plist-get node :todo)
-;;          when todo do (message todo))
 
 (defun org-node-cache--pos->olp (oldata pos)
   "Given buffer position POS, return the Org outline path.
