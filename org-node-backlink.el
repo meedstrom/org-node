@@ -253,9 +253,9 @@ merely a wrapper that drops the input."
           (setq id (gethash (concat type ":" path) org-node--refs-table))
           (setq file (plist-get (gethash id org-nodes) :file-path)))
         (when (and id file)
-          (org-node-backlink--add-to-here-in-target-1 file id part-of-mass-op))))))
+          (org-node-backlink--add-to-here-in-target-2 file id part-of-mass-op))))))
 
-(defun org-node-backlink--add-to-here-in-target-1 (target-file target-id &optional part-of-mass-op)
+(defun org-node-backlink--add-to-here-in-target-2 (target-file target-id &optional part-of-mass-op)
   (let ((case-fold-search t)
         (src-id (org-id-get nil nil nil t)))
     (if (not src-id)
