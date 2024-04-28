@@ -1,7 +1,7 @@
 * org-node
 ** What's all this
 
-I found org-roam too slow, so I made [[https://github.com/meedstrom/quickroam][quickroam]].  And that idea spun off into this package, a standalone thing.
+I found org-roam too slow, so I made [[https://github.com/meedstrom/quickroam][quickroam]].  And that idea spun off into this package, a standalone thing.  I'm hoping it's easier to learn.
 
 - *If you were using org-roam*, there is nothing to migrate.  It's exactly the same on-disk format: "notes" are identified by their org-id.
 
@@ -9,15 +9,15 @@ I found org-roam too slow, so I made [[https://github.com/meedstrom/quickroam][q
 
   In pursuit of being "just org-id", this package has no equivalent setting to =org-roam-directory= -- it just looks up =org-id-locations=.
 
-- *If you were not using org-roam*, think of it as a limited, focused alternative to org-ql.  If you were the sort of person to prefer org-id links over file links or any other type of link, you're in the right place: this basically lets you forget about filenames and hierarchies and directory structures -- as long as you've assigned an org-id to something, you can find it later.
+- *If you were not using org-roam*, think of it as a limited, focused alternative to org-ql.  If you were the sort of person to prefer ID-links over file links or any other type of link, you're in the right place: this basically lets you forget about filenames and hierarchies and directory structures -- as long as you've assigned an org-id to something, you can find it later.
 
   And you can still keep doing hierarchies and structures, where that brings you joy, unlike systems that mandate limitations like "one note per file" or strict filename rules.
 
 ** What's a "node"?
 
-My life can be divided into two periods "*before org-roam*" and "*after org-roam*".  I crossed a kind of gap once I got a good way to link between my notes.  It's odd to remember when I didn't have that, and just relied on browsing hierarchies of subtrees and the occasional file-link -- what a strange way to do things!
+My life can be divided into two periods "*before org-roam*" and "*after org-roam*".  I crossed a kind of gap once I got a good way to link between my notes.  It's odd to remember when I just relied on browsing hierarchies of subtrees -- what a strange way to do things!
 
-This is fundamentally what all the "notetaking packages" (orgrr/zk/deft/org-roam/denote/...) try to help you with: make it easy to link between notes.
+At the core, all the "notetaking packages" (orgrr/zk/deft/org-roam/denote/...) try to help you with this: make it easy to link between notes.
 
 Right off the bat, that imposes two requirements: a method to search for notes, since you can't link to something you can't search for, and a decision about exactly what kinds of things should turn up as search hits.
 
@@ -66,9 +66,9 @@ When I first ran across that concept in [[https://github.com/toshism/org-super-l
 
 But that's not true, it's rock solid!  There's a reason org-node caches thousands of ID-nodes in 1 second:
 
-1. Since our =org-id= system allows nested nodes (subtree nodes inside other subtrees), it makes resolving backlinks an optimization challenge.  Not only do you have to parse the file where a link is, you have to open and parse all the links' targets to find out which subtrees they are in.  A naive implementation will easily run at O(N^{2}) or worse.
+1. Since our permissive =org-id= system allows nested nodes (subtree nodes inside other subtrees), it makes resolving backlinks an optimization challenge.  Not only do you have to parse one file's links, you have to open and parse all the links' target files.  A naive implementation will easily run at O(N^{2}).
 
-2. If we've recorded the backlinks inside the subtrees, the cache builder can just grab them while it grabs all the other info, leaving almost zero work to do.
+2. By "pre-recording" backlinks in the subtrees that concern them, the cache builder can just grab them while it grabs all the other info, leaving almost zero work to do.
 
 Maybe you still worry about such backlinks growing stale.  So I made two systems against that: first, if you keep =org-node-backlink-mode= active all the time, it's not expected to happen unless something broke your save hooks.  It records the appearance and disappearance of links upon save.  Second, when you feel suspicious, the command =org-node-backlink-fix-all= will fix all files (slow).
 
@@ -80,7 +80,7 @@ Well... Now they're right there.
 
 **** It should be possible without-
 
-Yes.  But I've come to like the backlinks property anyway, so it's not my itch to scratch.
+Yes.  But I've come to like the =CACHED_BACKLINKS= anyway, so it's not my itch to scratch.
 
 **** Q: Will org-roam double-count my backlinks now?
 
@@ -96,7 +96,7 @@ Add an init snippet like this (assuming [[https://github.com/radian-software/str
   :hook (org-mode . org-node-enable))
 #+end_src
 
-The function =org-node-enable= only runs once, and turns on two global minor modes, =org-node-cache-mode= and =org-node-backlink-mode=.  Neither mode is required, as most commands work anyway.  The cache-mode makes the commands instant, and the backlinks-mode inserts corresponding backlinks whenever you insert a link.
+The function =org-node-enable= only runs once, and turns on two global minor modes, =org-node-cache-mode= and =org-node-backlink-mode=.  Neither mode is required, as most commands work anyway.  The cache-mode makes the commands instant, and the backlink-mode inserts corresponding backlinks whenever you insert a link.
 
 ** Commands
 
@@ -127,7 +127,7 @@ For config options, type =M-x customize-group RET org-node RET=.
 
 ** Org-capture
 
-You may know that org-roam had its own set of capture templates: the =org-roam-capture-templates=.
+You may know that org-roam has its own set of capture templates: the =org-roam-capture-templates=.
 
 It can make sense, for people who fully understand the magic of capture templates.  I didn't, so I was not confident using a second-order abstraction over an already leaky abstraction.
 
@@ -153,10 +153,12 @@ And if you want the =org-node-find= command to also outsource to org-capture whe
 
 Some user options to feel at home
 
-- Set =org-node-creation-fn= to =org-node-creation-fn-roam-capture=
-- Set =org-node-slug-fn= to =org-node-slugify-like-roam=
-- Set =org-node-creation-hook= to =nil=
-  
+#+begin_src elisp
+(setq org-node-creation-fn #'org-node-creation-fn-roam-capture)
+(setq org-node-slug-fn #'org-node-slugify-like-roam)
+(setq org-node-creation-hook nil)
+#+end_src
+
 ** Rich completions
 
 How to prepend subtrees with their outline paths:
