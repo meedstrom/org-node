@@ -76,20 +76,31 @@ Built-in choices:
 - `org-node-slugify-like-roam'
 "
   :group 'org-node
-  :type 'function)
+  :type '(choice
+          (const org-node-slugify-like-roam)
+          (const org-node-slugify-as-url)
+          function))
 
-(defcustom org-node-creation-fn #'org-node-creation-fn-basic
+(defcustom org-node-creation-fn #'org-node-new-file
   "Function called by `org-node-find', and `org-node-insert-link' to
-create a node.  During execution, two variables are set:
-`org-node-proposed-title' and `org-node-proposed-id'.
+create a node.
+
+If you wish to write a new function, know that during execution, two
+variables are available: `org-node-proposed-title' and
+`org-node-proposed-id'.  Use them.
 
 Some options
-- `org-node-creation-fn-basic'
-- `org-node-creation-fn-roam-capture'
+- `org-node-new-file'
+- `org-node-new-by-roam-capture'
 - `org-capture'
-"
+
+Using `org-capture' requires some assembly.  See `org-node-capture-target'."
   :group 'org-node
-  :type 'function)
+  :type '(choice
+          (const org-node-new-file)
+          (const org-node-new-by-roam-capture)
+          (const org-capture)
+          function))
 
 (defcustom org-node-insert-link-hook ()
   "Hook run after inserting a link to an Org-ID node.
@@ -103,18 +114,29 @@ Functions here should not leave point outside the link."
 (defcustom org-node-creation-hook '(org-node-put-created)
   "Hook run with point in the newly created buffer or entry.
 
-Applied only by `org-node-creation-fn-basic',
-`org-node-create-subtree' and `org-node-extract-subtree'.
+Applied only by `org-node-new-file', `org-node-create-subtree',
+`org-node-nodeify-entry' and `org-node-extract-subtree'.
 
-For `org-node-creation-fn-roam-capture', you want the
-hook `org-roam-capture-new-node-hook' instead.
+NOT run by `org-node-new-by-roam-capture' - see that package's hook
+`org-roam-capture-new-node-hook' instead.
 
 A good member for this hook is `org-node-put-created', especially
 since the default `org-node-slug-fn' does not put a timestamp in
-the filename.
-"
+the filename."
   :type 'hook
   :group 'org-node)
+
+
+;;; API extras
+;; Conveniences for users. Avoided inside this package.
+
+(defun org-node-at-point (&optional _point)
+  (gethash (org-id-get nil nil nil t) org-nodes))
+
+(defun org-node-read ()
+  (gethash (completing-read "Node: " org-node-collection
+                            () () () 'org-node-hist)
+           org-node-collection))
 
 
 ;;; Plumbing
@@ -186,43 +208,122 @@ a small wrapper such as:
 ;; (org-node-slugify-as-url "Slimline/\"pizza box\" computer chassis")
 ;; (org-node-slugify-as-url "#emacs")
 
-
-
-;;; API extras
-;; Conveniences for users. Avoided inside this package.
-
-(defun org-node-at-point (&optional _point)
-  (gethash (org-id-get nil nil nil t) org-nodes))
-
-(defun org-node-read ()
-  (gethash (completing-read "Node: " org-node-collection
-                            () () () 'org-node-hist)
-           org-node-collection))
-
-
-
-;;; Commands
-
 (defvar org-node-proposed-title nil)
 (defvar org-node-proposed-id nil)
 
-;; Just an example... untested
+;; Just an example... untested.
+;; Goes to the end of the file and assumes the capture template puts a subtree
+;; there.
 (defun org-node-capture-target ()
-  "Can be used as TARGET in `org-capture-templates'."
+  "Can be used as TARGET in a capture template.
+See `org-capture-templates' for what TARGET means.
+
+Note that a capture template using this for the TARGET cannot be used
+just anytime.  It relies on variables set when either `org-node-find' or
+`org-node-insert-link' calls out to `org-node-creation-fn'.
+
+In other situations, the template is unusable.  That's why org-roam
+opted to have a separate set of capture templates.  It makes more sense,
+once you fully understand the magic of capture templates so that you can
+be comfortable with a second abstraction.  However, org-node hopes to be
+more educational, and then it is better to show you how it would work
+with vanilla org-capture.
+
+In simple terms, let's say you have a template targeting `(function
+org-node-capture-target)'.  Here's a possible workflow:
+
+1. Run org-node-find
+2. Type name of an unknown node
+3. It will create a new file-level node and then insert your capture there
+
+Alternatively, if you intend to aim at a known node
+
+1. Run org-node-capture
+2. Type name of a known node
+3. It will go there, insert a new child subtree with the title provided
+   in step 1.  Then within that subtree, it inserts your capture
+   template.
+"
+  (org-node--init-org-id-locations-or-die)
   (let* ((dir (read-directory-name
                "Where to create the node? "
                (car (org-node--root-dirs (hash-table-values org-id-locations)))))
          (path-to-write (file-name-concat dir (funcall org-node-slug-fn
-                                                       org-node-proposed-title))))
+                                                       org-node-proposed-title)))
+         (new? (file-exists-p path-to-write)))
     (find-file path-to-write)
-    (goto-char (point-max))
-    (if (org-entry-get nil "ID")
-        (user-error "Already an ID in this location")
-      (org-entry-put nil "ID" org-node-proposed-id))
+    (if new?
+        (insert ":PROPERTIES:"
+                "\n:ID:       " org-node-proposed-id
+                "\n:END:"
+                "\n#+title: " org-node-proposed-title
+                "\n")
+      (goto-char (point-max))
+      (org-insert-heading)
+      (insert org-node-proposed-title)
+      (org-entry-put nil "ID" org-node-proposed-id)
+      (org-end-of-meta-data 'all))
     (run-hooks 'org-node-creation-hook)))
 
-(defun org-node-creation-fn-roam-capture ()
-  "Call `org-roam-capture-' with predetermined arguments."
+;; I just visualized having an `org-node-capture' command just for creating a
+;; new subtree node as a child of a preexisting node (guess that's what people
+;; use `org-roam-capture' for).  What if that could just be `org-capture'
+;; itself, and the target function prompts the user?  Yesss...
+(defun org-node-capture-target* ()
+  (org-node--init-org-id-locations-or-die)
+  (let (title node id)
+    (if org-node-proposed-title
+        ;; Was called from `org-node--create', so the user already typed the
+        ;; title and no such node exists
+        (progn
+          (setq title org-node-proposed-title)
+          (setq id org-node-proposed-id))
+      ;; Was called from `org-capture', which means the user has not yet typed
+      ;; the title
+      (org-node-cache-ensure-fresh)
+      (let ((input (completing-read "Node: " org-node-collection
+                                    () () () 'org-node-hist)))
+        (setq node (gethash input org-node-collection))
+        (if node
+            (progn
+              (setq title (plist-get node :title))
+              (setq id (plist-get node :id)))
+          (setq title input)
+          (setq id (org-id-new)))))
+    (if node
+        ;; Node exists; capture to a subtree within
+        (progn
+          (find-file (plist-get node :file-path))
+          (widen)
+          (goto-char (plist-get node :pos))
+          (let ((lvl (org-current-level)))
+            (outline-next-heading)
+            (let ((org-insert-heading-respect-content nil))
+              (org-insert-heading))
+            (when (eq lvl (org-current-level))
+              (org-do-demote)))
+          ;; (insert title)
+          (org-entry-put nil "ID" (org-id-new))
+          (org-end-of-meta-data 'all)
+          (run-hooks 'org-node-creation-hook))
+      ;; Node does not exist; capture to new file-level node
+      (let* ((dir (read-directory-name
+                   "Where to create the node? "
+                   (car (org-node--root-dirs (hash-table-values org-id-locations)))))
+             (path-to-write (file-name-concat dir (funcall org-node-slug-fn
+                                                           org-node-proposed-title))))
+        (find-file path-to-write)
+        (insert ":PROPERTIES:"
+                "\n:ID:       " id
+                "\n:END:"
+                "\n#+title: " title
+                "\n")
+        (run-hooks 'org-node-creation-hook)))))
+
+(defun org-node-new-by-roam-capture ()
+  "Call `org-roam-capture-' with predetermined arguments.
+Meant to be called as `org-node-creation-fn', which sets some necessary
+variables."
   (unless (fboundp #'org-roam-capture-)
     (org-node-die "Didn't create node! Either install org-roam or %s"
                   "configure `org-node-creation-fn'"))
@@ -230,8 +331,10 @@ a small wrapper such as:
   (org-roam-capture- :node (org-roam-node-create :title org-node-proposed-title
                                                  :id    org-node-proposed-id)))
 
-(defun org-node-creation-fn-basic ()
-  "Create a file-level node and ask where to save it."
+(defun org-node-new-file ()
+  "Create a file-level node and ask where to save it.
+Meant to be called as `org-node-creation-fn', which sets some necessary
+variables."
   (let* ((dir (read-directory-name
                "Where to create the node? "
                (car (org-node--root-dirs (hash-table-values org-id-locations)))))
@@ -241,22 +344,15 @@ a small wrapper such as:
             (find-buffer-visiting path-to-write))
         (message "A file or buffer already exists for path %s"
                  (file-name-nondirectory path-to-write))
-      (let ((buf (find-file-noselect path-to-write)))
-        (with-current-buffer buf
-          (insert ":PROPERTIES:"
-                  "\n:ID:       " org-node-proposed-id
-                  "\n:END:"
-                  "\n#+title: " org-node-proposed-title
-                  "\n")
+      (find-file path-to-write)
+      (insert ":PROPERTIES:"
+              "\n:ID:       " org-node-proposed-id
+              "\n:END:"
+              "\n#+title: " org-node-proposed-title
+              "\n")
+      (unwind-protect
           (run-hooks 'org-node-creation-hook)
-          (save-buffer))
-        buf))))
-
-(defun org-node-random (node)
-  (interactive)
-  (org-node--init-org-id-locations-or-die)
-  (org-node--goto (nth (random (hash-table-count org-nodes))
-                       (hash-table-values org-nodes))))
+        (save-buffer)))))
 
 (defun org-node--goto (node)
   "Visit NODE."
@@ -265,13 +361,31 @@ a small wrapper such as:
   (goto-char (plist-get node :pos))
   (recenter 5))
 
+(defun org-node--create (title id)
+  (setq org-node-proposed-title title)
+  (setq org-node-proposed-id id)
+  (condition-case err
+      ;; (let ((result (funcall org-node-creation-fn)))
+      ;;   (when (bufferp result)
+      ;;     (switch-to-buffer result)))
+      (funcall org-node-creation-fn)
+    ((t debug error)
+     (setq org-node-proposed-title nil)
+     (setq org-node-proposed-id nil)
+     (signal (car err) (cdr err)))
+    (:success
+     (setq org-node-proposed-title nil)
+     (setq org-node-proposed-id nil))))
+
+
+;;; Commands
+
 ;;;###autoload
 (defun org-node-find ()
   "Select and visit one of your ID nodes.
 
 To behave like `org-roam-node-find' when creating new nodes, set
-`org-node-creation-fn' to
-`org-node-creation-fn-roam-capture'."
+`org-node-creation-fn' to `org-node-new-by-roam-capture'."
   (interactive)
   (org-node-cache-ensure-fresh)
   (let* ((input (completing-read "Node: " org-node-collection
@@ -279,19 +393,7 @@ To behave like `org-roam-node-find' when creating new nodes, set
          (node (gethash input org-node-collection)))
     (if node
         (org-node--goto node)
-      (setq org-node-proposed-title input)
-      (setq org-node-proposed-id (org-id-new))
-      (condition-case err
-          (let ((result (funcall org-node-creation-fn)))
-            (when (bufferp result)
-              (switch-to-buffer result)))
-        ((t debug error)
-         (setq org-node-proposed-title nil)
-         (setq org-node-proposed-id nil)
-         (signal (car err) (cdr err)))
-        (:success
-         (setq org-node-proposed-title nil)
-         (setq org-node-proposed-id nil))))))
+      (org-node--create input (org-id-new)))))
 
 ;;;###autoload
 (defun org-node-insert-link ()
@@ -299,7 +401,7 @@ To behave like `org-roam-node-find' when creating new nodes, set
 
 To behave like `org-roam-node-insert' when creating new nodes,
 set `org-node-creation-fn' to
-`org-node-creation-fn-roam-capture'.
+`org-node-new-by-roam-capture'.
 
 If you find the behavior different, perhaps you have something in
 `org-roam-post-node-insert-hook'.  Then perhaps copy it to
@@ -313,10 +415,10 @@ If you find the behavior different, perhaps you have something in
          (region-text (when (region-active-p)
                         (setq end (region-end))
                         (goto-char (region-beginning))
-                        (skip-chars-forward "[:space:]")
+                        (skip-chars-forward "\n[:space:]")
                         (setq beg (point))
                         (goto-char end)
-                        (skip-chars-backward "[:space:]")
+                        (skip-chars-backward "\n[:space:]")
                         (setq end (point))
                         (org-link-display-format
                          (buffer-substring-no-properties beg end))))
@@ -334,22 +436,16 @@ If you find the behavior different, perhaps you have something in
           (setq link-desc (org-node--visit-get-true-heading node))))
       (insert (org-link-make-string (concat "id:" id) link-desc))
       (run-hook-with-args 'org-node-insert-link-hook id link-desc))
-    ;; Node doesn't exist yet, create it
     ;; TODO: Delete the link if a node was not created
     (unless node
-      (setq org-node-proposed-title input)
-      (setq org-node-proposed-id id)
-      (condition-case err
-          (let ((result (funcall org-node-creation-fn)))
-            (when (bufferp result)
-              (switch-to-buffer result)))
-        ((t debug error)
-         (setq org-node-proposed-title nil)
-         (setq org-node-proposed-id nil)
-         (signal (car err) (cdr err)))
-        (:success
-         (setq org-node-proposed-title nil)
-         (setq org-node-proposed-id nil))))))
+      (org-node--create input id))))
+
+;;;###autoload
+(defun org-node-random ()
+  (interactive)
+  (org-node-cache-ensure-fresh)
+  (org-node--goto (nth (random (hash-table-count org-nodes))
+                       (hash-table-values org-nodes))))
 
 ;;;###autoload
 (defun org-node-insert-transclusion-as-subtree ()
