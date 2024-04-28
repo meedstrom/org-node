@@ -211,65 +211,29 @@ a small wrapper such as:
 (defvar org-node-proposed-title nil)
 (defvar org-node-proposed-id nil)
 
-;; Just an example... untested.
-;; Goes to the end of the file and assumes the capture template puts a subtree
-;; there.
 (defun org-node-capture-target ()
   "Can be used as TARGET in a capture template.
 See `org-capture-templates' for what TARGET means.
 
-Note that a capture template using this for the TARGET cannot be used
-just anytime.  It relies on variables set when either `org-node-find' or
-`org-node-insert-link' calls out to `org-node-creation-fn'.
+In simple terms, let's say you have a template targeting
+`(function org-node-capture-target)'.  Here's a possible workflow:
 
-In other situations, the template is unusable.  That's why org-roam
-opted to have a separate set of capture templates.  It makes more sense,
-once you fully understand the magic of capture templates so that you can
-be comfortable with a second abstraction.  However, org-node hopes to be
-more educational, and then it is better to show you how it would work
-with vanilla org-capture.
+1. Run M-x org-capture
+2. Select your template
+3. Type name of known or unknown node
+4a. If it was known, it will capture into that node.
+4b. If it was unknown, it will create a file-level node and then capture
+    into there.
 
-In simple terms, let's say you have a template targeting `(function
-org-node-capture-target)'.  Here's a possible workflow:
+Additionally, if you've set (setq org-node-creation-fn #'org-capture),
+commands like `org-node-find' will also outsource to capture when you
+type the name of a node that does not exist:
 
-1. Run org-node-find
+1. Run M-x org-node-find
 2. Type name of an unknown node
-3. It will create a new file-level node and then insert your capture there
-
-Alternatively, if you intend to aim at a known node
-
-1. Run org-node-capture
-2. Type name of a known node
-3. It will go there, insert a new child subtree with the title provided
-   in step 1.  Then within that subtree, it inserts your capture
-   template.
-"
-  (org-node--init-org-id-locations-or-die)
-  (let* ((dir (read-directory-name
-               "Where to create the node? "
-               (car (org-node--root-dirs (hash-table-values org-id-locations)))))
-         (path-to-write (file-name-concat dir (funcall org-node-slug-fn
-                                                       org-node-proposed-title)))
-         (new? (file-exists-p path-to-write)))
-    (find-file path-to-write)
-    (if new?
-        (insert ":PROPERTIES:"
-                "\n:ID:       " org-node-proposed-id
-                "\n:END:"
-                "\n#+title: " org-node-proposed-title
-                "\n")
-      (goto-char (point-max))
-      (org-insert-heading)
-      (insert org-node-proposed-title)
-      (org-entry-put nil "ID" org-node-proposed-id)
-      (org-end-of-meta-data 'all))
-    (run-hooks 'org-node-creation-hook)))
-
-;; I just visualized having an `org-node-capture' command just for creating a
-;; new subtree node as a child of a preexisting node (guess that's what people
-;; use `org-roam-capture' for).  What if that could just be `org-capture'
-;; itself, and the target function prompts the user?  Yesss...
-(defun org-node-capture-target* ()
+3. A capture window pops up - now choose a template that targets
+   `org-node-capture-target'!
+4. Same as 4b earlier."
   (org-node--init-org-id-locations-or-die)
   (let (title node id)
     (if org-node-proposed-title
@@ -291,34 +255,32 @@ Alternatively, if you intend to aim at a known node
           (setq title input)
           (setq id (org-id-new)))))
     (if node
-        ;; Node exists; capture to a subtree within
+        ;; Node exists; capture into it
         (progn
           (find-file (plist-get node :file-path))
           (widen)
           (goto-char (plist-get node :pos))
-          (let ((lvl (org-current-level)))
-            (outline-next-heading)
-            (let ((org-insert-heading-respect-content nil))
-              (org-insert-heading))
-            (when (eq lvl (org-current-level))
-              (org-do-demote)))
-          ;; (insert title)
-          (org-entry-put nil "ID" (org-id-new))
-          (org-end-of-meta-data 'all)
-          (run-hooks 'org-node-creation-hook))
-      ;; Node does not exist; capture to new file-level node
+          (unless (and (= 1 (point)) (org-at-heading-p))
+            ;; Go to just before next heading, or end of buffer if there are no
+            ;; more headings
+            (when (outline-next-heading)
+              (backward-char 1))))
+      ;; Node does not exist; capture into new file-level node
       (let* ((dir (read-directory-name
                    "Where to create the node? "
                    (car (org-node--root-dirs (hash-table-values org-id-locations)))))
-             (path-to-write (file-name-concat dir (funcall org-node-slug-fn
-                                                           org-node-proposed-title))))
-        (find-file path-to-write)
-        (insert ":PROPERTIES:"
-                "\n:ID:       " id
-                "\n:END:"
-                "\n#+title: " title
-                "\n")
-        (run-hooks 'org-node-creation-hook)))))
+             (path-to-write (file-name-concat
+                             dir (funcall org-node-slug-fn title))))
+        (if (or (file-exists-p path-to-write)
+                (find-buffer-visiting path-to-write))
+            (error "File or buffer already exists: %s" path-to-write)
+          (find-file path-to-write)
+          (insert ":PROPERTIES:"
+                  "\n:ID:       " id
+                  "\n:END:"
+                  "\n#+title: " title
+                  "\n")
+          (run-hooks 'org-node-creation-hook))))))
 
 (defun org-node-new-by-roam-capture ()
   "Call `org-roam-capture-' with predetermined arguments.

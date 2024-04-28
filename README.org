@@ -32,24 +32,26 @@ For your pleasure, here's a comparison of three similar notetaking systems: all 
 |                                   | org-roam    | org-node           | [[https://github.com/toshism/org-super-links][org-super-links]]      |
 |-----------------------------------+-------------+--------------------+----------------------|
 | Backlinks                         | yes         | yes                | yes                  |
-| org-roam-capture integration      | yes         | yes                | no                   |
 | Node search and insert            | yes         | yes                | no (suggests org-ql) |
 | Node aliases                      | yes         | yes                | not applicable       |
 | Rich backlinks buffer             | yes         | yes (org-roam's)   | no                   |
 | Reflinks                          | yes         | yes (as backlinks) | no                   |
 | Ref search                        | yes         | yes (as aliases)   | no                   |
 | Extract subtree to new file       | yes         | yes                | no                   |
+| Can configure rich completions    | yes         | yes                | not applicable       |
+| org-roam-capture integration      | yes         | yes                | no                   |
+| org-capture integration           | no          | yes                | no                   |
 | Backlinks in same window          | no          | yes                | yes                  |
 | Avoid double-counting :BACKLINKS: | no          | yes                | yes                  |
 | Read =:CACHED_BACKLINKS:= as data   | no          | yes                | no                   |
 | Warn about dead links             | no          | yes                | no                   |
-| Can configure rich completions    | yes         | yes                | not applicable       |
+| Seek files/headings sans ID       | no          | yes                | not applicable       |
 | Node exclusion                    | yes         | limited            | not applicable       |
 | Support =roam:= links               | yes         | no                 | no                   |
 | Read :BACKLINKS: as data          | no          | no                 | yes                  |
 | Some query-able cache             | org-roam-db | org-nodes          | no                   |
-| Cache mandatory                   | yes         | no                 | no                   |
 |-----------------------------------+-------------+--------------------+----------------------|
+| Cache mandatory                   | yes         | no                 | no                   |
 | Time to re-cache 2000 files       | 3 minutes   | 1 second           | not applicable       |
 
 This isn't a totally fair comparison; org-roam has an advantage in the details, see Appendix II.  With org-node I've made what I would've liked to hack on, so it's more simplistic in many aspects.
@@ -74,11 +76,11 @@ Did you ever want to be able to see backlinks inside the Org buffer instead of i
 
 Well... Now they're right there.
 
-**** It should be possible without--
+**** It should be possible without-
 
-Yes.  Yes.  But I've come to like the backlinks property anyway, so it's not my itch to scratch.
+Yes.  But I've come to like the backlinks property anyway, so it's not my itch to scratch.
 
-**** Q: Will org-roam double-count my backlinks now??
+**** Q: Will org-roam double-count my backlinks now?
 
 Nope!  Org-roam doesn't count links in property drawers.
 
@@ -164,6 +166,31 @@ The second way (experimental) is translating org-node's info into a form suitabl
 
 This second method has potential to unlock more org-roam features (like =org-roam-display-templates=), but does not yet send all the data that org-roam wants, and given that it's slow anyway you may as well continue using the real =org-roam-db-sync=.
 
+
+** Org-capture
+
+You may know that org-roam had its own set of capture templates: the =org-roam-capture-templates=.
+
+It can make sense, for people who fully understand the magic of capture templates.  I didn't, so I was not confident using a second-order abstraction over an already leaky abstraction.
+
+That's why I never got acquainted with =M-x org-roam-capture=, only indirectly using the templates via =org-roam-node-find=.  It was a jungle I didn't want to explore.
+
+So I wondered if you can reproduce the functionality on top of vanilla org-capture.  That'd be less scary.  The answer is yes!
+
+Set-up: write a capture template that uses =(function org-node-capture-target)= as the =target=, and then you can use it via good old =M-x org-capture= to capture to any of your ID nodes.  Something like:
+
+#+begin_src elisp
+(setq org-capture-templates
+      '(("n" "ID node" plain (function org-node-capture-target))))
+#+end_src
+
+And if you want the =org-node-find= command to also outsource to org-capture when creating new nodes, use the following setting.
+
+#+begin_src elisp
+(setq org-node-creation-fn #'org-capture)
+#+end_src
+
+
 ** For you who use Org-roam at the same time
 
 Some user options to feel at home
@@ -172,13 +199,26 @@ Some user options to feel at home
 - Set =org-node-slug-fn= to =org-node-slugify-like-roam=
 - Set =org-node-creation-hook= to =nil=
   
+** Rich completions
+
+How to prepend subtrees with their outline paths:
+
+#+begin_src elisp
+(setq org-node-format-candidate-fn
+      (defun my-format-with-olp (node title)
+        "Prepend subtree completions with the outline path."
+        (if-let ((olp (plist-get node :olp)))
+            (concat (string-join olp " > ") " > " title)
+          title)))
+#+end_src
+
 ** Limitations
 *** Excluding nodes
 The =org-node-filter-fn= works well for ignoring TODO items that happen to have an ID, and ignoring org-drill items and that sort of thing, but beyond that, it has limited utility because unlike org-roam, *child ID nodes of an excluded node are not excluded!*
 
-So let's say you have a big archive file, fulla IDs, and you want to exclude all of it.  Putting a =:ROAM_EXCLUDE: t= atop won't do it.  As it stands, what I'd suggest is unfortunately, look at the file name.
+So let's say you have a big archive file, fulla IDs, and you want to exclude all of it.  Putting a =:ROAM_EXCLUDE: t= at the top won't do it.  As it stands, what I'd suggest is unfortunately, look at the file name.
 
-The whole point of org-id was to avoid dependence on filenames, but it's often pragmatic to let up on purism just a bit :-) It works well for me to filter out any file or directory that happens to contain "archive" in the name:
+The point of org-id is to avoid dependence on filenames, but it's often pragmatic to let up on purism just a bit :-) It works well for me to filter out any file or directory that happens to contain "archive" in the name:
 
 #+begin_src elisp
 (setq org-node-filter-fn
@@ -189,23 +229,9 @@ The whole point of org-id was to avoid dependence on filenames, but it's often p
              (not (string-search "archive" (plist-get node :file-path))))))
 #+end_src
 
-*** Rich completions
-
-In org-roam you could get a node's outline path (=org-roam-node-olp=), which can be used to enrich the completion candidates.
-
-We can do something similar:
-
-#+begin_src elisp
-(setq org-node-format-candidate-fn
-      (defun my-format-with-olp (node title)
-        (if-let ((olp (plist-get node :olp)))
-            (concat (string-join olp " > ") " > " title)
-          title)))
-#+end_src
-
 *** Ref format
 
-# Don't insert =[[http...][description]]= in the =ROAM_REFS= field.  Just the raw URL.
+For now, don't insert formatted links like =[[http...][description]]= in the =ROAM_REFS= field.  Just the raw URL.
 
 ** Appendix 0: Command equivalents :noexport:
 
@@ -220,16 +246,14 @@ Things you may as well just use from org-roam.  No vanilla org-mode equivalent, 
 
 API comparison between org-roam and org-node.
 
-You'll notice that org-node "API" is not much of an API, because I try to expose the plumbing:
-
 | Action                          | org-roam                        | org-node                                                                     |
 |---------------------------------+---------------------------------+------------------------------------------------------------------------------|
 | Get ID at point                 | =(org-roam-id-at-point)=          | =(org-id-get nil nil nil t)=                                                   |
 | Get node at point               | =(org-roam-node-at-point)=        | =(gethash (org-id-get nil nil nil t) org-nodes)=                               |
 | Get list of files               | =(org-roam-list-files)=           | =(seq-uniq (hash-table-values org-id-locations))=                              |
 | Prompt user to pick a node      | =(org-roam-node-read)=            | =(gethash (completing-read "Node: " org-node-collection) org-node-collection)= |
-| Get backlink IDs                |                                 | =(plist-get NODE :backlink-ids)=                                               |
-| Get org-roam-backlink objects   | =(org-roam-backlinks-get NODE)=   |                                                                              |
+| Get backlink IDs                |                                 | =(plist-get NODE :backlink-origins)=                                           |
+| Get org-roam-backlink objects   | =(org-roam-backlinks-get NODE)=   | =(org-node--fabricate-roam-backlinks (org-node--fabricate-roam-object NODE))=  |
 | Get title                       | =(org-roam-node-title NODE)=      | =(plist-get NODE :title)=                                                      |
 | Get ID                          | =(org-roam-node-id NODE)=         | =(plist-get NODE :id)=                                                         |
 | Get filename                    | =(org-roam-node-file NODE)=       | =(plist-get NODE :file-path)=                                                  |
@@ -237,17 +261,16 @@ You'll notice that org-node "API" is not much of an API, because I try to expose
 | Get subtree TODO state          | =(org-roam-node-todo NODE)=       | =(plist-get NODE :todo)=, only that match global =org-todo-keywords=             |
 | Get outline level               | =(org-roam-node-level NODE)=      | =(plist-get NODE :level)=, also the boolean =:is-subtree=                        |
 | Get =ROAM_ALIASES=                | =(org-roam-node-aliases NODE)=    | =(plist-get NODE :aliases)=                                                    |
-| Get =ROAM_REFS=                   | =(org-roam-node-refs NODE)=       |                                                                              |
+| Get =ROAM_REFS=                   | =(org-roam-node-refs NODE)=       | =(plist-get NODE :roam-refs)=                                                  |
 | Get =ROAM_EXCLUDE=                |                                 | =(plist-get NODE :exclude)=, doesn't inherit parent excludes!                  |
-| Get line number                 |                                 | =(plist-get NODE :line-number)=                                                |
-| Get char position               | =(org-roam-node-point NODE)=      | =(org-node--visit-get-pos NODE)=                                               |
-| Get :PROPERTIES:                | =(org-roam-node-properties NODE)= | =(org-node--visit-get-properties NODE)=                                        |
-| Get title of file where NODE is | =(org-roam-node-file-title NODE)= | =(org-node--visit-get-file-title NODE)=                                        |
-| Get subtree heading sans TODO   | =(org-roam-node-title NODE)=      | =(org-node--visit-get-true-heading NODE)=                                      |
-| Get outline-path                | =(org-roam-node-olp NODE)=        |                                                                              |
+| Get char position               | =(org-roam-node-point NODE)=      | =(plist-get NODE :pos)=                                                        |
+| Get :PROPERTIES:                | =(org-roam-node-properties NODE)= | =(plist-get NODE :properties)=                                                 |
+| Get title of file where NODE is | =(org-roam-node-file-title NODE)= | =(plist-get NODE :file-title)=                                                 |
+| Get subtree heading sans TODO   | =(org-roam-node-title NODE)=      | =(org-node--visit-get-true-heading NODE)=                                              |
+| Get outline-path                | =(org-roam-node-olp NODE)=        | =(plist-get NODE :olp)=                                                        |
 | Get subtree priority            | =(org-roam-node-priority NODE)=   |                                                                              |
-| Get subtree SCHEDULED           | =(org-roam-node-scheduled NODE)=  |                                                                              |
-| Get subtree DEADLINE            | =(org-roam-node-deadline NODE)=   |                                                                              |
+| Get subtree SCHEDULED           | =(org-roam-node-scheduled NODE)=  | =(plist-get NODE :scheduled)=                                                  |
+| Get subtree DEADLINE            | =(org-roam-node-deadline NODE)=   | =(plist-get NODE :deadline)=                                                   |
 | Get org-roam-reflink objects    | =(org-roam-reflinks-get NODE)=    |                                                                              |
 | Ensure fresh data               | =(org-roam-db-sync)=              | =(org-node-cache-ensure-fresh)=                                                |
 
@@ -255,7 +278,7 @@ You'll notice that org-node "API" is not much of an API, because I try to expose
 
 1. It is the most general toolkit.  Take a function like =org-roam-id-at-point=.  Why does it exist, when you could use =(org-id-get nil nil nil t)=?  Well, the org-roam version ignores those ancestor headings that have an ID but have been marked not to count as "Roam nodes", so it travels further up the tree until it finds one that is indeed "a Roam node".
 
-   - This brings good to users.  Complexity is not the enemy.  It's just a bit of a YAML vs TOML situation.  Or lsp-mode vs eglot.  I prefer to try to be "closer to the metal", use vanilla =org-capture= instead of =org-roam-capture=, look up vanilla =org-id-locations= instead of =org-roam-directory= etc.  Not have so many wrappers.
+   - This brings good to some users.  Complexity is not the enemy.  It's just a bit of a YAML vs TOML situation.  Or lsp-mode vs eglot.  I prefer to try to be "closer to the metal", use vanilla =org-capture= instead of =org-roam-capture=, look up vanilla =org-id-locations= instead of =org-roam-directory= etc.  Not have so many wrappers.
 
 2. Take the variable =org-roam-mode-sections=.  Under any ordinary Emacs Lisp package, this would just be a list of functions.  But in fact, you can add to it a cons cell of a function plus the arguments to pass to it.  I like programmability, but this is ... oriented towards people who aren't programmers, I think.
 
@@ -276,12 +299,14 @@ On Doom's Org module, you may need a fix to use org-transclusion:
 
 * Question for you
 
-I want to try to merge =:ROAM_REFS:= with the =:ID:= field.  I.e. let you paste URLs (or any other text string) directly on the ID field, because that's all =ROAM_REFS= are, and such a design would make it self-evident.  I think there must be many people today who remain unsure what a roam ref is because they put it on the backlog along with 500 other Emacs/Org concepts to learn.
+I want to try to merge =:ROAM_REFS:= with the =:ID:= field.  I.e. let you paste URLs (or any other text string) directly on the ID field, because that's all =ROAM_REFS= are, and such a design would make it self-evident.
+
+I think there must be many people today who remain unsure what a roam ref is, because they have a backlog of 500 other Emacs/Org concepts to learn.
 
 Plus, such a design would mean I can run the same code to collect backlinks as reflinks, as reflinks would just /be/ backlinks.
 
 Maybe if that doesn't pan out, we could make an =ID_ALIASES= field, so it's at least cognate to =ROAM_ALIASES=.
 
-Or =EXTRA_IDS=.
+Or =EXTRA_IDS=.  I think that may be best.
 
 What do you think? Awesome? Terrible?
