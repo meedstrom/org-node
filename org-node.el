@@ -25,30 +25,14 @@
 
 ;;; Commentary:
 
-;; Do you have a love-hate relationship with org-roam v2?  This package can
-;; work as an alternative way to access and work with your notes, or it can
-;; replace org-roam if you did not need all its features.
-;;
-;; Requires ripgrep installed.
-;;
-;; The main commands can use your org-roam-capture-templates if configured:
-;;
-;; - `org-node-find'
-;; - `org-node-insert-link'
-;;
-;; To make these commands as fast as can be, enable `org-node-cache-mode'.
-;;
-;; Later on, AFTER you read and understood the readme, there is also
-;; `org-node-backlink-mode'.  Read the readme to know what it does.
-
 ;;; Code:
 
 ;; TODO Test each user commmand again
 ;; TODO Annotations for completion
 ;; TODO Completion category https://github.com/alphapapa/org-ql/issues/299
 ;; TODO Maybe move user commands into a -commands.el and minimize the core
-;; TODO Command to grep across all files (then deprecate the regret command, and teach the user wgrep)
-;; TODO Command to insert link into :BACKLINKS:
+;; TODO Command to grep across all files (then deprecate the -regret command, and teach the user wgrep)
+;; TODO Option to insert backlink into :BACKLINKS:
 ;; TODO React to any org-element-cache error (they're common) and disable the cache during fix-all
 ;; TODO Use fundamental-mode in `org-node-backlink-fix-all'
 ;; TODO Command to explore feedback arc sets
@@ -56,11 +40,12 @@
 
 (require 'org-node-common)
 (require 'org-node-cache)
+(require 'org-node-backlink)
+(require 'org-node-roam)
 
 ;;;###autoload
 (defun org-node-enable ()
   "Designed for `org-mode-hook' and will remove itself."
-  (require 'org-node-backlink)
   (remove-hook 'org-mode-hook #'org-node-enable)
   (org-node-backlink-mode)
   (org-node-cache-mode))
