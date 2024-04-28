@@ -64,12 +64,12 @@ deduplicated, as if :unique t."
         (backlink-origins (plist-get node :backlink-origins))
         (is-subtree (plist-get node :is-subtree))
         (pos (plist-get node :pos)))
-    ;; `org-roam-db-insert-file'
+    ;; Replace `org-roam-db-insert-file'
     (org-roam-db-query
      [:insert :into files
       :values $v1]
      (list (vector file-path nil "" "" "")))
-    ;; `org-roam-db-insert-aliases'
+    ;; Replace `org-roam-db-insert-aliases'
     (when aliases
       (org-roam-db-query
        [:insert :into aliases
@@ -77,7 +77,7 @@ deduplicated, as if :unique t."
        (mapcar (lambda (alias)
                  (vector id alias))
                aliases)))
-    ;; `org-roam-db-insert-tags'
+    ;; Replace `org-roam-db-insert-tags'
     (when tags
       (org-roam-db-query
        [:insert :into tags
@@ -85,7 +85,7 @@ deduplicated, as if :unique t."
        (mapcar (lambda (tag)
                  (vector id tag))
                tags)))
-    ;; `org-roam-db-insert-node-data'
+    ;; Replace `org-roam-db-insert-node-data'
     ;; TODO actually sposed to insert formatted title, see src
     (when is-subtree
       (let ((file file-path)
@@ -106,7 +106,7 @@ deduplicated, as if :unique t."
           :values $v1]
          (vector id file level pos todo priority
                  scheduled deadline title properties olp))))
-    ;; `org-roam-db-insert-file-node'
+    ;; Replace `org-roam-db-insert-file-node'
     (when (not is-subtree)
       (let ((file file-path)
             (pos 1)
@@ -122,20 +122,20 @@ deduplicated, as if :unique t."
           :values $v1]
          (vector id file level pos todo priority
                  scheduled deadline title properties olp))))
-    ;; `org-roam-db-insert-refs'
+    ;; Replace `org-roam-db-insert-refs'
     (dolist (ref-link roam-refs)
       (dolist (individual-ref (org-node--ref-link->list ref-link id))
         (org-roam-db-query [:insert :into refs
                             :values $v1]
                            individual-ref)))
-    ;; `org-roam-db-insert-link'
+    ;; Replace `org-roam-db-insert-link'
     ;; TODO real pos and outline, once we have that info
     (dolist (backlink backlink-origins)
       (org-roam-db-query
        [:insert :into links
         :values $v1]
        (vector pos backlink id "id" (list :outline nil))))
-    ;; `org-roam-db-insert-citation'
+    ;; Replace `org-roam-db-insert-citation'
     ;; TODO once we have that info
     ))
 
@@ -143,25 +143,26 @@ deduplicated, as if :unique t."
   (require 'org-roam)
   (org-node-cache-ensure-fresh)
   (org-roam-db--close)
-  (org-roam-db-clear-all)
+  (delete-file org-roam-db-location)
+  ;; (org-roam-db-clear-all)
   (emacsql-with-transaction (org-roam-db)
-    ;; (emacsql-with-connection (db (org-roam-db))
     ;; Attempt to make it faster... doesn't help
+    ;; (emacsql-with-connection (db (org-roam-db))
     ;; (emacsql-send-message db "pragma journal_mode = WAL")
     ;; (emacsql-send-message db "pragma synchronous = normal")
     ;; (emacsql-send-message db "pragma temp_store = memory")
     ;; (emacsql-send-message db "pragma mmap_size = 30000000000")
-    (emacsql (org-roam-db) [:begin :transaction])
+    ;; (emacsql (org-roam-db) [:begin :transaction])
     (cl-loop
      with nodes = (--filter (plist-get it :id) (hash-table-values org-nodes))
      with ctr = 0
      with max = (length nodes)
      for node in nodes
-     do
-     (when (= 0 (% (cl-incf ctr) 20))
-       (message "Inserting into SQL DB... %d/%d" ctr max))
+     do (when (= 0 (% (cl-incf ctr) 20))
+          (message "Inserting into SQL DB... %d/%d" ctr max))
      (org-node--feed-node-to-roam-db node))
-    (emacsql (org-roam-db) [:end :transaction])))
+    ;; (emacsql (org-roam-db) [:end :transaction])
+    ))
 
 (defun org-node--ref-link->list (ref node-id)
   "Worker code adapted from `org-roam-db-insert-ref'"
