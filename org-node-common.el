@@ -112,10 +112,9 @@ Because not everyone has `debug-on-error' t."
 (defun org-node--root-dirs (file-list)
   "Given FILE-LIST, infer the most base root directories.
 
-In many cases, if passed the `hash-table-values' of
-`org-id-locations', this function will spit out a list of one
-item because many people keep their Org files in one root
-directory.
+In many cases, if FILE-LIST is the `hash-table-values' of
+`org-id-locations', this function will spit out a list of one item
+because many people keep their Org files in one root directory.
 
 If it finds more than one root, it sorts by count of files they
 contain, so that the most populous root directory will be the
@@ -134,7 +133,7 @@ first element."
       (cl-loop
        with dir-counters = (--map (cons it 0) directories)
        for file in files
-       as the-root = (--find (string-prefix-p file it) directories)
+       as the-root = (--find (string-prefix-p it file) directories)
        do (cl-incf (cdr (assoc the-root dir-counters)))
        finally return (mapcar #'car (cl-sort dir-counters #'> :key #'cdr))))))
 
