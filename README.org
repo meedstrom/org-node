@@ -1,11 +1,11 @@
 * org-node
 ** What's all this
 
-I found org-roam too slow, so I made [[https://github.com/meedstrom/quickroam][quickroam]].  And that idea spun off into this package, a standalone thing.  I'm hoping it's easier to learn.
+I found org-roam too slow, so I made [[https://github.com/meedstrom/quickroam][quickroam]].  And that idea spun off into this package, a standalone thing.  I hope it's also easier to learn.
 
-- *If you were using org-roam*, there is nothing to migrate.  It's exactly the same on-disk format: "notes" are identified by their org-id.
+- *If you were using org-roam*, there is nothing to migrate.  You can use both packages.  It's exactly the same on-disk format: "notes" are identified by their org-id.
 
-  Think of it as an extra set of commands.  *You can even skip syncing the org-roam DB* but still use its features, like the rich backlinks buffer and org-roam-capture, because we have shims faking the data that org-roam wants.
+  Thanks to shims, *you can even skip syncing the org-roam DB* but still use its features, like the rich backlinks buffer and org-roam-capture!
 
   In pursuit of being "just org-id", this package has no equivalent setting to =org-roam-directory= -- it just looks up =org-id-locations=.
 
