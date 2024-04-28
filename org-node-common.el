@@ -43,8 +43,7 @@ This example shows the ancestor entries to each node:
 
 (defcustom org-node-filter-fn
   (lambda (node)
-    (and (not (plist-get node :exclude))
-         (not (plist-get node :todo))))
+    (not (plist-get node :exclude)))
   "Predicate returning t to include a node, or nil to exclude it.
 
 This function is applied once for every Org-ID node found, and
@@ -63,11 +62,6 @@ See the following example for a way to filter out nodes tagged
              (not (plist-get node :todo))
              (not (member \"drill\" (plist-get node :tags)))
              (not (string-search \"archive\" (plist-get node :file-path))))))
-
-(setq org-node-filter-fn
-      (lambda (node)
-       (and (not (plist-get node :exclude))
-            (not (plist-get node :todo)))))
 
 If you have an expensive filter slowing things down, a tip is
 make a defun, not a lambda, and byte-compile that init file:
