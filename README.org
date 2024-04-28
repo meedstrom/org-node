@@ -11,7 +11,7 @@ Just searching for Org files is too coarse, and just searching for any subtree a
 
 Here's what org-roam invented.  It turns out that if you limit the search hits to just those files and subtrees you've deigned to assign an org-id -- which roughly maps to everything you've ever thought it was worth linking to -- it filters out the noise excellently.
 
-Once a subtree has an ID you can link to, it's a "node" because it has joined the wider graph, and graphs are made of nodes.  I wish the English language had more distinct sounds for the words "node" and "note", but to clarify, I'll say "ID-node" from now on.
+Once a subtree has an ID you can link to, it's a "node" because it has joined the wider graph, the network of linked nodes.  I wish the English language had more distinct sounds for the words "node" and "note", but to clarify, I'll say "ID-node" from now on.
 
 ** Great, so what's all this
 
@@ -19,7 +19,7 @@ I found org-roam too slow, so I made [[https://github.com/meedstrom/quickroam][q
 
 - *If you were using org-roam*, there is nothing to migrate.  It's exactly the same on-disk format: "notes" are identified by their org-id.
 
-  Think of it as an extra set of commands.  *You can even skip syncing the org-roam DB* but still use its features, like the rich backlinks buffer and org-roam-capture.
+  Think of it as an extra set of commands.  *You can even skip syncing the org-roam DB* but still use its features, like the rich backlinks buffer and org-roam-capture, because we have shims faking the data that org-roam wants.
 
   In pursuit of being "just org-id", this package has no equivalent setting to =org-roam-directory= -- it just looks up =org-id-locations=.
 
@@ -64,11 +64,11 @@ I'll warn you now about =org-node-backlink-mode=: it adds a =CACHED_BACKLINKS= t
 
 When I first ran across that concept in [[https://github.com/toshism/org-super-links][org-super-links]], I didn't like it.  A database /inside/ the user-written file?  It seemed like clutter, and possibly easy to break.
 
-But that's not true, it's solid and a clever performance hack!  There's a reason org-node caches thousands of ID-nodes in 1 second:
+But that's not true, it's rock solid!  There's a reason org-node caches thousands of ID-nodes in 1 second:
 
 1. Since our =org-id= system allows nested nodes (subtree nodes inside other subtrees), it makes resolving backlinks an optimization challenge.  Not only do you have to parse the file where a link is, you have to open and parse all the links' targets to find out which subtrees they are in.  A naive implementation will easily run at O(N^{2}) or worse.
 
-2. If we've cached the backlinks together with the subtrees, the cache builder can just grab them while it grabs everything else, leaving zero work to do.
+2. If we've recorded the backlinks inside the subtrees, the cache builder can just grab them while it grabs all the other info, leaving almost zero work to do.
 
 Maybe you still worry about such backlinks growing stale.  So I made two systems against that: first, if you keep =org-node-backlink-mode= active all the time, it's not expected to happen unless something broke your save hooks.  It records the appearance and disappearance of links upon save.  Second, when you feel suspicious, the command =org-node-backlink-fix-all= will fix all files (slow).
 
@@ -125,50 +125,6 @@ The function =org-node-enable= only runs once, and turns on two global minor mod
 
 For config options, type =M-x customize-group RET org-node RET=.
 
-** Getting started with backlinks
-
-The basic commands should just work, but you see no backlinks until you run =M-x org-node-backlink-mass-fix=.
-
-If you run into any issues, let me know!  Either here on Github or just [[mailto:meedstrom@runbox.eu][email me]] 💝
-
-# Mention taking ownership of org-id
-
-**** Known issues with the mass-fix
-
-- "couldn't open /dev/stderr: too many files open"
-  - Appears after about 1000 files for me.  It's not an error, just scary.  Interrupt the command and start again; it picks up where it left off, with no further complaint.
-  - Two reasons the command opens all files before beginning its work -- first, it's faster that way.  For each link found, it visits the target, so any given file gets visited many times anyway.  Second, it means you can stop and resume at any time.  Very convenient when a problem comes up.
-
-**** Enabling org-roam-buffer
-
-You have two ways to borrow the power of =M-x org-roam-buffer-toggle=.  But first, both ways have the same limitations:
-
-- Reflinks are represented as backlinks -- no separate reflinks heading
-- It behaves as if the :unique parameter is t and :point is equal to that of the node heading.
-
-The first way is cutting out the org-roam DB entirely:
-
-#+begin_src elisp
-(require 'org-node-roam)
-(advice-add 'org-roam-backlinks-get :override
-            #'org-node--fabricate-roam-backlinks)
-#+end_src
-
-The second way (experimental) is translating org-node's info into a form suitable for the org-roam DB.  This reveals just how much of the slowness of =org-roam-db-sync= came from EmacSQL/SQLite itself!
-
-#+begin_src elisp
-;; eval once
-(org-node-cache-reset)
-(org-node-feed-roam-db) ;; slow, maybe 1/5 of an (org-roam-db-sync 'force)
-
-;; init snippet
-(require 'org-node-roam)
-(add-hook 'org-node-cache-file-hook #'org-node-feed-file-to-roam-db)
-#+end_src
-
-This second method has potential to unlock more org-roam features (like =org-roam-display-templates=), but does not yet send all the data that org-roam wants, and given that it's slow anyway you may as well continue using the real =org-roam-db-sync=.
-
-
 ** Org-capture
 
 You may know that org-roam had its own set of capture templates: the =org-roam-capture-templates=.
@@ -213,6 +169,50 @@ How to prepend subtrees with their outline paths:
             (concat (string-join olp " > ") " > " title)
           title)))
 #+end_src
+
+** Getting started with backlinks
+
+The basic commands should just work, but you see no backlinks until you run =M-x org-node-backlink-mass-fix=.
+
+If you run into any issues, let me know!  Either here on Github or just [[mailto:meedstrom@runbox.eu][email me]] 💝
+
+# Mention taking ownership of org-id
+
+**** Known issues with the mass-fix
+
+- "couldn't open /dev/stderr: too many files open"
+  - Appears after about 1000 files for me.  It's not an error, just scary.  Interrupt the command and start again; it picks up where it left off, with no further complaint.
+  - Two reasons the command opens all files before beginning its work -- first, it's faster that way.  For each link found, it visits the target, so any given file gets visited many times anyway.  Second, it means you can stop and resume at any time.  Very convenient when a problem comes up.
+
+**** Enabling org-roam-buffer
+
+You have two ways to borrow the power of =M-x org-roam-buffer-toggle=.  But first, both ways have the same limitations:
+
+- Reflinks are represented as backlinks -- no separate reflinks heading
+- It behaves as if the :unique parameter is t and :point is equal to that of the node heading.
+
+The first way is cutting out the org-roam DB entirely:
+
+#+begin_src elisp
+(require 'org-node-roam)
+(advice-add 'org-roam-backlinks-get :override
+            #'org-node--fabricate-roam-backlinks)
+#+end_src
+
+The second way (experimental) is translating org-node's info into a form suitable for the org-roam DB.  This reveals just how much of the slowness of =org-roam-db-sync= came from EmacSQL/SQLite itself!
+
+#+begin_src elisp
+;; eval once
+(org-node-cache-reset)
+(org-node-feed-roam-db) ;; slow, maybe 1/5 of an (org-roam-db-sync 'force)
+
+;; init snippet
+(require 'org-node-roam)
+(add-hook 'org-node-cache-file-hook #'org-node-feed-file-to-roam-db)
+#+end_src
+
+This second method has potential to unlock more org-roam features (like =org-roam-display-templates=), but does not yet send all the data that org-roam wants, and given that it's slow anyway you may as well continue using the real =org-roam-db-sync=.
+
 
 ** Limitations
 *** Excluding nodes
