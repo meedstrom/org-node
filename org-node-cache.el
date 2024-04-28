@@ -15,10 +15,12 @@ time."
       (progn
         (add-hook 'after-save-hook #'org-node-cache-file)
         (advice-add #'rename-file :after #'org-node-cache-file)
-        (advice-add #'delete-file :before #'org-node-cache--schedule-reset-maybe))
+        (advice-add #'rename-file :before #'org-node-cache--handle-delete)
+        (advice-add #'delete-file :before #'org-node-cache--handle-delete))
     (remove-hook 'after-save-hook #'org-node-cache-file)
     (advice-remove #'rename-file #'org-node-cache-file)
-    (advice-remove #'delete-file #'org-node-cache--schedule-reset-maybe)))
+    (advice-remove #'rename-file #'org-node-cache--handle-delete)
+    (advice-remove #'delete-file #'org-node-cache--handle-delete)))
 
 (defun org-node-cache-peek (&optional ht keys)
   "For debugging: peek on some values of `org-nodes'.
@@ -75,12 +77,29 @@ peek on keys instead."
     (message "To speed up this command, turn on `org-node-cache-mode'")))
 
 (let ((this-timer (timer-create)))
-  (defun org-node-cache--schedule-reset-maybe (&rest _)
-    "If inside an org file now, reset cache after a few seconds.
+  (defun org-node-cache--handle-delete (&rest _)
+    "Update org-id and org-node after an Org file is deleted.
 
-This is intended to trigger prior to file deletion, and the delay
-avoids bothering the user who may be trying to delete many files."
+First remove references in `org-id-locations', as oddly, upstream does
+not do that.
+
+Then rebuild the org-node caches after a few idle seconds.  The delay
+avoids bothering the user who may be trying to delete many files in a
+short time."
     (when (derived-mode-p 'org-mode)
+      (cl-loop for id being the hash-keys of org-id-locations
+               using (hash-values file)
+               when (file-equal-p file (buffer-file-name))
+               do (remhash id org-id-locations))
+      ;; (let ((ids-in-file
+      ;;        (save-excursion
+      ;;          (without-restriction
+      ;;            (goto-char 1)
+      ;;            (cl-loop while (re-search-forward "^[\s\t]*:ID: *\\(.+?\\) *$"
+      ;;                                              nil t)
+      ;;                     collect (match-string 1))))))
+      ;;   (dolist (id ids-in-file)
+      ;;     (remhash id org-id-locations)))
       (cancel-timer this-timer)
       (setq this-timer (run-with-idle-timer 6 nil #'org-node-cache-reset)))))
 

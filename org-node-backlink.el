@@ -4,12 +4,7 @@
 
 ;;;###autoload
 (define-minor-mode org-node-backlink-mode
-  "Keep Org buffers in good state to be grepped.
-This involves:
-
-- sorting the property drawers
-- sorting the file-level keywords (front-matter like #+title)
-- updating the :CACHED_BACKLINKS: properties"
+  "Keep :CACHED_BACKLINKS: properties updated."
   :global t
   :group 'org-node
   (if org-node-backlink-mode
@@ -17,15 +12,18 @@ This involves:
         ;; hate the UX of before-save-hook, should probably hard depend on
         ;; apheleia or such system
         (add-hook 'before-save-hook #'org-node-backlink-check-buffer)
-        (add-hook 'org-roam-post-node-insert-hook #'org-node-backlink--add-to-here-in-target-a -99)
-        (add-hook 'org-node-insert-link-hook #'org-node-backlink--add-to-here-in-target-a -99)
-        (advice-add 'org-insert-link :after #'org-node-backlink--add-to-here-in-target-a))
+        (add-hook 'org-roam-post-node-insert-hook #'org-node-backlink--add-to-here-in-target -99)
+        (add-hook 'org-node-insert-link-hook #'org-node-backlink--add-to-here-in-target -99)
+        (advice-add 'org-insert-link :after #'org-node-backlink--add-to-here-in-target))
     (remove-hook 'before-save-hook #'org-node-backlink-check-buffer)
-    (remove-hook 'org-roam-post-node-insert-hook #'org-node-backlink--add-to-here-in-target-a)
-    (remove-hook 'org-node-insert-link-hook #'org-node-backlink--add-to-here-in-target-a)
-    (advice-remove 'org-insert-link #'org-node-backlink--add-to-here-in-target-a)))
+    (remove-hook 'org-roam-post-node-insert-hook #'org-node-backlink--add-to-here-in-target)
+    (remove-hook 'org-node-insert-link-hook #'org-node-backlink--add-to-here-in-target)
+    (advice-remove 'org-insert-link #'org-node-backlink--add-to-here-in-target)))
 
-;; Anything on `before-save-hook' MUST fail gracefully...
+;; TODO Large files would still be slow to save (now we disable it if there
+;;      are too many links), so instead of checking the entire file on
+;;      before-save-hook, try to just check the most local subtree on every
+;;      auto-save, and maybe on some other infrequent hooks
 (defun org-node-backlink-check-buffer ()
   "Designed for `before-save-hook'."
   (let ((n-links
@@ -33,12 +31,13 @@ This involves:
            (cl-loop while (re-search-forward org-link-bracket-re nil t)
                     count t))))
     ;; If there's a ton of links in this file, don't do anything
-    ;; TODO just scan the most local subtree in this case
     (unless (> n-links 100)
+      ;; Catch and drop any error, bc `before-save-hook' should never error
       (condition-case err
           (org-node-backlink--fix-findable-backlinks)
         ((t error debug)
-         (message "org-node-backlink failed with message %s %s" (car err) (cdr err)))))))
+         (message "org-node-backlink failed with message %s %s"
+                  (car err) (cdr err)))))))
 
 (defvar org-node-backlink--progress-total 0)
 (defvar org-node-backlink--progress-total-backlinks 0)
@@ -190,7 +189,7 @@ cleaning."
   "Visit link at point and check if it has a backlink to here."
   ;; NB: Do not use `org-element-property' because it ignores links on property
   ;; lines.  That's also why org-roam won't double-count our backlinks, because
-  ;; they're on a property line and it does consult `org-element-property'!
+  ;; they're on a property line and org-roam does use `org-element-property'!
   (save-match-data
     (let ((src-id (org-id-get nil nil nil t))
           (bounds (org-in-regexp org-link-any-re))
@@ -224,14 +223,14 @@ cleaning."
                                      (not (org-at-comment-p)))
                            return t))))))))))
 
-(defun org-node-backlink--add-to-here-in-target-a (&rest _)
+(defun org-node-backlink--add-to-here-in-target (&rest _)
   "Meant as advice after any command that inserts a link.
-See `org-node-backlink--add-to-here-in-target' - this is
+See `org-node-backlink--add-to-here-in-target-1' - this is
 merely a wrapper that drops the input."
   (org-node--init-org-id-locations-or-die)
-  (org-node-backlink--add-to-here-in-target))
+  (org-node-backlink--add-to-here-in-target-1))
 
-(defun org-node-backlink--add-to-here-in-target (&optional part-of-mass-op)
+(defun org-node-backlink--add-to-here-in-target-1 (&optional part-of-mass-op)
   "For known link at point, leave a backlink in the ref node."
   (unless (derived-mode-p 'org-mode)
     (user-error "Only works in org-mode buffers"))
@@ -358,7 +357,7 @@ Optional argument PART-OF-MASS-OP means skip some cleanup."
                   (org-entry-delete nil "CACHED_BACKLINKS")))))
            ;; Not a backlink, so it's a regular forward-link - add a backlink
            (t
-            (org-node-backlink--add-to-here-in-target part-of-mass-op))))
+            (org-node-backlink--add-to-here-in-target-1 part-of-mass-op))))
         (when part-of-mass-op
           (org-node-backlink--progress-print-message))))
     (and (not part-of-mass-op)
