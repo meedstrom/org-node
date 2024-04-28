@@ -11,7 +11,7 @@ I found org-roam too slow, so I made [[https://github.com/meedstrom/quickroam][q
 
 - *If you were not using org-roam*, think of it as a limited, focused [[https://github.com/alphapapa/org-ql][org-ql]].  If you were the sort of person to prefer ID-links over file links or any other type of link, you're in the right place: this basically lets you forget about filenames and hierarchies and directory structures -- as long as you've assigned an org-id to something, you can find it later.
 
-  And you can still keep doing hierarchies and structures, where that brings you joy, unlike systems that mandate limitations like "one note per file" or strict filename rules.
+  And you can still keep doing hierarchies and structures, where that brings you joy, unlike systems that mandate limitations like "one note per file" or strict rules about naming files.
 
 ** What's a "node"?
 
@@ -152,7 +152,7 @@ And if you want the =org-node-find= command to also outsource to org-capture whe
 Some user options to feel at home
 
 #+begin_src elisp
-(setq org-node-creation-fn #'org-node-creation-fn-roam-capture)
+(setq org-node-creation-fn #'org-node-new-by-roam-capture)
 (setq org-node-slug-fn #'org-node-slugify-like-roam)
 (setq org-node-creation-hook nil)
 #+end_src
