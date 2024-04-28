@@ -28,10 +28,17 @@ This involves:
 ;; Anything on `before-save-hook' MUST fail gracefully...
 (defun org-node-backlink-check-buffer ()
   "Designed for `before-save-hook'."
-  (condition-case err
-      (org-node-backlink--fix-findable-backlinks)
-    ((t error debug)
-     (message "org-node-backlink failed with message %s %s" (car err) (cdr err)))))
+  (let ((n-links
+         (save-mark-and-excursion
+           (cl-loop while (re-search-forward org-link-bracket-re nil t)
+                    count t))))
+    ;; If there's a ton of links in this file, don't do anything
+    ;; TODO just scan the most local subtree in this case
+    (unless (> n-links 100)
+      (condition-case err
+          (org-node-backlink--fix-findable-backlinks)
+        ((t error debug)
+         (message "org-node-backlink failed with message %s %s" (car err) (cdr err)))))))
 
 (defvar org-node-backlink--progress-total 0)
 (defvar org-node-backlink--progress-total-backlinks 0)
