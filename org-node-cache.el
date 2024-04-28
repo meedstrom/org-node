@@ -35,40 +35,24 @@ peek on keys instead."
   (interactive)
   (unless (executable-find "rg")
     (user-error "Install ripgrep to use org-node"))
-  (let ((sum-files 0)
-        (sum-subtrees 0)
-        (then (current-time)))
+  (let ((then (current-time)))
     ;; Wipe
     (clrhash org-nodes)
     (clrhash org-node-collection)
     (clrhash org-node-cache--refs-table)
     ;; Rebuild `org-nodes'
     (org-node--init-org-id-locations-or-die)
-    (org-node-cache--collect-nodes (-uniq (hash-table-values org-id-locations)))
-    (dolist (node (hash-table-values org-nodes))
-      (cl-incf (if (plist-get node :is-subtree) sum-subtrees sum-files))
-      (when (or (not org-node-only-show-subtrees-with-id) (plist-get node :id))
-        ;; Rebuild `org-node-cache--refs-table'
-        (dolist (ref (plist-get node :roam-refs))
-          (puthash ref (plist-get node :id) org-node-cache--refs-table)
-          ;; Let refs work as aliases
-          (puthash ref node org-node-collection))
-        ;; Rebuild `org-node-collection'
-        (if (funcall org-node-filter-fn node)
-            (dolist (title (cons (plist-get node :title)
-                                 (plist-get node :aliases)))
-              (puthash (funcall org-node-format-candidate-fn node title)
-                       node
-                       org-node-collection))
-          (plist-put node :is-excluded t))))
-    (message "org-node: parsed %d files and %d subtrees from scratch in %.2fs"
-             sum-files
-             sum-subtrees
-             (float-time (time-since then)))
+    (let ((files (-uniq (hash-table-values org-id-locations))))
+      (org-node-cache--collect-nodes files)
+      (message "org-node: scanned %d files and %d subtrees from scratch in %.2fs"
+               (length files)
+               (cl-loop for node being the hash-values of org-nodes
+                        count (plist-get node :is-subtree))
+               (float-time (time-since then))))
     (run-hooks 'org-node-cache-hook)))
 
 (defun org-node-cache-file (&rest args)
-  "Grep for nodes in a single file."
+  "Seek nodes in a single file."
   ;; If triggered as advice on `rename-file', the second argument is the new
   ;; name.  Do not assume it applies to the current buffer; it may be
   ;; called from a Dired buffer, for example.
@@ -87,7 +71,7 @@ peek on keys instead."
             (not (hash-table-p org-nodes))
             (hash-table-empty-p org-node-collection))
     (org-node-cache-reset)
-    ;; In practice, this message delivered once per emacs session
+    ;; This message delivers once per emacs session
     (message "To speed up this command, turn on `org-node-cache-mode'")))
 
 (let ((this-timer (timer-create)))
@@ -128,26 +112,20 @@ it does not check."
         (split-string (replace-regexp-in-string regexp "\\1" backlinks-string)
                       "  " t))))
 
-;; No perceptible perf diff now, but when I accidentally had some very large
-;; strings to unicodify, it made it a little bit better.  Prolly will deprecate.
-(defun org-node-cache--unicode (str)
-  (declare (pure t) (side-effect-free t))
-  (if (string-match-p "[^[:ascii:]]" str)
-      (decode-coding-string str 'utf-8)
-    str))
-
 (defun org-node-cache--collect-properties (beg end)
   (let (res)
     (goto-char beg)
     (with-restriction beg end
       (while (not (eobp))
         (search-forward ":")
-        (push (cons (upcase (org-node-cache--unicode
+        (push (cons (upcase (decode-coding-string
                              (buffer-substring
-                              (point) (1- (search-forward ":")))))
-                    (string-trim (org-node-cache--unicode
+                              (point) (1- (search-forward ":")))
+                             'utf-8))
+                    (string-trim (decode-coding-string
                                   (buffer-substring
-                                   (point) (line-end-position)))))
+                                   (point) (line-end-position))
+                                  'utf-8)))
               res)
         (forward-line 1)))
     res))
@@ -159,6 +137,7 @@ it does not check."
     (cl-flet ((unicode (str) (decode-coding-string str 'utf-8)))
       (cl-loop
        with todo-re = (org-node-cache--make-todo-regexp)
+       with single-file-being-scanned = (not (hash-table-empty-p org-nodes))
        with case-fold-search = t
        with gc-cons-threshold = (* 3 1000 1000 1000)
        for file in files
@@ -189,25 +168,27 @@ it does not check."
              (setq file-title (unicode (buffer-substring
                                         (point) (line-end-position))))
            (setq file-title (file-name-nondirectory file)))
-         (let ((id (cdr (assoc "ID" props))))
-           (when id
-             (puthash id (list
-                          :title file-title
-                          :level 0
-                          :tags file-tags
-                          :file-path file
-                          :pos 1
-                          :file-title file-title
-                          :properties props
-                          :id id
-                          :exclude (cdr (assoc "ROAM_EXCLUDE" props))
-                          :aliases (split-string-and-unquote
-                                    (or (cdr (assoc "ROAM_ALIASES" props)) ""))
-                          :roam-refs (let ((refs (cdr (assoc "ROAM_REFS" props))))
-                                       (and refs (split-string-and-unquote refs)))
-                          :backlink-origins (org-node-cache--backlinks->list
-                                             (cdr (assoc "CACHED_BACKLINKS" props))))
-                      org-nodes)))
+         (let* ((id (cdr (assoc "ID" props)))
+                (node (list
+                       :title file-title
+                       :level 0
+                       :tags file-tags
+                       :file-path file
+                       :pos 1
+                       :file-title file-title
+                       :properties props
+                       :id id
+                       :exclude (cdr (assoc "ROAM_EXCLUDE" props))
+                       :aliases (split-string-and-unquote
+                                 (or (cdr (assoc "ROAM_ALIASES" props)) ""))
+                       :roam-refs (let ((refs (cdr (assoc "ROAM_REFS" props))))
+                                    (and refs (split-string-and-unquote refs)))
+                       :backlink-origins (org-node-cache--backlinks->list
+                                          (cdr (assoc "CACHED_BACKLINKS" props))))))
+           (puthash id node org-nodes)
+           (org-node-cache--populate-other-tables node)
+           (when single-file-being-scanned
+             (when id (org-id-add-location id file))))
          ;; Loop over the file's subtrees
          (while (re-search-forward "^\\*+ " nil t)
            (let (here todo title line2-end level pos tags todo scheduled deadline props id)
@@ -253,30 +234,52 @@ it does not check."
                                          (line-beginning-position)))))
              (setq id (cdr (assoc "ID" props)))
              (push (list pos title level) outline-data)
-             (puthash
-              ;; Record subtree even if it has no ID
-              (or id (format-time-string "%N"))
-              (list :title title
-                    :is-subtree t
-                    :level level
-                    :pos pos
-                    :tags tags
-                    :todo todo
-                    :file-path file
-                    :scheduled scheduled
-                    :deadline deadline
-                    :file-title file-title
-                    :olp (org-node-cache--pos->olp outline-data pos)
-                    :properties props
-                    :id id
-                    :exclude (equal "t" (cdr (assoc "ROAM_EXCLUDE" props)))
-                    :aliases (split-string-and-unquote
-                              (or (cdr (assoc "ROAM_ALIASES" props)) ""))
-                    :roam-refs (when-let ((refs (cdr (assoc "ROAM_REFS" props))))
-                                 (split-string-and-unquote refs))
-                    :backlink-origins (org-node-cache--backlinks->list
-                                       (cdr (assoc "CACHED_BACKLINKS" props))))
-              org-nodes))))))))
+             (let ((node
+                    (list
+                     :title title
+                     :is-subtree t
+                     :level level
+                     :pos pos
+                     :tags tags
+                     :todo todo
+                     :file-path file
+                     :scheduled scheduled
+                     :deadline deadline
+                     :file-title file-title
+                     :olp (org-node-cache--pos->olp outline-data pos)
+                     :properties props
+                     :id id
+                     :exclude (equal "t" (cdr (assoc "ROAM_EXCLUDE" props)))
+                     :aliases (split-string-and-unquote
+                               (or (cdr (assoc "ROAM_ALIASES" props)) ""))
+                     :roam-refs (when-let ((refs (cdr (assoc "ROAM_REFS" props))))
+                                  (split-string-and-unquote refs))
+                     :backlink-origins (org-node-cache--backlinks->list
+                                        (cdr (assoc "CACHED_BACKLINKS" props))))))
+               (when single-file-being-scanned
+                 (when id (org-id-add-location id file)))
+               ;; Record subtree even if it has no ID
+               (puthash (or id (format-time-string "%N")) node org-nodes)
+               (org-node-cache--populate-other-tables node)))))))))
+
+(defun org-node-cache--populate-other-tables (node)
+  ;; Add to  `org-node-cache--refs-table' and `org-node-collection'
+  (when (or (not org-node-only-show-subtrees-with-id)
+            (plist-get node :id))
+    (dolist (ref (plist-get node :roam-refs))
+      (puthash ref (plist-get node :id) org-node-cache--refs-table))
+    (if (funcall org-node-filter-fn node)
+        (progn
+          (dolist (title (cons (plist-get node :title)
+                               (plist-get node :aliases)))
+            (puthash (funcall org-node-format-candidate-fn
+                              node title)
+                     node
+                     org-node-collection))
+          ;; Let refs work as aliases
+          (dolist (ref (plist-get node :roam-refs))
+            (puthash ref node org-node-collection)))
+      (plist-put node :is-excluded t))))
 
 ;; (cl-loop for node in (hash-table-values org-nodes)
 ;;          for todo = (plist-get node :todo)

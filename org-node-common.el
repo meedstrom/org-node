@@ -13,8 +13,8 @@
   "Support a zettelkasten of org-id files and subtrees."
   :group 'org)
 
-(defcustom org-node-only-show-subtrees-with-id nil
-  "Whether to include all subtrees as completion candidates."
+(defcustom org-node-only-show-subtrees-with-id t
+  "Set nil to include all subtrees as completion candidates."
   :group 'org-node
   :type 'boolean)
 
