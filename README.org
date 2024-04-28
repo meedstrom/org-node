@@ -1,16 +1,29 @@
 * org-node
+** What's a "node"?
 
-How to describe this package... If you know [[https://github.com/org-roam/org-roam][org-roam]], it's like that.  It shares the on-disk format: "notes" are identified by their org-id and you can nest notes.   It even lets you use some org-roam stuff, notably your capture templates and the rich backlinks buffer, without syncing its SQLite DB!
+My life can be divided into two periods "Before Org-Roam" and "After Org-Roam".  I crossed a kind of gap once I got in the habit of linking between my notes.  It's odd to remember when I didn't have that habit, and just relied on browsing hierarchies of subtrees and the occasional file-link -- what a strange way to do things!
 
-My [[https://github.com/meedstrom/quickroam][quickroam]] package was the initial inspiration.  Now it has grown into a standalone thing.
+This is fundamentally what all the "notetaking packages" (orgrr/zk/deft/org-roam/denote/...) try to help you with: make it easy to link between notes.
 
-** Why
+Right off the bat, that imposes two requirements: a method to search for notes, since you can't link to something you can't search for, and a decision about exactly what kinds of things should turn up as search hits.
 
-Let me get out the door that the package imposes nothing new.  You don't need to "migrate".
+Just searching for Org files is too coarse, and just searching for any subtree anywhere brings in too much clutter.
 
-Even org-roam imposed no house rules, aside from org-id, which if you're a certain sort of person, you would be using anyway.  You might have thought of it as "the org-roam format" due to lack of competition, but both org-roam and org-node are really just search engines for *the org-id format!*
+Here's what org-roam invented.  It turns out that if you limit the search hits to just those files and subtrees you've deigned to assign an org-id -- which roughly maps to everything you've ever thought it was worth linking to or from (or will be worth linking) -- it filters out the noise excellently.
 
-In pursuit of being "just org-id", this package has no equivalent setting to =org-roam-directory= -- it just looks up =org-id-locations=.
+Once a subtree has an ID you can link to, it's a "node" because it has joined the wider graph, and graphs are made of nodes.  I wish the English language had more distinct sounds for the words "node" and "note", but to clarify, I'll say "ID-node" from now on.
+
+** Great, so what's all this
+
+I found org-roam too slow, so I made [[https://github.com/meedstrom/quickroam][quickroam]].  And that idea spun off into this package, a standalone, bizarro alternative.
+
+- *If you were using org-roam,* you don't need to migrate.  It's exactly the same on-disk format: "notes" are identified by their org-id.  Think of it as an extra set of commands for working with your notes.
+
+  It even has shims to let you use org-roam's own features, like the rich backlinks buffer, without syncing its SQLite DB!
+
+  In pursuit of being "just org-id", this package has no equivalent setting to =org-roam-directory= -- it just looks up =org-id-locations=.
+
+- If you were *not* using org-roam, think of it as a limited, focused alternative to org-ql or something.  If you were the sort of person to prefer org-id links over file links or any other type, you're in the right place: this basically lets you forget about filenames and hierarchies and directory structures -- as long as you've given an org-id to something, you can find it later.
 
 ** Feature matrix
 
@@ -30,56 +43,30 @@ For your pleasure, here's a comparison of three similar notetaking systems: all 
 | Avoid double-counting :BACKLINKS: | no          | yes                | yes                  |
 | Read =:CACHED_BACKLINKS:= as data   | no          | yes                | no                   |
 | Warn about dead links             | no          | yes                | no                   |
+| Can configure rich completions    | yes         | yes                | not applicable       |
 | Node exclusion                    | yes         | limited            | not applicable       |
-| Can configure rich completions    | yes         | limited            | not applicable       |
 | Support =roam:= links               | yes         | no                 | no                   |
 | Read :BACKLINKS: as data          | no          | no                 | yes                  |
 | Some query-able cache             | org-roam-db | org-nodes          | no                   |
 | Cache mandatory                   | yes         | no                 | no                   |
 |-----------------------------------+-------------+--------------------+----------------------|
-| Time to rebuild the cache         | 2m 48s      | < 1s               | not applicable       |
+| Time to re-cache 2000 files       | 3 minutes   | 1 second           | not applicable       |
 
-This isn't a totally fair comparison; org-roam has an advantage in the details, see Appendix II.  With org-node I've made what I would've liked to hack on, so it's more simplistic on many aspects.
+This isn't a totally fair comparison; org-roam has an advantage in the details, see Appendix II.  With org-node I've made what I would've liked to hack on, so it's more simplistic in many aspects.
 
-** Butler wanted
+** Backlink-mode
 
-Once upon a time -- a few days ago --  this package was slow: re-scanning my 2900 nodes took over 1 second.  Sure, that's not bad, but [[https://github.com/meedstrom/quickroam][quickroam]] did its thing in 100 ms.  What went wrong?
+I'll warn you now about =org-node-backlink-mode=: it adds a =CACHED_BACKLINKS= to many of your ID-nodes' property drawers.
 
-Well, I had ripgrep grab the nodes' property drawers whole, and then some Elisp parse each one.
+When I first ran across that concept in [[https://github.com/toshism/org-super-links][org-super-links]], I didn't like it.  A database /inside/ the user-written file?  It seemed like clutter, and possibly easy to break.
 
-May just be my elisp, but it turns out ~5 times faster if I arrange all property drawers in alphabetic order beforehand, and let ripgrep's capture groups return directly the values of each property I seek.
+But that's not true, it's solid and a clever performance hack!  There's a reason org-node caches thousands of ID-nodes in 1 second:
 
-Finally!  A reason to alphabetize stuff, beyond base librarian impulses!
+1. Since our =org-id= system allows nested nodes (subtree nodes inside other subtrees), it makes resolving backlinks an optimization challenge.  Not only do you have to parse the file where a link is, you have to open and parse all the links' targets to find out which subtrees they are in.  A naive implementation will easily run at O(N^{2}) or worse.
 
-Enable =org-node-butler-mode=, which alphabetizes all property drawers when you save an Org buffer.
+2. If we've cached the backlinks together with the subtrees, the cache builder can just grab them while it grabs everything else, leaving zero work to do.
 
-(NB: Without =org-node-butler-mode=, lots of data fields in =org-nodes= are blank, and it takes longer to rebuild the cache, but the find and insert commands still work.)
-
-*** Segue
-
-There's a dream of collecting all the data needed to feed org-roam-db so we could totally replace =org-roam-db-sync= and =org-roam-db-autosync-mode=.
-
-But it's hard for regular expressions to collect all the kinds of data that org-roam collects, such as the outline-path, because resolving it requires asking the org-element parser.
-
-To collect such data without rendering Emacs inoperable for three minutes, we'd need some sort of asynchronous or incremental backfilling solution, which makes most sense as a separate system from the grepping.  That brings us to the next topic.
-
-*** The butler, he's a spy!
-
-I'll warn you now about =org-node-butler-mode=: it adds a property to many of your nodes' property drawers.  The property is =CACHED_BACKLINKS=.  It's his little spy book.
-
-When I first ran across that concept in [[https://github.com/toshism/org-super-links][org-super-links]], I didn't like it.  It seemed like clutter, and possibly easy to break.
-
-But that's not true, it's rock-solid!  It's very clever to cache backlinks directly in the file like this, because:
-
-1. Our =org-id= system allows nested nodes (subtree nodes inside other subtrees).  They make resolving backlinks a huge optimization challenge.  Not only do you have to parse the file where the link is, you have to open and parse all the targets to find out which subtree they are in.  A naive implementation will easily run at O(N^{2}) or worse.  
-
-2. As some of you nerds know, you get the best performance out of =rg= by executing it once for a whole directory.  One run, one regexp.  If we've cached the backlinks together with the subtrees, it can just grab them while it grabs everything else, leaving zero work to do.
-
-Maybe you still worry about such backlinks growing stale.  So I made two systems against that: first, if you keep =org-node-butler-mode= active all the time, it's not expected to happen unless something broke your save hooks.  It records the appearance and disappearance of links upon save.  Second, when you feel suspicious, the command =org-node-butler-fix-all= will fix all files (slow).
-
-**** And the other data?
-
-The backlinks were the central challenge, but I refuse to create more properties like =CACHED_OLPATH= and =CACHED_INHERITED_TAGS= and so on.  That's just--nah.  Fortunately, collecting most of these is not O(N^{2}), and I have an idea for how to do it: two-three passes of ripgrep with an interim calculation of outline paths.  Then you could also get all inherited properties, eliminate the need to alphabetize, and give org-roam-db a copy of the data so all its commands Just Work.  TBD if I get inspired and have time.
+Maybe you still worry about such backlinks growing stale.  So I made two systems against that: first, if you keep =org-node-backlink-mode= active all the time, it's not expected to happen unless something broke your save hooks.  It records the appearance and disappearance of links upon save.  Second, when you feel suspicious, the command =org-node-backlink-fix-all= will fix all files (slow).
 
 **** Surprising benefit
 
@@ -87,9 +74,17 @@ Did you ever want to be able to see backlinks inside the Org buffer instead of i
 
 Well... Now they're right there.
 
+**** It should be possible without--
+
+Yes.  Yes.  But I've come to like the backlinks property anyway, so it's not my itch to scratch.
+
+**** Q: Will org-roam double-count my backlinks now??
+
+Nope!  Org-roam doesn't count links in property drawers.
+
 ** Config and setup
 
-Install [[https://github.com/BurntSushi/ripgrep][ripgrep]], then add an init snippet like this (assuming [[https://github.com/radian-software/straight.el][straight.el]]):
+Add an init snippet like this (assuming [[https://github.com/radian-software/straight.el][straight.el]]):
 
 #+begin_src elisp
 (use-package org-node
@@ -97,33 +92,38 @@ Install [[https://github.com/BurntSushi/ripgrep][ripgrep]], then add an init sni
   :hook (org-mode . org-node-enable))
 #+end_src
 
-Commands:
+The function =org-node-enable= only runs once, and turns on two global minor modes, =org-node-cache-mode= and =org-node-backlink-mode=.  Neither mode is required, as most commands work anyway.  The cache-mode makes the commands instant, and the backlinks-mode inserts corresponding backlinks whenever you insert a link.
+
+** Commands
 
 - =org-node-find=
-  - Counterpart to =org-roam-node-find=
+  - A counterpart to =org-roam-node-find=
 - =org-node-insert-link=
-  - Counterpart to =org-roam-node-insert=
+  - A counterpart to =org-roam-node-insert=
 - =org-node-insert-include=
 - =org-node-insert-transclusion=
 - =org-node-insert-transclusion-as-subtree=
-- =org-node-nodeify-entry=
-- =org-node-create-subtree=
 - =org-node-extract-subtree=
-  - Bizarro counterpart to =org-roam-extract-subtree=
+  - A bizarro counterpart to =org-roam-extract-subtree=
+- =org-node-nodeify-entry=
+  - Trivial: Give an ID to subtree at point (and run org-node-creation-hook)
+- =org-node-create-subtree=
+  - Trivial: Create a subtree with an ID (and run org-node-creation-hook)
+- =org-node-random=
 - =org-node-rewrite-links-ask=
   - Look for link descriptions that got out of sync with the current node title, then prompt at each link to update it
 - =org-node-rename-file-by-title=
-  - Auto-rename the file based on the current #+title
-- =org-node-butler-mass-fix=
+  - Auto-rename the file based on the current =#+title=
+- =org-node-backlink-mass-fix=
   - Good first thing to do, to add =CACHED_BACKLINKS= everywhere
-- =org-node-butler-regret=
+- =org-node-backlink-regret=
   - In case you regret using this package -- remove all =CACHED_BACKLINKS=
 
 For config options, type =M-x customize-group RET org-node RET=.
 
 ** Getting started with backlinks
 
-The basic commands should just work, but you see no backlinks until you run =M-x org-node-butler-mass-fix=.
+The basic commands should just work, but you see no backlinks until you run =M-x org-node-backlink-mass-fix=.
 
 If you run into any issues, let me know!  Either here on Github or just [[mailto:meedstrom@runbox.eu][email me]] 💝
 
@@ -150,7 +150,7 @@ The first way is cutting out the org-roam DB entirely:
             #'org-node--fabricate-roam-backlinks)
 #+end_src
 
-The second way (experimental) is translating the info org-node has into a form suitable for the org-roam DB.  This reveals just how much of the slowness of =org-roam-db-sync= comes from EmacSQL/SQLite itself!
+The second way (experimental) is translating org-node's info into a form suitable for the org-roam DB.  This reveals just how much of the slowness of =org-roam-db-sync= came from EmacSQL/SQLite itself!
 
 #+begin_src elisp
 ;; eval once
@@ -162,7 +162,7 @@ The second way (experimental) is translating the info org-node has into a form s
 (add-hook 'org-node-cache-file-hook #'org-node-feed-file-to-roam-db)
 #+end_src
 
-This second method has more potential, of course, unlocking all of org-roam, but does not yet send all the data that org-roam wants, and given that it's slow anyway you may as well continue using the real =org-roam-db-sync=.
+This second method has potential to unlock more org-roam features (like =org-roam-display-templates=), but does not yet send all the data that org-roam wants, and given that it's slow anyway you may as well continue using the real =org-roam-db-sync=.
 
 ** For you who use Org-roam at the same time
 
@@ -193,31 +193,19 @@ The whole point of org-id was to avoid dependence on filenames, but it's often p
 
 In org-roam you could get a node's outline path (=org-roam-node-olp=), which can be used to enrich the completion candidates.
 
-We can do something similar, though our pseudo-outline path does not include subtrees without IDs... only those with, and it makes cache rebuild 50% slower.  It works well, but I'm marking it experimental because I'm not sure how much further I can generalize the code before I've just reinvented org-ql.
-
-(Actually I have an idea about switching out ripgrep for org-ql, but that's a research project... first need to benchmark...)
+We can do something similar:
 
 #+begin_src elisp
-(require 'org-node-experimental)
-(advice-add 'org-node-cache--scan :override
-            #'org-node-experimental--scan)
-(advice-add 'org-node-cache-reset :before
-            #'org-node-experimental--clear-extra-hash-tables)
-(setq org-node-format-candidate-fn 
+(setq org-node-format-candidate-fn
       (defun my-format-with-olp (node title)
-        (concat
-         (cl-loop
-          for id in (org-node-experimental--olpath->ids
-                     (plist-get node :file-path)
-                     (plist-get node :pseudo-olpath))
-          concat (concat (plist-get (gethash id org-nodes) :title) " -> "))
-         title))
-(org-node-cache-reset)
+        (if-let ((olp (plist-get node :olp)))
+            (concat (string-join olp " > ") " > " title)
+          title)))
 #+end_src
 
 *** Ref format
 
-Don't insert =[[http...][description]]= in the =ROAM_REFS= field.  Just the raw URL.
+# Don't insert =[[http...][description]]= in the =ROAM_REFS= field.  Just the raw URL.
 
 ** Appendix 0: Command equivalents :noexport:
 
@@ -263,8 +251,6 @@ You'll notice that org-node "API" is not much of an API, because I try to expose
 | Get org-roam-reflink objects    | =(org-roam-reflinks-get NODE)=    |                                                                              |
 | Ensure fresh data               | =(org-roam-db-sync)=              | =(org-node-cache-ensure-fresh)=                                                |
 
-As you might infer, all the stuff in an org-node plist was already collected by Ripgrep, but the "visit-get" functions like =org-node--visit-get-properties= have to visit the target.  It's a bad idea to call a "visit-get" from your =org-node-filter-fn= or =org-node-format-candidate-fn=, as that horribly slows down the cache rebuilds -- to the speed of an =(org-roam-db-sync 'force)=, in fact.
-
 ** Appendix II: Pros of org-roam
 
 1. It is the most general toolkit.  Take a function like =org-roam-id-at-point=.  Why does it exist, when you could use =(org-id-get nil nil nil t)=?  Well, the org-roam version ignores those ancestor headings that have an ID but have been marked not to count as "Roam nodes", so it travels further up the tree until it finds one that is indeed "a Roam node".
@@ -277,7 +263,7 @@ As you might infer, all the stuff in an org-node plist was already collected by 
 
 3. Take the variable =org-roam-node-display-templates=.  At least, others may consider this a pro, but for my tastes no.  I try to let people customize with little lambdas and provide examples of how they'd get some result or other.  This instead has the dream UI where you can just set the variable to a string "${olp} ${tags} ${title}" or some such and be done with it.  Problem is it's a new mini-DSL (domain-specific language), and when you learn it you miss out on an elisp lesson.  Convenient for beginners but also /keeps/ them beginners.
 
-** Appendix III: Other bonus fixes
+** Appendix III: Other bonus fixes :noexport:
 
 On Doom's Org module, you may need a fix to use org-transclusion:
 

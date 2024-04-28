@@ -25,17 +25,18 @@ Affects how selections are displayed during e.g. `org-node-find'.
 
 Called with two arguments: the node data and the title.
 
-The node data is a plist which form you can observe in examples
-from \\[org-node-cache-peek].  The title may in fact be one of
-the aliases and not the real title, because the function runs
-again for every alias.
+The title may in fact be one of the aliases and not the canonical title,
+because the function runs again for every alias.  The node data is a
+plist which form you can observe in examples from
+\\[org-node-cache-peek].
 
 This example shows the ancestor entries to each node:
 
-(defun my-format-with-olp (node title)
-  (if-let ((olp (plist-get node :olp)))
-      (concat (string-join olp \" > \") \" > \" title)
-    title))
+(setq org-node-format-candidate-fn
+      (defun my-format-with-olp (node title)
+        (if-let ((olp (plist-get node :olp)))
+            (concat (string-join olp \" > \") \" > \" title)
+          title)))
 "
   :group 'org-node
   :type 'function)

@@ -103,8 +103,6 @@ avoids bothering the user who may be trying to delete many files."
 
 ;;; Plumbing
 
-(defvar org-node-cache--refs-table (make-hash-table :test #'equal))
-
 (defun org-node-cache--make-todo-regexp ()
   "Make a regexp based on global value of `org-todo-keywords',
 that will match any of the keywords."
@@ -155,9 +153,9 @@ it does not check."
     res))
 
 (defun org-node-cache--collect-nodes (files)
-  "Scan FILES for ID nodes, adding them to `org-nodes'."
+  "Scan FILES for id-nodes, adding them to `org-nodes'."
   (with-temp-buffer
-    ;; Shorthand since its extra arg is a PITA during refactor
+    ;; Shorthand to avoid juggling its extra arg during refactor
     (cl-flet ((unicode (str) (decode-coding-string str 'utf-8)))
       (cl-loop
        with todo-re = (org-node-cache--make-todo-regexp)
@@ -180,17 +178,19 @@ it does not check."
                         (point) (and (re-search-forward "^ *:end:")
                                      (line-beginning-position)))))
          (goto-char 1)
-         (when (re-search-forward "^#\\+title: " far t)
-           (setq file-title (unicode (buffer-substring
-                                      (point) (line-end-position)))))
-         (goto-char 1)
          (when (re-search-forward "^#\\+filetags: " far t)
            (setq file-tags (split-string
                             (unicode (buffer-substring
                                       (point) (line-end-position)))
                             ":" t)))
+         (goto-char 1)
+         ;; this also means unlike roam, file nodes dont need #+title
+         (if (re-search-forward "^#\\+title: " far t)
+             (setq file-title (unicode (buffer-substring
+                                        (point) (line-end-position))))
+           (setq file-title (file-name-nondirectory file)))
          (let ((id (cdr (assoc "ID" props))))
-           (when (and id file-title)
+           (when id
              (puthash id (list
                           :title file-title
                           :level 0
@@ -235,13 +235,14 @@ it does not check."
                (setq scheduled
                      (unicode
                       (buffer-substring
-                       (point) (+ (point) (skip-chars-forward "^]>\n")))))
+                       ;; \n just there for safety
+                       (point) (+ 1 (point) (skip-chars-forward "^]>\n")))))
                (goto-char here))
              (when (re-search-forward "[\n\s]DEADLINE: " line2-end t)
                (setq deadline
                      (unicode
                       (buffer-substring
-                       (point) (+ (point) (skip-chars-forward "^]>\n"))))))
+                       (point) (+ 1 (point) (skip-chars-forward "^]>\n"))))))
              (setq here (point))
              (setq line2-end (and (forward-line 2) (point)))
              (goto-char here)
