@@ -141,18 +141,9 @@ deduplicated, as if :unique t."
 
 (defun org-node-feed-roam-db ()
   (require 'org-roam)
-  (org-node-cache-ensure-fresh)
   (org-roam-db--close)
   (delete-file org-roam-db-location)
-  ;; (org-roam-db-clear-all)
   (emacsql-with-transaction (org-roam-db)
-    ;; Attempt to make it faster... doesn't help
-    ;; (emacsql-with-connection (db (org-roam-db))
-    ;; (emacsql-send-message db "pragma journal_mode = WAL")
-    ;; (emacsql-send-message db "pragma synchronous = normal")
-    ;; (emacsql-send-message db "pragma temp_store = memory")
-    ;; (emacsql-send-message db "pragma mmap_size = 30000000000")
-    ;; (emacsql (org-roam-db) [:begin :transaction])
     (cl-loop
      with nodes = (--filter (plist-get it :id) (hash-table-values org-nodes))
      with ctr = 0
@@ -160,9 +151,7 @@ deduplicated, as if :unique t."
      for node in nodes
      do (when (= 0 (% (cl-incf ctr) 20))
           (message "Inserting into SQL DB... %d/%d" ctr max))
-     (org-node--feed-node-to-roam-db node))
-    ;; (emacsql (org-roam-db) [:end :transaction])
-    ))
+     (org-node--feed-node-to-roam-db node))))
 
 (defun org-node--ref-link->list (ref node-id)
   "Worker code adapted from `org-roam-db-insert-ref'"
@@ -171,7 +160,7 @@ deduplicated, as if :unique t."
            (string-prefix-p "@" ref)
            (push (vector node-id (substring ref 1) "cite") rows))
           (;; [cite:@citeKey]
-           ;; Basically, a given citation can contain multiple keys
+           ;; Turns out a given citation can contain multiple keys
            (string-prefix-p "[cite:" ref)
            (condition-case nil
                (let ((cite-obj (org-cite-parse-objects ref)))
@@ -180,15 +169,14 @@ deduplicated, as if :unique t."
                      (let ((key (org-element-property :key cite)))
                        (push (vector node-id key "cite") rows)))))
              (error
-              (lwarn '(org-roam) :warning
-                     "%s:%s\tInvalid cite %s, skipping..." (buffer-file-name) (point) ref))))
+              (lwarn '(org-node) :warning
+                     "%s:%s\tInvalid cite %s, skipping..."
+                     (buffer-file-name) (point) ref))))
           (;; https://google.com, cite:citeKey
-           ;; Note: we use string-match here because it matches any link:
-           ;; e.g. [[cite:abc][abc]] But this form of matching is loose, and can
-           ;; accept invalid links e.g. [[cite:abc]
            (string-match org-link-any-re (org-link-encode ref '(#x20)))
            (setq ref (org-link-encode ref '(#x20)))
-           (let ((ref-url (url-generic-parse-url (or (match-string 2 ref) (match-string 0 ref))))
+           (let ((ref-url (url-generic-parse-url
+                           (or (match-string 2 ref) (match-string 0 ref))))
                  (link-type ()) ;; clear url-type for backward compatible.
                  (path ()))
              (url-type (url-generic-parse-url "https://google.com"))
@@ -202,8 +190,9 @@ deduplicated, as if :unique t."
                    (push (vector node-id key link-type) rows))
                (push (vector node-id path link-type) rows))))
           (t
-           (lwarn '(org-roam) :warning
-                  "%s:%s\tInvalid ref %s, skipping..." (buffer-file-name) (point) ref)))
+           (lwarn '(org-node) :warning
+                  "%s:%s\tInvalid ref %s, skipping..."
+                  (buffer-file-name) (point) ref)))
     rows))
 
 (provide 'org-node-roam)
