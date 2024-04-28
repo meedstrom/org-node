@@ -39,7 +39,7 @@ peek on keys instead."
     ;; Wipe
     (clrhash org-nodes)
     (clrhash org-node-collection)
-    (clrhash org-node-cache--refs-table)
+    (clrhash org-node--refs-table)
     ;; Rebuild `org-nodes'
     (org-node--init-org-id-locations-or-die)
     (let ((files (-uniq (hash-table-values org-id-locations))))
@@ -263,11 +263,11 @@ it does not check."
                (org-node-cache--populate-other-tables node)))))))))
 
 (defun org-node-cache--populate-other-tables (node)
-  ;; Add to  `org-node-cache--refs-table' and `org-node-collection'
+  ;; Add to  `org-node--refs-table' and `org-node-collection'
   (when (or (not org-node-only-show-subtrees-with-id)
             (plist-get node :id))
     (dolist (ref (plist-get node :roam-refs))
-      (puthash ref (plist-get node :id) org-node-cache--refs-table))
+      (puthash ref (plist-get node :id) org-node--refs-table))
     (if (funcall org-node-filter-fn node)
         (progn
           (dolist (title (cons (plist-get node :title)
