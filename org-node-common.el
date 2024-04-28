@@ -123,8 +123,7 @@ first element."
   (let* ((files (-uniq file-list))
          (directories (-uniq (mapcar #'file-name-directory files))))
     ;; Example: if there is /home/roam/courses/Math1A/, but ancestor dir
-    ;; /home/roam/ is also a member of the set, throw out the child because
-    ;; ripgrep works recursively anyway
+    ;; /home/roam/ is also a member of the set, throw out the child
     (cl-loop for dir in directories
              as dirs-aside-from-this-one = (remove dir directories)
              when (--any-p (string-prefix-p it dir) dirs-aside-from-this-one)
