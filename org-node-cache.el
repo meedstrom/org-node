@@ -20,29 +20,6 @@ time."
     (advice-remove #'rename-file #'org-node-cache-file)
     (advice-remove #'delete-file #'org-node-cache--schedule-reset-maybe)))
 
-(defcustom org-node-cache-extra-rg-args
-  '("--glob" "**/*.org"
-    "--glob" "!**/logseq/bak/**"
-    "--glob" "!**/logseq/version-files/**"
-    "--glob" "!**/*.sync-conflict-*") ;; ignore Syncthing dups
-  "Extra arguments to ripgrep - useful for filtering paths.
-Read about glob syntax in the Ripgrep guide:
-
-  https://github.com/BurntSushi/ripgrep/blob/master/GUIDE.md
-
-Rather than add more arguments here, it's probably easier to rely
-on local .ignore or .gitignore rules.
-
-On an exotic system such as Windows, you probably have to edit
-these paths.
-
-These arguments are NOT passed through a shell, so there's no
-need to shell-escape characters.  If you have a filename with a
-space, it's fine (I think).  Do not pass several arguments in a
-single string, it will not work."
-  :type '(repeat string)
-  :group 'org-node)
-
 (defun org-node-cache-peek (&optional ht keys)
   "For debugging: peek on some values of `org-nodes'.
 When called from Lisp, peek on any hash table HT.  With KEYS t,
@@ -65,11 +42,9 @@ peek on keys instead."
     (clrhash org-nodes)
     (clrhash org-node-collection)
     (clrhash org-node-cache--refs-table)
-    (clrhash org-node-cache--files)
     ;; Rebuild `org-nodes'
     (org-node--init-org-id-locations-or-die)
-    (dolist (dir (org-node--root-dirs (hash-table-values org-id-locations)))
-      (org-node-cache--scan dir))
+    (org-node-cache--collect-nodes (-uniq (hash-table-values org-id-locations)))
     (dolist (node (hash-table-values org-nodes))
       (cl-incf (if (plist-get node :is-subtree) sum-subtrees sum-files))
       ;; Rebuild `org-node-cache--refs-table'
@@ -85,34 +60,31 @@ peek on keys instead."
                      node
                      org-node-collection))
         (plist-put node :is-excluded t)))
-    (message "org-node: recorded %d files and %d subtrees in %.2fs"
+    (message "org-node: parsed %d files and %d subtrees from scratch in %.2fs"
              sum-files
              sum-subtrees
              (float-time (time-since then)))
     (run-hooks 'org-node-cache-hook)))
 
-(defun org-node-cache--scan (target)
-  (org-node-cache--collect-file-level-nodes target)
-  (org-node-cache--calc-file-outlines target)
-  (org-node-cache--collect-subtree-nodes target))
-
 (defun org-node-cache-file (&rest args)
   "Grep for nodes in a single file."
-  ;; If triggered by `rename-file' advice, the second argument is NEWNAME.  The
-  ;; new name may not be that of the current buffer, e.g. it may be called from
-  ;; a Dired buffer.
+  ;; If triggered as advice on `rename-file', the second argument is the new
+  ;; name.  Do not assume it applies to the current buffer; it may be
+  ;; called from a Dired buffer, for example.
   (let* ((arg2 (cadr args))
          (file (if (and arg2 (stringp arg2) (file-exists-p arg2))
                    arg2
                  (buffer-file-name))))
-    (org-node-cache--scan file))
+    (org-node-cache--collect-nodes (list file)))
   (run-hooks 'org-node-cache-file-hook))
 
 (defvar org-node-cache-hook (list))
 (defvar org-node-cache-file-hook (list))
 
 (defun org-node-cache-ensure-fresh ()
-  (when (or (not org-node-cache-mode) (not (hash-table-p org-nodes)) (hash-table-empty-p org-node-collection))
+  (when (or (not org-node-cache-mode)
+            (not (hash-table-p org-nodes))
+            (hash-table-empty-p org-node-collection))
     (org-node-cache-reset)
     ;; In practice, this message delivered once per emacs session
     (message "To speed up this command, turn on `org-node-cache-mode'")))
@@ -143,321 +115,206 @@ that will match any of the keywords."
        (string-split)
        (regexp-opt)))
 
-;; Optimized for one purpose, do not reuse
+;; Optimized for one purpose, do NOT reuse.  Bungles the match data despite
+;; claiming not to!
 (let ((regexp (rx "[[id:" (group (+? nonl)) "][" (+? nonl) "]]")))
   (defun org-node-cache--backlinks->list (backlinks-string)
-    "Take substrings looking like [[id:abcd][Description]] in
-BACKLINKS-STRING, and collect the \"abcd\" parts into a list.
+    "Out of BACKLINKS-STRING, take substrings looking like
+[[id:abcd][Description]], and collect the \"abcd\" parts into a list.
 
-At least if its assumptions about STR are correct, which it does
-not check."
+At least if its assumptions about the input are correct, which
+it does not check."
     (declare (pure t) (side-effect-free t))
     (if backlinks-string
-        (string-split (replace-regexp-in-string regexp "\\1" backlinks-string)
+        (split-string (replace-regexp-in-string regexp "\\1" backlinks-string)
                       "  " t))))
-
-(defun org-node-cache--program-output (program &rest args)
-  "Like `shell-command-to-string', but skip the shell intermediary.
-
-Arguments PROGRAM and ARGS as in `call-process'.  Each argument
-is a string usually without spaces, and needs not
-backslash-escape characters such as asterisks.  On the other
-hand, you get no shell magic such as globs or envvars."
-  (with-temp-buffer
-    (apply #'call-process program nil t nil args)
-    (buffer-string)))
 
 
 ;;; More fun plumbing
 
-;; TODO: make the entire property drawer optional
-(defconst org-node-cache--file-level-re
-  (rxt-elisp-to-pcre
-   (rx bol ":PROPERTIES:" (* space)
-       (group (+? "\n:" (not space) (* nonl)))
-       "\n:END:" (* space)
-       (*? "\n" (* nonl))
-       (group (+ "\n#+" (* nonl)))))
-  "Regexp to match file-level nodes.")
+;; No perceptible perf diff now, but when I accidentally had some very large
+;; strings to unicodify, it made it a little bit better.  Prolly will deprecate.
+(defun org-node-cache--unicode (str)
+  (declare (pure t) (side-effect-free t))
+  (if (string-match-p "[^[:ascii:]]" str)
+      (decode-coding-string str 'utf-8)
+    str))
 
-(defvar org-node-cache--subtree-re
-  (rxt-elisp-to-pcre
-   (rx bol (+ "*") (+ space) (+ nonl)
-       (? "\n" (* space) (>= 5 upper-case) (* nonl)) ; CLOSED/SCHEDULED/DEADLINE
-       (? "\n" (* space) ":properties:"
-          (+? "\n" (* space) ":" (not space) (+ nonl))
-          "\n" (* space) ":end:")))
-  "Regexp to match subtrees and their property drawers.")
-
-(defun org-node-cache--collect-file-level-nodes (target)
-  "Scan TARGET (a file or directory) for file-level ID nodes."
-  (let ((case-fold-search t)
-        (rg-result
-         (apply #'org-node-cache--program-output "rg"
-                `("--multiline"
-                  "--ignore-case"
-                  "--with-filename"
-                  "--line-number"
-                  "--max-count" "1"
-                  "--only-matching"
-                  "--replace"
-                  "\f$1\f$2--sophisticatedSeparator--"
-                  ,@org-node-cache-extra-rg-args
-                  ,org-node-cache--file-level-re
-                  ,target))))
-    (with-temp-buffer
-      (dolist (file-head (string-split rg-result "--sophisticatedSeparator--\n" t))
-        (let ((splits (string-split file-head "\f")))
-          (let ((file:lnum (string-split (nth 0 splits) ":" t))
-                ($1 (nth 1 splits))
-                ($2 (nth 2 splits))
-                props id title tags)
-            (erase-buffer)
-            (insert $1)
-            (goto-char (point-min))
-            (while (not (eobp))
-              (dotimes (_ 3) (search-forward ":"))
-              (push (cons (upcase (buffer-substring-no-properties
-                                   (point) (1- (search-forward ":"))))
-                          (string-trim (buffer-substring-no-properties
-                                        (point) (line-end-position))))
-                    props)
-              (forward-line 1))
-            (let ((beg (point)))
-              (insert $2)
-              (goto-char beg)
-              (when (search-forward "#+title: " nil t)
-                (setq title (string-trim (buffer-substring-no-properties
-                                          (point) (line-end-position))))
-                (goto-char beg))
-              (when (search-forward "#+filetags: " nil t)
-                (setq tags (string-trim (buffer-substring-no-properties
-                                         (point) (line-end-position))))))
-            (setq id (cdr (assoc "ID" props)))
-            (when (and id title)
-              (puthash id (list
-                           :title title
-                           :level 0
-                           :line-number 1
-                           :file-path (car file:lnum)
-                           :file-title title
-                           :id id
-                           :tags (and tags (string-split tags ":" t))
-                           :properties props
-                           :exclude
-                           (equal "t" (cdr (assoc "ROAM_EXCLUDE" props)))
-                           :aliases
-                           (let ((aliases (cdr (assoc "ROAM_ALIASES" props))))
-                             (and aliases (split-string-and-unquote aliases)))
-                           :roam-refs
-                           (let ((refs (cdr (assoc "ROAM_REFS" props))))
-                             (and refs (split-string-and-unquote refs)))
-                           :backlink-origins
-                           (org-node-cache--backlinks->list
-                            (cdr (assoc "CACHED_BACKLINKS" props))))
-                       org-nodes)
-              (puthash (car file:lnum) (list title) org-node-cache--files))
-            ))))))
-
-(defun org-node-cache--calc-file-outlines (target)
-  "Record outline level at each line num with a heading."
-  (let ((rg-result (apply #'org-node-cache--program-output "rg"
-                          `("--with-filename"
-                            "--line-number"
-                            "--only-matching"
-                            ,@org-node-cache-extra-rg-args
-                            "^\\*+ "
-                            ,target))))
-    (dolist (line (split-string rg-result "\n" t))
-      ;; A match looks like /home/file.org:91:***
-      (let ((parts (split-string line ":")))
-        (let ((lnum (string-to-number (nth 1 parts)))
-              (level (length (substring (nth 2 parts) 0 -1))))
-          (push (list lnum level)
-                (gethash (nth 0 parts) org-node-cache--files)))))))
-
-(defun org-node-cache--collect-subtree-nodes (target)
-  "Scan TARGET (a file or directory) for subtree ID nodes."
-  (let ((workaround-counter 0)
-        (case-fold-search t)
-        (rg-result
-         (apply #'org-node-cache--program-output "rg"
-                `("--multiline"
-                  "--with-filename"
-                  "--line-number"
-                  ,@org-node-cache-extra-rg-args
-                  ,org-node-cache--subtree-re
-                  ,target))))
-    (with-temp-buffer
-      (insert rg-result)
-      (goto-char (point-min))
-      (let ((file (buffer-substring (point) (1- (search-forward ":"))))
-            beg end)
-        (setq beg (point))
-        (while (search-forward file nil t))
-        (forward-line 1)
-        (setq end (point))
-        (goto-char beg)
-
-        )
-
-      ;; subtree
+(defun org-node-cache--collect-properties (beg end)
+  (let (res)
+    (goto-char beg)
+    (with-restriction beg end
       (while (not (eobp))
-      (let (beg end title level file-path lnum tags todo scheduled deadline props id)
-        (setq file-path (buffer-substring (point) (1- (search-forward ":"))))
-        (setq lnum (string-to-number
-                    (buffer-substring (point) (1- (search-forward ":")))))
-        (setq level (skip-chars-forward "*"))
-        (skip-chars-forward " ")
-        (setq beg (point))
-        ;; ASSUMPTION: noone writes :* in the heading or props (lint this)
-        (setq end (or (and (search-forward ":*" nil t)
-                           (line-beginning-position))
-                      (point-max)))
-        (goto-char beg)
-        (if (re-search-forward " +\(:.+:\) *$" (line-end-position) t)
-            (progn
-              (setq tags (string-split (match-string 1) ":" t))
-              (setq title (buffer-substring beg (match-beginning 0))))
-          (setq title (buffer-substring beg (line-end-position))))
-        (when (re-search-forward "[\n ]SCHEDULED: " end t)
-          (setq scheduled
-                (buffer-substring (point) (re-search-forward "[>]]"))))
-        (goto-char beg)
-        (when (re-search-forward "[\n ]DEADLINE: " end t)
-          (setq deadline
-                (buffer-substring (point) (re-search-forward "[>]]"))))
-        (when (search-forward ":properties:" end t)
-          (forward-line 1)
-          (setq beg (point))
-          (search-forward ":end:" end)
-          (setq end (line-beginning-position))
-          (goto-char beg)
-          (with-restriction beg end
-            (while (not (eobp))
-              (dotimes (_ 3) (search-forward ":"))
-              (push (cons (upcase (buffer-substring-no-properties
-                                   (point) (1- (search-forward ":"))))
-                          (string-trim (buffer-substring-no-properties
-                                        (point) (line-end-position))))
-                    props)
-              (forward-line 1))))
-        (setq id (cdr (assoc "ID" props)))
-        (goto-char end)
-        (puthash
-         ;; Record subtree even if it has no ID
-         (or id (format-time-string "%N"))
-         (list :title title
-               :is-subtree t
-               :level level
-               :line-number lnum
-               :tags tags
-               :todo nil
-               :file-path file-path
-               :scheduled scheduled
-               :deadline deadline
-               :file-title file-title
-               ;; :olp (org-node-cache--line->olp outline-data lnum)
-               :properties props
-               :id id
-               :exclude (equal "t" (cdr (assoc "ROAM_EXCLUDE" props)))
-               :aliases (split-string-and-unquote
-                         (or (cdr (assoc "ROAM_ALIASES" props)) ""))
-               :roam-refs (when-let ((refs (cdr (assoc "ROAM_REFS" props))))
-                            (split-string-and-unquote refs))
-               :backlink-origins (org-node-cache--backlinks->list
-                                  (cdr (assoc "CACHED_BACKLINKS" props))))
-         org-nodes))
+        (search-forward ":")
+        (push (cons (upcase (org-node-cache--unicode
+                             (buffer-substring
+                              (point) (1- (search-forward ":")))))
+                    (string-trim (org-node-cache--unicode
+                                  (buffer-substring
+                                   (point) (line-end-position)))))
+              res)
+        (forward-line 1)))
+    res))
 
-        )
+(defun org-node-cache--collect-nodes (files)
+  "Scan FILES for ID nodes, adding them to `org-nodes'."
+  (with-temp-buffer
+    ;; Shorthand since its extra arg is a PITA during refactor
+    (cl-flet ((unicode (str) (decode-coding-string str 'utf-8)))
+      (cl-loop
+       with todo-re = (org-node-cache--make-todo-regexp)
+       with case-fold-search = t
+       with gc-cons-threshold = (* 3 1000 1000 1000)
+       for file in files
+       when (--none-p (string-search it file) '("/logseq/"))
+       do
+       (erase-buffer)
+       (insert-file-contents-literally file)
+       (let (;; Position of first content (a line not starting with # or :)
+             (far (or (re-search-forward "^ *?[^#:]" nil t) (point-max)))
+             ;; (far (or (re-search-forward "^\\*" nil t) (point-max)))
+             props file-title file-tags
+             outline-data)
+         (goto-char 1)
+         (when (re-search-forward "^ *:properties:" far t)
+           (forward-line 1)
+           (setq props (org-node-cache--collect-properties
+                        (point) (and (re-search-forward "^ *:end:")
+                                     (line-beginning-position)))))
+         (goto-char 1)
+         (when (re-search-forward "^#\\+title: " far t)
+           (setq file-title (unicode (buffer-substring
+                                      (point) (line-end-position)))))
+         (goto-char 1)
+         (when (re-search-forward "^#\\+filetags: " far t)
+           (setq file-tags (split-string
+                            (unicode (buffer-substring
+                                      (point) (line-end-position)))
+                            ":" t)))
+         (let ((id (cdr (assoc "ID" props))))
+           (when (and id file-title)
+             (puthash id (list
+                          :title file-title
+                          :level 0
+                          :tags file-tags
+                          :file-path file
+                          :pos 1
+                          :file-title file-title
+                          :properties props
+                          :id id
+                          :exclude (cdr (assoc "ROAM_EXCLUDE" props))
+                          :aliases (split-string-and-unquote
+                                    (or (cdr (assoc "ROAM_ALIASES" props)) ""))
+                          :roam-refs (let ((refs (cdr (assoc "ROAM_REFS" props))))
+                                       (and refs (split-string-and-unquote refs)))
+                          :backlink-origins (org-node-cache--backlinks->list
+                                             (cdr (assoc "CACHED_BACKLINKS" props))))
+                      org-nodes)))
+         ;; Loop over the file's subtrees
+         (while (re-search-forward "^\\*+ " nil t)
+           (let (here todo title line2-end level pos tags todo scheduled deadline props id)
+             (setq pos (goto-char (line-beginning-position)))
+             (setq level (skip-chars-forward "*"))
+             (skip-chars-forward " ")
+             (setq here (point))
+             ;; NOTE: The todo-regexp prolly won't match unicode todo keywords
+             (when (looking-at todo-re)
+               (setq todo (buffer-substring (point) (match-end 0)))
+               (goto-char (1+ (match-end 0)))
+               (setq here (point)))
+             (if (re-search-forward " +\\(:.+:\\) *$" (line-end-position) t)
+                 (progn
+                   (setq title (unicode (buffer-substring
+                                         here (match-beginning 0))))
+                   (setq tags (string-split (unicode (match-string 1))
+                                            ":" t)))
+               (setq title (unicode (buffer-substring
+                                     here (line-end-position)))))
+             (setq here (point))
+             (setq line2-end (and (forward-line 2) (point)))
+             (goto-char here)
+             (when (re-search-forward "[\n\s]SCHEDULED: " line2-end t)
+               (setq scheduled
+                     (unicode
+                      (buffer-substring
+                       (point) (+ (point) (skip-chars-forward "^]>\n")))))
+               (goto-char here))
+             (when (re-search-forward "[\n\s]DEADLINE: " line2-end t)
+               (setq deadline
+                     (unicode
+                      (buffer-substring
+                       (point) (+ (point) (skip-chars-forward "^]>\n"))))))
+             (setq here (point))
+             (setq line2-end (and (forward-line 2) (point)))
+             (goto-char here)
+             (when (re-search-forward "^ *:properties:" line2-end t)
+               (forward-line 1)
+               (setq props (org-node-cache--collect-properties
+                            (point) (and (re-search-forward "^ *:end:")
+                                         (line-beginning-position)))))
+             (setq id (cdr (assoc "ID" props)))
+             (push (list pos title level) outline-data)
+             (puthash
+              ;; Record subtree even if it has no ID
+              (or id (format-time-string "%N"))
+              (list :title title
+                    :is-subtree t
+                    :level level
+                    :pos pos
+                    :tags tags
+                    :todo todo
+                    :file-path file
+                    :scheduled scheduled
+                    :deadline deadline
+                    :file-title file-title
+                    :olp (org-node-cache--pos->olp outline-data pos)
+                    :properties props
+                    :id id
+                    :exclude (equal "t" (cdr (assoc "ROAM_EXCLUDE" props)))
+                    :aliases (split-string-and-unquote
+                              (or (cdr (assoc "ROAM_ALIASES" props)) ""))
+                    :roam-refs (when-let ((refs (cdr (assoc "ROAM_REFS" props))))
+                                 (split-string-and-unquote refs))
+                    :backlink-origins (org-node-cache--backlinks->list
+                                       (cdr (assoc "CACHED_BACKLINKS" props))))
+              org-nodes))))))))
 
+;; (cl-loop for node in (hash-table-values org-nodes)
+;;          for todo = (plist-get node :todo)
+;;          when todo do (message todo))
 
-      ;; TODO: boost perf by grouping some operations by file
+(defun org-node-cache--pos->olp (oldata pos)
+  "Given buffer position POS, return the Org outline path.
+Result should be like that from `org-get-outline-path'.
 
-      ;; add this heading title to the outline data, for use next iter.
-      (push $3 (alist-get lnum (gethash file org-node-cache--files)))
-
-      (erase-buffer)
-      (insert $6)
-      (goto-char (point-min))
-      (while (not (eobp))
-        (dotimes (_ 3) (search-forward ":"))
-        (push (cons (upcase (buffer-substring-no-properties
-                             (point) (1- (search-forward ":"))))
-                    (string-trim (buffer-substring-no-properties
-                                  (point) (line-end-position))))
-              props)
-        (forward-line 1))
-      (setq id (cdr (assoc "ID" props)))
-      (let ((beg (point)))
-        (insert $5)
-        (goto-char beg)
-        (when (search-forward "SCHEDULED: " nil t)
-          (setq scheduled
-                (string-trim (buffer-substring-no-properties
-                              (point) (1+ (re-search-forward "[^]>]*")))))
-          (goto-char beg))
-        (when (search-forward "DEADLINE: " nil t)
-          (setq deadline
-                (string-trim (buffer-substring-no-properties
-                              (point) (1+ (re-search-forward "[^]>]*")))))))
-      )))
-
-(defvar org-node-cache--files
-  (make-hash-table :size 3000 :test #'equal)
-  "Table keyed on filepaths, where the value is a plist:
-:file-level-node t/nil
-:lnums-ids
-((LINE-NUM . ID)
- (LINE-NUM . ID)
- ...)
-:lnums-levels
-((LINE-NUM . OUTLINE-LEVEL)
- (LINE-NUM . OUTLINE-LEVEL)
- ...)
-")
-
-(defun org-node-cache--line->olp (outline-data line)
-  "Given LINE number, return a list of line numbers corresponding to
-where the ancestor subtrees are.  The current subtree is included.
-
-Argument OUTLINE-DATA must be of the form
- ((1 \"File title\" 0)
-  (23 \"Heading title\" 3)
-  (50 \"Another heading\" 1)
-  (73 \"Heading\" 2)
+Argument OLDATA must be of the form
+ ((373 \"Heading\" 2)
+  (250 \"Another heading\" 1)
+  (123 \"Misplaced third-level heading\" 3)
   ...)
 
-where the car of each element represents a line number, the cadr the
+where the car of each element represents a buffer position, the cadr the
 heading title and the caddr the outline depth i.e. the number of
-asterisks in the heading at that line.
+asterisks in the heading at that location.
 
-LINE itself needs not to correspond to a subtree."
-  (let* (reversed
-         ;; Drop all the lines below LINE
-         (relevant (cl-loop for cell in (reverse outline-data)
-                            if (> line (car cell))
-                            do (push cell reversed)
-                            else return t))
+OLDATA must be in reverse order, so the last heading in the file is
+represented as the first element.
 
-         (curr-level (caddr (car reversed)))
-         ;; Bootstrap
-         ;; (olp (list (cadr (car reversed))))
-         (olp nil))
-    ;; (print reversed)
-    ;; Work backwards towards the top of the file
-    (cl-loop for cell in reversed
-             when (> curr-level (caddr cell))
-             do (setq curr-level (caddr cell))
-             (push (cadr cell) olp))
-    ;; (print olp)
+OLDATA must contain an element containing POS."
+  (declare (pure t) (side-effect-free t))
+  (let (olp
+        ;; Drop all the data about positions below POS
+        (reversed (-drop (-elem-index (assoc pos oldata) oldata) oldata)))
+    (let ((curr-level (caddr (car reversed))))
+      ;; Work backwards towards the top of the file
+      (cl-loop for cell in reversed
+               when (> curr-level (caddr cell))
+               do (setq curr-level (caddr cell))
+               (push (cadr cell) olp)
+               and if (= 1 curr-level)
+               ;; Stop
+               return nil))
     olp))
-
-
-;; (cadr (hash-table-keys org-node-cache--files))
-;; (cadr (hash-table-values org-node-cache--files))
-;; (clrhash org-node-cache--files)
-;; (gethash (org-id-get nil nil nil t) org-nodes)
 
 (provide 'org-node-cache)
 
