@@ -145,7 +145,7 @@ first element."
        do (cl-incf (cdr (assoc the-root dir-counters)))
        finally return (mapcar #'car (cl-sort dir-counters #'> :key #'cdr))))))
 
-(defvar org-node-cache--refs-table (make-hash-table :test #'equal))
+(defvar org-node--refs-table (make-hash-table :test #'equal))
 
 (provide 'org-node-common)
 
