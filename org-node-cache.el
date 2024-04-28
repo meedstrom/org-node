@@ -47,19 +47,20 @@ peek on keys instead."
     (org-node-cache--collect-nodes (-uniq (hash-table-values org-id-locations)))
     (dolist (node (hash-table-values org-nodes))
       (cl-incf (if (plist-get node :is-subtree) sum-subtrees sum-files))
-      ;; Rebuild `org-node-cache--refs-table'
-      (dolist (ref (plist-get node :roam-refs))
-        (puthash ref (plist-get node :id) org-node-cache--refs-table)
-        ;; Let refs work as aliases
-        (puthash ref node org-node-collection))
-      ;; Rebuild `org-node-collection'
-      (if (funcall org-node-filter-fn node)
-          (dolist (title (cons (plist-get node :title)
-                               (plist-get node :aliases)))
-            (puthash (funcall org-node-format-candidate-fn node title)
-                     node
-                     org-node-collection))
-        (plist-put node :is-excluded t)))
+      (when (or (not org-node-only-show-subtrees-with-id) (plist-get node :id))
+        ;; Rebuild `org-node-cache--refs-table'
+        (dolist (ref (plist-get node :roam-refs))
+          (puthash ref (plist-get node :id) org-node-cache--refs-table)
+          ;; Let refs work as aliases
+          (puthash ref node org-node-collection))
+        ;; Rebuild `org-node-collection'
+        (if (funcall org-node-filter-fn node)
+            (dolist (title (cons (plist-get node :title)
+                                 (plist-get node :aliases)))
+              (puthash (funcall org-node-format-candidate-fn node title)
+                       node
+                       org-node-collection))
+          (plist-put node :is-excluded t))))
     (message "org-node: parsed %d files and %d subtrees from scratch in %.2fs"
              sum-files
              sum-subtrees
@@ -102,7 +103,7 @@ avoids bothering the user who may be trying to delete many files."
 
 ;;; Plumbing
 
-(defvar org-node-cache--refs-table (make-hash-table :size 1000 :test #'equal))
+(defvar org-node-cache--refs-table (make-hash-table :test #'equal))
 
 (defun org-node-cache--make-todo-regexp ()
   "Make a regexp based on global value of `org-todo-keywords',
@@ -128,9 +129,6 @@ it does not check."
     (if backlinks-string
         (split-string (replace-regexp-in-string regexp "\\1" backlinks-string)
                       "  " t))))
-
-
-;;; More fun plumbing
 
 ;; No perceptible perf diff now, but when I accidentally had some very large
 ;; strings to unicodify, it made it a little bit better.  Prolly will deprecate.

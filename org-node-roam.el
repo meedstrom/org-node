@@ -15,7 +15,7 @@ Some of the fields are blank."
    :title (plist-get node :title)
    :tags (plist-get node :tags)
    :aliases (plist-get node :aliases)
-   :point (org-node--visit-get-pos node)))
+   :point (plist-get node :pos)))
 
 (defun org-node--fabricate-roam-backlinks (roam-object &rest _)
   "Return org-roam-backlink objects targeting ROAM-OBJECT.
@@ -63,7 +63,7 @@ deduplicated, as if :unique t."
         (properties (plist-get node :properties))
         (backlink-origins (plist-get node :backlink-origins))
         (is-subtree (plist-get node :is-subtree))
-        (pos (org-node--visit-get-pos node)))
+        (pos (plist-get node :pos)))
     ;; `org-roam-db-insert-file'
     (org-roam-db-query
      [:insert :into files
@@ -153,11 +153,12 @@ deduplicated, as if :unique t."
     ;; (emacsql-send-message db "pragma mmap_size = 30000000000")
     (emacsql (org-roam-db) [:begin :transaction])
     (cl-loop
+     with nodes = (--filter (plist-get it :id) (hash-table-values org-nodes))
      with ctr = 0
-     with max = (hash-table-count org-nodes)
-     for node being the hash-values of org-nodes
+     with max = (length nodes)
+     for node in nodes
      do
-     (when (= 0 (% (cl-incf ctr) 10))
+     (when (= 0 (% (cl-incf ctr) 20))
        (message "Inserting into SQL DB... %d/%d" ctr max))
      (org-node--feed-node-to-roam-db node))
     (emacsql (org-roam-db) [:end :transaction])))

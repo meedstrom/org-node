@@ -13,6 +13,11 @@
   "Support a zettelkasten of org-id files and subtrees."
   :group 'org)
 
+(defcustom org-node-only-show-subtrees-with-id nil
+  "Whether to include all subtrees as completion candidates."
+  :group 'org-node
+  :type 'boolean)
+
 (defcustom org-node-format-candidate-fn
   (lambda (_node title) title)
   "Function to return what string should represent this node.
@@ -25,13 +30,12 @@ from \\[org-node-cache-peek].  The title may in fact be one of
 the aliases and not the real title, because the function runs
 again for every alias.
 
-This example shows the file name in addition to the title:
+This example shows the ancestor entries to each node:
 
-(setq org-node-format-candidate-fn
-      (lambda (node title)
-        (concat (file-name-nondirectory (plist-get node :file-path))
-                \" -- \"
-                title)))
+(defun my-format-with-olp (node title)
+  (if-let ((olp (plist-get node :olp)))
+      (concat (string-join olp \" > \") \" > \" title)
+    title))
 "
   :group 'org-node
   :type 'function)
