@@ -45,12 +45,10 @@ For your pleasure, here's a comparison of three similar notetaking systems: all 
 | org-capture integration           | no          | yes                | no                   |
 | Backlinks in same window          | no          | yes                | yes                  |
 | Avoid double-counting :BACKLINKS: | no          | yes                | yes                  |
-| Read =:CACHED_BACKLINKS:= as data   | no          | yes                | no                   |
 | Warn about dead links             | no          | yes                | no                   |
 | Seek files/headings sans ID       | no          | yes                | not applicable       |
 | Node exclusion                    | yes         | limited            | not applicable       |
 | Support =roam:= links               | yes         | no                 | no                   |
-| Read :BACKLINKS: as data          | no          | no                 | yes                  |
 | Some query-able cache             | org-roam-db | org-nodes          | no                   |
 |-----------------------------------+-------------+--------------------+----------------------|
 | Cache mandatory                   | yes         | no                 | no                   |
@@ -213,8 +211,7 @@ The second way (experimental) is translating org-node's info into a form suitabl
 (add-hook 'org-node-cache-file-hook #'org-node-feed-file-to-roam-db)
 #+end_src
 
-This second method has potential to unlock more org-roam features (like =org-roam-display-templates=), but does not yet send all the data that org-roam wants, and given that it's slow anyway you may as well continue using the real =org-roam-db-sync=.
-
+This second method has potential to unlock more org-roam features (like =org-roam-node-display-template=), but does not yet send all the data that org-roam wants, and given that it's slow anyway you may as well continue using the real =org-roam-db-sync= -- for now...
 
 ** Limitations
 *** Excluding nodes
@@ -235,20 +232,11 @@ The point of org-id is to avoid dependence on filenames, but it's often pragmati
 
 *** org-id
 
-In lieu of a convenient =org-roam-update-org-id-locations=, see Appendix III for how to defeat org-id's idiosyncrasies.
+In lieu of a convenient =org-roam-update-org-id-locations=, see [[https://github.com/meedstrom/org-node?tab=readme-ov-file#appendix-iii-taking-ownership-of-org-id][Appendix III]] for how to defeat org-id's idiosyncrasies, ensuring org-node knows about all the relevant ID locations.
 
 *** Ref format
 
 For now, don't insert formatted links like =[[http...][description]]= in the =ROAM_REFS= field.  Just the raw URL.
-
-** Appendix 0: Command equivalents :noexport:
-
-Things you may as well just use from org-roam.  No vanilla org-mode equivalent, and I won't reinvent the wheel.
-
-- org-roam-tag-add   
-- org-roam-alias-add
-- org-roam-ref-add
-- org-roam-buffer-toggle
 
 ** Appendix I: Rosetta stone
 
@@ -300,7 +288,7 @@ Let's say most of your Org files sit in a folder =/home/kept/notes/= but some ot
 
 The challenges with org-id:
 
-1. The classic way to tell it where to look for IDs is adding the directory =/home/kept/notes/= to =org-agenda-files=.
+1. The classic way to tell it where to look for IDs is adding the directories to =org-agenda-files=.
    - Unfortunately with thousands of files, this slows down the agenda something extreme.  Not an option.
 2. An alternative way is to populate =org-id-extra-files= or =org-agenda-text-search-extra-files=.
    - See snippet A, but unfortunately with thousands of files this slows down =M-x customize-group= for org-id or org-agenda something extreme.
@@ -377,17 +365,6 @@ Bonus snippet: full reset
        (setq org-id-extra-files nil))
 #+end_src
 
-
-** Appendix IV: Other bonus fixes :noexport:
-
-On Doom's Org module, you may need a fix to use org-transclusion:
-
-#+begin_src elisp
-(if (modulep! :lang org)
-    ;; fix interference with org-transclusion
-    (after! org
-      (advice-remove 'org-link-search '+org--recenter-after-follow-link-a)))
-#+end_src
 
 * Question for you
 
