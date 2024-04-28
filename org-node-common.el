@@ -38,7 +38,7 @@ This example shows the file name in addition to the title:
 
 (defcustom org-node-filter-fn
   (lambda (node)
-    (and (not (plist-get node :roam-exclude))
+    (and (not (plist-get node :exclude))
          (not (plist-get node :todo))))
   "Predicate returning t to include a node, or nil to exclude it.
 
@@ -54,14 +54,14 @@ See the following example for a way to filter out nodes tagged
 
 (setq org-node-filter-fn
       (lambda (node)
-        (and (not (plist-get node :roam-exclude))
+        (and (not (plist-get node :exclude))
              (not (plist-get node :todo))
              (not (member \"drill\" (plist-get node :tags)))
              (not (string-search \"archive\" (plist-get node :file-path))))))
 
 (setq org-node-filter-fn
       (lambda (node)
-       (and (not (plist-get node :roam-exclude))
+       (and (not (plist-get node :exclude))
             (not (plist-get node :todo)))))
 
 If you have an expensive filter slowing things down, a tip is
@@ -139,30 +139,6 @@ first element."
        as the-root = (--find (string-prefix-p file it) directories)
        do (cl-incf (cdr (assoc the-root dir-counters)))
        finally return (mapcar #'car (cl-sort dir-counters #'> :key #'cdr))))))
-
-
-;;; Visit-getters
-
-(defun org-node--visit-get-pos (node)
-  "Visit NODE and return the char position where it starts."
-  (if (plist-get node :is-subtree)
-      (with-temp-buffer
-        (insert-file-contents (plist-get node :file-path))
-        (forward-line (1- (plist-get node :line-number)))
-        (point))
-    1))
-
-(defun org-node--visit-get-file-title (node)
-  (org-with-file-buffer (plist-get node :file)
-    (org-get-title)))
-
-(defun org-node--visit-get-properties (node)
-  (org-with-file-buffer (plist-get node :file)
-    (save-excursion
-      (without-restriction
-        (goto-char 1)
-        (forward-line (plist-get node :line-number))
-        (org-entry-properties)))))
 
 (provide 'org-node-common)
 
