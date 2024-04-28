@@ -44,8 +44,6 @@
 
 ;;; Code:
 
-;; TODO Test with plain org-capture
-;; TODO Write example capture template
 ;; TODO Test each user commmand again
 ;; TODO Annotations for completion
 ;; TODO Completion category https://github.com/alphapapa/org-ql/issues/299
