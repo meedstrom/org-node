@@ -130,8 +130,7 @@ of the heading."
   (org-with-file-buffer (plist-get node :file-path)
     (save-excursion
       (without-restriction
-        (goto-char 1)
-        (forward-line (plist-get node :line-number))
+        (goto-char (plist-get node :pos))
         (nth 4 (org-heading-components))))))
 
 (defun org-node-slugify-like-roam (title)
@@ -262,8 +261,7 @@ a small wrapper such as:
   "Visit NODE."
   (find-file (plist-get node :file-path))
   (widen)
-  (goto-char 1)
-  (forward-line (1- (plist-get node :line-number)))
+  (goto-char (plist-get node :pos))
   (recenter 5))
 
 ;;;###autoload
