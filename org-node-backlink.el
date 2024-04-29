@@ -12,13 +12,13 @@
         ;; hate the UX of before-save-hook, should probably hard depend on
         ;; apheleia or such system
         (add-hook 'before-save-hook #'org-node-backlink-check-buffer)
-        (add-hook 'org-roam-post-node-insert-hook #'org-node-backlink--add-to-here-in-target-a -99)
-        (add-hook 'org-node-insert-link-hook #'org-node-backlink--add-to-here-in-target-a -99)
-        (advice-add 'org-insert-link :after #'org-node-backlink--add-to-here-in-target-a))
+        (add-hook 'org-roam-post-node-insert-hook #'org-node-backlink--add-in-target-a -99)
+        (add-hook 'org-node-insert-link-hook #'org-node-backlink--add-in-target-a -99)
+        (advice-add 'org-insert-link :after #'org-node-backlink--add-in-target-a))
     (remove-hook 'before-save-hook #'org-node-backlink-check-buffer)
-    (remove-hook 'org-roam-post-node-insert-hook #'org-node-backlink--add-to-here-in-target-a)
-    (remove-hook 'org-node-insert-link-hook #'org-node-backlink--add-to-here-in-target-a)
-    (advice-remove 'org-insert-link #'org-node-backlink--add-to-here-in-target-a)))
+    (remove-hook 'org-roam-post-node-insert-hook #'org-node-backlink--add-in-target-a)
+    (remove-hook 'org-node-insert-link-hook #'org-node-backlink--add-in-target-a)
+    (advice-remove 'org-insert-link #'org-node-backlink--add-in-target-a)))
 
 ;; TODO Large files would still be slow to save (now we stop checking if there
 ;;      are too many links), so instead of checking the entire file on
@@ -45,7 +45,7 @@
     (unless (> n-links 100)
       ;; Catch and drop any error
       (condition-case err
-          (org-node-backlink--fix-findable-backlinks)
+          (org-node-backlink--fix-discoverable)
         ((t error)
          (message "org-node-backlink failed with message %s %s"
                   (car err) (cdr err)))))))
@@ -58,15 +58,16 @@
 (defvar org-node-backlink--progress-total-files 0)
 
 (defun org-node-backlink--progress-print-message ()
-  (message
-   "Checking... (file %d/%d) link %d, added %d backlinks, removed %d stale, current file %s"
-   org-node-backlink--progress-total-worked
-   org-node-backlink--progress-total-files
-   org-node-backlink--progress-total
-   org-node-backlink--progress-total-backlinks
-   org-node-backlink--progress-total-stale
-   org-node-backlink--progress-file)
-  (redisplay))
+  (when (= 0 (% org-node-backlink--progress-total 10))
+    (message
+     "Checking... (file %d/%d) link %d, added %d backlinks, removed %d stale, current file %s"
+     org-node-backlink--progress-total-worked
+     org-node-backlink--progress-total-files
+     org-node-backlink--progress-total
+     org-node-backlink--progress-total-backlinks
+     org-node-backlink--progress-total-stale
+     org-node-backlink--progress-file)
+    (redisplay)))
 
 ;; Separate function so the debugger don't have to step thru 2000 items
 (defun org-node-backlink--pre-open (files total)
@@ -81,15 +82,6 @@
               (find-file-noselect file))
             bufs))
     bufs))
-
-(defun org-node--consent-to-problematic-modes-for-mass-op ()
-  (--all-p (if (and (boundp it) (symbol-value it))
-               (y-or-n-p
-                (format "%S is active - proceed anyway?" it))
-             t)
-           '(auto-save-mode
-             auto-save-visited-mode
-             git-auto-commit-mode)))
 
 (defvar org-node-backlink--fixed (list))
 (defvar org-node-backlink--had-work (list))
@@ -141,7 +133,7 @@ cleaning."
                          (not (null buffer-undo-list))
                          (push buf org-node-backlink--had-work))
                     (widen)
-                    (org-node-backlink--fix-findable-backlinks t)
+                    (org-node-backlink--fix-discoverable t)
                     (push buf org-node-backlink--fixed)))))
           ((t error debug)
            (when (> org-node-backlink--progress-total-worked 10)
@@ -201,60 +193,60 @@ cleaning."
   ;; NB: Do not use `org-element-property' because it ignores links on property
   ;; lines.  That's also why org-roam won't double-count our backlinks, because
   ;; they're on a property line and org-roam does use `org-element-property'!
-  (let ((src-id (org-id-get nil nil nil t))
-        (bounds (org-in-regexp org-link-any-re))
-        (case-fold-search t))
-    (save-excursion
-      (goto-char (car bounds))
-      (let (target-id target-file)
-        (if (looking-at-p "\\[\\[id:")
-            ;; Backlink
-            (progn
-              (re-search-forward "id:\\([^\]]+\\)" (cdr bounds))
-              (setq target-id (match-string-no-properties 1)))
-          ;; Reflink
-          (re-search-forward (rx (+ (not (any "][")))) (cdr bounds))
-          (setq target-id (gethash (match-string-no-properties 0)
-                                   org-node--refs-table)))
-        ;; Gotcha: (org-id-find-id-file nil) actually returns something!
-        ;; So many ways org-id.el unsafe, guess it wasn't designed as a lib.
-        (setq target-file (gethash target-id org-id-locations))
-        (when (and src-id target-file)
-          ;; Time to look inside the target file!
-          ;;
-          ;; Here I would use `org-with-file-buffer' and such niceties if
-          ;; org-mode was fast.  Instead, let's write hairy code.
-          (with-temp-buffer
-            (insert-file-contents target-file)
-            (setq-local outline-regexp org-outline-regexp)
-            (when-let ((after-id (re-search-forward
-                                  (concat "^[[:space:]]*:id: +"
-                                          (regexp-quote target-id)))))
-              ;; OK, we found the ID-node.  Now we gotta determine boundaries
-              ;; of this tree in order to search for links here only.
-              (outline-previous-heading)
-              (let ((beg (point))
-                    (end (org-node-backlink--end-of-node)))
-                (goto-char after-id)
-                (narrow-to-region beg end)
-                (catch 'link-found
-                  (while (progn
-                           (let ((boundary (save-excursion
-                                             (outline-next-heading))))
-                             ;; Do not descend into subtrees that have IDs
-                             (if (re-search-forward
-                                  "^[[:space:]]*:id: " boundary t)
-                                 (goto-char (org-node-backlink--end-of-node))
-                               (cl-loop
-                                while (search-forward src-id boundary t)
-                                when (save-excursion
-                                       (goto-char (line-beginning-position))
-                                       ;; Not a comment or property line
-                                       (and (not (looking-at "# " t))
-                                            (not (looking-at "#\\+" t))
-                                            (not (looking-at ":[^ ]" t))))
-                                do (throw 'link-found t))))
-                           (outline-next-heading))))))))))))
+  (save-match-data
+    (let ((src-id (org-id-get nil nil nil t))
+          (bounds (org-in-regexp org-link-any-re))
+          (case-fold-search t))
+      (save-excursion
+        (goto-char (car bounds))
+        (let (target-id target-file)
+          (if (looking-at-p "\\[\\[id:")
+              ;; Backlink
+              (progn
+                (re-search-forward "id:\\([^\]]+\\)" (cdr bounds))
+                (setq target-id (match-string-no-properties 1)))
+            ;; Reflink
+            (re-search-forward (rx (+ (not (any "][")))) (cdr bounds))
+            (setq target-id (gethash (match-string-no-properties 0)
+                                     org-node--refs-table)))
+          ;; Gotcha: (org-id-find-id-file nil) actually returns something!
+          ;; So many ways org-id.el unsafe, guess it wasn't designed as a lib.
+          (setq target-file (gethash target-id org-id-locations))
+          (when (and src-id target-file)
+            ;; Time to look inside the target file!
+            ;;
+            ;; Here I would use `org-with-file-buffer' and such niceties if
+            ;; org-mode was fast.  Instead, let's write hairy code.
+            (with-temp-buffer
+              (insert-file-contents target-file)
+              (setq-local outline-regexp org-outline-regexp)
+              (when-let ((after-id (re-search-forward
+                                    (concat "^[[:space:]]*:id: +"
+                                            (regexp-quote target-id)))))
+                ;; OK, we found the ID-node.  Now we gotta determine boundaries
+                ;; of this tree in order to search for links here only.
+                (outline-previous-heading)
+                (let ((beg (point)))
+                  (goto-char after-id)
+                  (narrow-to-region beg (org-node-backlink--end-of-node))
+                  (catch 'link-found
+                    (while (progn
+                             (let ((boundary (save-excursion
+                                               (outline-next-heading))))
+                               ;; Do not descend into subtrees that have IDs
+                               (if (re-search-forward
+                                    "^[[:space:]]*:id: " boundary t)
+                                   (goto-char (org-node-backlink--end-of-node))
+                                 (cl-loop
+                                  while (search-forward src-id boundary t)
+                                  when (save-excursion
+                                         (goto-char (line-beginning-position))
+                                         ;; Not a comment or property line
+                                         (and (not (looking-at "[[:space:]]*# " t))
+                                              (not (looking-at "[[:space:]]*#\\+" t))
+                                              (not (looking-at "[[:space:]]*:[^ ]" t))))
+                                  do (throw 'link-found t))))
+                             (outline-next-heading)))))))))))))
 
 (defun org-node-backlink--end-of-node ()
   "Similar idea as `org-forward-heading-same-level'.
@@ -275,17 +267,18 @@ higher level.  Return `point-max' if before first heading."
       ;; Wasn't in a subtree but file-level node
       (point-max))))
 
-(defun org-node-backlink--add-to-here-in-target-a (&rest _)
+(defun org-node-backlink--add-in-target-a (&rest _)
   "Meant as advice after any command that inserts a link.
-See `org-node-backlink--add-to-here-in-target' - this is
+See `org-node-backlink--add-in-target' - this is
 merely a wrapper that drops the input."
   (org-node--init-org-id-locations-or-die)
-  (org-node-backlink--add-to-here-in-target))
+  (org-node-backlink--add-in-target))
 
 ;; TODO rewrite to work in fundamental mode, so `org-node-backlink-fix-all' can
 ;; be much faster
-(defun org-node-backlink--add-to-here-in-target (&optional part-of-mass-op)
-  "For known link at point, leave a backlink in the ref node."
+(defun org-node-backlink--add-in-target (&optional part-of-mass-op)
+  "For known link at point, leave a backlink in the target node.
+Does NOT try to validate the rest of the target's backlinks."
   (unless (derived-mode-p 'org-mode)
     (user-error "Only works in org-mode buffers"))
   (let ((elm (org-element-context)))
@@ -307,9 +300,9 @@ merely a wrapper that drops the input."
           (setq id (gethash (concat type ":" path) org-node--refs-table))
           (setq file (plist-get (gethash id org-nodes) :file-path)))
         (when (and id file)
-          (org-node-backlink--add-to-here-in-target-1 file id part-of-mass-op))))))
+          (org-node-backlink--add-in-target-1 file id part-of-mass-op))))))
 
-(defun org-node-backlink--add-to-here-in-target-1
+(defun org-node-backlink--add-in-target-1
     (target-file target-id &optional part-of-mass-op)
   (let ((case-fold-search t)
         (src-id (org-id-get nil nil nil t)))
@@ -319,7 +312,8 @@ merely a wrapper that drops the input."
       (let* ((src-title (save-excursion
                           (re-search-backward (concat "^[ \t]*:id: +" src-id))
                           (or (org-get-heading t t t t)
-                              (org-get-title))))
+                              (org-get-title)
+                              (file-name-nondirectory (buffer-file-name)))))
              (src-link (concat "[[id:" src-id "][" src-title "]]")))
         (org-with-file-buffer target-file
           (org-with-wide-buffer
@@ -337,15 +331,17 @@ merely a wrapper that drops the input."
                      ;; twice. To use the builtin
                      ;; `org-entry-add-to-multivalued-property', the link
                      ;; descriptions would have to be free of spaces.
-                     (let ((ls (delete-dups
+                     (let ((ls (-uniq
                                 (string-split (replace-regexp-in-string
                                                "]][[:space:]]+\\[\\["
                                                "]]\f[["
                                                (string-trim backlinks-string))
                                               "\f" t))))
                        (dolist (id-dup (--filter (string-search src-id it) ls))
-                         (setq ls (delete id-dup ls)))
+                         (setq ls (remove id-dup ls)))
                        (push src-link ls)
+                       (when (-any-p #'null ls)
+                         (org-node-die "nulls in %S" ls))
                        ;; Prevent unnecessary work like putting the most recent
                        ;; link in front even if it was already in the list
                        (sort ls #'string-lessp)
@@ -363,7 +359,7 @@ merely a wrapper that drops the input."
 
 (defvar org-node-backlink--last-warnings nil)
 
-(defun org-node-backlink--fix-findable-backlinks (&optional part-of-mass-op)
+(defun org-node-backlink--fix-discoverable (&optional part-of-mass-op)
   "Visit all [[id:... links and give the targets a backlink.
 Also clean current file's own backlinks, by visiting them and
 checking whether they still have a reference to the current file.
@@ -373,10 +369,10 @@ current buffer, as that would require searching the world!  That
 is why `org-node-backlink-mode' advises link-insertion commands,
 taking care of the other side of the equation.
 
-To do a mass fix, try \\[org-node-backlink-fix-all].
+To try adding backlinks that you think should be present, use
+\\[org-node-backlink-fix-all].
 
 Optional argument PART-OF-MASS-OP means skip some cleanup."
-  ;; INFO For all the link regexps see `org-link-make-regexps' in org-el
   (when (derived-mode-p 'org-mode)
     (org-node--init-org-id-locations-or-die)
     (save-excursion
@@ -386,20 +382,19 @@ Optional argument PART-OF-MASS-OP means skip some cleanup."
               (end (match-end 0)))
           (cl-incf org-node-backlink--progress-total)
           (cond
-           ;; On a # comment or #+keyword, ignore
+           ;; On a # comment or #+keyword, do nothing
            ((save-excursion
-              (forward-line 0)
-              (looking-at-p "#"))
+              (goto-char (line-beginning-position))
+              (or (looking-at "[[:space:]]*# " t)
+                  (looking-at "[[:space:]]*#\\+" t)))
             (forward-line 1))
            ;; On a CACHED_BACKLINKS property or in :BACKLINKS:...:END: drawer,
            ;; delete link if it's stale
            ((or (save-excursion
-                  (forward-line 0)
-                  (and (looking-at org-property-re)
-                       (string-equal-ignore-case (match-string 2)
-                                                 "CACHED_BACKLINKS")))
-                (org-node-backlink--in-backlinks-drawer-p))
-            ;; REVIEW: ensure it works
+                  (goto-char (line-beginning-position))
+                  (looking-at "[[:space:]]*:cached_backlinks: " t))
+                ;; (org-node-backlink--in-backlinks-drawer-p)
+                )
             (unless (org-node-backlink--target-has-link-to-here-p)
               (cl-incf org-node-backlink--progress-total-stale)
               (goto-char beg)
@@ -412,7 +407,7 @@ Optional argument PART-OF-MASS-OP means skip some cleanup."
                   (org-entry-delete nil "CACHED_BACKLINKS")))))
            ;; Not a backlink, so it's a regular forward-link - add a backlink
            (t
-            (org-node-backlink--add-to-here-in-target part-of-mass-op))))
+            (org-node-backlink--add-in-target part-of-mass-op))))
         (when part-of-mass-op
           (org-node-backlink--progress-print-message))))
     (and (not part-of-mass-op)
@@ -428,18 +423,19 @@ Optional argument PART-OF-MASS-OP means skip some cleanup."
 ;; OK, just realized there is `org-super-links--in-drawer'.  But this one works
 ;; in fundamental-mode.
 (defun org-node-backlink--in-backlinks-drawer-p ()
-  (let ((case-fold-search t))
-    (let ((drawer-beg-above
-           (save-excursion (search-backward "\n:backlinks:\n" nil t)))
-          (drawer-end-above
-           (save-excursion (search-backward "\n:end:\n" nil t)))
-          (drawer-beg-below
-           (save-excursion (search-forward "\n:backlinks:\n" nil t)))
-          (drawer-end-below
-           (save-excursion (search-forward "\n:end:\n" nil t))))
-      (and (and drawer-beg-above drawer-end-below)
-           (if drawer-end-above (> drawer-end-above drawer-beg-above) t)
-           (if drawer-beg-below (> drawer-end-below drawer-beg-below) t)))))
+  (save-match-data
+    (let ((case-fold-search t))
+      (let ((drawer-beg-above
+             (save-excursion (search-backward "\n:backlinks:\n" nil t)))
+            (drawer-end-above
+             (save-excursion (search-backward "\n:end:\n" nil t)))
+            (drawer-beg-below
+             (save-excursion (search-forward "\n:backlinks:\n" nil t)))
+            (drawer-end-below
+             (save-excursion (search-forward "\n:end:\n" nil t))))
+        (and (and drawer-beg-above drawer-end-below)
+             (if drawer-end-above (> drawer-end-above drawer-beg-above) t)
+             (if drawer-beg-below (> drawer-end-below drawer-beg-below) t))))))
 
 (provide 'org-node-backlink)
 

@@ -137,6 +137,15 @@ first element."
        do (cl-incf (cdr (assoc the-root dir-counters)))
        finally return (mapcar #'car (cl-sort dir-counters #'> :key #'cdr))))))
 
+(defun org-node--consent-to-problematic-modes-for-mass-op ()
+  (--all-p (if (and (boundp it) (symbol-value it))
+               (y-or-n-p
+                (format "%S is active - proceed anyway?" it))
+             t)
+           '(auto-save-mode
+             auto-save-visited-mode
+             git-auto-commit-mode)))
+
 (defvar org-node--refs-table (make-hash-table :test #'equal))
 
 (provide 'org-node-common)
