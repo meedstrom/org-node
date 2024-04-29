@@ -494,55 +494,49 @@ Prompt the user for each one."
   (interactive)
   (require 'ol)
   (org-node-cache-ensure-fresh)
-  ;; (set-face-attribute 'org-node-rewrite-links-face nil
-  ;;                     :inverse-video (face-inverse-video-p 'org-link)
-  ;;                     :foreground (face-background 'default)
-  ;;                     :background (face-foreground 'org-link))
   (set-face-inverse-video 'org-node-rewrite-links-face
                           (not (face-inverse-video-p 'org-link)))
-  (when auto-save-visited-mode
-    (when (yes-or-no-p "Disable auto-save-visited-mode? (recommended)")
-      (auto-save-visited-mode 0)))
-  (dolist (file (hash-table-values org-id-locations))
-    (find-file-noselect file)
-    (org-with-file-buffer file
-      (goto-char (point-min))
-      (while-let ((end (re-search-forward org-link-bracket-re nil t)))
-        (let* ((beg (match-beginning 0))
-               (link (match-string 0))
-               (parts (split-string link "]\\["))
-               (target (substring (car parts) 2))
-               (desc (when (cadr parts)
-                       (substring (cadr parts) 0 -2)))
-               (id (when (string-prefix-p "id:" target)
-                     (substring target 3)))
-               (node (when id
-                       (gethash id org-nodes)))
-               (true-title (when node
-                             (plist-get node :title)))
-               (answered-yes nil))
-          (when (and node
-                     (not (string-equal-ignore-case desc true-title))
-                     (not (member-ignore-case desc
-                                              (plist-get node :aliases))))
-            (switch-to-buffer (current-buffer))
-            (org-reveal)
-            (recenter)
-            (highlight-regexp (rx (literal link)) 'org-node-rewrite-links-face)
-            ;; (highlight-regexp (rx (literal link)))
-            (unwind-protect
-                (setq answered-yes (y-or-n-p
-                                    (format "Rewrite link? Will become: \"%s\""
-                                            true-title)))
-              (unhighlight-regexp (rx (literal link))))
-            (when answered-yes
-              (goto-char beg)
-              (atomic-change-group
-                (delete-region beg end)
-                (insert (org-link-make-string target true-title)))
-              ;; Give user 110+ ms to glimpse the result before moving on
-              (redisplay)
-              (sleep-for .11)))))))
+  (when (org-node--consent-to-problematic-modes-for-mass-op)
+    (dolist (file (hash-table-values org-id-locations))
+      (find-file-noselect file)
+      (org-with-file-buffer file
+        (goto-char (point-min))
+        (while-let ((end (re-search-forward org-link-bracket-re nil t)))
+          (let* ((beg (match-beginning 0))
+                 (link (match-string 0))
+                 (parts (split-string link "]\\["))
+                 (target (substring (car parts) 2))
+                 (desc (when (cadr parts)
+                         (substring (cadr parts) 0 -2)))
+                 (id (when (string-prefix-p "id:" target)
+                       (substring target 3)))
+                 (node (when id
+                         (gethash id org-nodes)))
+                 (true-title (when node
+                               (plist-get node :title)))
+                 (answered-yes nil))
+            (when (and node
+                       (not (string-equal-ignore-case desc true-title))
+                       (not (member-ignore-case desc
+                                                (plist-get node :aliases))))
+              (switch-to-buffer (current-buffer))
+              (org-reveal)
+              (recenter)
+              (highlight-regexp (rx (literal link)) 'org-node-rewrite-links-face)
+              ;; (highlight-regexp (rx (literal link)))
+              (unwind-protect
+                  (setq answered-yes (y-or-n-p
+                                      (format "Rewrite link? Will become: \"%s\""
+                                              true-title)))
+                (unhighlight-regexp (rx (literal link))))
+              (when answered-yes
+                (goto-char beg)
+                (atomic-change-group
+                  (delete-region beg end)
+                  (insert (org-link-make-string target true-title)))
+                ;; Give user 110+ ms to glimpse the result before moving on
+                (redisplay)
+                (sleep-for .11))))))))
   (when (yes-or-no-p "Save the edited buffers?")
     (save-some-buffers)))
 
