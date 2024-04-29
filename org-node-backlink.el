@@ -12,31 +12,41 @@
         ;; hate the UX of before-save-hook, should probably hard depend on
         ;; apheleia or such system
         (add-hook 'before-save-hook #'org-node-backlink-check-buffer)
-        (add-hook 'org-roam-post-node-insert-hook #'org-node-backlink--add-to-here-in-target -99)
-        (add-hook 'org-node-insert-link-hook #'org-node-backlink--add-to-here-in-target -99)
-        (advice-add 'org-insert-link :after #'org-node-backlink--add-to-here-in-target))
+        (add-hook 'org-roam-post-node-insert-hook #'org-node-backlink--add-to-here-in-target-a -99)
+        (add-hook 'org-node-insert-link-hook #'org-node-backlink--add-to-here-in-target-a -99)
+        (advice-add 'org-insert-link :after #'org-node-backlink--add-to-here-in-target-a))
     (remove-hook 'before-save-hook #'org-node-backlink-check-buffer)
-    (remove-hook 'org-roam-post-node-insert-hook #'org-node-backlink--add-to-here-in-target)
-    (remove-hook 'org-node-insert-link-hook #'org-node-backlink--add-to-here-in-target)
-    (advice-remove 'org-insert-link #'org-node-backlink--add-to-here-in-target)))
+    (remove-hook 'org-roam-post-node-insert-hook #'org-node-backlink--add-to-here-in-target-a)
+    (remove-hook 'org-node-insert-link-hook #'org-node-backlink--add-to-here-in-target-a)
+    (advice-remove 'org-insert-link #'org-node-backlink--add-to-here-in-target-a)))
 
-;; TODO Large files would still be slow to save (now we disable it if there are
-;;      too many links), so instead of checking the entire file on
+;; TODO Large files would still be slow to save (now we stop checking if there
+;;      are too many links), so instead of checking the entire file on
 ;;      before-save-hook, try to just check the most local subtree on every
-;;      auto-save, and maybe on some other infrequent hooks.  Also, leave the
-;;      target file buffers open (but buried).
+;;      auto-save, and maybe on some other infrequent hooks.  If we have to
+;;      visit the targets in org-mode buffers, leave the buffers open.
+;;
+;;      Actually, maybe advise `yank' and `delete-region' and then we can stop
+;;      doing full buffer checks.  If there is a big yank, like with a thousand
+;;      links, it could just add the links to some list to check on an idle
+;;      timer.
+;;
+;;      How does ws-butler know which lines have recently changed? That'd be
+;;      great to have.
 (defun org-node-backlink-check-buffer ()
-  "Designed for `before-save-hook'."
+  "Designed for `before-save-hook', and avoids signaling an error."
+  (interactive)
   (let ((n-links
          (save-mark-and-excursion
+           (goto-char (point-min))
            (cl-loop while (re-search-forward org-link-bracket-re nil t)
                     count t))))
     ;; If there's a ton of links in this file, don't do anything
     (unless (> n-links 100)
-      ;; Catch and drop any error, bc `before-save-hook' should never error
+      ;; Catch and drop any error
       (condition-case err
           (org-node-backlink--fix-findable-backlinks)
-        ((t error debug)
+        ((t error)
          (message "org-node-backlink failed with message %s %s"
                   (car err) (cdr err)))))))
 
@@ -191,65 +201,66 @@ cleaning."
   ;; NB: Do not use `org-element-property' because it ignores links on property
   ;; lines.  That's also why org-roam won't double-count our backlinks, because
   ;; they're on a property line and org-roam does use `org-element-property'!
-  (save-match-data
-    (let ((src-id (org-id-get nil nil nil t))
-          (bounds (org-in-regexp org-link-any-re))
-          (case-fold-search t))
-      (save-excursion
-        (goto-char (car bounds))
-        (let (target-id target-file)
-          (if (looking-at-p "\\[\\[id:")
-              ;; Backlink
-              (progn
-                (re-search-forward "id:\\([^\]]+\\)" (cdr bounds))
-                (setq target-id (match-string-no-properties 1)))
-            ;; Reflink
-            (re-search-forward (rx (+ (not (any "][")))) (cdr bounds))
-            (setq target-id (gethash (match-string-no-properties 0)
-                                     org-node--refs-table)))
-          ;; Gotcha: (org-id-find-id-file nil) actually returns something!
-          ;; So many ways org-id.el unsafe.  Should write an org-id2.el.
-          (setq target-file (gethash target-id org-id-locations))
-          (when (and src-id target-file)
-            ;; Time to visit the target!
-            ;; Here I would use `org-with-file-buffer' and such niceties if
-            ;; org-mode was fast.  Instead, let's write hairy code.
-            (with-temp-buffer
-              (insert-file-contents target-file)
-              (setq-local outline-regexp org-outline-regexp)
-              (when-let ((after-id (re-search-forward
-                                    (concat "^[[:space:]]*:id: +"
-                                            (regexp-quote target-id)))))
-                ;; OK, we found the ID-node.  Now we gotta determine boundaries
-                ;; of this tree in order to search for links here only.
-                (outline-previous-heading)
-                (let ((beg (point))
-                      (end (org-node-backlink--end-of-node)))
-                  (goto-char after-id)
-                  (narrow-to-region beg end)
-                  (catch 'link-found
-                    (while (progn
-                             (let ((boundary (save-excursion
-                                               (outline-next-heading))))
-                               ;; Do not descend into subtrees that have IDs
-                               (if (re-search-forward
-                                    "^[[:space:]]*:id: " boundary t)
-                                   (goto-char (org-node-backlink--end-of-node))
-                                 (cl-loop
-                                  while (search-forward src-id boundary t)
-                                  when (save-excursion
-                                         (goto-char (line-beginning-position))
-                                         ;; Not a comment or property line
-                                         (and (not (looking-at "# " t))
-                                              (not (looking-at "#\\+" t))
-                                              (not (looking-at ":[^ ]" t))))
-                                  do (throw 'link-found t))))
-                             (outline-next-heading)))))))))))))
+  (let ((src-id (org-id-get nil nil nil t))
+        (bounds (org-in-regexp org-link-any-re))
+        (case-fold-search t))
+    (save-excursion
+      (goto-char (car bounds))
+      (let (target-id target-file)
+        (if (looking-at-p "\\[\\[id:")
+            ;; Backlink
+            (progn
+              (re-search-forward "id:\\([^\]]+\\)" (cdr bounds))
+              (setq target-id (match-string-no-properties 1)))
+          ;; Reflink
+          (re-search-forward (rx (+ (not (any "][")))) (cdr bounds))
+          (setq target-id (gethash (match-string-no-properties 0)
+                                   org-node--refs-table)))
+        ;; Gotcha: (org-id-find-id-file nil) actually returns something!
+        ;; So many ways org-id.el unsafe, guess it wasn't designed as a lib.
+        (setq target-file (gethash target-id org-id-locations))
+        (when (and src-id target-file)
+          ;; Time to look inside the target file!
+          ;;
+          ;; Here I would use `org-with-file-buffer' and such niceties if
+          ;; org-mode was fast.  Instead, let's write hairy code.
+          (with-temp-buffer
+            (insert-file-contents target-file)
+            (setq-local outline-regexp org-outline-regexp)
+            (when-let ((after-id (re-search-forward
+                                  (concat "^[[:space:]]*:id: +"
+                                          (regexp-quote target-id)))))
+              ;; OK, we found the ID-node.  Now we gotta determine boundaries
+              ;; of this tree in order to search for links here only.
+              (outline-previous-heading)
+              (let ((beg (point))
+                    (end (org-node-backlink--end-of-node)))
+                (goto-char after-id)
+                (narrow-to-region beg end)
+                (catch 'link-found
+                  (while (progn
+                           (let ((boundary (save-excursion
+                                             (outline-next-heading))))
+                             ;; Do not descend into subtrees that have IDs
+                             (if (re-search-forward
+                                  "^[[:space:]]*:id: " boundary t)
+                                 (goto-char (org-node-backlink--end-of-node))
+                               (cl-loop
+                                while (search-forward src-id boundary t)
+                                when (save-excursion
+                                       (goto-char (line-beginning-position))
+                                       ;; Not a comment or property line
+                                       (and (not (looking-at "# " t))
+                                            (not (looking-at "#\\+" t))
+                                            (not (looking-at ":[^ ]" t))))
+                                do (throw 'link-found t))))
+                           (outline-next-heading))))))))))))
 
 (defun org-node-backlink--end-of-node ()
   "Similar idea as `org-forward-heading-same-level'.
 Works in `fundamental-mode'.  Don't move point, just return a
-buffer position.  Return `point-max' if before first heading."
+buffer position right before the next heading of the same or
+higher level.  Return `point-max' if before first heading."
   (save-excursion
     (if (or (looking-at-p org-outline-regexp-bol)
             (re-search-backward org-outline-regexp-bol nil t))
@@ -264,14 +275,16 @@ buffer position.  Return `point-max' if before first heading."
       ;; Wasn't in a subtree but file-level node
       (point-max))))
 
-(defun org-node-backlink--add-to-here-in-target (&rest _)
+(defun org-node-backlink--add-to-here-in-target-a (&rest _)
   "Meant as advice after any command that inserts a link.
-See `org-node-backlink--add-to-here-in-target-1' - this is
+See `org-node-backlink--add-to-here-in-target' - this is
 merely a wrapper that drops the input."
   (org-node--init-org-id-locations-or-die)
-  (org-node-backlink--add-to-here-in-target-1))
+  (org-node-backlink--add-to-here-in-target))
 
-(defun org-node-backlink--add-to-here-in-target-1 (&optional part-of-mass-op)
+;; TODO rewrite to work in fundamental mode, so `org-node-backlink-fix-all' can
+;; be much faster
+(defun org-node-backlink--add-to-here-in-target (&optional part-of-mass-op)
   "For known link at point, leave a backlink in the ref node."
   (unless (derived-mode-p 'org-mode)
     (user-error "Only works in org-mode buffers"))
@@ -294,9 +307,10 @@ merely a wrapper that drops the input."
           (setq id (gethash (concat type ":" path) org-node--refs-table))
           (setq file (plist-get (gethash id org-nodes) :file-path)))
         (when (and id file)
-          (org-node-backlink--add-to-here-in-target-2 file id part-of-mass-op))))))
+          (org-node-backlink--add-to-here-in-target-1 file id part-of-mass-op))))))
 
-(defun org-node-backlink--add-to-here-in-target-2 (target-file target-id &optional part-of-mass-op)
+(defun org-node-backlink--add-to-here-in-target-1
+    (target-file target-id &optional part-of-mass-op)
   (let ((case-fold-search t)
         (src-id (org-id-get nil nil nil t)))
     (if (not src-id)
@@ -332,7 +346,7 @@ merely a wrapper that drops the input."
                        (dolist (id-dup (--filter (string-search src-id it) ls))
                          (setq ls (delete id-dup ls)))
                        (push src-link ls)
-                       ;; Prevent unnecessary work from putting the most recent
+                       ;; Prevent unnecessary work like putting the most recent
                        ;; link in front even if it was already in the list
                        (sort ls #'string-lessp)
                        ;; Two spaces between links help them look distinct
@@ -349,7 +363,6 @@ merely a wrapper that drops the input."
 
 (defvar org-node-backlink--last-warnings nil)
 
-;; TODO Rewrite to avoid org-mode in the link targets
 (defun org-node-backlink--fix-findable-backlinks (&optional part-of-mass-op)
   "Visit all [[id:... links and give the targets a backlink.
 Also clean current file's own backlinks, by visiting them and
@@ -399,7 +412,7 @@ Optional argument PART-OF-MASS-OP means skip some cleanup."
                   (org-entry-delete nil "CACHED_BACKLINKS")))))
            ;; Not a backlink, so it's a regular forward-link - add a backlink
            (t
-            (org-node-backlink--add-to-here-in-target-1 part-of-mass-op))))
+            (org-node-backlink--add-to-here-in-target part-of-mass-op))))
         (when part-of-mass-op
           (org-node-backlink--progress-print-message))))
     (and (not part-of-mass-op)
@@ -410,21 +423,23 @@ Optional argument PART-OF-MASS-OP means skip some cleanup."
          (setq org-node-backlink--last-warnings org-node-backlink--fails)
          (setq org-node-backlink--fails nil))))
 
-;; Can't find an Org builtin to check if we are inside a drawer
+;; Can't find an Org builtin to check if we are inside a drawer,
+;; just `org-at-drawer-p' which only works on a drawer boundary.
+;; OK, just realized there is `org-super-links--in-drawer'.  But this one works
+;; in fundamental-mode.
 (defun org-node-backlink--in-backlinks-drawer-p ()
-  (save-match-data
-    (let ((case-fold-search t))
-      (let ((drawer-beg-above
-             (save-excursion (search-backward "\n:backlinks:\n" nil t)))
-            (drawer-end-above
-             (save-excursion (search-backward "\n:end:\n" nil t)))
-            (drawer-beg-below
-             (save-excursion (search-forward "\n:backlinks:\n" nil t)))
-            (drawer-end-below
-             (save-excursion (search-forward "\n:end:\n" nil t))))
-        (and (and drawer-beg-above drawer-end-below)
-             (if drawer-end-above (> drawer-end-above drawer-beg-above) t)
-             (if drawer-beg-below (> drawer-end-below drawer-beg-below) t))))))
+  (let ((case-fold-search t))
+    (let ((drawer-beg-above
+           (save-excursion (search-backward "\n:backlinks:\n" nil t)))
+          (drawer-end-above
+           (save-excursion (search-backward "\n:end:\n" nil t)))
+          (drawer-beg-below
+           (save-excursion (search-forward "\n:backlinks:\n" nil t)))
+          (drawer-end-below
+           (save-excursion (search-forward "\n:end:\n" nil t))))
+      (and (and drawer-beg-above drawer-end-below)
+           (if drawer-end-above (> drawer-end-above drawer-beg-above) t)
+           (if drawer-beg-below (> drawer-end-below drawer-beg-below) t)))))
 
 (provide 'org-node-backlink)
 
