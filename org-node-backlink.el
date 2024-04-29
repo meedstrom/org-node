@@ -1,6 +1,6 @@
 ;;; org-node-backlink.el -*- lexical-binding: t; -*-
 
-(require 'org-node-common)
+(require 'org-node-lib)
 
 ;;;###autoload
 (define-minor-mode org-node-backlink-mode
@@ -9,8 +9,6 @@
   :group 'org-node
   (if org-node-backlink-mode
       (progn
-        ;; hate the UX of before-save-hook, should probably hard depend on
-        ;; apheleia or such system
         (add-hook 'before-save-hook #'org-node-backlink-check-buffer)
         (add-hook 'org-roam-post-node-insert-hook #'org-node-backlink--add-in-target-a -99)
         (add-hook 'org-node-insert-link-hook #'org-node-backlink--add-in-target-a -99)
@@ -57,6 +55,50 @@
 (defvar org-node-backlink--progress-total-worked 0)
 (defvar org-node-backlink--progress-total-files 0)
 
+;; wip
+(setq ctr 0)
+(setq remainder (org-id-hash-to-alist org-id-locations))
+(defun org-node-backlink-fix-all-2 ()
+  (interactive)
+  (when current-prefix-arg
+    (setq org-node-backlink--fixed nil))
+  (org-node-backlink-mode 0)
+  (org-node--init-org-id-locations-or-die)
+  (let* ((files (-uniq (hash-table-values org-id-locations)))
+         (total (length files))
+         (cells (-take 1000 remainder))
+         )
+    (setq remainder (-drop 1000 remainder))
+    ;; when (and (yes-or-no-p
+    ;;            (format "Edit the %d files found in `org-id-locations'?" total))
+    ;;           (org-node--consent-to-problematic-modes-for-mass-op))
+    (dolist (cell cells)
+      (message "fixing backlinks... %d/%d files" (cl-incf ctr) total)
+      (org-with-file-buffer (car cell)
+        (org-with-wide-buffer
+         (dolist (id (cdr cell))
+           (goto-char (org-find-entry-with-id id))
+           (let ((backlinks
+                  (->> (gethash id org-node--links-table)
+                       (--map (plist-get it :src))
+                       (-uniq)
+                       (-sort #'string-lessp)
+                       (--map (org-link-make-string
+                               (concat "id:" it)
+                               (plist-get (gethash it org-nodes) :title))))))
+             ;; unless (equal backlinks (org-entry-get nil "CACHED_BACKLINKS"))
+             (if backlinks
+                 (org-entry-put nil "CACHED_BACKLINKS"
+                                (string-join backlinks "  "))
+               (org-entry-delete nil "CACHED_BACKLINKS")))))
+        (and org-file-buffer-created
+             (buffer-modified-p)
+             (let ((save-silently t)
+                   (inhibit-message t))
+               (save-buffer)))))
+    (when remainder
+      (run-with-timer 1 nil #'org-node-backlink-fix-all-2))))
+
 (defun org-node-backlink--progress-print-message ()
   (when (= 0 (% org-node-backlink--progress-total 10))
     (message
@@ -68,98 +110,6 @@
      org-node-backlink--progress-total-stale
      org-node-backlink--progress-file)
     (redisplay)))
-
-;; Separate function so the debugger don't have to step thru 2000 items
-(defun org-node-backlink--pre-open (files total)
-  (let ((ctr-open 0)
-        bufs)
-    (dolist (file files)
-      (message
-       "Pre-opening buffers... (%d/%d) (you may cancel and resume anytime)"
-       (cl-incf ctr-open)
-       total)
-      (push (delay-mode-hooks
-              (find-file-noselect file))
-            bufs))
-    bufs))
-
-(defvar org-node-backlink--fixed (list))
-(defvar org-node-backlink--had-work (list))
-
-(defun org-node-backlink-fix-all ()
-  "Thoroughly check every file in `org-id-locations'.
-
-This ensures that all have up-to-date backlinks, and that
-org-node can collect other metadata.
-
-This command is not expected to ever be necessary if you always
-have `org-node-backlink-mode' active.  Think of it as a spring
-cleaning."
-  (interactive)
-  (when current-prefix-arg
-    (setq org-node-backlink--fixed nil))
-  (org-node-backlink-mode 0)
-  (org-node--init-org-id-locations-or-die)
-  (let* ((files (-uniq (hash-table-values org-id-locations)))
-         (total (length files)))
-    (when (and (yes-or-no-p
-                (format "Edit the %d files found in `org-id-locations'?" total))
-               (org-node--consent-to-problematic-modes-for-mass-op))
-      (let (bufs
-            (ctr-worked 0)
-            (find-file-hook nil)
-            (after-save-hook nil)
-            (before-save-hook nil)
-            (org-agenda-files nil)
-            (auto-save-default nil)
-            (org-inhibit-startup t)
-            (gc-cons-threshold (max gc-cons-threshold 2000000000)))
-        (setq org-node-backlink--progress-total-worked 0
-              org-node-backlink--progress-total-files total
-              org-node-backlink--progress-total 0
-              org-node-backlink--progress-total-backlinks 0
-              org-node-backlink--progress-total-stale 0)
-        ;; Pre-open all files, not just for performance, also correctness.
-        (setq bufs (org-node-backlink--pre-open files total))
-        (condition-case err
-            (progn
-              (dolist (buf bufs)
-                (cl-incf org-node-backlink--progress-total-worked)
-                (unless (member buf org-node-backlink--fixed)
-                  (with-current-buffer buf
-                    (setq org-node-backlink--progress-file (buffer-file-name))
-                    (and (not (member buf org-node-backlink--had-work))
-                         (not (eq t buffer-undo-list))
-                         (not (null buffer-undo-list))
-                         (push buf org-node-backlink--had-work))
-                    (widen)
-                    (org-node-backlink--fix-discoverable t)
-                    (push buf org-node-backlink--fixed)))))
-          ((t error debug)
-           (when (> org-node-backlink--progress-total-worked 10)
-             (message "Many buffers left unsaved"))
-           (signal (car err) (cdr err)))
-          (:success
-           (setq org-node-backlink--fixed nil)
-           (when (yes-or-no-p "Fixed all buffers!  Save them?")
-             (dolist (buf bufs)
-               (with-current-buffer buf
-                 (save-buffer buf)
-                 (unless (member buf org-node-backlink--had-work)
-                   (kill-buffer buf)))))
-           (org-node-backlink-mode)
-           (when org-node-backlink--fails
-             (delete-dups org-node-backlink--fails)
-             (org-node-die "All done, but couldn't find these IDs: \n%s%s"
-                           (string-join org-node-backlink--fails "\n")
-                           ;; In case it's a stupid-long warning
-                           (if (> (length org-node-backlink--fails) 15)
-                               "\n--- End warning ---"
-                             "")))
-           (setq org-node-backlink--fails nil)
-           (when (yes-or-no-p "Fixed all files!  Kill their buffers?")
-             (dolist (buf bufs)
-               (kill-buffer buf)))))))))
 
 ;; TODO: Much faster: just collect grep buffer of all the org-id-locations and
 ;;       suggest the user do wgrep + search and replace.
@@ -302,8 +252,7 @@ Does NOT try to validate the rest of the target's backlinks."
         (when (and id file)
           (org-node-backlink--add-in-target-1 file id part-of-mass-op))))))
 
-(defun org-node-backlink--add-in-target-1
-    (target-file target-id &optional part-of-mass-op)
+(defun org-node-backlink--add-in-target-1 (target-file target-id &optional part-of-mass-op)
   (let ((case-fold-search t)
         (src-id (org-id-get nil nil nil t)))
     (if (not src-id)
@@ -326,17 +275,21 @@ Does NOT try to validate the rest of the target's backlinks."
                  (push target-id org-node-backlink--fails)
                (let ((backlinks-string (org-entry-get nil "CACHED_BACKLINKS"))
                      new-value)
+                 ;; NOTE: Not sure why, but version 2cff874 dropped some
+                 ;; backlinks and it seemed to be fixed by one or both of these
+                 ;; changes:
+                 ;; - sub `-uniq' for `delete-dups'
+                 ;; - sub `remove' for `delete'
                  (if backlinks-string
                      ;; Build a temp list to check we don't add the same link
                      ;; twice. To use the builtin
                      ;; `org-entry-add-to-multivalued-property', the link
                      ;; descriptions would have to be free of spaces.
-                     (let ((ls (-uniq
-                                (string-split (replace-regexp-in-string
-                                               "]][[:space:]]+\\[\\["
-                                               "]]\f[["
-                                               (string-trim backlinks-string))
-                                              "\f" t))))
+                     (let ((ls (string-split (replace-regexp-in-string
+                                              "]][[:space:]]+\\[\\["
+                                              "]]\f[["
+                                              (string-trim backlinks-string))
+                                             "\f" t)))
                        (dolist (id-dup (--filter (string-search src-id it) ls))
                          (setq ls (remove id-dup ls)))
                        (push src-link ls)
