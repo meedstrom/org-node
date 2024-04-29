@@ -38,13 +38,14 @@ peek on keys instead."
     (clrhash org-nodes)
     (clrhash org-node-collection)
     (clrhash org-node--refs-table)
+    (clrhash org-node--links-table)
     (org-node--init-org-id-locations-or-die)
     (let ((files (-uniq (hash-table-values org-id-locations))))
       (org-node-cache--collect-nodes files)
       (message "org-node: scanned %d files and %d subtrees in %.2fs"
                (length files)
                (cl-loop for node being the hash-values of org-nodes
-                        count (plist-get node :is-subtree))
+                        count (org-node-is-subtree node))
                (float-time (time-since then))))
     (run-hooks 'org-node-cache-hook)))
 
@@ -146,7 +147,15 @@ it does not check."
 (defun org-node-cache--collect-nodes (files)
   "Scan FILES for id-nodes, adding them to `org-nodes'."
   (with-temp-buffer
-    (let ((todo-re (org-node-cache--make-todo-regexp))
+    (let ((outline-regexp org-outline-regexp)
+          (backlinks-drawer-re
+           (concat "^[[:space:]]*:"
+                   (or (and (boundp 'org-super-links-backlink-into-drawer)
+                            (stringp org-super-links-backlink-into-drawer)
+                            (downcase org-super-links-backlink-into-drawer))
+                       "backlinks")
+                   ":"))
+          (todo-re (org-node-cache--make-todo-regexp))
           (not-a-full-reset (not (hash-table-empty-p org-nodes)))
           (case-fold-search t)
           (gc-cons-threshold (* 1000 1000 1000))
@@ -177,7 +186,7 @@ it does not check."
           (insert-file-contents-literally file)
           (let (;; Position of first "content": a line not starting with # or :
                 (far (or (re-search-forward "^ *?[^#:]" nil t) (point-max)))
-                props file-title file-tags outline-data)
+                props file-title file-tags file-id outline-data)
             (goto-char 1)
             (when (re-search-forward "^ *:properties:" far t)
               (forward-line 1)
@@ -198,31 +207,41 @@ it does not check."
                                   'utf-8))
               ;; File nodes dont strictly need #+title, fall back on filename
               (setq file-title (file-name-nondirectory file)))
-            (let ((id (cdr (assoc "ID" props))))
-              (when not-a-full-reset
-                (when id (org-id-add-location id file)))
-              (org-node-cache--add-node-to-tables
-               (list
-                :title file-title
-                :level 0
-                :tags file-tags
-                :file-path file
-                :pos 1
-                :file-title file-title
-                :properties props
-                :id id
-                :exclude (cdr (assoc "ROAM_EXCLUDE" props))
-                :aliases (split-string-and-unquote
-                          (or (cdr (assoc "ROAM_ALIASES" props)) ""))
-                :roam-refs (let ((refs (cdr (assoc "ROAM_REFS" props))))
-                             (and refs (split-string-and-unquote refs)))
-                :backlink-origins (org-node-cache--backlinks->list
-                                   (cdr (assoc "CACHED_BACKLINKS" props))))))
+            (setq file-id (cdr (assoc "ID" props)))
+            (when not-a-full-reset
+              (when file-id (org-id-add-location file-id file)))
+
+            ;; Collect links
+            (let ((end (save-excursion
+                         (outline-next-heading)
+                         (1- (point)))))
+              (when file-id
+                ;; Don't count org-super-links backlinks as forward links
+                (when (re-search-forward backlinks-drawer-re end t)
+                  (search-forward ":end:"))
+                (org-node-cache--collect-links-until end file-id nil)))
+
+            (org-node-cache--add-node-to-tables
+             (make-org-node
+              :title file-title
+              :level 0
+              :tags file-tags
+              :file-path file
+              :pos 1
+              :file-title file-title
+              :properties props
+              :id file-id
+              :aliases (split-string-and-unquote
+                        (or (cdr (assoc "ROAM_ALIASES" props)) ""))
+              :refs (let ((refs (cdr (assoc "ROAM_REFS" props))))
+                      (and refs (split-string-and-unquote refs)))
+              :backlink-origins (org-node-cache--backlinks->list
+                                 (cdr (assoc "CACHED_BACKLINKS" props)))))
             ;; Loop over the file's subtrees
-            (while (re-search-forward "^\\*+ " nil t)
-              (let ((pos (goto-char (line-beginning-position)))
+            (while (outline-next-heading)
+              (let ((pos (point))
                     (level (skip-chars-forward "*"))
-                    here todo title line+2 tags todo sched deadline props id)
+                    here todo title line+2 tags todo sched deadline props id olp)
                 (skip-chars-forward " ")
                 (setq here (point))
                 ;; TODO Allow unicode todo keywords
@@ -266,17 +285,37 @@ it does not check."
                 (when (re-search-forward "^ *:properties:" line+2 t)
                   (forward-line 1)
                   (setq props (org-node-cache--collect-properties
-                               (point) (and (re-search-forward "^ *:end:")
-                                            (line-beginning-position)))))
+                               (point) (progn
+                                         (re-search-forward "^ *:end:")
+                                         (line-beginning-position)))))
                 (setq id (cdr (assoc "ID" props)))
                 (when not-a-full-reset
                   (when id (org-id-add-location id file)))
-                (push (list pos title level) outline-data)
+                (push (list pos title level id) outline-data)
+                (setq olp (org-node-cache--pos->olp outline-data pos))
+                ;; Now collect links!
+                (let ((id-here (or id (org-node-cache--pos->parent-id
+                                       outline-data pos file-id)))
+                      (end (save-excursion
+                             (outline-next-heading)
+                             (1- (point))))
+                      (olp-with-self (append olp (list title))))
+                  (when id-here
+                    ;; Don't count org-super-links backlinks as forward links
+                    (when (re-search-forward backlinks-drawer-re end t)
+                      (search-forward ":end:"))
+                    (org-node-cache--collect-links-until end id-here olp-with-self)
+                    ;; Gotcha... also collect links inside the heading
+                    (goto-char pos)
+                    ;; (forward-char 1) ;; Do not match org-outline-regexp-bol
+                    (org-node-cache--collect-links-until
+                     (line-end-position) id-here olp-with-self)))
                 (org-node-cache--add-node-to-tables
-                 (list
+                 (make-org-node
                   :title title
                   :is-subtree t
                   :level level
+                  :id id
                   :pos pos
                   :tags tags
                   :todo todo
@@ -284,43 +323,105 @@ it does not check."
                   :scheduled sched
                   :deadline deadline
                   :file-title file-title
-                  :olp (org-node-cache--pos->olp outline-data pos)
+                  :olp olp
                   :properties props
-                  :id id
-                  :exclude (equal "t" (cdr (assoc "ROAM_EXCLUDE" props)))
                   :aliases (split-string-and-unquote
                             (or (cdr (assoc "ROAM_ALIASES" props)) ""))
-                  :roam-refs (let ((refs (cdr (assoc "ROAM_REFS" props))))
-                               (and refs (split-string-and-unquote refs)))
+                  :refs (let ((refs (cdr (assoc "ROAM_REFS" props))))
+                          (and refs (split-string-and-unquote refs)))
                   :backlink-origins (org-node-cache--backlinks->list
                                      (cdr (assoc "CACHED_BACKLINKS" props))))))))))
       (when please-update-id
         (org-id-update-id-locations)
-        (org-id-locations-save)))))
+        (org-id-locations-save)
+        ;; ...potential infinite recursion?
+        (org-node-cache-reset)))))
+
+;; A struct was pointless while I developed the package for my own use, but
+;; now that it has users... the problem with `plist-get' is I can never rename
+;; any of the data fields.
+;;
+;; If you use `plist-get' to fetch a key that doesn't exist, it just quietly
+;; returns nil, no error, no warning.  (Bad for an API!)  By contrast, if I've
+;; deprecated a field `org-node-roam-exclude' and an user tries to call such a
+;; getter, I can have it emit any message to the user that I choose.
+(cl-defstruct org-node
+  title
+  is-subtree
+  level
+  id
+  pos
+  tags
+  todo
+  file-path
+  scheduled
+  deadline
+  file-title
+  olp
+  properties
+  aliases
+  refs
+  backlink-origins)
+
+(defun org-node-cache--collect-links-until (end id-here olp-with-self)
+  (while (re-search-forward org-link-plain-re end t)
+    (let ((type (match-string 1))
+          (path (match-string 2)))
+      (if (save-excursion
+            (goto-char (line-beginning-position))
+            (or (looking-at "[[:space:]]*# " t)
+                (looking-at "[[:space:]]*#\\+" t)))
+          ;; On a # comment or #+keyword, skip whole line
+          (goto-char (line-end-position))
+        (push (list :src id-here
+                    :pos (point)
+                    :type type
+                    ;; Because org-roam asks for it
+                    :properties (list :outline olp-with-self))
+              (gethash path (if (equal type "id")
+                                org-node--links-table
+                              org-node--reflinks-table)))))))
 
 ;; I feel like this could be easier to read...
 (defun org-node-cache--add-node-to-tables (node)
   "Add NODE to `org-nodes' and maybe `org-node-collection'."
   ;; Record to `org-nodes' even if it has no ID
-  (puthash (or (plist-get node :id) (format-time-string "%N"))
+  (puthash (or (org-node-id node) (format-time-string "%N"))
            node
            org-nodes)
-  (when (or (not org-node-only-show-subtrees-with-id) (plist-get node :id))
+  (when (or (not org-node-only-show-subtrees-with-id) (org-node-id node))
     ;; Add to `org-node--refs-table'
-    (dolist (ref (plist-get node :roam-refs))
-      (puthash ref (plist-get node :id) org-node--refs-table))
-    (if (funcall org-node-filter-fn node)
-        (progn
-          ;; Add to `org-node-collection'
-          (dolist (title (cons (plist-get node :title)
-                               (plist-get node :aliases)))
-            (puthash (funcall org-node-format-candidate-fn node title)
-                     node
-                     org-node-collection))
-          ;; Let refs work as aliases
-          (dolist (ref (plist-get node :roam-refs))
-            (puthash ref node org-node-collection)))
-      (plist-put node :is-excluded t))))
+    (dolist (ref (org-node-refs node))
+      (puthash ref (org-node-id node) org-node--refs-table))
+    (when (funcall org-node-filter-fn node)
+      (progn
+        ;; Add to `org-node-collection'
+        (dolist (title (cons (org-node-title node)
+                             (org-node-aliases node)))
+          (puthash (funcall org-node-format-candidate-fn node title)
+                   node
+                   org-node-collection))
+        ;; Let refs work as aliases
+        (dolist (ref (org-node-refs node))
+          (puthash ref node org-node-collection))))))
+
+;; WIP
+(defun org-node-cache--pos->inherited-props (oldata pos))
+
+(defun org-node-cache--pos->parent-id (oldata pos file-id)
+  (declare (pure t) (side-effect-free t))
+  (let (;; Drop all the data about positions below POS
+        (reversed (-drop (-elem-index (assoc pos oldata) oldata) oldata)))
+    (let ((curr-level (caddr (car reversed))))
+      ;; Work backwards towards the top of the file
+      ;; Sorry for the `cl-loop' brainfuck
+      (cl-loop for cell in reversed
+               as id = (nth 3 cell)
+               if (> curr-level (caddr cell))
+               do (setq curr-level (caddr cell))
+               and if id return id
+
+               if (= 1 curr-level) return file-id))))
 
 (defun org-node-cache--pos->olp (oldata pos)
   "Given buffer position POS, return the Org outline path.
