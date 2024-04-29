@@ -78,7 +78,7 @@ Well... Now they're right there.
 
 **** It should be possible without-
 
-Yes.  But I've come to like the =CACHED_BACKLINKS= anyway, so it's not my itch to scratch.
+Yes.  I've got in my head an alternative solution to caching link data (primarily because =org-node-backlink-fix-all= is something of a PITA), and once it's in place, =CACHED_BACKLINKS= will be optional.  But I recommend opting in anyway, it grows on you!
 
 **** Q: Will org-roam double-count my backlinks now?
 
@@ -241,33 +241,33 @@ For now, don't insert formatted links like =[[http...][description]]= in the =RO
 
 API comparison between org-roam and org-node.
 
-| Action                          | org-roam                        | org-node                                                                     |
-|---------------------------------+---------------------------------+------------------------------------------------------------------------------|
-| Get ID at point                 | =(org-roam-id-at-point)=          | =(org-id-get nil nil nil t)=                                                   |
-| Get node at point               | =(org-roam-node-at-point)=        | =(gethash (org-id-get nil nil nil t) org-nodes)=                               |
-| Get list of files               | =(org-roam-list-files)=           | =(seq-uniq (hash-table-values org-id-locations))=                              |
-| Prompt user to pick a node      | =(org-roam-node-read)=            | =(gethash (completing-read "Node: " org-node-collection) org-node-collection)= |
-| Get backlink IDs                |                                 | =(plist-get NODE :backlink-origins)=                                           |
-| Get org-roam-backlink objects   | =(org-roam-backlinks-get NODE)=   | =(org-node--fabricate-roam-backlinks (org-node--fabricate-roam-object NODE))=  |
-| Get title                       | =(org-roam-node-title NODE)=      | =(plist-get NODE :title)=                                                      |
-| Get ID                          | =(org-roam-node-id NODE)=         | =(plist-get NODE :id)=                                                         |
-| Get filename                    | =(org-roam-node-file NODE)=       | =(plist-get NODE :file-path)=                                                  |
-| Get tags                        | =(org-roam-node-tags NODE)=       | =(plist-get NODE :tags)=, no inherited tags                                    |
-| Get subtree TODO state          | =(org-roam-node-todo NODE)=       | =(plist-get NODE :todo)=, only that match global =org-todo-keywords=             |
-| Get outline level               | =(org-roam-node-level NODE)=      | =(plist-get NODE :level)=, also the boolean =:is-subtree=                        |
-| Get =ROAM_ALIASES=                | =(org-roam-node-aliases NODE)=    | =(plist-get NODE :aliases)=                                                    |
-| Get =ROAM_REFS=                   | =(org-roam-node-refs NODE)=       | =(plist-get NODE :roam-refs)=                                                  |
-| Get =ROAM_EXCLUDE=                |                                 | =(plist-get NODE :exclude)=, doesn't inherit parent excludes!                  |
-| Get char position               | =(org-roam-node-point NODE)=      | =(plist-get NODE :pos)=                                                        |
-| Get :PROPERTIES:                | =(org-roam-node-properties NODE)= | =(plist-get NODE :properties)=                                                 |
-| Get title of file where NODE is | =(org-roam-node-file-title NODE)= | =(plist-get NODE :file-title)=                                                 |
-| Get subtree heading sans TODO   | =(org-roam-node-title NODE)=      | =(org-node--visit-get-true-heading NODE)=                                              |
-| Get outline-path                | =(org-roam-node-olp NODE)=        | =(plist-get NODE :olp)=                                                        |
-| Get subtree priority            | =(org-roam-node-priority NODE)=   |                                                                              |
-| Get subtree SCHEDULED           | =(org-roam-node-scheduled NODE)=  | =(plist-get NODE :scheduled)=                                                  |
-| Get subtree DEADLINE            | =(org-roam-node-deadline NODE)=   | =(plist-get NODE :deadline)=                                                   |
-| Get org-roam-reflink objects    | =(org-roam-reflinks-get NODE)=    |                                                                              |
-| Ensure fresh data               | =(org-roam-db-sync)=              | =(org-node-cache-ensure-fresh)=                                                |
+| Action                          | org-roam                        | org-node                                                                            |
+|---------------------------------+---------------------------------+-------------------------------------------------------------------------------------|
+| Get ID at point                 | =(org-roam-id-at-point)=          | =(org-id-get nil nil nil t)=                                                          |
+| Get node at point               | =(org-roam-node-at-point)=        | =(gethash (org-id-get nil nil nil t) org-nodes)=                                      |
+| Get list of files               | =(org-roam-list-files)=           | =(seq-uniq (hash-table-values org-id-locations))=                                     |
+| Prompt user to pick a node      | =(org-roam-node-read)=            | =(gethash (completing-read "Node: " org-node-collection) org-node-collection)=        |
+| Get backlink IDs                |                                 | =(org-node-backlink-origins NODE)=                                                    |
+| Get org-roam-backlink objects   | =(org-roam-backlinks-get NODE)=   | =(org-node--fabricate-roam-backlinks (org-node--fabricate-roam-object NODE))=         |
+| Get title                       | =(org-roam-node-title NODE)=      | =(org-node-title NODE)=                                                               |
+| Get ID                          | =(org-roam-node-id NODE)=         | =(org-node-id NODE)=                                                                  |
+| Get filename                    | =(org-roam-node-file NODE)=       | =(org-node-file-path NODE)=                                                           |
+| Get tags                        | =(org-roam-node-tags NODE)=       | =(org-node-tags NODE)=, no inherited tags                                             |
+| Get subtree TODO state          | =(org-roam-node-todo NODE)=       | =(org-node-todo NODE)=, only that match global =org-todo-keywords=                      |
+| Get outline level               | =(org-roam-node-level NODE)=      | =(org-node-level NODE)=, also the boolean =:is-subtree=                                 |
+| Get =ROAM_ALIASES=                | =(org-roam-node-aliases NODE)=    | =(org-node-aliases NODE)=                                                             |
+| Get =ROAM_REFS=                   | =(org-roam-node-refs NODE)=       | =(org-node-refs NODE)=                                                                |
+| Get =ROAM_EXCLUDE=                |                                 | =(assoc "ROAM_EXCLUDE" (org-node-properties NODE))=, doesn't inherit parent excludes! |
+| Get char position               | =(org-roam-node-point NODE)=      | =(org-node-pos NODE)=                                                                 |
+| Get :PROPERTIES:                | =(org-roam-node-properties NODE)= | =(org-node-properties NODE)=                                                          |
+| Get title of file where NODE is | =(org-roam-node-file-title NODE)= | =(org-node-file-title NODE)=                                                          |
+| Get subtree heading sans TODO   | =(org-roam-node-title NODE)=      | =(org-node--visit-get-true-heading NODE)=                                             |
+| Get outline-path                | =(org-roam-node-olp NODE)=        | =(org-node-olp NODE)=                                                                 |
+| Get subtree priority            | =(org-roam-node-priority NODE)=   |                                                                                     |
+| Get subtree SCHEDULED           | =(org-roam-node-scheduled NODE)=  | =(org-node-scheduled NODE)=                                                           |
+| Get subtree DEADLINE            | =(org-roam-node-deadline NODE)=   | =(org-node-deadline NODE)=                                                            |
+| Get org-roam-reflink objects    | =(org-roam-reflinks-get NODE)=    |                                                                                     |
+| Ensure fresh data               | =(org-roam-db-sync)=              | =(org-node-cache-ensure-fresh)=                                                       |
 
 ** Appendix II: Pros of org-roam
 
