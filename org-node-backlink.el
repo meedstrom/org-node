@@ -211,18 +211,58 @@ cleaning."
           ;; So many ways org-id.el unsafe.  Should write an org-id2.el.
           (setq target-file (gethash target-id org-id-locations))
           (when (and src-id target-file)
-            (org-with-file-buffer target-file
-              (save-excursion
-                (without-restriction
-                  (goto-char (point-min))
-                  (re-search-forward (concat "^[ \t]*:id: +" target-id))
-                  ;; TODO Bound the-file level node
-                  (unless (org-before-first-heading-p)
-                    (org-narrow-to-subtree))
-                  (cl-loop while (search-forward src-id nil t)
-                           when (and (not (org-at-property-p))
-                                     (not (org-at-comment-p)))
-                           return t))))))))))
+            ;; Time to visit the target!
+            ;; Here I would use `org-with-file-buffer' and such niceties if
+            ;; org-mode was fast.  Instead, let's write hairy code.
+            (with-temp-buffer
+              (insert-file-contents target-file)
+              (setq-local outline-regexp org-outline-regexp)
+              (when-let ((after-id (re-search-forward
+                                    (concat "^[[:space:]]*:id: +"
+                                            (regexp-quote target-id)))))
+                ;; OK, we found the ID-node.  Now we gotta determine boundaries
+                ;; of this tree in order to search for links here only.
+                (outline-previous-heading)
+                (let ((beg (point))
+                      (end (org-node-backlink--end-of-node)))
+                  (goto-char after-id)
+                  (narrow-to-region beg end)
+                  (catch 'link-found
+                    (while (progn
+                             (let ((boundary (save-excursion
+                                               (outline-next-heading))))
+                               ;; Do not descend into subtrees that have IDs
+                               (if (re-search-forward
+                                    "^[[:space:]]*:id: " boundary t)
+                                   (goto-char (org-node-backlink--end-of-node))
+                                 (cl-loop
+                                  while (search-forward src-id boundary t)
+                                  when (save-excursion
+                                         (goto-char (line-beginning-position))
+                                         ;; Not a comment or property line
+                                         (and (not (looking-at "# " t))
+                                              (not (looking-at "#\\+" t))
+                                              (not (looking-at ":[^ ]" t))))
+                                  do (throw 'link-found t))))
+                             (outline-next-heading)))))))))))))
+
+(defun org-node-backlink--end-of-node ()
+  "Similar idea as `org-forward-heading-same-level'.
+Works in `fundamental-mode'.  Don't move point, just return a
+buffer position.  Return `point-max' if before first heading."
+  (save-excursion
+    (if (or (looking-at-p org-outline-regexp-bol)
+            (re-search-backward org-outline-regexp-bol nil t))
+        ;; Go to next heading of same or higher level
+        (let ((stars (skip-chars-forward "*")))
+          (if (re-search-forward
+               (rx-to-string `(and bol (** 1 ,stars "*")))
+               nil t)
+              (1- (line-beginning-position))
+            ;; No next heading -- EOB it is
+            (point-max)))
+      ;; Wasn't in a subtree but file-level node
+      (point-max))))
 
 (defun org-node-backlink--add-to-here-in-target (&rest _)
   "Meant as advice after any command that inserts a link.
@@ -309,7 +349,7 @@ merely a wrapper that drops the input."
 
 (defvar org-node-backlink--last-warnings nil)
 
-;; TODO Rewrite to avoid org-mode
+;; TODO Rewrite to avoid org-mode in the link targets
 (defun org-node-backlink--fix-findable-backlinks (&optional part-of-mass-op)
   "Visit all [[id:... links and give the targets a backlink.
 Also clean current file's own backlinks, by visiting them and
