@@ -215,6 +215,33 @@ first element."
 (defvar org-node--links-table (make-hash-table :test #'equal))
 (defvar org-node--refs-table (make-hash-table :test #'equal))
 
+;; A struct was pointless while I developed the package for my own use, but
+;; now that it has users... the problem with `plist-get' is I can never rename
+;; any of the data fields.
+;;
+;; If you use `plist-get' to fetch a key that doesn't exist, it just quietly
+;; returns nil, no error, no warning.  (Bad for an API!)  By contrast, if I've
+;; deprecated a field such as `org-node-roam-exclude' and an user tries to call
+;; such a getter, I can have it emit any message to the user that I choose,
+;; making possible a soft-deprecation pathway.
+(cl-defstruct org-node
+  title
+  is-subtree
+  level
+  id
+  pos
+  tags
+  todo
+  file-path
+  scheduled
+  deadline
+  file-title
+  olp
+  properties
+  aliases
+  refs
+  backlink-origins)
+
 (provide 'org-node-lib)
 
 ;;; org-node-lib.el ends here

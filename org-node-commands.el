@@ -120,7 +120,7 @@ type the name of a node that does not exist:
 3. A capture window pops up - now choose a template that targets
    `org-node-capture-target'!
 4. Same as 4b earlier."
-  (org-node--init-org-id-locations-or-die)
+  (org-node-cache-ensure-fresh)
   (let (title node id)
     (if org-node-proposed-title
         ;; Was called from `org-node--create', so the user already typed the
@@ -130,7 +130,7 @@ type the name of a node that does not exist:
           (setq id org-node-proposed-id))
       ;; Was called from `org-capture', which means the user has not yet typed
       ;; the title
-      (org-node-cache-ensure-fresh)
+
       (let ((input (completing-read "Node: " org-node-collection
                                     () () () 'org-node-hist)))
         (setq node (gethash input org-node-collection))
@@ -486,7 +486,7 @@ Adding to that, here is an example advice to copy any inherited
   (interactive nil org-mode)
   (unless (derived-mode-p 'org-mode)
     (user-error "Only works in org-mode buffers"))
-  (org-node--init-org-id-locations-or-die)
+  (org-node-cache-ensure-fresh)
   (let* ((guess (car (org-node--root-dirs
                       (hash-table-values org-id-locations))))
          (dir (if org-node-ask-directory
@@ -587,7 +587,7 @@ Adding to that, here is an example advice to copy any inherited
 (defun org-node-nodeify-entry ()
   "Add an ID to entry at point and run `org-node-creation-hook'."
   (interactive nil org-mode)
-  (org-node--init-org-id-locations-or-die)
+  (org-node-cache-ensure-fresh)
   (org-id-get-create)
   (run-hooks 'org-node-creation-hook))
 

@@ -12,12 +12,12 @@ time."
   :group 'org-node
   (if org-node-cache-mode
       (progn
-        (add-hook 'after-save-hook #'org-node-cache-file)
-        (advice-add #'rename-file :after #'org-node-cache-file)
+        (add-hook 'after-save-hook #'org-node-cache-scan-file)
+        (advice-add #'rename-file :after #'org-node-cache-scan-file)
         (advice-add #'rename-file :before #'org-node-cache--handle-delete)
         (advice-add #'delete-file :before #'org-node-cache--handle-delete))
-    (remove-hook 'after-save-hook #'org-node-cache-file)
-    (advice-remove #'rename-file #'org-node-cache-file)
+    (remove-hook 'after-save-hook #'org-node-cache-scan-file)
+    (advice-remove #'rename-file #'org-node-cache-scan-file)
     (advice-remove #'rename-file #'org-node-cache--handle-delete)
     (advice-remove #'delete-file #'org-node-cache--handle-delete)))
 
@@ -38,18 +38,19 @@ peek on keys instead."
     (clrhash org-nodes)
     (clrhash org-node-collection)
     (clrhash org-node--refs-table)
+    (clrhash org-node--reflinks-table)
     (clrhash org-node--links-table)
     (org-node--init-org-id-locations-or-die)
     (let ((files (-uniq (hash-table-values org-id-locations))))
       (org-node-cache--collect-nodes files)
+      (run-hooks 'org-node-cache-hook)
       (message "org-node: scanned %d files and %d subtrees in %.2fs"
                (length files)
                (cl-loop for node being the hash-values of org-nodes
                         count (org-node-is-subtree node))
-               (float-time (time-since then))))
-    (run-hooks 'org-node-cache-hook)))
+               (float-time (time-since then))))))
 
-(defun org-node-cache-file (&optional _ arg2 &rest _args)
+(defun org-node-cache-scan-file (&optional _ arg2 &rest _args)
   "Seek nodes in a single file."
   ;; If triggered as advice on `rename-file', the second argument is the new
   ;; name.  Do not assume it is being done to the current buffer; it may be
@@ -211,7 +212,6 @@ it does not check."
             (setq file-id (cdr (assoc "ID" props)))
             (when not-a-full-reset
               (when file-id (org-id-add-location file-id file)))
-
             ;; Collect links
             (let ((end (save-excursion
                          (outline-next-heading)
@@ -221,7 +221,6 @@ it does not check."
                 (when (re-search-forward backlinks-drawer-re end t)
                   (search-forward ":end:"))
                 (org-node-cache--collect-links-until end file-id nil)))
-
             (org-node-cache--add-node-to-tables
              (make-org-node
               :title file-title
@@ -335,34 +334,10 @@ it does not check."
       (when please-update-id
         (org-id-update-id-locations)
         (org-id-locations-save)
-        ;; ...potential infinite recursion?
+        ;; potential infinite recursion
         (org-node-cache-reset)))))
 
-;; A struct was pointless while I developed the package for my own use, but
-;; now that it has users... the problem with `plist-get' is I can never rename
-;; any of the data fields.
-;;
-;; If you use `plist-get' to fetch a key that doesn't exist, it just quietly
-;; returns nil, no error, no warning.  (Bad for an API!)  By contrast, if I've
-;; deprecated a field `org-node-roam-exclude' and an user tries to call such a
-;; getter, I can have it emit any message to the user that I choose.
-(cl-defstruct org-node
-  title
-  is-subtree
-  level
-  id
-  pos
-  tags
-  todo
-  file-path
-  scheduled
-  deadline
-  file-title
-  olp
-  properties
-  aliases
-  refs
-  backlink-origins)
+;; (hash-table-values org-node--reflinks-table)
 
 (defun org-node-cache--collect-links-until (end id-here olp-with-self)
   (while (re-search-forward org-link-plain-re end t)
