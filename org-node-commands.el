@@ -1,73 +1,8 @@
 ;;; org-node-commands.el -*- lexical-binding: t; -*-
 
-(require 'org-node-common)
+(require 'org-node-lib)
 (require 'org-node-cache)
 (require 'org-faces)
-
-(defcustom org-node-ask-directory t
-  "Set t to ask where to save a new node.
-Set nil to assume that the most populous root directory in
-`org-id-locations' is correct."
-  :group 'org-node
-  :type 'boolean)
-
-(defcustom org-node-slug-fn #'org-node-slugify-as-url
-  "Function to transform title into a filename.
-
-Built-in choices:
-- `org-node-slugify-as-url'
-- `org-node-slugify-like-roam'
-"
-  :group 'org-node
-  :type '(choice
-          (const org-node-slugify-like-roam)
-          (const org-node-slugify-as-url)
-          function))
-
-(defcustom org-node-creation-fn #'org-node-new-file
-  "Function called by `org-node-find', and `org-node-insert-link' to
-create a node.
-
-If you wish to write a new function, know that during execution, two
-variables are available: `org-node-proposed-title' and
-`org-node-proposed-id'.  Use them.
-
-Some options
-- `org-node-new-file'
-- `org-node-new-by-roam-capture'
-- `org-capture'
-
-Using `org-capture' requires some assembly.  See `org-node-capture-target'."
-  :group 'org-node
-  :type '(choice
-          (const org-node-new-file)
-          (const org-node-new-by-roam-capture)
-          (const org-capture)
-          function))
-
-(defcustom org-node-insert-link-hook ()
-  "Hook run after inserting a link to an Org-ID node.
-
-Two arguments provided: the ID and the link description.
-
-Functions here should not leave point outside the link."
-  :group 'org-node
-  :type 'hook)
-
-(defcustom org-node-creation-hook '(org-node-put-created)
-  "Hook run with point in the newly created buffer or entry.
-
-Applied only by `org-node-new-file', `org-node-create-subtree',
-`org-node-nodeify-entry' and `org-node-extract-subtree'.
-
-NOT run by `org-node-new-by-roam-capture' - see that package's hook
-`org-roam-capture-new-node-hook' instead.
-
-A good member for this hook is `org-node-put-created', especially
-since the default `org-node-slug-fn' does not put a timestamp in
-the filename."
-  :type 'hook
-  :group 'org-node)
 
 
 ;;; Plumbing
@@ -79,12 +14,12 @@ the filename."
   "Visit subtree NODE and get the heading, in a way that's aware of
 buffer-local #+todo settings so the todo state is not taken as part
 of the heading."
-  (unless (plist-get node :is-subtree)
+  (unless (org-node-is-subtree node)
     (error "Not a subtree node %s" node))
-  (org-with-file-buffer (plist-get node :file-path)
+  (org-with-file-buffer (org-node-file-path node)
     (save-excursion
       (without-restriction
-        (goto-char (plist-get node :pos))
+        (goto-char (org-node-pos node))
         (nth 4 (org-heading-components))))))
 
 (defun org-node-slugify-like-roam (title)
@@ -201,16 +136,16 @@ type the name of a node that does not exist:
         (setq node (gethash input org-node-collection))
         (if node
             (progn
-              (setq title (plist-get node :title))
-              (setq id (plist-get node :id)))
+              (setq title (org-node-title node))
+              (setq id (org-node-id node)))
           (setq title input)
           (setq id (org-id-new)))))
     (if node
         ;; Node exists; capture into it
         (progn
-          (find-file (plist-get node :file-path))
+          (find-file (org-node-file-path node))
           (widen)
-          (goto-char (plist-get node :pos))
+          (goto-char (org-node-pos node))
           (unless (and (= 1 (point)) (org-at-heading-p))
             ;; Go to just before next heading, or end of buffer if there are no
             ;; more headings
@@ -273,9 +208,9 @@ variables."
 
 (defun org-node--goto (node)
   "Visit NODE."
-  (find-file (plist-get node :file-path))
+  (find-file (org-node-file-path node))
   (widen)
-  (goto-char (plist-get node :pos))
+  (goto-char (org-node-pos node))
   (org-reveal)
   (recenter 5))
 
@@ -327,7 +262,7 @@ If you find the behavior different, perhaps you have something in
          (input (completing-read "Node: " org-node-collection
                                  () () () 'org-node-hist))
          (node (gethash input org-node-collection))
-         (id (or (plist-get node :id) (org-id-new)))
+         (id (or (org-node-id node) (org-id-new)))
          (link-desc (or region-text input)))
     (atomic-change-group
       (if region-text
@@ -371,8 +306,8 @@ adding keywords to the things to exclude:
   (let ((node (gethash (completing-read "Node: " org-node-collection
                                         () () () 'org-node-hist)
                        org-node-collection)))
-    (let ((id (plist-get node :id))
-          (title (plist-get node :title))
+    (let ((id (org-node-id node))
+          (title (org-node-title node))
           (level (or (org-current-level) 0))
           (m1 (make-marker)))
       (insert (org-link-make-string (concat "id:" id) title))
@@ -413,8 +348,8 @@ adding keywords to the things to exclude:
   (let ((node (gethash (completing-read "Node: " org-node-collection
                                         () () () 'org-node-hist)
                        org-node-collection)))
-    (let ((id (plist-get node :id))
-          (title (plist-get node :title))
+    (let ((id (org-node-id node))
+          (title (org-node-title node))
           (level (or (org-current-level) 0)))
       (insert (org-link-make-string (concat "id:" id) title))
       (goto-char (line-beginning-position))
@@ -495,12 +430,12 @@ Prompt the user for each one."
                  (node (when id
                          (gethash id org-nodes)))
                  (true-title (when node
-                               (plist-get node :title)))
+                               (org-node-title node)))
                  (answered-yes nil))
             (when (and node
                        (not (string-equal-ignore-case desc true-title))
                        (not (member-ignore-case desc
-                                                (plist-get node :aliases))))
+                                                (org-node-aliases node))))
               (switch-to-buffer (current-buffer))
               (org-reveal)
               (recenter)

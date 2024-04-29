@@ -9,13 +9,13 @@ This just uses information in org-node's own `org-nodes'.
 Some of the fields are blank."
   (require 'org-roam)
   (org-roam-node-create
-   :file (plist-get node :file-path)
-   :id (plist-get node :id)
-   :level (plist-get node :level)
-   :title (plist-get node :title)
-   :tags (plist-get node :tags)
-   :aliases (plist-get node :aliases)
-   :point (plist-get node :pos)))
+   :file (org-node-file-path node)
+   :id (org-node-id node)
+   :level (org-node-level node)
+   :title (org-node-title node)
+   :tags (org-node-tags node)
+   :aliases (org-node-aliases node)
+   :point (org-node-pos node)))
 
 (defun org-node--fabricate-roam-backlinks (roam-object &rest _)
   "Return org-roam-backlink objects targeting ROAM-OBJECT.
@@ -29,7 +29,7 @@ deduplicated, as if :unique t."
   (let ((node (gethash (org-roam-node-id roam-object) org-nodes)))
     (when node
       (cl-loop
-       for backlink-id in (plist-get node :backlink-origins)
+       for backlink-id in (org-node-backlink-origins node)
        as node-that-contains-link = (gethash backlink-id org-nodes)
        when node-that-contains-link
        collect (let ((roam-object-that-contains-link
@@ -50,20 +50,20 @@ deduplicated, as if :unique t."
   (emacsql-with-transaction (org-roam-db)
     (cl-loop with file = (buffer-file-name)
              for node being the hash-values of org-nodes
-             when (equal file (plist-get node :file-path))
+             when (equal file (org-node-file-path node))
              do (org-node--feed-node-to-roam-db node))))
 
 (defun org-node--feed-node-to-roam-db (node)
-  (let ((id (plist-get node :id))
-        (file-path (plist-get node :file-path))
-        (tags (plist-get node :tags))
-        (aliases (plist-get node :aliases))
-        (roam-refs (plist-get node :roam-refs))
-        (title (plist-get node :title))
-        (properties (plist-get node :properties))
-        (backlink-origins (plist-get node :backlink-origins))
-        (is-subtree (plist-get node :is-subtree))
-        (pos (plist-get node :pos)))
+  (let ((id (org-node-id node))
+        (file-path (org-node-file-path node))
+        (tags (org-node-tags node))
+        (aliases (org-node-aliases node))
+        (roam-refs (org-node-refs node))
+        (title (org-node-title node))
+        (properties (org-node-properties node))
+        (backlink-origins (org-node-backlink-origins node))
+        (is-subtree (org-node-is-subtree node))
+        (pos (org-node-pos node)))
     ;; Replace `org-roam-db-insert-file'
     (org-roam-db-query
      [:insert :into files
@@ -89,14 +89,14 @@ deduplicated, as if :unique t."
     ;; TODO actually sposed to insert formatted title, see src
     (when is-subtree
       (let ((file file-path)
-            (todo (plist-get node :todo))
+            (todo (org-node-todo node))
             (priority nil)
-            (level (plist-get node :level))
-            (scheduled (when-let ((scheduled (plist-get node :scheduled)))
+            (level (org-node-level node))
+            (scheduled (when-let ((scheduled (org-node-scheduled node)))
                          (format-time-string
                           "%FT%T%z"
                           (encode-time (org-parse-time-string scheduled)))))
-            (deadline (when-let ((deadline (plist-get node :deadline)))
+            (deadline (when-let ((deadline (org-node-deadline node)))
                         (format-time-string
                          "%FT%T%z"
                          (encode-time (org-parse-time-string deadline)))))
@@ -141,6 +141,7 @@ deduplicated, as if :unique t."
 
 (defun org-node-feed-roam-db ()
   (require 'org-roam)
+  (org-roam-db-clear-all)
   (org-roam-db--close)
   (delete-file org-roam-db-location)
   (emacsql-with-transaction (org-roam-db)
@@ -149,12 +150,33 @@ deduplicated, as if :unique t."
      with ctr = 0
      with max = (length nodes)
      for node in nodes
-     do (when (= 0 (% (cl-incf ctr) 20))
-          (message "Inserting into SQL DB... %d/%d" ctr max))
+     do (when (= 0 (% (cl-incf ctr) 10))
+          (message "Inserting into %s... %d/%d"
+                   org-roam-db-location ctr max))
      (org-node--feed-node-to-roam-db node))))
 
+;; Revamp backlink-check-buffer
+;;  one thing aside from the cacher will possibly be aware of refs:
+;; - check-buffer
+;;
+;; Make a decision about how to treat links that look like refs.  Both the
+;; cacher and the check-buffer (if we even keep it) will do the same thing.
+;;
+;; From the POV of the cacher, already know what to do. Will just add non-id
+;; links to some refs-table.
+;;
+;; The question that remains: how to use that refs-table?  Well, fix-all (and
+;; whatever small hooks/advices we add to mirror its effect) is going to use the
+;; refs-table to...  insert them as backlinks.
+
+;; ok look ,two sides.  One side COLLECTS links into tables, other side USES
+;; the;; tables.  and check-buffer style functions would actually do some
+;; collection, and additionally consume the data it just collected, but the
+;; intent is to reflect what a fix-all would have done.
+;;
+
 (defun org-node--ref-link->list (ref node-id)
-  "Worker code adapted from `org-roam-db-insert-ref'"
+  "Worker code adapted from `org-roam-db-insert-refs'"
   (let (rows)
     (cond (;; @citeKey
            (string-prefix-p "@" ref)
@@ -179,7 +201,6 @@ deduplicated, as if :unique t."
                            (or (match-string 2 ref) (match-string 0 ref))))
                  (link-type ()) ;; clear url-type for backward compatible.
                  (path ()))
-             (url-type (url-generic-parse-url "https://google.com"))
              (setq link-type (url-type ref-url))
              (setf (url-type ref-url) nil)
              (setq path (org-link-decode (url-recreate-url ref-url)))

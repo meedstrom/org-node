@@ -1,6 +1,6 @@
 ;;; org-node-cache.el --- The heart -*- lexical-binding: t; -*-
 
-(require 'org-node-common)
+(require 'org-node-lib)
 
 ;;;###autoload
 (define-minor-mode org-node-cache-mode
