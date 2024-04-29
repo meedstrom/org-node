@@ -1,6 +1,7 @@
 ;;; org-node-backlink.el -*- lexical-binding: t; -*-
 
 (require 'org-node-lib)
+(require 'org-node-cache)
 
 ;;;###autoload
 (define-minor-mode org-node-backlink-mode
@@ -48,68 +49,54 @@
          (message "org-node-backlink failed with message %s %s"
                   (car err) (cdr err)))))))
 
-(defvar org-node-backlink--progress-total 0)
-(defvar org-node-backlink--progress-total-backlinks 0)
-(defvar org-node-backlink--progress-total-stale 0)
-(defvar org-node-backlink--progress-file nil)
-(defvar org-node-backlink--progress-total-worked 0)
-(defvar org-node-backlink--progress-total-files 0)
+(defvar org-node-backlink--fix-ctr 0)
+(defvar org-node-backlink--fix-cells nil)
 
-;; wip
-(setq ctr 0)
-(setq remainder (org-id-hash-to-alist org-id-locations))
-(defun org-node-backlink-fix-all-2 ()
+(defun org-node-backlink-fix-all ()
   (interactive)
-  (when current-prefix-arg
-    (setq org-node-backlink--fixed nil))
+  (org-node-cache-ensure-fresh)
+  ;; when (and (yes-or-no-p
+  ;;            (format "Edit the %d files found in `org-id-locations'?" total))
+  ;;           (org-node--consent-to-problematic-modes-for-mass-op))
   (org-node-backlink-mode 0)
-  (org-node--init-org-id-locations-or-die)
-  (let* ((files (-uniq (hash-table-values org-id-locations)))
-         (total (length files))
-         (cells (-take 1000 remainder))
-         )
-    (setq remainder (-drop 1000 remainder))
-    ;; when (and (yes-or-no-p
-    ;;            (format "Edit the %d files found in `org-id-locations'?" total))
-    ;;           (org-node--consent-to-problematic-modes-for-mass-op))
-    (dolist (cell cells)
-      (message "fixing backlinks... %d/%d files" (cl-incf ctr) total)
+  (when (or (= 0 org-node-backlink--fix-ctr) current-prefix-arg)
+    ;; Reset
+    (setq org-node-backlink--fix-cells (org-id-hash-to-alist org-id-locations)))
+  ;; Do 1000 at a time, bc Emacs cries about opening too many files in one loop
+  (let ((find-file-hook nil)
+        (org-mode-hook nil)
+        (org-inhibit-startup t)))
+  (dotimes (_ 1000)
+    (let ((cell (pop org-node-backlink--fix-cells)))
+      (message "fixing backlinks... %d files"
+               (cl-incf org-node-backlink--fix-ctr))
       (org-with-file-buffer (car cell)
         (org-with-wide-buffer
          (dolist (id (cdr cell))
            (goto-char (org-find-entry-with-id id))
-           (let ((backlinks
-                  (->> (gethash id org-node--links-table)
-                       (--map (plist-get it :src))
-                       (-uniq)
-                       (-sort #'string-lessp)
-                       (--map (org-link-make-string
-                               (concat "id:" it)
-                               (plist-get (gethash it org-nodes) :title))))))
-             ;; unless (equal backlinks (org-entry-get nil "CACHED_BACKLINKS"))
-             (if backlinks
-                 (org-entry-put nil "CACHED_BACKLINKS"
-                                (string-join backlinks "  "))
+           (let* ((refs (org-node-refs (gethash id org-nodes)))
+                  (reflinks (--map (gethash it org-node--reflinks-table) refs))
+                  (backlinks (gethash id org-node--links-table))
+                  (combined
+                   (->> (append reflinks backlinks)
+                        (--keep (plist-get it :src))
+                        (-uniq)
+                        (-sort #'string-lessp)
+                        (--map (org-link-make-string
+                                (concat "id:" it)
+                                (org-node-title (gethash it org-nodes)))))))
+             (if combined
+                 (org-entry-put nil "CACHED_BACKLINKS" (string-join combined "  "))
                (org-entry-delete nil "CACHED_BACKLINKS")))))
         (and org-file-buffer-created
              (buffer-modified-p)
              (let ((save-silently t)
                    (inhibit-message t))
-               (save-buffer)))))
-    (when remainder
-      (run-with-timer 1 nil #'org-node-backlink-fix-all-2))))
-
-(defun org-node-backlink--progress-print-message ()
-  (when (= 0 (% org-node-backlink--progress-total 10))
-    (message
-     "Checking... (file %d/%d) link %d, added %d backlinks, removed %d stale, current file %s"
-     org-node-backlink--progress-total-worked
-     org-node-backlink--progress-total-files
-     org-node-backlink--progress-total
-     org-node-backlink--progress-total-backlinks
-     org-node-backlink--progress-total-stale
-     org-node-backlink--progress-file)
-    (redisplay)))
+               (save-buffer))))))
+  (if org-node-backlink--fix-cells
+      (run-with-timer 0 nil #'org-node-backlink-fix-all)
+    ;; Reset
+    (setq org-node-backlink--fix-ctr 0)))
 
 ;; TODO: Much faster: just collect grep buffer of all the org-id-locations and
 ;;       suggest the user do wgrep + search and replace.
@@ -221,11 +208,9 @@ higher level.  Return `point-max' if before first heading."
   "Meant as advice after any command that inserts a link.
 See `org-node-backlink--add-in-target' - this is
 merely a wrapper that drops the input."
-  (org-node--init-org-id-locations-or-die)
+  (org-node-cache-ensure-fresh)
   (org-node-backlink--add-in-target))
 
-;; TODO rewrite to work in fundamental mode, so `org-node-backlink-fix-all' can
-;; be much faster
 (defun org-node-backlink--add-in-target (&optional part-of-mass-op)
   "For known link at point, leave a backlink in the target node.
 Does NOT try to validate the rest of the target's backlinks."
@@ -327,7 +312,7 @@ To try adding backlinks that you think should be present, use
 
 Optional argument PART-OF-MASS-OP means skip some cleanup."
   (when (derived-mode-p 'org-mode)
-    (org-node--init-org-id-locations-or-die)
+    (org-node-cache-ensure-fresh)
     (save-excursion
       (goto-char (point-min))
       (while (re-search-forward org-link-plain-re nil t)
