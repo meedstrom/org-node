@@ -102,7 +102,6 @@ The function =org-node-enable= only runs once, and turns on two global minor mod
   - A counterpart to =org-roam-node-find=
 - =org-node-insert-link=
   - A counterpart to =org-roam-node-insert=
-- =org-node-insert-include=
 - =org-node-insert-transclusion=
 - =org-node-insert-transclusion-as-subtree=
 - =org-node-extract-subtree=

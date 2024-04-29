@@ -27,7 +27,6 @@
 
 ;;; Code:
 
-;; TODO Test each user commmand again
 ;; TODO Annotations for completion
 ;; TODO Completion category https://github.com/alphapapa/org-ql/issues/299
 ;; TODO Command to grep across all files (then deprecate the -regret command, and teach the user wgrep)

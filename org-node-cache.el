@@ -48,15 +48,14 @@ peek on keys instead."
                (float-time (time-since then))))
     (run-hooks 'org-node-cache-hook)))
 
-(defun org-node-cache-file (&rest args)
+(defun org-node-cache-file (&optional _ arg2 &rest _args)
   "Seek nodes in a single file."
   ;; If triggered as advice on `rename-file', the second argument is the new
-  ;; name.  Do not assume it applies to the current buffer; it may be
+  ;; name.  Do not assume it is being done to the current buffer; it may be
   ;; called from a Dired buffer, for example.
-  (let* ((arg2 (cadr args))
-         (file (if (and arg2 (stringp arg2) (file-exists-p arg2))
-                   arg2
-                 (buffer-file-name))))
+  (let ((file (if (and arg2 (stringp arg2) (file-exists-p arg2))
+                  arg2
+                (buffer-file-name))))
     (org-node-cache--collect-nodes (list file)))
   (run-hooks 'org-node-cache-file-hook))
 
@@ -150,7 +149,8 @@ it does not check."
     (let ((todo-re (org-node-cache--make-todo-regexp))
           (not-a-full-reset (not (hash-table-empty-p org-nodes)))
           (case-fold-search t)
-          (gc-cons-threshold (* 1000 1000 1000)))
+          (gc-cons-threshold (* 1000 1000 1000))
+          (please-update-id nil))
       (dolist (file files)
         (if (not (file-exists-p file))
             ;; Example situation: user renamed/deleted a file using shell
@@ -172,7 +172,7 @@ it does not check."
             ;; exclude, like backups.  Starting to think we need an org-id2.el.
             (progn
               (org-node-cache--forget-id-location file)
-              (org-id-update-id-locations))
+              (setq please-update-id t))
           (erase-buffer)
           (insert-file-contents-literally file)
           (let (;; Position of first "content": a line not starting with # or :
@@ -293,7 +293,10 @@ it does not check."
                   :roam-refs (let ((refs (cdr (assoc "ROAM_REFS" props))))
                                (and refs (split-string-and-unquote refs)))
                   :backlink-origins (org-node-cache--backlinks->list
-                                     (cdr (assoc "CACHED_BACKLINKS" props)))))))))))))
+                                     (cdr (assoc "CACHED_BACKLINKS" props))))))))))
+      (when please-update-id
+        (org-id-update-id-locations)
+        (org-id-locations-save)))))
 
 ;; I feel like this could be easier to read...
 (defun org-node-cache--add-node-to-tables (node)
