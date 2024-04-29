@@ -1,6 +1,5 @@
 ;;; org-node-cache.el --- The heart -*- lexical-binding: t; -*-
 
-(require 'pcre2el)
 (require 'org-node-common)
 
 ;;;###autoload
@@ -161,7 +160,16 @@ it does not check."
             ;; in its usual ways.
             ;;
             ;; This is a good time to do `org-id-update-id-locations' just
-            ;; because, but it won't pick up the new file path.
+            ;; because, but it won't pick up the new file path.  A heuristic we
+            ;; could've used:
+            ;;
+            ;; (org-id-update-id-locations
+            ;;  (--mapcat
+            ;;   (directory-files-recursively it "\\.org$")
+            ;;   (org-node--root-dirs (hash-table-values org-id-locations))))
+            ;;
+            ;; but it doesn't take into account what the user may want to
+            ;; exclude, like backups.  Starting to think we need an org-id2.el.
             (progn
               (org-node-cache--forget-id-location file)
               (org-id-update-id-locations))

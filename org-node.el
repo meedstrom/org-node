@@ -32,7 +32,8 @@
 ;; TODO Completion category https://github.com/alphapapa/org-ql/issues/299
 ;; TODO Maybe move user commands into a -commands.el and minimize the core
 ;; TODO Command to grep across all files (then deprecate the -regret command, and teach the user wgrep)
-;; TODO Option to insert backlink into :BACKLINKS:
+;; TODO Rename :CACHED_BACKLINKS: to :BACKLINKS: ?
+;; TODO Option to insert backlink into org-super-links :BACKLINKS: drawer
 ;; TODO React to any org-element-cache error (they're common) and disable the cache during fix-all
 ;; TODO Use fundamental-mode in `org-node-backlink-fix-all'
 ;; TODO Command to explore feedback arc sets
