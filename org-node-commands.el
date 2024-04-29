@@ -276,6 +276,7 @@ variables."
   (find-file (plist-get node :file-path))
   (widen)
   (goto-char (plist-get node :pos))
+  (org-reveal)
   (recenter 5))
 
 
