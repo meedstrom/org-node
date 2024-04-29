@@ -21,15 +21,20 @@ time."
     (advice-remove #'rename-file #'org-node-cache--handle-delete)
     (advice-remove #'delete-file #'org-node-cache--handle-delete)))
 
-(defun org-node-cache-peek (&optional ht keys)
-  "For debugging: peek on some values of `org-nodes'.
-When called from Lisp, peek on any hash table HT.  With KEYS t,
-peek on keys instead."
+(defun org-node-cache-peek ()
+  "For debugging: peek on some values of `org-nodes'."
   (interactive)
-  (let ((rows (if keys (hash-table-keys (or ht org-nodes))
-                (hash-table-values (or ht org-nodes)))))
+  (let ((rows (hash-table-values org-nodes))
+        (fields (map-keys (cdr (cl-struct-slot-info 'org-node)))))
     (dotimes (_ 4)
-      (print (nth (random (length rows)) rows)))))
+      (let ((random-node (nth (random (length rows)) rows)))
+        (print
+         (-interleave
+          (--map (intern (concat ":" (symbol-name it))) fields)
+          (cl-loop
+           for field in fields
+           collect (funcall (intern (concat "org-node-" (symbol-name field)))
+                            random-node))))))))
 
 (defun org-node-cache-reset ()
   "Wipe and rebuild the cache."
@@ -204,9 +209,11 @@ it does not check."
                                ":" t)))
             (goto-char 1)
             (if (re-search-forward "^#\\+title: " far t)
-                (setq file-title (decode-coding-string
-                                  (buffer-substring (point) (line-end-position))
-                                  'utf-8))
+                (setq file-title
+                      (org-link-display-format
+                       (decode-coding-string
+                        (buffer-substring (point) (line-end-position))
+                        'utf-8)))
               ;; File nodes dont strictly need #+title, fall back on filename
               (setq file-title (file-name-nondirectory file)))
             (setq file-id (cdr (assoc "ID" props)))
@@ -251,17 +258,19 @@ it does not check."
                   (setq here (point)))
                 (if (re-search-forward " +\\(:.+:\\) *$" (line-end-position) t)
                     (progn
-                      (setq title (decode-coding-string
-                                   (buffer-substring
-                                    here (match-beginning 0))
-                                   'utf-8))
+                      (setq title (org-link-display-format
+                                   (decode-coding-string
+                                    (buffer-substring
+                                     here (match-beginning 0))
+                                    'utf-8)))
                       (setq tags (string-split
                                   (decode-coding-string (match-string 1)
                                                         'utf-8)
                                   ":" t)))
-                  (setq title (decode-coding-string (buffer-substring
-                                                     here (line-end-position))
-                                                    'utf-8)))
+                  (setq title (org-link-display-format
+                               (decode-coding-string (buffer-substring
+                                                      here (line-end-position))
+                                                     'utf-8))))
                 (setq here (point))
                 (setq line+2 (and (forward-line 2) (point)))
                 (goto-char here)
