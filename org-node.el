@@ -36,8 +36,10 @@
 ;; TODO Use fundamental-mode in `org-node-backlink-fix-all'
 ;; TODO Command to explore feedback arc sets
 ;; TODO Bit of a test suite
+;; TODO Test a custom id format involving emoji to see if that breaks regexps
+;; TODO Do you get more performant searches by disabling case-fold-search?
 
-(require 'org-node-common)
+(require 'org-node-lib)
 (require 'org-node-cache)
 (require 'org-node-commands)
 (require 'org-node-backlink)

@@ -1,4 +1,4 @@
-;;; org-node-common.el -*- lexical-binding: t; -*-
+;;; org-node-lib.el -*- lexical-binding: t; -*-
 
 (require 'cl-lib)
 (require 'subr-x)
@@ -12,6 +12,71 @@
 (defgroup org-node nil
   "Support a zettelkasten of org-id files and subtrees."
   :group 'org)
+
+(defcustom org-node-ask-directory t
+  "Set t to ask where to save a new node.
+Set nil to assume that the most populous root directory in
+`org-id-locations' is correct."
+  :group 'org-node
+  :type 'boolean)
+
+(defcustom org-node-slug-fn #'org-node-slugify-as-url
+  "Function to transform title into a filename.
+
+Built-in choices:
+- `org-node-slugify-as-url'
+- `org-node-slugify-like-roam'
+"
+  :group 'org-node
+  :type '(choice
+          (const org-node-slugify-like-roam)
+          (const org-node-slugify-as-url)
+          function))
+
+(defcustom org-node-creation-fn #'org-node-new-file
+  "Function called by `org-node-find', and `org-node-insert-link' to
+create a node.
+
+If you wish to write a new function, know that during execution, two
+variables are available: `org-node-proposed-title' and
+`org-node-proposed-id'.  Use them.
+
+Some options
+- `org-node-new-file'
+- `org-node-new-by-roam-capture'
+- `org-capture'
+
+Using `org-capture' requires some assembly.  See `org-node-capture-target'."
+  :group 'org-node
+  :type '(choice
+          (const org-node-new-file)
+          (const org-node-new-by-roam-capture)
+          (const org-capture)
+          function))
+
+(defcustom org-node-insert-link-hook ()
+  "Hook run after inserting a link to an Org-ID node.
+
+Two arguments provided: the ID and the link description.
+
+Functions here should not leave point outside the link."
+  :group 'org-node
+  :type 'hook)
+
+(defcustom org-node-creation-hook '(org-node-put-created)
+  "Hook run with point in the newly created buffer or entry.
+
+Applied only by `org-node-new-file', `org-node-create-subtree',
+`org-node-nodeify-entry' and `org-node-extract-subtree'.
+
+NOT run by `org-node-new-by-roam-capture' - see that package's hook
+`org-roam-capture-new-node-hook' instead.
+
+A good member for this hook is `org-node-put-created', especially
+since the default `org-node-slug-fn' does not put a timestamp in
+the filename."
+  :type 'hook
+  :group 'org-node)
 
 (defcustom org-node-only-show-subtrees-with-id t
   "Set nil to include all subtrees as completion candidates."
@@ -34,7 +99,7 @@ This example shows the ancestor entries to each node:
 
 (setq org-node-format-candidate-fn
       (defun my-format-with-olp (node title)
-        (if-let ((olp (plist-get node :olp)))
+        (if-let ((olp (org-node-olp node)))
             (concat (string-join olp \" > \") \" > \" title)
           title)))
 "
@@ -43,7 +108,7 @@ This example shows the ancestor entries to each node:
 
 (defcustom org-node-filter-fn
   (lambda (node)
-    (not (plist-get node :exclude)))
+    (not (assoc "ROAM_EXCLUDE" (org-node-properties node))))
   "Predicate returning t to include a node, or nil to exclude it.
 
 This function is applied once for every Org-ID node found, and
@@ -59,9 +124,9 @@ See the following example for a way to filter out nodes tagged
 (setq org-node-filter-fn
       (lambda (node)
         (and (not (plist-get node :exclude))
-             (not (plist-get node :todo))
-             (not (member \"drill\" (plist-get node :tags)))
-             (not (string-search \"archive\" (plist-get node :file-path))))))
+             (not (org-node-todo node))
+             (not (member \"drill\" (org-node-tags node)))
+             (not (string-search \"archive\" (org-node-file-path node))))))
 
 If you have an expensive filter slowing things down, a tip is
 make a defun, not a lambda, and byte-compile that init file:
@@ -146,8 +211,10 @@ first element."
              auto-save-visited-mode
              git-auto-commit-mode)))
 
+(defvar org-node--reflinks-table (make-hash-table :test #'equal))
+(defvar org-node--links-table (make-hash-table :test #'equal))
 (defvar org-node--refs-table (make-hash-table :test #'equal))
 
-(provide 'org-node-common)
+(provide 'org-node-lib)
 
-;;; org-node-common.el ends here
+;;; org-node-lib.el ends here
