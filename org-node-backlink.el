@@ -65,34 +65,38 @@
   ;; Do 1000 at a time, bc Emacs cries about opening too many files in one loop
   (let ((find-file-hook nil)
         (org-mode-hook nil)
-        (org-inhibit-startup t)))
-  (dotimes (_ 1000)
-    (let ((cell (pop org-node-backlink--fix-cells)))
-      (message "fixing backlinks... %d files"
-               (cl-incf org-node-backlink--fix-ctr))
-      (org-with-file-buffer (car cell)
-        (org-with-wide-buffer
-         (dolist (id (cdr cell))
-           (goto-char (org-find-entry-with-id id))
-           (let* ((refs (org-node-refs (gethash id org-nodes)))
-                  (reflinks (--map (gethash it org-node--reflinks-table) refs))
-                  (backlinks (gethash id org-node--links-table))
-                  (combined
-                   (->> (append reflinks backlinks)
-                        (--keep (plist-get it :src))
-                        (-uniq)
-                        (-sort #'string-lessp)
-                        (--map (org-link-make-string
-                                (concat "id:" it)
-                                (org-node-title (gethash it org-nodes)))))))
-             (if combined
-                 (org-entry-put nil "CACHED_BACKLINKS" (string-join combined "  "))
-               (org-entry-delete nil "CACHED_BACKLINKS")))))
-        (and org-file-buffer-created
-             (buffer-modified-p)
-             (let ((save-silently t)
-                   (inhibit-message t))
-               (save-buffer))))))
+        (after-save-hook nil)
+        (before-save-hook nil)
+        (org-agenda-files nil)
+        (org-inhibit-startup t)
+        (gc-cons-threshold (* 1000 1000 1000)))
+    (dotimes (_ 1000)
+      (let ((cell (pop org-node-backlink--fix-cells)))
+        (message "Fixing backlinks... %d files (you can stop and resume)"
+                 (cl-incf org-node-backlink--fix-ctr))
+        (org-with-file-buffer (car cell)
+          (org-with-wide-buffer
+           (dolist (id (cdr cell))
+             (goto-char (org-find-entry-with-id id))
+             (let* ((refs (org-node-refs (gethash id org-nodes)))
+                    (reflinks (--map (gethash it org-node--reflinks-table) refs))
+                    (backlinks (gethash id org-node--links-table))
+                    (combined
+                     (->> (append reflinks backlinks)
+                          (--map (plist-get it :src))
+                          (-uniq)
+                          (-sort #'string-lessp)
+                          (--map (org-link-make-string
+                                  (concat "id:" it)
+                                  (org-node-title (gethash it org-nodes)))))))
+               (if combined
+                   (org-entry-put nil "CACHED_BACKLINKS" (string-join combined "  "))
+                 (org-entry-delete nil "CACHED_BACKLINKS")))))
+          (and org-file-buffer-created
+               (buffer-modified-p)
+               (let ((save-silently t)
+                     (inhibit-message t))
+                 (save-buffer)))))))
   (if org-node-backlink--fix-cells
       (run-with-timer 0 nil #'org-node-backlink-fix-all)
     ;; Reset
