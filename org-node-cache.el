@@ -64,12 +64,13 @@ peek on keys instead."
 (defvar org-node-cache-file-hook (list))
 
 (defun org-node-cache-ensure-fresh ()
-  (when (or (not org-node-cache-mode)
-            (not (hash-table-p org-nodes))
-            (hash-table-empty-p org-node-collection))
-    (org-node-cache-reset)
-    ;; This message delivers once per emacs session
-    (message "To speed up this command, turn on `org-node-cache-mode'")))
+  (org-node--init-org-id-locations-or-die)
+  (when (hash-table-empty-p org-node-collection)
+    ;; Tip once per emacs session
+    (message "To speed up this command, turn on `org-node-cache-mode'"))
+  (when (not org-node-cache-mode)
+    (let ((inhibit-message t))
+      (org-node-cache-reset))))
 
 (let ((this-timer (timer-create)))
   (defun org-node-cache--handle-delete (arg1 &rest args)
