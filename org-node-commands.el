@@ -403,25 +403,6 @@ adding keywords to the things to exclude:
       (run-hook-with-args 'org-node-insert-link-hook id title))))
 
 ;;;###autoload
-(defun org-node-insert-include ()
-  "Insert an #+include: referring to a node."
-  (interactive nil org-mode)
-  (unless (derived-mode-p 'org-mode)
-    (user-error "Only works in org-mode buffers"))
-  (org-node-cache-ensure-fresh)
-  (let ((node (gethash (completing-read "Node: " org-node-collection
-                                        () () () 'org-node-hist)
-                       org-node-collection)))
-    (let ((id (plist-get node :id))
-          (title (plist-get node :title))
-          (level (or (org-current-level) 0)))
-      (insert (org-link-make-string (concat "id:" id) title))
-      (goto-char (line-beginning-position))
-      (insert "#+include: ")
-      (forward-char 1)
-      (run-hook-with-args 'org-node-insert-link-hook id title))))
-
-;;;###autoload
 (defun org-node-insert-transclusion ()
   "Insert a #+transclude: referring to a node."
   (interactive nil org-mode)
