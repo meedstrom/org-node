@@ -50,7 +50,9 @@ Optional argument REMOVE-THEM means remove them instead, like
 \\[org-node-backlink-regret]."
   (interactive)
   ;; Reset
-  (when (or (= 0 org-node-backlink--fix-ctr) current-prefix-arg)
+  (when (or (= 0 org-node-backlink--fix-ctr)
+            (null org-node-backlink--fix-cells)
+            current-prefix-arg)
     (org-node-cache-reset)
     (setq org-node-backlink--fix-cells (org-id-hash-to-alist org-id-locations)))
   (org-node-backlink-mode 0)

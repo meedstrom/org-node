@@ -9,7 +9,7 @@ I found org-roam too slow, so I made [[https://github.com/meedstrom/quickroam][q
 
   In pursuit of being "just org-id", this package has no equivalent setting to =org-roam-directory= -- it just looks up =org-id-locations=.
 
-- *If you were not using org-roam*, think of it as a limited, focused [[https://github.com/alphapapa/org-ql][org-ql]].  If you were the sort of person to prefer ID-links over file links or any other type of link, you're in the right place: this basically lets you forget about filenames and hierarchies and directory structures -- as long as you've assigned an org-id to something, you can find it later.
+- *If you were not using org-roam*, maybe think of it as a limited, focused [[https://github.com/alphapapa/org-ql][org-ql]].  If you were the sort of person to prefer ID-links over file links or any other type of link, you're in the right place: this basically lets you forget about filenames and hierarchies and directory structures -- as long as you've assigned an org-id to something, you can find it later.
 
   And you can still keep doing hierarchies and structures, where that brings you joy, unlike systems that mandate limitations like "one note per file" or strict rules about naming files.
 
@@ -76,9 +76,9 @@ These user options help you feel at home using both packages side-by-side:
 (setq org-node-creation-hook nil)
 #+end_src
 
-With that done, try the command =org-node-find= instead of =org-roam-node-find=, and other such equivalents listed in [[https://github.com/meedstrom/org-node#commands][Commands]]. Enjoy!
+With that done, try the command =org-node-find= instead of =org-roam-node-find=, and other such equivalents listed in [[https://github.com/meedstrom/org-node?tab=readme-ov-file#commands][Commands]]. Enjoy!
 
-You may also want [[https://github.com/meedstrom/org-node#1-see-backlinks-in-the-org-roam-buffer-window][org-roam-buffer backlinks]].
+You may also want [[https://github.com/meedstrom/org-node?tab=readme-ov-file#1-see-backlinks-in-the-org-roam-buffer-window][org-roam-buffer backlinks]].
 
 *** Commands
 
@@ -106,35 +106,31 @@ You may also want [[https://github.com/meedstrom/org-node#1-see-backlinks-in-the
 
 For config options, type =M-x customize-group RET org-node RET=.
 
-*** Getting started with backlinks
-
-You have two different ways to see backlinks:
-
-**** 1. See backlinks in the org-roam-buffer window
+*** See backlinks as an org-roam-buffer
 
 Want the good old =M-x org-roam-buffer-toggle=?
 
-You can tell org-node to share its data with org-roam.  For a first-time run, type =M-x org-node-feed-roam-db= (slow!).  Then add this init snippet to keep the database updated over time:
+*Option 1*.  Feed data to org-roam so all its features will Just Work^{sort of}.  For a first-time run, type =M-x org-node-feed-roam-db= (slow!).  Then add the following init snippet to keep the database updated over time.
 
 #+begin_src elisp
 (add-hook 'org-node-cache-scan-file-hook #'org-node-feed-file-to-roam-db)
 (setq org-roam-db-update-on-save nil)
 #+end_src
 
-It is also possible to cut out the DB altogether.  Instead of the above, add this advice:
+*Option 2*.  Cut out the DB altogether.  Instead of the above, add this hack:
 
 #+begin_src elisp
 (advice-add 'org-roam-backlinks-get :override
             #'org-node--fabricate-roam-backlinks)
 #+end_src
 
-**** 2. See backlinks on a subtree property line
+*** See backlinks inside the file, on a property line
 
 I love this solution, because I rarely have space for a second window to show org-roam's backlinks.
 
-You can let org-node add a =BACKLINKS= property to all nodes.  For a first-time run, type =M-x org-node-backlink-fix-all=.
+Let org-node add a =BACKLINKS= property to all nodes.  For a first-time run, type =M-x org-node-backlink-fix-all=.  (Don't worry, if you change your mind there is =M-x org-node-backlink-regret=.)
 
-Turn on =M-x org-node-backlink-mode=, a global minor mode that keeps these properties updated.  Init snippet:
+Then start using the minor mode =org-node-backlink-mode=, which keeps these properties updated.  Init snippet:
 
 #+begin_src elisp
 (add-hook 'org-mode-hook #'org-node-backlink-mode)
