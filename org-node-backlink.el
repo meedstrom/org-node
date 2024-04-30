@@ -229,7 +229,8 @@ Does NOT try to validate the rest of the target's backlinks."
                             org-node--standard-tip)))
           ;; "Reflink"
           (setq id (gethash (concat type ":" path) org-node--refs-table))
-          (setq file (plist-get (gethash id org-nodes) :file-path)))
+          (setq file (ignore-errors
+                       (org-node-file-path (gethash id org-nodes)))))
         (when (and id file)
           (org-node-backlink--add-in-target-1 file id part-of-mass-op))))))
 

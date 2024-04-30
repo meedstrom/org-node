@@ -167,7 +167,7 @@ How to see the headings' full outline paths while searching for nodes:
 (setq org-node-format-candidate-fn
       (defun my-format-with-olp (node title)
         "Prepend subtree completions with the outline path."
-        (if-let ((olp (plist-get node :olp)))
+        (if-let ((olp (org-node-olp node)))
             (concat (string-join olp " > ") " > " title)
           title)))
 #+end_src
@@ -183,10 +183,10 @@ The point of org-id is to avoid dependence on filenames, but it's often pragmati
 #+begin_src elisp
 (setq org-node-filter-fn
       (lambda (node)
-        (and (not (plist-get node :exclude))
-             (not (plist-get node :todo))
-             (not (member "drill" (plist-get node :tags)))
-             (not (string-search "archive" (plist-get node :file-path))))))
+        (and (not (org-node-todo node))
+             (not (member "drill" (org-node-tags node)))
+             (not (assoc "ROAM_EXCLUDE" (org-node-properties node))
+             (not (string-search "archive" (org-node-file-path node))))))
 #+end_src
 
 **** org-id
