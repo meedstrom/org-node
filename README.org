@@ -157,7 +157,7 @@ Users of [[https://github.com/toshism/org-super-links][org-super-links]] are alr
 I am looking into enabling that possibility as well.  For now, if you are such an user, forget all the above and instead continue to rely on org-super-links:
 
 #+begin_src elisp
-(add-hook 'org-node-insert-link-hook #'org-super-links-convert-link-to-super)
+(add-hook 'org-node-insert-link-hook #'org-node-convert-link-to-super)
 #+end_src
 
 I /think/ that should work. Totally untested, let me know!
