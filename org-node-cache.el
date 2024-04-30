@@ -1,4 +1,4 @@
-;;; org-node-cache.el --- The heart -*- lexical-binding: t; -*-
+;;; org-node-cache.el --- The beating heart -*- lexical-binding: t; -*-
 
 (require 'org-node-lib)
 
@@ -10,6 +10,7 @@ While the mode is active, commands such as `org-node-find' and
 time."
   :global t
   :group 'org-node
+  (remove-hook 'org-mode-hook #'org-node-cache-mode)
   (if org-node-cache-mode
       (progn
         (add-hook 'after-save-hook #'org-node-cache-scan-file)
@@ -37,23 +38,16 @@ time."
                             random-node))))))))
 
 (defun org-node-cache-reset ()
-  "Wipe and rebuild the cache."
-  (interactive)
-  (let ((then (current-time)))
-    (clrhash org-nodes)
-    (clrhash org-node-collection)
-    (clrhash org-node--refs-table)
-    (clrhash org-node--reflinks-table)
-    (clrhash org-node--links-table)
-    (org-node--init-org-id-locations-or-die)
-    (let ((files (-uniq (hash-table-values org-id-locations))))
-      (org-node-cache--collect-nodes files)
-      (run-hooks 'org-node-cache-hook)
-      (message "org-node: scanned %d files and %d subtrees in %.2fs"
-               (length files)
-               (cl-loop for node being the hash-values of org-nodes
-                        count (org-node-is-subtree node))
-               (float-time (time-since then))))))
+  "Wipe and rebuild the cache.
+For an user-facing command, see \\[org-node-reset]."
+  (clrhash org-nodes)
+  (clrhash org-node-collection)
+  (clrhash org-node--refs-table)
+  (clrhash org-node--reflinks-table)
+  (clrhash org-node--links-table)
+  (org-node--init-org-id-locations-or-die)
+  (org-node-cache--collect-nodes (-uniq (hash-table-values org-id-locations)))
+  (run-hooks 'org-node-cache-reset-hook))
 
 (defun org-node-cache-scan-file (&optional _ arg2 &rest _args)
   "Seek nodes in a single file."
@@ -61,29 +55,29 @@ time."
   ;; name.  Do not assume it is being done to the current buffer; it may be
   ;; called from a Dired buffer, for example.
   (let ((file (if (and arg2 (stringp arg2) (file-exists-p arg2))
-                  arg2
+                  arg2x
                 (buffer-file-name))))
     (org-node-cache--collect-nodes (list file)))
-  (run-hooks 'org-node-cache-file-hook))
+  (run-hooks 'org-node-cache-scan-file-hook))
 
-(defvar org-node-cache-hook (list))
-(defvar org-node-cache-file-hook (list))
+(defvar org-node-cache-reset-hook nil)
+(defvar org-node-cache-scan-file-hook nil)
 
 (defun org-node-cache-ensure-fresh ()
   (org-node--init-org-id-locations-or-die)
   (when (hash-table-empty-p org-node-collection)
-    ;; Tip once per emacs session
+    ;; Once-per-session tip
     (message "To speed up this command, turn on `org-node-cache-mode'"))
-  (when (not org-node-cache-mode)
+  (when (or (not org-node-cache-mode)
+            (hash-table-empty-p org-node-collection))
     (let ((inhibit-message t))
       (org-node-cache-reset))))
 
 (let ((this-timer (timer-create)))
   (defun org-node-cache--handle-delete (arg1 &rest args)
-    "Update org-id and org-node after an Org file is deleted.
+    "Update org-id and org-node after a file is deleted.
 
-First remove references in `org-id-locations', as oddly, upstream does
-not do that.
+First remove references in `org-id-locations'.
 
 Then rebuild the org-node caches after a few idle seconds.  The delay
 avoids bothering the user who may be trying to delete many files in a
@@ -93,7 +87,6 @@ short time."
                                 (buffer-file-name))))
       (when (member (file-name-extension file-being-deleted)
                     '("org" "org_archive" "gpg"))
-        (org-node--init-org-id-locations-or-die)
         (org-node-cache--forget-id-location file-being-deleted)
         (cancel-timer this-timer)
         (setq this-timer
@@ -103,6 +96,7 @@ short time."
 ;;; Plumbing
 
 (defun org-node-cache--forget-id-location (file)
+  (org-node--init-org-id-locations-or-die)
   (cl-loop for id being the hash-keys of org-id-locations
            using (hash-values file-on-record)
            when (file-equal-p file file-on-record)
@@ -118,20 +112,6 @@ that will match any of the keywords."
        (string-trim)
        (string-split)
        (regexp-opt)))
-
-;; Optimized for one purpose, do NOT reuse.  Bungles the match data despite
-;; claiming not to!
-(let ((regexp (rx "[[id:" (group (+? nonl)) "][" (+? nonl) "]]")))
-  (defun org-node-cache--backlinks->list (backlinks-string)
-    "Out of BACKLINKS-STRING, take substrings looking like
-[[id:abcd][Description]], and collect the \"abcd\" parts into a list.
-
-At least if its assumptions about the input are correct, which
-it does not check."
-    (declare (pure t) (side-effect-free t))
-    (if backlinks-string
-        (split-string (replace-regexp-in-string regexp "\\1" backlinks-string)
-                      "  " t))))
 
 (defun org-node-cache--collect-properties (beg end)
   (let (res)
@@ -152,7 +132,8 @@ it does not check."
     res))
 
 (defun org-node-cache--collect-nodes (files)
-  "Scan FILES for id-nodes, adding them to `org-nodes'."
+  "Scan FILES for id-nodes, adding them to `org-nodes'.
+Also scan for links."
   (with-temp-buffer
     (let ((outline-regexp org-outline-regexp)
           (backlinks-drawer-re
@@ -170,7 +151,7 @@ it does not check."
       (dolist (file files)
         (if (not (file-exists-p file))
             ;; Example situation: user renamed/deleted a file using shell
-            ;; commands, outside Emacs.  So org-id references a file that
+            ;; commands, outside Emacs.  Now org-id references a file that
             ;; doesn't exist.  Our solution: just skip.  If the file was
             ;; renamed to a new location, it'll have to be picked up by org-id
             ;; in its usual ways.
@@ -185,7 +166,8 @@ it does not check."
             ;;   (org-node--root-dirs (hash-table-values org-id-locations))))
             ;;
             ;; but it doesn't take into account what the user may want to
-            ;; exclude, like backups.  Starting to think we need an org-id2.el.
+            ;; exclude, like versioned backup files, so we shouldn't do that.
+            ;; Starting to think we need an org-id2.el.
             (progn
               (org-node-cache--forget-id-location file)
               (setq please-update-id t))
@@ -240,10 +222,8 @@ it does not check."
               :id file-id
               :aliases (split-string-and-unquote
                         (or (cdr (assoc "ROAM_ALIASES" props)) ""))
-              :refs (let ((refs (cdr (assoc "ROAM_REFS" props))))
-                      (and refs (split-string-and-unquote refs)))
-              :backlink-origins (org-node-cache--backlinks->list
-                                 (cdr (assoc "CACHED_BACKLINKS" props)))))
+              :refs (split-string-and-unquote
+                     (or (cdr (assoc "ROAM_REFS" props)) ""))))
             ;; Loop over the file's subtrees
             (while (outline-next-heading)
               (let ((pos (point))
@@ -336,19 +316,27 @@ it does not check."
                   :properties props
                   :aliases (split-string-and-unquote
                             (or (cdr (assoc "ROAM_ALIASES" props)) ""))
-                  :refs (let ((refs (cdr (assoc "ROAM_REFS" props))))
-                          (and refs (split-string-and-unquote refs)))
-                  :backlink-origins (org-node-cache--backlinks->list
-                                     (cdr (assoc "CACHED_BACKLINKS" props))))))))))
+                  :refs (split-string-and-unquote
+                         (or (cdr (assoc "ROAM_REFS" props)) "")))))))))
       (when please-update-id
         (org-id-update-id-locations)
         (org-id-locations-save)
-        ;; potential infinite recursion
+        ;; REVIEW Ensure this can't lead to infinite recursion
         (org-node-cache-reset)))))
 
-;; (hash-table-values org-node--reflinks-table)
-
 (defun org-node-cache--collect-links-until (end id-here olp-with-self)
+  "From here to position END, look for forward-links.
+Use these links to populate tables `org-node--links-table' and
+`org-node--reflinks-table'.
+
+Argument ID-HERE is the ID of the subtree where this function
+will presumably be executed (or that of an ancestor subtree).  It
+is important for correctness that END is also within the
+boundaries of that subtree.
+
+Argument OLP-WITH-SELF is simply the outline path to the current
+subtree, including its own heading.  This is data that org-roam
+wants for some reason."
   (while (re-search-forward org-link-plain-re end t)
     (let ((type (match-string 1))
           (path (match-string 2)))
@@ -370,36 +358,37 @@ it does not check."
 ;; I feel like this could be easier to read...
 (defun org-node-cache--add-node-to-tables (node)
   "Add NODE to `org-nodes' and maybe `org-node-collection'."
-  ;; Record to `org-nodes' even if it has no ID
+  ;; Record the node even if it has no ID
   (puthash (or (org-node-id node) (format-time-string "%N"))
            node
            org-nodes)
   (when (or (not org-node-only-show-subtrees-with-id) (org-node-id node))
-    ;; Add to `org-node--refs-table'
+    ;; Populate `org-node--refs-table'
     (dolist (ref (org-node-refs node))
       (puthash ref (org-node-id node) org-node--refs-table))
     (when (funcall org-node-filter-fn node)
-      (progn
-        ;; Add to `org-node-collection'
-        (dolist (title (cons (org-node-title node)
-                             (org-node-aliases node)))
-          (puthash (funcall org-node-format-candidate-fn node title)
-                   node
-                   org-node-collection))
-        ;; Let refs work as aliases
-        (dolist (ref (org-node-refs node))
-          (puthash ref node org-node-collection))))))
-
-;; WIP
-(defun org-node-cache--pos->inherited-props (oldata pos))
+      ;; Populate `org-node-collection'
+      (dolist (title (cons (org-node-title node)
+                           (org-node-aliases node)))
+        (puthash (funcall org-node-format-candidate-fn node title)
+                 node
+                 org-node-collection))
+      ;; Let refs work as aliases
+      (dolist (ref (org-node-refs node))
+        (puthash ref node org-node-collection)))))
 
 (defun org-node-cache--pos->parent-id (oldata pos file-id)
+  "Return ID of the closest ancestor heading that has an ID.
+See `org-node-cache--pos->olp' for explanation of arguments.
+
+Extra argument FILE-ID is the file-level id, used as a fallback
+if no ancestor heading has an ID.  It can be nil."
   (declare (pure t) (side-effect-free t))
   (let (;; Drop all the data about positions below POS
         (reversed (-drop (-elem-index (assoc pos oldata) oldata) oldata)))
     (let ((curr-level (caddr (car reversed))))
       ;; Work backwards towards the top of the file
-      ;; Sorry for the `cl-loop' brainfuck
+      ;; Sorry about the `cl-loop' brain teaser.
       (cl-loop for cell in reversed
                as id = (nth 3 cell)
                if (> curr-level (caddr cell))

@@ -239,8 +239,7 @@ first element."
   olp
   properties
   aliases
-  refs
-  backlink-origins)
+  refs)
 
 (provide 'org-node-lib)
 

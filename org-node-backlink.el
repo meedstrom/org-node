@@ -5,33 +5,25 @@
 
 ;;;###autoload
 (define-minor-mode org-node-backlink-mode
-  "Keep :CACHED_BACKLINKS: properties updated."
-  :global t
+  "Keep :BACKLINKS: properties updated."
   :group 'org-node
   (if org-node-backlink-mode
       (progn
-        (add-hook 'before-save-hook #'org-node-backlink-check-buffer)
-        (add-hook 'org-roam-post-node-insert-hook #'org-node-backlink--add-in-target-a -99)
-        (add-hook 'org-node-insert-link-hook #'org-node-backlink--add-in-target-a -99)
+        (add-hook 'before-save-hook #'org-node-backlink-check-buffer 0 t)
+        (add-hook 'org-roam-post-node-insert-hook #'org-node-backlink--add-in-target-a -99 t)
+        (add-hook 'org-node-insert-link-hook #'org-node-backlink--add-in-target-a -99 t)
+        ;; Advices cannot be buffer-local, but it's ok, this one checks if the
+        ;; mode is on.
         (advice-add 'org-insert-link :after #'org-node-backlink--add-in-target-a))
-    (remove-hook 'before-save-hook #'org-node-backlink-check-buffer)
-    (remove-hook 'org-roam-post-node-insert-hook #'org-node-backlink--add-in-target-a)
-    (remove-hook 'org-node-insert-link-hook #'org-node-backlink--add-in-target-a)
-    (advice-remove 'org-insert-link #'org-node-backlink--add-in-target-a)))
+    (remove-hook 'before-save-hook #'org-node-backlink-check-buffer t)
+    (remove-hook 'org-roam-post-node-insert-hook #'org-node-backlink--add-in-target-a t)
+    (remove-hook 'org-node-insert-link-hook #'org-node-backlink--add-in-target-a t)))
 
-;; TODO Large files would still be slow to save (now we stop checking if there
-;;      are too many links), so instead of checking the entire file on
-;;      before-save-hook, try to just check the most local subtree on every
-;;      auto-save, and maybe on some other infrequent hooks.  If we have to
-;;      visit the targets in org-mode buffers, leave the buffers open.
-;;
-;;      Actually, maybe advise `yank' and `delete-region' and then we can stop
-;;      doing full buffer checks.  If there is a big yank, like with a thousand
-;;      links, it could just add the links to some list to check on an idle
-;;      timer.
-;;
-;;      How does ws-butler know which lines have recently changed? That'd be
-;;      great to have.
+;; TODO Let it update giant files quickly.  Now it just gives up and gets out of
+;; the way if there are >100 links, but it should get faster with the new
+;; `org-node--links-table'.  Anyway, for a truly giant file, I'd like to take a
+;; page from the ws-butler concept: only update the parts of the file that
+;; changed.
 (defun org-node-backlink-check-buffer ()
   "Designed for `before-save-hook', and avoids signaling an error."
   (interactive)
@@ -52,79 +44,73 @@
 (defvar org-node-backlink--fix-ctr 0)
 (defvar org-node-backlink--fix-cells nil)
 
-(defun org-node-backlink-fix-all ()
+(defun org-node-backlink-fix-all (&optional remove-them)
+  "Add :BACKLINKS: property to all nodes known to `org-id-locations'.
+Optional argument REMOVE-THEM means remove them instead, like
+\\[org-node-backlink-regret]."
   (interactive)
-  (org-node-cache-ensure-fresh)
-  ;; when (and (yes-or-no-p
-  ;;            (format "Edit the %d files found in `org-id-locations'?" total))
-  ;;           (org-node--consent-to-problematic-modes-for-mass-op))
-  (org-node-backlink-mode 0)
+  ;; Reset
   (when (or (= 0 org-node-backlink--fix-ctr) current-prefix-arg)
-    ;; Reset
+    (org-node-cache-reset)
     (setq org-node-backlink--fix-cells (org-id-hash-to-alist org-id-locations)))
-  ;; Do 1000 at a time, bc Emacs cries about opening too many files in one loop
-  (let ((find-file-hook nil)
-        (org-mode-hook nil)
-        (after-save-hook nil)
-        (before-save-hook nil)
-        (org-agenda-files nil)
-        (org-inhibit-startup t)
-        (gc-cons-threshold (* 1000 1000 1000)))
-    (dotimes (_ 1000)
-      (let ((cell (pop org-node-backlink--fix-cells)))
-        (message "Fixing backlinks... %d files (you can stop and resume)"
-                 (cl-incf org-node-backlink--fix-ctr))
-        (org-with-file-buffer (car cell)
-          (org-with-wide-buffer
-           (dolist (id (cdr cell))
-             (goto-char (org-find-entry-with-id id))
-             (let* ((refs (org-node-refs (gethash id org-nodes)))
-                    (reflinks (--map (gethash it org-node--reflinks-table) refs))
-                    (backlinks (gethash id org-node--links-table))
-                    (combined
-                     (->> (append reflinks backlinks)
-                          (--map (plist-get it :src))
-                          (-uniq)
-                          (-sort #'string-lessp)
-                          (--map (org-link-make-string
-                                  (concat "id:" it)
-                                  (org-node-title (gethash it org-nodes)))))))
-               (if combined
-                   (org-entry-put nil "CACHED_BACKLINKS" (string-join combined "  "))
-                 (org-entry-delete nil "CACHED_BACKLINKS")))))
-          (and org-file-buffer-created
-               (buffer-modified-p)
-               (let ((save-silently t)
-                     (inhibit-message t))
-                 (save-buffer)))))))
-  (if org-node-backlink--fix-cells
-      (run-with-timer 0 nil #'org-node-backlink-fix-all)
-    ;; Reset
-    (setq org-node-backlink--fix-ctr 0)))
+  (org-node-backlink-mode 0)
+  (when (or (/= 0 org-node-backlink--fix-ctr)
+            (y-or-n-p (format "Edit the %d files found in `org-id-locations'?"
+                              (length org-node-backlink--fix-cells))))
+    (let ((find-file-hook nil)
+          (org-mode-hook nil)
+          (after-save-hook nil)
+          (before-save-hook nil)
+          (org-agenda-files nil)
+          (org-inhibit-startup t)
+          (gc-cons-threshold (* 1000 1000 1000)))
+      ;; Do 1000 at a time, because Emacs cries about opening too many file
+      ;; buffers in one loop
+      (dotimes (_ 1000)
+        (let ((cell (pop org-node-backlink--fix-cells)))
+          (message "Fixing backlinks... %d files (you can stop and resume)"
+                   (cl-incf org-node-backlink--fix-ctr))
+          (org-with-file-buffer (car cell)
+            (org-with-wide-buffer
+             (dolist (id (cdr cell))
+               (goto-char (org-find-entry-with-id id))
+               ;; Old name, get rid of it
+               (org-entry-delete nil "CACHED_BACKLINKS")
+               (if remove-them
+                   (org-entry-delete nil "BACKLINKS")
+                 (let* ((refs (org-node-refs (gethash id org-nodes)))
+                        (reflinks (--map (gethash it org-node--reflinks-table) refs))
+                        (backlinks (gethash id org-node--links-table))
+                        (combined
+                         (->> (append reflinks backlinks)
+                              (--map (plist-get it :src))
+                              (-uniq)
+                              (-sort #'string-lessp)
+                              (--map (org-link-make-string
+                                      (concat "id:" it)
+                                      (org-node-title (gethash it org-nodes)))))))
+                   (if combined
+                       (org-entry-put nil "BACKLINKS" (string-join combined "  "))
+                     (org-entry-delete nil "BACKLINKS"))))))
+            (and org-file-buffer-created
+                 (buffer-modified-p)
+                 (let ((save-silently t)
+                       (inhibit-message t))
+                   (save-buffer)))))))
+    (if org-node-backlink--fix-cells
+        (run-with-timer 0 nil #'org-node-backlink-fix-all remove-them)
+      ;; Reset
+      (setq org-node-backlink--fix-ctr 0))))
 
-;; TODO: Much faster: just collect grep buffer of all the org-id-locations and
-;;       suggest the user do wgrep + search and replace.
 (defun org-node-backlink-regret (dir)
-  "Remove :CACHED_BACKLINKS: from all files under DIR."
-  (interactive "DWipe :CACHED_BACKLINKS: from Org files under directory: ")
-  (let ((ctr 0))
-    (dolist (file (directory-files-recursively dir "\\.org$"))
-      (when (--none-p (string-search it file) '("/logseq/bak/"
-                                                "/logseq/version-files/"
-                                                ".sync-conflict-"))
-        (org-with-file-buffer file
-          (without-restriction
-            (goto-char (point-min))
-            (while (progn
-                     (org-entry-delete nil "CACHED_BACKLINKS")
-                     (outline-next-heading))))
-          (and org-file-buffer-created
-               (buffer-modified-p)
-               (save-buffer))))
-      (message "Removing CACHED_BACKLINKS... (%d files)" (cl-incf ctr)))))
+  "Remove Org properties :BACKLINKS: and :CACHED_BACKLINKS: from all
+files known to `org-id-locations'."
+  (interactive)
+  (org-node-backlink-fix-all 'remove))
 
 
-;;; Plumbing
+;;; Plumbing for the mode
+;; Much of this may be deprecated soon
 
 (defvar org-node-backlink--fails nil
   "List of IDs that could not be resolved.")
@@ -212,8 +198,9 @@ higher level.  Return `point-max' if before first heading."
   "Meant as advice after any command that inserts a link.
 See `org-node-backlink--add-in-target' - this is
 merely a wrapper that drops the input."
-  (org-node-cache-ensure-fresh)
-  (org-node-backlink--add-in-target))
+  (when org-node-backlink-mode
+    (org-node-cache-ensure-fresh)
+    (org-node-backlink--add-in-target)))
 
 (defun org-node-backlink--add-in-target (&optional part-of-mass-op)
   "For known link at point, leave a backlink in the target node.
@@ -262,7 +249,7 @@ Does NOT try to validate the rest of the target's backlinks."
                        (concat "^[ \t]*:id: +" (regexp-quote target-id))
                        nil t))
                  (push target-id org-node-backlink--fails)
-               (let ((backlinks-string (org-entry-get nil "CACHED_BACKLINKS"))
+               (let ((backlinks-string (org-entry-get nil "BACKLINKS"))
                      new-value)
                  ;; NOTE: Not sure why, but version 2cff874 dropped some
                  ;; backlinks and it seemed to be fixed by one or both of these
@@ -291,7 +278,7 @@ Does NOT try to validate the rest of the target's backlinks."
                        (setq new-value (string-join ls "  ")))
                    (setq new-value src-link))
                  (unless (equal backlinks-string new-value)
-                   (org-entry-put nil "CACHED_BACKLINKS" new-value)
+                   (org-entry-put nil "BACKLINKS" new-value)
                    (cl-incf org-node-backlink--progress-total-backlinks)
                    (unless part-of-mass-op
                      (and org-file-buffer-created
@@ -330,7 +317,7 @@ Optional argument PART-OF-MASS-OP means skip some cleanup."
               (or (looking-at "[[:space:]]*# " t)
                   (looking-at "[[:space:]]*#\\+" t)))
             (forward-line 1))
-           ;; On a CACHED_BACKLINKS property or in :BACKLINKS:...:END: drawer,
+           ;; On a BACKLINKS property or in :BACKLINKS:...:END: drawer,
            ;; delete link if it's stale
            ((or (save-excursion
                   (goto-char (line-beginning-position))
@@ -344,9 +331,9 @@ Optional argument PART-OF-MASS-OP means skip some cleanup."
                   (kill-region (- (point) 2) (search-forward "]]"))
                 (kill-region (point) end))
               ;; Delete when there's nothing left
-              (let ((prop (org-entry-get nil "CACHED_BACKLINKS")))
+              (let ((prop (org-entry-get nil "BACKLINKS")))
                 (when (and prop (string-blank-p prop))
-                  (org-entry-delete nil "CACHED_BACKLINKS")))))
+                  (org-entry-delete nil "BACKLINKS")))))
            ;; Not a backlink, so it's a regular forward-link - add a backlink
            (t
             (org-node-backlink--add-in-target part-of-mass-op))))

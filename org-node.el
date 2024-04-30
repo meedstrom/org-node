@@ -29,15 +29,12 @@
 
 ;; TODO Annotations for completion
 ;; TODO Completion category https://github.com/alphapapa/org-ql/issues/299
-;; TODO Command to grep across all files (then deprecate the -regret command, and teach the user wgrep)
-;; TODO Rename :CACHED_BACKLINKS: to :BACKLINKS: ?
+;; TODO Command to grep across all files
 ;; TODO Option to insert backlink into org-super-links :BACKLINKS: drawer
-;; TODO React to any org-element-cache error (they're common) and disable the cache during fix-all
-;; TODO Use fundamental-mode in `org-node-backlink-fix-all'
 ;; TODO Command to explore feedback arc sets
 ;; TODO Bit of a test suite
 ;; TODO Test a custom id format involving emoji to see if that breaks regexps
-;; TODO Do you get more performant searches by disabling case-fold-search?
+;; TODO Test perf of disabling case-fold-search
 
 (require 'org-node-lib)
 (require 'org-node-cache)
@@ -45,12 +42,15 @@
 (require 'org-node-backlink)
 (require 'org-node-roam)
 
+;; Will deprecate soon
 ;;;###autoload
 (defun org-node-enable ()
   "Designed for `org-mode-hook' and will remove itself."
   (remove-hook 'org-mode-hook #'org-node-enable)
   (org-node-backlink-mode)
-  (org-node-cache-mode))
+  (org-node-cache-mode)
+  ;; 2024-04-30
+  (message "Org-node has new recommendations for init, see README"))
 
 (provide 'org-node)
 
