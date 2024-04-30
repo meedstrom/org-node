@@ -208,7 +208,8 @@ type the name of a node that does not exist:
       (let* ((guess (car (org-node--root-dirs
                           (hash-table-values org-id-locations))))
              (dir (if org-node-ask-directory
-                      (read-directory-name "Where to create the node? " guess)
+                      (read-directory-name
+                       "Save the node in which directory? " guess)
                     guess))
              (path-to-write (file-name-concat
                              dir (funcall org-node-slug-fn title))))
@@ -241,7 +242,8 @@ variables."
   (let* ((guess (car (org-node--root-dirs
                       (hash-table-values org-id-locations))))
          (dir (if org-node-ask-directory
-                  (read-directory-name "Where to create the node? " guess)
+                  (read-directory-name
+                   "Save the node in which directory? " guess)
                 guess))
          (path-to-write (file-name-concat dir (funcall org-node-slug-fn
                                                        org-node-proposed-title))))
@@ -543,7 +545,8 @@ Adding to that, here is an example advice to copy any inherited
   (let* ((guess (car (org-node--root-dirs
                       (hash-table-values org-id-locations))))
          (dir (if org-node-ask-directory
-                  (read-directory-name "Where to create the node? " guess)
+                  (read-directory-name
+                   "Save the node in which directory? " guess)
                 guess)))
     (save-excursion
       (org-back-to-heading t)

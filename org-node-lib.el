@@ -13,10 +13,11 @@
   "Support a zettelkasten of org-id files and subtrees."
   :group 'org)
 
-(defcustom org-node-ask-directory t
-  "Set t to ask where to save a new node.
+(defcustom org-node-ask-directory nil
+  "Whether to ask the user where to save a new node.
+
 Set nil to assume that the most populous root directory in
-`org-id-locations' is correct."
+`org-id-locations' is always the correct choice."
   :group 'org-node
   :type 'boolean)
 
