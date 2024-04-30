@@ -81,14 +81,14 @@ The keys I use:
 
 #+begin_src elisp
 (global-set-key (kbd "<f2> f") #'org-node-find)
-(global-set-key (kbd "<f2> i") #'org-node-insert)
+(global-set-key (kbd "<f2> i") #'org-node-insert-link)
 #+end_src
 
-(I like F2, but as everyone aside from Xah Lee seems to hate F1-F12, maybe you'd prefer... let's say =M-s=?
+(I like F2, but as everyone aside from Xah Lee seems to hate F1-F12, maybe you'd prefer... let's say =M-s=?)
 
 #+begin_src elisp
 (global-set-key (kbd "M-s f") #'org-node-find)
-(global-set-key (kbd "M-s i") #'org-node-insert)
+(global-set-key (kbd "M-s i") #'org-node-insert-link)
 #+end_src
 
 To browse other config options, type =M-x customize-group RET org-node RET=.
