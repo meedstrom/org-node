@@ -46,16 +46,13 @@
 
 (defun org-node-backlink-fix-all (&optional remove-them)
   "Add :BACKLINKS: property to all nodes known to `org-id-locations'.
-Optional argument REMOVE-THEM means remove them instead, like
-\\[org-node-backlink-regret]."
+Optional argument REMOVE-THEM means remove them instead, the same
+as the user command \\[org-node-backlink-regret]."
   (interactive)
-  ;; Reset
-  (when (or (= 0 org-node-backlink--fix-ctr)
-            (null org-node-backlink--fix-cells)
-            current-prefix-arg)
+  (when (or (null org-node-backlink--fix-cells) current-prefix-arg)
+    ;; Start over
     (org-node-cache-reset)
     (setq org-node-backlink--fix-cells (org-id-hash-to-alist org-id-locations)))
-  (org-node-backlink-mode 0)
   (when (or (/= 0 org-node-backlink--fix-ctr)
             (y-or-n-p (format "Edit the %d files found in `org-id-locations'?"
                               (length org-node-backlink--fix-cells))))
@@ -64,14 +61,14 @@ Optional argument REMOVE-THEM means remove them instead, like
           (after-save-hook nil)
           (before-save-hook nil)
           (org-agenda-files nil)
-          (org-inhibit-startup t)
-          (gc-cons-threshold (* 1000 1000 1000)))
+          (org-inhibit-startup t))
       ;; Do 1000 at a time, because Emacs cries about opening too many file
       ;; buffers in one loop
       (dotimes (_ 1000)
         (when-let ((cell (pop org-node-backlink--fix-cells)))
-          (message "Fixing backlinks... %d files (you can stop and resume)"
-                   (cl-incf org-node-backlink--fix-ctr))
+          (message
+           "Adding/updating :BACKLINKS:... (you can stop and resume) (%d) %s"
+           (cl-incf org-node-backlink--fix-ctr) (car cell))
           (org-with-file-buffer (car cell)
             (org-with-wide-buffer
              (dolist (id (cdr cell))
@@ -88,6 +85,8 @@ Optional argument REMOVE-THEM means remove them instead, like
                         (combined
                          (->> (append reflinks backlinks)
                               (--map (plist-get it :src))
+                              ;; TODO Not sure how there are nils, look into it
+                              (remq 'nil)
                               (-uniq)
                               (-sort #'string-lessp)
                               (--map (org-link-make-string
@@ -103,7 +102,8 @@ Optional argument REMOVE-THEM means remove them instead, like
                        (inhibit-message t))
                    (save-buffer)))))))
     (if org-node-backlink--fix-cells
-        (run-with-timer 0 nil #'org-node-backlink-fix-all remove-them)
+        ;; Keep going
+        (run-with-timer 1 nil #'org-node-backlink-fix-all remove-them)
       ;; Reset
       (setq org-node-backlink--fix-ctr 0))))
 
