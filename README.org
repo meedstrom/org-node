@@ -45,44 +45,16 @@ For your pleasure, here's a comparison of three similar notetaking systems: all 
 | org-capture integration           | no          | yes                | no                   |
 | Backlinks in same window          | no          | yes                | yes                  |
 | Avoid double-counting :BACKLINKS: | no          | yes                | yes                  |
-| Warn about dead links             | no          | yes                | no                   |
-| Seek files/headings sans ID       | no          | yes                | not applicable       |
+| Find files/headings without ID    | no          | yes                | not applicable       |
 | Node exclusion                    | yes         | limited            | not applicable       |
 | Support =roam:= links               | yes         | no                 | no                   |
+| Warn about dead links             | no          | no                 | no                   |
 | Some query-able cache             | org-roam-db | org-nodes          | no                   |
 |-----------------------------------+-------------+--------------------+----------------------|
 | Cache mandatory                   | yes         | no                 | no                   |
 | Time to re-cache 2000 files       | 3 minutes   | 1 second           | not applicable       |
 
 This isn't a totally fair comparison; org-roam has an advantage in the details, see Appendix II.  With org-node I've made what I would've liked to hack on, so it's more simplistic in many aspects.
-
-** Backlink-mode
-
-I'll warn you now about =org-node-backlink-mode=: it adds a =CACHED_BACKLINKS= to many of your ID-nodes' property drawers.
-
-When I first ran across that concept in [[https://github.com/toshism/org-super-links][org-super-links]], I didn't like it.  A database /inside/ the user-written file?  It seemed like clutter, and possibly easy to break.
-
-But that's not true, it's rock solid!  There's a reason org-node caches thousands of ID-nodes in 1 second:
-
-1. Since our permissive =org-id= system allows nested nodes (subtree nodes inside other subtrees), it makes resolving backlinks an optimization challenge.  Not only do you have to parse one file's links, you have to open and parse all the links' target files.  A naive implementation will easily run at O(N^{2}).
-
-2. By "pre-recording" backlinks in the subtrees that concern them, the cache builder can just grab them while it grabs all the other info, leaving almost zero work to do.
-
-Maybe you still worry about such backlinks growing stale.  So I made two systems against that: first, if you keep =org-node-backlink-mode= active all the time, it's not expected to happen unless something broke your save hooks.  It records the appearance and disappearance of links upon save.  Second, when you feel suspicious, the command =org-node-backlink-fix-all= will fix all files (slow).
-
-**** Surprising benefit
-
-Did you ever want to be able to see backlinks inside the Org buffer instead of in a separate window?
-
-Well... Now they're right there.
-
-**** It should be possible without-
-
-Yes.  I've got in my head an alternative solution to caching link data (primarily because =org-node-backlink-fix-all= is something of a PITA), and once it's in place, =CACHED_BACKLINKS= will be optional.  But I recommend opting in anyway, it grows on you!
-
-**** Q: Will org-roam double-count my backlinks now?
-
-Nope!  Org-roam doesn't count links in property drawers.
 
 ** Config and setup
 
@@ -91,12 +63,24 @@ Add an init snippet like this (assuming [[https://github.com/radian-software/str
 #+begin_src elisp
 (use-package org-node
   :straight (org-node :type git :host github :repo "meedstrom/org-node")
-  :hook (org-mode . org-node-enable))
+  :hook (org-mode . org-node-cache-mode))
 #+end_src
 
-The function =org-node-enable= only runs once, and turns on two global minor modes, =org-node-cache-mode= and =org-node-backlink-mode=.  Neither mode is required, as most commands work anyway.  The cache-mode makes the commands instant, and the backlink-mode inserts corresponding backlinks whenever you insert a link.
+*** Use Org-roam at the same time?
 
-** Commands
+These user options help you feel at home using both packages side-by-side:
+
+#+begin_src elisp
+(setq org-node-creation-fn #'org-node-new-by-roam-capture)
+(setq org-node-slug-fn #'org-node-slugify-like-roam)
+(setq org-node-creation-hook nil)
+#+end_src
+
+With that done, try the command =org-node-find= instead of =org-roam-node-find=, and other such equivalents listed in [[https://github.com/meedstrom/org-node#commands][Commands]]. Enjoy!
+
+You may also want [[https://github.com/meedstrom/org-node#1-see-backlinks-in-the-org-roam-buffer-window][org-roam-buffer backlinks]].
+
+*** Commands
 
 - =org-node-find=
   - A counterpart to =org-roam-node-find=
@@ -107,30 +91,64 @@ The function =org-node-enable= only runs once, and turns on two global minor mod
 - =org-node-extract-subtree=
   - A bizarro counterpart to =org-roam-extract-subtree=
 - =org-node-nodeify-entry=
-  - Trivial: Give an ID to subtree at point (and run org-node-creation-hook)
+  - Trivial - give an ID to subtree at point (and run org-node-creation-hook)
 - =org-node-create-subtree=
-  - Trivial: Create a subtree with an ID (and run org-node-creation-hook)
+  - Trivial - insert a new subtree with an ID (and run org-node-creation-hook)
 - =org-node-random=
 - =org-node-rewrite-links-ask=
   - Look for link descriptions that got out of sync with the current node title, then prompt at each link to update it
 - =org-node-rename-file-by-title=
   - Auto-rename the file based on the current =#+title=
-- =org-node-backlink-mass-fix=
-  - Good first thing to do, to add =CACHED_BACKLINKS= everywhere
+- =org-node-backlink-fix-all=
+  - Add =BACKLINKS= property to every node everywhere that should have one
 - =org-node-backlink-regret=
-  - In case you regret using this package -- remove all =CACHED_BACKLINKS=
+  - In case you regret using this package -- remove all =BACKLINKS=
 
 For config options, type =M-x customize-group RET org-node RET=.
 
-** Org-capture
+*** Getting started with backlinks
+
+You have two different ways to see backlinks:
+
+**** 1. See backlinks in the org-roam-buffer window
+
+Want the good old =M-x org-roam-buffer-toggle=?
+
+You can tell org-node to share its data with org-roam.  For a first-time run, type =M-x org-node-feed-roam-db= (slow!).  Then add this init snippet to keep the database updated over time:
+
+#+begin_src elisp
+(add-hook 'org-node-cache-scan-file-hook #'org-node-feed-file-to-roam-db)
+(setq org-roam-db-update-on-save nil)
+#+end_src
+
+It is also possible to cut out the DB altogether.  Instead of the above, add this advice:
+
+#+begin_src elisp
+(advice-add 'org-roam-backlinks-get :override
+            #'org-node--fabricate-roam-backlinks)
+#+end_src
+
+**** 2. See backlinks on a subtree property line
+
+I love this solution, because I rarely have space for a second window to show org-roam's backlinks.
+
+You can let org-node add a =BACKLINKS= property to all nodes.  For a first-time run, type =M-x org-node-backlink-fix-all=.
+
+Turn on =M-x org-node-backlink-mode=, a global minor mode that keeps these properties updated.  Init snippet:
+
+#+begin_src elisp
+(add-hook 'org-mode-hook #'org-node-backlink-mode)
+#+end_src
+
+*** Org-capture
 
 You may know that org-roam has its own set of capture templates: the =org-roam-capture-templates=.
 
 It can make sense, for people who fully understand the magic of capture templates.  I didn't, so I was not confident using a second-order abstraction over an already leaky abstraction.
 
-That's why I never got acquainted with =M-x org-roam-capture=, only indirectly using the templates via =org-roam-node-find=.  It was a jungle I didn't want to explore.
+That's why I never knew the existence of =M-x org-roam-capture=, and only indirectly used the templates via =org-roam-node-find=.  It was a jungle I didn't want to explore.
 
-So I wondered if you can reproduce the functionality on top of vanilla org-capture.  That'd be less scary.  The answer is yes!
+So can we reproduce the functionality on top of vanilla org-capture?  That'd be less scary.  The answer is yes!
 
 Set-up: write a capture template that uses =(function org-node-capture-target)= as the =target=, and then you can use it via good old =M-x org-capture= to capture to any of your ID nodes.  Something like:
 
@@ -139,26 +157,15 @@ Set-up: write a capture template that uses =(function org-node-capture-target)= 
       '(("n" "ID node" plain (function org-node-capture-target))))
 #+end_src
 
-And if you want the =org-node-find= command to also outsource to org-capture when creating new nodes, use the following setting.
+And if you want the commands =org-node-find= & =org-node-insert-link= to likewise outsource to org-capture when creating new nodes, use the following setting.
 
 #+begin_src elisp
 (setq org-node-creation-fn #'org-capture)
 #+end_src
 
+*** Rich completions
 
-** For you who use Org-roam at the same time
-
-Some user options to feel at home
-
-#+begin_src elisp
-(setq org-node-creation-fn #'org-node-new-by-roam-capture)
-(setq org-node-slug-fn #'org-node-slugify-like-roam)
-(setq org-node-creation-hook nil)
-#+end_src
-
-** Rich completions
-
-How to prepend subtrees with their outline paths:
+How to see the headings' full outline paths while searching for nodes:
 
 #+begin_src elisp
 (setq org-node-format-candidate-fn
@@ -169,51 +176,8 @@ How to prepend subtrees with their outline paths:
           title)))
 #+end_src
 
-** Getting started with backlinks
-
-The basic commands should just work, but you see no backlinks until you run =M-x org-node-backlink-mass-fix=.
-
-If you run into any issues, let me know!  Either here on Github or just [[mailto:meedstrom@runbox.eu][email me]] 💝
-
-# Mention taking ownership of org-id
-
-**** Known issues with the mass-fix
-
-- "couldn't open /dev/stderr: too many files open"
-  - Appears after about 1000 files for me.  It's not an error, just scary.  Interrupt the command and start again; it picks up where it left off, with no further complaint.
-  - Two reasons the command opens all files before beginning its work -- first, it's faster that way.  For each link found, it visits the target, so any given file gets visited many times anyway.  Second, it means you can stop and resume at any time.  Very convenient when a problem comes up.
-
-**** Enabling org-roam-buffer
-
-You have two ways to borrow the power of =M-x org-roam-buffer-toggle=.  But first, both ways have the same limitations:
-
-- Reflinks are represented as backlinks -- no separate reflinks heading
-- It behaves as if the :unique parameter is t and :point is equal to that of the node heading.
-
-The first way is cutting out the org-roam DB entirely:
-
-#+begin_src elisp
-(require 'org-node-roam)
-(advice-add 'org-roam-backlinks-get :override
-            #'org-node--fabricate-roam-backlinks)
-#+end_src
-
-The second way (experimental) is translating org-node's info into a form suitable for the org-roam DB.  This reveals just how much of the slowness of =org-roam-db-sync= came from EmacSQL/SQLite itself!
-
-#+begin_src elisp
-;; eval once
-(org-node-cache-reset)
-(org-node-feed-roam-db) ;; slow, maybe 1/5 of an (org-roam-db-sync 'force)
-
-;; init snippet
-(require 'org-node-roam)
-(add-hook 'org-node-cache-file-hook #'org-node-feed-file-to-roam-db)
-#+end_src
-
-This second method has potential to unlock more org-roam features (like =org-roam-node-display-template=), but does not yet send all the data that org-roam wants, and given that it's slow anyway you may as well continue using the real =org-roam-db-sync= -- for now...
-
-** Limitations
-*** Excluding nodes
+*** Limitations
+**** Excluding nodes
 The =org-node-filter-fn= works well for ignoring TODO items that happen to have an ID, and ignoring org-drill items and that sort of thing, but beyond that, it has limited utility because unlike org-roam, *child ID nodes of an excluded node are not excluded!*
 
 So let's say you have a big archive file, fulla IDs, and you want to exclude all of it.  Putting a =:ROAM_EXCLUDE: t= at the top won't do it.  As it stands, what I'd suggest is unfortunately, look at the file name.
@@ -229,13 +193,9 @@ The point of org-id is to avoid dependence on filenames, but it's often pragmati
              (not (string-search "archive" (plist-get node :file-path))))))
 #+end_src
 
-*** org-id
+**** org-id
 
 In lieu of a convenient =org-roam-update-org-id-locations=, see [[https://github.com/meedstrom/org-node?tab=readme-ov-file#appendix-iii-taking-ownership-of-org-id][Appendix III]] for how to defeat org-id's idiosyncrasies, ensuring org-node knows about all the relevant ID locations.
-
-*** Ref format
-
-For now, don't insert formatted links like =[[http...][description]]= in the =ROAM_REFS= field.  Just the raw URL.
 
 ** Appendix I: Rosetta stone
 
@@ -247,26 +207,26 @@ API comparison between org-roam and org-node.
 | Get node at point               | =(org-roam-node-at-point)=        | =(gethash (org-id-get nil nil nil t) org-nodes)=                                      |
 | Get list of files               | =(org-roam-list-files)=           | =(seq-uniq (hash-table-values org-id-locations))=                                     |
 | Prompt user to pick a node      | =(org-roam-node-read)=            | =(gethash (completing-read "Node: " org-node-collection) org-node-collection)=        |
-| Get backlink IDs                |                                 | =(org-node-backlink-origins NODE)=                                                    |
-| Get org-roam-backlink objects   | =(org-roam-backlinks-get NODE)=   | =(org-node--fabricate-roam-backlinks (org-node--fabricate-roam-object NODE))=         |
+| Get backlink objects            | =(org-roam-backlinks-get NODE)=   | =(gethash (org-node id NODE) org-node--links-table)=                                  |
+| Get reflink objects             | =(org-roam-reflinks-get NODE)=    | =(gethash (org-node id NODE) org-node--reflinks-table)=                               |
 | Get title                       | =(org-roam-node-title NODE)=      | =(org-node-title NODE)=                                                               |
+| Get title of file where NODE is | =(org-roam-node-file-title NODE)= | =(org-node-file-title NODE)=                                                          |
 | Get ID                          | =(org-roam-node-id NODE)=         | =(org-node-id NODE)=                                                                  |
 | Get filename                    | =(org-roam-node-file NODE)=       | =(org-node-file-path NODE)=                                                           |
 | Get tags                        | =(org-roam-node-tags NODE)=       | =(org-node-tags NODE)=, no inherited tags                                             |
-| Get subtree TODO state          | =(org-roam-node-todo NODE)=       | =(org-node-todo NODE)=, only that match global =org-todo-keywords=                      |
-| Get outline level               | =(org-roam-node-level NODE)=      | =(org-node-level NODE)=, also the boolean =:is-subtree=                                 |
-| Get =ROAM_ALIASES=                | =(org-roam-node-aliases NODE)=    | =(org-node-aliases NODE)=                                                             |
-| Get =ROAM_REFS=                   | =(org-roam-node-refs NODE)=       | =(org-node-refs NODE)=                                                                |
-| Get =ROAM_EXCLUDE=                |                                 | =(assoc "ROAM_EXCLUDE" (org-node-properties NODE))=, doesn't inherit parent excludes! |
+| Get outline level               | =(org-roam-node-level NODE)=      | =(org-node-level NODE)=,                                                              |
 | Get char position               | =(org-roam-node-point NODE)=      | =(org-node-pos NODE)=                                                                 |
-| Get :PROPERTIES:                | =(org-roam-node-properties NODE)= | =(org-node-properties NODE)=                                                          |
-| Get title of file where NODE is | =(org-roam-node-file-title NODE)= | =(org-node-file-title NODE)=                                                          |
-| Get subtree heading sans TODO   | =(org-roam-node-title NODE)=      | =(org-node--visit-get-true-heading NODE)=                                             |
-| Get outline-path                | =(org-roam-node-olp NODE)=        | =(org-node-olp NODE)=                                                                 |
-| Get subtree priority            | =(org-roam-node-priority NODE)=   |                                                                                     |
+| Get properties                  | =(org-roam-node-properties NODE)= | =(org-node-properties NODE)=, no inherited properties                                 |
+| Get subtree TODO state          | =(org-roam-node-todo NODE)=       | =(org-node-todo NODE)=, only that match global =org-todo-keywords=                      |
 | Get subtree SCHEDULED           | =(org-roam-node-scheduled NODE)=  | =(org-node-scheduled NODE)=                                                           |
 | Get subtree DEADLINE            | =(org-roam-node-deadline NODE)=   | =(org-node-deadline NODE)=                                                            |
-| Get org-roam-reflink objects    | =(org-roam-reflinks-get NODE)=    |                                                                                     |
+| Get outline-path                | =(org-roam-node-olp NODE)=        | =(org-node-olp NODE)=                                                                 |
+| Get =ROAM_REFS=                   | =(org-roam-node-refs NODE)=       | =(org-node-refs NODE)=                                                                |
+| Get =ROAM_ALIASES=                | =(org-roam-node-aliases NODE)=    | =(org-node-aliases NODE)=                                                             |
+| Get =ROAM_EXCLUDE=                |                                 | =(assoc "ROAM_EXCLUDE" (org-node-properties NODE))=, doesn't inherit parent excludes! |
+| Get whether this is a subtree   |                                 | =(org-node-is-subtree NODE)=                                                          |
+| Get subtree heading sans TODO   | =(org-roam-node-title NODE)=      | =(org-node--visit-get-true-heading NODE)=                                             |
+| Get subtree priority            | =(org-roam-node-priority NODE)=   |                                                                                     |
 | Ensure fresh data               | =(org-roam-db-sync)=              | =(org-node-cache-ensure-fresh)=                                                       |
 
 ** Appendix II: Pros of org-roam
@@ -327,8 +287,8 @@ Snippet B
              (not (hash-table-empty-p org-id-locations)))
   ;; Tell org-id without setting `org-id-extra-files'
   (org-id-update-id-locations
-   (--reject (or (string-search "/logseq/bak/" it)
-                 (string-search "/logseq/version-files/" it))
+   (--filter (and (not (string-search "/logseq/bak/" it))
+                  (not (string-search "/logseq/version-files/" it)))
              (--mapcat (directory-files-recursively it "\\.org$")
                        '(;; Example values
                          "/home/kept/notes/"

@@ -1,179 +1,57 @@
 ;;; org-node-roam.el -*- lexical-binding: t; -*-
 
+(require 'url-parse)
+(require 'ol)
+
+;;; Method 1: no DB at all
+
 ;; To make `org-roam-buffer-toggle' work without any DB, eval this:
 ;; (advice-add 'org-roam-backlinks-get :override #'org-node--fabricate-roam-backlinks)
 
-(defun org-node--fabricate-roam-object (node)
-  "Construct an org-roam-node object from NODE.
-This just uses information in org-node's own `org-nodes'.
-Some of the fields are blank."
+(defun org-node--convert-to-roam (node)
+  "Construct an org-roam-node object from NODE."
   (require 'org-roam)
   (org-roam-node-create
    :file (org-node-file-path node)
    :id (org-node-id node)
+   :olp (org-node-olp node)
+   :scheduled (when-let ((scheduled (org-node-scheduled node)))
+                (format-time-string
+                 "%FT%T%z"
+                 (encode-time (org-parse-time-string scheduled))))
+   :deadline (when-let ((deadline (org-node-deadline node)))
+               (format-time-string
+                "%FT%T%z"
+                (encode-time (org-parse-time-string deadline))))
    :level (org-node-level node)
    :title (org-node-title node)
+   :file-title (org-node-file-title node)
    :tags (org-node-tags node)
    :aliases (org-node-aliases node)
-   :point (org-node-pos node)))
+   :todo (org-node-todo node)
+   :refs (org-node-refs node)
+   :point (org-node-pos node)
+   :properties (org-node-properties node)))
 
-(defun org-node--fabricate-roam-backlinks (roam-object &rest _)
+(defun org-node--fabricate-roam-backlinks (roam-target-node &rest _)
   "Return org-roam-backlink objects targeting ROAM-OBJECT.
-
-A drop-in replacement for `org-roam-backlinks-get', but ignores
-its UNIQUE argument because org-node does not track multiple
-backlinks from the same node anyway: literally all the
-information comes from the CACHED_BACKLINKS property, which is
-deduplicated, as if :unique t."
+Designed as override advice for `org-roam-backlinks-get'."
   (require 'org-roam)
-  (let ((node (gethash (org-roam-node-id roam-object) org-nodes)))
-    (when node
+  (let ((target-id (org-roam-node-id roam-target-node)))
+    (when target-id
       (cl-loop
-       for backlink-id in (org-node-backlink-origins node)
-       as node-that-contains-link = (gethash backlink-id org-nodes)
-       when node-that-contains-link
-       collect (let ((roam-object-that-contains-link
-                      (org-node--fabricate-roam-object node-that-contains-link)))
-                 (org-roam-backlink-create
-                  :target-node roam-object
-                  :source-node roam-object-that-contains-link
-                  ;; Differs from upstream.  Supposed to be position of the
-                  ;; link, but we just give it the position of the subtree!
-                  ;; In other words, it's as if a link sits inside the heading.
-                  :point (org-roam-node-point roam-object-that-contains-link)
-                  :properties nil))))))
+       for link-data in (gethash target-id org-node--links-table)
+       as src-id = (plist-get link-data :src)
+       as src-node = (gethash src-id org-nodes)
+       when src-node
+       collect (org-roam-backlink-create
+                :target-node roam-target-node
+                :source-node (org-node--convert-to-roam src-node)
+                :point (plist-get link-data :pos)
+                :properties (plist-get link-data :properties))))))
 
 
-;;; Feed the DB
-
-(defun org-node-feed-file-to-roam-db ()
-  (emacsql-with-transaction (org-roam-db)
-    (cl-loop with file = (buffer-file-name)
-             for node being the hash-values of org-nodes
-             when (equal file (org-node-file-path node))
-             do (org-node--feed-node-to-roam-db node))))
-
-(defun org-node--feed-node-to-roam-db (node)
-  (let ((id (org-node-id node))
-        (file-path (org-node-file-path node))
-        (tags (org-node-tags node))
-        (aliases (org-node-aliases node))
-        (roam-refs (org-node-refs node))
-        (title (org-node-title node))
-        (properties (org-node-properties node))
-        (backlink-origins (org-node-backlink-origins node))
-        (is-subtree (org-node-is-subtree node))
-        (pos (org-node-pos node)))
-    ;; Replace `org-roam-db-insert-file'
-    (org-roam-db-query
-     [:insert :into files
-      :values $v1]
-     (list (vector file-path nil "" "" "")))
-    ;; Replace `org-roam-db-insert-aliases'
-    (when aliases
-      (org-roam-db-query
-       [:insert :into aliases
-        :values $v1]
-       (mapcar (lambda (alias)
-                 (vector id alias))
-               aliases)))
-    ;; Replace `org-roam-db-insert-tags'
-    (when tags
-      (org-roam-db-query
-       [:insert :into tags
-        :values $v1]
-       (mapcar (lambda (tag)
-                 (vector id tag))
-               tags)))
-    ;; Replace `org-roam-db-insert-node-data'
-    ;; TODO actually sposed to insert formatted title, see src
-    (when is-subtree
-      (let ((file file-path)
-            (todo (org-node-todo node))
-            (priority nil)
-            (level (org-node-level node))
-            (scheduled (when-let ((scheduled (org-node-scheduled node)))
-                         (format-time-string
-                          "%FT%T%z"
-                          (encode-time (org-parse-time-string scheduled)))))
-            (deadline (when-let ((deadline (org-node-deadline node)))
-                        (format-time-string
-                         "%FT%T%z"
-                         (encode-time (org-parse-time-string deadline)))))
-            (olp nil))
-        (org-roam-db-query
-         [:insert :into nodes
-          :values $v1]
-         (vector id file level pos todo priority
-                 scheduled deadline title properties olp))))
-    ;; Replace `org-roam-db-insert-file-node'
-    (when (not is-subtree)
-      (let ((file file-path)
-            (pos 1)
-            (todo nil)
-            (priority nil)
-            (scheduled nil)
-            (deadline nil)
-            (level 0)
-            (tags tags) ;; meaning is a bit off
-            (olp nil))
-        (org-roam-db-query
-         [:insert :into nodes
-          :values $v1]
-         (vector id file level pos todo priority
-                 scheduled deadline title properties olp))))
-    ;; Replace `org-roam-db-insert-refs'
-    (dolist (ref-link roam-refs)
-      (dolist (individual-ref (org-node--ref-link->list ref-link id))
-        (org-roam-db-query [:insert :into refs
-                            :values $v1]
-                           individual-ref)))
-    ;; Replace `org-roam-db-insert-link'
-    ;; TODO real pos and outline, once we have that info
-    (dolist (backlink backlink-origins)
-      (org-roam-db-query
-       [:insert :into links
-        :values $v1]
-       (vector pos backlink id "id" (list :outline nil))))
-    ;; Replace `org-roam-db-insert-citation'
-    ;; TODO once we have that info
-    ))
-
-(defun org-node-feed-roam-db ()
-  (require 'org-roam)
-  (org-roam-db-clear-all)
-  (org-roam-db--close)
-  (delete-file org-roam-db-location)
-  (emacsql-with-transaction (org-roam-db)
-    (cl-loop
-     with nodes = (--filter (plist-get it :id) (hash-table-values org-nodes))
-     with ctr = 0
-     with max = (length nodes)
-     for node in nodes
-     do (when (= 0 (% (cl-incf ctr) 10))
-          (message "Inserting into %s... %d/%d"
-                   org-roam-db-location ctr max))
-     (org-node--feed-node-to-roam-db node))))
-
-;; Revamp backlink-check-buffer
-;;  one thing aside from the cacher will possibly be aware of refs:
-;; - check-buffer
-;;
-;; Make a decision about how to treat links that look like refs.  Both the
-;; cacher and the check-buffer (if we even keep it) will do the same thing.
-;;
-;; From the POV of the cacher, already know what to do. Will just add non-id
-;; links to some refs-table.
-;;
-;; The question that remains: how to use that refs-table?  Well, fix-all (and
-;; whatever small hooks/advices we add to mirror its effect) is going to use the
-;; refs-table to...  insert them as backlinks.
-
-;; ok look ,two sides.  One side COLLECTS links into tables, other side USES
-;; the;; tables.  and check-buffer style functions would actually do some
-;; collection, and additionally consume the data it just collected, but the
-;; intent is to reflect what a fix-all would have done.
-;;
+;;; Method 2: feed the DB
 
 (defun org-node--ref-link->list (ref node-id)
   "Worker code adapted from `org-roam-db-insert-refs'"
@@ -215,6 +93,123 @@ deduplicated, as if :unique t."
                   "%s:%s\tInvalid ref %s, skipping..."
                   (buffer-file-name) (point) ref)))
     rows))
+
+(defun org-node--feed-node-to-roam-db (node)
+  (let ((id (org-node-id node))
+        (file-path (org-node-file-path node))
+        (file-title (org-node-file-title node))
+        (tags (org-node-tags node))
+        (aliases (org-node-aliases node))
+        (roam-refs (org-node-refs node))
+        (title (org-node-title node))
+        (properties (org-node-properties node))
+        (level (org-node-level node))
+        (todo (org-node-todo node))
+        (is-subtree (org-node-is-subtree node))
+        (olp (org-node-olp node))
+        (pos (org-node-pos node)))
+    ;; `org-roam-db-insert-file'
+    (org-roam-db-query
+     [:insert :into files
+      :values $v1]
+     (list (vector file-path file-title "" "" "")))
+    ;; `org-roam-db-insert-aliases'
+    (when aliases
+      (org-roam-db-query
+       [:insert :into aliases
+        :values $v1]
+       (mapcar (lambda (alias)
+                 (vector id alias))
+               aliases)))
+    ;; `org-roam-db-insert-tags'
+    ;; FIXME no inheritance
+    (when tags
+      (org-roam-db-query
+       [:insert :into tags
+        :values $v1]
+       (mapcar (lambda (tag)
+                 (vector id tag))
+               tags)))
+    ;; `org-roam-db-insert-node-data'
+    (when is-subtree
+      (let ((priority nil)
+            (scheduled (when-let ((scheduled (org-node-scheduled node)))
+                         (format-time-string
+                          "%FT%T%z"
+                          (encode-time (org-parse-time-string scheduled)))))
+            (deadline (when-let ((deadline (org-node-deadline node)))
+                        (format-time-string
+                         "%FT%T%z"
+                         (encode-time (org-parse-time-string deadline)))))
+            (title (org-link-display-format title)))
+        (org-roam-db-query
+         [:insert :into nodes
+          :values $v1]
+         (vector id file-path level pos todo priority
+                 scheduled deadline title properties olp))))
+    ;; `org-roam-db-insert-file-node'
+    (when (not is-subtree)
+      (let ((pos 1)
+            (todo nil)
+            (priority nil)
+            (scheduled nil)
+            (deadline nil)
+            (level 0))
+        (org-roam-db-query
+         [:insert :into nodes
+          :values $v1]
+         (vector id file-path level pos todo priority
+                 scheduled deadline title properties olp))))
+    ;; `org-roam-db-insert-refs'
+    (dolist (ref-link roam-refs)
+      (dolist (individual-ref (org-node--ref-link->list ref-link id))
+        (org-roam-db-query [:insert :into refs
+                            :values $v1]
+                           individual-ref)))
+    ;; `org-roam-db-insert-citation'
+    ;; TODO once we have that info
+    ))
+
+(defun org-node--feed-links-to-roam-db (target-id)
+  (let ((backlinks (gethash target-id org-node--links-table)))
+    (dolist (backlink backlinks)
+      ;; See `org-roam-db-insert-link'
+      (org-roam-db-query [:insert :into links
+                          :values $v1]
+                         (vector (plist-get backlink :pos)
+                                 (plist-get backlink :src)
+                                 target-id
+                                 (plist-get backlink :type)
+                                 (plist-get backlink :properties))))))
+
+(defun org-node-feed-roam-db ()
+  (interactive)
+  (require 'org-roam)
+  (org-roam-db-clear-all)
+  (org-roam-db--close)
+  (delete-file org-roam-db-location)
+  (emacsql-with-transaction (org-roam-db)
+    (cl-loop
+     with nodes = (-filter #'org-node-id (hash-table-values org-nodes))
+     with ctr = 0
+     with max = (length nodes)
+     for node in nodes
+     do (when (= 0 (% (cl-incf ctr) 10))
+          (message "Inserting into %s... %d/%d"
+                   org-roam-db-location ctr max))
+     (org-node--feed-node-to-roam-db node)
+     (org-node--feed-links-to-roam-db (org-node-id node)))))
+
+(defun org-node-feed-file-to-roam-db ()
+  (emacsql-with-transaction (org-roam-db)
+    (cl-loop with file = (buffer-file-name)
+             for node being the hash-values of org-nodes
+             when (equal file (org-node-file-path node))
+             do
+             (let ((id (org-node-id node)))
+               (org-node--feed-node-to-roam-db node)
+               (org-node--feed-links-to-roam-db id)
+               ))))
 
 (provide 'org-node-roam)
 
