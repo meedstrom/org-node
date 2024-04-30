@@ -2,7 +2,7 @@
 ** Recent changes [2024-04-30]
 - We no longer depend on a =BACKLINKS= property!  It is still a great way to show backlinks, so it remains as an option.
 - Renamed =CACHED_BACKLINKS= to just =BACKLINKS=.  One =M-x org-node-backlink-fix-all= will take care of the rename, or you can remove them all with =M-x org-node-backlink-regret=.
-- *Breaking API change* -- nodes are objects now, not plists!  Unfortunately the software can't give you a deprecation notice, because plists fail silently (that's why the change, better sooner than later).  See updated examples for =org-node-filter-fn= etc.
+- *Breaking API change* -- nodes are objects now, not plists!  Unfortunately the software can't give you a deprecation notice, because plists fail silently (that's why the change).  See updated examples for =org-node-filter-fn= etc.
 
 ** What's all this
 
@@ -36,32 +36,32 @@ Once a subtree has an ID you can link to, it's a "node" because it has joined th
 
 For your pleasure, here's a comparison of three similar notetaking systems: all permitting org-id as first-class citizen and not locking you into an "one-note-per-file" concept.
 
-|                                   | org-roam    | org-node           | [[https://github.com/toshism/org-super-links][org-super-links]]      |
-|-----------------------------------+-------------+--------------------+----------------------|
-| Backlinks                         | yes         | yes                | yes                  |
-| Node search and insert            | yes         | yes                | no (suggests org-ql) |
-| Node aliases                      | yes         | yes                | not applicable       |
-| Rich backlinks buffer             | yes         | yes (org-roam's)   | no                   |
-| Reflinks                          | yes         | yes (as backlinks) | no                   |
-| Ref search                        | yes         | yes (as aliases)   | no                   |
-| Extract subtree to new file       | yes         | yes                | no                   |
-| Can configure rich completions    | yes         | yes                | not applicable       |
-| org-roam-capture integration      | yes         | yes                | no                   |
-| org-capture integration           | no          | yes                | no                   |
-| Backlinks in same window          | no          | yes                | yes                  |
-| Avoid double-counting :BACKLINKS: | no          | yes                | yes                  |
-| Find files/headings without ID    | no          | yes                | not applicable       |
-| Node exclusion                    | yes         | limited            | not applicable       |
-| Support =roam:= links               | yes         | no                 | no                   |
-| Warn about dead links             | no          | no                 | no                   |
-| Some query-able cache             | org-roam-db | org-nodes          | no                   |
-|-----------------------------------+-------------+--------------------+----------------------|
-| Cache mandatory                   | yes         | no                 | no                   |
-| Time to re-cache 2000 files       | 3 minutes   | 1 second           | not applicable       |
+|                                    | org-roam    | org-node           | [[https://github.com/toshism/org-super-links][org-super-links]]      |
+|------------------------------------+-------------+--------------------+----------------------|
+| Backlinks                          | yes         | yes                | yes                  |
+| Node search and insert             | yes         | yes                | no (suggests org-ql) |
+| Node aliases                       | yes         | yes                | not applicable       |
+| Rich backlinks buffer              | yes         | yes (org-roam's)   | no                   |
+| Reflinks                           | yes         | yes (as backlinks) | no                   |
+| Ref search                         | yes         | yes (as aliases)   | no                   |
+| Extract subtree to new file        | yes         | yes                | no                   |
+| Can configure rich completions     | yes         | yes                | not applicable       |
+| org-roam-capture integration       | yes         | yes                | no                   |
+| org-capture integration            | no          | yes                | no                   |
+| Backlinks in same window           | no          | yes                | yes                  |
+| Avoid scanning :BACKLINKS: drawers | no          | yes                | yes                  |
+| Find files/headings without ID     | no          | yes                | not applicable       |
+| Node exclusion                     | yes         | limited            | not applicable       |
+| Support =roam:= links                | yes         | no                 | no                   |
+| Warn about dead links              | no          | no                 | no                   |
+| Some query-able cache              | org-roam-db | org-nodes          | no                   |
+|------------------------------------+-------------+--------------------+----------------------|
+| Cache mandatory                    | yes         | no                 | no                   |
+| Time to re-cache my 2000 files     | 3 minutes   | 1 second           | not applicable       |
 
 This isn't a totally fair comparison; org-roam has an advantage in the details, see Appendix II.  With org-node I've made what I would've liked to hack on, so it's more simplistic in many aspects.
 
-** Config and setup
+** Setup
 
 Add an init snippet like this (assuming [[https://github.com/radian-software/straight.el][straight.el]]):
 
@@ -103,6 +103,12 @@ These user options help you feel at home using both packages side-by-side:
 (setq org-node-creation-hook nil)
 #+end_src
 
+In addition, if you've been struggling with slow saving of big files org-roam's autosync mode has 
+
+#+begin_src elisp
+(setq org-roam-db-update-on-save nil)
+#+end_src
+
 With that done, try the command substitutes:
 - =org-node-find= instead of =org-roam-node-find=
 - =org-node-insert-link= instead of =org-roam-node-insert=
@@ -120,7 +126,6 @@ Want the good old =M-x org-roam-buffer-toggle=?
 
 #+begin_src elisp
 (add-hook 'org-node-cache-scan-file-hook #'org-node-feed-file-to-roam-db)
-(setq org-roam-db-update-on-save nil)
 #+end_src
 
 *Option 2*.  Cut out the DB altogether.  Instead of the above, add this hack:
@@ -132,7 +137,7 @@ Want the good old =M-x org-roam-buffer-toggle=?
 
 ** Backlink solution 2: inside the file
 
-I love this solution, because I rarely have space for a second window to show org-roam's backlinks.
+I love this solution, because I rarely have space on my screen to fit a whole window for backlinks anyway.
 
 Let org-node add a =BACKLINKS= property to all nodes.  For a first-time run, type =M-x org-node-backlink-fix-all=.  (Don't worry, if you change your mind there is =M-x org-node-backlink-regret=.)
 
@@ -148,8 +153,6 @@ Then start using the minor mode =org-node-backlink-mode=, which keeps these prop
 You may know that org-roam has its own set of capture templates: the =org-roam-capture-templates=.
 
 It can make sense, for people who fully understand the magic of capture templates.  I didn't, so I was not confident using a second-order abstraction over an already leaky abstraction.
-
-That's why I never knew the existence of =M-x org-roam-capture=, and only indirectly used the templates via =org-roam-node-find=.  It was a jungle I didn't want to explore.
 
 So can we reproduce the functionality on top of vanilla org-capture?  That'd be less scary.  The answer is yes!
 
@@ -179,8 +182,7 @@ How to see the headings' full outline paths while searching for nodes:
           title)))
 #+end_src
 
-*** Limitations
-**** Excluding nodes
+*** Limitations: excluding notes
 The =org-node-filter-fn= works well for ignoring TODO items that happen to have an ID, and ignoring org-drill items and that sort of thing, but beyond that, it has limited utility because unlike org-roam, *child ID nodes of an excluded node are not excluded!*
 
 So let's say you have a big archive file, fulla IDs, and you want to exclude all of it.  Putting a =:ROAM_EXCLUDE: t= at the top won't do it.  As it stands, what I'd suggest is unfortunately, look at the file name.
@@ -196,7 +198,7 @@ The point of org-id is to avoid dependence on filenames, but it's often pragmati
              (not (string-search "archive" (org-node-file-path node))))))
 #+end_src
 
-**** org-id
+*** Limitations: org-id
 
 In lieu of a convenient =org-roam-update-org-id-locations=, see [[https://github.com/meedstrom/org-node?tab=readme-ov-file#appendix-iii-taking-ownership-of-org-id][Appendix III]] for how to defeat org-id's idiosyncrasies, ensuring org-node knows about all the relevant ID locations.
 
