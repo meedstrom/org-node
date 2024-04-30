@@ -19,6 +19,13 @@
     (remove-hook 'org-roam-post-node-insert-hook #'org-node-backlink--add-in-target-a t)
     (remove-hook 'org-node-insert-link-hook #'org-node-backlink--add-in-target-a t)))
 
+;;;###autoload
+(defun org-node-backlinks-mode ()
+  (display-warning
+   'org-node :error
+   "Someone misspelled `org-node-backlink-mode', but I ran it for you")
+  (org-node-backlink-mode))
+
 ;; TODO Let it update giant files quickly.  Now it just gives up and gets out of
 ;; the way if there are >100 links, but it should get faster with the new
 ;; `org-node--links-table'.  Anyway, for a truly giant file, I'd like to take a
@@ -53,9 +60,11 @@ as the user command \\[org-node-backlink-regret]."
     ;; Start over
     (org-node-cache-reset)
     (setq org-node-backlink--fix-cells (org-id-hash-to-alist org-id-locations)))
-  (when (or (/= 0 org-node-backlink--fix-ctr)
-            (y-or-n-p (format "Edit the %d files found in `org-id-locations'?"
-                              (length org-node-backlink--fix-cells))))
+  (when (or (not (= 0 org-node-backlink--fix-ctr)) ;; resume interrupted
+            (and
+             (y-or-n-p (format "Edit the %d files found in `org-id-locations'?"
+                               (length org-node-backlink--fix-cells)))
+             (y-or-n-p "You understand that your auto git-commit systems and similar will probably run?")))
     (let ((find-file-hook nil)
           (org-mode-hook nil)
           (after-save-hook nil)
@@ -67,7 +76,7 @@ as the user command \\[org-node-backlink-regret]."
       (dotimes (_ 1000)
         (when-let ((cell (pop org-node-backlink--fix-cells)))
           (message
-           "Adding/updating :BACKLINKS:... (you can stop and resume) (%d) %s"
+           "Adding/updating :BACKLINKS:... (you can stop and resume anytime) (%d) %s"
            (cl-incf org-node-backlink--fix-ctr) (car cell))
           (org-with-file-buffer (car cell)
             (org-with-wide-buffer
