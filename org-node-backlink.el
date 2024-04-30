@@ -285,7 +285,6 @@ Does NOT try to validate the rest of the target's backlinks."
                    (setq new-value src-link))
                  (unless (equal backlinks-string new-value)
                    (org-entry-put nil "BACKLINKS" new-value)
-                   (cl-incf org-node-backlink--progress-total-backlinks)
                    (unless part-of-mass-op
                      (and org-file-buffer-created
                           (buffer-modified-p)
@@ -315,7 +314,6 @@ Optional argument PART-OF-MASS-OP means skip some cleanup."
       (while (re-search-forward org-link-plain-re nil t)
         (let ((beg (match-beginning 0))
               (end (match-end 0)))
-          (cl-incf org-node-backlink--progress-total)
           (cond
            ;; On a # comment or #+keyword, do nothing
            ((save-excursion
@@ -331,7 +329,6 @@ Optional argument PART-OF-MASS-OP means skip some cleanup."
                 ;; (org-node-backlink--in-backlinks-drawer-p)
                 )
             (unless (org-node-backlink--target-has-link-to-here-p)
-              (cl-incf org-node-backlink--progress-total-stale)
               (goto-char beg)
               (if (looking-back "\\[\\[")
                   (kill-region (- (point) 2) (search-forward "]]"))
@@ -342,9 +339,7 @@ Optional argument PART-OF-MASS-OP means skip some cleanup."
                   (org-entry-delete nil "BACKLINKS")))))
            ;; Not a backlink, so it's a regular forward-link - add a backlink
            (t
-            (org-node-backlink--add-in-target part-of-mass-op))))
-        (when part-of-mass-op
-          (org-node-backlink--progress-print-message))))
+            (org-node-backlink--add-in-target part-of-mass-op))))))
     (and (not part-of-mass-op)
          org-node-backlink--fails
          (not (equal org-node-backlink--fails org-node-backlink--last-warnings))
