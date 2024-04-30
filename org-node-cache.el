@@ -13,12 +13,12 @@ time."
   (remove-hook 'org-mode-hook #'org-node-cache-mode)
   (if org-node-cache-mode
       (progn
-        (add-hook 'after-save-hook #'org-node-cache-scan-file)
-        (advice-add #'rename-file :after #'org-node-cache-scan-file)
+        (add-hook 'after-save-hook #'org-node-cache-refresh-one-file)
+        (advice-add #'rename-file :after #'org-node-cache-refresh-one-file)
         (advice-add #'rename-file :before #'org-node-cache--handle-delete)
         (advice-add #'delete-file :before #'org-node-cache--handle-delete))
-    (remove-hook 'after-save-hook #'org-node-cache-scan-file)
-    (advice-remove #'rename-file #'org-node-cache-scan-file)
+    (remove-hook 'after-save-hook #'org-node-cache-refresh-one-file)
+    (advice-remove #'rename-file #'org-node-cache-refresh-one-file)
     (advice-remove #'rename-file #'org-node-cache--handle-delete)
     (advice-remove #'delete-file #'org-node-cache--handle-delete)))
 
@@ -33,7 +33,7 @@ time."
                       (-filter #'org-node-id (hash-table-values org-nodes)))))
     (message "%s"
              (--zip-with
-              (format "(%s NODE) => %s\n" it other)
+              (format "(%s X) => %s\n" it other)
               fields
               (cl-loop for field in fields
                        collect (funcall field random-node))))))
@@ -50,19 +50,19 @@ For an user-facing command, see \\[org-node-reset]."
   (org-node-cache--collect-nodes (-uniq (hash-table-values org-id-locations)))
   (run-hooks 'org-node-cache-reset-hook))
 
-(defun org-node-cache-scan-file (&optional _ arg2 &rest _args)
+(defun org-node-cache-refresh-one-file (&optional _ arg2 &rest _args)
   "Seek nodes in a single file."
   ;; If triggered as advice on `rename-file', the second argument is the new
   ;; name.  Do not assume it is being done to the current buffer; it may be
   ;; called from a Dired buffer, for example.
   (let ((file (if (and arg2 (stringp arg2) (file-exists-p arg2))
-                  arg2x
+                  arg2
                 (buffer-file-name))))
     (org-node-cache--collect-nodes (list file)))
-  (run-hooks 'org-node-cache-scan-file-hook))
+  (run-hooks 'org-node-cache-refresh-one-file-hook))
 
 (defvar org-node-cache-reset-hook nil)
-(defvar org-node-cache-scan-file-hook nil)
+(defvar org-node-cache-refresh-one-file-hook nil)
 
 (defun org-node-cache-ensure-fresh ()
   (org-node--init-org-id-locations-or-die)

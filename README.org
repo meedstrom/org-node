@@ -1,4 +1,9 @@
 * org-node
+** Recent changes [2024-04-30]
+- We no longer depend on a =BACKLINKS= property!  It is still a great way to show backlinks, so it remains as an option.
+- Renamed =CACHED_BACKLINKS= to just =BACKLINKS=.  One =M-x org-node-backlink-fix-all= will take care of it, or you can remove them with =M-x org-node-backlink-regret=.
+- The optional system for populating the org-roam DB should Just Work now
+
 ** What's all this
 
 I found org-roam too slow, so I made [[https://github.com/meedstrom/quickroam][quickroam]].  And that idea spun off into this package, a standalone thing.  I hope it's also easier to learn.
