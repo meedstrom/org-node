@@ -73,9 +73,11 @@ Add an init snippet like this (assuming [[https://github.com/radian-software/str
 
 *** Quick start
 
-If you're new to the whole concept, you don't really need to configure anything.
+If you're new to these concepts, fear not.  The main things for day-to-day operation are two commands: the "find" and the "insert-link" command.
 
-As with org-roam, the main things you use in day-to-day operation are two commands: "find" and "insert".  Pick some good keys and try them out, and you can come back to this README later---or never.
+# (OK if you love [[https://github.com/meedstrom/org-node?tab=readme-ov-file#org-capture][org-capture]], you might end up using that a lot too, but you know who you are.)
+
+Pick some good keys and try them out, and you can come back to this README later---or never.
 
 The keys I use:
 
@@ -92,6 +94,8 @@ The keys I use:
 #+end_src
 
 To browse other config options, type =M-x customize-group RET org-node RET=.
+
+Final tip for the newbie: you create a new node through these same commands---just type the name of a node that doesn't exist!
 
 *** Use Org-roam at the same time?
 
