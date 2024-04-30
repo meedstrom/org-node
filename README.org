@@ -73,7 +73,7 @@ Add an init snippet like this (assuming [[https://github.com/radian-software/str
 
 *** Quick start
 
-If you're new to these concepts, fear not.  The main things for day-to-day operation are two commands: the "find" and the "insert-link" command.
+If you're new to these concepts, fear not.  The main things for day-to-day operation are two commands: "find" and "insert-link".
 
 # (OK if you love [[https://github.com/meedstrom/org-node?tab=readme-ov-file#org-capture][org-capture]], you might end up using that a lot too, but you know who you are.)
 
@@ -107,20 +107,21 @@ These user options help you feel at home using both packages side-by-side:
 (setq org-node-creation-hook nil)
 #+end_src
 
-In addition, if you've been struggling with slow saving of big files org-roam's autosync mode has 
+In addition, if you've been struggling with slow saving of big files, consider these org-roam settings:
 
 #+begin_src elisp
-(setq org-roam-db-update-on-save nil)
+(setq org-roam-db-update-on-save nil) ;; don't scan file on save
+(setq org-roam-link-auto-replace nil) ;; don't look for roam: links on save
 #+end_src
 
-With that done, try the command substitutes:
+With that done, try out these command substitutes:
+
 - =org-node-find= instead of =org-roam-node-find=
 - =org-node-insert-link= instead of =org-roam-node-insert=
-- =org-node-extract-subtree= instead of =org-roam-extract-subtree=
 
 Check out more under [[https://github.com/meedstrom/org-node?tab=readme-ov-file#commands][Commands]].  Enjoy!
 
-I'm guessing you also want [[https://github.com/meedstrom/org-node?tab=readme-ov-file#backlink-solution-1-org-roam-buffer][org-roam-buffer backlinks]].  See that section.
+I'm guessing you also want the [[https://github.com/meedstrom/org-node?tab=readme-ov-file#backlink-solution-1-org-roam-buffer][org-roam-buffer]].  See next section.
 
 ** Backlink solution 1: org-roam-buffer
 
