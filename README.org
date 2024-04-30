@@ -103,35 +103,16 @@ These user options help you feel at home using both packages side-by-side:
 (setq org-node-creation-hook nil)
 #+end_src
 
-With that done, try the command =org-node-find= instead of =org-roam-node-find=, and other such equivalents listed in [[https://github.com/meedstrom/org-node?tab=readme-ov-file#commands][Commands]]. Enjoy!
+With that done, try the command substitutes:
+- =org-node-find= instead of =org-roam-node-find=,
+- =org-node-insert-link= instead of =org-roam-node-insert=
+- =org-node-extract-subtree= insted of =org-roam-extract-subtree=
 
-You may also want [[https://github.com/meedstrom/org-node?tab=readme-ov-file#1-see-backlinks-in-the-org-roam-buffer-window][org-roam-buffer backlinks]].
+And there are other commands listed under [[https://github.com/meedstrom/org-node?tab=readme-ov-file#commands][Commands]].  Enjoy!
 
-*** Commands
+I'm guessing you also want [[https://github.com/meedstrom/org-node?tab=readme-ov-file#backlink-solutin-1-org-roam-buffer][org-roam-buffer backlinks]].  See that section.
 
-- =org-node-find=
-  - A counterpart to =org-roam-node-find=
-- =org-node-insert-link=
-  - A counterpart to =org-roam-node-insert=
-- =org-node-insert-transclusion=
-- =org-node-insert-transclusion-as-subtree=
-- =org-node-extract-subtree=
-  - A bizarro counterpart to =org-roam-extract-subtree=
-- =org-node-nodeify-entry=
-  - Trivial - give an ID to subtree at point (and run org-node-creation-hook)
-- =org-node-create-subtree=
-  - Trivial - insert a new subtree with an ID (and run org-node-creation-hook)
-- =org-node-random=
-- =org-node-rewrite-links-ask=
-  - Look for link descriptions that got out of sync with the current node title, then prompt at each link to update it
-- =org-node-rename-file-by-title=
-  - Auto-rename the file based on the current =#+title=
-- =org-node-backlink-fix-all=
-  - Add =BACKLINKS= property to every node everywhere that should have one
-- =org-node-backlink-regret=
-  - In case you regret using this package -- remove all =BACKLINKS=
-
-*** See backlinks as an org-roam-buffer
+** Backlink solution 1: org-roam-buffer
 
 Want the good old =M-x org-roam-buffer-toggle=?
 
@@ -149,7 +130,7 @@ Want the good old =M-x org-roam-buffer-toggle=?
             #'org-node--fabricate-roam-backlinks)
 #+end_src
 
-*** See backlinks inside the file, on a property line
+** Backlink solution 2: inside the file
 
 I love this solution, because I rarely have space for a second window to show org-roam's backlinks.
 
@@ -161,6 +142,7 @@ Then start using the minor mode =org-node-backlink-mode=, which keeps these prop
 (add-hook 'org-mode-hook #'org-node-backlink-mode)
 #+end_src
 
+** Misc
 *** Org-capture
 
 You may know that org-roam has its own set of capture templates: the =org-roam-capture-templates=.
@@ -217,6 +199,30 @@ The point of org-id is to avoid dependence on filenames, but it's often pragmati
 **** org-id
 
 In lieu of a convenient =org-roam-update-org-id-locations=, see [[https://github.com/meedstrom/org-node?tab=readme-ov-file#appendix-iii-taking-ownership-of-org-id][Appendix III]] for how to defeat org-id's idiosyncrasies, ensuring org-node knows about all the relevant ID locations.
+
+*** Commands
+
+- =org-node-find=
+  - A counterpart to =org-roam-node-find=
+- =org-node-insert-link=
+  - A counterpart to =org-roam-node-insert=
+- =org-node-insert-transclusion=
+- =org-node-insert-transclusion-as-subtree=
+- =org-node-extract-subtree=
+  - A bizarro counterpart to =org-roam-extract-subtree=
+- =org-node-nodeify-entry=
+  - Trivial - give an ID to subtree at point (and run org-node-creation-hook)
+- =org-node-create-subtree=
+  - Trivial - insert a new subtree with an ID (and run org-node-creation-hook)
+- =org-node-random=
+- =org-node-rewrite-links-ask=
+  - Look for link descriptions that got out of sync with the current node title, then prompt at each link to update it
+- =org-node-rename-file-by-title=
+  - Auto-rename the file based on the current =#+title=
+- =org-node-backlink-fix-all=
+  - Add =BACKLINKS= property to every node everywhere that should have one
+- =org-node-backlink-regret=
+  - In case you regret using this package -- remove all =BACKLINKS=
 
 ** Appendix I: Rosetta stone
 
