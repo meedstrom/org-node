@@ -142,14 +142,16 @@ make a defun, not a lambda, and byte-compile that init file:
   :type 'function
   :group 'org-node)
 
+
+
 (defvar org-nodes (make-hash-table :test #'equal :size 4000)
-  "Table associating ids with cached file/subtree data.
+  "Table associating ids with file/subtree data.
 To peek on the contents, try \\[org-node-cache-peek] a few times, which
 should suffice to demonstrate the data format.")
 
 (defvar org-node-collection (make-hash-table :test #'equal :size 4000)
   "Filtered `org-nodes', keyed not on ids but formatted titles.
-This allows direct use with `completing-read'.")
+This allows use with `completing-read'.")
 
 (defun org-node-die (format-string &rest args)
   "Like `error' but make sure the user sees it.
