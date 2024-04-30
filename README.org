@@ -86,16 +86,16 @@ The keys I use:
 (global-set-key (kbd "<f2> i") #'org-node-insert-link)
 #+end_src
 
-(I like F2, but as everyone aside from Xah Lee seems to hate F1-F12, maybe you'd prefer... let's say =M-s=?)
+(I like F2, but if you don't, maybe M-s?)
 
 #+begin_src elisp
 (global-set-key (kbd "M-s f") #'org-node-find)
 (global-set-key (kbd "M-s i") #'org-node-insert-link)
 #+end_src
 
-To browse other config options, type =M-x customize-group RET org-node RET=.
+To browse config options, type =M-x customize-group RET org-node RET=.
 
-Final tip for the newbie: you create a new node through these same commands---just type the name of a node that doesn't exist!
+Final tip for the newbie: you can create new nodes through these same commands!  Just type the name of a node that doesn't exist!
 
 *** Use Org-roam at the same time?
 
