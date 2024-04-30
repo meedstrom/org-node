@@ -67,7 +67,7 @@ Optional argument REMOVE-THEM means remove them instead, like
       ;; Do 1000 at a time, because Emacs cries about opening too many file
       ;; buffers in one loop
       (dotimes (_ 1000)
-        (let ((cell (pop org-node-backlink--fix-cells)))
+        (when-let ((cell (pop org-node-backlink--fix-cells)))
           (message "Fixing backlinks... %d files (you can stop and resume)"
                    (cl-incf org-node-backlink--fix-ctr))
           (org-with-file-buffer (car cell)
@@ -78,8 +78,10 @@ Optional argument REMOVE-THEM means remove them instead, like
                (org-entry-delete nil "CACHED_BACKLINKS")
                (if remove-them
                    (org-entry-delete nil "BACKLINKS")
-                 (let* ((refs (org-node-refs (gethash id org-nodes)))
-                        (reflinks (--map (gethash it org-node--reflinks-table) refs))
+                 (let* ((refs (ignore-errors
+                                (org-node-refs (gethash id org-nodes))))
+                        (reflinks (--map (gethash it org-node--reflinks-table)
+                                         refs))
                         (backlinks (gethash id org-node--links-table))
                         (combined
                          (->> (append reflinks backlinks)
@@ -88,7 +90,8 @@ Optional argument REMOVE-THEM means remove them instead, like
                               (-sort #'string-lessp)
                               (--map (org-link-make-string
                                       (concat "id:" it)
-                                      (org-node-title (gethash it org-nodes)))))))
+                                      (ignore-errors
+                                        (org-node-title (gethash it org-nodes))))))))
                    (if combined
                        (org-entry-put nil "BACKLINKS" (string-join combined "  "))
                      (org-entry-delete nil "BACKLINKS"))))))
