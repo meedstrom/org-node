@@ -127,13 +127,13 @@ I'm guessing you also want the [[https://github.com/meedstrom/org-node?tab=readm
 
 Want the good old =M-x org-roam-buffer-toggle=?
 
-*Option 1*.  Feed data to org-roam so all its features will Just Work^{sort of}.  For a first-time run, type =M-x org-node-feed-roam-db= (slow!).  Then add the following init snippet to keep the database updated over time.
+*Option 1A*.  Feed data to org-roam so all its features will Just Work^{sort of}.  For a first-time run, type =M-x org-node-feed-roam-db= (slow!).  Then add the following init snippet to keep the database updated over time.
 
 #+begin_src elisp
 (add-hook 'org-node-cache-scan-file-hook #'org-node-feed-file-to-roam-db)
 #+end_src
 
-*Option 2*.  Cut out the DB altogether.  Instead of the above, add this hack:
+*Option 1B*.  Cut out the DB altogether.  Instead of the above, add this hack:
 
 #+begin_src elisp
 (advice-add 'org-roam-backlinks-get :override
@@ -144,7 +144,9 @@ Want the good old =M-x org-roam-buffer-toggle=?
 
 I love this solution, because I rarely have space on my screen to fit a whole window for backlinks anyway.
 
-Let org-node add a =BACKLINKS= property to all nodes.  For a first-time run, type =M-x org-node-backlink-fix-all=.  (Don't worry, if you change your mind there is =M-x org-node-backlink-regret=.)
+*Option 2A*.  Let org-node add a =:BACKLINKS:= property to all nodes.
+
+For a first-time run, type =M-x org-node-backlink-fix-all=.  (Don't worry, if you change your mind there is =M-x org-node-backlink-regret=.)
 
 Then start using the minor mode =org-node-backlink-mode=, which keeps these properties updated.  Init snippet:
 
@@ -152,15 +154,13 @@ Then start using the minor mode =org-node-backlink-mode=, which keeps these prop
 (add-hook 'org-mode-hook #'org-node-backlink-mode)
 #+end_src
 
-Users of [[https://github.com/toshism/org-super-links][org-super-links]] are already familiar with this concept, but they use a /drawer/ called :BACKLINKS:, not a /property line/.
+*Option 2B*  Let [[https://github.com/toshism/org-super-links][org-super-links]] manage a =:BACKLINKS:...:END:= drawer.
 
-I am looking into enabling that possibility as well.  For now, if you are such an user, forget all the above and instead continue to rely on org-super-links:
+I /think/ the following should work. Totally untested, let me know!
 
 #+begin_src elisp
 (add-hook 'org-node-insert-link-hook #'org-node-convert-link-to-super)
 #+end_src
-
-I /think/ that should work. Totally untested, let me know!
 
 ** Misc
 *** Org-capture
