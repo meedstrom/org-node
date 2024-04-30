@@ -30,7 +30,7 @@ Just searching for Org files is too coarse, and just searching for any subtree a
 
 Here's what org-roam invented.  It turns out that if you limit the search hits to just those files and subtrees you've deigned to assign an org-id -- which roughly maps to everything you've ever thought it was worth linking to -- it filters out the noise excellently.
 
-Once a subtree has an ID you can link to, it's a "node" because it has joined the wider graph, the network of linked nodes.  I wish the English language had more distinct sounds for the words "node" and "note", but to clarify, I'll say "ID-node" from now on.
+Once a subtree has an ID you can link to, it's a "node" because it has joined the wider graph, the network of linked nodes.  I wish the English language had more distinct sounds for the words "node" and "note", but to clarify, I'll say "ID-node" when the distinction matters.
 
 ** Feature matrix
 
@@ -95,7 +95,7 @@ The keys I use:
 
 To browse config options, type =M-x customize-group RET org-node RET=.
 
-Final tip for the newbie: you can create new nodes through these same commands!  Just type the name of a node that doesn't exist!
+Final tip for the newbie: you normally create new nodes through these same commands!  Just type the name of a node that doesn't exist.
 
 *** Use Org-roam at the same time?
 
@@ -152,6 +152,16 @@ Then start using the minor mode =org-node-backlink-mode=, which keeps these prop
 (add-hook 'org-mode-hook #'org-node-backlink-mode)
 #+end_src
 
+Users of [[https://github.com/toshism/org-super-links][org-super-links]] are already familiar with this concept, but they use a /drawer/ called :BACKLINKS:, not a /property line/.
+
+I am looking into enabling that possibility as well.  For now, if you are such an user, forget all the above and instead continue to rely on org-super-links:
+
+#+begin_src elisp
+(add-hook 'org-node-insert-link-hook #'org-super-links-convert-link-to-super)
+#+end_src
+
+I /think/ that should work. Totally untested, let me know!
+
 ** Misc
 *** Org-capture
 
@@ -179,9 +189,9 @@ And if you want the commands =org-node-find= & =org-node-insert-link= to likewis
 How to see the headings' full outline paths while searching for nodes:
 
 #+begin_src elisp
+;; Prepend completions with the heading's outline path
 (setq org-node-format-candidate-fn
-      (defun my-format-with-olp (node title)
-        "Prepend subtree completions with the outline path."
+      (lambda (node title)
         (if-let ((olp (org-node-olp node)))
             (concat (string-join olp " > ") " > " title)
           title)))
@@ -197,10 +207,10 @@ The point of org-id is to avoid dependence on filenames, but it's often pragmati
 #+begin_src elisp
 (setq org-node-filter-fn
       (lambda (node)
-        (and (not (org-node-todo node))
-             (not (member "drill" (org-node-tags node)))
-             (not (assoc "ROAM_EXCLUDE" (org-node-properties node))
-             (not (string-search "archive" (org-node-file-path node))))))
+        (not (or (org-node-todo node)
+                 (member "drill" (org-node-tags node))
+                 (assoc "ROAM_EXCLUDE" (org-node-properties node))
+                 (string-search "archive" (org-node-file-path node))))))
 #+end_src
 
 *** Limitations: org-id
@@ -306,11 +316,11 @@ Snippet A
                           "/home/kept/notes/"
                           "/home/kept/project1/"
                           "/home/kept/project2/")))
-  (when (and (not (string-search "/logseq/bak/" file))
-             (not (string-search "/logseq/version-files/" file)))
+  (when (not (or (string-search "/logseq/bak/" file)
+                 (string-search "/logseq/version-files/" file)))
     (push file org-id-extra-files)))
 
-;; Eval to regen the `org-id-locations-file' - NOT needed each init
+;; Eval to regen the `org-id-locations-file' - NOT needed on init
 (org-id-update-id-locations)
 #+end_src
 
@@ -321,8 +331,8 @@ Snippet B
              (not (hash-table-empty-p org-id-locations)))
   ;; Tell org-id without setting `org-id-extra-files'
   (org-id-update-id-locations
-   (--filter (and (not (string-search "/logseq/bak/" it))
-                  (not (string-search "/logseq/version-files/" it)))
+   (--reject (or (string-search "/logseq/bak/" it)
+                 (string-search "/logseq/version-files/" it))
              (--mapcat (directory-files-recursively it "\\.org$")
                        '(;; Example values
                          "/home/kept/notes/"
@@ -358,17 +368,3 @@ Bonus snippet: full reset
        (setq org-id-extra-files nil))
 #+end_src
 
-
-* Question for you
-
-I want to try to merge =:ROAM_REFS:= with the =:ID:= field.  I.e. let you paste URLs (or any other text string) directly on the ID field, because that's all =ROAM_REFS= are, and such a design would make it self-evident.
-
-I think there must be many people today who remain unsure what a roam ref is, because they have a backlog of 500 other Emacs/Org concepts to learn.
-
-Plus, such a design would mean I can run the same code to collect backlinks as reflinks, as reflinks would just /be/ backlinks.
-
-Maybe if that doesn't pan out, we could make an =ID_ALIASES= field, so it's at least cognate to =ROAM_ALIASES=.
-
-Or =EXTRA_IDS=.  I think that may be best.
-
-What do you think? Awesome? Terrible?
