@@ -13,12 +13,12 @@ time."
   (remove-hook 'org-mode-hook #'org-node-cache-mode)
   (if org-node-cache-mode
       (progn
-        (add-hook 'after-save-hook #'org-node-cache-refresh-one-file)
-        (advice-add #'rename-file :after #'org-node-cache-refresh-one-file)
+        (add-hook 'after-save-hook #'org-node-cache-rescan-file)
+        (advice-add #'rename-file :after #'org-node-cache-rescan-file)
         (advice-add #'rename-file :before #'org-node-cache--handle-delete)
         (advice-add #'delete-file :before #'org-node-cache--handle-delete))
-    (remove-hook 'after-save-hook #'org-node-cache-refresh-one-file)
-    (advice-remove #'rename-file #'org-node-cache-refresh-one-file)
+    (remove-hook 'after-save-hook #'org-node-cache-rescan-file)
+    (advice-remove #'rename-file #'org-node-cache-rescan-file)
     (advice-remove #'rename-file #'org-node-cache--handle-delete)
     (advice-remove #'delete-file #'org-node-cache--handle-delete)))
 
@@ -47,54 +47,50 @@ For an user-facing command, see \\[org-node-reset]."
   (clrhash org-node--reflinks-table)
   (clrhash org-node--links-table)
   (org-node--init-org-id-locations-or-die)
-  (org-node-cache--collect-nodes (-uniq (hash-table-values org-id-locations)))
+  (org-node-cache--collect (-uniq (hash-table-values org-id-locations)))
   (run-hooks 'org-node-cache-reset-hook))
 
-(defun org-node-cache-refresh-one-file (&optional _ arg2 &rest _args)
-  "Seek nodes in a single file."
+(defun org-node-cache-rescan-file (&optional _arg1 arg2 &rest _)
+  "Seek nodes and links in a single file."
   ;; If triggered as advice on `rename-file', the second argument is the new
   ;; name.  Do not assume it is being done to the current buffer; it may be
   ;; called from a Dired buffer, for example.
   (let ((file (if (and arg2 (stringp arg2) (file-exists-p arg2))
                   arg2
                 (buffer-file-name))))
-    (org-node-cache--collect-nodes (list file)))
-  (run-hooks 'org-node-cache-refresh-one-file-hook))
+    (org-node-cache--collect (list file)))
+  (run-hooks 'org-node-cache-rescan-file-hook))
 
 (defvar org-node-cache-reset-hook nil)
-(defvar org-node-cache-refresh-one-file-hook nil)
+(defvar org-node-cache-rescan-file-hook nil)
 
 (defun org-node-cache-ensure-fresh ()
   (org-node--init-org-id-locations-or-die)
-  (when (hash-table-empty-p org-node-collection)
-    ;; Once-per-session tip
+  ;; Once-per-session tip
+  (when (and (hash-table-empty-p org-node-collection)
+             (not (member 'org-node-cache-mode org-mode-hook)))
     (message "To speed up this command, turn on `org-node-cache-mode'"))
   (when (or (not org-node-cache-mode)
             (hash-table-empty-p org-node-collection))
-    (let ((inhibit-message t))
-      (org-node-cache-reset))))
+    (org-node-cache-reset)))
 
-(let ((this-timer (timer-create)))
-  (defun org-node-cache--handle-delete (arg1 &rest args)
-    "Update org-id and org-node after a file is deleted.
+(let ((timer (timer-create)))
+  (defun org-node-cache--handle-delete (&optional arg1 &rest _)
+    "Update org-id and org-node after an Org file is deleted.
 
-First remove references in `org-id-locations'.
+First remove any references to the file in `org-id-locations'.
 
-Then rebuild the org-node caches after a few idle seconds.  The delay
-avoids bothering the user who may be trying to delete many files in a
-short time."
-    (let ((file-being-deleted (if (and arg1 (stringp arg1) (file-exists-p arg1))
+Then schedule a rebuild of org-node caches after a few idle
+seconds.  The delay avoids bothering the user who may be trying
+to delete several files in a row."
+    (let ((file-being-deleted (if (and arg1 (file-exists-p arg1))
                                   arg1
                                 (buffer-file-name))))
       (when (member (file-name-extension file-being-deleted)
                     '("org" "org_archive" "gpg"))
         (org-node-cache--forget-id-location file-being-deleted)
-        (cancel-timer this-timer)
-        (setq this-timer
-              (run-with-idle-timer 6 nil #'org-node-cache-reset))))))
-
-
-;;; Plumbing
+        (cancel-timer timer)
+        (setq timer (run-with-idle-timer 6 nil #'org-node-cache-reset))))))
 
 (defun org-node-cache--forget-id-location (file)
   (org-node--init-org-id-locations-or-die)
@@ -132,7 +128,7 @@ that will match any of the keywords."
         (forward-line 1)))
     res))
 
-(defun org-node-cache--collect-nodes (files)
+(defun org-node-cache--collect (files)
   "Scan FILES for id-nodes, adding them to `org-nodes'.
 Also scan for links."
   (with-temp-buffer
