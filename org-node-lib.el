@@ -84,16 +84,18 @@ the filename."
   :type 'boolean)
 
 (defcustom org-node-format-candidate-fn
-  (lambda (_node title) title)
+  (lambda (_node title)
+    title)
   "Function to return what string should represent this node.
 Affects how selections are displayed during e.g. `org-node-find'.
 
 Called with two arguments: the node data and the title.
 
 The title may in fact be one of the aliases and not the canonical title,
-because the function runs again for every alias.  The node data is a
-plist which form you can observe in examples from
-\\[org-node-cache-peek].
+because the function runs again for every alias.
+
+The node data is an object which form you can observe in
+examples from \\[org-node-cache-peek].
 
 This example shows the ancestor entries to each node:
 
@@ -112,7 +114,7 @@ This example shows the ancestor entries to each node:
   "Predicate returning t to include a node, or nil to exclude it.
 
 This function is applied once for every Org-ID node found, and
-receives the node data as a single argument: a plist which form
+receives the node data as a single argument: an object which form
 you can observe in examples from \\[org-node-cache-peek].
 
 This function is called after fully building the `org-nodes'
@@ -123,7 +125,7 @@ See the following example for a way to filter out nodes tagged
 
 (setq org-node-filter-fn
       (lambda (node)
-        (and (not (plist-get node :exclude))
+        (and (not (assoc \"ROAM_EXCLUDE\" (org-node-properties node)))
              (not (org-node-todo node))
              (not (member \"drill\" (org-node-tags node)))
              (not (string-search \"archive\" (org-node-file-path node))))))

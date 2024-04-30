@@ -23,19 +23,20 @@ time."
     (advice-remove #'delete-file #'org-node-cache--handle-delete)))
 
 (defun org-node-cache-peek ()
-  "For debugging: peek on some values of `org-nodes'."
+  "For debugging: peek on a random member of `org-nodes'."
   (interactive)
-  (let ((rows (hash-table-values org-nodes))
-        (fields (map-keys (cdr (cl-struct-slot-info 'org-node)))))
-    (dotimes (_ 4)
-      (let ((random-node (nth (random (length rows)) rows)))
-        (print
-         (-interleave
-          (--map (intern (concat ":" (symbol-name it))) fields)
-          (cl-loop
-           for field in fields
-           collect (funcall (intern (concat "org-node-" (symbol-name field)))
-                            random-node))))))))
+  (require 'map)
+  (require 'seq)
+  (let ((fields (--map (intern (concat "org-node-" (symbol-name it)))
+                       (map-keys (cdr (cl-struct-slot-info 'org-node)))))
+        (random-node (seq-random-elt
+                      (-filter #'org-node-id (hash-table-values org-nodes)))))
+    (message "%s"
+             (--zip-with
+              (format "(%s NODE) => %s\n" it other)
+              fields
+              (cl-loop for field in fields
+                       collect (funcall field random-node))))))
 
 (defun org-node-cache-reset ()
   "Wipe and rebuild the cache.
