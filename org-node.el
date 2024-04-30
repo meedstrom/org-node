@@ -64,6 +64,11 @@ Please add onto org-mode-hook:
 (defvar org-node-hist nil
   "Minibuffer history.")
 
+(defun org-node-convert-link-to-super (&rest _)
+  "Wrapper for `org-super-links-convert-link-to-super'."
+  (require 'org-super-links)
+  (org-super-links-convert-link-to-super nil))
+
 (defun org-node--visit-get-true-heading (node)
   "Visit subtree NODE and get the heading, in a way that's aware of
 buffer-local #+todo settings so the todo state is not taken as part
