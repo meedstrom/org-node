@@ -1,8 +1,9 @@
 * org-node
 ** Recent changes [2024-04-30]
 - We no longer depend on a =BACKLINKS= property!  It is still a great way to show backlinks, so it remains as an option.
-- Renamed =CACHED_BACKLINKS= to just =BACKLINKS=.  One =M-x org-node-backlink-fix-all= will take care of it, or you can remove them with =M-x org-node-backlink-regret=.
+- Renamed =CACHED_BACKLINKS= to just =BACKLINKS=.  One =M-x org-node-backlink-fix-all= will take care of the rename, or you can remove them all with =M-x org-node-backlink-regret=.
 - The optional system for populating the org-roam DB should Just Work now
+- *Breaking API change* -- nodes are objects now, not plists!  Unfortunately the software can't give you a deprecation notice, because plists fail silently (that's why we changed it, better sooner than later).  See updated examples for =org-node-filter-fn= etc.
 
 ** What's all this
 
