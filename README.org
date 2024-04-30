@@ -71,6 +71,28 @@ Add an init snippet like this (assuming [[https://github.com/radian-software/str
   :hook (org-mode . org-node-cache-mode))
 #+end_src
 
+*** Quick start
+
+If you're new to the whole concept, you don't really need to configure anything.
+
+As with org-roam, the main things you use in day-to-day operation are two commands: "find" and "insert".  Pick some good keys and try them out, and you can come back to this README later---or never.
+
+The keys I use:
+
+#+begin_src elisp
+(global-set-key (kbd "<f2> f") #'org-node-find)
+(global-set-key (kbd "<f2> i") #'org-node-insert)
+#+end_src
+
+(I like F2, but as everyone aside from Xah Lee seems to hate F1-F12, maybe you'd prefer... let's say =M-s=?
+
+#+begin_src elisp
+(global-set-key (kbd "M-s f") #'org-node-find)
+(global-set-key (kbd "M-s i") #'org-node-insert)
+#+end_src
+
+To browse other config options, type =M-x customize-group RET org-node RET=.
+
 *** Use Org-roam at the same time?
 
 These user options help you feel at home using both packages side-by-side:
@@ -108,8 +130,6 @@ You may also want [[https://github.com/meedstrom/org-node?tab=readme-ov-file#1-s
   - Add =BACKLINKS= property to every node everywhere that should have one
 - =org-node-backlink-regret=
   - In case you regret using this package -- remove all =BACKLINKS=
-
-For config options, type =M-x customize-group RET org-node RET=.
 
 *** See backlinks as an org-roam-buffer
 
