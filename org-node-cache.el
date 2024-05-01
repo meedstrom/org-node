@@ -32,9 +32,9 @@ time."
   (require 'map)
   (require 'seq)
   (let ((fields (--map (intern (concat "org-node-" (symbol-name it)))
-                       (map-keys (cdr (cl-struct-slot-info 'org-node)))))
+                       (map-keys (cdr (cl-struct-slot-info 'org-node-data)))))
         (random-node (seq-random-elt
-                      (-filter #'org-node-id (hash-table-values org-nodes)))))
+                      (-filter #'org-node-get-id (hash-table-values org-nodes)))))
     (message "%s"
              (--zip-with
               (format "(%s X) => %s\n" it other)
