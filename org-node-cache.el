@@ -38,6 +38,9 @@ time."
               (cl-loop for field in fields
                        collect (funcall field random-node))))))
 
+(defvar org-node-cache-reset-hook nil)
+(defvar org-node-cache-rescan-file-hook nil)
+
 (defun org-node-cache-reset ()
   "Wipe and rebuild the cache.
 For an user-facing command, see \\[org-node-reset]."
@@ -58,11 +61,12 @@ For an user-facing command, see \\[org-node-reset]."
   (let ((file (if (and arg2 (stringp arg2) (file-exists-p arg2))
                   arg2
                 (buffer-file-name))))
-    (org-node-cache--collect (list file)))
-  (run-hooks 'org-node-cache-rescan-file-hook))
+    (org-node-cache--collect (list file))
+    (when (boundp 'org-node-cache-scan-file-hook)
+      (lwarn 'org-node :warning "Hook renamed: org-node-cache-scan-file-hook to org-node-cache-rescan-file-hook"))
+    (run-hooks 'org-node-cache-rescan-file-hook)))
 
-(defvar org-node-cache-reset-hook nil)
-(defvar org-node-cache-rescan-file-hook nil)
+(define-obsolete-function-alias 'org-node-cache-scan-file 'org-node-cache-rescan-file "2024-05-01")
 
 (defun org-node-cache-ensure-fresh ()
   (org-node--init-org-id-locations-or-die)
