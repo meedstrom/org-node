@@ -186,9 +186,9 @@ files known to `org-id-locations'."
                                   when (save-excursion
                                          (goto-char (line-beginning-position))
                                          ;; Not a comment or property line
-                                         (and (not (looking-at "[[:space:]]*# " t))
-                                              (not (looking-at "[[:space:]]*#\\+" t))
-                                              (not (looking-at "[[:space:]]*:[^ ]" t))))
+                                         (and (not (looking-at-p "[[:space:]]*# "))
+                                              (not (looking-at-p "[[:space:]]*#\\+"))
+                                              (not (looking-at-p "[[:space:]]*:[^ ]"))))
                                   do (throw 'link-found t))))
                              (outline-next-heading)))))))))))))
 
@@ -330,16 +330,15 @@ Optional argument PART-OF-MASS-OP means skip some cleanup."
            ;; On a # comment or #+keyword, do nothing
            ((save-excursion
               (goto-char (line-beginning-position))
-              (or (looking-at "[[:space:]]*# " t)
-                  (looking-at "[[:space:]]*#\\+" t)))
+              (or (looking-at-p "[[:space:]]*# ")
+                  (looking-at-p "[[:space:]]*#\\+")))
             (forward-line 1))
            ;; On a BACKLINKS property or in :BACKLINKS:...:END: drawer,
            ;; delete link if it's stale
            ((or (save-excursion
                   (goto-char (line-beginning-position))
-                  (looking-at "[[:space:]]*:cached_backlinks: " t))
-                ;; (org-node-backlink--in-backlinks-drawer-p)
-                )
+                  (looking-at-p "[[:space:]]*:cached_backlinks: "))
+                (org-node-backlink--in-backlinks-drawer-p))
             (unless (org-node-backlink--target-has-link-to-here-p)
               (goto-char beg)
               (if (looking-back "\\[\\[")
