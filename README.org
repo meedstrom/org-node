@@ -1,6 +1,6 @@
 * org-node
 ** News [2024-05-01]
-- So it turns out this package is much slower on a vanilla Emacs config than on my personal Doom Emacs config, somehow!  The command =org-node-reset= takes me 1 second but in `emacs -Q` it takes 60 seconds!  I'm looking into why.
+- It turns out that =org-node-reset= took dozens of seconds on some people's configs.  I /think/ it's fixed now, it should only take 0-3 seconds.  Tweak =org-node-perf-gc-cons-threshold= if you still experience it taking long.
 
 ** News [2024-04-30]
 - We no longer depend on a =BACKLINKS= property!  It is still a great way to show backlinks, so it remains as an option.

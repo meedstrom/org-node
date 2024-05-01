@@ -162,10 +162,14 @@ files."
   :group 'org-node
   :type 'boolean)
 
-(defcustom org-node-perf-gc-cons-threshold (* 1000 1000 1000)
+(defcustom org-node-perf-gc-cons-threshold nil
   "Temporary setting for `gc-cons-threshold'.
-A good value speeds up `org-node-reset' a bit.  Set nil to fall
-back on the actual value of `gc-cons-threshold'."
+Tweak to maybe speed up `org-node-reset'.  Set nil to use the
+actual value of `gc-cons-threshold'.
+
+It can be surprising which value works best.  It is possible that
+80 kB is performant, and 16 MB is performant, but something in
+between such as 1 MB is very slow."
   :group 'org-node
   :type '(choice number (const nil)))
 
@@ -189,12 +193,9 @@ Also scan for links."
           (case-fold-search t)
           (please-update-id nil)
           (garbage-collection-messages nil)
-          ;; Temporary user-friendliness while I work on issue #2
-          ;; https://github.com/meedstrom/org-node/issues/2
           (ctr 0)
           (ctr-max (length files))
-          ;; (ctr-chunk (max 1 (round (log (length files) 5))))
-          (ctr-chunk 1)
+          (ctr-chunk (max 1 (round (log (length files) 5))))
           ;; Attempt to improve performance
           (inhibit-modification-hooks t)
           (inhibit-point-motion-hooks t)
@@ -214,15 +215,10 @@ Also scan for links."
                (list (rassoc 'epa-file-handler file-name-handler-alist))
              file-name-handler-alist)))
       (setq-local outline-regexp org-outline-regexp)
-      ;; TODO Temporarily remove any advices
-      ;; (advice-mapc (lambda (advice)
-      ;;                (push advice insert-file-contents-advices)
-      ;;                (advice-remove 'insert-file-contents advice))
-      ;;              'insert-file-contents)
       (dolist (file files)
         (when (= 0 (% (cl-incf ctr) ctr-chunk))
-          (message "org-node: Collecting... %d/%d (should only take 0-5 seconds, but per bug #2, some systems hang for a while afterwards!)\n%s"
-                   ctr ctr-max file)
+          (message "org-node: Collecting... %d/%d (if this takes more than 0-5 seconds, tweak `org-node-perf-gc-cons-threshold')"
+                   ctr ctr-max)
           (redisplay))
         (if (not (file-exists-p file))
             ;; Example situation: user renamed/deleted a file using shell
