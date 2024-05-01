@@ -12,26 +12,26 @@
   "Construct an org-roam-node object from NODE."
   (require 'org-roam)
   (org-roam-node-create
-   :file (org-node-file-path node)
-   :id (org-node-id node)
-   :olp (org-node-olp node)
-   :scheduled (when-let ((scheduled (org-node-scheduled node)))
+   :file (org-node-get-file-path node)
+   :id (org-node-get-id node)
+   :olp (org-node-get-olp node)
+   :scheduled (when-let ((scheduled (org-node-get-scheduled node)))
                 (format-time-string
                  "%FT%T%z"
                  (encode-time (org-parse-time-string scheduled))))
-   :deadline (when-let ((deadline (org-node-deadline node)))
+   :deadline (when-let ((deadline (org-node-get-deadline node)))
                (format-time-string
                 "%FT%T%z"
                 (encode-time (org-parse-time-string deadline))))
-   :level (org-node-level node)
-   :title (org-node-title node)
-   :file-title (org-node-file-title node)
-   :tags (org-node-tags node)
-   :aliases (org-node-aliases node)
-   :todo (org-node-todo node)
-   :refs (org-node-refs node)
-   :point (org-node-pos node)
-   :properties (org-node-properties node)))
+   :level (org-node-get-level node)
+   :title (org-node-get-title node)
+   :file-title (org-node-get-file-title node)
+   :tags (org-node-get-tags node)
+   :aliases (org-node-get-aliases node)
+   :todo (org-node-get-todo node)
+   :refs (org-node-get-refs node)
+   :point (org-node-get-pos node)
+   :properties (org-node-get-properties node)))
 
 (defun org-node--fabricate-roam-backlinks (roam-target-node &rest _)
   "Return org-roam-backlink objects targeting ROAM-OBJECT.
@@ -95,19 +95,19 @@ Designed as override advice for `org-roam-backlinks-get'."
     rows))
 
 (defun org-node--feed-node-to-roam-db (node)
-  (let ((id (org-node-id node))
-        (file-path (org-node-file-path node))
-        (file-title (org-node-file-title node))
-        (tags (org-node-tags node))
-        (aliases (org-node-aliases node))
-        (roam-refs (org-node-refs node))
-        (title (org-node-title node))
-        (properties (org-node-properties node))
-        (level (org-node-level node))
-        (todo (org-node-todo node))
-        (is-subtree (org-node-is-subtree node))
-        (olp (org-node-olp node))
-        (pos (org-node-pos node)))
+  (let ((id (org-node-get-id node))
+        (file-path (org-node-get-file-path node))
+        (file-title (org-node-get-file-title node))
+        (tags (org-node-get-tags node))
+        (aliases (org-node-get-aliases node))
+        (roam-refs (org-node-get-refs node))
+        (title (org-node-get-title node))
+        (properties (org-node-get-properties node))
+        (level (org-node-get-level node))
+        (todo (org-node-get-todo node))
+        (is-subtree (org-node-get-is-subtree node))
+        (olp (org-node-get-olp node))
+        (pos (org-node-get-pos node)))
     ;; `org-roam-db-insert-file'
     (org-roam-db-query
      [:insert :into files
@@ -133,11 +133,11 @@ Designed as override advice for `org-roam-backlinks-get'."
     ;; `org-roam-db-insert-node-data'
     (when is-subtree
       (let ((priority nil)
-            (scheduled (when-let ((scheduled (org-node-scheduled node)))
+            (scheduled (when-let ((scheduled (org-node-get-scheduled node)))
                          (format-time-string
                           "%FT%T%z"
                           (encode-time (org-parse-time-string scheduled)))))
-            (deadline (when-let ((deadline (org-node-deadline node)))
+            (deadline (when-let ((deadline (org-node-get-deadline node)))
                         (format-time-string
                          "%FT%T%z"
                          (encode-time (org-parse-time-string deadline)))))
@@ -198,15 +198,15 @@ Designed as override advice for `org-roam-backlinks-get'."
           (message "Inserting into %s... %d/%d"
                    org-roam-db-location ctr max))
      (org-node--feed-node-to-roam-db node)
-     (org-node--feed-links-to-roam-db (org-node-id node)))))
+     (org-node--feed-links-to-roam-db (org-node-get-id node)))))
 
 (defun org-node-feed-file-to-roam-db ()
   (emacsql-with-transaction (org-roam-db)
     (cl-loop with file = (buffer-file-name)
              for node being the hash-values of org-nodes
-             when (equal file (org-node-file-path node))
+             when (equal file (org-node-get-file-path node))
              do
-             (let ((id (org-node-id node)))
+             (let ((id (org-node-get-id node)))
                (org-node--feed-node-to-roam-db node)
                (org-node--feed-links-to-roam-db id)
                ))))

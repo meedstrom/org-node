@@ -75,14 +75,14 @@ Please add onto org-mode-hook:
   "Visit subtree NODE and get the heading, in a way that's aware of
 buffer-local #+todo settings so the todo state is not taken as part
 of the heading."
-  (if (org-node-is-subtree node)
+  (if (org-node-get-is-subtree node)
       (delay-mode-hooks
-        (org-with-file-buffer (org-node-file-path node)
+        (org-with-file-buffer (org-node-get-file-path node)
           (save-excursion
             (without-restriction
-              (goto-char (org-node-pos node))
+              (goto-char (org-node-get-pos node))
               (nth 4 (org-heading-components))))))
-    (org-node-title node)))
+    (org-node-get-title node)))
 
 (defun org-node-slugify-like-roam (title)
   "From TITLE, make a filename in the default org-roam style."
@@ -197,16 +197,16 @@ type the name of a node that does not exist:
         (setq node (gethash input org-node-collection))
         (if node
             (progn
-              (setq title (org-node-title node))
-              (setq id (org-node-id node)))
+              (setq title (org-node-get-title node))
+              (setq id (org-node-get-id node)))
           (setq title input)
           (setq id (org-id-new)))))
     (if node
         ;; Node exists; capture into it
         (progn
-          (find-file (org-node-file-path node))
+          (find-file (org-node-get-file-path node))
           (widen)
-          (goto-char (org-node-pos node))
+          (goto-char (org-node-get-pos node))
           (org-reveal)
           ;; TODO: Figure out how to play well with :prepend vs not :prepend.
           ;; Now it's just like it always prepends, I think?
@@ -275,9 +275,9 @@ variables."
 
 (defun org-node--goto (node)
   "Visit NODE."
-  (find-file (org-node-file-path node))
+  (find-file (org-node-get-file-path node))
   (widen)
-  (goto-char (org-node-pos node))
+  (goto-char (org-node-get-pos node))
   (org-reveal)
   (recenter 5))
 
@@ -329,11 +329,11 @@ If you find the behavior different, perhaps you have something in
          (input (completing-read "Node: " org-node-collection
                                  () () () 'org-node-hist))
          (node (gethash input org-node-collection))
-         (id (or (org-node-id node) (org-id-new)))
+         (id (or (org-node-get-id node) (org-id-new)))
          (link-desc (or region-text
-                        (if-let ((aliases (org-node-aliases node)))
+                        (if-let ((aliases (org-node-get-aliases node)))
                             (--find (string-match it input) aliases))
-                        (org-node-title node)
+                        (org-node-get-title node)
                         input)))
     (atomic-change-group
       (if region-text
@@ -373,8 +373,8 @@ adding keywords to the things to exclude:
   (let ((node (gethash (completing-read "Node: " org-node-collection
                                         () () () 'org-node-hist)
                        org-node-collection)))
-    (let ((id (org-node-id node))
-          (title (org-node-title node))
+    (let ((id (org-node-get-id node))
+          (title (org-node-get-title node))
           (level (or (org-current-level) 0))
           (m1 (make-marker)))
       (insert (org-link-make-string (concat "id:" id) title))
@@ -415,8 +415,8 @@ adding keywords to the things to exclude:
   (let ((node (gethash (completing-read "Node: " org-node-collection
                                         () () () 'org-node-hist)
                        org-node-collection)))
-    (let ((id (org-node-id node))
-          (title (org-node-title node))
+    (let ((id (org-node-get-id node))
+          (title (org-node-get-title node))
           (level (or (org-current-level) 0)))
       (insert (org-link-make-string (concat "id:" id) title))
       (goto-char (line-beginning-position))
@@ -498,12 +498,12 @@ Prompt the user for each one."
                  (node (when id
                          (gethash id org-nodes)))
                  (true-title (when node
-                               (org-node-title node)))
+                               (org-node-get-title node)))
                  (answered-yes nil))
             (when (and node
                        (not (string-equal-ignore-case desc true-title))
                        (not (member-ignore-case desc
-                                                (org-node-aliases node))))
+                                                (org-node-get-aliases node))))
               (switch-to-buffer (current-buffer))
               (org-reveal)
               (recenter)
@@ -679,7 +679,7 @@ Adding to that, here is an example advice to copy any inherited
   (let ((then (current-time)))
     (org-node-cache-reset)
     (let ((n-subtrees (cl-loop for node being the hash-values of org-nodes
-                               count (org-node-is-subtree node))))
+                               count (org-node-get-is-subtree node))))
       (message "org-node: found %d files, %d subtrees and %d links in %.2fs"
                (- (hash-table-count org-nodes) n-subtrees)
                n-subtrees

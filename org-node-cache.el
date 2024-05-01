@@ -293,7 +293,7 @@ Also scan for links."
                   (search-forward ":end:"))
                 (org-node-cache--collect-links-until end file-id nil)))
             (org-node-cache--add-node-to-tables
-             (make-org-node
+             (make-org-node-data
               :title file-title
               :level 0
               :tags file-tags
@@ -371,7 +371,7 @@ Also scan for links."
                     ;; (forward-char 1) ;; Do not match org-outline-regexp-bol
                     (org-node-cache--collect-links-until (pos-eol) id-here olp-with-self)))
                 (org-node-cache--add-node-to-tables
-                 (make-org-node
+                 (make-org-node-data
                   :title title
                   :is-subtree t
                   :level level
