@@ -12,19 +12,22 @@
         (add-hook 'before-save-hook #'org-node-backlink-check-buffer 0 t)
         (add-hook 'org-roam-post-node-insert-hook #'org-node-backlink--add-in-target-a -99 t)
         (add-hook 'org-node-insert-link-hook #'org-node-backlink--add-in-target-a -99 t)
-        ;; Advices cannot be buffer-local, but it's ok, this one checks if the
-        ;; mode is on.
+        ;; It seems advices cannot be buffer-local, but it's OK, this function
+        ;; will do nothing if this mode isn't active in current buffer.
         (advice-add 'org-insert-link :after #'org-node-backlink--add-in-target-a))
     (remove-hook 'before-save-hook #'org-node-backlink-check-buffer t)
     (remove-hook 'org-roam-post-node-insert-hook #'org-node-backlink--add-in-target-a t)
     (remove-hook 'org-node-insert-link-hook #'org-node-backlink--add-in-target-a t)))
 
 ;;;###autoload
-(defun org-node-backlinks-mode ()
-  (display-warning
-   'org-node :error
-   "Someone misspelled `org-node-backlink-mode', but I ran it for you")
-  (org-node-backlink-mode))
+(let (warned-once)
+  (defun org-node-backlinks-mode ()
+    (unless warned-once
+      (run-with-timer
+       .1 nil #'lwarn 'org-node :error
+       "Someone misspelled `org-node-backlink-mode', but I ran it for you")
+      (setq warned-once t))
+    (org-node-backlink-mode)))
 
 ;; TODO Let it update giant files quickly.  Now it just gives up and gets out of
 ;; the way if there are >100 links, but it should get faster with the new
