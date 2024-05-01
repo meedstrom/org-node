@@ -75,13 +75,13 @@ Please add onto org-mode-hook:
   "Visit subtree NODE and get the heading, in a way that's aware of
 buffer-local #+todo settings so the todo state is not taken as part
 of the heading."
-  (unless (org-node-is-subtree node)
-    (error "Not a subtree node %s" node))
-  (org-with-file-buffer (org-node-file-path node)
-    (save-excursion
-      (without-restriction
-        (goto-char (org-node-pos node))
-        (nth 4 (org-heading-components))))))
+  (if (org-node-is-subtree node)
+      (org-with-file-buffer (org-node-file-path node)
+        (save-excursion
+          (without-restriction
+            (goto-char (org-node-pos node))
+            (nth 4 (org-heading-components)))))
+    (org-node-title node)))
 
 (defun org-node-slugify-like-roam (title)
   "From TITLE, make a filename in the default org-roam style."
