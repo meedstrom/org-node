@@ -75,11 +75,12 @@ Please add onto org-mode-hook:
 buffer-local #+todo settings so the todo state is not taken as part
 of the heading."
   (if (org-node-is-subtree node)
-      (org-with-file-buffer (org-node-file-path node)
-        (save-excursion
-          (without-restriction
-            (goto-char (org-node-pos node))
-            (nth 4 (org-heading-components)))))
+      (delay-mode-hooks
+        (org-with-file-buffer (org-node-file-path node)
+          (save-excursion
+            (without-restriction
+              (goto-char (org-node-pos node))
+              (nth 4 (org-heading-components))))))
     (org-node-title node)))
 
 (defun org-node-slugify-like-roam (title)
@@ -328,16 +329,14 @@ If you find the behavior different, perhaps you have something in
                                  () () () 'org-node-hist))
          (node (gethash input org-node-collection))
          (id (or (org-node-id node) (org-id-new)))
-         (link-desc (or region-text input)))
+         (link-desc (or region-text
+                        (if-let ((aliases (org-node-aliases node)))
+                            (--find (string-match it input) aliases))
+                        (org-node-title node)
+                        input)))
     (atomic-change-group
       (if region-text
-          (delete-region beg end)
-        ;; Try to strip the todo keyword, looking up what counts as todo syntax
-        ;; in the target file.  Fail without exiting because it matters little.
-        (condition-case err
-            (setq link-desc (org-node--visit-get-true-heading node))
-          (( error )
-           (message "org-node--visit-get-true-heading signaled: %S" err))))
+          (delete-region beg end))
       (insert (org-link-make-string (concat "id:" id) link-desc))
       (run-hook-with-args 'org-node-insert-link-hook id link-desc))
     ;; TODO: Delete the link if a node was not created

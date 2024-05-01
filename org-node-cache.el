@@ -270,7 +270,7 @@ Also scan for links."
               (setq todo-re
                     (org-node-cache--make-todo-regexp
                      (buffer-substring-no-properties (point) (pos-eol))))
-              (goto-char 1))
+              (goto-char 1))            
             (if (re-search-forward "^#\\+title: " far t)
                 (setq file-title
                       (org-link-display-format
@@ -386,6 +386,7 @@ Also scan for links."
                             (or (cdr (assoc "ROAM_ALIASES" props)) ""))
                   :refs (split-string-and-unquote
                          (or (cdr (assoc "ROAM_REFS" props)) "")))))))))
+      (message nil)
       ;; (dolist (ad insert-file-contents-advices)
       ;;   (advice-add 'insert-file-contents (advice--how) (car ad) (cdr ad)))
       (when please-update-id
