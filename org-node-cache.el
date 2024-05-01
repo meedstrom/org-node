@@ -14,8 +14,7 @@ time."
   ;; Take this opportunity to check for deprecated usage
   (when (or (string-search "plist-get" (prin1-to-string org-node-filter-fn))
             (string-search "plist-get" (prin1-to-string org-node-format-candidate-fn)))
-    (display-warning 'org-node (string-fill "\nBreaking change 2024-04-30: nodes are objects now, not plists!  This change was made because plist-get fails silently, which makes debugging more difficult.  See updated examples for org-node-filter-fn etc."
-                                            79)))
+    (display-warning 'org-node (string-fill "\n2024-04-30 breaking change: node metadata comes in objects now, not plists!  This change was made because plist-get fails silently, which makes debugging more difficult.  See updated examples for org-node-filter-fn etc." 79)))
   (if org-node-cache-mode
       (progn
         (add-hook 'after-save-hook #'org-node-cache-rescan-file)
@@ -125,14 +124,14 @@ that will match any of the keywords."
     (with-restriction beg end
       (while (not (eobp))
         (search-forward ":")
-        (push (cons (upcase (decode-coding-string
-                             (buffer-substring
-                              (point) (1- (search-forward ":")))
-                             'utf-8))
-                    (string-trim (decode-coding-string
-                                  (buffer-substring
-                                   (point) (line-end-position))
-                                  'utf-8)))
+        (push (cons (upcase
+                     (buffer-substring
+                      (point) (1- (search-forward ":")))
+                     )
+                    (string-trim
+                     (buffer-substring
+                      (point) (line-end-position))
+                     ))
               res)
         (forward-line 1)))
     res))
@@ -178,7 +177,7 @@ Also scan for links."
               (org-node-cache--forget-id-location file)
               (setq please-update-id t))
           (erase-buffer)
-          (insert-file-contents-literally file)
+          (insert-file-contents file)
           (let (;; Position of first "content": a line not starting with # or :
                 (far (or (re-search-forward "^ *?[^#:]" nil t) (point-max)))
                 props file-title file-tags file-id outline-data)
@@ -191,17 +190,17 @@ Also scan for links."
             (goto-char 1)
             (when (re-search-forward "^#\\+filetags: " far t)
               (setq file-tags (split-string
-                               (decode-coding-string
-                                (buffer-substring (point) (line-end-position))
-                                'utf-8)
+
+                               (buffer-substring (point) (line-end-position))
+
                                ":" t)))
             (goto-char 1)
             (if (re-search-forward "^#\\+title: " far t)
                 (setq file-title
                       (org-link-display-format
-                       (decode-coding-string
-                        (buffer-substring (point) (line-end-position))
-                        'utf-8)))
+
+                       (buffer-substring (point) (line-end-position))
+                       ))
               ;; File nodes dont strictly need #+title, fall back on filename
               (setq file-title (file-name-nondirectory file)))
             (setq file-id (cdr (assoc "ID" props)))
@@ -245,35 +244,35 @@ Also scan for links."
                 (if (re-search-forward " +\\(:.+:\\) *$" (line-end-position) t)
                     (progn
                       (setq title (org-link-display-format
-                                   (decode-coding-string
-                                    (buffer-substring
-                                     here (match-beginning 0))
-                                    'utf-8)))
+
+                                   (buffer-substring
+                                    here (match-beginning 0))
+                                   ))
                       (setq tags (string-split
-                                  (decode-coding-string (match-string 1)
-                                                        'utf-8)
+                                  (match-string 1)
+
                                   ":" t)))
                   (setq title (org-link-display-format
-                               (decode-coding-string (buffer-substring
-                                                      here (line-end-position))
-                                                     'utf-8))))
+                               (buffer-substring
+                                here (line-end-position))
+                               )))
                 (setq here (point))
                 (setq line+2 (and (forward-line 2) (point)))
                 (goto-char here)
                 (when (re-search-forward "[\n\s]SCHEDULED: " line+2 t)
                   (setq sched
-                        (decode-coding-string
-                         (buffer-substring
-                          ;; \n just there for safety
-                          (point) (+ 1 (point) (skip-chars-forward "^]>\n")))
-                         'utf-8))
+
+                        (buffer-substring
+                         ;; \n just there for safety
+                         (point) (+ 1 (point) (skip-chars-forward "^]>\n")))
+                        )
                   (goto-char here))
                 (when (re-search-forward "[\n\s]DEADLINE: " line+2 t)
                   (setq deadline
-                        (decode-coding-string
-                         (buffer-substring
-                          (point) (+ 1 (point) (skip-chars-forward "^]>\n")))
-                         'utf-8)))
+
+                        (buffer-substring
+                         (point) (+ 1 (point) (skip-chars-forward "^]>\n")))
+                        ))
                 (setq here (point))
                 (setq line+2 (and (forward-line 2) (point)))
                 (goto-char here)
