@@ -110,8 +110,8 @@ These user options help you feel at home using both packages side-by-side:
 In addition, if you've been struggling with slow saving of big files, consider these org-roam settings:
 
 #+begin_src elisp
-(setq org-roam-db-update-on-save nil) ;; don't scan file on save
-(setq org-roam-link-auto-replace nil) ;; don't look for roam: links on save
+(setq org-roam-db-update-on-save nil) ;; don't update DB on save, not needed
+(setq org-roam-link-auto-replace nil) ;; don't look for "roam:" links on save
 #+end_src
 
 With that done, try out these command substitutes:
@@ -125,15 +125,23 @@ I'm guessing you also want the [[https://github.com/meedstrom/org-node?tab=readm
 
 ** Backlink solution 1: org-roam-buffer
 
-Want the good old =M-x org-roam-buffer-toggle=?
+Want to keep using =M-x org-roam-buffer-toggle=?
 
-*Option 1A*.  Feed data to org-roam so all its features will Just Work^{sort of}.  For a first-time run, type =M-x org-node-feed-roam-db= (slow!).  Then add the following init snippet to keep the database updated over time.
+*Option 1A.*  Keep letting org-roam update its own DB.
+
+If you didn't have laggy saves, this is fine.  In other words, keep =org-roam-db-update-on-save= at t.
+
+*Option 1B*.  Tell org-node to write to the org-roam DB in its stead.
+
+The following hook keeps the database synced.
 
 #+begin_src elisp
-(add-hook 'org-node-cache-scan-file-hook #'org-node-feed-file-to-roam-db)
+(add-hook 'org-node-cache-rescan-file-hook #'org-node-feed-file-to-roam-db)
 #+end_src
 
-*Option 1B*.  Cut out the DB altogether.  Instead of the above, add this hack:
+For a full reset, equivalent to =C-u M-x org-roam-db-sync=, you can type =M-x org-node-feed-roam-db=.  It's still slow, but interestingly, all the slowness comes from EmacSQL or SQLite.  If someone figures out how to optimize that, please let me know!
+
+*Option 1C*.  Cut out the DB altogether.  Instead of the above, add this hack:
 
 #+begin_src elisp
 (advice-add 'org-roam-backlinks-get :override
@@ -142,11 +150,11 @@ Want the good old =M-x org-roam-buffer-toggle=?
 
 ** Backlink solution 2: inside the file
 
-I love this solution, because I rarely have space on my screen to fit a whole window for backlinks anyway.
+I love this solution, because I rarely have space on my screen for a backlink buffer anyway.
 
 *Option 2A*.  Let org-node add a =:BACKLINKS:= property to all nodes.
 
-For a first-time run, type =M-x org-node-backlink-fix-all=.  (Don't worry, if you change your mind there is =M-x org-node-backlink-regret=.)
+For a first-time run, type =M-x org-node-backlink-fix-all=.  (Don't worry, if you change your mind, you can undo with =M-x org-node-backlink-regret=.)
 
 Then start using the minor mode =org-node-backlink-mode=, which keeps these properties updated.  Init snippet:
 
@@ -165,7 +173,7 @@ I /think/ the following should work. Totally untested, let me know!
 ** Misc
 *** Org-capture
 
-You may know that org-roam has its own set of capture templates: the =org-roam-capture-templates=.
+You may have heard that org-roam has its own set of capture templates: the =org-roam-capture-templates=.
 
 It can make sense, for people who fully understand the magic of capture templates.  I didn't, so I was not confident using a second-order abstraction over an already leaky abstraction.
 
