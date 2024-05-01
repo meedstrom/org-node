@@ -476,6 +476,7 @@ Can also operate on a file at given PATH."
   "Look for links to update to match the current title.
 Prompt the user for each one."
   (interactive)
+  (require 'org-macs) ;; Test a fix for #4
   (require 'ol)
   (org-node-cache-ensure-fresh)
   (set-face-inverse-video 'org-node-rewrite-links-face
@@ -646,10 +647,16 @@ Adding to that, here is an example advice to copy any inherited
       (message "Waiting for rgrep to populate buffer..."))))
 
 ;;;###autoload
-(defun org-node-create-subtree ()
+(defun org-node-insert-heading-node ()
+  "Insert a heading with ID and properties."
   (interactive nil org-mode)
   (org-insert-heading)
   (org-node-nodeify-entry))
+
+;; Badly named
+;;;###autoload
+(define-obsolete-function-alias
+  'org-node-create-subtree 'org-node-insert-heading-node "2024-05-01")
 
 ;;;###autoload
 (defun org-node-nodeify-entry ()

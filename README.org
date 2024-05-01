@@ -251,8 +251,8 @@ In lieu of a convenient =org-roam-update-org-id-locations=, see [[https://github
   - A bizarro counterpart to =org-roam-extract-subtree=
 - =org-node-nodeify-entry=
   - Trivial - give an ID to subtree at point (and run org-node-creation-hook)
-- =org-node-create-subtree=
-  - Trivial - insert a new subtree with an ID (and run org-node-creation-hook)
+- =org-node-insert-heading-node=
+  - Trivial - insert a new heading with an ID (and run org-node-creation-hook)
 - =org-node-random=
 - =org-node-rewrite-links-ask=
   - Look for link descriptions that got out of sync with the current node title, then prompt at each link to update it
