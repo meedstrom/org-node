@@ -11,6 +11,11 @@ time."
   :global t
   :group 'org-node
   (remove-hook 'org-mode-hook #'org-node-cache-mode)
+  ;; Take this opportunity to check for deprecated usage
+  (when (or (string-search "plist-get" (prin1-to-string org-node-filter-fn))
+            (string-search "plist-get" (prin1-to-string org-node-format-candidate-fn)))
+    (display-warning 'org-node (string-fill "\nBreaking change 2024-04-30: nodes are objects now, not plists!  This change was made because plist-get fails silently, which makes debugging more difficult.  See updated examples for org-node-filter-fn etc."
+                                            79)))
   (if org-node-cache-mode
       (progn
         (add-hook 'after-save-hook #'org-node-cache-rescan-file)
