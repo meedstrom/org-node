@@ -103,7 +103,7 @@ This example shows the ancestor entries to each node:
 
 (setq org-node-format-candidate-fn
       (defun my-format-with-olp (node title)
-        (if-let ((olp (org-node-olp node)))
+        (if-let ((olp (org-node-get-olp node)))
             (concat (string-join olp \" > \") \" > \" title)
           title)))
 "
@@ -112,7 +112,7 @@ This example shows the ancestor entries to each node:
 
 (defcustom org-node-filter-fn
   (lambda (node)
-    (not (assoc "ROAM_EXCLUDE" (org-node-properties node))))
+    (not (assoc "ROAM_EXCLUDE" (org-node-get-properties node))))
   "Predicate returning t to include a node, or nil to exclude it.
 
 This function is applied once for every Org-ID node found, and
@@ -127,10 +127,10 @@ See the following example for a way to filter out nodes tagged
 
 (setq org-node-filter-fn
       (lambda (node)
-        (and (not (assoc \"ROAM_EXCLUDE\" (org-node-properties node)))
-             (not (org-node-todo node))
-             (not (member \"drill\" (org-node-tags node)))
-             (not (string-search \"archive\" (org-node-file-path node))))))
+        (and (not (assoc \"ROAM_EXCLUDE\" (org-node-get-properties node)))
+             (not (org-node-get-todo node))
+             (not (member \"drill\" (org-node-get-tags node)))
+             (not (string-search \"archive\" (org-node-get-file-path node))))))
 
 If you have an expensive filter slowing things down, a tip is
 make a defun, not a lambda, and byte-compile that init file:
@@ -226,26 +226,79 @@ first element."
 ;; any of the data fields.
 ;;
 ;; If you use `plist-get' to fetch a key that doesn't exist, it just quietly
-;; returns nil, no error, no warning.  (Bad for an API!)  By contrast, if I've
-;; deprecated a field such as `org-node-roam-exclude' and an user tries to call
-;; such a getter, I can have it emit any message to the user that I choose,
-;; making possible a soft-deprecation pathway.
-(cl-defstruct org-node
-  title
-  is-subtree
-  level
-  id
-  pos
-  tags
-  todo
-  file-path
-  scheduled
-  deadline
-  file-title
-  olp
-  properties
-  aliases
-  refs)
+;; returns nil, no error, no warning.  (Bad for an API!)  Let's say I want to
+;; deprecate or rename a field such :roam-exclude, then I must hope everyone
+;; reads the news.  By contrast if the getter is a function
+;; `org-node-get-roam-exclude', I can override it so it emits a warning.
+(eval `(cl-defstruct org-node-data
+         "To get a node's title, use e.g. `(org-node-get-title NODE)'."
+         (aliases    nil :read-only t :type list    :documentation ,(string-fill "List of ROAM_ALIASES." 70))
+         (deadline   nil :read-only t :type string  :documentation ,(string-fill "The DEADLINE state." 70))
+         (file-path  nil :read-only t :type string  :documentation ,(string-fill "Full file path." 70))
+         (file-title nil :read-only t :type string  :documentation ,(string-fill "The title of the file where this node is.  If this node is itself a file-level node, then it is the same as the title." 70))
+         (id         nil :read-only t :type string  :documentation ,(string-fill "The ID property." 70))
+         (is-subtree nil :read-only t :type boolean :documentation ,(string-fill "Valued t if it is a subtree, nil if it is a file-level node." 70))
+         (level      nil :read-only t :type number  :documentation ,(string-fill "Outline level, i.e. the number of stars in the heading.  A file-level node has level 0." 70))
+         (olp        nil :read-only t :type list    :documentation ,(string-fill "List of ancestor headings to this node.  Naturally, this is empty if the node is a file-level node or a top-level heading." 70))
+         (pos        nil :read-only t :type number  :documentation ,(string-fill "" 70))
+         (properties nil :read-only t :type list    :documentation ,(string-fill "" 70))
+         (refs       nil :read-only t :type list    :documentation ,(string-fill "" 70))
+         (scheduled  nil :read-only t :type string  :documentation ,(string-fill "" 70))
+         (tags       nil :read-only t :type list    :documentation ,(string-fill "" 70))
+         (title      nil :read-only t :type string  :documentation ,(string-fill "" 70))
+         (todo       nil :read-only t :type string  :documentation ,(string-fill "" 70))))
+
+;; Make getters called "org-node-get-..." instead of "org-node-data-..."
+;;
+;; It's one letter shorter, and a verb.  Function names generally read better
+;; as verbs, and while that may not necessary for lisp struct accessors, then
+;; consider a getter like "org-node-data-title": what does this mean?  The
+;; title of the data, or the title of the node?  Much less confusion with
+;; "org-node-get-title"!
+;;
+;; Of course it could've been just "org-node-title", which is free of the above
+;; confusion, but has its own issues.  First (1) the package itself is also
+;; called "org-node", so this pollutes the namespace.  When you search for
+;; functions, you're unsure what's a getter for a node object and what may be
+;; commands that have nothing to do with node objects.  Additionally (2) it's
+;; good to distinguish the concept of an ID node (which is an Org file, or a
+;; heading in an Org file) from the concept of a data object that just holds
+;; metadata about that ID node.
+;;
+;; The sentence "snow is white" is true if and only if snow is white, and all
+;; that.
+(defalias 'org-node-get-aliases    #'org-node-data-aliases)
+(defalias 'org-node-get-deadline   #'org-node-data-deadline)
+(defalias 'org-node-get-file-path  #'org-node-data-file-path)
+(defalias 'org-node-get-file-title #'org-node-data-file-title)
+(defalias 'org-node-get-id         #'org-node-data-id)
+(defalias 'org-node-get-is-subtree #'org-node-data-is-subtree)
+(defalias 'org-node-get-level      #'org-node-data-level)
+(defalias 'org-node-get-olp        #'org-node-data-olp)
+(defalias 'org-node-get-pos        #'org-node-data-pos)
+(defalias 'org-node-get-properties #'org-node-data-properties)
+(defalias 'org-node-get-refs       #'org-node-data-refs)
+(defalias 'org-node-get-scheduled  #'org-node-data-scheduled)
+(defalias 'org-node-get-tags       #'org-node-data-tags)
+(defalias 'org-node-get-title      #'org-node-data-title)
+(defalias 'org-node-get-todo       #'org-node-data-todo)
+
+;; 2024-05-01 Deprecate the old "org-node" struct, badly named
+(define-obsolete-function-alias 'org-node-aliases    #'org-node-get-aliases    "2024-05-01")
+(define-obsolete-function-alias 'org-node-deadline   #'org-node-get-deadline   "2024-05-01")
+(define-obsolete-function-alias 'org-node-file-path  #'org-node-get-file-path  "2024-05-01")
+(define-obsolete-function-alias 'org-node-file-title #'org-node-get-file-title "2024-05-01")
+(define-obsolete-function-alias 'org-node-id         #'org-node-get-id         "2024-05-01")
+(define-obsolete-function-alias 'org-node-is-subtree #'org-node-get-is-subtree "2024-05-01")
+(define-obsolete-function-alias 'org-node-level      #'org-node-get-level      "2024-05-01")
+(define-obsolete-function-alias 'org-node-olp        #'org-node-get-olp        "2024-05-01")
+(define-obsolete-function-alias 'org-node-pos        #'org-node-get-pos        "2024-05-01")
+(define-obsolete-function-alias 'org-node-properties #'org-node-get-properties "2024-05-01")
+(define-obsolete-function-alias 'org-node-refs       #'org-node-get-refs       "2024-05-01")
+(define-obsolete-function-alias 'org-node-scheduled  #'org-node-get-scheduled  "2024-05-01")
+(define-obsolete-function-alias 'org-node-tags       #'org-node-get-tags       "2024-05-01")
+(define-obsolete-function-alias 'org-node-title      #'org-node-get-title      "2024-05-01")
+(define-obsolete-function-alias 'org-node-todo       #'org-node-get-todo       "2024-05-01")
 
 (provide 'org-node-lib)
 

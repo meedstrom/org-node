@@ -90,7 +90,7 @@ as the user command \\[org-node-backlink-regret]."
                (if remove-them
                    (org-entry-delete nil "BACKLINKS")
                  (let* ((refs (ignore-errors
-                                (org-node-refs (gethash id org-nodes))))
+                                (org-node-get-refs (gethash id org-nodes))))
                         (reflinks (--map (gethash it org-node--reflinks-table)
                                          refs))
                         (backlinks (gethash id org-node--links-table))
@@ -104,7 +104,7 @@ as the user command \\[org-node-backlink-regret]."
                               (--map (org-link-make-string
                                       (concat "id:" it)
                                       (ignore-errors
-                                        (org-node-title (gethash it org-nodes))))))))
+                                        (org-node-get-title (gethash it org-nodes))))))))
                    (if combined
                        (org-entry-put nil "BACKLINKS" (string-join combined "  "))
                      (org-entry-delete nil "BACKLINKS"))))))
@@ -242,7 +242,7 @@ Does NOT try to validate the rest of the target's backlinks."
           ;; "Reflink"
           (setq id (gethash (concat type ":" path) org-node--refs-table))
           (setq file (ignore-errors
-                       (org-node-file-path (gethash id org-nodes)))))
+                       (org-node-get-file-path (gethash id org-nodes)))))
         (when (and id file)
           (org-node-backlink--add-in-target-1 file id part-of-mass-op))))))
 
