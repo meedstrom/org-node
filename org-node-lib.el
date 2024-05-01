@@ -240,13 +240,13 @@ first element."
          (is-subtree nil :read-only t :type boolean :documentation ,(string-fill "Valued t if it is a subtree, nil if it is a file-level node." 70))
          (level      nil :read-only t :type number  :documentation ,(string-fill "Outline level, i.e. the number of stars in the heading.  A file-level node has level 0." 70))
          (olp        nil :read-only t :type list    :documentation ,(string-fill "List of ancestor headings to this node.  Naturally, this is empty if the node is a file-level node or a top-level heading." 70))
-         (pos        nil :read-only t :type number  :documentation ,(string-fill "" 70))
-         (properties nil :read-only t :type list    :documentation ,(string-fill "" 70))
-         (refs       nil :read-only t :type list    :documentation ,(string-fill "" 70))
-         (scheduled  nil :read-only t :type string  :documentation ,(string-fill "" 70))
-         (tags       nil :read-only t :type list    :documentation ,(string-fill "" 70))
-         (title      nil :read-only t :type string  :documentation ,(string-fill "" 70))
-         (todo       nil :read-only t :type string  :documentation ,(string-fill "" 70))))
+         (pos        nil :read-only t :type number  :documentation ,(string-fill "Char position of the node.  File-level nodes always have position 1." 70))
+         (properties nil :read-only t :type list    :documentation ,(string-fill "Alist of properties from the :PROPERTIES: drawer." 70))
+         (refs       nil :read-only t :type list    :documentation ,(string-fill "List of ROAM_REFS." 70))
+         (scheduled  nil :read-only t :type string  :documentation ,(string-fill "The SCHEDULED state." 70))
+         (tags       nil :read-only t :type list    :documentation ,(string-fill "List of tags." 70))
+         (title      nil :read-only t :type string  :documentation ,(string-fill "The node's heading, or #+title if it is not a heading." 70))
+         (todo       nil :read-only t :type string  :documentation ,(string-fill "The TODO state." 70))))
 
 ;; Make getters called "org-node-get-..." instead of "org-node-data-..."
 ;;
