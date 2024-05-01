@@ -334,9 +334,11 @@ If you find the behavior different, perhaps you have something in
       (if region-text
           (delete-region beg end)
         ;; Try to strip the todo keyword, looking up what counts as todo syntax
-        ;; in the target file.  Fail silently because it matters little.
-        (ignore-errors
-          (setq link-desc (org-node--visit-get-true-heading node))))
+        ;; in the target file.  Fail without exiting because it matters little.
+        (condition-case err
+            (setq link-desc (org-node--visit-get-true-heading node))
+          (( error )
+           (message "org-node--visit-get-true-heading signaled: %S" err))))
       (insert (org-link-make-string (concat "id:" id) link-desc))
       (run-hook-with-args 'org-node-insert-link-hook id link-desc))
     ;; TODO: Delete the link if a node was not created
