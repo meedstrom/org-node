@@ -221,7 +221,7 @@ Also scan for links."
       ;;              'insert-file-contents)
       (dolist (file files)
         (when (= 0 (% (cl-incf ctr) ctr-chunk))
-          (message "org-node: Collecting... %d/%d (should only take 0-5 seconds, but per bug #2, some systems take much longer)\n%s"
+          (message "org-node: Collecting... %d/%d (should only take 0-5 seconds, but per bug #2, some systems hang for a while afterwards!)\n%s"
                    ctr ctr-max file)
           (redisplay))
         (if (not (file-exists-p file))
