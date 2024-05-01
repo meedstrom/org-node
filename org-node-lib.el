@@ -1,5 +1,6 @@
 ;;; org-node-lib.el -*- lexical-binding: t; -*-
 
+(require 'compat)
 (require 'cl-lib)
 (require 'subr-x)
 (require 'dash)
