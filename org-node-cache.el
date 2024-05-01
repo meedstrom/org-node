@@ -55,6 +55,7 @@ For an user-facing command, see \\[org-node-reset]."
   (clrhash org-node--links-table)
   (org-node--init-org-id-locations-or-die)
   (org-node-cache--collect (-uniq (hash-table-values org-id-locations)))
+  (message nil)
   (run-hooks 'org-node-cache-reset-hook))
 
 (defun org-node-cache-rescan-file (&optional _arg1 arg2 &rest _)
@@ -125,23 +126,55 @@ that will match any of the keywords."
       (while (not (eobp))
         (search-forward ":")
         (push (cons (upcase
-                     (buffer-substring
-                      (point) (1- (search-forward ":")))
-                     )
+                     (buffer-substring-no-properties
+                      (point) (1- (search-forward ":"))))
                     (string-trim
-                     (buffer-substring
-                      (point) (line-end-position))
-                     ))
+                     (buffer-substring-no-properties
+                      (point) (pos-eol))))
               res)
         (forward-line 1)))
     res))
 
+(defcustom org-node-perf-assume-coding-system nil
+  "Coding system to use while scanning files for metadata.
+This speeds up `org-node-reset' a bit.  Set nil to let Emacs
+figure it out anew on every file.
+
+On modern Linux systems, the correct assumption is almost always
+the symbol `utf-8-unix'.  If you access your files from several
+different systems, consider keeping this at nil.
+
+Some example choices:
+utf-8-unix utf-8-dos utf-8-mac utf-16-le-dos utf-16-be-dos"
+  :group 'org-node
+  :type '(choice symbol (const nil)))
+
+;; TODO Detect at some other time (not at reset time) the presence of tramp or
+;; jka filenames in org-id-locations, and alert the user that they should change
+;; this setting.
+(defcustom org-node-perf-bungle-file-name-handler t
+  "Whether to simplify the file name handler while scanning.
+
+This speeds up `org-node-reset' a bit, but the result is
+inability to search files through TRAMP or inside compressed
+files."
+  :group 'org-node
+  :type 'boolean)
+
+(defcustom org-node-perf-gc-cons-threshold (* 1000 1000 1000)
+  "Temporary setting for `gc-cons-threshold'.
+A good value speeds up `org-node-reset' a bit.  Set nil to fall
+back on the actual value of `gc-cons-threshold'."
+  :group 'org-node
+  :type '(choice number (const nil)))
+
+;; TODO Consider what to do if org-id-locations stored the same file under
+;; different names
 (defun org-node-cache--collect (files)
   "Scan FILES for id-nodes, adding them to `org-nodes'.
 Also scan for links."
   (with-temp-buffer
-    (let ((outline-regexp org-outline-regexp)
-          (backlinks-drawer-re
+    (let ((backlinks-drawer-re
            (concat "^[[:space:]]*:"
                    (or (and (boundp 'org-super-links-backlink-into-drawer)
                             (stringp org-super-links-backlink-into-drawer)
@@ -151,9 +184,40 @@ Also scan for links."
           (todo-re (org-node-cache--make-todo-regexp))
           (not-a-full-reset (not (hash-table-empty-p org-nodes)))
           (case-fold-search t)
-          (gc-cons-threshold (* 1000 1000 1000))
-          (please-update-id nil))
+          (please-update-id nil)
+          ;; Temporary profilers while I work on issue #2
+          ;; https://github.com/meedstrom/org-node/issues/2
+          (ctr 0)
+          (ctr-max (length files))
+          (ctr-chunk (max 1 (round (log (length files) 5))))
+          ;; PERF stuff
+          (inhibit-modification-hooks t)
+          (inhibit-point-motion-hooks t)
+          (coding-system-for-read org-node-perf-assume-coding-system)
+	  (coding-system-for-write org-node-perf-assume-coding-system)
+          (inhibit-eol-conversion
+           (member org-node-perf-assume-coding-system
+                   '(utf-8-unix utf-8-dos utf-8-mac utf-16-le-dos utf-16-be-dos)))
+          (gc-cons-threshold (or org-node-perf-gc-cons-threshold
+                                 gc-cons-threshold))
+          (after-insert-file-functions nil)
+          (format-alist nil)
+          ;; Keep only the EasyPG handler, not the TRAMP handlers nor the
+          ;; compressed-archive handler
+          (file-name-handler-alist
+           (if org-node-perf-bungle-file-name-handler
+               (list (rassoc 'epa-file-handler file-name-handler-alist))
+             file-name-handler-alist)))
+      (setq-local outline-regexp org-outline-regexp)
+      ;; TODO Temporarily remove any advices
+      ;; (advice-mapc (lambda (advice)
+      ;;                (push advice insert-file-contents-advices)
+      ;;                (advice-remove 'insert-file-contents advice))
+      ;;              'insert-file-contents)
       (dolist (file files)
+        (when (= 0 (% (cl-incf ctr) ctr-chunk))
+          (message "org-node: Collecting... %d/%d (if this takes more than a couple of seconds, it's a known bug!  Fixes will come.)"
+                   ctr ctr-max))
         (if (not (file-exists-p file))
             ;; Example situation: user renamed/deleted a file using shell
             ;; commands, outside Emacs.  Now org-id references a file that
@@ -177,8 +241,13 @@ Also scan for links."
               (org-node-cache--forget-id-location file)
               (setq please-update-id t))
           (erase-buffer)
+          ;; NOTE: Used `insert-file-contents-literally' in the past, converting
+          ;; each captured substring afterwards with `decode-coding-string', but
+          ;; it still made us record the wrong value for :pos when there was any
+          ;; Unicode in the file.  Instead, we reproduce most of what it did in
+          ;; the let-bindings above, but retain Unicode parsing.
           (insert-file-contents file)
-          (let (;; Position of first "content": a line not starting with # or :
+          (let (;; Good-enough substitute for `org-end-of-meta-data'
                 (far (or (re-search-forward "^ *?[^#:]" nil t) (point-max)))
                 props file-title file-tags file-id outline-data)
             (goto-char 1)
@@ -186,21 +255,17 @@ Also scan for links."
               (forward-line 1)
               (setq props (org-node-cache--collect-properties
                            (point) (and (re-search-forward "^ *:end:")
-                                        (line-beginning-position)))))
+                                        (pos-bol)))))
             (goto-char 1)
             (when (re-search-forward "^#\\+filetags: " far t)
               (setq file-tags (split-string
-
-                               (buffer-substring (point) (line-end-position))
-
+                               (buffer-substring-no-properties (point) (pos-eol))
                                ":" t)))
             (goto-char 1)
             (if (re-search-forward "^#\\+title: " far t)
                 (setq file-title
                       (org-link-display-format
-
-                       (buffer-substring (point) (line-end-position))
-                       ))
+                       (buffer-substring-no-properties (point) (pos-eol))))
               ;; File nodes dont strictly need #+title, fall back on filename
               (setq file-title (file-name-nondirectory file)))
             (setq file-id (cdr (assoc "ID" props)))
@@ -238,41 +303,31 @@ Also scan for links."
                 (setq here (point))
                 ;; TODO Allow unicode todo keywords
                 (when (looking-at todo-re)
-                  (setq todo (buffer-substring (point) (match-end 0)))
+                  (setq todo (buffer-substring-no-properties
+                              (point) (match-end 0)))
                   (goto-char (1+ (match-end 0)))
                   (setq here (point)))
-                (if (re-search-forward " +\\(:.+:\\) *$" (line-end-position) t)
+                (if (re-search-forward " +\\(:.+:\\) *$" (pos-eol) t)
                     (progn
                       (setq title (org-link-display-format
-
-                                   (buffer-substring
-                                    here (match-beginning 0))
-                                   ))
-                      (setq tags (string-split
-                                  (match-string 1)
-
-                                  ":" t)))
+                                   (buffer-substring-no-properties
+                                    here (match-beginning 0))))
+                      (setq tags (string-split (match-string 1) ":" t)))
                   (setq title (org-link-display-format
-                               (buffer-substring
-                                here (line-end-position))
-                               )))
+                               (buffer-substring-no-properties here (pos-eol)))))
                 (setq here (point))
                 (setq line+2 (and (forward-line 2) (point)))
                 (goto-char here)
                 (when (re-search-forward "[\n\s]SCHEDULED: " line+2 t)
                   (setq sched
-
-                        (buffer-substring
+                        (buffer-substring-no-properties
                          ;; \n just there for safety
-                         (point) (+ 1 (point) (skip-chars-forward "^]>\n")))
-                        )
+                         (point) (+ 1 (point) (skip-chars-forward "^]>\n"))))
                   (goto-char here))
                 (when (re-search-forward "[\n\s]DEADLINE: " line+2 t)
                   (setq deadline
-
-                        (buffer-substring
-                         (point) (+ 1 (point) (skip-chars-forward "^]>\n")))
-                        ))
+                        (buffer-substring-no-properties
+                         (point) (+ 1 (point) (skip-chars-forward "^]>\n")))))
                 (setq here (point))
                 (setq line+2 (and (forward-line 2) (point)))
                 (goto-char here)
@@ -281,7 +336,7 @@ Also scan for links."
                   (setq props (org-node-cache--collect-properties
                                (point) (progn
                                          (re-search-forward "^ *:end:")
-                                         (line-beginning-position)))))
+                                         (pos-bol)))))
                 (setq id (cdr (assoc "ID" props)))
                 (when not-a-full-reset
                   (when id (org-id-add-location id file)))
@@ -302,8 +357,7 @@ Also scan for links."
                     ;; Gotcha... also collect links inside the heading
                     (goto-char pos)
                     ;; (forward-char 1) ;; Do not match org-outline-regexp-bol
-                    (org-node-cache--collect-links-until
-                     (line-end-position) id-here olp-with-self)))
+                    (org-node-cache--collect-links-until (pos-eol) id-here olp-with-self)))
                 (org-node-cache--add-node-to-tables
                  (make-org-node
                   :title title
@@ -323,6 +377,8 @@ Also scan for links."
                             (or (cdr (assoc "ROAM_ALIASES" props)) ""))
                   :refs (split-string-and-unquote
                          (or (cdr (assoc "ROAM_REFS" props)) "")))))))))
+      ;; (dolist (ad insert-file-contents-advices)
+      ;;   (advice-add 'insert-file-contents (advice--how) (car ad) (cdr ad)))
       (when please-update-id
         (org-id-update-id-locations)
         (org-id-locations-save)
@@ -346,11 +402,11 @@ wants for some reason."
     (let ((type (match-string 1))
           (path (match-string 2)))
       (if (save-excursion
-            (goto-char (line-beginning-position))
+            (goto-char (pos-bol))
             (or (looking-at "[[:space:]]*# " t)
                 (looking-at "[[:space:]]*#\\+" t)))
           ;; On a # comment or #+keyword, skip whole line
-          (goto-char (line-end-position))
+          (goto-char (pos-eol))
         (push (list :src id-here
                     :pos (point)
                     :type type

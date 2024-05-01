@@ -27,6 +27,9 @@
 
 ;;; Code:
 
+;; FIXME Why does doom-emacs make `org-node-reset' 50x faster?
+;; TODO Better initial setup for people who have a wildly lacking org-id initialization
+;; TODO Use async.el
 ;; TODO Annotations for completion
 ;; TODO Completion category https://github.com/alphapapa/org-ql/issues/299
 ;; TODO Command to grep across all files

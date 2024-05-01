@@ -1,5 +1,8 @@
 * org-node
-** Recent changes [2024-04-30]
+** News [2024-05-01]
+- So it turns out this package takes tens of seconds to scan files on a vanilla Emacs config!  On my Emacs config, somehow, it just takes one second... I'm looking into why.
+
+** News [2024-04-30]
 - We no longer depend on a =BACKLINKS= property!  It is still a great way to show backlinks, so it remains as an option.
 - Renamed =CACHED_BACKLINKS= to just =BACKLINKS=.  One =M-x org-node-backlink-fix-all= will take care of the rename, or you can remove them all with =M-x org-node-backlink-regret=.
 - *Breaking API change* -- nodes are objects now, not plists!  Unfortunately the software can't give you a deprecation notice, because plists fail silently (that's why the change).  See updated examples for =org-node-filter-fn= etc.
