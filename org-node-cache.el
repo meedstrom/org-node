@@ -108,11 +108,12 @@ to delete several files in a row."
            when (file-equal-p file file-on-record)
            do (remhash id org-id-locations)))
 
-(defun org-node-cache--make-todo-regexp ()
+(defun org-node-cache--make-todo-regexp (&optional string)
   "Make a regexp based on global value of `org-todo-keywords',
 that will match any of the keywords."
   (require 'org)
-  (->> (string-join (-mapcat #'cdr (default-value 'org-todo-keywords)) " ")
+  (->> (or string
+           (string-join (-mapcat #'cdr (default-value 'org-todo-keywords)) " "))
        (replace-regexp-in-string "(.*?)" "")
        (replace-regexp-in-string "[^ [:alpha:]]" "")
        (string-trim)
@@ -181,7 +182,9 @@ Also scan for links."
                             (downcase org-super-links-backlink-into-drawer))
                        "backlinks")
                    ":"))
-          (todo-re (org-node-cache--make-todo-regexp))
+          (file-local-todo-keyword-re
+           (rx bol (or "#+todo: " "#+seq_todo: " "#+typ_todo: ")))
+          (global-todo-re (org-node-cache--make-todo-regexp))
           (not-a-full-reset (not (hash-table-empty-p org-nodes)))
           (case-fold-search t)
           (please-update-id nil)
@@ -249,19 +252,25 @@ Also scan for links."
           (insert-file-contents file)
           (let (;; Good-enough substitute for `org-end-of-meta-data'
                 (far (or (re-search-forward "^ *?[^#:]" nil t) (point-max)))
+                (todo-re global-todo-re)
                 props file-title file-tags file-id outline-data)
             (goto-char 1)
             (when (re-search-forward "^ *:properties:" far t)
               (forward-line 1)
               (setq props (org-node-cache--collect-properties
                            (point) (and (re-search-forward "^ *:end:")
-                                        (pos-bol)))))
-            (goto-char 1)
+                                        (pos-bol))))
+              (goto-char 1))
             (when (re-search-forward "^#\\+filetags: " far t)
               (setq file-tags (split-string
                                (buffer-substring-no-properties (point) (pos-eol))
-                               ":" t)))
-            (goto-char 1)
+                               ":" t))
+              (goto-char 1))
+            (when (re-search-forward file-local-todo-keyword-re far t)
+              (setq todo-re
+                    (org-node-cache--make-todo-regexp
+                     (buffer-substring-no-properties (point) (pos-eol))))
+              (goto-char 1))
             (if (re-search-forward "^#\\+title: " far t)
                 (setq file-title
                       (org-link-display-format
