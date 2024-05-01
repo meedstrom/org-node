@@ -154,7 +154,7 @@ Then start using the minor mode =org-node-backlink-mode=, which keeps these prop
 (add-hook 'org-mode-hook #'org-node-backlink-mode)
 #+end_src
 
-*Option 2B*  Let [[https://github.com/toshism/org-super-links][org-super-links]] manage a =:BACKLINKS:...:END:= drawer.
+*Option 2B.*  Let [[https://github.com/toshism/org-super-links][org-super-links]] manage a =:BACKLINKS:...:END:= drawer.
 
 I /think/ the following should work. Totally untested, let me know!
 
@@ -171,11 +171,22 @@ It can make sense, for people who fully understand the magic of capture template
 
 So can we reproduce the functionality on top of vanilla org-capture?  That'd be less scary.  The answer is yes!
 
-Set-up: write a capture template that uses =(function org-node-capture-target)= as the =target=, and then you can use it via good old =M-x org-capture= to capture to any of your ID nodes.  Something like:
+Here are some example capture templates. The secret sauce is =(function org-node-capture-target)=.
 
 #+begin_src elisp
 (setq org-capture-templates
-      '(("n" "ID node" plain (function org-node-capture-target))))
+      '(("n" "ID node")
+        ("nc" "Capture to ID node (maybe creating it)"
+         plain (function org-node-capture-target) nil
+         :empty-lines-after 1)
+        ("nv" "Visit ID node (maybe creating it)"
+         plain (function org-node-capture-target) nil
+         :jump-to-captured t
+         :immediate-finish t)
+        ;; Sometimes useful with `org-node-insert-link' to make a stub
+        ("ni" "Instantly create ID node without content & without visiting"
+         plain (function org-node-capture-target) nil
+         :immediate-finish t)))
 #+end_src
 
 And if you want the commands =org-node-find= & =org-node-insert-link= to likewise outsource to org-capture when creating new nodes, use the following setting.
@@ -258,7 +269,7 @@ API comparison between org-roam and org-node.
 | Get ID                          | =(org-roam-node-id NODE)=         | =(org-node-id NODE)=                                                                  |
 | Get filename                    | =(org-roam-node-file NODE)=       | =(org-node-file-path NODE)=                                                           |
 | Get tags                        | =(org-roam-node-tags NODE)=       | =(org-node-tags NODE)=, no inherited tags                                             |
-| Get outline level               | =(org-roam-node-level NODE)=      | =(org-node-level NODE)=,                                                              |
+| Get outline level               | =(org-roam-node-level NODE)=      | =(org-node-level NODE)=                                                               |
 | Get char position               | =(org-roam-node-point NODE)=      | =(org-node-pos NODE)=                                                                 |
 | Get properties                  | =(org-roam-node-properties NODE)= | =(org-node-properties NODE)=, no inherited properties                                 |
 | Get subtree TODO state          | =(org-roam-node-todo NODE)=       | =(org-node-todo NODE)=, only that match global =org-todo-keywords=                      |
