@@ -1,6 +1,6 @@
 * org-node
 ** News [2024-05-01]
-- So it turns out this package takes tens of seconds to scan files on a vanilla Emacs config!  On my Emacs config, somehow, it just takes one second... I'm looking into why.
+- So it turns out this package is much slower on a vanilla Emacs config than on my personal Doom Emacs config, somehow!  The command =org-node-reset= takes me 1 second but in `emacs -Q` it takes 60 seconds!  I'm looking into why.
 
 ** News [2024-04-30]
 - We no longer depend on a =BACKLINKS= property!  It is still a great way to show backlinks, so it remains as an option.

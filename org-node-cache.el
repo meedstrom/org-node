@@ -188,12 +188,14 @@ Also scan for links."
           (not-a-full-reset (not (hash-table-empty-p org-nodes)))
           (case-fold-search t)
           (please-update-id nil)
-          ;; Temporary profilers while I work on issue #2
+          (garbage-collection-messages nil)
+          ;; Temporary user-friendliness while I work on issue #2
           ;; https://github.com/meedstrom/org-node/issues/2
           (ctr 0)
           (ctr-max (length files))
-          (ctr-chunk (max 1 (round (log (length files) 5))))
-          ;; PERF stuff
+          ;; (ctr-chunk (max 1 (round (log (length files) 5))))
+          (ctr-chunk 1)
+          ;; Attempt to improve performance
           (inhibit-modification-hooks t)
           (inhibit-point-motion-hooks t)
           (coding-system-for-read org-node-perf-assume-coding-system)
@@ -219,8 +221,9 @@ Also scan for links."
       ;;              'insert-file-contents)
       (dolist (file files)
         (when (= 0 (% (cl-incf ctr) ctr-chunk))
-          (message "org-node: Collecting... %d/%d (if this takes more than a couple of seconds, it's a known bug!  Fixes will come.)"
-                   ctr ctr-max))
+          (message "org-node: Collecting... %d/%d (should only take 0-5 seconds, but per bug #2, some systems take much longer)\n%s"
+                   ctr ctr-max file)
+          (redisplay))
         (if (not (file-exists-p file))
             ;; Example situation: user renamed/deleted a file using shell
             ;; commands, outside Emacs.  Now org-id references a file that
