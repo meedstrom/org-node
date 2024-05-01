@@ -30,7 +30,6 @@
 ;; TODO Annotations for completion
 ;; TODO Completion category https://github.com/alphapapa/org-ql/issues/299
 ;; TODO Command to grep across all files
-;; TODO Option to insert backlink into org-super-links :BACKLINKS: drawer
 ;; TODO Command to explore feedback arc sets
 ;; TODO Bit of a test suite
 ;; TODO Test a custom id format involving emoji to see if that breaks regexps
@@ -175,8 +174,7 @@ type the name of a node that does not exist:
 
 1. Run M-x org-node-find
 2. Type name of an unknown node
-3. A capture window pops up - now choose a template that targets
-   `org-node-capture-target'!
+3. Select your template
 4. Same as 4b earlier."
   (org-node-cache-ensure-fresh)
   (let (title node id)
@@ -204,9 +202,13 @@ type the name of a node that does not exist:
           (find-file (org-node-file-path node))
           (widen)
           (goto-char (org-node-pos node))
+          (org-reveal)
+          ;; TODO: Figure out how to play well with :prepend vs not :prepend.
+          ;; Now it's just like it always prepends, I think?
           (unless (and (= 1 (point)) (org-at-heading-p))
             ;; Go to just before next heading, or end of buffer if there are no
-            ;; more headings
+            ;; more headings.  This allows the template to insert subtrees
+            ;; without swallowing content that was already there.
             (when (outline-next-heading)
               (backward-char 1))))
       ;; Node does not exist; capture into new file-level node
