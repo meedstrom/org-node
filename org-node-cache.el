@@ -416,8 +416,8 @@ wants for some reason."
           (path (match-string 2)))
       (if (save-excursion
             (goto-char (pos-bol))
-            (or (looking-at "[[:space:]]*# " t)
-                (looking-at "[[:space:]]*#\\+" t)))
+            (or (looking-at-p "[[:space:]]*# ")
+                (looking-at-p "[[:space:]]*#\\+")))
           ;; On a # comment or #+keyword, skip whole line
           (goto-char (pos-eol))
         (push (list :src id-here
