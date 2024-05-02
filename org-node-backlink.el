@@ -279,7 +279,7 @@ Does NOT try to validate the rest of the target's backlinks."
                      ;; twice. To use the builtin
                      ;; `org-entry-add-to-multivalued-property', the link
                      ;; descriptions would have to be free of spaces.
-                     (let ((ls (string-split (replace-regexp-in-string
+                     (let ((ls (split-string (replace-regexp-in-string
                                               "]][[:space:]]+\\[\\["
                                               "]]\f[["
                                               (string-trim backlinks-string))
