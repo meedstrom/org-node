@@ -27,7 +27,8 @@ time."
     (advice-remove #'delete-file #'org-node-cache--handle-delete)))
 
 (defun org-node-cache-peek ()
-  "For debugging: peek on a random member of `org-nodes'."
+  "For debugging: peek on a random member of `org-nodes'.
+See also the type `org-node-data'."
   (interactive)
   (require 'map)
   (require 'seq)
@@ -197,8 +198,6 @@ Also scan for links."
           (ctr-max (length files))
           (ctr-chunk (max 1 (round (log (length files) 5))))
           ;; Attempt to improve performance
-          (inhibit-modification-hooks t)
-          (inhibit-point-motion-hooks t)
           (coding-system-for-read org-node-perf-assume-coding-system)
 	  (coding-system-for-write org-node-perf-assume-coding-system)
           (inhibit-eol-conversion

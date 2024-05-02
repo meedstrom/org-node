@@ -96,8 +96,9 @@ Called with two arguments: the node data and the title.
 The title may in fact be one of the aliases and not the canonical title,
 because the function runs again for every alias.
 
-The node data is an object which form you can observe in
-examples from \\[org-node-cache-peek].
+The node data is an object which form you can observe in examples
+from \\[org-node-cache-peek] and specified in the type
+`org-node-data'.
 
 This example shows the ancestor entries to each node:
 
@@ -117,7 +118,8 @@ This example shows the ancestor entries to each node:
 
 This function is applied once for every Org-ID node found, and
 receives the node data as a single argument: an object which form
-you can observe in examples from \\[org-node-cache-peek].
+you can observe in examples from \\[org-node-cache-peek] and
+specified in the type `org-node-data'.
 
 This function is called after fully building the `org-nodes'
 table, so you may query it as needed.
@@ -148,7 +150,7 @@ make a defun, not a lambda, and byte-compile that init file:
 (defvar org-nodes (make-hash-table :test #'equal :size 4000)
   "Table associating ids with file/subtree data.
 To peek on the contents, try \\[org-node-cache-peek] a few times, which
-should suffice to demonstrate the data format.")
+can demonstrate the data format.  See also the type `org-node-data'.")
 
 (defvar org-node-collection (make-hash-table :test #'equal :size 4000)
   "Filtered `org-nodes', keyed not on ids but formatted titles.
