@@ -2,7 +2,7 @@
 
 (require 'bytecomp)
 (require 'org-node-lib)
-;; (require 'org-node-worker)
+(require 'org-node-worker)
 
 (defvar org-node-async-reset-hook nil)
 (defvar org-node-async-rescan-file-hook nil)
@@ -33,13 +33,6 @@
         (dolist (ref (org-node-get-refs node))
           (puthash ref node org-node-collection))))))
 
-(defun org-node-async--forget-id-location (file)
-  (org-node--init-org-id-locations-or-die)
-  (cl-loop for id being the hash-keys of org-id-locations
-           using (hash-values file-on-record)
-           when (file-equal-p file file-on-record)
-           do (remhash id org-id-locations)))
-
 (defun org-node-async--split-into-n-sublists (big-list n)
   (let ((len (/ (length big-list) n))
         res)
@@ -65,7 +58,7 @@
                         org-node--reflinks-table))))
 
 (defun org-node-async--collect (files)
-  (setq org-node-async--n-cores
+  (setq org-node-async--jobs
         (max 1 (1- (string-to-number
                     (pcase system-type
                       ((or 'gnu 'gnu/linux 'gnu/kfreebsd 'berkeley-unix)
@@ -79,122 +72,87 @@
                         "sysctl -n hw.logicalcpu_max"))
                       ((or 'cygwin 'windows-nt 'ms-dos)
                        (user-error "org-node: Windows not yet supported")))))))
-  (let* ((native (and (featurep 'native-compile)
-                      (native-comp-available-p)))
-         (lib (find-library-name "org-node-worker"))
-         (eln (comp-el-to-eln-filename lib))
-         ;; ensure we don't pollute local repo
-         (elc "/tmp/org-node-worker.elc")
-         (variables
-          `(($bungle-file-name-handler . ,org-node-perf-bungle-file-name-handler)
-            ($not-a-full-reset . ,(not (hash-table-empty-p org-nodes)))
-            (coding-system-for-write . ,org-node-perf-assume-coding-system)
-            (coding-system-for-read . ,org-node-perf-assume-coding-system)
-            (gc-cons-threshold
-             . ,(or org-node-perf-gc-cons-threshold gc-cons-threshold))
-            ;; REVIEW Maybe it makes no difference
-            (inhibit-eol-conversion
-             . ,(member org-node-perf-assume-coding-system
-                        '(utf-8-unix utf-8-dos utf-8-mac utf-16-le-dos utf-16-be-dos)))
-            ($backlink-drawer-re
-             . ,(concat "^[[:space:]]*:"
-                        (or (and (boundp 'org-super-links-backlink-into-drawer)
-                                 (stringp org-super-links-backlink-into-drawer)
-                                 (downcase org-super-links-backlink-into-drawer))
-                            "backlinks")
-                        ":"))
-            ($global-todo-re
-             . ,(org-node--make-todo-regexp
-                 (mapconcat #'identity
-                            (mapcan #'cdr (default-toplevel-value
-                                           'org-todo-keywords))
-                            " ")))
-            ($file-todo-option-re
-             . ,(rx bol (or "#+todo: " "#+seq_todo: " "#+typ_todo: "))))))
-    ;; Pre-compile code for the external Emacs processes to use,
-    ;; in case the user's package manager didn't.
-    (let ((byte-compile-dest-file-function
-           `(lambda (&rest _) ,elc)))
-      (if native
-          (unless (and (file-exists-p eln)
-                       (file-newer-than-file-p eln lib))
-            (native-compile lib))
-        (unless (and (file-exists-p elc)
-                     (file-newer-than-file-p elc lib))
+  (let* ((lib (find-library-name "org-node-worker"))
+         (native (when (and (featurep 'native-compile)
+                            (native-comp-available-p))
+                   (comp-el-to-eln-filename lib)))
+         (elc "/tmp/org-node-worker.elc"))
+
+    ;; Pre-compile code for the external Emacs processes,
+    ;; in case the user's package manager didn't compile.
+    (if native
+        (unless (and (file-exists-p native)
+                     (file-newer-than-file-p native lib))
+          (native-compile lib))
+      (unless (and (file-exists-p elc)
+                   (file-newer-than-file-p elc lib))
+        (let ((byte-compile-dest-file-function
+               `(lambda (&rest _) ,elc)))
           (byte-compile-file lib))))
+
     (setq org-node-async--start-time (current-time))
     (setq org-node-async--done-ctr 0)
-    (with-temp-file (file-name-concat (temporary-file-directory)
-                                      "org-node-worker-variables.eld")
-      (insert (prin1-to-string variables)))
-    (if org-node-perf-multicore
-        ;; Split the work over many Emacs processes
-        (let ((file-lists (org-node-async--split-into-n-sublists
-                           files org-node-async--n-cores))
-              ;; Perf attempts
-              ;; (write-region-inhibit-fsync t)
-              ;; (coding-system-for-write org-node-perf-assume-coding-system)
-              ;; (write-file-hooks nil)
-              ;; (file-name-handler-alist nil)
-              )
-          (dolist (old-process org-node-async--processes)
-            (when (process-live-p old-process)
-              (kill-process old-process)))
-          (dotimes (i org-node-async--n-cores)
-            (with-temp-file (format "/tmp/org-node-file-list-%d.eld" i)
-              (insert (prin1-to-string (pop file-lists))))
-            (push (make-process
-                   :name (format "org-node-%d" i)
-                   :noquery t
-                   :stderr (get-buffer-create " *org-node-worker stderr*")
-                   :command
-                   (list (file-truename (expand-file-name invocation-name
-                                                          invocation-directory))
-                         "--quick"
-                         "--no-init-file"
-                         "--no-site-lisp"
-                         "--batch"
-                         "--insert"
-                         (format "/tmp/org-node-file-list-%d.eld" i)
-                         "--eval"
-                         (format
-                          "(setq files (cons %d (car (read-from-string (buffer-string)))))"
-                          i)
-                         "--load"
-                         (if native
-                             eln
-                           elc)
-                         "--funcall"
-                         "org-node-worker-function")
-                   :sentinel #'org-node-async-finish)
-                  org-node-async--processes)))
-      ;; TODO: execute in the current emacs process
-      )))
+    (with-temp-file "/tmp/org-node-worker-variables.eld"
+      (insert (prin1-to-string (append (org-node-worker-variables)
+                                       org-node-async-inject-variables))))
+    ;; Split the work over many Emacs processes
+    (let ((file-lists (org-node-async--split-into-n-sublists
+                       files org-node-async--jobs))
+          ;; Perf attempts
+          ;; (write-region-inhibit-fsync t)
+          ;; (coding-system-for-write org-node-perf-assume-coding-system)
+          ;; (write-file-hooks nil)
+          ;; (file-name-handler-alist nil)
+          )
+      (dolist (old-process org-node-async--processes)
+        (when (process-live-p old-process)
+          (kill-process old-process)))
+      (dotimes (i org-node-async--jobs)
+        (with-temp-file (format "/tmp/org-node-file-list-%d.eld" i)
+          (insert (prin1-to-string (pop file-lists))))
+        (push (make-process
+               :name (format "org-node-%d" i)
+               :noquery t
+               :stderr (get-buffer-create " *org-node-worker stderr*")
+               :command
+               (list (file-truename (expand-file-name invocation-name
+                                                      invocation-directory))
+                     "--quick"
+                     "--no-init-file"
+                     "--no-site-lisp"
+                     "--batch"
+                     "--insert"
+                     (format "/tmp/org-node-file-list-%d.eld" i)
+                     "--eval"
+                     (format
+                      "(setq files (cons %d (car (read-from-string (buffer-string)))))"
+                      i)
+                     "--load"
+                     (or native elc)
+                     "--funcall"
+                     "org-node-worker--collect")
+               :sentinel #'org-node-async--handle-finished-job)
+              org-node-async--processes)))))
 
 (defvar org-node-async--processes (list))
-
-;; (async-start (lambda () (sleep-for 1) (message "hi ho"))
-;;              (lambda (res) (message "done %s" (random 100))))
-
 (defvar org-node-async--done-ctr 0)
-(defvar org-node-async--n-cores nil)
+(defvar org-node-async--jobs nil)
 (defvar org-node-async--please-update-id-locations nil)
 
-(defun org-node-async-finish (process _)
+(defun org-node-async--handle-finished-job (process _)
   (with-temp-buffer
     (insert-file-contents
      (let ((name (process-name process)))
        (format "/tmp/org-node-result-%s.eld"
                (string-match "org-node-\\(.\\)" name)
                (match-string 1 name))))
-    ;; Run the instructions that were saved in `org-node-worker--queued-writes'
-    (dolist (instruction (car (read-from-string (buffer-string))))
-      (apply (car instruction) (cdr instruction))
-      (when (eq 'org-id-add-location (car instruction))
+    ;; Execute the demands that the worker wrote
+    (dolist (demand (car (read-from-string (buffer-string))))
+      (apply (car demand) (cdr demand))
+      (when (eq 'org-id-add-location (car demand))
         (setq org-node-async--please-update-id-locations t))))
   ;; The last process has completed
-  (when (eq (cl-incf org-node-async--done-ctr)
-            org-node-async--n-cores)
+  (when (eq (cl-incf org-node-async--done-ctr) org-node-async--jobs)
     (when org-node-async--please-update-id-locations
       (setq org-node-async--please-update-id-locations nil)
       (org-id-update-id-locations)

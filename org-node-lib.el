@@ -36,16 +36,17 @@ utf-8-unix utf-8-dos utf-8-mac utf-16-le-dos utf-16-be-dos"
   :group 'org-node
   :type '(choice symbol (const nil)))
 
-;; DEPREC
-(defvar org-node-perf-bungle-file-name-handler t
-  "Whether to simplify the file name handler while scanning.
+(defcustom org-node-async-inject-variables (list)
+  "Alist of variable-value pairs that child processes should set.
 
-This speeds up `org-node-reset' a bit, but the result is
-inability to search files through TRAMP or inside compressed
-files.")
+May be useful for injecting your authinfo and EasyPG settings so
+that even with `org-node-perf-multicore', the child processes can
+scan for metadata inside .org.gpg files.
 
-;; NOTE: easyPG still won't work with async until we provide a way to pass in
-;; config variables to the child process
+I don't use EPG so I don't know if that's enough to make it work."
+  :group 'org-node
+  :type 'alist)
+
 (defcustom org-node-perf-keep-file-name-handlers '(epa-file-handler)
   "Which file handlers to not ignore while scanning for metadata.
 
@@ -213,6 +214,13 @@ can demonstrate the data format.  See also the type `org-node-data'.")
 (defvar org-node-collection (make-hash-table :test #'equal :size 4000)
   "Filtered `org-nodes', keyed not on ids but formatted titles.
 This allows use with `completing-read'.")
+
+(defun org-node--forget-id-location (file)
+  (org-node--init-org-id-locations-or-die)
+  (cl-loop for id being the hash-keys of org-id-locations
+           using (hash-values file-on-record)
+           when (file-equal-p file file-on-record)
+           do (remhash id org-id-locations)))
 
 (defun org-node-die (format-string &rest args)
   "Like `error' but make sure the user sees it.
@@ -382,7 +390,7 @@ first element."
 
 ;;;###autoload
 (let (warned-once)
-  (defun 'org-node-insert-heading-node (&rest args)
+  (defun org-node-insert-heading-node (&rest args)
     (interactive)
     (unless warned-once
       (setq warned-once t)
