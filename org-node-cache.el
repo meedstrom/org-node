@@ -21,18 +21,23 @@ time."
         (advice-add #'rename-file :after #'org-node-cache-rescan-file)
         (advice-add #'rename-file :before #'org-node-cache--handle-delete)
         (advice-add #'delete-file :before #'org-node-cache--handle-delete)
-        (advice-add #'org-id-add-location :after #'org-node-cache--reset-soon))
+        (advice-add #'org-id-add-location :after #'org-node-cache--update-id-locs-soon))
     (remove-hook 'after-save-hook #'org-node-cache-rescan-file)
     (advice-remove #'rename-file #'org-node-cache-rescan-file)
     (advice-remove #'rename-file #'org-node-cache--handle-delete)
     (advice-remove #'delete-file #'org-node-cache--handle-delete)
-    (advice-remove #'org-id-add-location #'org-node-cache--reset-soon)))
+    (advice-remove #'org-id-add-location #'org-node-cache--update-id-locs-soon)))
 
 ;; Found it necessary
 (let ((timer (timer-create)))
-  (defun org-node-cache--reset-soon (&rest _)
+  (defun org-node-cache--update-id-locs-soon (&rest _)
     (cancel-timer timer)
-    (setq timer (run-with-idle-timer 6 nil #'org-node-cache-reset))))
+    (setq timer (run-with-idle-timer
+                 6 nil (lambda ()
+                         (org-id-update-id-locations)
+                         (org-id-locations-save)
+                         ;; maybe
+                         (org-node-cache-reset))))))
 
 (defun org-node-cache-peek ()
   "For debugging: peek on a random member of `org-nodes'.
@@ -63,9 +68,10 @@ For an user-facing command, see \\[org-node-reset]."
   (clrhash org-node--reflinks-table)
   (clrhash org-node--links-table)
   (org-node--init-org-id-locations-or-die)
-  (org-node-cache--collect (-uniq (hash-table-values org-id-locations)))
-  (message nil)
-  (run-hooks 'org-node-cache-reset-hook))
+  (if org-node-perf-multicore
+      (org-node-async--collect (-uniq (hash-table-values org-id-locations)))
+    (org-node-cache--collect (-uniq (hash-table-values org-id-locations)))
+    (run-hooks 'org-node-cache-reset-hook)))
 
 (defun org-node-cache-rescan-file (&optional _arg1 arg2 &rest _)
   "Seek nodes and links in a single file."
@@ -145,42 +151,6 @@ that will match any of the keywords."
         (forward-line 1)))
     res))
 
-(defcustom org-node-perf-assume-coding-system nil
-  "Coding system to use while scanning files for metadata.
-This speeds up `org-node-reset' a bit.  Set nil to let Emacs
-figure it out anew on every file.
-
-On modern Linux systems, the correct assumption is almost always
-the symbol `utf-8-unix'.  If you access your files from several
-different systems, consider keeping this at nil.
-
-Some example choices:
-utf-8-unix utf-8-dos utf-8-mac utf-16-le-dos utf-16-be-dos"
-  :group 'org-node
-  :type '(choice symbol (const nil)))
-
-;; TODO Detect at some other time (not at reset time) the presence of tramp or
-;; jka filenames in org-id-locations, and alert the user that they should change
-;; this setting.
-(defcustom org-node-perf-bungle-file-name-handler t
-  "Whether to simplify the file name handler while scanning.
-
-This speeds up `org-node-reset' a bit, but the result is
-inability to search files through TRAMP or inside compressed
-files."
-  :group 'org-node
-  :type 'boolean)
-
-(defcustom org-node-perf-gc-cons-threshold nil
-  "Temporary setting for `gc-cons-threshold'.
-Tweak to maybe speed up `org-node-reset'.  Set nil to use the
-actual value of `gc-cons-threshold'.
-
-It can be surprising which value works best.  It is possible that
-80 kB is performant, and 16 MB is performant, but something in
-between such as 1 MB is very slow."
-  :group 'org-node
-  :type '(choice number (const nil)))
 
 ;; TODO Consider what to do if org-id-locations stored the same file under
 ;; different names

@@ -7,18 +7,6 @@
 (defvar org-node-async-rescan-file-hook nil)
 (defvar org-node-async--start-time nil)
 
-(defun org-node-async-reset ()
-  "Wipe and rebuild the cache.
-For an user-facing command, see \\[org-node-reset]."
-  (clrhash org-nodes)
-  (clrhash org-node-collection)
-  (clrhash org-node--refs-table)
-  (clrhash org-node--reflinks-table)
-  (clrhash org-node--links-table)
-  (org-node--init-org-id-locations-or-die)
-  (org-node-async--collect (-uniq (hash-table-values org-id-locations)))
-  (message nil))
-
 
 
 ;; I feel like this could be easier to read...
@@ -68,11 +56,6 @@ For an user-facing command, see \\[org-node-reset]."
 ;;       '(a v e e  q l fk k k ki i o r r  r r r r r r r r g g g  g g gg)
 ;;       4)
 
-;; FIXME: I suspect each process is slow at the start, spinning up.  Must be
-;; that it's parsing the long quoted lambda, as it contains a big list of files
-;; literally.  Try reading that list in from a .eld file.  Or somehow just
-;; write the entire lambda to a file and run emacs with the command args that
-;; say "execute that file kthx".
 (defun org-node-async--collect (files)
   (setq org-node-async--n-cores
         (max 1 (1- (string-to-number
@@ -178,10 +161,6 @@ For an user-facing command, see \\[org-node-reset]."
       )))
 
 (defvar org-node-async--processes (list))
-(defcustom org-node-perf-multicore t
-  ""
-  :group 'org-node
-  :type 'boolean)
 
 ;; (async-start (lambda () (sleep-for 1) (message "hi ho"))
 ;;              (lambda (res) (message "done %s" (random 100))))
@@ -192,15 +171,15 @@ For an user-facing command, see \\[org-node-reset]."
 (defun org-node-async-finish (process _)
   (with-temp-buffer
     (insert-file-contents
-     (format "/tmp/org-node-result-%s.eld"
-             (substring (process-name process) -1)))
+     (let ((name (process-name process)))
+       (format "/tmp/org-node-result-%s.eld"
+               (string-match "org-node-\\(.\\)" name)
+               (match-string 1 name))))
+    ;; Run the instructions that were saved in `org-node-worker--queued-writes'
     (dolist (instruction (car (read-from-string (buffer-string))))
       (apply (car instruction) (cdr instruction))))
   (when (eq (cl-incf org-node-async--done-ctr)
             org-node-async--n-cores)
-    ;; (org-id-update-id-locations)
-    ;; (org-id-locations-save)
-    ;; (org-node-async-reset)
     (message "Finished in %.2f s"
              (float-time (time-since org-node-async--start-time)))))
 
