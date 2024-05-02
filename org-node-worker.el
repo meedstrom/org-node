@@ -119,30 +119,7 @@ an element corresponding to POS exactly."
                return nil))
     olp))
 
-
-;; best to advise org-id-add-location and maybe forget-id-location
-;; to schedule an update on the next reset
-;; simples
 (defvar org-node-worker--queued-writes nil)
-(defun async-send (&rest result)
-  (if-let ((add (plist-get result :add-id-loc)))
-      (push `(org-id-add-location ,(car add) ,(cdr add))
-            org-node-worker--queued-writes)
-    (if-let ((forget (plist-get result :forget)))
-        (push `(org-node-async--forget-id-location ,forget)
-              org-node-worker--queued-writes)
-      (if-let ((node (plist-get result :node)))
-          (push `(org-node-async--add-node-to-tables
-                  (make-org-node-data ,@node))
-                org-node-worker--queued-writes)
-        (let ((link (plist-get result :link))
-              (path (plist-get result :path))
-              (type (plist-get result :type)))
-          (push
-           `(push ,link (gethash ,path ,(if (equal type "id")
-                                            'org-node--links-table
-                                          'org-node--reflinks-table)))
-           org-node-worker--queued-writes))))))
 
 (defun org-node-worker--collect-links-until (end id-here olp-with-self)
   "From here to position END, look for forward-links.
@@ -174,13 +151,16 @@ wants for some reason."
                 (looking-at-p "[[:space:]]*#\\+")))
           ;; On a # comment or #+keyword, skip whole line
           (goto-char (pos-eol))
-        (async-send :type type
-                    :path path
-                    :link (list :src id-here
-                                :pos (point)
-                                :type type
-                                ;; Because org-roam asks for it
-                                :properties (list :outline olp-with-self)))))))
+        (push
+         `(push ,(list :src id-here
+                       :pos (point)
+                       :type type
+                       ;; Because org-roam asks for it
+                       :properties (list :outline olp-with-self))
+                (gethash ,path ,(if (equal type "id")
+                                    'org-node--links-table
+                                  'org-node--reflinks-table)))
+         org-node-worker--queued-writes)))))
 
 ;; TODO Let it run in a single Emacs
 ;; TODO Get rid of the uglier perf attempts that didn't help after all (and
@@ -300,7 +280,8 @@ Also scan for links."
             ;; Loop over the file's subtrees
             (while (org-node-worker--next-heading)
               ;; These bindings must be reinitialized to nil on each subtree,
-              ;; because a nil value is meaningful
+              ;; because a nil value is meaningful and we may not set them to
+              ;; anything non-nil.
               (let (TODO-STATE TAGS SCHED DEADLINE PROPS ID OLP)
                 (skip-chars-forward " ")
                 (setq POS (point))
@@ -367,27 +348,27 @@ Also scan for links."
                     (goto-char POS)
                     (org-node-worker--collect-links-until
                      (pos-eol) ID-HERE OLP-WITH-SELF)))
-                (async-send
-                 :node
-                 (list :title TITLE
-                       :is-subtree t
-                       :level LEVEL
-                       :id ID
-                       :pos POS
-                       :tags TAGS
-                       :todo TODO-STATE
-                       :file-path file
-                       :scheduled SCHED
-                       :deadline DEADLINE
-                       :file-title FILE-TITLE
-                       :olp OLP
-                       :properties PROPS
-                       :aliases
-                       (split-string-and-unquote
-                        (or (cdr (assoc "ROAM_ALIASES" PROPS)) ""))
-                       :refs
-                       (split-string-and-unquote
-                        (or (cdr (assoc "ROAM_REFS" PROPS)) "")))))))))
+                (push `(org-node-async--add-node-to-tables
+                        ,(list :title TITLE
+                               :is-subtree t
+                               :level LEVEL
+                               :id ID
+                               :pos POS
+                               :tags TAGS
+                               :todo TODO-STATE
+                               :file-path file
+                               :scheduled SCHED
+                               :deadline DEADLINE
+                               :file-title FILE-TITLE
+                               :olp OLP
+                               :properties PROPS
+                               :aliases
+                               (split-string-and-unquote
+                                (or (cdr (assoc "ROAM_ALIASES" PROPS)) ""))
+                               :refs
+                               (split-string-and-unquote
+                                (or (cdr (assoc "ROAM_REFS" PROPS)) ""))))
+                      org-node-worker--queued-writes))))))
       (with-temp-file (format "/tmp/org-node-result-%d.eld" i)
         (insert (prin1-to-string org-node-worker--queued-writes))))))
 
