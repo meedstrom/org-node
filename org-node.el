@@ -647,7 +647,7 @@ Adding to that, here is an example advice to copy any inherited
       (message "Waiting for rgrep to populate buffer..."))))
 
 ;;;###autoload
-(defun org-node-insert-heading-node ()
+(defun org-node-insert-heading ()
   "Insert a heading with ID and properties."
   (interactive nil org-mode)
   (org-insert-heading)
@@ -656,7 +656,10 @@ Adding to that, here is an example advice to copy any inherited
 ;; Badly named
 ;;;###autoload
 (define-obsolete-function-alias
-  'org-node-create-subtree 'org-node-insert-heading-node "2024-05-01")
+  'org-node-create-subtree 'org-node-insert-heading "2024-05-01")
+;;;###autoload
+(define-obsolete-function-alias
+  'org-node-insert-heading-node 'org-node-insert-heading "2024-05-02")
 
 ;;;###autoload
 (defun org-node-nodeify-entry ()

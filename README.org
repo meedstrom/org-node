@@ -117,6 +117,8 @@ In addition, if you've been struggling with slow saving of big files, consider t
 (setq org-roam-link-auto-replace nil) ;; don't look for "roam:" links on save
 #+end_src
 
+Do a =M-x org-roam-update-org-id-locations=.
+
 With that done, try out these command substitutes:
 
 - =org-node-find= instead of =org-roam-node-find=
@@ -251,7 +253,7 @@ In lieu of a convenient =org-roam-update-org-id-locations=, see [[https://github
   - A bizarro counterpart to =org-roam-extract-subtree=
 - =org-node-nodeify-entry=
   - Trivial - give an ID to subtree at point (and run org-node-creation-hook)
-- =org-node-insert-heading-node=
+- =org-node-insert-heading=
   - Trivial - insert a new heading with an ID (and run org-node-creation-hook)
 - =org-node-random=
 - =org-node-rewrite-links-ask=
