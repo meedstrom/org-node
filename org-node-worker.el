@@ -5,6 +5,19 @@
   (require 'cl-macs)
   (require 'compat))
 
+;; copy pasta
+(defun org-node--make-todo-regexp (todo-string)
+  "Make a regexp based on global value of `org-todo-keywords',
+that will match any of the keywords."
+  (declare (pure t) (side-effect-free t))
+  (save-match-data
+    (thread-last todo-string
+                 (replace-regexp-in-string "(.*?)" "")
+                 (replace-regexp-in-string "[^ [:alpha:]]" "")
+                 (string-trim)
+                 (string-split)
+                 (regexp-opt))))
+
 (defun org-node-worker--org-link-display-format (s)
   "Like `org-link-display-format'."
   (save-match-data
@@ -39,18 +52,6 @@
               res)
         (forward-line 1)))
     res))
-
-(defun org-node-worker--make-todo-regexp (todo-string)
-  "Make a regexp based on global value of `org-todo-keywords',
-that will match any of the keywords."
-  (declare (pure t) (side-effect-free t))
-  (save-match-data
-    (thread-last todo-string
-                 (replace-regexp-in-string "(.*?)" "")
-                 (replace-regexp-in-string "[^ [:alpha:]]" "")
-                 (string-trim)
-                 (string-split)
-                 (regexp-opt))))
 
 (defun org-node-worker--elem-index (elem list)
   "Like `-elem-index'."
@@ -161,12 +162,6 @@ wants for some reason."
            ,path ,type)
          org-node-worker--queued-writes)))))
 
-(defun org-node-async--add-link-to-tables (link-plist path type)
-  (push link-plist
-        (gethash path (if (equal type "id")
-                          org-node--links-table
-                        org-node--reflinks-table))))
-
 ;; TODO Let it run in a single Emacs
 ;; TODO Get rid of the uglier perf attempts that didn't help after all (and
 ;;      profile)
@@ -243,7 +238,7 @@ Also scan for links."
               (goto-char 1))
             (when (re-search-forward $file-todo-option-re FAR t)
               (setq TODO-RE
-                    (org-node-worker--make-todo-regexp
+                    (org-node--make-todo-regexp
                      (buffer-substring-no-properties (point) (pos-eol))))
               (goto-char 1))
             (if (re-search-forward "^#\\+title: " FAR t)
