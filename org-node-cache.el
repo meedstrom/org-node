@@ -20,25 +20,12 @@ time."
       (progn
         (add-hook 'after-save-hook #'org-node-cache-rescan-file)
         (advice-add #'rename-file :after #'org-node-cache-rescan-file)
-        ;; (advice-add #'org-id-add-location :after #'org-node-cache--update-id-locs-soon)
         (advice-add #'rename-file :before #'org-node-cache--handle-delete)
         (advice-add #'delete-file :before #'org-node-cache--handle-delete))
     (remove-hook 'after-save-hook #'org-node-cache-rescan-file)
     (advice-remove #'rename-file #'org-node-cache-rescan-file)
-    ;; (advice-remove #'org-id-add-location #'org-node-cache--update-id-locs-soon)
     (advice-remove #'rename-file #'org-node-cache--handle-delete)
     (advice-remove #'delete-file #'org-node-cache--handle-delete)))
-
-;; Ok, no
-(let ((timer (timer-create)))
-  (defun org-node-cache--update-id-locs-soon (&rest _)
-    (cancel-timer timer)
-    (setq timer (run-with-idle-timer
-                 6 nil (lambda ()
-                         (org-id-update-id-locations)
-                         (org-id-locations-save)
-                         ;; maybe
-                         (org-node-cache-reset))))))
 
 (defun org-node-cache-peek ()
   "For debugging: peek on a random member of `org-nodes'.
@@ -84,10 +71,9 @@ For an user-facing command, see \\[org-node-reset]."
                 (buffer-file-name))))
     (org-node-cache--collect (list file))
     (when (boundp 'org-node-cache-scan-file-hook)
-      (lwarn 'org-node :warning "Hook renamed: org-node-cache-scan-file-hook to org-node-cache-rescan-file-hook"))
+      (lwarn 'org-node :warning
+             "Hook renamed: org-node-cache-scan-file-hook to org-node-cache-rescan-file-hook"))
     (run-hooks 'org-node-cache-rescan-file-hook)))
-
-(define-obsolete-function-alias 'org-node-cache-scan-file 'org-node-cache-rescan-file "2024-05-01")
 
 (defun org-node-cache-ensure-fresh ()
   (org-node--init-org-id-locations-or-die)
@@ -176,7 +162,7 @@ Also scan for links."
           (garbage-collection-messages nil)
           (ctr 0)
           (ctr-max (length files))
-          (ctr-chunk (max 1 (round (log (length files) 5))))
+          (ctr-chunk (max 1 (round (log (length files)))))
           ;; Attempt to improve performance
           (coding-system-for-read org-node-perf-assume-coding-system)
 	  (coding-system-for-write org-node-perf-assume-coding-system)

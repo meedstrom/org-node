@@ -78,12 +78,13 @@
                        (shell-command-to-string
                         "sysctl -n hw.logicalcpu_max"))
                       ((or 'cygwin 'windows-nt 'ms-dos)
-                       (user-error "org-node does not support Windows")))))))
+                       (user-error "org-node: Windows not yet supported")))))))
   (let* ((native (and (featurep 'native-compile)
                       (native-comp-available-p)))
          (lib (find-library-name "org-node-worker"))
-         (lib.eln (comp-el-to-eln-filename lib))
-         (lib.elc (byte-compile-dest-file lib))
+         (eln (comp-el-to-eln-filename lib))
+         ;; ensure we don't pollute local repo
+         (elc "/tmp/org-node-worker.elc")
          (variables
           `(($bungle-file-name-handler . ,org-node-perf-bungle-file-name-handler)
             ($not-a-full-reset . ,(not (hash-table-empty-p org-nodes)))
@@ -112,13 +113,15 @@
              . ,(rx bol (or "#+todo: " "#+seq_todo: " "#+typ_todo: "))))))
     ;; Pre-compile code for the external Emacs processes to use,
     ;; in case the user's package manager didn't.
-    (if native
-        (unless (and (file-exists-p lib.eln)
-                     (file-newer-than-file-p lib.eln lib))
-          (native-compile lib))
-      (unless (and (file-exists-p lib.elc)
-                   (file-newer-than-file-p lib.elc lib))
-        (byte-compile-file lib)))
+    (let ((byte-compile-dest-file-function
+           `(lambda (&rest _) ,elc)))
+      (if native
+          (unless (and (file-exists-p eln)
+                       (file-newer-than-file-p eln lib))
+            (native-compile lib))
+        (unless (and (file-exists-p elc)
+                     (file-newer-than-file-p elc lib))
+          (byte-compile-file lib))))
     (setq org-node-async--start-time (current-time))
     (setq org-node-async--done-ctr 0)
     (with-temp-file (file-name-concat (temporary-file-directory)
@@ -159,8 +162,8 @@
                           i)
                          "--load"
                          (if native
-                             lib.eln
-                           lib.elc)
+                             eln
+                           elc)
                          "--funcall"
                          "org-node-worker-function")
                    :sentinel #'org-node-async-finish)

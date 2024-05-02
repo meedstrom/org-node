@@ -27,6 +27,8 @@
 
 ;;; Code:
 
+;; TODO Use worker.el code synchronously in cache.el
+;; TODO Like we feed the org-roam-db, maybe feed org-id-locations too?  We can probably do it faster.  Then we can also provide saner user config.
 ;; TODO Better initial setup for people who have a wildly lacking org-id initialization
 ;; TODO Annotations for completion
 ;; TODO Completion category https://github.com/alphapapa/org-ql/issues/299
@@ -651,14 +653,6 @@ Adding to that, here is an example advice to copy any inherited
   (org-insert-heading)
   (org-node-nodeify-entry))
 
-;; Badly named
-;;;###autoload
-(define-obsolete-function-alias
-  'org-node-create-subtree 'org-node-insert-heading "2024-05-01")
-;;;###autoload
-(define-obsolete-function-alias
-  'org-node-insert-heading-node 'org-node-insert-heading "2024-05-02")
-
 ;;;###autoload
 (defun org-node-nodeify-entry ()
   "Add an ID to entry at point and run `org-node-creation-hook'."
@@ -679,7 +673,7 @@ Adding to that, here is an example advice to copy any inherited
   (interactive)
   (let ((then (current-time)))
     (org-node-cache-reset)
-    ;; Multicore async means can't report any numbers right now
+    ;; Multicore is async, so it can't report any numbers right now
     (unless org-node-perf-multicore
       (let ((n-subtrees (cl-loop for node being the hash-values of org-nodes
                                  count (org-node-get-is-subtree node))))
