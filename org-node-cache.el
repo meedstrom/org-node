@@ -1,6 +1,7 @@
 ;;; org-node-cache.el --- The beating heart -*- lexical-binding: t; -*-
 
 (require 'org-node-lib)
+(require 'org-node-async)
 
 ;;;###autoload
 (define-minor-mode org-node-cache-mode
@@ -19,16 +20,16 @@ time."
       (progn
         (add-hook 'after-save-hook #'org-node-cache-rescan-file)
         (advice-add #'rename-file :after #'org-node-cache-rescan-file)
+        ;; (advice-add #'org-id-add-location :after #'org-node-cache--update-id-locs-soon)
         (advice-add #'rename-file :before #'org-node-cache--handle-delete)
-        (advice-add #'delete-file :before #'org-node-cache--handle-delete)
-        (advice-add #'org-id-add-location :after #'org-node-cache--update-id-locs-soon))
+        (advice-add #'delete-file :before #'org-node-cache--handle-delete))
     (remove-hook 'after-save-hook #'org-node-cache-rescan-file)
     (advice-remove #'rename-file #'org-node-cache-rescan-file)
+    ;; (advice-remove #'org-id-add-location #'org-node-cache--update-id-locs-soon)
     (advice-remove #'rename-file #'org-node-cache--handle-delete)
-    (advice-remove #'delete-file #'org-node-cache--handle-delete)
-    (advice-remove #'org-id-add-location #'org-node-cache--update-id-locs-soon)))
+    (advice-remove #'delete-file #'org-node-cache--handle-delete)))
 
-;; Found it necessary
+;; Ok, no
 (let ((timer (timer-create)))
   (defun org-node-cache--update-id-locs-soon (&rest _)
     (cancel-timer timer)
@@ -91,12 +92,13 @@ For an user-facing command, see \\[org-node-reset]."
 (defun org-node-cache-ensure-fresh ()
   (org-node--init-org-id-locations-or-die)
   ;; Once-per-session tip
-  (when (and (hash-table-empty-p org-node-collection)
-             (not (member 'org-node-cache-mode org-mode-hook)))
-    (message "To speed up this command, turn on `org-node-cache-mode'"))
-  (when (or (not org-node-cache-mode)
-            (hash-table-empty-p org-node-collection))
-    (org-node-cache-reset)))
+  (let ((org-node-perf-multicore nil)) ;;HACK
+    (when (and (hash-table-empty-p org-node-collection)
+               (not (member 'org-node-cache-mode org-mode-hook)))
+      (message "To speed up this command, turn on `org-node-cache-mode'"))
+    (when (or (not org-node-cache-mode)
+              (hash-table-empty-p org-node-collection))
+      (org-node-cache-reset))))
 
 (let ((timer (timer-create)))
   (defun org-node-cache--handle-delete (&optional arg1 &rest _)

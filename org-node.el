@@ -29,7 +29,6 @@
 ;;; Code:
 
 ;; TODO Better initial setup for people who have a wildly lacking org-id initialization
-;; TODO Use async.el
 ;; TODO Annotations for completion
 ;; TODO Completion category https://github.com/alphapapa/org-ql/issues/299
 ;; TODO Command to grep across all files
@@ -681,16 +680,18 @@ Adding to that, here is an example advice to copy any inherited
   (interactive)
   (let ((then (current-time)))
     (org-node-cache-reset)
-    (let ((n-subtrees (cl-loop for node being the hash-values of org-nodes
-                               count (org-node-get-is-subtree node))))
-      (message "org-node: found %d files, %d subtrees and %d links in %.2fs"
-               (- (hash-table-count org-nodes) n-subtrees)
-               n-subtrees
-               (+ (length (apply #'append
-                                 (hash-table-values org-node--links-table)))
-                  (length (apply #'append
-                                 (hash-table-values org-node--reflinks-table))))
-               (float-time (time-since then))))))
+    ;; Multicore async means can't report any numbers right now
+    (unless org-node-perf-multicore
+      (let ((n-subtrees (cl-loop for node being the hash-values of org-nodes
+                                 count (org-node-get-is-subtree node))))
+        (message "org-node: found %d files, %d subtrees and %d links in %.2fs"
+                 (- (hash-table-count org-nodes) n-subtrees)
+                 n-subtrees
+                 (+ (length (apply #'append
+                                   (hash-table-values org-node--links-table)))
+                    (length (apply #'append
+                                   (hash-table-values org-node--reflinks-table))))
+                 (float-time (time-since then)))))))
 
 (provide 'org-node)
 

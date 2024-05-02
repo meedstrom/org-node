@@ -2,6 +2,7 @@
 
 (require 'bytecomp)
 (require 'org-node-lib)
+;; (require 'org-node-worker)
 
 (defvar org-node-async-reset-hook nil)
 (defvar org-node-async-rescan-file-hook nil)
@@ -56,6 +57,13 @@
 ;;       '(a v e e  q l fk k k ki i o r r  r r r r r r r r g g g  g g gg)
 ;;       4)
 
+
+(defun org-node-async--add-link-to-tables (link-plist path type)
+  (push link-plist
+        (gethash path (if (equal type "id")
+                          org-node--links-table
+                        org-node--reflinks-table))))
+
 (defun org-node-async--collect (files)
   (setq org-node-async--n-cores
         (max 1 (1- (string-to-number
@@ -95,7 +103,7 @@
                             "backlinks")
                         ":"))
             ($global-todo-re
-             . ,(org-node-worker--make-todo-regexp
+             . ,(org-node--make-todo-regexp
                  (mapconcat #'identity
                             (mapcan #'cdr (default-toplevel-value
                                            'org-todo-keywords))
@@ -167,6 +175,7 @@
 
 (defvar org-node-async--done-ctr 0)
 (defvar org-node-async--n-cores nil)
+(defvar org-node-async--please-update-id-locations nil)
 
 (defun org-node-async-finish (process _)
   (with-temp-buffer
@@ -177,9 +186,16 @@
                (match-string 1 name))))
     ;; Run the instructions that were saved in `org-node-worker--queued-writes'
     (dolist (instruction (car (read-from-string (buffer-string))))
-      (apply (car instruction) (cdr instruction))))
+      (apply (car instruction) (cdr instruction))
+      (when (eq 'org-id-add-location (car instruction))
+        (setq org-node-async--please-update-id-locations t))))
+  ;; The last process has completed
   (when (eq (cl-incf org-node-async--done-ctr)
             org-node-async--n-cores)
+    (when org-node-async--please-update-id-locations
+      (setq org-node-async--please-update-id-locations nil)
+      (org-id-update-id-locations)
+      (org-id-locations-save))
     (message "Finished in %.2f s"
              (float-time (time-since org-node-async--start-time)))))
 
