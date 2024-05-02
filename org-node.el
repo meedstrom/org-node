@@ -41,6 +41,8 @@
 (require 'org-node-cache)
 (require 'org-node-backlink)
 (require 'org-node-roam)
+(require 'org-node-async)
+(require 'org-node-worker)
 (require 'org-faces)
 
 ;; Will deprecate soon
