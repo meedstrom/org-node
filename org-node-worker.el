@@ -1,25 +1,16 @@
-;;; org-node-worker.el --- The beating heart -*- lexical-binding: t; -*-
+;;; org-node-worker.el --- Gotta go fast -*- lexical-binding: t; -*-
 
 (eval-when-compile
   ;; (require 'subr-x)
-  (require 'cl-lib)
-  ;; (require 'ol)
-  )
-
-(defvar org-node-worker--global-todo-keywords nil)
-(defvar org-node-worker--not-a-full-reset nil)
-(defvar org-node-worker--files nil)
-(defvar org-node-worker--org-node-perf-assume-coding-system nil)
-(defvar org-node-worker--org-node-perf-bungle-file-name-handler nil)
-(defvar org-node-worker--org-node-perf-gc-cons-threshold nil)
-(defvar org-node-worker--org-link-bracket-re nil)
-(defvar org-node-worker--org-link-plain-re nil)
+  (require 'cl-macs)
+  (require 'compat))
 
 (defun org-node-worker--org-link-display-format (s)
   "Like `org-link-display-format'."
   (save-match-data
     (replace-regexp-in-string
-     org-node-worker--org-link-bracket-re
+     ;; Pasted from `org-link-bracket-re'
+     "\\[\\[\\(\\(?:[^][\\]\\|\\\\\\(?:\\\\\\\\\\)*[][]\\|\\\\+[^][]\\)+\\)]\\(?:\\[\\([^z-a]+?\\)]\\)?]"
      (lambda (m) (or (match-string 2 m) (match-string 1 m)))
      s nil t)))
 
@@ -52,14 +43,16 @@
 (defun org-node-worker--make-todo-regexp (todo-string)
   "Make a regexp based on global value of `org-todo-keywords',
 that will match any of the keywords."
-  (thread-last todo-string
-               (replace-regexp-in-string "(.*?)" "")
-               (replace-regexp-in-string "[^ [:alpha:]]" "")
-               (string-trim)
-               (string-split)
-               (regexp-opt)))
+  (declare (pure t) (side-effect-free t))
+  (save-match-data
+    (thread-last todo-string
+                 (replace-regexp-in-string "(.*?)" "")
+                 (replace-regexp-in-string "[^ [:alpha:]]" "")
+                 (string-trim)
+                 (string-split)
+                 (regexp-opt))))
 
-(defun org-node-worker---elem-index (elem list)
+(defun org-node-worker--elem-index (elem list)
   "Like `-elem-index'."
   (declare (pure t) (side-effect-free t))
   (let ((list list)
@@ -78,8 +71,8 @@ Extra argument FILE-ID is the file-level id, used as a fallback
 if no ancestor heading has an ID.  It can be nil."
   (declare (pure t) (side-effect-free t))
   (let (;; Drop all the data about positions below POS
-        (reversed (nthcdr (org-node-worker---elem-index (assoc pos oldata)
-                                                        oldata)
+        (reversed (nthcdr (org-node-worker--elem-index (assoc pos oldata)
+                                                       oldata)
                           oldata)))
     (let ((curr-level (caddr (car reversed))))
       ;; Work backwards towards the top of the file
@@ -97,22 +90,24 @@ if no ancestor heading has an ID.  It can be nil."
 Result should be like that from `org-get-outline-path'.
 
 Argument OLDATA must be of the form
- ((373 \"Heading\" 2)
-  (250 \"Another heading\" 1)
-  (123 \"Misplaced third-level heading\" 3)
-  ...)
+ ((373 \"A subheading\" 2)
+  (250 \"A top heading\" 1)
+  (199 \"Another top heading\" 1)
+  (123 \"Poorly placed third-level heading\" 3))
 
 where the car of each element represents a buffer position, the cadr the
-heading title and the caddr the outline depth i.e. the number of
+heading title, and the caddr the outline depth i.e. the number of
 asterisks in the heading at that location.
 
-OLDATA must be in reverse order, so the last heading in the file is
-represented as the first element.  It must also contain an element
-corresponding to POS."
+OLDATA must be in \"reverse\" order, such the last heading in the
+file is represented as the first element.  It must also contain
+an element corresponding to POS exactly."
   (declare (pure t) (side-effect-free t))
   (let (olp
         ;; Drop all the data about positions below POS
-        (reversed (nthcdr (org-node-worker---elem-index (assoc pos oldata) oldata) oldata)))
+        (reversed (nthcdr (org-node-worker--elem-index (assoc pos oldata)
+                                                       oldata)
+                          oldata)))
     (let ((curr-level (caddr (car reversed))))
       ;; Work backwards towards the top of the file
       (cl-loop for cell in reversed
@@ -123,6 +118,31 @@ corresponding to POS."
                ;; Stop
                return nil))
     olp))
+
+
+;; best to advise org-id-add-location and maybe forget-id-location
+;; to schedule an update on the next reset
+;; simples
+(defvar org-node-worker--queued-writes nil)
+(defun async-send (&rest result)
+  (if-let ((add (plist-get result :add-id-loc)))
+      (push `(org-id-add-location ,(car add) ,(cdr add))
+            org-node-worker--queued-writes)
+    (if-let ((forget (plist-get result :forget)))
+        (push `(org-node-async--forget-id-location ,forget)
+              org-node-worker--queued-writes)
+      (if-let ((node (plist-get result :node)))
+          (push `(org-node-async--add-node-to-tables
+                  (make-org-node-data ,@node))
+                org-node-worker--queued-writes)
+        (let ((link (plist-get result :link))
+              (path (plist-get result :path))
+              (type (plist-get result :type)))
+          (push
+           `(push ,link (gethash ,path ,(if (equal type "id")
+                                            'org-node--links-table
+                                          'org-node--reflinks-table)))
+           org-node-worker--queued-writes))))))
 
 (defun org-node-worker--collect-links-until (end id-here olp-with-self)
   "From here to position END, look for forward-links.
@@ -137,7 +157,15 @@ boundaries of that subtree.
 Argument OLP-WITH-SELF is simply the outline path to the current
 subtree, including its own heading.  This is data that org-roam
 wants for some reason."
-  (while (re-search-forward org-node-worker--org-link-plain-re end t)
+  (while (re-search-forward
+          ;; Pasted from `org-link-plain-re'
+          "\\(?:\\<\\(?:\\(attachment\\|el\\(?:feed\\|isp\\)\\|f\\(?:ile\\(?:\\+\\(?:\\(?:emac\\|sy\\)s\\)\\)?\\|tp\\)\\|h\\(?:elp\\|ttps?\\)\\|id\\|mailto\\|news\\|roam\\|shell\\)\\):\\(\\(?:[^][
+()<>]\\|[(<[]\\(?:[^][
+()<>]\\|[(<[][^][
+()<>]*[])>]\\)*[])>]\\)+\\(?:[^[:punct:]
+]\\|/\\|[(<[]\\(?:[^][
+()<>]\\|[(<[][^][
+()<>]*[])>]\\)*[])>]\\)\\)\\)" end t)
     (let ((type (match-string 1))
           (path (match-string 2)))
       (if (save-excursion
@@ -154,53 +182,35 @@ wants for some reason."
                                 ;; Because org-roam asks for it
                                 :properties (list :outline olp-with-self)))))))
 
-(defvar org-node-worker--input nil)
-
+;; TODO Let it run in a single Emacs
+;; TODO Get rid of the uglier perf attempts that didn't help after all (and
+;;      profile)
 ;; TODO Consider what to do if org-id-locations stored the same file under
-;; different names
-(defun org-node-worker-function (files)
+;;      different names
+(defun org-node-worker-function ()
   "Scan FILES for id-nodes, adding them to `org-nodes'.
 Also scan for links."
-  (let ((backlink-drawer-re       (cdr (assq backlink-drawer-re       org-node-worker--input)))
-        (global-todo-keywords     (cdr (assq global-todo-keywords     org-node-worker--input)))
-        (bungle-file-name-handler (cdr (assq bungle-file-name-handler org-node-worker--input)))
-        (assume-coding-system     (cdr (assq assume-coding-system     org-node-worker--input)))
-        (gc-cons-threshold        (cdr (assq gc-cons-threshold        org-node-worker--input)))
-        (not-a-full-reset         (cdr (assq not-a-full-reset         org-node-worker--input)))
-        (link-bracket-re          (cdr (assq link-bracket-re          org-node-worker--input)))
-        (link-plain-re            (cdr (assq link-plain-re            org-node-worker--input)))
-        (files                    (cdr (assq files                    org-node-worker--input)))
-        (global-todo-re
-         (org-node-worker--make-todo-regexp
-          (string-join (mapcan #'cdr org-node-worker--global-todo-keywords)
-                       " ")))
-        (file-local-todo-keyword-re
-         (rx bol (or "#+todo: " "#+seq_todo: " "#+typ_todo: ")))
-        (case-fold-search t)
-        (ctr 0)
-        (ctr-max (length org-node-worker--files))
-        (ctr-chunk (max 1 (round (log (length org-node-worker--files) 5))))
-        ;; Attempt to improve performance
-        (inhibit-modification-hooks t)
-        (inhibit-point-motion-hooks t)
-        (coding-system-for-read org-node-perf-assume-coding-system)
-	(coding-system-for-write org-node-perf-assume-coding-system)
-        (inhibit-eol-conversion
-         (member org-node-perf-assume-coding-system
-                 '(utf-8-unix utf-8-dos utf-8-mac utf-16-le-dos utf-16-be-dos)))
-        (gc-cons-threshold (or org-node-perf-gc-cons-threshold
-                               gc-cons-threshold))
-        (after-insert-file-functions nil)
-        (format-alist nil)
-        ;; Keep only the EasyPG handler, not the TRAMP handlers nor the
-        ;; compressed-archive handler
-        (file-name-handler-alist
-         (if org-node-worker--org-node-perf-bungle-file-name-handler
-             (list (rassoc 'epa-file-handler file-name-handler-alist))
-           file-name-handler-alist)))
-    (with-temp-buffer
-      (dolist (file org-node-worker--files)
+  (with-temp-buffer
+    (insert-file-contents (file-name-concat (temporary-file-directory)
+                                            "org-node-worker-variables.eld"))
+    (dolist (variable (car (read-from-string (buffer-string))))
+      (set (car variable) (cdr variable)))
+    (let ((case-fold-search t)
+          (i (pop files))
+          (format-alist nil)
+          ;; Keep only the EasyPG handler, not the TRAMP handlers nor the
+          ;; compressed-archive handler
+          (file-name-handler-alist
+           (if $bungle-file-name-handler
+               (let ((epa (rassoc 'epa-file-handler file-name-handler-alist)))
+                 (if epa
+                     (list epa)
+                   ()))
+             file-name-handler-alist)))
+      (dolist (file files)
         (if (not (file-exists-p file))
+            ;; TODO: Move this explanation somewhere else
+            ;;
             ;; Example situation: user renamed/deleted a file using shell
             ;; commands, outside Emacs.  Now org-id references a file that
             ;; doesn't exist.  Our solution: just skip.  If the file was
@@ -219,7 +229,8 @@ Also scan for links."
             ;; but it doesn't take into account what the user may want to
             ;; exclude, like versioned backup org-node-worker--files, so we shouldn't do that.
             ;; Starting to think we need an org-id2.el.
-            (async-send :forget file)
+            (push `(org-node-async--forget-id-location ,forget)
+                  org-node-worker--queued-writes)
           (erase-buffer)
           ;; NOTE: Used `insert-file-contents-literally' in the past, converting
           ;; each captured substring afterwards with `decode-coding-string', but
@@ -229,7 +240,7 @@ Also scan for links."
           (insert-file-contents file)
           (let (;; Good-enough substitute for `org-end-of-meta-data'
                 (FAR (or (re-search-forward "^ *?[^#:]" nil t) (point-max)))
-                (TODO-RE global-todo-re)
+                (TODO-RE $global-todo-re)
                 PROPS FILE-TITLE FILE-TAGS FILE-ID OUTLINE-DATA
                 POS LEVEL HERE TITLE LINE+2)
             (goto-char 1)
@@ -240,11 +251,12 @@ Also scan for links."
                                         (pos-bol))))
               (goto-char 1))
             (when (re-search-forward "^#\\+filetags: " FAR t)
-              (setq FILE-TAGS (split-string
-                               (buffer-substring-no-properties (point) (pos-eol))
-                               ":" t))
+              (setq FILE-TAGS
+                    (split-string
+                     (buffer-substring-no-properties (point) (pos-eol))
+                     ":" t))
               (goto-char 1))
-            (when (re-search-forward file-local-todo-keyword-re FAR t)
+            (when (re-search-forward $file-todo-option-re FAR t)
               (setq TODO-RE
                     (org-node-worker--make-todo-regexp
                      (buffer-substring-no-properties (point) (pos-eol))))
@@ -256,37 +268,39 @@ Also scan for links."
               ;; File nodes dont strictly need #+title, fall back on filename
               (setq FILE-TITLE (file-name-nondirectory file)))
             (setq FILE-ID (cdr (assoc "ID" PROPS)))
-            (when org-node-worker--not-a-full-reset
+            (when $not-a-full-reset
               (when FILE-ID
-                (async-send :add (cons FILE-ID file))))
+                (push `(org-id-add-location ,FILE-ID ,file)
+                      org-node-worker--queued-writes)))
             ;; Collect links
             (let ((END (save-excursion
                          (org-node-worker--next-heading)
                          (1- (point)))))
               (when FILE-ID
                 ;; Don't count org-super-links backlinks as forward links
-                (when (re-search-forward org-node-worker--backlink-drawer-re END t)
+                (when (re-search-forward $backlink-drawer-re END t)
                   (search-forward ":end:"))
                 (org-node-worker--collect-links-until END FILE-ID nil)))
-            (async-send
-             :node (list :title FILE-TITLE
-                         :level 0
-                         :tags FILE-TAGS
-                         :file-path file
-                         :pos 1
-                         :file-title FILE-TITLE
-                         :properties PROPS
-                         :id FILE-ID
-                         :aliases
-                         (split-string-and-unquote
-                          (or (cdr (assoc "ROAM_ALIASES" PROPS)) ""))
-                         :refs
-                         (split-string-and-unquote
-                          (or (cdr (assoc "ROAM_REFS" PROPS)) ""))))
+            (push `(org-node-async--add-node-to-tables
+                    ,(list :title FILE-TITLE
+                           :level 0
+                           :tags FILE-TAGS
+                           :file-path file
+                           :pos 1
+                           :file-title FILE-TITLE
+                           :properties PROPS
+                           :id FILE-ID
+                           :aliases
+                           (split-string-and-unquote
+                            (or (cdr (assoc "ROAM_ALIASES" PROPS)) ""))
+                           :refs
+                           (split-string-and-unquote
+                            (or (cdr (assoc "ROAM_REFS" PROPS)) ""))))
+                  org-node-worker--queued-writes)
             ;; Loop over the file's subtrees
-            ;; TODO: move some of the let bindings out of this while loop
-            ;; for perf.  shouild only be inside if nil is a possible value
             (while (org-node-worker--next-heading)
+              ;; These bindings must be reinitialized to nil on each subtree,
+              ;; because a nil value is meaningful
               (let (TODO-STATE TAGS SCHED DEADLINE PROPS ID OLP)
                 (skip-chars-forward " ")
                 (setq POS (point))
@@ -299,12 +313,14 @@ Also scan for links."
                   (setq HERE (point)))
                 (if (re-search-forward " +\\(:.+:\\) *$" (pos-eol) t)
                     (progn
-                      (setq TITLE (org-node-worker--org-link-display-format
-                                   (buffer-substring-no-properties
-                                    HERE (match-beginning 0))))
+                      (setq TITLE
+                            (org-node-worker--org-link-display-format
+                             (buffer-substring-no-properties
+                              HERE (match-beginning 0))))
                       (setq TAGS (split-string (match-string 1) ":" t)))
-                  (setq TITLE (org-node-worker--org-link-display-format
-                               (buffer-substring-no-properties HERE (pos-eol)))))
+                  (setq TITLE
+                        (org-node-worker--org-link-display-format
+                         (buffer-substring-no-properties HERE (pos-eol)))))
                 (setq HERE (point))
                 (setq LINE+2 (and (forward-line 2) (point)))
                 (goto-char HERE)
@@ -328,8 +344,10 @@ Also scan for links."
                                          (re-search-forward "^ *:end:")
                                          (pos-bol)))))
                 (setq ID (cdr (assoc "ID" PROPS)))
-                (when org-node-worker--not-a-full-reset
-                  (when ID (async-send :add (cons ID file))))
+                (when $not-a-full-reset
+                  (when ID
+                    (push `(org-id-add-location ,ID ,file)
+                          org-node-worker--queued-writes)))
                 (push (list POS TITLE LEVEL ID) OUTLINE-DATA)
                 (setq OLP (org-node-worker--pos->olp OUTLINE-DATA POS))
                 ;; Now collect links!
@@ -341,7 +359,7 @@ Also scan for links."
                       (OLP-WITH-SELF (append OLP (list TITLE))))
                   (when ID-HERE
                     ;; Don't count org-super-links backlinks
-                    (when (re-search-forward org-node-worker--backlink-drawer-re END t)
+                    (when (re-search-forward $backlink-drawer-re END t)
                       (search-forward ":end:"))
                     (org-node-worker--collect-links-until
                      END ID-HERE OLP-WITH-SELF)
@@ -350,35 +368,28 @@ Also scan for links."
                     (org-node-worker--collect-links-until
                      (pos-eol) ID-HERE OLP-WITH-SELF)))
                 (async-send
-                 :node (list :title TITLE
-                             :is-subtree t
-                             :level LEVEL
-                             :id ID
-                             :pos POS
-                             :tags TAGS
-                             :todo TODO-STATE
-                             :file-path file
-                             :scheduled SCHED
-                             :deadline DEADLINE
-                             :file-title FILE-TITLE
-                             :olp OLP
-                             :properties PROPS
-                             :aliases
-                             (split-string-and-unquote
-                              (or (cdr (assoc "ROAM_ALIASES" PROPS)) ""))
-                             :refs
-                             (split-string-and-unquote
-                              (or (cdr (assoc "ROAM_REFS" PROPS)) "")))))))))))
-  'done)
-
-;; to set at runtime, actually
-(defvar org-node-worker--backlink-drawer-re
-  (concat "^[[:space:]]*:"
-          (or (and (boundp 'org-super-links-backlink-into-drawer)
-                   (stringp org-super-links-backlink-into-drawer)
-                   (downcase org-super-links-backlink-into-drawer))
-              "backlinks")
-          ":"))
+                 :node
+                 (list :title TITLE
+                       :is-subtree t
+                       :level LEVEL
+                       :id ID
+                       :pos POS
+                       :tags TAGS
+                       :todo TODO-STATE
+                       :file-path file
+                       :scheduled SCHED
+                       :deadline DEADLINE
+                       :file-title FILE-TITLE
+                       :olp OLP
+                       :properties PROPS
+                       :aliases
+                       (split-string-and-unquote
+                        (or (cdr (assoc "ROAM_ALIASES" PROPS)) ""))
+                       :refs
+                       (split-string-and-unquote
+                        (or (cdr (assoc "ROAM_REFS" PROPS)) "")))))))))
+      (with-temp-file (format "/tmp/org-node-result-%d.eld" i)
+        (insert (prin1-to-string org-node-worker--queued-writes))))))
 
 (provide 'org-node-worker)
 
