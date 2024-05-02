@@ -20,11 +20,19 @@ time."
         (add-hook 'after-save-hook #'org-node-cache-rescan-file)
         (advice-add #'rename-file :after #'org-node-cache-rescan-file)
         (advice-add #'rename-file :before #'org-node-cache--handle-delete)
-        (advice-add #'delete-file :before #'org-node-cache--handle-delete))
+        (advice-add #'delete-file :before #'org-node-cache--handle-delete)
+        (advice-add #'org-id-add-location :after #'org-node-cache--reset-soon))
     (remove-hook 'after-save-hook #'org-node-cache-rescan-file)
     (advice-remove #'rename-file #'org-node-cache-rescan-file)
     (advice-remove #'rename-file #'org-node-cache--handle-delete)
-    (advice-remove #'delete-file #'org-node-cache--handle-delete)))
+    (advice-remove #'delete-file #'org-node-cache--handle-delete)
+    (advice-remove #'org-id-add-location #'org-node-cache--reset-soon)))
+
+;; Found it necessary
+(let ((timer (timer-create)))
+  (defun org-node-cache--reset-soon (&rest _)
+    (cancel-timer timer)
+    (setq timer (run-with-idle-timer 6 nil #'org-node-cache-reset))))
 
 (defun org-node-cache-peek ()
   "For debugging: peek on a random member of `org-nodes'.
