@@ -15,7 +15,7 @@
   :group 'org)
 
 (defcustom org-node-ask-directory nil
-  "Whether to ask the user where to save a new node.
+  "Whether to ask the user where to save a new file node.
 
 Set nil to assume that the most populous root directory in
 `org-id-locations' is always the correct choice."
@@ -23,7 +23,7 @@ Set nil to assume that the most populous root directory in
   :type 'boolean)
 
 (defcustom org-node-perf-assume-coding-system nil
-  "Coding system to use while scanning files for metadata.
+  "Coding system to use while scanning for metadata.
 This speeds up `org-node-reset' a bit.  Set nil to let Emacs
 figure it out anew on every file.
 
@@ -36,17 +36,36 @@ utf-8-unix utf-8-dos utf-8-mac utf-16-le-dos utf-16-be-dos"
   :group 'org-node
   :type '(choice symbol (const nil)))
 
-;; TODO Detect at some other time (not at reset time) the presence of tramp or
-;; jka filenames in org-id-locations, and alert the user that they should change
-;; this setting.
-(defcustom org-node-perf-bungle-file-name-handler t
+;; DEPREC
+(defvar org-node-perf-bungle-file-name-handler t
   "Whether to simplify the file name handler while scanning.
 
 This speeds up `org-node-reset' a bit, but the result is
 inability to search files through TRAMP or inside compressed
-files."
+files.")
+
+;; NOTE: easyPG still won't work with async until we provide a way to pass in
+;; config variables to the child process
+(defcustom org-node-perf-keep-file-name-handlers '(epa-file-handler)
+  "Which file handlers to not ignore while scanning for metadata.
+
+Normally, `file-name-handler-alist' reacts specially to seeing
+some file names: TRAMP paths, compressed files or
+.org.gpg files.
+
+It's infamous for (somewhat) slowing down the access of very many
+files, since it is a series of regexps applied to every file name
+encountered.  Temporarily eliminating members will speed up
+`org-node-reset' a bit."
   :group 'org-node
-  :type 'boolean)
+  :type '(choice (const :tag "Keep all" t)
+          (set
+           (function-item jka-compr-handler)
+           (function-item epa-file-handler)
+           (function-item tramp-file-name-handler)
+           (function-item tramp-completion-file-name-handler)
+           (function-item tramp-archive-file-name-handler)
+           (function-item file-name-non-special))))
 
 (defcustom org-node-perf-gc-cons-threshold nil
   "Temporary setting for `gc-cons-threshold'.
@@ -73,8 +92,8 @@ Built-in choices:
 "
   :group 'org-node
   :type '(choice
-          (const org-node-slugify-like-roam)
-          (const org-node-slugify-as-url)
+          (function-item org-node-slugify-like-roam)
+          (function-item org-node-slugify-as-url)
           function))
 
 (defcustom org-node-creation-fn #'org-node-new-file
@@ -93,9 +112,9 @@ Some options
 Using `org-capture' requires some assembly.  See `org-node-capture-target'."
   :group 'org-node
   :type '(choice
-          (const org-node-new-file)
-          (const org-node-new-by-roam-capture)
-          (const org-capture)
+          (function-item org-node-new-file)
+          (function-item org-node-new-by-roam-capture)
+          (function-item org-capture)
           function))
 
 (defcustom org-node-insert-link-hook ()
@@ -130,22 +149,23 @@ the filename."
 (defcustom org-node-format-candidate-fn
   (lambda (_node title)
     title)
-  "Function to return what string should represent this node.
+  "Function to return a string to represent a given node.
 Affects how selections are displayed during e.g. `org-node-find'.
 
 Called with two arguments: the node data and the title.
 
-The title may in fact be one of the aliases and not the canonical title,
-because the function runs again for every alias.
+The title may in fact be one of the aliases and not the canonical
+title, because the function runs again for every alias.
 
 The node data is an object which form you can observe in examples
 from \\[org-node-cache-peek] and specified in the type
-`org-node-data'.
+`org-node-data' (use C-h o to search for it).
 
-This example shows the ancestor entries to each node:
+The following example will make the completions display the
+ancestors (outline path) to each node:
 
 (setq org-node-format-candidate-fn
-      (defun my-format-with-olp (node title)
+      (lambda (node title)
         (if-let ((olp (org-node-get-olp node)))
             (concat (string-join olp \" > \") \" > \" title)
           title)))
@@ -158,16 +178,20 @@ This example shows the ancestor entries to each node:
     (not (assoc "ROAM_EXCLUDE" (org-node-get-properties node))))
   "Predicate returning t to include a node, or nil to exclude it.
 
-This function is applied once for every Org-ID node found, and
+This function is applied once for every org-id node found, and
 receives the node data as a single argument: an object which form
 you can observe in examples from \\[org-node-cache-peek] and
-specified in the type `org-node-data'.
+specified in the type `org-node-data' (search with C-h o).
 
 This function is called after fully building the `org-nodes'
-table, so you may query it as needed.
+table, so you can even query it for other nodes.  The filtering
+only has an impact on `org-node-collection', which forms the
+basis for completions in the minibuffer.
 
-See the following example for a way to filter out nodes tagged
-:drill: and all files with a substring \"archive\" in the name.
+See the following example for a way to filter out nodes with a
+ROAM_EXCLUDE property, or that have any kind of TODO state, or
+are tagged :drill:, or where the full file path contains the word
+\"archive\".
 
 (setq org-node-filter-fn
       (lambda (node)
@@ -175,14 +199,6 @@ See the following example for a way to filter out nodes tagged
              (not (org-node-get-todo node))
              (not (member \"drill\" (org-node-get-tags node)))
              (not (string-search \"archive\" (org-node-get-file-path node))))))
-
-If you have an expensive filter slowing things down, a tip is
-make a defun, not a lambda, and byte-compile that init file:
-
-(setq org-node-filter-fn #'my-filter)
-(defun my-filter (node)
-  (some expensive calculations)
-  (phew!))
 "
   :type 'function
   :group 'org-node)
@@ -271,8 +287,8 @@ first element."
 ;;
 ;; If you use `plist-get' to fetch a key that doesn't exist, it just quietly
 ;; returns nil, no error, no warning.  (Bad for an API!)  Let's say I want to
-;; deprecate or rename a field such :roam-exclude, then I must hope everyone
-;; reads the news.  By contrast if the getter is a function
+;; deprecate or rename a plist field such :roam-exclude, then I must hope
+;; everyone reads the news.  By contrast if the getter is a function
 ;; `org-node-get-roam-exclude', I can override it so it emits a warning.
 (eval `(cl-defstruct org-node-data
          "To get a node's title, use e.g. `(org-node-get-title NODE)'."
@@ -292,25 +308,24 @@ first element."
          (title      nil :read-only t :type string  :documentation ,(string-fill "The node's heading, or #+title if it is not a heading." 70))
          (todo       nil :read-only t :type string  :documentation ,(string-fill "The TODO state." 70))))
 
-;; Make getters called "org-node-get-..." instead of "org-node-data-..."
+;; Make getters called "org-node-get-..." instead of "org-node-data-...".
 ;;
-;; It's one letter shorter, and a verb.  Function names generally read better
-;; as verbs, and while that may not necessary for lisp struct accessors, then
-;; consider a getter like "org-node-data-title": what does this mean?  The
-;; title of the data, or the title of the node?  Much less confusion with
+;; It's one letter shorter, and a verb.  Function names read better as verbs,
+;; and while it may not be necessary for a struct accessor, then consider an
+;; accessor like "org-node-data-title": what does this mean?  The title of the
+;; data, or the title of the node?  Much less confusion with
 ;; "org-node-get-title"!
 ;;
 ;; Of course it could've been just "org-node-title", which is free of the above
 ;; confusion, but has its own issues.  First (1) the package itself is also
 ;; called "org-node", so this pollutes the namespace.  When you search for
-;; functions, you're unsure what's a getter for a node object and what may be
-;; commands that have nothing to do with node objects.  Additionally (2) it's
-;; good to distinguish the concept of an ID node (which is an Org file, or a
-;; heading in an Org file) from the concept of a data object that just holds
-;; metadata about that ID node.
+;; functions, you're unsure what's a struct accessor and what may be commands
+;; that have nothing to do with the struct.
 ;;
-;; The sentence "snow is white" is true if and only if snow is white, and all
-;; that.
+;; Additionally (2), it's good to distinguish the concept of an ID node
+;; (meaning an Org file, or a heading in an Org file) from the concept of a
+;; metadata object about that ID node.  The sentence "snow is white" is true if
+;; and only if snow is white, and all that.
 (defalias 'org-node-get-aliases    #'org-node-data-aliases)
 (defalias 'org-node-get-deadline   #'org-node-data-deadline)
 (defalias 'org-node-get-file-path  #'org-node-data-file-path)
@@ -343,6 +358,38 @@ first element."
 (define-obsolete-function-alias 'org-node-tags       #'org-node-get-tags       "2024-05-01")
 (define-obsolete-function-alias 'org-node-title      #'org-node-get-title      "2024-05-01")
 (define-obsolete-function-alias 'org-node-todo       #'org-node-get-todo       "2024-05-01")
+
+
+;;; Other obsoletions
+
+(let (warned-once)
+  (defun org-node-cache-scan-file (&rest args)
+    (unless warned-once
+      (setq warned-once t)
+      (lwarn 'org-node :warning
+             "Function renamed on 2024-05-01: org-node-cache-scan-file to org-node-cache-rescan-file"))
+    (apply #'org-node-cache-rescan-file args)))
+
+;;;###autoload
+(let (warned-once)
+  (defun org-node-create-subtree (&rest args)
+    (interactive)
+    (unless warned-once
+      (setq warned-once t)
+      (lwarn 'org-node :warning
+             "Command renamed on 2024-05-01: org-node-create-subtree to org-node-insert-heading"))
+    (apply #'org-node-insert-heading args)))
+
+;;;###autoload
+(let (warned-once)
+  (defun 'org-node-insert-heading-node (&rest args)
+    (interactive)
+    (unless warned-once
+      (setq warned-once t)
+      (lwarn 'org-node :warning
+             "Command renamed on 2024-05-02: org-node-insert-heading-node to org-node-insert-heading"))
+    (apply #'org-node-insert-heading args)))
+
 
 (provide 'org-node-lib)
 

@@ -167,7 +167,7 @@ wants for some reason."
 ;;      profile)
 ;; TODO Consider what to do if org-id-locations stored the same file under
 ;;      different names
-(defun org-node-worker-function ()
+(defun org-node-worker-function (synchronous)
   "Scan FILES for id-nodes, adding them to `org-nodes'.
 Also scan for links."
   (with-temp-buffer
