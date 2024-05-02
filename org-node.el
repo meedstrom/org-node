@@ -28,7 +28,6 @@
 
 ;;; Code:
 
-;; FIXME Why does doom-emacs make `org-node-reset' 50x faster?
 ;; TODO Better initial setup for people who have a wildly lacking org-id initialization
 ;; TODO Use async.el
 ;; TODO Annotations for completion
@@ -58,7 +57,6 @@ Please add onto org-mode-hook:
   (org-node-cache-mode)
   ;; 2024-04-30
   (message "Org-node has new recommendations for init, see README"))
-
 
 
 ;;; Plumbing

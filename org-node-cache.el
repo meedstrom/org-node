@@ -319,7 +319,7 @@ Also scan for links."
                       (setq title (org-link-display-format
                                    (buffer-substring-no-properties
                                     here (match-beginning 0))))
-                      (setq tags (string-split (match-string 1) ":" t)))
+                      (setq tags (split-string (match-string 1) ":" t)))
                   (setq title (org-link-display-format
                                (buffer-substring-no-properties here (pos-eol)))))
                 (setq here (point))
