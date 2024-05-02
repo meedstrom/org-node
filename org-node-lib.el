@@ -22,6 +22,48 @@ Set nil to assume that the most populous root directory in
   :group 'org-node
   :type 'boolean)
 
+(defcustom org-node-perf-assume-coding-system nil
+  "Coding system to use while scanning files for metadata.
+This speeds up `org-node-reset' a bit.  Set nil to let Emacs
+figure it out anew on every file.
+
+On modern Linux systems, the correct assumption is almost always
+the symbol `utf-8-unix'.  If you access your files from several
+different systems, consider keeping this at nil.
+
+Some example choices:
+utf-8-unix utf-8-dos utf-8-mac utf-16-le-dos utf-16-be-dos"
+  :group 'org-node
+  :type '(choice symbol (const nil)))
+
+;; TODO Detect at some other time (not at reset time) the presence of tramp or
+;; jka filenames in org-id-locations, and alert the user that they should change
+;; this setting.
+(defcustom org-node-perf-bungle-file-name-handler t
+  "Whether to simplify the file name handler while scanning.
+
+This speeds up `org-node-reset' a bit, but the result is
+inability to search files through TRAMP or inside compressed
+files."
+  :group 'org-node
+  :type 'boolean)
+
+(defcustom org-node-perf-gc-cons-threshold nil
+  "Temporary setting for `gc-cons-threshold'.
+Tweak to maybe speed up `org-node-reset'.  Set nil to use the
+actual value of `gc-cons-threshold'.
+
+It can be surprising which value works best.  It is possible that
+80 kB is performant, and 16 MB is performant, but something in
+between such as 1 MB is very slow."
+  :group 'org-node
+  :type '(choice number (const nil)))
+
+(defcustom org-node-perf-multicore t
+  "Whether to use the async, multi-threaded cacher."
+  :group 'org-node
+  :type 'boolean)
+
 (defcustom org-node-slug-fn #'org-node-slugify-as-url
   "Function to transform title into a filename.
 

@@ -152,15 +152,20 @@ wants for some reason."
           ;; On a # comment or #+keyword, skip whole line
           (goto-char (pos-eol))
         (push
-         `(push ,(list :src id-here
-                       :pos (point)
-                       :type type
-                       ;; Because org-roam asks for it
-                       :properties (list :outline olp-with-self))
-                (gethash ,path ,(if (equal type "id")
-                                    'org-node--links-table
-                                  'org-node--reflinks-table)))
+         `(org-node-async--add-link-to-tables
+           ,(list :src id-here
+                  :pos (point)
+                  :type type
+                  ;; Because org-roam asks for it
+                  :properties (list :outline olp-with-self))
+           ,path ,type)
          org-node-worker--queued-writes)))))
+
+(defun org-node-async--add-link-to-tables (link-plist path type)
+  (push link-plist
+        (gethash path (if (equal type "id")
+                          org-node--links-table
+                        org-node--reflinks-table))))
 
 ;; TODO Let it run in a single Emacs
 ;; TODO Get rid of the uglier perf attempts that didn't help after all (and
