@@ -309,7 +309,6 @@ Also scan for links."
                     here todo title line+2 tags todo sched deadline props id olp)
                 (skip-chars-forward " ")
                 (setq here (point))
-                ;; TODO Allow unicode todo keywords
                 (when (looking-at todo-re)
                   (setq todo (buffer-substring-no-properties
                               (point) (match-end 0)))
