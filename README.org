@@ -2,7 +2,7 @@
 ** News [2024-05-03]
 - org-node is now multi-threaded, speeding it up even more!
 
-  If anything breaks, try nulling the option =org-node-perf-multicore=, or adding =:branch "before-refactor"= to the Straight package expression.
+  If anything breaks, try nulling the user option =org-node-perf-multicore=, or revert versions by adding :branch "before-refactor" to the Straight package expression.
 
 ** News [2024-05-01]
 - It turns out that =org-node-reset= took dozens of seconds on some people's configs.  I /think/ it's fixed now, it should only take 0-3 seconds.  Tweak =org-node-perf-gc-cons-threshold= if you still experience it taking long.
