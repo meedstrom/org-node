@@ -59,7 +59,7 @@
     (setq org-node-async--start-time (current-time))
     (setq org-node-async--done-ctr 0)
     (with-temp-file "/tmp/org-node-worker-variables.eld"
-      (insert (prin1-to-string (append (org-node-worker-variables)
+      (insert (prin1-to-string (append (org-node--work-variables)
                                        org-node-async-inject-variables))))
     ;; Split the work over many Emacs processes
     (let ((file-lists (org-node-async--split-into-n-sublists

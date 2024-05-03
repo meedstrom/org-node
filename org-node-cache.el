@@ -59,7 +59,8 @@ For an user-facing command, see \\[org-node-reset]."
   (org-node--init-org-id-locations-or-die)
   (if org-node-perf-multicore
       (org-node-async--collect (-uniq (hash-table-values org-id-locations)))
-    (org-node-worker--collect (-uniq (hash-table-values org-id-locations)))
+    (org-node-worker--collect (-uniq (hash-table-values org-id-locations))
+                              (org-node--work-variables))
     (run-hooks 'org-node-cache-reset-hook)))
 
 (defun org-node-cache-rescan-file (&optional _arg1 arg2 &rest _)
@@ -70,7 +71,7 @@ For an user-facing command, see \\[org-node-reset]."
   (let ((file (if (and arg2 (stringp arg2) (file-exists-p arg2))
                   arg2
                 (buffer-file-name))))
-    (org-node-worker--collect (list file))
+    (org-node-worker--collect (list file) (org-node--work-variables))
     (when (boundp 'org-node-cache-scan-file-hook)
       (lwarn 'org-node :warning
              "Hook renamed: org-node-cache-scan-file-hook to org-node-cache-rescan-file-hook"))

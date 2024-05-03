@@ -317,6 +317,30 @@ first element."
                                      org-node--links-table
                                    org-node--reflinks-table))))
 
+(defun org-node--work-variables ()
+  "Calculate an alist of variables to give to the worker process."
+  (require 'org-node-worker)
+  `(($keep-file-name-handlers . ,org-node-perf-keep-file-name-handlers)
+    ($not-a-full-reset . ,(not (hash-table-empty-p org-nodes)))
+    ($assume-coding-system . ,org-node-perf-assume-coding-system)
+    ($gc-cons-threshold
+     . ,(or org-node-perf-gc-cons-threshold gc-cons-threshold))
+    ($backlink-drawer-re
+     . ,(concat "^[[:space:]]*:"
+                (or (and (boundp 'org-super-links-backlink-into-drawer)
+                         (stringp org-super-links-backlink-into-drawer)
+                         (downcase org-super-links-backlink-into-drawer))
+                    "backlinks")
+                ":"))
+    ($global-todo-re
+     . ,(org-node-worker--make-todo-regexp
+         (mapconcat #'identity
+                    (mapcan #'cdr (default-toplevel-value
+                                   'org-todo-keywords))
+                    " ")))
+    ($file-todo-option-re
+     . ,(rx bol (or "#+todo: " "#+seq_todo: " "#+typ_todo: ")))))
+
 ;; A struct was pointless while I developed the package for my own use, but
 ;; now that it has users... the problem with `plist-get' is I can never rename
 ;; any of the data fields.
