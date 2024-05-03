@@ -400,7 +400,7 @@ by `org-node-async--collect' and do what it expects."
           (let ((please-update-id-locations nil))
             (while-let ((demand (pop org-node-worker--demands)))
               (apply (car demand) (cdr demand))
-              (when (eq 'org-id-add-location (car demand))
+              (when (eq 'org-node--forget-id-location (car demand))
                 (setq please-update-id-locations t)))
             (when please-update-id-locations
               (org-id-update-id-locations)
