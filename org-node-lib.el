@@ -289,6 +289,36 @@ first element."
 (defvar org-node--links-table (make-hash-table :test #'equal))
 (defvar org-node--refs-table (make-hash-table :test #'equal))
 
+;; I feel like this could be easier to read...
+(defun org-node--add-node-to-tables (node-as-plist)
+  "Add a node to `org-nodes' and maybe `org-node-collection'."
+  (let ((node (apply #'make-org-node-data node-as-plist)))
+    ;; Record the node even if it has no ID
+    (puthash (or (org-node-get-id node) (format-time-string "%N"))
+             node
+             org-nodes)
+    (when (or (not org-node-only-show-subtrees-with-id) (org-node-get-id node))
+      ;; Populate `org-node--refs-table'
+      (dolist (ref (org-node-get-refs node))
+        (puthash ref (org-node-get-id node) org-node--refs-table))
+      (when (funcall org-node-filter-fn node)
+        ;; Populate `org-node-collection'
+        (dolist (title (cons (org-node-get-title node)
+                             (org-node-get-aliases node)))
+          (puthash (funcall org-node-format-candidate-fn node title)
+                   node
+                   org-node-collection))
+        ;; Let refs work as aliases
+        (dolist (ref (org-node-get-refs node))
+          (puthash ref node org-node-collection))))))
+
+(defun org-node--add-link-to-tables (link-plist path type)
+  (push link-plist
+        (gethash path (if (equal type "id")
+                          org-node--links-table
+                        org-node--reflinks-table))))
+
+
 ;; A struct was pointless while I developed the package for my own use, but
 ;; now that it has users... the problem with `plist-get' is I can never rename
 ;; any of the data fields.
