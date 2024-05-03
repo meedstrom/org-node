@@ -1,8 +1,15 @@
 * org-node
 ** News [2024-05-03]
-- org-node is now multi-threaded, speeding it up even more!
+- org-node is now async and multi-threaded, speeding it up even more!
 
-  If anything breaks, try nulling the user option =org-node-perf-multicore=, or revert versions by adding :branch "before-refactor" to the Straight package expression.
+  If anything breaks, try nulling the user option =org-node-perf-multicore=, or revert to the =before-refactor= branch, which can be done in the Straight package expression like:
+
+  #+begin_src elisp
+  (use-package org-node
+    :straight (org-node :type git :host github :repo "meedstrom/org-node"
+                        :branch "before-refactor")
+    :hook (org-mode . org-node-cache-mode))
+  #+end_src
 
 ** News [2024-05-01]
 - It turns out that =org-node-reset= took dozens of seconds on some people's configs.  I /think/ it's fixed now, it should only take 0-3 seconds.  Tweak =org-node-perf-gc-cons-threshold= if you still experience it taking long.
@@ -341,31 +348,33 @@ The challenges with org-id:
 Snippet A
 #+begin_src elisp
 ;; Populate `org-id-extra-files'
-(require 'dash)
-(dolist (file (--mapcat (directory-files-recursively it "\\.org$")
-                        '(;; Example values
-                          "/home/kept/notes/"
-                          "/home/kept/project1/"
-                          "/home/kept/project2/")))
-  (when (not (or (string-search "/logseq/bak/" file)
-                 (string-search "/logseq/version-files/" file)))
-    (push file org-id-extra-files)))
+(dolist (file (mapcan (lambda (dir)
+                        (directory-files-recursively dir "\\.org$"))
+                      '(;; Example values
+                        "/home/kept/notes/"
+                        "/home/kept/project1/"
+                        "/home/kept/project2/")))
+  (or (string-search "/logseq/bak/" file)
+      (string-search "/logseq/version-files/" file)
+      (push file org-id-extra-files)))
 
-;; Eval to regen the `org-id-locations-file' - NOT needed on init
-(org-id-update-id-locations)
+;; Then run M-x org-id-update-id-locations to update your current session.
 #+end_src
 
 Snippet B
 #+begin_src elisp
-(require 'dash)
-(unless (and (file-exists-p org-id-locations-file)
+;; Populate org-id without setting `org-id-extra-files'. Only do it if
+;; `org-id-locations-file' is gone.
+(unless (and (null org-id-locations)
+             (file-exists-p org-id-locations-file)
              (org-id-locations-load)
-             (not (hash-table-empty-p org-id-locations)))
-  ;; Populate org-id without setting `org-id-extra-files'
+             (hash-table-empty-p org-id-locations))
   (org-id-update-id-locations
-   (--reject (or (string-search "/logseq/bak/" it)
-                 (string-search "/logseq/version-files/" it))
-             (--mapcat (directory-files-recursively it "\\.org$")
+   (seq-remove (lambda (file)
+                 (or (string-search "/logseq/bak/" file)
+                     (string-search "/logseq/version-files/" file)))
+               (mapcan (lambda (dir)
+                         (directory-files-recursively dir "\\.org$"))
                        '(;; Example values
                          "/home/kept/notes/"
                          "/home/kept/project1/"
@@ -374,9 +383,12 @@ Snippet B
 
 Snippet C
 #+begin_src elisp
-(unless (and (file-exists-p org-id-locations-file)
+;; Populate org-id without setting `org-id-extra-files'. Only do it if
+;; `org-id-locations-file' is gone.
+(unless (and (null org-id-locations)
+             (file-exists-p org-id-locations-file)
              (org-id-locations-load)
-             (not (hash-table-empty-p org-id-locations)))
+             (hash-table-empty-p org-id-locations))
   (dolist (default-directory '(;; Example values
                                "/home/kept/notes/"
                                "/home/kept/project1/"
