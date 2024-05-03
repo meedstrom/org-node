@@ -1,6 +1,6 @@
 ;;; org-node-backlink.el -*- lexical-binding: t; -*-
 
-(require 'org-node-lib)
+(require 'org-node-common)
 (require 'org-node-cache)
 
 ;;;###autoload

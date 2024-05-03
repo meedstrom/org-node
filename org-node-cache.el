@@ -1,6 +1,6 @@
 ;;; org-node-cache.el --- The beating heart -*- lexical-binding: t; -*-
 
-(require 'org-node-lib)
+(require 'org-node-common)
 (require 'org-node-async)
 (require 'org-node-worker)
 
