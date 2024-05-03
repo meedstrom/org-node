@@ -354,6 +354,7 @@ Snippet B
 (unless (and (file-exists-p org-id-locations-file)
              (org-id-locations-load)
              (not (hash-table-empty-p org-id-locations)))
+  (require 'dash)
   ;; Tell org-id without setting `org-id-extra-files'
   (org-id-update-id-locations
    (--reject (or (string-search "/logseq/bak/" it)

@@ -4,34 +4,7 @@
 (require 'org-node-lib)
 (require 'org-node-worker)
 
-(defvar org-node-async-reset-hook nil)
-(defvar org-node-async-rescan-file-hook nil)
 (defvar org-node-async--start-time nil)
-
-
-
-;; I feel like this could be easier to read...
-(defun org-node-async--add-node-to-tables (node-as-plist)
-  "Add a node to `org-nodes' and maybe `org-node-collection'."
-  (let ((node (apply #'make-org-node-data node-as-plist)))
-    ;; Record the node even if it has no ID
-    (puthash (or (org-node-get-id node) (format-time-string "%N"))
-             node
-             org-nodes)
-    (when (or (not org-node-only-show-subtrees-with-id) (org-node-get-id node))
-      ;; Populate `org-node--refs-table'
-      (dolist (ref (org-node-get-refs node))
-        (puthash ref (org-node-get-id node) org-node--refs-table))
-      (when (funcall org-node-filter-fn node)
-        ;; Populate `org-node-collection'
-        (dolist (title (cons (org-node-get-title node)
-                             (org-node-get-aliases node)))
-          (puthash (funcall org-node-format-candidate-fn node title)
-                   node
-                   org-node-collection))
-        ;; Let refs work as aliases
-        (dolist (ref (org-node-get-refs node))
-          (puthash ref node org-node-collection))))))
 
 (defun org-node-async--split-into-n-sublists (big-list n)
   (let ((len (/ (length big-list) n))
@@ -49,13 +22,6 @@
 ;; (org-node-async--split-into-n-sublists
 ;;       '(a v e e  q l fk k k ki i o r r  r r r r r r r r g g g  g g gg)
 ;;       4)
-
-
-(defun org-node-async--add-link-to-tables (link-plist path type)
-  (push link-plist
-        (gethash path (if (equal type "id")
-                          org-node--links-table
-                        org-node--reflinks-table))))
 
 (defun org-node-async--collect (files)
   (setq org-node-async--jobs
@@ -106,6 +72,7 @@
           )
       (dolist (old-process org-node-async--processes)
         (when (process-live-p old-process)
+          ;; TODO Option to keep them alive, but then we have to do actual IPC
           (kill-process old-process)))
       (dotimes (i org-node-async--jobs)
         (with-temp-file (format "/tmp/org-node-file-list-%d.eld" i)
@@ -113,7 +80,7 @@
         (push (make-process
                :name (format "org-node-%d" i)
                :noquery t
-               :stderr (get-buffer-create " *org-node-worker stderr*")
+               :stderr (get-buffer-create " *org-node-async*")
                :command
                (list (file-truename (expand-file-name invocation-name
                                                       invocation-directory))
@@ -137,28 +104,32 @@
 (defvar org-node-async--processes (list))
 (defvar org-node-async--done-ctr 0)
 (defvar org-node-async--jobs nil)
-(defvar org-node-async--please-update-id-locations nil)
 
 (defun org-node-async--handle-finished-job (process _)
   (with-temp-buffer
-    (insert-file-contents
-     (let ((name (process-name process)))
-       (format "/tmp/org-node-result-%s.eld"
-               (string-match "org-node-\\(.\\)" name)
-               (match-string 1 name))))
-    ;; Execute the demands that the worker wrote
-    (dolist (demand (car (read-from-string (buffer-string))))
-      (apply (car demand) (cdr demand))
-      (when (eq 'org-id-add-location (car demand))
-        (setq org-node-async--please-update-id-locations t))))
-  ;; The last process has completed
-  (when (eq (cl-incf org-node-async--done-ctr) org-node-async--jobs)
-    (when org-node-async--please-update-id-locations
-      (setq org-node-async--please-update-id-locations nil)
-      (org-id-update-id-locations)
-      (org-id-locations-save))
-    (message "Finished in %.2f s"
-             (float-time (time-since org-node-async--start-time)))))
+    ;; Paste what the worker output
+    (let ((file (format "/tmp/org-node-result-%s.eld"
+                        (string-match "org-node-\\(.\\)" (process-name process))
+                        (match-string 1 (process-name process)))))
+      (insert-file-contents file)
+      ;; Execute the demands that the worker wrote
+      (let ((please-update-id-locations nil))
+        (dolist (demand (car (read-from-string (buffer-string))))
+          (apply (car demand) (cdr demand))
+          (when (eq 'org-id-add-location (car demand))
+            (setq please-update-id-locations t)))        
+        ;; The last process has completed
+        (when (eq (cl-incf org-node-async--done-ctr) org-node-async--jobs)
+          (when please-update-id-locations
+            (setq please-update-id-locations nil)
+            (org-id-update-id-locations)
+            (org-id-locations-save)
+            ;; in case
+            (when (listp org-id-locations)
+              (setq org-id-locations (org-id-alist-to-hash org-id-locations))))
+          (message "Finished in %.2f s"
+                   (float-time (time-since org-node-async--start-time)))))
+      (delete-file file))))
 
 (provide 'org-node-async)
 

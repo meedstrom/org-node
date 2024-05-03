@@ -1,44 +1,18 @@
 ;;; org-node-worker.el --- Gotta go fast -*- lexical-binding: t; -*-
 
 (eval-when-compile
-  (require 'cl-macs)
-  (require 'ol)
-  (require 'outline)
-  (require 'org)
-  ;; Yup we make it impossible for the child emacsen to run this file
-  ;; uncompiled, since they have no load path
-  (require 'org-node-lib)
-  (require 'dash)
-  (require 'compat))
+  (require 'cl-macs))
 
-(defun org-node-worker--collect-properties (beg end)
-  (let (res)
-    (goto-char beg)
-    (with-restriction beg end
-      (while (not (eobp))
-        (search-forward ":")
-        (push (cons (upcase
-                     (buffer-substring
-                      (point) (1- (search-forward ":"))))
-                    (string-trim
-                     (buffer-substring
-                      (point) (pos-eol))))
-              res)
-        (forward-line 1)))
-    res))
-
-;; NOTE: the $sigils just visually distinguish these variables in the body of
-;; `org-node-worker--collect'.
+;; The purpose of $sigils is just visual.  They distinguish these variables in
+;; the body of `org-node-worker--collect'.
+;; NOTE: When async, these values were evaluated by the mother Emacs.
+;; TODO: Move out to reduce compile time since it is not needed by the child
 (defun org-node-worker-variables ()
   `(($keep-file-name-handlers . ,org-node-perf-keep-file-name-handlers)
     ($not-a-full-reset . ,(not (hash-table-empty-p org-nodes)))
     ($assume-coding-system . ,org-node-perf-assume-coding-system)
     ($gc-cons-threshold
      . ,(or org-node-perf-gc-cons-threshold gc-cons-threshold))
-    ;; REVIEW Maybe it makes no difference
-    ;; (inhibit-eol-conversion
-    ;;  . ,(member org-node-perf-assume-coding-system
-    ;;             '(utf-8-unix utf-8-dos utf-8-mac utf-16-le-dos utf-16-be-dos)))
     ($backlink-drawer-re
      . ,(concat "^[[:space:]]*:"
                 (or (and (boundp 'org-super-links-backlink-into-drawer)
@@ -47,7 +21,7 @@
                     "backlinks")
                 ":"))
     ($global-todo-re
-     . ,(org-node--make-todo-regexp
+     . ,(org-node-worker--make-todo-regexp
          (mapconcat #'identity
                     (mapcan #'cdr (default-toplevel-value
                                    'org-todo-keywords))
@@ -74,75 +48,116 @@ Extra argument FILE-ID is the file-level id, used as a fallback
 if no ancestor heading has an ID.  It can be nil."
   (declare (pure t) (side-effect-free t))
   (let (;; Drop all the data about positions below POS
-        (reversed (nthcdr (org-node-worker--elem-index (assoc pos oldata)
-                                                       oldata)
-                          oldata)))
-    (let ((curr-level (caddr (car reversed))))
+        (data-until-pos (nthcdr (org-node-worker--elem-index (assoc pos oldata)
+                                                             oldata)
+                                oldata)))
+    (let ((previous-level (nth 2 (car data-until-pos))))
       ;; Work backwards towards the top of the file
-      ;; Sorry about the `cl-loop' brain teaser.
-      (cl-loop for cell in reversed
-               as id = (nth 3 cell)
-               if (> curr-level (caddr cell))
-               do (setq curr-level (caddr cell))
+      (cl-loop for row in data-until-pos
+               as id = (nth 3 row)
+               as curr-level = (nth 2 row)
+               if (> previous-level curr-level)
+               do (setq previous-level curr-level)
                and if id return id
-
-               if (= 1 curr-level) return file-id))))
+               ;; Even the top-level heading had no id
+               if (= 1 previous-level) return file-id))))
 
 (defun org-node-worker--pos->olp (oldata pos)
   "Given buffer position POS, return the Org outline path.
 Result should be like that from `org-get-outline-path'.
 
-Argument OLDATA must be of the form
+Argument OLDATA must be of a form looking like
  ((373 \"A subheading\" 2)
   (250 \"A top heading\" 1)
   (199 \"Another top heading\" 1)
-  (123 \"Poorly placed third-level heading\" 3))
+  (123 \"First heading in the file is apparently third-level\" 3))
 
 where the car of each element represents a buffer position, the cadr the
 heading title, and the caddr the outline depth i.e. the number of
 asterisks in the heading at that location.
 
 OLDATA must be in \"reverse\" order, such the last heading in the
-file is represented as the first element.  It must also contain
-an element corresponding to POS exactly."
+file is represented as the first element.  POS itself must be
+included in one of the elements."
   (declare (pure t) (side-effect-free t))
   (let (olp
-        ;; Drop all the data about positions below POS
-        (reversed (nthcdr (org-node-worker--elem-index (assoc pos oldata)
-                                                       oldata)
-                          oldata)))
-    (let ((curr-level (caddr (car reversed))))
+        ;; Drop all the data about positions below POS (using `nthcdr' because
+        ;; oldata is in reverse order)
+        (data-until-pos (nthcdr (org-node-worker--elem-index (assoc pos oldata)
+                                                             oldata)
+                                oldata)))
+    (let ((previous-level (caddr (car data-until-pos))))
       ;; Work backwards towards the top of the file
-      (cl-loop for cell in reversed
-               when (> curr-level (caddr cell))
-               do (setq curr-level (caddr cell))
-               (push (cadr cell) olp)
-               and if (= 1 curr-level)
+      (cl-loop for row in data-until-pos
+               when (> previous-level (caddr row))
+               do (setq previous-level (caddr row))
+               (push (cadr row) olp)
+               and if (= 1 previous-level)
                ;; Stop
                return nil))
     olp))
 
+(defun org-node-worker--make-todo-regexp (todo-string)
+  "Make a regexp based on global value of `org-todo-keywords',
+that will match any of the keywords."
+  (declare (pure t) (side-effect-free t))
+  (save-match-data
+    (thread-last todo-string
+                 (replace-regexp-in-string "(.*?)" "")
+                 (replace-regexp-in-string "[^ [:alpha:]]" "")
+                 (string-trim)
+                 (string-split)
+                 (regexp-opt))))
+
+(defun org-node-worker--org-link-display-format (s)
+  "Copy-pasted from `org-link-display-format'."
+  (save-match-data
+    (replace-regexp-in-string
+     ;; Pasted from `org-link-bracket-re'
+     "\\[\\[\\(\\(?:[^][\\]\\|\\\\\\(?:\\\\\\\\\\)*[][]\\|\\\\+[^][]\\)+\\)]\\(?:\\[\\([^z-a]+?\\)]\\)?]"
+     (lambda (m) (or (match-string 2 m) (match-string 1 m)))
+     s nil t)))
+
+(defun org-node-worker--next-heading ()
+  "Like `org-node-worker--next-heading'."
+  ;; Prevent matching the same line forever
+  (if (and (bolp) (not (eobp)))
+      (forward-char))
+  (if (re-search-forward "^\\*+ " nil 'move)
+      (goto-char (pos-bol))))
+
 (defvar org-node-worker--demands nil
   "Alist of functions and arguments to execute.
 
-With `org-node-perf-multicore', each subprocess builds its own
-copy of this variable and then writes it to a file for reading
-by the main Emacs process.")
+With `org-node-perf-multicore' non-nil, each subprocess builds
+its own instance of this variable and then writes it to a file
+for reading by the mother Emacs process.")
 
 (defun org-node-worker--collect-links-until (end id-here olp-with-self)
-  "From here to position END, look for forward-links.
+  "From here to buffer position END, look for forward-links.
 Use these links to populate tables `org-node--links-table' and
 `org-node--reflinks-table'.
 
 Argument ID-HERE is the ID of the subtree where this function
-will presumably be executed (or that of an ancestor subtree).  It
-is important for correctness that END is also within the
-boundaries of that subtree.
+will presumably be executed (or that of an ancestor subtree, if
+the current subtree has none).
 
-Argument OLP-WITH-SELF is simply the outline path to the current
-subtree, including its own heading.  This is data that org-roam
-wants for some reason."
-  (while (re-search-forward org-link-plain-re end t)
+It is important that END does not extend past any sub-heading, as
+the subheading potentially has an ID of its own.
+
+Argument OLP-WITH-SELF is the outline path to the current
+subtree, with its own heading tacked onto the end.  This is data
+that org-roam expects to have."
+  (while (re-search-forward
+          ;; Pasted from `org-link-plain-re'
+          "\\(?:\\<\\(?:\\(attachment\\|el\\(?:feed\\|isp\\)\\|f\\(?:ile\\(?:\\+\\(?:\\(?:emac\\|sy\\)s\\)\\)?\\|tp\\)\\|h\\(?:elp\\|ttps?\\)\\|id\\|mailto\\|news\\|roam\\|shell\\)\\):\\(\\(?:[^][
+()<>]\\|[(<[]\\(?:[^][
+()<>]\\|[(<[][^][
+()<>]*[])>]\\)*[])>]\\)+\\(?:[^[:punct:]
+]\\|/\\|[(<[]\\(?:[^][
+()<>]\\|[(<[][^][
+()<>]*[])>]\\)*[])>]\\)\\)\\)"
+          end t)
     (let ((type (match-string 1))
           (path (match-string 2)))
       (if (save-excursion
@@ -151,15 +166,34 @@ wants for some reason."
                 (looking-at-p "[[:space:]]*#\\+")))
           ;; On a # comment or #+keyword, skip whole line
           (goto-char (pos-eol))
-        (push
-         `(org-node-async--add-link-to-tables
-           ,(list :src id-here
-                  :pos (point)
-                  :type type
-                  ;; Because org-roam asks for it
-                  :properties (list :outline olp-with-self))
-           ,path ,type)
-         org-node-worker--demands)))))
+        (push `(org-node--add-link-to-tables
+                ,(list :src id-here
+                       :pos (point)
+                       :type type
+                       ;; Because org-roam asks for it
+                       :properties (list :outline olp-with-self))
+                ,path
+                ,type)
+              org-node-worker--demands)))))
+
+(defun org-node-worker--collect-properties (beg end)
+  "Assuming BEG and END mark the region in between a
+:PROPERTIES:...:END: drawer, collect the properties into an
+alist."
+  (let (res)
+    (goto-char beg)
+    (with-restriction beg end
+      (while (not (eobp))
+        (search-forward ":")
+        (push (cons (upcase
+                     (buffer-substring
+                      (point) (1- (search-forward ":"))))
+                    (string-trim
+                     (buffer-substring
+                      (point) (pos-eol))))
+              res)
+        (forward-line 1)))
+    res))
 
 ;; TODO Consider what to do if org-id-locations stored the same file under
 ;;      different names
@@ -186,12 +220,15 @@ by `org-node-async--collect' and do what it expects."
     (let ((case-fold-search t)
           ;; Perf
           (format-alist nil) ;; REVIEW: profile
-          (file-name-handler-alist (--keep (rassoc it file-name-handler-alist)
-                                           $keep-file-name-handlers))
+          (file-name-handler-alist
+           (delq nil (mapcar (lambda (handler)
+                               (rassoc handler file-name-handler-alist))
+                             $keep-file-name-handlers)))
           (gc-cons-threshold $gc-cons-threshold)
           (coding-system-for-read $assume-coding-system)
-          org-node-worker--demands)
-      (setq-local outline-regexp org-outline-regexp)
+          ;; Always assigned on every iteration, so may as well reuse the
+          ;; memory locations (hopefully producing less garbage)
+          TITLE FILE-TITLE POS LEVEL HERE LINE+2)
       (dolist (FILE files)
         (if (not (file-exists-p FILE))
             ;; TODO: Move this explanation somewhere else
@@ -226,8 +263,7 @@ by `org-node-async--collect' and do what it expects."
           (let (;; Roughly like `org-end-of-meta-data' for file level
                 (FAR (or (re-search-forward "^ *?[^#:]" nil t) (point-max)))
                 (TODO-RE $global-todo-re)
-                PROPS FILE-TITLE FILE-TAGS FILE-ID OUTLINE-DATA
-                POS LEVEL HERE TITLE LINE+2)
+                PROPS FILE-TAGS FILE-ID)
             (goto-char 1)
             (when (re-search-forward "^ *:properties:" FAR t)
               (forward-line 1)
@@ -243,30 +279,32 @@ by `org-node-async--collect' and do what it expects."
               (goto-char 1))
             (when (re-search-forward $file-todo-option-re FAR t)
               (setq TODO-RE
-                    (org-node--make-todo-regexp
+                    (org-node-worker--make-todo-regexp
                      (buffer-substring (point) (pos-eol))))
               (goto-char 1))
             (if (re-search-forward "^#\\+title: " FAR t)
                 (setq FILE-TITLE
-                      (org-link-display-format
+                      (org-node-worker--org-link-display-format
                        (buffer-substring (point) (pos-eol))))
               ;; File nodes dont strictly need #+title, fall back on filename
               (setq FILE-TITLE (file-name-nondirectory FILE)))
             (setq FILE-ID (cdr (assoc "ID" PROPS)))
             (when $not-a-full-reset
+              ;; This was probably called by a rename-file advice, so...
+              ;; REVIEW: Maybe rename the boolean to $explicit?
               (when FILE-ID
                 (push `(org-id-add-location ,FILE-ID ,FILE)
                       org-node-worker--demands)))
             ;; Collect links
             (let ((END (save-excursion
-                         (outline-next-heading)
+                         (org-node-worker--next-heading)
                          (1- (point)))))
               (when FILE-ID
                 ;; Don't count org-super-links backlinks as forward links
                 (when (re-search-forward $backlink-drawer-re END t)
                   (search-forward ":end:"))
                 (org-node-worker--collect-links-until END FILE-ID nil)))
-            (push `(org-node-async--add-node-to-tables
+            (push `(org-node--add-node-to-tables
                     ,(list :title FILE-TITLE
                            :level 0
                            :tags FILE-TAGS
@@ -283,11 +321,10 @@ by `org-node-async--collect' and do what it expects."
                             (or (cdr (assoc "ROAM_REFS" PROPS)) ""))))
                   org-node-worker--demands)
             ;; Loop over the file's subtrees
-            (while (outline-next-heading)
+            (while (org-node-worker--next-heading)
               ;; These bindings must be reinitialized to nil on each subtree,
-              ;; because a nil value is meaningful and we may not set them to
-              ;; anything non-nil.
-              (let (TODO-STATE TAGS SCHED DEADLINE PROPS ID OLP)
+              ;; because a nil value is also meaningful
+              (let (TODO-STATE TAGS SCHED DEADLINE PROPS ID OLP OUTLINE-DATA)
                 (skip-chars-forward " ")
                 (setq POS (point))
                 (setq LEVEL (skip-chars-forward "*"))
@@ -300,12 +337,12 @@ by `org-node-async--collect' and do what it expects."
                 (if (re-search-forward " +\\(:.+:\\) *$" (pos-eol) t)
                     (progn
                       (setq TITLE
-                            (org-link-display-format
+                            (org-node-worker--org-link-display-format
                              (buffer-substring
                               HERE (match-beginning 0))))
                       (setq TAGS (split-string (match-string 1) ":" t)))
                   (setq TITLE
-                        (org-link-display-format
+                        (org-node-worker--org-link-display-format
                          (buffer-substring HERE (pos-eol)))))
                 (setq HERE (point))
                 (setq LINE+2 (and (forward-line 2) (point)))
@@ -331,16 +368,17 @@ by `org-node-async--collect' and do what it expects."
                                          (pos-bol)))))
                 (setq ID (cdr (assoc "ID" PROPS)))
                 (when $not-a-full-reset
+                  ;; Called by a rename-file advice
                   (when ID
                     (push `(org-id-add-location ,ID ,FILE)
                           org-node-worker--demands)))
                 (push (list POS TITLE LEVEL ID) OUTLINE-DATA)
                 (setq OLP (org-node-worker--pos->olp OUTLINE-DATA POS))
-                ;; Now collect links!
+                ;; Now collect links while we're here!
                 (let ((ID-HERE (or ID (org-node-worker--pos->parent-id
                                        OUTLINE-DATA POS FILE-ID)))
                       (END (save-excursion
-                             (outline-next-heading)
+                             (org-node-worker--next-heading)
                              (1- (point))))
                       (OLP-WITH-SELF (append OLP (list TITLE))))
                   (when ID-HERE
@@ -349,11 +387,12 @@ by `org-node-async--collect' and do what it expects."
                       (search-forward ":end:"))
                     (org-node-worker--collect-links-until
                      END ID-HERE OLP-WITH-SELF)
-                    ;; Gotcha... also collect links inside the heading
+                    ;; Gotcha... also collect links inside the heading, not
+                    ;; just the body text
                     (goto-char POS)
                     (org-node-worker--collect-links-until
                      (pos-eol) ID-HERE OLP-WITH-SELF)))
-                (push `(org-node-async--add-node-to-tables
+                (push `(org-node--add-node-to-tables
                         ,(list :title TITLE
                                :is-subtree t
                                :level LEVEL
@@ -376,13 +415,16 @@ by `org-node-async--collect' and do what it expects."
                       org-node-worker--demands))))))
       (if synchronous
           (let ((please-update-id-locations nil))
-            (dolist (demand org-node-worker--demands)
+            (while-let (demand (pop org-node-worker--demands))
               (apply (car demand) (cdr demand))
               (when (eq 'org-id-add-location (car demand))
                 (setq please-update-id-locations t)))
             (when please-update-id-locations
               (org-id-update-id-locations)
-              (org-id-locations-save)))
+              (org-id-locations-save)
+              ;; in case
+              (when (listp org-id-locations)
+                (setq org-id-locations (org-id-alist-to-hash org-id-locations)))))
         ;; Write down the demands so `org-node-async--handle-finished-job' will
         ;; do the equivalent of above in the main Emacs process
         (with-temp-file (format "/tmp/org-node-result-%d.eld" i)

@@ -27,6 +27,7 @@
 
 ;;; Code:
 
+;; TODO How to react when moving a subtree to another file?  Maybe advise yank and refile.
 ;; TODO Like we feed the org-roam-db, maybe feed org-id-locations too?  We can probably do it faster.  Then we can also provide saner user config.
 ;; TODO Better initial setup for people who have a wildly lacking org-id initialization
 ;; TODO Annotations for completion
