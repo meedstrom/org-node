@@ -216,7 +216,11 @@ can demonstrate the data format.  See also the type `org-node-data'.")
 This allows use with `completing-read'.")
 
 (defun org-node--forget-id-location (file)
-  (org-node--init-org-id-locations-or-die)
+  "Remove references to FILE in `org-id-locations'."
+  ;; NOTE: Do not call `org-node--init-org-id-locations-or-die' here as you
+  ;; might usually do for safety, because several invocations of this function
+  ;; may be queued, and they would undo each other's work.  These functions'
+  ;; work must be "committed" via `org-id-locations-save'.
   (cl-loop for id being the hash-keys of org-id-locations
            using (hash-values file-on-record)
            when (file-equal-p file file-on-record)
@@ -240,11 +244,10 @@ Because not everyone has `debug-on-error' t."
   (if (or (null org-id-locations)
           (if (hash-table-p org-id-locations)
               (hash-table-empty-p org-id-locations)))
-      ;; Load, and guarantee a hash-table from now on
       (org-id-locations-load)
     (when (listp org-id-locations)
-      ;; This /should/ make it a hash table...
-      (org-id-update-id-locations)))
+      ;; Sometimes it reverts back to an alist??
+      (setq org-id-locations (org-id-alist-to-hash org-id-locations))))
   (when (hash-table-empty-p org-id-locations)
     (org-node-die "org-id-locations empty%s" org-node--standard-tip)))
 

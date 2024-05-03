@@ -72,6 +72,7 @@ For an user-facing command, see \\[org-node-reset]."
                   arg2
                 (buffer-file-name))))
     (when (derived-mode-p 'org-mode)
+      ;; (org-node--init-org-id-locations-or-die)
       (org-node-worker--collect (list file) (org-node--work-variables))
       (when (boundp 'org-node-cache-scan-file-hook)
         (lwarn 'org-node :warning
