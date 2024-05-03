@@ -80,8 +80,8 @@ For an user-facing command, see \\[org-node-reset]."
 
 (defun org-node-cache-ensure-fresh ()
   (org-node--init-org-id-locations-or-die)
-  ;; Once-per-session tip
   (let ((org-node-perf-multicore nil)) ;;HACK
+    ;; Once-per-session tip
     (when (and (hash-table-empty-p org-node-collection)
                (not (member 'org-node-cache-mode org-mode-hook)))
       (message "To speed up this command, turn on `org-node-cache-mode'"))
