@@ -317,6 +317,8 @@ first element."
                                      org-node--links-table
                                    org-node--reflinks-table))))
 
+;; The purpose of $sigils is just visual.  They distinguish these variables in
+;; the body of `org-node-worker--collect'.
 (defun org-node--work-variables ()
   "Calculate an alist of variables to give to the worker process."
   (require 'org-node-worker)

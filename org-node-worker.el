@@ -189,7 +189,7 @@ by `org-node-async--collect' and do what it expects."
   (with-temp-buffer
     (setq vars (if synchronous
                    variables
-                 (insert-file-contents "/tmp/org-node-worker-variables.eld")
+                 (insert-file-contents "/tmp/org-node/work-variables.eld")
                  (car (read-from-string (buffer-string)))))
     (dolist (var vars)
       (set (car var) (cdr var)))
@@ -301,6 +301,7 @@ by `org-node-async--collect' and do what it expects."
                            (split-string-and-unquote
                             (or (cdr (assoc "ROAM_REFS" PROPS)) ""))))
                   org-node-worker--demands)
+
             ;; Loop over the file's subtrees
             (while (org-node-worker--next-heading)
               ;; These bindings must be reinitialized to nil on each subtree,
@@ -394,9 +395,10 @@ by `org-node-async--collect' and do what it expects."
                                (split-string-and-unquote
                                 (or (cdr (assoc "ROAM_REFS" PROPS)) ""))))
                       org-node-worker--demands))))))
+
       (if synchronous
           (let ((please-update-id-locations nil))
-            (while-let (demand (pop org-node-worker--demands))
+            (while-let ((demand (pop org-node-worker--demands)))
               (apply (car demand) (cdr demand))
               (when (eq 'org-id-add-location (car demand))
                 (setq please-update-id-locations t)))
@@ -408,8 +410,9 @@ by `org-node-async--collect' and do what it expects."
                 (setq org-id-locations (org-id-alist-to-hash org-id-locations)))))
         ;; Write down the demands so `org-node-async--handle-finished-job' will
         ;; do the equivalent of above in the main Emacs process
-        (with-temp-file (format "/tmp/org-node-result-%d.eld" i)
-          (insert (prin1-to-string org-node-worker--demands)))))))
+        (with-temp-file (format "/tmp/org-node/result-%d.eld" i)
+          (insert (prin1-to-string org-node-worker--demands))
+          )))))
 
 (provide 'org-node-worker)
 
