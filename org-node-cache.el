@@ -22,7 +22,8 @@ time."
         (add-hook 'after-save-hook #'org-node-cache-rescan-file)
         (advice-add #'rename-file :after #'org-node-cache-rescan-file)
         (advice-add #'rename-file :before #'org-node-cache--handle-delete)
-        (advice-add #'delete-file :before #'org-node-cache--handle-delete))
+        (advice-add #'delete-file :before #'org-node-cache--handle-delete)
+        (org-node-reset))
     (remove-hook 'after-save-hook #'org-node-cache-rescan-file)
     (advice-remove #'rename-file #'org-node-cache-rescan-file)
     (advice-remove #'rename-file #'org-node-cache--handle-delete)
@@ -79,15 +80,20 @@ For an user-facing command, see \\[org-node-reset]."
                "Hook renamed: org-node-cache-scan-file-hook to org-node-cache-rescan-file-hook"))
       (run-hooks 'org-node-cache-rescan-file-hook))))
 
+;; I feel like I could merge this with the init-org-id-locations and maybe
+;; intentionally not cover some of the situations that this covers
 (defun org-node-cache-ensure-fresh ()
   (org-node--init-org-id-locations-or-die)
-  (let ((org-node-perf-multicore nil)) ;;HACK
-    ;; Once-per-session tip
-    (when (and (hash-table-empty-p org-node-collection)
-               (not (member 'org-node-cache-mode org-mode-hook)))
-      (message "To speed up this command, turn on `org-node-cache-mode'"))
-    (when (or (not org-node-cache-mode)
-              (hash-table-empty-p org-node-collection))
+  ;; Once-per-session tip
+  ;; (when (and (hash-table-empty-p org-node-collection)
+  ;;              (not (member 'org-node-cache-mode org-mode-hook)))
+  ;;     (message "To speed up this command, turn on `org-node-cache-mode'"))
+  (when (or (not org-node-cache-mode)
+            (hash-table-empty-p org-node-collection))
+    (if (hash-table-empty-p org-node-collection)
+        (let ((org-node-perf-multicore nil))
+          (message "First run and no cache, caching synchronously...")
+          (org-node-cache-reset))
       (org-node-cache-reset))))
 
 (let ((timer (timer-create)))
