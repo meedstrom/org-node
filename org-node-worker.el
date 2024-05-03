@@ -3,32 +3,6 @@
 (eval-when-compile
   (require 'cl-macs))
 
-;; The purpose of $sigils is just visual.  They distinguish these variables in
-;; the body of `org-node-worker--collect'.
-;; NOTE: When async, these values were evaluated by the mother Emacs.
-;; TODO: Move out to reduce compile time since it is not needed by the child
-(defun org-node-worker-variables ()
-  `(($keep-file-name-handlers . ,org-node-perf-keep-file-name-handlers)
-    ($not-a-full-reset . ,(not (hash-table-empty-p org-nodes)))
-    ($assume-coding-system . ,org-node-perf-assume-coding-system)
-    ($gc-cons-threshold
-     . ,(or org-node-perf-gc-cons-threshold gc-cons-threshold))
-    ($backlink-drawer-re
-     . ,(concat "^[[:space:]]*:"
-                (or (and (boundp 'org-super-links-backlink-into-drawer)
-                         (stringp org-super-links-backlink-into-drawer)
-                         (downcase org-super-links-backlink-into-drawer))
-                    "backlinks")
-                ":"))
-    ($global-todo-re
-     . ,(org-node-worker--make-todo-regexp
-         (mapconcat #'identity
-                    (mapcan #'cdr (default-toplevel-value
-                                   'org-todo-keywords))
-                    " ")))
-    ($file-todo-option-re
-     . ,(rx bol (or "#+todo: " "#+seq_todo: " "#+typ_todo: ")))))
-
 (defun org-node-worker--elem-index (elem list)
   "Like `-elem-index'."
   (declare (pure t) (side-effect-free t))
@@ -53,6 +27,15 @@ if no ancestor heading has an ID.  It can be nil."
                                 oldata)))
     (let ((previous-level (nth 2 (car data-until-pos))))
       ;; Work backwards towards the top of the file
+      ;; New version without `cl-loop' (untested):
+      ;; (catch 'id
+      ;;   (while (let* ((row (pop (data-until-pos)))
+      ;;                 (curr-level (nth 2 row))
+      ;;                 (id (nth 3 row)))
+      ;;            (when (> previous-level curr-level)
+      ;;              (setq previous-level curr-level)
+      ;;              (if id (throw 'id id)))
+      ;;            (if (= 1 previous-level) (throw 'id file-id)))))
       (cl-loop for row in data-until-pos
                as id = (nth 3 row)
                as curr-level = (nth 2 row)
@@ -197,7 +180,7 @@ alist."
 
 ;; TODO Consider what to do if org-id-locations stored the same file under
 ;;      different names
-(defun org-node-worker--collect (&optional synchronous)
+(defun org-node-worker--collect (&optional synchronous variables)
   "Scan for id-nodes across all files, adding them to `org-nodes'.
 
 The argument SYNCHRONOUS, if provided, should be a list of files
@@ -205,9 +188,7 @@ to scan.  If not provided, assume we are in a child emacs spawned
 by `org-node-async--collect' and do what it expects."
   (with-temp-buffer
     (setq vars (if synchronous
-                   ;; Synchronous means we're in the main Emacs process, which
-                   ;; has direct access to this stuff.
-                   (org-node-worker-variables)
+                   variables
                  (insert-file-contents "/tmp/org-node-worker-variables.eld")
                  (car (read-from-string (buffer-string)))))
     (dolist (var vars)
