@@ -1,4 +1,9 @@
 * org-node
+** News [2024-05-03]
+- org-node is now multi-threaded, speeding it up even more!
+
+  If anything breaks, try nulling the option =org-node-perf-multicore=, or adding =:branch "before-refactor"= to the Straight package expression.
+
 ** News [2024-05-01]
 - It turns out that =org-node-reset= took dozens of seconds on some people's configs.  I /think/ it's fixed now, it should only take 0-3 seconds.  Tweak =org-node-perf-gc-cons-threshold= if you still experience it taking long.
 
@@ -19,7 +24,7 @@ I found org-roam too slow, so I made [[https://github.com/meedstrom/quickroam][q
 
 - *If you were not using org-roam*, maybe think of it as a limited, focused [[https://github.com/alphapapa/org-ql][org-ql]].  If you were the sort of person to prefer ID-links over file links or any other type of link, you're in the right place: this basically lets you forget about filenames and hierarchies and directory structures -- as long as you've assigned an org-id to something, you can find it later.
 
-  And you can still keep doing hierarchies and structures, where that brings you joy, unlike systems that mandate limitations like "one note per file" or strict rules about naming files.
+  And you can still keep doing hierarchies and structures, where that brings you joy, unlivke systems that mandate limitations like "one note per file" or strict rules about naming files.
 
 ** What's a "node"?
 
@@ -336,6 +341,7 @@ The challenges with org-id:
 Snippet A
 #+begin_src elisp
 ;; Populate `org-id-extra-files'
+(require 'dash)
 (dolist (file (--mapcat (directory-files-recursively it "\\.org$")
                         '(;; Example values
                           "/home/kept/notes/"
@@ -351,11 +357,11 @@ Snippet A
 
 Snippet B
 #+begin_src elisp
+(require 'dash)
 (unless (and (file-exists-p org-id-locations-file)
              (org-id-locations-load)
              (not (hash-table-empty-p org-id-locations)))
-  (require 'dash)
-  ;; Tell org-id without setting `org-id-extra-files'
+  ;; Populate org-id without setting `org-id-extra-files'
   (org-id-update-id-locations
    (--reject (or (string-search "/logseq/bak/" it)
                  (string-search "/logseq/version-files/" it))
