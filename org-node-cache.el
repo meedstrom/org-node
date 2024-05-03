@@ -71,11 +71,12 @@ For an user-facing command, see \\[org-node-reset]."
   (let ((file (if (and arg2 (stringp arg2) (file-exists-p arg2))
                   arg2
                 (buffer-file-name))))
-    (org-node-worker--collect (list file) (org-node--work-variables))
-    (when (boundp 'org-node-cache-scan-file-hook)
-      (lwarn 'org-node :warning
-             "Hook renamed: org-node-cache-scan-file-hook to org-node-cache-rescan-file-hook"))
-    (run-hooks 'org-node-cache-rescan-file-hook)))
+    (when (derived-mode-p 'org-mode)
+      (org-node-worker--collect (list file) (org-node--work-variables))
+      (when (boundp 'org-node-cache-scan-file-hook)
+        (lwarn 'org-node :warning
+               "Hook renamed: org-node-cache-scan-file-hook to org-node-cache-rescan-file-hook"))
+      (run-hooks 'org-node-cache-rescan-file-hook))))
 
 (defun org-node-cache-ensure-fresh ()
   (org-node--init-org-id-locations-or-die)
