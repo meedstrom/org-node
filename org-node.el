@@ -38,7 +38,7 @@
 ;; TODO Test a custom id format involving emoji to see if that breaks regexps
 ;; TODO Test perf of disabling case-fold-search
 
-(require 'org-node-lib)
+(require 'org-node-common)
 (require 'org-node-cache)
 (require 'org-node-backlink)
 (require 'org-node-roam)

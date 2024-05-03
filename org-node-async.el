@@ -1,7 +1,7 @@
 ;;; org-node-async.el --- The beating heart -*- lexical-binding: t; -*-
 
 (require 'bytecomp)
-(require 'org-node-lib)
+(require 'org-node-common)
 (require 'org-node-worker)
 
 (defvar org-node-async--start-time nil)

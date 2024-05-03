@@ -1,4 +1,4 @@
-;;; org-node-lib.el -*- lexical-binding: t; -*-
+;;; org-node-common.el -*- lexical-binding: t; -*-
 
 (require 'compat)
 (require 'cl-lib)
@@ -313,11 +313,9 @@ first element."
           (puthash ref node org-node-collection))))))
 
 (defun org-node--add-link-to-tables (link-plist path type)
-  (push link-plist
-        (gethash path (if (equal type "id")
-                          org-node--links-table
-                        org-node--reflinks-table))))
-
+  (push link-plist (gethash path (if (equal type "id")
+                                     org-node--links-table
+                                   org-node--reflinks-table))))
 
 ;; A struct was pointless while I developed the package for my own use, but
 ;; now that it has users... the problem with `plist-get' is I can never rename
@@ -325,7 +323,7 @@ first element."
 ;;
 ;; If you use `plist-get' to fetch a key that doesn't exist, it just quietly
 ;; returns nil, no error, no warning.  (Bad for an API!)  Let's say I want to
-;; deprecate or rename a plist field such :roam-exclude, then I must hope
+;; deprecate or rename a plist field such as :roam-exclude, then I must hope
 ;; everyone reads the news.  By contrast if the getter is a function
 ;; `org-node-get-roam-exclude', I can override it so it emits a warning.
 (eval `(cl-defstruct org-node-data
@@ -429,6 +427,6 @@ first element."
     (apply #'org-node-insert-heading args)))
 
 
-(provide 'org-node-lib)
+(provide 'org-node-common)
 
-;;; org-node-lib.el ends here
+;;; org-node-common.el ends here
