@@ -1,7 +1,10 @@
 ;;; org-node-worker.el --- Gotta go fast -*- lexical-binding: t; -*-
 
+;; TODO Test perf of disabling case-fold-search
+
 (eval-when-compile
-  (require 'cl-macs))
+  (require 'cl-macs)
+  (require 'subr-x))
 
 (defun org-node-worker--elem-index (elem list)
   "Like `-elem-index'."
@@ -27,15 +30,6 @@ if no ancestor heading has an ID.  It can be nil."
                                 oldata)))
     (let ((previous-level (nth 2 (car data-until-pos))))
       ;; Work backwards towards the top of the file
-      ;; New version without `cl-loop' (untested):
-      ;; (catch 'id
-      ;;   (while (let* ((row (pop (data-until-pos)))
-      ;;                 (curr-level (nth 2 row))
-      ;;                 (id (nth 3 row)))
-      ;;            (when (> previous-level curr-level)
-      ;;              (setq previous-level curr-level)
-      ;;              (if id (throw 'id id)))
-      ;;            (if (= 1 previous-level) (throw 'id file-id)))))
       (cl-loop for row in data-until-pos
                as id = (nth 3 row)
                as curr-level = (nth 2 row)
@@ -71,6 +65,7 @@ included in one of the elements."
                                 oldata)))
     (let ((previous-level (caddr (car data-until-pos))))
       ;; Work backwards towards the top of the file
+      ;; NOTE: Tried catch-throw and dolist, but `cl-loop' wins perf
       (cl-loop for row in data-until-pos
                when (> previous-level (caddr row))
                do (setq previous-level (caddr row))
@@ -81,16 +76,15 @@ included in one of the elements."
     olp))
 
 (defun org-node-worker--make-todo-regexp (todo-string)
-  "Make a regexp based on global value of `org-todo-keywords',
+  "Make a regexp based on TODO-STRING,
 that will match any of the keywords."
   (declare (pure t) (side-effect-free t))
-  (save-match-data
-    (thread-last todo-string
-                 (replace-regexp-in-string "(.*?)" "")
-                 (replace-regexp-in-string "[^ [:alpha:]]" "")
-                 (string-trim)
-                 (string-split)
-                 (regexp-opt))))
+  (thread-last todo-string
+               (replace-regexp-in-string "(.*?)" "")
+               (replace-regexp-in-string "[^ [:alpha:]]" "")
+               (string-trim)
+               (string-split)
+               (regexp-opt)))
 
 (defun org-node-worker--org-link-display-format (s)
   "Copy-pasted from `org-link-display-format'."
@@ -206,7 +200,7 @@ by `org-node-async--collect' and do what it expects."
           (coding-system-for-read $assume-coding-system)
           ;; Reassigned on every iteration, so may as well reuse the
           ;; memory locations (hopefully producing less garbage)
-          TITLE FILE-TITLE POS LEVEL HERE LINE+2)
+          TITLE FILE-TITLE POS LEVEL HERE LINE+2 OUTLINE-DATA)
       (dolist (FILE files)
         (if (not (file-exists-p FILE))
             ;; We got here because user deleted a file in a way that we didn't
@@ -283,15 +277,15 @@ by `org-node-async--collect' and do what it expects."
                            (split-string-and-unquote
                             (or (cdr (assoc "ROAM_REFS" PROPS)) ""))))
                   org-node-worker--demands)
-
             ;; Loop over the file's subtrees
             (while (org-node-worker--next-heading)
               ;; These bindings must be reinitialized to nil on each subtree,
               ;; because a nil value is also meaningful
-              (let (TODO-STATE TAGS SCHED DEADLINE PROPS ID OLP OUTLINE-DATA)
+              (let (TODO-STATE TAGS SCHED DEADLINE PROPS ID OLP)
                 (skip-chars-forward " ")
                 (setq POS (point))
                 (setq LEVEL (skip-chars-forward "*"))
+                (skip-chars-forward " ")
                 (setq HERE (point))
                 (when (looking-at TODO-RE)
                   (setq TODO-STATE (buffer-substring
@@ -302,8 +296,7 @@ by `org-node-async--collect' and do what it expects."
                     (progn
                       (setq TITLE
                             (org-node-worker--org-link-display-format
-                             (buffer-substring
-                              HERE (match-beginning 0))))
+                             (buffer-substring HERE (match-beginning 0))))
                       (setq TAGS (split-string (match-string 1) ":" t)))
                   (setq TITLE
                         (org-node-worker--org-link-display-format
