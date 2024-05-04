@@ -27,6 +27,7 @@
 
 ;;; Code:
 
+;; TODO Simplify backlink-mode
 ;; TODO What happens when we move a subtree to a differetn file but save the destination before saving  the origin file?
 ;; TODO Like we feed the org-roam-db, maybe feed org-id-locations too?  We can probably do it faster.  Then we can also provide saner user config.
 ;; TODO Better initial setup for people with incomplete org-id
@@ -36,7 +37,6 @@
 ;; TODO Command to explore feedback arc sets
 ;; TODO Bit of a test suite
 ;; TODO Test a custom id format involving emoji to see if that breaks regexps
-;; TODO Test perf of disabling case-fold-search
 
 (require 'org-node-common)
 (require 'org-node-cache)
@@ -45,6 +45,7 @@
 (require 'org-node-async)
 (require 'org-node-worker)
 (require 'org-faces)
+(require 'org-macs) ;; Test a fix for #4
 
 ;; Will deprecate soon
 ;;;###autoload

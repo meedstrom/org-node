@@ -84,16 +84,11 @@
                                        org-node-async-inject-variables))))
     ;; Split the work over many Emacs processes
     (let ((file-lists (org-node-async--split-into-n-sublists
-                       files org-node-async--jobs))
-          ;; Perf attempts
-          ;; (write-region-inhibit-fsync t)
-          ;; (coding-system-for-write org-node-perf-assume-coding-system)
-          ;; (write-file-hooks nil)
-          ;; (file-name-handler-alist nil)
-
-          )
+                       files org-node-async--jobs)))
       (while-let ((old-process (pop org-node-async--processes)))
-        ;; TODO Keep them alive... but then we have to do actual IPC
+        ;; NB: I considered keeping the processes alive to skip the spin-up
+        ;; time, but the subprocesses report `emacs-init-time' as 0.001s.
+        ;; There could be an invisible OS component though.
         (when (process-live-p old-process)
           (delete-process old-process)))
       (dotimes (i org-node-async--jobs)
@@ -130,14 +125,6 @@
 (defvar org-node-async--jobs nil)
 
 (defun org-node-async--handle-finished-job (process _ i)
-  ;; if-let ((err (or (eq 'signal (process-status process))
-  ;;                  (with-current-buffer (process-buffer process)
-  ;;                    (flush-lines "finished$")
-  ;;                    (flush-lines "^$")
-  ;;                    (let ((buffer-string (buffer-string)))
-  ;;                      (unless (string-blank-p buffer-string)
-  ;;                        buffer-string))))))
-  ;; (message "An org-node worker failed to scan files: %s" err)
   (with-temp-buffer
     ;; Paste what the worker output
     (let ((file (format "/tmp/org-node/result-%d.eld" i)))
