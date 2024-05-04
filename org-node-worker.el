@@ -201,37 +201,19 @@ by `org-node-async--collect' and do what it expects."
     (let ((case-fold-search t)
           ;; Perf
           (format-alist nil) ;; REVIEW: profile
-          (file-name-handler-alist
-           (delq nil (mapcar (lambda (handler)
-                               (rassoc handler file-name-handler-alist))
-                             $keep-file-name-handlers)))
+          (file-name-handler-alist $file-name-handler-alist)
           (gc-cons-threshold $gc-cons-threshold)
           (coding-system-for-read $assume-coding-system)
-          ;; Always assigned on every iteration, so may as well reuse the
+          ;; Reassigned on every iteration, so may as well reuse the
           ;; memory locations (hopefully producing less garbage)
           TITLE FILE-TITLE POS LEVEL HERE LINE+2)
       (dolist (FILE files)
         (if (not (file-exists-p FILE))
-            ;; TODO: Move this explanation somewhere else
-            ;;
-            ;; Example situation: user renamed/deleted a file using shell
-            ;; commands, outside Emacs.  Now org-id references a file that
-            ;; doesn't exist.  Our solution: just skip.  If the file was
-            ;; renamed to a new location, it'll have to be picked up by org-id
-            ;; in its usual ways.
-            ;;
-            ;; This is a good time to do `org-id-update-id-locations' just
-            ;; because, but it won't pick up the new file path.  A heuristic we
-            ;; could've used:
-            ;;
-            ;; (org-id-update-id-locations
-            ;;  (--mapcat
-            ;;   (directory-files-recursively it "\\.org$")
-            ;;   (org-node--root-dirs (hash-table-values org-id-locations))))
-            ;;
-            ;; but it doesn't take into account what the user may want to
-            ;; exclude, like versioned backup org-node-worker--files, so we shouldn't do that.
-            ;; Starting to think we need an org-id2.el.
+            ;; We got here because user deleted a file in a way that we didn't
+            ;; notice.  If it was actually a rename, it'll get picked up on
+            ;; next reset.  The best fix would be rewriting org-id.el so user
+            ;; can specify where to look for new files and what to ignore, so
+            ;; that we could just run that algorithm here.
             (push `(org-node--forget-id-location ,forget)
                   org-node-worker--demands)
           (erase-buffer)

@@ -2,7 +2,7 @@
 ** News [2024-05-03]
 - org-node is now async and multi-threaded, speeding it up even more!
 
-  If anything breaks, try nulling the user option =org-node-perf-multicore=, or revert to the =before-refactor= branch, which can be done in the Straight package expression like:
+  If anything breaks, try nulling the user option =org-node-perf-multicore=, or revert to the "before-refactor" branch, which can be done in the Straight package expression like:
 
   #+begin_src elisp
   (use-package org-node
@@ -29,9 +29,9 @@ I found org-roam too slow, so I made [[https://github.com/meedstrom/quickroam][q
 
   In pursuit of being "just org-id", this package has no equivalent setting to =org-roam-directory= -- it just looks up =org-id-locations=.
 
-- *If you were not using org-roam*, maybe think of it as a limited, focused [[https://github.com/alphapapa/org-ql][org-ql]].  If you were the sort of person to prefer ID-links over file links or any other type of link, you're in the right place: this basically lets you forget about filenames and hierarchies and directory structures -- as long as you've assigned an org-id to something, you can find it later.
+- *If you were not using org-roam*, maybe think of it as a limited, focused [[https://github.com/alphapapa/org-ql][org-ql]].  If you were the sort of person to prefer ID-links over file links or any other type of link, you're in the right place!  This basically lets you really rely on them, and forget about filenames and hierarchies and directory structures -- as long as you've assigned an org-id to something, you can find it later.
 
-  And you can still keep doing hierarchies and structures, where that brings you joy, unlivke systems that mandate limitations like "one note per file" or strict rules about naming files.
+  And you can still keep doing hierarchies and structures, where that brings you joy, unlike systems that mandate limitations like "one note per file" or strict rules about file names.
 
 ** What's a "node"?
 
@@ -69,12 +69,15 @@ For your pleasure, here's a comparison of three similar notetaking systems: all 
 | Node exclusion                     | yes         | limited            | not applicable       |
 | Support =roam:= links                | yes         | no                 | no                   |
 | Warn about dead links              | no          | no                 | no                   |
-| Some query-able cache              | org-roam-db | org-nodes          | no                   |
 |------------------------------------+-------------+--------------------+----------------------|
+| Some query-able cache              | =org-roam-db= | =org-nodes=          | no                   |
 | Cache mandatory                    | yes         | no                 | no                   |
-| Time to re-cache my 2000 files     | 3 minutes   | 1 second           | not applicable       |
+| Asynchronous                       | no          | yes                | yes (very async ;)   |
+| Time to re-cache my 2000 files     | 2m 48s      | 0m 01s             | not applicable       |
 
 This isn't a totally fair comparison; org-roam has an advantage in the details, see Appendix II.  With org-node I've made what I would've liked to hack on, so it's more simplistic in many aspects.
+
+I'm committed to performance, so if your =M-x org-node-reset= shows any kind of slowness, that's a bug!  Don't hesitate to reach out!
 
 ** Setup
 
@@ -110,7 +113,7 @@ The keys I use:
 
 To browse config options, type =M-x customize-group RET org-node RET=.
 
-Final tip for the newbie: you normally create new nodes through these same commands!  Just type the name of a node that doesn't exist.
+Final tip for the newbie: there's no separate command for node creation!  You just use the commands above, and type the name of a node that doesn't exist.
 
 *** Use Org-roam at the same time?
 
@@ -129,14 +132,9 @@ In addition, if you've been struggling with slow saving of big files, consider t
 (setq org-roam-link-auto-replace nil) ;; don't look for "roam:" links on save
 #+end_src
 
-Do a =M-x org-roam-update-org-id-locations=.
+Do a =M-x org-roam-update-org-id-locations=.  (I'm looking into a more principled way to manage the org-id database, but that'll have to do for now.)
 
-With that done, try out these command substitutes:
-
-- =org-node-find= instead of =org-roam-node-find=
-- =org-node-insert-link= instead of =org-roam-node-insert=
-
-Check out more under [[https://github.com/meedstrom/org-node?tab=readme-ov-file#commands][Commands]].  Enjoy!
+With that done, try out the commands mentioned in [[https://github.com/meedstrom/org-node?tab=readme-ov-file#quick-start][Quick start]].  There's more under [[https://github.com/meedstrom/org-node?tab=readme-ov-file#commands][Commands]].  Enjoy!
 
 I'm guessing you also want the [[https://github.com/meedstrom/org-node?tab=readme-ov-file#backlink-solution-1-org-roam-buffer][org-roam-buffer]].  See next section.
 
@@ -243,7 +241,7 @@ The point of org-id is to avoid dependence on filenames, but it's often pragmati
 #+begin_src elisp
 (setq org-node-filter-fn
       (lambda (node)
-        (not (or (org-node-get-todo node)
+        (not (or (org-node-get-todo node) ;; Ignore headings with todo state
                  (member "drill" (org-node-get-tags node))
                  (assoc "ROAM_EXCLUDE" (org-node-get-properties node))
                  (string-search "archive" (org-node-get-file-path node))))))

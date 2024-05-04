@@ -161,8 +161,16 @@
               ;; in case
               (when (listp org-id-locations)
                 (setq org-id-locations (org-id-alist-to-hash org-id-locations))))
-            (message "Finished in %.2f s"
-                     (float-time (time-since org-node-async--start-time)))))))))
+            (let ((n-subtrees (cl-loop for node being the hash-values of org-nodes
+                                       count (org-node-get-is-subtree node))))
+              (message "org-node: found %d files, %d subtrees and %d links in %.2fs"
+                       (- (hash-table-count org-nodes) n-subtrees)
+                       n-subtrees
+                       (+ (length (apply #'append
+                                         (hash-table-values org-node--links-table)))
+                          (length (apply #'append
+                                         (hash-table-values org-node--reflinks-table))))
+                       (float-time (time-since org-node-async--start-time))))))))))
 
 (provide 'org-node-async)
 
