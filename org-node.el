@@ -27,9 +27,9 @@
 
 ;;; Code:
 
-;; TODO How to react when moving a subtree to another file?  Maybe advise yank and refile.
+;; TODO What happens when we move a subtree to a differetn file but save the destination before saving  the origin file?
 ;; TODO Like we feed the org-roam-db, maybe feed org-id-locations too?  We can probably do it faster.  Then we can also provide saner user config.
-;; TODO Better initial setup for people who have a wildly lacking org-id initialization
+;; TODO Better initial setup for people with incomplete org-id
 ;; TODO Annotations for completion
 ;; TODO Completion category https://github.com/alphapapa/org-ql/issues/299
 ;; TODO Command to grep across all files
@@ -217,12 +217,10 @@ type the name of a node that does not exist:
             (when (outline-next-heading)
               (backward-char 1))))
       ;; Node does not exist; capture into new file-level node
-      (let* ((guess (car (org-node--root-dirs
-                          (hash-table-values org-id-locations))))
-             (dir (if org-node-ask-directory
-                      (read-directory-name
-                       "Save the node in which directory? " guess)
-                    guess))
+      (let* ((dir (if org-node-ask-directory
+                      (read-directory-name "New file in which directory? ")
+                    (car (org-node--root-dirs
+                          (hash-table-values org-id-locations)))))
              (path-to-write (file-name-concat
                              dir (funcall org-node-slug-fn title))))
         (if (or (file-exists-p path-to-write)
@@ -251,12 +249,10 @@ variables."
   "Create a file-level node and ask where to save it.
 Meant to be called as `org-node-creation-fn', which sets some necessary
 variables."
-  (let* ((guess (car (org-node--root-dirs
-                      (hash-table-values org-id-locations))))
-         (dir (if org-node-ask-directory
-                  (read-directory-name
-                   "Save the node in which directory? " guess)
-                guess))
+  (let* ((dir (if org-node-ask-directory
+                  (read-directory-name "New file in which directory? ")
+                (car (org-node--root-dirs
+                      (hash-table-values org-id-locations)))))
          (path-to-write (file-name-concat dir (funcall org-node-slug-fn
                                                        org-node-proposed-title))))
     (if (or (file-exists-p path-to-write)
@@ -380,11 +376,11 @@ adding keywords to the things to exclude:
       (insert (org-link-make-string (concat "id:" id) title))
       (set-marker m1 (1- (point)))
       (duplicate-line)
-      (goto-char (line-beginning-position))
+      (goto-char (eol))
       (insert (make-string (+ 1 level) ?\*) " ")
       (forward-line 1)
       (insert "#+transclude: ")
-      (goto-char (line-end-position))
+      (goto-char (bol))
       (insert " :level " (number-to-string (+ 2 level)))
       ;; If the target is a subtree rather than file-level node, I'd like to
       ;; cut out the initial heading because we already made a heading.  (And
@@ -555,12 +551,10 @@ Adding to that, here is an example advice to copy any inherited
   (unless (derived-mode-p 'org-mode)
     (user-error "Only works in org-mode buffers"))
   (org-node-cache-ensure-fresh)
-  (let* ((guess (car (org-node--root-dirs
-                      (hash-table-values org-id-locations))))
-         (dir (if org-node-ask-directory
-                  (read-directory-name
-                   "Save the node in which directory? " guess)
-                guess)))
+  (let ((dir (if org-node-ask-directory
+                 (read-directory-name "Extract to new file in directory: ")
+               (car (org-node--root-dirs
+                     (hash-table-values org-id-locations))))))
     (save-excursion
       (org-back-to-heading t)
       (save-buffer)
@@ -579,8 +573,7 @@ Adding to that, here is an example advice to copy any inherited
              (path-to-write (file-name-concat
                              dir (funcall org-node-slug-fn title))))
         (if (file-exists-p path-to-write)
-            (message "A file already exists named %s"
-                     (file-name-nondirectory path-to-write))
+            (message "A file already exists named %s" path-to-write)
           (org-cut-subtree)
           ;; Leave a link where the subtree was
           (open-line 1)
