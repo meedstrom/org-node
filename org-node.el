@@ -492,12 +492,11 @@ Prompt the user for each one."
                          (substring (cadr parts) 0 -2)))
                  (id (when (string-prefix-p "id:" target)
                        (substring target 3)))
-                 (node (when id
-                         (gethash id org-nodes)))
+                 (node (gethash id org-nodes))
                  (true-title (when node
                                (org-node-get-title node)))
                  (answered-yes nil))
-            (when (and node
+            (when (and id node desc
                        (not (string-equal-ignore-case desc true-title))
                        (not (member-ignore-case desc
                                                 (org-node-get-aliases node))))
@@ -518,7 +517,8 @@ Prompt the user for each one."
                   (insert (org-link-make-string target true-title)))
                 ;; Give user 110+ ms to glimpse the result before moving on
                 (redisplay)
-                (sleep-for .11))))))))
+                (sleep-for .11))
+              (goto-char end)))))))
   (when (yes-or-no-p "Save the edited buffers?")
     (save-some-buffers)))
 

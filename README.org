@@ -2,22 +2,13 @@
 ** News [2024-05-03]
 - org-node is now async and multi-threaded, speeding it up even more!
 
-  If anything breaks, try nulling the user option =org-node-perf-multicore=, or revert to the "before-refactor" branch, which can be done in the Straight package expression like:
-
-  #+begin_src elisp
-  (use-package org-node
-    :straight (org-node :type git :host github :repo "meedstrom/org-node"
-                        :branch "before-refactor")
-    :hook (org-mode . org-node-cache-mode))
-  #+end_src
-
 ** News [2024-05-01]
 - It turns out that =org-node-reset= took dozens of seconds on some people's configs.  I /think/ it's fixed now, it should only take 0-3 seconds.  Tweak =org-node-perf-gc-cons-threshold= if you still experience it taking long.
 
 ** News [2024-04-30]
 - We no longer depend on a =BACKLINKS= property!  It is still a great way to show backlinks, so it remains as an option.
 - Renamed =CACHED_BACKLINKS= to just =BACKLINKS=.  One =M-x org-node-backlink-fix-all= will take care of the rename, or you can remove them all with =M-x org-node-backlink-regret=.
-- *Breaking API change* -- nodes are objects now, not plists!  Unfortunately the software can't give you a deprecation notice, because plists fail silently (that's why the change).  See updated examples for =org-node-filter-fn= etc.
+- *Breaking API change* -- nodes are objects now, not plists!  The software can't give you a deprecation notice, because plists fail silently (that's why the change).  See updated examples for =org-node-filter-fn= etc.
 
 ** What's all this
 
