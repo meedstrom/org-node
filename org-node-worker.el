@@ -200,7 +200,7 @@ by `org-node-async--collect' and do what it expects."
           (coding-system-for-read $assume-coding-system)
           ;; Reassigned on every iteration, so may as well reuse the
           ;; memory locations (hopefully producing less garbage)
-          TITLE FILE-TITLE POS LEVEL HERE LINE+2 OUTLINE-DATA)
+          TITLE FILE-TITLE POS LEVEL HERE LINE+2)
       (dolist (FILE files)
         (if (not (file-exists-p FILE))
             ;; We got here because user deleted a file in a way that we didn't
@@ -220,7 +220,7 @@ by `org-node-async--collect' and do what it expects."
           (let (;; Roughly like `org-end-of-meta-data' for file level
                 (FAR (or (re-search-forward "^ *?[^#:]" nil t) (point-max)))
                 (TODO-RE $global-todo-re)
-                PROPS FILE-TAGS FILE-ID)
+                PROPS FILE-TAGS FILE-ID OUTLINE-DATA)
             (goto-char 1)
             (when (re-search-forward "^ *:properties:" FAR t)
               (forward-line 1)

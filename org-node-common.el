@@ -337,10 +337,8 @@ first element."
                 file-name-handler-alist))
     ($global-todo-re
      . ,(org-node-worker--make-todo-regexp
-         (mapconcat #'identity
-                    (mapcan #'cdr (default-toplevel-value
-                                   'org-todo-keywords))
-                    " ")))
+         (string-join (mapcan #'cdr (default-value 'org-todo-keywords))
+                      " ")))
     ($backlink-drawer-re
      . ,(concat "^[[:space:]]*:"
                 (or (and (boundp 'org-super-links-backlink-into-drawer)
