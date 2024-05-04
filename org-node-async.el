@@ -20,31 +20,16 @@
     res))
 
 ;; (org-node-async--split-into-n-sublists
+;;       '(a v e e)
+;;       7)
+
+;; (org-node-async--split-into-n-sublists
 ;;       '(a v e e  q l fk k k ki i o r r  r r r r r r r r g g g  g g gg)
 ;;       4)
 
-;; (defun org-node-async--stderr-sentinel (stderr-process event)
-;;   (with-current-buffer (process-buffer stderr-process)
-;;     (if (equal event "finished\n")
-;;         (if (= 0 (buffer-size))
-;;             nil
-;;           (error "%s" (buffer-string)))
-;;       (error "%s" (buffer-string)))))
-
-;; ;; Need our own stderr handler for an easy way to see if there was an
-;; ;; error.  The default `internal-default-process-sentinel' adds
-;; ;; "finished" messages in the stderr buffer, so it is not possible to
-;; ;; simply check for a non-empty stderr buffer.
-;; ;; https://emacs.stackexchange.com/questions/71492/
-;; (defvar org-node-async--stderr-process
-;;   (make-pipe-process :name "org-node stderr"
-;;                      :buffer "*org-node-async*"
-;;                      :noquery t
-;;                      :sentinel #'org-node-async--stderr-sentinel))
-
 (defun org-node-async--collect (files)
   (mkdir "/tmp/org-node/" t)
-  (with-current-buffer (get-buffer-create "*org-node*")
+  (with-current-buffer (get-buffer-create " *org-node*")
     (erase-buffer))
   (setq org-node-async--jobs
         (max 1 (1- (string-to-number
@@ -85,6 +70,9 @@
     ;; Split the work over many Emacs processes
     (let ((file-lists (org-node-async--split-into-n-sublists
                        files org-node-async--jobs)))
+      (delq nil file-lists)
+      ;; If user has only e.g. 4 files but 8 cores, still spin up only 4 jobs.
+      (setq org-node-async--jobs (min org-node-async--jobs (length file-lists)))
       (while-let ((old-process (pop org-node-async--processes)))
         ;; NB: I considered keeping the processes alive to skip the spin-up
         ;; time, but the subprocesses report `emacs-init-time' as 0.001s.
@@ -97,7 +85,7 @@
         (push (make-process
                :name (format "org-node-%d" i)
                :noquery t
-               :stderr (get-buffer-create "*org-node*")
+               :stderr (get-buffer-create " *org-node*")
                :command (list (file-truename
                                (expand-file-name invocation-name
                                                  invocation-directory))
