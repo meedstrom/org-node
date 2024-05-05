@@ -146,23 +146,61 @@ Update the :BACKLINKS: property.  With arg REMOVE, remove it instead."
 
 (defun org-node-backlink--update-changed-parts-of-buffer ()
   (when org-node-backlink-mode
-    (unless ws-butler-mode
-      (message "If saving a big file is slow, see org-node README for a fix based on ws-butler"))
-    (while-let ((marker (pop org-node-backlink--subtree-markers)))
-      (set-marker marker nil))
     ;; Catch any error because this runs at `before-save-hook' which MUST fail
     ;; gracefully and let the user save anyway.
     (condition-case err
         (progn
-          (ws-butler-map-changes #'org-node-backlink--flag-subtrees-with-changes)
-          (org-node-backlink--update-buffer
-           nil org-node-backlink--subtree-markers))
+          (while-let ((marker (pop org-node-backlink--subtree-markers)))
+            (set-marker marker nil))
+          (if ws-butler-mode
+              (progn
+                (ws-butler-map-changes #'org-node-backlink--flag-subtrees-with-changes)
+                (org-node-backlink--update-buffer
+                 nil org-node-backlink--subtree-markers))
+            (message "If saving a big file is slow, see org-node README for a fix based on ws-butler")
+            (org-node-backlink--update-buffer)))
       (( error user-error debug )
        (lwarn 'org-node :error
               "org-node-backlink--update-changed-parts-of-buffer: %S" err)))))
 
 
 
+(defun ws-butler-after-change (beg end length-before)
+  ;; From ws-butler.el:
+  ;; "In Emacs 27+, functions like `call-process-region' will invoke
+  ;; `after-change-functions' on the process buffer, where ws-butler don't care
+  ;; about changes, making this guard is necessary:"
+  (when (eq (current-buffer) (window-buffer (selected-window)))
+    (let ((type (if (and (= beg end) (> length-before 0))
+                    'delete
+                  'chg)))
+      (if undo-in-progress
+          ;; add back deleted text during undo
+          (if (and (zerop length-before)
+                   (> end beg)
+                   (eq (get-text-property end 'ws-butler-chg) 'delete))
+              (remove-list-of-text-properties end (1+ end) '(ws-butler-chg)))
+        (with-silent-modifications
+          (when (eq type 'delete)
+            (setq end (min (+ end 1) (point-max))))
+          (put-text-property beg end 'ws-butler-chg type))))))
+
+(defun ws-butler-map-changes (func &optional start-position end-position)
+  "Call FUNC with each changed region (START-POSITION END-POSITION).
+
+This simply uses an end marker since we are modifying the buffer
+in place."
+  ;; See `hilit-chg-map-changes'.
+  (let ((start (or start-position (point-min)))
+        (limit (copy-marker (or end-position (point-max))))
+        prop end)
+    (while (and start (< start limit))
+      (setq prop (get-text-property start 'ws-butler-chg))
+      (setq end (text-property-not-all start limit 'ws-butler-chg prop))
+      (if prop
+          (funcall func prop start (or end limit)))
+      (setq start end))
+    (set-marker limit nil)))
 
 
 ;;; Link-insertion advice
