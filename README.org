@@ -155,10 +155,7 @@ For a full reset, equivalent to =C-u M-x org-roam-db-sync=, you can type =M-x or
 #+end_src
 
 ** Backlink solution 2: inside the file
-
-I love this solution, because I rarely have space on my screen for a backlink buffer anyway.
-
-*Option 2A*.  Let org-node add a =:BACKLINKS:= property to all nodes.
+**** *Option 2A*  Let org-node add a =:BACKLINKS:= property to all nodes.
 
 For a first-time run, type =M-x org-node-backlink-fix-all=.  (Don't worry, if you change your mind, you can undo with =M-x org-node-backlink-regret=.)
 
@@ -178,7 +175,7 @@ Necessary setup for ws-butler follows.  Users of =auto-save-visited-mode= may wa
 (setq ws-butler-keep-whitespace-before-point nil)
 #+end_src
 
-*Option 2B.*  Let [[https://github.com/toshism/org-super-links][org-super-links]] manage a =:BACKLINKS:...:END:= drawer.
+**** *Option 2B.*  Let [[https://github.com/toshism/org-super-links][org-super-links]] manage a =:BACKLINKS:...:END:= drawer.
 
 I /think/ the following should work. Totally untested, let me know!
 
