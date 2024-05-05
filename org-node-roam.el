@@ -33,6 +33,10 @@
    :point (org-node-get-pos node)
    :properties (org-node-get-properties node)))
 
+;; Eval to see the form
+;; (seq-random-elt (hash-table-keys org-node--links-table))
+;; (seq-random-elt (hash-table-values org-node--links-table))
+
 (defun org-node--fabricate-roam-backlinks (roam-target-node &rest _)
   "Return org-roam-backlink objects targeting ROAM-OBJECT.
 Designed as override advice for `org-roam-backlinks-get'."
@@ -50,10 +54,37 @@ Designed as override advice for `org-roam-backlinks-get'."
                 :point (plist-get link-data :pos)
                 :properties (plist-get link-data :properties))))))
 
+;; Eval to see the form
+;; (seq-random-elt (hash-table-keys org-node--reflinks-table))
+;; (seq-random-elt (hash-table-values org-node--reflinks-table))
+
+(defun org-node--fabricate-roam-reflinks (roam-target-node &rest _)
+  "Return org-roam-backlink objects targeting ROAM-OBJECT.
+Designed as override advice for `org-roam-backlinks-get'."
+  (require 'org-roam)
+  (let* ((target-id (org-roam-node-id roam-target-node))
+         (node (gethash target-id org-nodes)))
+    (when node
+      (cl-loop
+       for ref in  (--map (replace-regexp-in-string "https:" "" it)
+                          (org-node-get-refs node))
+       as reflinks =
+       (cl-loop
+        for link-data in (gethash ref org-node--reflinks-table)
+        as src-id = (plist-get link-data :src)
+        as src-node = (gethash src-id org-nodes)
+        when src-node
+        collect (org-roam-reflink-create
+                 :ref ref
+                 :source-node (org-node--convert-to-roam src-node)
+                 :point (plist-get link-data :pos)
+                 :properties (plist-get link-data :properties)))
+       when reflinks append reflinks))))
+
 
 ;;; Method 2: feed the DB
 
-(defun org-node--ref-link->list (ref node-id)
+(defun org-node--ref->list (ref node-id)
   "Worker code adapted from `org-roam-db-insert-refs'"
   (let (rows)
     (cond (;; @citeKey
@@ -122,7 +153,7 @@ Designed as override advice for `org-roam-backlinks-get'."
                  (vector id alias))
                aliases)))
     ;; `org-roam-db-insert-tags'
-    ;; FIXME no inheritance
+    ;; FIXME there's no inheritance
     (when tags
       (org-roam-db-query
        [:insert :into tags
@@ -162,7 +193,7 @@ Designed as override advice for `org-roam-backlinks-get'."
                  scheduled deadline title properties olp))))
     ;; `org-roam-db-insert-refs'
     (dolist (ref-link roam-refs)
-      (dolist (individual-ref (org-node--ref-link->list ref-link id))
+      (dolist (individual-ref (org-node--ref->list ref-link id))
         (org-roam-db-query [:insert :into refs
                             :values $v1]
                            individual-ref)))
