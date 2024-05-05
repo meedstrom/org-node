@@ -28,6 +28,7 @@
 
 ;;; Code:
 
+;; TODO Merge -async.el into -cache.el
 ;; TODO Simplify backlink-mode
 ;; TODO What happens when we move a subtree to a differetn file but save the destination before saving  the origin file?
 ;; TODO Like we feed the org-roam-db, maybe feed org-id-locations too?  We can probably do it faster.  Then we can also provide saner user config.
@@ -61,6 +62,17 @@ Please add onto org-mode-hook:
   (org-node-cache-mode)
   ;; 2024-04-30
   (message "Org-node has new recommendations for init, see README"))
+
+
+;;; API not used inside this package
+
+(defun org-node-at-point ()
+  (gethash (org-id-get nil nil nil t) org-nodes))
+
+(defun org-node-read ()
+  (gethash (completing-read "Node: " org-node-collection
+                            () () () 'org-node-hist)
+           org-node-collection))
 
 
 ;;; Plumbing
@@ -238,38 +250,44 @@ type the name of a node that does not exist:
 
 (defun org-node-new-by-roam-capture ()
   "Call `org-roam-capture-' with predetermined arguments.
-Meant to be called as `org-node-creation-fn', which sets some necessary
-variables."
-  (unless (fboundp #'org-roam-capture-)
-    (org-node-die "Didn't create node! Either install org-roam or %s"
-                  "configure `org-node-creation-fn'"))
-  (require 'org-roam)
-  (org-roam-capture- :node (org-roam-node-create :title org-node-proposed-title
-                                                 :id    org-node-proposed-id)))
+Meant to be called as `org-node-creation-fn', during which it
+gets some necessary variables."
+  (if (or (null org-node-proposed-title)
+          (null org-node-proposed-id))
+      (message "org-node-new-by-roam-capture is meant to be called indirectly")
+    (unless (fboundp #'org-roam-capture-)
+      (org-node-die "Didn't create node! Either install org-roam or %s"
+                    "configure `org-node-creation-fn'"))
+    (require 'org-roam)
+    (org-roam-capture- :node (org-roam-node-create :title org-node-proposed-title
+                                                   :id    org-node-proposed-id))))
 
 (defun org-node-new-file ()
-  "Create a file-level node and ask where to save it.
-Meant to be called as `org-node-creation-fn', which sets some necessary
-variables."
-  (let* ((dir (if org-node-ask-directory
-                  (read-directory-name "New file in which directory? ")
-                (car (org-node--root-dirs
-                      (hash-table-values org-id-locations)))))
-         (path-to-write (file-name-concat dir (funcall org-node-slug-fn
-                                                       org-node-proposed-title))))
-    (if (or (file-exists-p path-to-write)
-            (find-buffer-visiting path-to-write))
-        (message "A file or buffer already exists for path %s"
-                 (file-name-nondirectory path-to-write))
-      (find-file path-to-write)
-      (insert ":PROPERTIES:"
-              "\n:ID:       " org-node-proposed-id
-              "\n:END:"
-              "\n#+title: " org-node-proposed-title
-              "\n")
-      (unwind-protect
-          (run-hooks 'org-node-creation-hook)
-        (save-buffer)))))
+  "Create a file-level node.
+Meant to be called as `org-node-creation-fn', during which it
+gets some necessary variables."
+  (if (or (null org-node-proposed-title)
+          (null org-node-proposed-id))
+      (message "org-node-new-file is meant to be called indirectly")
+    (let* ((dir (if org-node-ask-directory
+                    (read-directory-name "New file in which directory? ")
+                  (car (org-node--root-dirs
+                        (hash-table-values org-id-locations)))))
+           (path-to-write (file-name-concat dir (funcall org-node-slug-fn
+                                                         org-node-proposed-title))))
+      (if (or (file-exists-p path-to-write)
+              (find-buffer-visiting path-to-write))
+          (message "A file or buffer already exists for path %s"
+                   (file-name-nondirectory path-to-write))
+        (find-file path-to-write)
+        (insert ":PROPERTIES:"
+                "\n:ID:       " org-node-proposed-id
+                "\n:END:"
+                "\n#+title: " org-node-proposed-title
+                "\n")
+        (unwind-protect
+            (run-hooks 'org-node-creation-hook)
+          (save-buffer))))))
 
 (defun org-node--goto (node)
   "Visit NODE."
@@ -470,7 +488,7 @@ Can also operate on a file at given PATH."
   "Face for use in `org-node-rewrite-links-ask'.")
 
 ;;;###autoload
-(defun org-node-rewrite-links-ask ()
+(defun org-node-rewrite-links-ask (&optional file)
   "Look for links to update to match the current title.
 Prompt the user for each one."
   (interactive)
@@ -480,7 +498,7 @@ Prompt the user for each one."
   (set-face-inverse-video 'org-node-rewrite-links-face
                           (not (face-inverse-video-p 'org-link)))
   (when (org-node--consent-to-problematic-modes-for-mass-op)
-    (dolist (file (hash-table-values org-id-locations))
+    (dolist (file (if file (list file) (hash-table-values org-id-locations)))
       (find-file-noselect file)
       (org-with-file-buffer file
         (goto-char (point-min))
@@ -605,21 +623,28 @@ Adding to that, here is an example advice to copy any inherited
           (run-hooks 'org-node-creation-hook)
           (save-buffer))))))
 
-;; FIXME WIP
+;;;###autoload
 (defun org-node-rename-asset-and-rewrite-links ()
+  "Prompt for an asset such as an image file to be renamed, then
+search recursively for Org files with a link to that asset, give
+the user a wgrep buffer of the search hits, and start an
+interactive search-replace that updates the links.  After the
+user completes the replacements, finally rename the file itself."
   (interactive)
-  (require 'dash)
   (require 'wgrep)
-  (when (or (equal default-directory org-roam-directory)
-            (when (yes-or-no-p "Not in org-roam-directory, go there?")
-              (find-file org-roam-directory)
-              t))
+  (let ((root (car (org-node--root-dirs (hash-table-values org-id-locations))))
+        (default-directory default-directory))
+    (or (equal default-directory root)
+        (if (y-or-n-p (format "Go to this folder? %s" root))
+            (setq default-directory root)
+          (setq default-directory
+                (read-directory-name
+                 "Directory with Org notes to operate on: "))))
     (when-let ((bufs (--filter (string-search "*grep*" (buffer-name it))
                                (buffer-list))))
-      (when (yes-or-no-p "Some *grep* buffers, kill to be sure this works?")
+      (when (yes-or-no-p "Kill other *grep* buffers to be sure this works?")
         (mapc #'kill-buffer bufs)))
-    (let* ((filename (file-relative-name
-                      (read-file-name "File: ") org-roam-directory))
+    (let* ((filename (file-relative-name (read-file-name "File to rename: ")))
            (new (read-string "New name: " filename)))
       (mkdir (file-name-directory new) t)
       (unless (file-writable-p new)
@@ -628,17 +653,17 @@ Adding to that, here is an example advice to copy any inherited
       (run-with-timer
        1 nil
        (lambda ()
-         (save-window-excursion
-           (delete-other-windows)
-           (switch-to-buffer (--find (string-search "*grep*" (buffer-name it))
-                                     (buffer-list)))
-           (wgrep-change-to-wgrep-mode)
-           (goto-char (point-min))
-           (query-replace filename new)
+         (pop-to-buffer (--find (string-search "*grep*" (buffer-name it))
+                                (buffer-list)))
+         (wgrep-change-to-wgrep-mode)
+         (goto-char (point-min))
+         (query-replace filename new)
+         ;; NOTE: If the user quits the replaces with C-g, this code won't run,
+         ;;       which is good.
+         (when (buffer-modified-p)
            (wgrep-finish-edit)
-           (when (y-or-n-p "Finished editing links, rename file?")
-             (rename-file filename new)
-             (message "File renamed from %s to %s" filename new)))))
+           (rename-file filename new)
+           (message "File renamed from %s to %s" filename new))))
       (message "Waiting for rgrep to populate buffer..."))))
 
 ;;;###autoload

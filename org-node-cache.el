@@ -29,23 +29,6 @@ time."
     (advice-remove #'rename-file #'org-node-cache--handle-delete)
     (advice-remove #'delete-file #'org-node-cache--handle-delete)))
 
-(defun org-node-cache-peek ()
-  "For debugging: peek on a random member of `org-nodes'.
-See also the type `org-node-data'."
-  (interactive)
-  (require 'map)
-  (require 'seq)
-  (let ((fields (--map (intern (concat "org-node-" (symbol-name it)))
-                       (map-keys (cdr (cl-struct-slot-info 'org-node-data)))))
-        (random-node (seq-random-elt
-                      (-filter #'org-node-get-id (hash-table-values org-nodes)))))
-    (message "%s"
-             (--zip-with
-              (format "(%s X) => %s\n" it other)
-              fields
-              (cl-loop for field in fields
-                       collect (funcall field random-node))))))
-
 (defvar org-node-cache-reset-hook nil)
 (defvar org-node-cache-rescan-file-hook nil)
 
@@ -80,8 +63,10 @@ For an user-facing command, see \\[org-node-reset]."
                "Hook renamed: org-node-cache-scan-file-hook to org-node-cache-rescan-file-hook"))
       (run-hooks 'org-node-cache-rescan-file-hook))))
 
-;; I feel like I could merge this with the init-org-id-locations and maybe
-;; intentionally not cover some of the situations that this covers
+;; I feel like I could merge this with
+;; `org-node--init-org-id-locations-or-die', maybe by intentionally
+;; not-covering all situations and moving some into `org-node-cache-reset'
+;; itself
 (defun org-node-cache-ensure-fresh ()
   (org-node--init-org-id-locations-or-die)
   ;; Once-per-session tip
@@ -113,6 +98,23 @@ to delete several files in a row."
         (org-node--forget-id-location file-being-deleted)
         (cancel-timer timer)
         (setq timer (run-with-idle-timer 6 nil #'org-node-cache-reset))))))
+
+(defun org-node-cache-peek ()
+  "For debugging: peek on a random member of `org-nodes'.
+See also the type `org-node-data'."
+  (interactive)
+  (require 'map)
+  (require 'seq)
+  (let ((fields (--map (intern (concat "org-node-" (symbol-name it)))
+                       (map-keys (cdr (cl-struct-slot-info 'org-node-data)))))
+        (random-node (seq-random-elt
+                      (-filter #'org-node-get-id (hash-table-values org-nodes)))))
+    (message "%s"
+             (--zip-with
+              (format "(%s X) => %s\n" it other)
+              fields
+              (cl-loop for field in fields
+                       collect (funcall field random-node))))))
 
 (provide 'org-node-cache)
 
