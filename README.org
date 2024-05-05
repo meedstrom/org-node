@@ -171,16 +171,6 @@ Then start using the minor mode =org-node-backlink-mode=, which keeps these prop
 (add-hook 'org-mode-hook #'org-node-backlink-mode)
 #+end_src
 
-Please note that if you have huge files, saving them may be slow unless you install and enable [[https://github.com/hlissner/ws-butler][ws-butler-mode]], which provides a great mechanism for org-node to only check the parts of the buffer that changed, so even monster files can be saved fast.
-
-Necessary setup for ws-butler follows.  Users of =auto-save-visited-mode= may want to read [[https://github.com/meedstrom/org-node?tab=readme-ov-file#appendix-iv-ws-butler--org-mode--auto-save-visited-mode--hell][Appendix IV]].
-
-#+begin_src elisp
-(add-hook 'org-mode-hook #'ws-butler-mode)
-;; Don't scare the org-element cache
-(setq ws-butler-keep-whitespace-before-point nil)
-#+end_src
-
 **** *Option 2B.*  Let [[https://github.com/toshism/org-super-links][org-super-links]] manage a =:BACKLINKS:...:END:= drawer.
 
 I /think/ the following should work. Totally untested, let me know!
@@ -419,41 +409,3 @@ Bonus snippet: full reset
        (setq org-id-files nil)
        (setq org-id-extra-files nil))
 #+end_src
-
-** Appendix IV: ws-butler + org-mode + auto-save-visited-mode = hell
-
-If you want to try Option 2A for backlinks, there's an issue for users of =auto-save-visited-mode=.  If you have already used that mode together with ws-butler in the past, you've probably ended up setting =ws-butler-keep-whitespace-before-point= to =t=, else it [[https://github.com/doomemacs/doomemacs/pull/7843][makes point jump every 5 seconds]]!  Very distracting!
-
-But after setting it to =t=, the org-element parser started whining about "unregistered buffer modifications", so then you compromised by turning off ws-butler for org-mode specifically.  Right?  My story anyway.
-
-Now it's time to fix this once and for all.
-
-Two options:
-
-1. Use this advice:
-   #+begin_src elisp
-   ;; At some point (9.5?) the org-element cache started warning about
-   ;; unregistered buffer modifications, but that's part of how ws-butler does its
-   ;; work, so stop the warnings.
-   (after! org-element
-     (advice-add 'org-element--cache-sync :before
-                 (defun my-pretend-correct-buffer-size (&rest _)
-                   (setq org-element--cache-last-buffer-size (buffer-size)))))
-   #+end_src
-
-2. Quit using auto-save-visited-mode -- there's a way to repurpose the classic auto-save system to grant you a similar luxury:
-
-   #+begin_src elisp
-   (setq auto-save-timeout 5)
-   (setq auto-save-no-message t)
-   ;; Just save all files after 40 idle seconds, do not even ask
-   (setq my-mass-save-timer (run-with-idle-timer 40 t #'save-some-buffers t))
-   ;; Automatically do the "M-x recover-this-file" thing if emacs crashed before
-   ;; those 40 seconds
-   (add-hook 'find-file-hook
-             (defun my-auto-recover-this-file ()
-               (when (file-newer-than-file-p (or buffer-auto-save-file-name
-                                                 (make-auto-save-file-name))
-                                             buffer-file-name)
-                 (recover-file buffer-file-name))))
-   #+end_src
