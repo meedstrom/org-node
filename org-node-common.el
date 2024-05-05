@@ -456,6 +456,15 @@ first element."
              "Command renamed on 2024-05-02: org-node-insert-heading-node to org-node-insert-heading"))
     (apply #'org-node-insert-heading args)))
 
+;;;###autoload
+(let (warned-once)
+  (defun org-node-backlinks-mode (&rest args)
+    (unless warned-once
+      (setq warned-once t)
+      (run-with-timer
+       .1 nil #'lwarn 'org-node :warning
+       "Someone misspelled `org-node-backlink-mode', but I ran it for you"))
+    (apply #'org-node-backlink-mode args)))
 
 (provide 'org-node-common)
 

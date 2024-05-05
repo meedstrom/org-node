@@ -125,7 +125,7 @@ In addition, if you've been struggling with slow saving of big files, consider t
 
 Do a =M-x org-roam-update-org-id-locations=.  (I'm looking into a more principled way to manage the org-id database, but that'll have to do for now.)
 
-With that done, try out the commands mentioned in [[https://github.com/meedstrom/org-node?tab=readme-ov-file#quick-start][Quick start]].  There's more under [[https://github.com/meedstrom/org-node?tab=readme-ov-file#commands][Commands]].  Enjoy!
+With that done, try out the commands mentioned in [[https://github.com/meedstrom/org-node?tab=readme-ov-file#quick-start][Quick start]].  There's more under [[https://github.com/meedstrom/org-node?tab=readme-ov-file#toolbox][Toolbox]].  Enjoy!
 
 I'm guessing you also want the [[https://github.com/meedstrom/org-node?tab=readme-ov-file#backlink-solution-1-org-roam-buffer][org-roam-buffer]].  See next section.
 
@@ -193,17 +193,19 @@ Here are some example capture templates. The secret sauce is =(function org-node
         ("nc" "Capture to ID node (maybe creating it)"
          plain (function org-node-capture-target) nil
          :empty-lines-after 1)
+
         ("nv" "Visit ID node (maybe creating it)"
          plain (function org-node-capture-target) nil
          :jump-to-captured t
          :immediate-finish t)
+
         ;; Sometimes useful with `org-node-insert-link' to make a stub
         ("ni" "Instantly create ID node without content & without visiting"
          plain (function org-node-capture-target) nil
          :immediate-finish t)))
 #+end_src
 
-And if you want the commands =org-node-find= & =org-node-insert-link= to likewise outsource to org-capture when creating new nodes, use the following setting.
+And if you want the commands =org-node-find= & =org-node-insert-link= to likewise outsource to org-capture when creating new nodes:
 
 #+begin_src elisp
 (setq org-node-creation-fn #'org-capture)
@@ -242,7 +244,7 @@ The point of org-id is to avoid dependence on filenames, but it's often pragmati
 
 In lieu of a convenient =org-roam-update-org-id-locations=, see [[https://github.com/meedstrom/org-node?tab=readme-ov-file#appendix-iii-taking-ownership-of-org-id][Appendix III]] for how to defeat org-id's idiosyncrasies, ensuring org-node knows about all the relevant ID locations.
 
-*** Commands
+*** Toolbox
 
 - =org-node-find=
   - A counterpart to =org-roam-node-find=
@@ -251,16 +253,20 @@ In lieu of a convenient =org-roam-update-org-id-locations=, see [[https://github
 - =org-node-insert-transclusion=
 - =org-node-insert-transclusion-as-subtree=
 - =org-node-extract-subtree=
-  - A bizarro counterpart to =org-roam-extract-subtree=
+  - A bizarro counterpart to =org-roam-extract-subtree=.  Export a subtree at point into a file-level node, leave a link in the source, and make the new node the current buffer.
 - =org-node-nodeify-entry=
-  - Trivial - give an ID to subtree at point (and run org-node-creation-hook)
+  - (Trivial) Give an ID to the subtree at point (and run org-node-creation-hook)
 - =org-node-insert-heading=
-  - Trivial - insert a new heading with an ID (and run org-node-creation-hook)
+  - (Trivial) Insert a new heading with an ID (and run org-node-creation-hook)
 - =org-node-random=
+  - Visit a random node
 - =org-node-rewrite-links-ask=
   - Look for link descriptions that got out of sync with the current node title, then prompt at each link to update it
 - =org-node-rename-file-by-title=
   - Auto-rename the file based on the current =#+title=
+- =org-node-rename-asset-and-rewrite-links=
+  - Interactively rename an asset such as an image file and try to update all Org links to them
+    - NOTE: For now, it only looks for links inside the root directory that it prompts you for, and sub and sub-subdirectories and so on -- but won't find a link in a completely different place.  Like if you have stuff under /stuff linking to stuff in /home, those links won't be updated.
 - =org-node-backlink-fix-all=
   - Add =BACKLINKS= property to every node everywhere that should have one
 - =org-node-backlink-regret=
@@ -270,14 +276,14 @@ In lieu of a convenient =org-roam-update-org-id-locations=, see [[https://github
 
 API comparison between org-roam and org-node.
 
-| Action                          | org-roam                        | org-node                                                                            |
-|---------------------------------+---------------------------------+-------------------------------------------------------------------------------------|
-| Get ID at point                 | =(org-roam-id-at-point)=          | =(org-id-get nil nil nil t)=                                                          |
-| Get node at point               | =(org-roam-node-at-point)=        | =(gethash (org-id-get nil nil nil t) org-nodes)=                                      |
-| Get list of files               | =(org-roam-list-files)=           | =(seq-uniq (hash-table-values org-id-locations))=                                     |
-| Prompt user to pick a node      | =(org-roam-node-read)=            | =(gethash (completing-read "Node: " org-node-collection) org-node-collection)=        |
-| Get backlink objects            | =(org-roam-backlinks-get NODE)=   | =(gethash (org-node id NODE) org-node--links-table)=                                  |
-| Get reflink objects             | =(org-roam-reflinks-get NODE)=    | =(gethash (org-node id NODE) org-node--reflinks-table)=                               |
+| Action                          | org-roam                        | org-node                                                                                |
+|---------------------------------+---------------------------------+-----------------------------------------------------------------------------------------|
+| Get ID at point                 | =(org-roam-id-at-point)=          | =(org-id-get nil nil nil t)=                                                              |
+| Get node at point               | =(org-roam-node-at-point)=        | =(org-node-at-point)=                                                                     |
+| Get list of files               | =(org-roam-list-files)=           | =(seq-uniq (hash-table-values org-id-locations))=                                         |
+| Prompt user to pick a node      | =(org-roam-node-read)=            | =(org-node-read)=                                                                         |
+| Get backlink objects            | =(org-roam-backlinks-get NODE)=   | =(gethash (org-node id NODE) org-node--links-table)=                                      |
+| Get reflink objects             | =(org-roam-reflinks-get NODE)=    | =(gethash (org-node id NODE) org-node--reflinks-table)=                                   |
 | Get title                       | =(org-roam-node-title NODE)=      | =(org-node-get-title NODE)=                                                               |
 | Get title of file where NODE is | =(org-roam-node-file-title NODE)= | =(org-node-get-file-title NODE)=                                                          |
 | Get ID                          | =(org-roam-node-id NODE)=         | =(org-node-get-id NODE)=                                                                  |
@@ -294,9 +300,9 @@ API comparison between org-roam and org-node.
 | Get =ROAM_ALIASES=                | =(org-roam-node-aliases NODE)=    | =(org-node-get-aliases NODE)=                                                             |
 | Get =ROAM_EXCLUDE=                |                                 | =(assoc "ROAM_EXCLUDE" (org-node-get-properties NODE))=, doesn't inherit parent excludes! |
 | Get whether this is a subtree   |                                 | =(org-node-get-is-subtree NODE)=                                                          |
-| Get subtree heading sans TODO   | =(org-roam-node-title NODE)=      | =(org-node--visit-get-true-heading NODE)=                                             |
-| Get subtree priority            | =(org-roam-node-priority NODE)=   |                                                                                     |
-| Ensure fresh data               | =(org-roam-db-sync)=              | =(org-node-cache-ensure-fresh)=                                                       |
+| Get subtree heading sans TODO   | =(org-roam-node-title NODE)=      | =(org-node--visit-get-true-heading NODE)=                                                 |
+| Get subtree priority            | =(org-roam-node-priority NODE)=   |                                                                                         |
+| Ensure fresh data               | =(org-roam-db-sync)=              | =(org-node-cache-ensure-fresh)=                                                           |
 
 
 ** Appendix II: Pros of org-roam

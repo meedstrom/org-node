@@ -1,12 +1,17 @@
-;;; org-node-async.el --- The beating heart -*- lexical-binding: t; -*-
+;;; org-node-async.el -*- lexical-binding: t; -*-
 
 (require 'bytecomp)
 (require 'org-node-common)
 (require 'org-node-worker)
 
-(defvar org-node-async--start-time nil)
+(defvar org-node-async--start-time nil
+  "Timestamp used to measure time to rebuild the cache.")
 
 (defun org-node-async--split-into-n-sublists (big-list n)
+  "Split BIG-LIST into a list of N sublists.
+
+In the special case where BIG-LIST contains fewer than N
+elements, the return value is still N items, where some are nil."
   (let ((len (/ (length big-list) n))
         res)
     (dotimes (i n)
