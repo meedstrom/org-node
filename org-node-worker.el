@@ -6,6 +6,11 @@
   (require 'cl-macs)
   (require 'subr-x))
 
+(defun org-node-worker--dir (&optional file)
+  "A shorthand to expand FILE in org-node's temporary directory."
+  (expand-file-name (or file "")
+                    (expand-file-name "org-node" (temporary-file-directory))))
+
 (defun org-node-worker--elem-index (elem list)
   "Like `-elem-index'."
   (declare (pure t) (side-effect-free t))
@@ -179,10 +184,11 @@ The argument SYNCHRONOUS, if provided, should be a list of files
 to scan.  If not provided, assume we are in a child emacs spawned
 by `org-node-async--collect' and do what it expects."
   (with-temp-buffer
-    (setq $vars (if synchronous
-                    variables
-                  (insert-file-contents "/tmp/org-node/work-variables.eld")
-                  (car (read-from-string (buffer-string)))))
+    (setq $vars
+          (if synchronous
+              variables
+            (insert-file-contents (org-node-worker--dir "work-variables.eld"))
+            (car (read-from-string (buffer-string)))))
     (dolist (var $vars)
       (set (car var) (cdr var)))
     (if synchronous
@@ -393,7 +399,7 @@ by `org-node-async--collect' and do what it expects."
             (makunbound '$vars))
         ;; Write down the demands so `org-node-async--handle-finished-job' will
         ;; do the equivalent of above in the main Emacs process
-        (with-temp-file (format "/tmp/org-node/result-%d.eld" i)
+        (with-temp-file (org-node-worker--dir (format "result-%d.eld" i))
           (insert (prin1-to-string org-node-worker--demands)))))))
 
 (provide 'org-node-worker)

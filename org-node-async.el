@@ -33,7 +33,7 @@ elements, the return value is still N items, where some are nil."
 ;;       4)
 
 (defun org-node-async--collect (files)
-  (mkdir "/tmp/org-node/" t)
+  (mkdir (org-node-worker--dir) t)
   (with-current-buffer (get-buffer-create " *org-node*")
     (erase-buffer))
   (setq org-node-async--jobs
@@ -48,28 +48,37 @@ elements, the return value is still N items, where some are nil."
                       ((or 'darwin)
                        (shell-command-to-string
                         "sysctl -n hw.logicalcpu_max"))
+                      ;; I have no idea if this works
                       ((or 'cygwin 'windows-nt 'ms-dos)
-                       (user-error "org-node: Windows not supported with `org-node-perf-multicore'")))))))
+                       (or (ignore-errors
+                             (with-temp-buffer
+                               (call-process "echo" nil t nil "%NUMBER_OF_PROCESSORS%")
+                               (buffer-string)))
+                           (user-error "org-node: Windows not supported with `org-node-perf-multicore'"))))))))
   (let* ((lib (find-library-name "org-node-worker"))
          (native (when (and (featurep 'native-compile)
                             (native-comp-available-p))
                    (comp-el-to-eln-filename lib)))
-         (elc "/tmp/org-node/worker.elc"))
-    ;; Pre-compile code for the external Emacs processes,
-    ;; in case the user's package manager didn't compile.
+         ;; (precompiled-elc (funcall byte-compile-dest-file-function lib))
+         (elc (org-node-worker--dir "worker.elc")))
+    ;; Pre-compile the worker, in case the user's
+    ;; package manager didn't compile already.
     (if native
         (unless (and (file-exists-p native)
                      (file-newer-than-file-p native lib))
           (native-compile lib))
       (unless (and (file-exists-p elc)
                    (file-newer-than-file-p elc lib))
+        ;; Hard to predict that it won't end up cluttering some source
+        ;; directory if we obey `byte-compile-dest-file-function', so just put
+        ;; it in /tmp.  It's a very fast build anyway.
         (let ((byte-compile-dest-file-function
                `(lambda (&rest _) ,elc)))
           (byte-compile-file lib))))
 
     (setq org-node-async--start-time (current-time))
     (setq org-node-async--done-ctr 0)
-    (with-temp-file "/tmp/org-node/work-variables.eld"
+    (with-temp-file (org-node-worker--dir "work-variables.eld")
       (insert (prin1-to-string (append (org-node--work-variables)
                                        org-node-async-inject-variables))))
     ;; Split the work over many Emacs processes
@@ -85,7 +94,7 @@ elements, the return value is still N items, where some are nil."
         (when (process-live-p old-process)
           (delete-process old-process)))
       (dotimes (i org-node-async--jobs)
-        (with-temp-file (format "/tmp/org-node/file-list-%d.eld" i)
+        (with-temp-file (org-node-worker--dir (format "file-list-%d.eld" i))
           (insert (prin1-to-string (pop file-lists))))
         (push (make-process
                :name (format "org-node-%d" i)
@@ -99,7 +108,7 @@ elements, the return value is still N items, where some are nil."
                               "--no-site-lisp"
                               "--batch"
                               "--insert"
-                              (format "/tmp/org-node/file-list-%d.eld" i)
+                              (org-node-worker--dir (format "file-list-%d.eld" i))
                               "--eval"
                               (format
                                "(setq files (cons %d (car (read-from-string (buffer-string)))))"
@@ -120,7 +129,7 @@ elements, the return value is still N items, where some are nil."
 (defun org-node-async--handle-finished-job (process _ i)
   (with-temp-buffer
     ;; Paste what the worker output
-    (let ((file (format "/tmp/org-node/result-%d.eld" i)))
+    (let ((file (org-node-worker--dir (format "result-%d.eld" i))))
       (if (not (file-exists-p file))
           (message "An org-node worker failed to scan files, not producing %s"
                    file)
