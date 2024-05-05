@@ -415,22 +415,24 @@ first element."
 (defalias 'org-node-get-title      #'org-node-data-title)
 (defalias 'org-node-get-todo       #'org-node-data-todo)
 
-;; 2024-05-01 Deprecate the old "org-node" struct, badly named
-(define-obsolete-function-alias 'org-node-aliases    #'org-node-get-aliases    "2024-05-01")
-(define-obsolete-function-alias 'org-node-deadline   #'org-node-get-deadline   "2024-05-01")
-(define-obsolete-function-alias 'org-node-file-path  #'org-node-get-file-path  "2024-05-01")
-(define-obsolete-function-alias 'org-node-file-title #'org-node-get-file-title "2024-05-01")
-(define-obsolete-function-alias 'org-node-id         #'org-node-get-id         "2024-05-01")
-(define-obsolete-function-alias 'org-node-is-subtree #'org-node-get-is-subtree "2024-05-01")
-(define-obsolete-function-alias 'org-node-level      #'org-node-get-level      "2024-05-01")
-(define-obsolete-function-alias 'org-node-olp        #'org-node-get-olp        "2024-05-01")
-(define-obsolete-function-alias 'org-node-pos        #'org-node-get-pos        "2024-05-01")
-(define-obsolete-function-alias 'org-node-properties #'org-node-get-properties "2024-05-01")
-(define-obsolete-function-alias 'org-node-refs       #'org-node-get-refs       "2024-05-01")
-(define-obsolete-function-alias 'org-node-scheduled  #'org-node-get-scheduled  "2024-05-01")
-(define-obsolete-function-alias 'org-node-tags       #'org-node-get-tags       "2024-05-01")
-(define-obsolete-function-alias 'org-node-title      #'org-node-get-title      "2024-05-01")
-(define-obsolete-function-alias 'org-node-todo       #'org-node-get-todo       "2024-05-01")
+;; 2024-05-01 Very-soft-deprecate the old "org-node" struct, badly named
+;; 2024-05-05 Soft-deprecate
+(let (warned-once)
+  (defun org-node-aliases    (node) (unless warned-once (display-warning 'org-node "Your config uses deprecated accessors org-node-..., update to org-node-get-...") (setq warned-once t)) (org-node-get-aliases    node))
+  (defun org-node-deadline   (node) (unless warned-once (display-warning 'org-node "Your config uses deprecated accessors org-node-..., update to org-node-get-...") (setq warned-once t)) (org-node-get-deadline   node))
+  (defun org-node-file-path  (node) (unless warned-once (display-warning 'org-node "Your config uses deprecated accessors org-node-..., update to org-node-get-...") (setq warned-once t)) (org-node-get-file-path  node))
+  (defun org-node-file-title (node) (unless warned-once (display-warning 'org-node "Your config uses deprecated accessors org-node-..., update to org-node-get-...") (setq warned-once t)) (org-node-get-file-title node))
+  (defun org-node-id         (node) (unless warned-once (display-warning 'org-node "Your config uses deprecated accessors org-node-..., update to org-node-get-...") (setq warned-once t)) (org-node-get-id         node))
+  (defun org-node-is-subtree (node) (unless warned-once (display-warning 'org-node "Your config uses deprecated accessors org-node-..., update to org-node-get-...") (setq warned-once t)) (org-node-get-is-subtree node))
+  (defun org-node-level      (node) (unless warned-once (display-warning 'org-node "Your config uses deprecated accessors org-node-..., update to org-node-get-...") (setq warned-once t)) (org-node-get-level      node))
+  (defun org-node-olp        (node) (unless warned-once (display-warning 'org-node "Your config uses deprecated accessors org-node-..., update to org-node-get-...") (setq warned-once t)) (org-node-get-olp        node))
+  (defun org-node-pos        (node) (unless warned-once (display-warning 'org-node "Your config uses deprecated accessors org-node-..., update to org-node-get-...") (setq warned-once t)) (org-node-get-pos        node))
+  (defun org-node-properties (node) (unless warned-once (display-warning 'org-node "Your config uses deprecated accessors org-node-..., update to org-node-get-...") (setq warned-once t)) (org-node-get-properties node))
+  (defun org-node-refs       (node) (unless warned-once (display-warning 'org-node "Your config uses deprecated accessors org-node-..., update to org-node-get-...") (setq warned-once t)) (org-node-get-refs       node))
+  (defun org-node-scheduled  (node) (unless warned-once (display-warning 'org-node "Your config uses deprecated accessors org-node-..., update to org-node-get-...") (setq warned-once t)) (org-node-get-scheduled  node))
+  (defun org-node-tags       (node) (unless warned-once (display-warning 'org-node "Your config uses deprecated accessors org-node-..., update to org-node-get-...") (setq warned-once t)) (org-node-get-tags       node))
+  (defun org-node-title      (node) (unless warned-once (display-warning 'org-node "Your config uses deprecated accessors org-node-..., update to org-node-get-...") (setq warned-once t)) (org-node-get-title      node))
+  (defun org-node-todo       (node) (unless warned-once (display-warning 'org-node "Your config uses deprecated accessors org-node-..., update to org-node-get-...") (setq warned-once t)) (org-node-get-todo       node)))
 
 
 ;;; Other obsoletions
