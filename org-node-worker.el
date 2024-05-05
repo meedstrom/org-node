@@ -110,7 +110,7 @@ With `org-node-perf-multicore' non-nil, each subprocess builds
 its own instance of this variable and then writes it to a file
 for reading by the mother Emacs process.")
 
-(defun org-node-worker--collect-links-until (end id-here olp-with-self)
+(defun org-node-worker--collect-links-until (end id-here olp-with-self link-re)
   "From here to buffer position END, look for forward-links.
 Use these links to populate tables `org-node--links-table' and
 `org-node--reflinks-table'.
@@ -126,14 +126,12 @@ Argument OLP-WITH-SELF is the outline path to the current
 subtree, with its own heading tacked onto the end.  This is data
 that org-roam expects to have."
   (while (re-search-forward
-          ;; Pasted from `org-link-plain-re'
-          "\\(?:\\<\\(?:\\(attachment\\|el\\(?:feed\\|isp\\)\\|f\\(?:ile\\(?:\\+\\(?:\\(?:emac\\|sy\\)s\\)\\)?\\|tp\\)\\|h\\(?:elp\\|ttps?\\)\\|id\\|mailto\\|news\\|roam\\|shell\\)\\):\\(\\(?:[^][
-()<>]\\|[(<[]\\(?:[^][
-()<>]\\|[(<[][^][
-()<>]*[])>]\\)*[])>]\\)+\\(?:[^[:punct:]
-]\\|/\\|[(<[]\\(?:[^][
-()<>]\\|[(<[][^][
-()<>]*[])>]\\)*[])>]\\)\\)\\)"
+          ;; NOTE: There was a hair-pulling bug here because I pasted the
+          ;; evalled value of `org-link-plain-re', but whitespace cleaners
+          ;; subtly changed it upon save!  So now we just pass in the variable.
+          ;; And a lesson: set your editor to always highlight trailing spaces,
+          ;; at least in the regions you have modified (patch ws-butler?)
+          link-re
           end t)
     (let ((type (match-string 1))
           (path (match-string 2)))
@@ -181,11 +179,11 @@ The argument SYNCHRONOUS, if provided, should be a list of files
 to scan.  If not provided, assume we are in a child emacs spawned
 by `org-node-async--collect' and do what it expects."
   (with-temp-buffer
-    (setq vars (if synchronous
-                   variables
-                 (insert-file-contents "/tmp/org-node/work-variables.eld")
-                 (car (read-from-string (buffer-string)))))
-    (dolist (var vars)
+    (setq $vars (if synchronous
+                    variables
+                  (insert-file-contents "/tmp/org-node/work-variables.eld")
+                  (car (read-from-string (buffer-string)))))
+    (dolist (var $vars)
       (set (car var) (cdr var)))
     (if synchronous
         (setq files synchronous)
@@ -198,9 +196,12 @@ by `org-node-async--collect' and do what it expects."
           (file-name-handler-alist $file-name-handler-alist)
           (gc-cons-threshold $gc-cons-threshold)
           (coding-system-for-read $assume-coding-system)
-          ;; Reassigned on every iteration, so may as well reuse the
-          ;; memory locations (hopefully producing less garbage)
-          TITLE FILE-TITLE POS LEVEL HERE LINE+2)
+          (coding-system-for-write $assume-coding-system)
+          ;; Reassigned on every iteration, so may as well re-use the memory
+          ;; locations (hopefully producing less garbage). Not sure how elisp
+          ;; works tho.
+          TITLE FILE-TITLE POS LEVEL HERE LINE+2
+          TODO-STATE TAGS SCHED DEADLINE ID OLP)
       (dolist (FILE files)
         (if (not (file-exists-p FILE))
             ;; We got here because user deleted a file in a way that we didn't
@@ -255,12 +256,13 @@ by `org-node-async--collect' and do what it expects."
             ;; Collect links
             (let ((END (save-excursion
                          (org-node-worker--next-heading)
+                         ;; REVIEW: necessary?
                          (1- (point)))))
               (when FILE-ID
                 ;; Don't count org-super-links backlinks as forward links
                 (when (re-search-forward $backlink-drawer-re END t)
                   (search-forward ":end:"))
-                (org-node-worker--collect-links-until END FILE-ID nil)))
+                (org-node-worker--collect-links-until END FILE-ID nil $link-re)))
             (push `(org-node--add-node-to-tables
                     ,(list :title FILE-TITLE
                            :level 0
@@ -279,97 +281,99 @@ by `org-node-async--collect' and do what it expects."
                   org-node-worker--demands)
             ;; Loop over the file's subtrees
             (while (org-node-worker--next-heading)
-              ;; These bindings must be reinitialized to nil on each subtree,
-              ;; because a nil value is also meaningful
-              (let (TODO-STATE TAGS SCHED DEADLINE PROPS ID OLP)
-                (skip-chars-forward " ")
-                (setq POS (point))
-                (setq LEVEL (skip-chars-forward "*"))
-                (skip-chars-forward " ")
-                (setq HERE (point))
-                (when (looking-at TODO-RE)
-                  (setq TODO-STATE (buffer-substring
-                                    (point) (match-end 0)))
-                  (goto-char (1+ (match-end 0)))
-                  (setq HERE (point)))
-                (if (re-search-forward " +\\(:.+:\\) *$" (pos-eol) t)
-                    (progn
-                      (setq TITLE
-                            (org-node-worker--org-link-display-format
-                             (buffer-substring HERE (match-beginning 0))))
-                      (setq TAGS (split-string (match-string 1) ":" t)))
-                  (setq TITLE
-                        (org-node-worker--org-link-display-format
-                         (buffer-substring HERE (pos-eol)))))
-                (setq HERE (point))
-                (setq LINE+2 (and (forward-line 2) (point)))
-                (goto-char HERE)
-                (when (re-search-forward "[\n\s]SCHEDULED: " LINE+2 t)
-                  (setq SCHED
+              (setq POS (point))
+              (setq LEVEL (skip-chars-forward "*"))
+              (skip-chars-forward " ")
+              (setq HERE (point))
+              (if (looking-at TODO-RE)
+                  (progn
+                    (setq TODO-STATE (buffer-substring
+                                      (point) (match-end 0)))
+                    (goto-char (1+ (match-end 0)))
+                    (setq HERE (point)))
+                (setq TODO-STATE nil))
+              (if (re-search-forward " +\\(:.+:\\) *$" (pos-eol) t)
+                  (progn
+                    (setq TITLE
+                          (org-node-worker--org-link-display-format
+                           (buffer-substring HERE (match-beginning 0))))
+                    (setq TAGS (split-string (match-string 1) ":" t)))
+                (setq TITLE
+                      (org-node-worker--org-link-display-format
+                       (buffer-substring HERE (pos-eol))))
+                (setq TAGS nil))
+              (setq HERE (point))
+              (setq LINE+2 (progn (forward-line 2) (point)))
+              (goto-char HERE)
+              (setq SCHED
+                    (if (re-search-forward "[\n\s]SCHEDULED: " LINE+2 t)
+                        (prog1 (buffer-substring
+                                ;; \n just there for safety
+                                (point)
+                                (+ 1 (point) (skip-chars-forward "^]>\n")))
+                          (goto-char HERE))
+                      nil))
+              (setq DEADLINE
+                    (if (re-search-forward "[\n\s]DEADLINE: " LINE+2 t)
                         (buffer-substring
-                         ;; \n just there for safety
-                         (point) (+ 1 (point) (skip-chars-forward "^]>\n"))))
-                  (goto-char HERE))
-                (when (re-search-forward "[\n\s]DEADLINE: " LINE+2 t)
-                  (setq DEADLINE
-                        (buffer-substring
-                         (point) (+ 1 (point) (skip-chars-forward "^]>\n")))))
-                (setq HERE (point))
-                (setq LINE+2 (and (forward-line 2) (point)))
-                (goto-char HERE)
-                (when (re-search-forward "^ *:properties:" LINE+2 t)
-                  (forward-line 1)
-                  (setq PROPS (org-node-worker--collect-properties
-                               (point) (progn
-                                         (re-search-forward "^ *:end:")
-                                         (pos-bol)))))
-                (setq ID (cdr (assoc "ID" PROPS)))
-                (when $not-a-full-reset
-                  ;; Called by a rename-file advice
-                  (when ID
-                    (push `(org-id-add-location ,ID ,FILE)
-                          org-node-worker--demands)))
-                (push (list POS TITLE LEVEL ID) OUTLINE-DATA)
-                (setq OLP (org-node-worker--pos->olp OUTLINE-DATA POS))
-                ;; Now collect links while we're here!
-                (let ((ID-HERE (or ID (org-node-worker--pos->parent-id
-                                       OUTLINE-DATA POS FILE-ID)))
-                      (END (save-excursion
-                             (org-node-worker--next-heading)
-                             (1- (point))))
-                      (OLP-WITH-SELF (append OLP (list TITLE))))
-                  (when ID-HERE
-                    ;; Don't count org-super-links backlinks
-                    (when (re-search-forward $backlink-drawer-re END t)
-                      (search-forward ":end:"))
-                    (org-node-worker--collect-links-until
-                     END ID-HERE OLP-WITH-SELF)
-                    ;; Gotcha... also collect links inside the heading, not
-                    ;; just the body text
-                    (goto-char POS)
-                    (org-node-worker--collect-links-until
-                     (pos-eol) ID-HERE OLP-WITH-SELF)))
-                (push `(org-node--add-node-to-tables
-                        ,(list :title TITLE
-                               :is-subtree t
-                               :level LEVEL
-                               :id ID
-                               :pos POS
-                               :tags TAGS
-                               :todo TODO-STATE
-                               :file-path FILE
-                               :scheduled SCHED
-                               :deadline DEADLINE
-                               :file-title FILE-TITLE
-                               :olp OLP
-                               :properties PROPS
-                               :aliases
-                               (split-string-and-unquote
-                                (or (cdr (assoc "ROAM_ALIASES" PROPS)) ""))
-                               :refs
-                               (split-string-and-unquote
-                                (or (cdr (assoc "ROAM_REFS" PROPS)) ""))))
-                      org-node-worker--demands))))))
+                         (point) (+ 1 (point) (skip-chars-forward "^]>\n")))
+                      nil))
+              (setq HERE (point))
+              (setq LINE+2 (progn (forward-line 2) (point)))
+              (goto-char HERE)
+              (setq PROPS
+                    (if (re-search-forward "^ *:properties:\n" LINE+2 t)
+                        (org-node-worker--collect-properties
+                         (point) (progn (re-search-forward "^ *:end:")
+                                        (pos-bol)))
+                      nil))
+              (setq ID (cdr (assoc "ID" PROPS)))
+              (when $not-a-full-reset
+                ;; Called by a rename-file advice
+                (when ID
+                  (push `(org-id-add-location ,ID ,FILE)
+                        org-node-worker--demands)))
+              (push (list POS TITLE LEVEL ID) OUTLINE-DATA)
+              (setq OLP (org-node-worker--pos->olp OUTLINE-DATA POS))
+              ;; Now collect links while we're here!
+              (let ((ID-HERE (or ID (org-node-worker--pos->parent-id
+                                     OUTLINE-DATA POS FILE-ID)))
+                    (END (save-excursion
+                           (org-node-worker--next-heading)
+                           (1- (point))))
+                    (OLP-WITH-SELF (append OLP (list TITLE))))
+                (when ID-HERE
+                  ;; Don't count org-super-links backlinks
+                  (when (re-search-forward $backlink-drawer-re END t)
+                    (search-forward ":end:"))
+                  (org-node-worker--collect-links-until
+                   END ID-HERE OLP-WITH-SELF $link-re)
+                  ;; Gotcha... also collect links inside the heading, not
+                  ;; just the body text
+                  (goto-char POS)
+                  (org-node-worker--collect-links-until
+                   (pos-eol) ID-HERE OLP-WITH-SELF $link-re)))
+              (push `(org-node--add-node-to-tables
+                      ,(list :title TITLE
+                             :is-subtree t
+                             :level LEVEL
+                             :id ID
+                             :pos POS
+                             :tags TAGS
+                             :todo TODO-STATE
+                             :file-path FILE
+                             :scheduled SCHED
+                             :deadline DEADLINE
+                             :file-title FILE-TITLE
+                             :olp OLP
+                             :properties PROPS
+                             :aliases
+                             (split-string-and-unquote
+                              (or (cdr (assoc "ROAM_ALIASES" PROPS)) ""))
+                             :refs
+                             (split-string-and-unquote
+                              (or (cdr (assoc "ROAM_REFS" PROPS)) ""))))
+                    org-node-worker--demands)))))
 
       (if synchronous
           (let ((please-update-id-locations nil))
@@ -380,14 +384,17 @@ by `org-node-async--collect' and do what it expects."
             (when please-update-id-locations
               (org-id-update-id-locations)
               (org-id-locations-save)
-              ;; in case
+              ;; Just in case
               (when (listp org-id-locations)
-                (setq org-id-locations (org-id-alist-to-hash org-id-locations)))))
+                (setq org-id-locations (org-id-alist-to-hash org-id-locations))))
+            ;; Cleanup
+            (dolist (var $vars)
+              (makunbound (car var)))
+            (makunbound '$vars))
         ;; Write down the demands so `org-node-async--handle-finished-job' will
         ;; do the equivalent of above in the main Emacs process
         (with-temp-file (format "/tmp/org-node/result-%d.eld" i)
-          (insert (prin1-to-string org-node-worker--demands))
-          )))))
+          (insert (prin1-to-string org-node-worker--demands)))))))
 
 (provide 'org-node-worker)
 

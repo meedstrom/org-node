@@ -334,6 +334,7 @@ first element."
   `(($keep-file-name-handlers . ,org-node-perf-keep-file-name-handlers)
     ($assume-coding-system . ,org-node-perf-assume-coding-system)
     ($not-a-full-reset . ,(not (hash-table-empty-p org-nodes)))
+    ($link-re . ,org-link-plain-re)
     ($gc-cons-threshold
      . ,(or org-node-perf-gc-cons-threshold gc-cons-threshold))
     ($file-todo-option-re
