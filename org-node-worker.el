@@ -162,6 +162,7 @@ that org-roam expects to have."
 alist."
   (let (res)
     (goto-char beg)
+    ;; `with-restriction' is great, no perf impact and easy to reason about
     (with-restriction beg end
       (while (not (eobp))
         (search-forward ":")
@@ -219,8 +220,9 @@ by `org-node-async--collect' and do what it expects."
           TODO-STATE TAGS SCHED DEADLINE ID OLP
           PROPS FILE-TAGS FILE-ID OUTLINE-DATA TODO-RE FAR)
       (dolist (FILE files)
-        (when (= 0 (% (setq ctr (1+ ctr)) ctr-chunk))
-          (message "org-node resetting... inspected %d/%d files" ctr ctr-max))
+        (unless $not-a-full-reset
+          (when (= 0 (% (setq ctr (1+ ctr)) ctr-chunk))
+            (message "org-node resetting... inspected %d/%d files" ctr ctr-max)))
         (if (not (file-exists-p FILE))
             ;; We got here because user deleted a file in a way that we didn't
             ;; notice.  If it was actually a rename, it'll get picked up on

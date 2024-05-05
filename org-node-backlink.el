@@ -9,33 +9,45 @@
   :group 'org-node
   (if org-node-backlink-mode
       (progn
-        (add-hook 'org-roam-post-node-insert-hook #'org-node-backlink--add-in-target-a -99 t)
-        (add-hook 'org-node-insert-link-hook #'org-node-backlink--add-in-target-a -99 t)
-        ;; It seems advices cannot be buffer-local, but it's OK, these fns
-        ;; do nothing if this mode isn't active in the current buffer.
+        (add-hook 'org-roam-post-node-insert-hook
+                  #'org-node-backlink--add-in-target-a -99 t)
+        (add-hook 'org-node-insert-link-hook
+                  #'org-node-backlink--add-in-target-a -99 t)
+        (add-hook 'after-change-functions
+                  #'org-node-backlink--flag-change nil t)
+        (add-hook 'before-save-hook
+                  #'org-node-backlink--update-changed-parts-of-buffer nil t)
+        ;; It seems advices cannot be buffer-local, but it's OK, this fn
+        ;; does nothing if this mode isn't active in the current buffer.
         (advice-add 'org-insert-link :after
-                    #'org-node-backlink--add-in-target-a)
-        (advice-add 'ws-butler-before-save :before
-                    #'org-node-backlink--update-changed-parts-of-buffer))
-    (remove-hook 'org-roam-post-node-insert-hook #'org-node-backlink--add-in-target-a t)
-    (remove-hook 'org-node-insert-link-hook #'org-node-backlink--add-in-target-a t)))
+                    #'org-node-backlink--add-in-target-a))
+    (remove-hook 'after-change-functions
+                 #'org-node-backlink--flag-change t)
+    (remove-hook 'before-save-hook
+                 #'org-node-backlink--update-changed-parts-of-buffer t)
+    (remove-hook 'org-roam-post-node-insert-hook
+                 #'org-node-backlink--add-in-target-a t)
+    (remove-hook 'org-node-insert-link-hook
+                 #'org-node-backlink--add-in-target-a t)))
 
 (defvar org-node-backlink--fix-ctr 0)
-(defvar org-node-backlink--fix-cells nil)
+(defvar org-node-backlink--fix-files nil)
 
 (defun org-node-backlink-fix-all (&optional remove)
   "Add :BACKLINKS: property to all nodes known to `org-id-locations'.
-Optional argument REMOVE-THEM means remove them instead, the same
+Optional argument REMOVE means remove them instead, the same
 as the user command \\[org-node-backlink-regret]."
   (interactive)
-  (when (or (null org-node-backlink--fix-cells) current-prefix-arg)
+  (when (or (null org-node-backlink--fix-files) current-prefix-arg)
     ;; Start over
-    (org-node-cache-reset)
-    (setq org-node-backlink--fix-cells (org-id-hash-to-alist org-id-locations)))
+    (let ((org-node-perf-multicore nil))
+      (org-node-cache-reset))
+    (setq org-node-backlink--fix-files
+          (-uniq (hash-table-values org-id-locations))))
   (when (or (not (= 0 org-node-backlink--fix-ctr)) ;; resume interrupted
             (and
              (y-or-n-p (format "Edit the %d files found in `org-id-locations'?"
-                               (length org-node-backlink--fix-cells)))
+                               (length org-node-backlink--fix-files)))
              (y-or-n-p "You understand that this may trigger your auto git-commit systems and similar?")))
     (let ((find-file-hook nil)
           (org-mode-hook nil)
@@ -46,20 +58,20 @@ as the user command \\[org-node-backlink-regret]."
       ;; Do 1000 at a time, because Emacs cries about opening too many file
       ;; buffers in one loop
       (dotimes (_ 1000)
-        (when-let ((cell (pop org-node-backlink--fix-cells)))
+        (when-let ((file (pop org-node-backlink--fix-files)))
           (message
            "Adding/updating :BACKLINKS:... (you may quit and resume anytime) (%d) %s"
-           (cl-incf org-node-backlink--fix-ctr) (car cell))
+           (cl-incf org-node-backlink--fix-ctr) file)
           (delay-mode-hooks
-            (org-with-file-buffer (car cell)
+            (org-with-file-buffer file
               (org-with-wide-buffer
-               (org-node-backlink--update-buffer remove))
+               (org-node-backlink--update-whole-buffer remove))
               (and org-file-buffer-created
                    (buffer-modified-p)
                    (let ((save-silently t)
                          (inhibit-message t))
                      (save-buffer))))))))
-    (if org-node-backlink--fix-cells
+    (if org-node-backlink--fix-files
         ;; Keep going
         (run-with-timer 1 nil #'org-node-backlink-fix-all remove)
       ;; Reset
@@ -70,9 +82,6 @@ as the user command \\[org-node-backlink-regret]."
 files known to `org-id-locations'."
   (interactive)
   (org-node-backlink-fix-all 'remove))
-
-
-;;; Single file update
 
 (defun org-node-backlink--update-subtree-here (&optional remove)
   "Assumes point is at an :ID: line!
@@ -88,7 +97,7 @@ Update the :BACKLINKS: property.  With arg REMOVE, remove it instead."
              (or (gethash id org-nodes)
                  (if (string-blank-p id)
                      (user-error "Blank ID property in %s" buffer-file-name)
-                   (error "ID exists but not scanned by org-node for some reason, bad syntax? %s in file %s"
+                   (error "ID exists but not scanned by org-node for some reason, bad syntax? The ID seems valued as \"%s\" in file %s"
                           id buffer-file-name)))))
            (reflinks (--map (gethash it org-node--reflinks-table)
                             ROAM_REFS))
@@ -115,53 +124,64 @@ Update the :BACKLINKS: property.  With arg REMOVE, remove it instead."
             (org-entry-put nil "BACKLINKS" link-string))
         (org-entry-delete nil "BACKLINKS")))))
 
-(defun org-node-backlink--update-buffer (&optional remove markers)
+(defun org-node-backlink--update-whole-buffer (&optional remove)
   (save-excursion
     (goto-char (point-min))
-    (if markers
-        (dolist (marker markers)
-          (goto-char (marker-position marker))
-          (set-marker marker nil)
-          (org-node-backlink--update-subtree-here remove))
-      (let ((case-fold-search t))
-        (while (re-search-forward "^[[:space:]]*:id: " nil t)
-          (org-node-backlink--update-subtree-here remove))))))
-
-(defvar-local org-node-backlink--subtree-markers (list))
-
-(defun org-node-backlink--flag-subtrees-with-changes (_prop start end)
-  (save-excursion
-    (goto-char start)
     (let ((case-fold-search t))
-      ;; We're in a region where ws-butler detected a change, but the region
-      ;; will almost never envelop the preceding heading, so search back for it
-      (save-excursion
-        (when (re-search-backward "^[[:space:]]*:id: " nil t)
-          (goto-char (match-end 0))
-          (push (point-marker) org-node-backlink--subtree-markers)))
-      ;; ...and if the region of detected change is massive, spanning multiple
-      ;; subtrees, find each one
-      (while (re-search-forward "^[[:space:]]*:id: " end t)
-        (push (point-marker) org-node-backlink--subtree-markers)))))
+      (while (re-search-forward "^[[:space:]]*:id: " nil t)
+        (org-node-backlink--update-subtree-here remove)))))
 
 (defun org-node-backlink--update-changed-parts-of-buffer ()
   (when org-node-backlink-mode
     ;; Catch any error because this runs at `before-save-hook' which MUST fail
-    ;; gracefully and let the user save anyway.
+    ;; gracefully and let the user save anyway
     (condition-case err
         (progn
-          (while-let ((marker (pop org-node-backlink--subtree-markers)))
-            (set-marker marker nil))
-          (if ws-butler-mode
-              (progn
-                (ws-butler-map-changes #'org-node-backlink--flag-subtrees-with-changes)
-                (org-node-backlink--update-buffer
-                 nil org-node-backlink--subtree-markers))
-            (message "If saving a big file is slow, see org-node README for a fix based on ws-butler")
-            (org-node-backlink--update-buffer)))
+          ;; Algorithm to iterate over each change-region borrowed from
+          ;; `ws-butler-map-changes'.  Pretty odd, but elegant.  Worth knowing
+          ;; that if a bit of text has a property valued nil, that's the same
+          ;; as it not having that property at all.  So if START is in some
+          ;; unmodified territory - "org-node-chg" is valued at nil - the
+          ;; effect of this usage of `text-property-not-all' is to search until
+          ;; it is t.  Then the opposite happens, to search until it is nil
+          ;; again.
+          (let ((start (point-min))
+                (eob (copy-marker (point-max)))
+                prop end)
+            (while (and start (< start eob))
+              (setq prop (get-text-property start 'org-node-chg))
+              (setq end (text-property-not-all start eob 'org-node-chg prop))
+              (when prop
+                (goto-char start)
+                (let ((case-fold-search t))
+                  ;; START and END delineate an area where changes were detected, but the
+                  ;; area rarely envelops the current subtree's property drawer,
+                  ;; likely placed long before START, so search back for it
+                  (save-excursion
+                    (let ((id-here (org-entry-get nil "ID" t)))
+                      (when id-here
+                        (re-search-backward
+                         (concat "^[[:space:]]*:id: *" (regexp-quote id-here)))
+                        (re-search-forward "^[[:space:]]*:id: ")
+                        (org-node-backlink--update-subtree-here))))
+                  ;; ...and if the change-area is massive, spanning multiple
+                  ;; subtrees, update each one
+                  (while (re-search-forward "^[[:space:]]*:id: " end t)
+                    (org-node-backlink--update-subtree-here))))
+              ;; Move on and seek the next changed area
+              (remove-text-properties start (or end eob) 'org-node-chg)
+              (setq start end))
+            (set-marker eob nil)))
       (( error user-error debug )
        (lwarn 'org-node :error
               "org-node-backlink--update-changed-parts-of-buffer: %S" err)))))
+
+(defun org-node-backlink--flag-change (beg end _)
+  "Propertize changed text, for use by `org-node-backlink-mode'.
+Designed to run on `after-change-functions'."
+  (when (derived-mode-p 'org-mode)
+    (with-silent-modifications
+      (put-text-property beg end 'org-node-chg t))))
 
 
 ;;; Link-insertion advice

@@ -64,7 +64,7 @@ For your pleasure, here's a comparison of three similar notetaking systems: all 
 | Some query-able cache              | =org-roam-db= | =org-nodes=          | no                   |
 | Cache mandatory                    | yes         | no                 | no                   |
 | Asynchronous caching               | no          | yes                | yes (very async ;)   |
-| Time to re-cache my 2000 files     | 2m 48s      | 0m 01s             | not applicable       |
+| Time to re-cache my 2000 files     | 2m 48s      | 0m 02s             | not applicable       |
 
 This isn't a totally fair comparison; org-roam has an advantage in the details, see Appendix II.  With org-node I've made what I would've liked to hack on, so it's more simplistic in many aspects.
 
@@ -291,7 +291,7 @@ API comparison between org-roam and org-node.
 
 | Action                          | org-roam                           | org-node                                                                                |
 |---------------------------------+------------------------------------+-----------------------------------------------------------------------------------------|
-| Get ID at point                 | =(org-roam-id-at-point)=             | =(org-id-get nil nil nil t)=                                                              |
+| Get ID at point                 | =(org-roam-id-at-point)=             | =(org-entry-get nil "ID" t)=                                                              |
 | Get node at point               | =(org-roam-node-at-point)=           | =(org-node-at-point)=                                                                     |
 | Get list of files               | =(org-roam-list-files)=              | =(seq-uniq (hash-table-values org-id-locations))=                                         |
 | Prompt user to pick a node      | =(org-roam-node-read)=               | =(org-node-read)=                                                                         |
@@ -447,7 +447,7 @@ Two options:
    (setq auto-save-timeout 5)
    (setq auto-save-no-message t)
    ;; Just save all files after 40 idle seconds, do not even ask
-   (setq my-mass-save-timer (run-wi th-idle-timer 40 t #'save-some-buffers t))
+   (setq my-mass-save-timer (run-with-idle-timer 40 t #'save-some-buffers t))
    ;; Automatically do the "M-x recover-this-file" thing if emacs crashed before
    ;; those 40 seconds
    (add-hook 'find-file-hook
