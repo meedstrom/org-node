@@ -28,9 +28,7 @@
 
 ;;; Code:
 
-;; TODO Merge -async.el into -cache.el
-;; TODO Simplify backlink-mode
-;; TODO What happens when we move a subtree to a differetn file but save the destination before saving  the origin file?
+;; TODO What happens when we move a subtree to a different file but save the destination before saving  the origin file?
 ;; TODO Like we feed the org-roam-db, maybe feed org-id-locations too?  We can probably do it faster.  Then we can also provide saner user config.
 ;; TODO Better initial setup for people with incomplete org-id
 ;; TODO Annotations for completion
