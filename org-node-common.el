@@ -295,7 +295,13 @@ first element."
 ;; I feel like this could be easier to read...
 (defun org-node--add-node-to-tables (node-as-plist)
   "Add a node to `org-nodes' and maybe `org-node-collection'."
-  (let ((node (apply #'make-org-node-data node-as-plist)))
+  (let* ((node (apply #'make-org-node-data node-as-plist))
+         (id (org-node-get-id node)))
+    (when (gethash id org-nodes)
+      (user-error "Duplicate ID %s in files %s and %s"
+                  id
+                  (org-node-get-file-path node)
+                  (org-node-get-file-path (gethash id org-nodes))))
     ;; Record the node even if it has no ID
     (puthash (or (org-node-get-id node) (format-time-string "%N"))
              node
