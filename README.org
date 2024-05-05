@@ -170,7 +170,7 @@ Then start using the minor mode =org-node-backlink-mode=, which keeps these prop
 
 Please note that if you have huge files, saving them may be slow unless you install and enable [[https://github.com/hlissner/ws-butler][ws-butler-mode]], which provides a great mechanism for org-node to only check the parts of the buffer that changed, so even monster files can be saved fast.
 
-Necessary setup for ws-butler follows.  Users of =auto-save-visited-mode= may want to read [[https://github.com/meedstrom/org-node?tab=readme-ov-file#appendix-iv-ws-butler-org-mode-auto-save-visited-mode-hell][Appendix IV]].
+Necessary setup for ws-butler follows.  Users of =auto-save-visited-mode= may want to read [[https://github.com/meedstrom/org-node?tab=readme-ov-file#appendix-iv-ws-butler--org-mode--auto-save-visited-mode--hell][Appendix IV]].
 
 #+begin_src elisp
 (add-hook 'org-mode-hook #'ws-butler-mode)
