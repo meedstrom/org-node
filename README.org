@@ -137,7 +137,7 @@ Want to keep using =M-x org-roam-buffer-toggle=?
 
 If you didn't have laggy saves, this is fine.  In other words, keep =org-roam-db-update-on-save= at t.
 
-**** *Option 1B*.  Tell org-node to write to the org-roam DB in its stead.
+**** *Option 1B*.  Tell org-node to write to the org-roam DB.
 
 The following hook keeps the database synced.
 
@@ -149,14 +149,18 @@ For a full reset, equivalent to =C-u M-x org-roam-db-sync=, you can type =M-x or
 
 **** *Option 1C*.  Cut out the DB altogether.
 
-Instead of the above, add this hack:
+Instead of the above, do some hax:
 
 #+begin_src elisp
 (advice-add 'org-roam-backlinks-get :override
             #'org-node--fabricate-roam-backlinks)
+(advice-add 'org-roam-reflinks-get :override
+            #'org-node--fabricate-roam-reflinks)
 #+end_src
 
 ** Backlink solution 2: inside the file
+I love these solutions because I rarely have the screen space to display a backlink buffer.
+
 **** *Option 2A*.  Let org-node add a =:BACKLINKS:= property to all nodes.
 
 For a first-time run, type =M-x org-node-backlink-fix-all=.  (Don't worry, if you change your mind, you can undo with =M-x org-node-backlink-regret=.)
