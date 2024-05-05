@@ -175,6 +175,9 @@ alist."
         (forward-line 1)))
     res))
 
+;; TODO Write a command that verifies that all files in id-locations are
+;;      utf-8-unix
+;;
 ;; TODO Consider what to do if org-id-locations stored the same file under
 ;;      different names
 (defun org-node-worker--collect (&optional synchronous variables)
@@ -229,11 +232,13 @@ by `org-node-async--collect' and do what it expects."
           (erase-buffer)
           ;; NOTE: Used `insert-file-contents-literally' in the past,
           ;; converting each captured substring afterwards with
-          ;; `decode-coding-string', but it still made us record the wrong
+          ;; `decode-coding-string', but it still made me record the wrong
           ;; value for :pos when there was any Unicode in the file.  So
           ;; instead, the let-bindings above reproduce much of what it did.
           (insert-file-contents FILE)
           (setq OUTLINE-DATA nil)
+          ;; TODO: handle a byte-order mark...
+          ;; (when (equal (buffer-substring 0 3) "\xEF\xBB\xBF"))
           ;; Roughly like `org-end-of-meta-data' for file level
           (setq FAR (or (re-search-forward "^ *?[^#:]" nil t) (point-max)))
           (goto-char 1)
@@ -321,6 +326,9 @@ by `org-node-async--collect' and do what it expects."
                      (buffer-substring HERE (pos-eol))))
               (setq TAGS nil))
             (setq HERE (point))
+            ;; This boundary guards against the case of working from a
+            ;; content-less heading just before another heading, and matching
+            ;; that one's metadata
             (setq LINE+2 (progn (forward-line 2) (point)))
             (goto-char HERE)
             (setq SCHED
@@ -329,20 +337,21 @@ by `org-node-async--collect' and do what it expects."
                               ;; \n just there for safety
                               (point)
                               (+ 1 (point) (skip-chars-forward "^]>\n")))
+                        (setq LINE+2 (progn (forward-line 2) (point)))
                         (goto-char HERE))
                     nil))
             (setq DEADLINE
                   (if (re-search-forward "[\n\s]DEADLINE: " LINE+2 t)
-                      (buffer-substring
-                       (point) (+ 1 (point) (skip-chars-forward "^]>\n")))
+                      (prog1 (buffer-substring
+                              (point)
+                              (+ 1 (point) (skip-chars-forward "^]>\n")))
+                        (setq LINE+2 (progn (forward-line 2) (point)))
+                        (goto-char HERE))
                     nil))
-            (setq HERE (point))
-            (setq LINE+2 (progn (forward-line 2) (point)))
-            (goto-char HERE)
             (setq PROPS
-                  (if (re-search-forward "^ *:properties:\n" LINE+2 t)
+                  (if (re-search-forward "^[[:space:]]*:properties:" LINE+2 t)
                       (org-node-worker--collect-properties
-                       (point) (progn (re-search-forward "^ *:end:")
+                       (point) (progn (re-search-forward "^[[:space:]]*:end:")
                                       (pos-bol)))
                     nil))
             (setq ID (cdr (assoc "ID" PROPS)))
