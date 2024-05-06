@@ -3,6 +3,12 @@
 (require 'org-node-common)
 (require 'org-node-cache)
 
+(define-globalized-minor-mode org-node-backlink-global-mode
+  org-node-backlink-mode
+  (lambda ()
+    (when (derived-mode-p 'org-mode)
+      (org-node-backlink-mode))))
+
 ;;;###autoload
 (define-minor-mode org-node-backlink-mode
   "Keep :BACKLINKS: properties updated."
@@ -40,10 +46,9 @@ as the user command \\[org-node-backlink-regret]."
   (interactive)
   (when (or (null org-node-backlink--fix-files) current-prefix-arg)
     ;; Start over
-    (let ((org-node-perf-multicore nil))
-      (org-node-cache-reset))
+    (org-node-cache-ensure t t)
     (setq org-node-backlink--fix-files
-          (org-node-files)))
+          (-uniq (hash-table-values org-id-locations))))
   (when (or (not (= 0 org-node-backlink--fix-ctr)) ;; resume interrupted
             (and
              (y-or-n-p (format "Edit the %d files found in `org-id-locations'?"

@@ -138,8 +138,7 @@ that org-roam expects to have."
           ;; subtly changed it upon save!  So now we just pass in the variable.
           ;; And a lesson: set your editor to always highlight trailing spaces,
           ;; at least in the regions you have modified (patch ws-butler?)
-          link-re
-          end t)
+          link-re end t)
     (let ((type (match-string 1))
           (path (match-string 2)))
       (if (save-excursion
@@ -183,29 +182,27 @@ alist."
         (forward-line 1)))
     res))
 
-;; TODO If no ID was detected, just store OLDATA and skip to the next heading.
-;;      Do not record the subtree.
+;; TODO First do one search for any ID inside the file at all, so we can skip
 ;;
 ;; TODO Write a command that verifies that all files in id-locations are
-;;      utf-8-unix
+;;      utf-8-unix or whichever charset
 ;;
 ;; TODO Consider what to do if org-id-locations stored the same file under
 ;;      different names
 (defun org-node-worker--collect ()
-  "Scan for id-nodes across files, adding them to `org-nodes'."
+  "Scan for id-nodes across files."
   (with-temp-buffer
     (insert-file-contents (org-node-worker--tmpfile "work-variables.eld"))
     (dolist (var (car (read-from-string (buffer-string))))
       (set (car var) (cdr var)))
-    ;; For each process, `$files' is set by `org-node-async--collect'... with an
-    ;; extra morsel of data sent along
+    ;; For each process, an unique `$files' is set1 by
+    ;; `org-node-async--collect'... with an extra morsel of data sent along
     (setq i (pop $files))
     (let ((case-fold-search t)
           ;; Perf
           (file-name-handler-alist $file-name-handler-alist)
           (gc-cons-threshold $gc-cons-threshold)
           (coding-system-for-read $assume-coding-system)
-          (coding-system-for-write $assume-coding-system)
           ;; Reassigned on every iteration, so may as well re-use the memory
           ;; locations (hopefully producing less garbage) instead of making a
           ;; new let-binding every time.  Not sure how elisp works... but
@@ -267,40 +264,35 @@ alist."
                      (buffer-substring (point) (pos-eol)))
                   ;; File nodes dont strictly need #+title, fall back on filename
                   (file-name-nondirectory FILE)))
-          (setq FILE-ID (cdr (assoc "ID" PROPS)))
-          (when $not-a-full-reset
-            ;; This was probably called by a rename-file advice
-            ;; REVIEW: Maybe rename the boolean to $explicit?
-            (when FILE-ID
+          (when (setq FILE-ID (cdr (assoc "ID" PROPS)))
+            (when $targeted
+              ;; This was probably called by a rename-file advice, i.e. this
+              ;; is not a full reset of all files, just a scan of 1 file
               (push `(org-id-add-location ,FILE-ID ,FILE)
-                    org-node-worker--demands)))
-          ;; Collect links
-          (let ((END (save-excursion
-                       (org-node-worker--next-heading)
-                       ;; REVIEW: necessary?
-                       (1- (point)))))
-            (when FILE-ID
+                    org-node-worker--demands))
+            ;; Collect links
+            (let ((END (save-excursion (org-node-worker--next-heading))))
               ;; Don't count org-super-links backlinks as forward links
               (when (re-search-forward $backlink-drawer-re END t)
                 (unless (search-forward ":end:" END t)
                   (error "Couldn't find matching :END: drawer in file %s" FILE)))
-              (org-node-worker--collect-links-until END FILE-ID nil $link-re)))
-          (push `(org-node--add-node-to-tables
-                  ,(list :title FILE-TITLE
-                         :level 0
-                         :tags FILE-TAGS
-                         :file-path FILE
-                         :pos 1
-                         :file-title FILE-TITLE
-                         :properties PROPS
-                         :id FILE-ID
-                         :aliases
-                         (split-string-and-unquote
-                          (or (cdr (assoc "ROAM_ALIASES" PROPS)) ""))
-                         :refs
-                         (split-string-and-unquote
-                          (or (cdr (assoc "ROAM_REFS" PROPS)) ""))))
-                org-node-worker--demands)
+              (org-node-worker--collect-links-until END FILE-ID nil $link-re))
+            (push `(org-node--add-node-to-tables
+                    ,(list :title FILE-TITLE
+                           :level 0
+                           :tags FILE-TAGS
+                           :file-path FILE
+                           :pos 1
+                           :file-title FILE-TITLE
+                           :properties PROPS
+                           :id FILE-ID
+                           :aliases
+                           (split-string-and-unquote
+                            (or (cdr (assoc "ROAM_ALIASES" PROPS)) ""))
+                           :refs
+                           (split-string-and-unquote
+                            (or (cdr (assoc "ROAM_REFS" PROPS)) ""))))
+                  org-node-worker--demands))
           ;; Loop over the file's subtrees
           (while (org-node-worker--next-heading)
             (setq POS (point))
@@ -328,6 +320,8 @@ alist."
             ;; that one's metadata
             (setq LINE+2 (progn (forward-line 2) (point)))
             (goto-char HERE)
+            ;; TODO: look for CLOSED too. maybe more optimal algo by moving
+            ;; onto that line and just looking at the line
             (setq SCHED
                   (if (re-search-forward "[\n\s]SCHEDULED: " LINE+2 t)
                       (prog1 (buffer-substring
@@ -355,13 +349,35 @@ alist."
                        FILE)
                     nil))
             (setq ID (cdr (assoc "ID" PROPS)))
-            (when $not-a-full-reset
-              ;; Called by a rename-file advice
-              (when ID
+            (when ID
+              (when $targeted
+                ;; Called by a rename-file advice
                 (push `(org-id-add-location ,ID ,FILE)
                       org-node-worker--demands)))
             (push (list POS TITLE LEVEL ID) OUTLINE-DATA)
-            (setq OLP (org-node-worker--pos->olp OUTLINE-DATA POS))
+            (when ID
+              (setq OLP (org-node-worker--pos->olp OUTLINE-DATA POS))
+              (push `(org-node--add-node-to-tables
+                      ,(list :title TITLE
+                             :is-subtree t
+                             :level LEVEL
+                             :id ID
+                             :pos POS
+                             :tags TAGS
+                             :todo TODO-STATE
+                             :file-path FILE
+                             :scheduled SCHED
+                             :deadline DEADLINE
+                             :file-title FILE-TITLE
+                             :olp OLP
+                             :properties PROPS
+                             :aliases
+                             (split-string-and-unquote
+                              (or (cdr (assoc "ROAM_ALIASES" PROPS)) ""))
+                             :refs
+                             (split-string-and-unquote
+                              (or (cdr (assoc "ROAM_REFS" PROPS)) ""))))
+                    org-node-worker--demands))
             ;; Now collect links while we're here!
             (let ((ID-HERE (or ID (org-node-worker--pos->parent-id
                                    OUTLINE-DATA POS FILE-ID)))
@@ -381,28 +397,7 @@ alist."
                 ;; just the body text
                 (goto-char POS)
                 (org-node-worker--collect-links-until
-                 (pos-eol) ID-HERE OLP-WITH-SELF $link-re)))
-            (push `(org-node--add-node-to-tables
-                    ,(list :title TITLE
-                           :is-subtree t
-                           :level LEVEL
-                           :id ID
-                           :pos POS
-                           :tags TAGS
-                           :todo TODO-STATE
-                           :file-path FILE
-                           :scheduled SCHED
-                           :deadline DEADLINE
-                           :file-title FILE-TITLE
-                           :olp OLP
-                           :properties PROPS
-                           :aliases
-                           (split-string-and-unquote
-                            (or (cdr (assoc "ROAM_ALIASES" PROPS)) ""))
-                           :refs
-                           (split-string-and-unquote
-                            (or (cdr (assoc "ROAM_REFS" PROPS)) ""))))
-                  org-node-worker--demands))))
+                 (pos-eol) ID-HERE OLP-WITH-SELF $link-re))))))
       (with-temp-file (org-node-worker--tmpfile "result-%d.eld" i)
         (let ((print-length nil))
           (insert (prin1-to-string org-node-worker--demands)))))))

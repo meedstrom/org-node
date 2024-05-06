@@ -8,8 +8,7 @@
   "Recurring timer used while `org-node-cache-mode' is off.")
 
 (defun org-node-cache-reset ()
-  "Wipe and rebuild the cache.
-For an user-facing command, see \\[org-node-reset]."
+  "Wipe and rebuild the cache."
   (org-node-cache-ensure nil t))
 
 (defun org-node-cache-ensure (&optional synchronous force)
@@ -27,7 +26,6 @@ asynchronously unless SYNCHRONOUS is also set.  When
 when this argument is nil."
   ;; First just make sure we've loaded org-id's stuff from disk.
   (when (null org-id-locations)
-    (message "org-id-locations empty%s" org-node--standard-tip)
     (when (file-exists-p org-id-locations-file)
       (org-id-locations-load)))
   (when (listp org-id-locations)
@@ -43,19 +41,13 @@ when this argument is nil."
     (setq org-node-cache--modeless-timer
           (run-with-idle-timer 45 t #'org-node-cache-reset)))
   (when (hash-table-empty-p org-nodes)
-    (setq synchronous t force t))
-  (let ((live (-any-p #'process-live-p org-node-async--processes)))
-    (cond
-     ((and synchronous force) ;; Blocking scan requested
-      (or live (org-node-async--collect (org-node-files)))
-      (message "org-node: Caching synchronously...")
-      (mapc #'accept-process-output org-node-async--processes))
-
-     ((and (not synchronous) force) ;; Chill scan requested
-      (or live (org-node-async--collect (org-node-files))))
-
-     ((and synchronous (not force)) ;; Block only if scan ongoing
-      (mapc #'accept-process-output org-node-async--processes)))))
+    (setq synchronous t
+          force t))
+  (when force
+    (unless (-any-p #'process-live-p org-node-async--processes)
+      (org-node-async--collect)))
+  (when synchronous
+    (mapc #'accept-process-output org-node-async--processes)))
 
 ;;;###autoload
 (define-minor-mode org-node-cache-mode
@@ -128,7 +120,7 @@ row."
   "Print some random members of `org-nodes' that have IDs.
 See also the type `org-node-data'."
   (interactive)
-  (let ((id-nodes (-filter #'org-node-get-id (hash-table-values org-nodes))))
+  (let ((id-nodes (hash-table-values org-nodes)))
     (dotimes (_ 3)
       (print '----------------------------)
       (cl-prin1 (nth (random (length id-nodes)) id-nodes)))))

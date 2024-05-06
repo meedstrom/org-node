@@ -27,14 +27,6 @@ elements, the return value is still N items, where some are nil."
        res))
     res))
 
-;; (org-node-async--split-into-n-sublists
-;;       '(a v e e)
-;;       7)
-
-;; (org-node-async--split-into-n-sublists
-;;       '(a v e e  q l fk k k ki i o r r  r r r r r r r r g g g  g g gg)
-;;       4)
-
 (defun org-node-async--collect (&optional files)
   (mkdir (org-node-worker--tmpfile) t)
   (with-current-buffer (get-buffer-create " *org-node*")
@@ -60,8 +52,8 @@ elements, the return value is still N items, where some are nil."
          (native (when (and (featurep 'native-compile)
                             (native-comp-available-p))
                    (comp-el-to-eln-filename lib)))
-         (native-comp-speed 3)
-         (elc (org-node-worker--tmpfile "worker.elc")))
+         (elc (org-node-worker--tmpfile "worker.elc"))
+         (targeted (not (null files))))
     ;; Pre-compile the worker, if the user's package manager didn't compile it
     ;; already, or if development is happening in org-node-worker.el.
     (if native
@@ -77,15 +69,38 @@ elements, the return value is still N items, where some are nil."
                `(lambda (&rest _) ,elc)))
           (byte-compile-file lib))))
 
-
     (setq org-node-async--start-time (current-time))
     (setq org-node-async--done-ctr 0)
     (with-temp-file (org-node-worker--tmpfile "work-variables.eld")
-      (insert (prin1-to-string
-               (append (org-node--work-variables)
-                       '(($not-a-full-reset . ,(not (null files))))
-                       org-node-async-inject-variables))))
-    (setq files (or files (org-node-files)))
+      (insert
+       (prin1-to-string
+        ;; The purpose of $sigils is just visual, to distinguish these
+        ;; variables in the body of `org-node-worker--collect'.
+        (append
+         org-node-async-inject-variables
+         `(($targeted . ,targeted)
+           ($keep-file-name-handlers . ,org-node-perf-keep-file-name-handlers)
+           ($assume-coding-system . ,org-node-perf-assume-coding-system)
+           ($link-re . ,org-link-plain-re)
+           ($gc-cons-threshold
+            . ,(or org-node-perf-gc-cons-threshold gc-cons-threshold))
+           ($file-todo-option-re
+            . ,(rx bol (or "#+todo: " "#+seq_todo: " "#+typ_todo: ")))
+           ($file-name-handler-alist
+            . ,(--keep (rassoc it org-node-perf-keep-file-name-handlers)
+                       file-name-handler-alist))
+           ($global-todo-re
+            . ,(org-node-worker--make-todo-regexp
+                (string-join (mapcan #'cdr (default-value 'org-todo-keywords))
+                             " ")))
+           ($backlink-drawer-re
+            . ,(concat "^[[:space:]]*:"
+                       (or (and (fboundp 'org-super-links-link)
+                                (require 'org-super-links)
+                                (stringp org-super-links-backlink-into-drawer)
+                                (downcase org-super-links-backlink-into-drawer))
+                           "backlinks")
+                       ":")))))))
 
     ;; NB: I considered keeping the processes alive to skip the spin-up
     ;; time, but the subprocesses report `emacs-init-time' as 0.001s.
@@ -98,9 +113,10 @@ elements, the return value is still N items, where some are nil."
         (delete-process old-process)))
 
     ;; Split the work over many Emacs processes
-    (let ((file-lists (org-node-async--split-into-n-sublists
-                       files org-node-async--jobs))
-          (print-length nil))
+    (let ((print-length nil)
+          (file-lists (org-node-async--split-into-n-sublists
+                       (or files (org-node-files))
+                       org-node-async--jobs)))
       ;; If user has e.g. 8 cores but only 5 files, spin up only 5 jobs
       (delq nil file-lists)
       (setq org-node-async--jobs (min org-node-async--jobs (length file-lists)))
@@ -129,26 +145,27 @@ elements, the return value is still N items, where some are nil."
                               (or native elc)
                               "--funcall"
                               "org-node-worker--collect")
-               :sentinel (lambda (process event)
+               :sentinel (lambda (process _event)
                            (org-node-async--handle-finished-job
-                            process event i)))
+                            process i targeted)))
               org-node-async--processes)))))
 
 (defvar org-node-async--processes (list))
 (defvar org-node-async--done-ctr 0)
 (defvar org-node-async--jobs nil)
 
-(defun org-node-async--handle-finished-job (process _ i)
-  (when (= 0 org-node-async--done-ctr)
-    ;; This used to be in `org-node-cache-reset', wiping tables before
-    ;; launching the processes, but that leads to a larger time window when
-    ;; completions are unavailable.  Instead, wait until the first process
-    ;; starts returning, then wipe the tables.
-    (clrhash org-nodes)
-    (clrhash org-node-collection)
-    (clrhash org-node--refs-table)
-    (clrhash org-node--reflinks-table)
-    (clrhash org-node--links-table))
+(defun org-node-async--handle-finished-job (process i targeted)
+  (unless targeted
+    (when (= 0 org-node-async--done-ctr)
+      ;; This used to be in `org-node-cache-reset', wiping tables before
+      ;; launching the processes, but that leads to a larger time window when
+      ;; completions are unavailable.  Instead, we've wait until the first
+      ;; process starts returning, and now wipe the tables.
+      (clrhash org-nodes)
+      (clrhash org-node-collection)
+      (clrhash org-node--refs-table)
+      (clrhash org-node--reflinks-table)
+      (clrhash org-node--links-table)))
   (with-temp-buffer
     ;; Paste what the worker output
     (let ((file (org-node-worker--tmpfile "result-%d.eld" i)))
@@ -159,7 +176,8 @@ elements, the return value is still N items, where some are nil."
             (when (get-buffer "*org-node errors*")
               (kill-buffer "*org-node errors*"))
             (with-current-buffer (get-buffer-create " *org-node*")
-              (rename-buffer "*org-node errors*")))
+              (rename-buffer "*org-node errors*")
+              (insert (format-time-string "\nThis output printed at %T"))))
         (insert-file-contents file)
         ;; Execute the demands that the worker wrote
         (let ((please-rescan nil))
@@ -167,25 +185,33 @@ elements, the return value is still N items, where some are nil."
             (apply (car demand) (cdr demand))
             (when (eq 'org-node--forget-id-location (car demand))
               (setq please-rescan t)))
-          ;; The last process has completed
+          ;; Check if this was the last process to return, then wrap-up
           (when (eq (cl-incf org-node-async--done-ctr) org-node-async--jobs)
             (when please-rescan
               (org-node-async--collect (org-node-files)))
             ;; Print time elapsed.  Don't do it if cache mode is off because
-            ;; that'd be spammy as it resets all the time.
-            (when (bound-and-true-p org-node-cache-mode)
-              (let ((n-subtrees
-                     (cl-loop for node being the hash-values of org-nodes
-                              count (org-node-get-is-subtree node))))
-                (message
-                 "org-node: found %d files, %d subtrees and %d links in %.2fs"
-                 (- (hash-table-count org-nodes) n-subtrees)
-                 n-subtrees
-                 (+ (length (apply #'append
-                                   (hash-table-values org-node--links-table)))
-                    (length (apply #'append
-                                   (hash-table-values org-node--reflinks-table))))
-                 (float-time (time-since org-node-async--start-time)))))))))))
+            ;; that'd be spammy as it resets all the time, nor if this was a
+            ;; $targeted run (operated on single file after a rename) as the
+            ;; sums would be misleading.
+            (when (and (bound-and-true-p org-node-cache-mode)
+                       (not targeted))
+              (let ((n-subtrees (cl-loop
+                                 for node being the hash-values of org-nodes
+                                 count (org-node-get-is-subtree node)))
+                    (n-backlinks (length (apply #'append
+                                                (hash-table-values
+                                                 org-node--links-table))))
+                    (n-reflinks (length (apply #'append
+                                               (hash-table-values
+                                                org-node--reflinks-table)))))
+                ;; (2024-05-06) NOTE In a few days, remove "w ID" (transitional)
+                (message "%.1fs: org-node saw %d files, %d subtrees w ID, %d ID-links, %d potential reflinks"
+                         (float-time (time-since org-node-async--start-time))
+                         (- (hash-table-count org-nodes) n-subtrees)
+                         n-subtrees
+                         n-backlinks
+                         n-reflinks)))
+            (org-id-locations-save)))))))
 
 (provide 'org-node-async)
 
