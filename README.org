@@ -56,7 +56,7 @@ For your pleasure, here's a comparison of three similar notetaking systems: all 
 | org-capture integration            | no          | yes                | no                   |
 | Backlinks in same window           | no          | yes                | yes                  |
 | Avoid scanning :BACKLINKS: drawers | no          | yes                | yes                  |
-| Find files/headings without ID     | no          | yes                | not applicable       |
+| Find files/headings without ID     | no          | optional           | not applicable       |
 | Node exclusion                     | yes         | limited            | not applicable       |
 | Support =roam:= links                | yes         | no                 | no                   |
 | Warn about dead links              | no          | no                 | no                   |

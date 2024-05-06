@@ -33,7 +33,7 @@ elements, the return value is still N items, where some are nil."
 ;;       4)
 
 (defun org-node-async--collect (files)
-  (mkdir (org-node-worker--dir) t)
+  (mkdir (org-node-worker--tmpfile) t)
   (with-current-buffer (get-buffer-create " *org-node*")
     (erase-buffer))
   (setq org-node-async--jobs
@@ -60,7 +60,7 @@ elements, the return value is still N items, where some are nil."
                             (native-comp-available-p))
                    (comp-el-to-eln-filename lib)))
          ;; (precompiled-elc (funcall byte-compile-dest-file-function lib))
-         (elc (org-node-worker--dir "worker.elc")))
+         (elc (org-node-worker--tmpfile "worker.elc")))
     ;; Pre-compile the worker, in case the user's
     ;; package manager didn't compile already.
     (if native
@@ -78,7 +78,7 @@ elements, the return value is still N items, where some are nil."
 
     (setq org-node-async--start-time (current-time))
     (setq org-node-async--done-ctr 0)
-    (with-temp-file (org-node-worker--dir "work-variables.eld")
+    (with-temp-file (org-node-worker--tmpfile "work-variables.eld")
       (insert (prin1-to-string (append (org-node--work-variables)
                                        org-node-async-inject-variables))))
     ;; Split the work over many Emacs processes
@@ -94,7 +94,7 @@ elements, the return value is still N items, where some are nil."
         (when (process-live-p old-process)
           (delete-process old-process)))
       (dotimes (i org-node-async--jobs)
-        (with-temp-file (org-node-worker--dir (format "file-list-%d.eld" i))
+        (with-temp-file (org-node-worker--tmpfile (format "file-list-%d.eld" i))
           (insert (prin1-to-string (pop file-lists))))
         (push (make-process
                :name (format "org-node-%d" i)
@@ -108,7 +108,7 @@ elements, the return value is still N items, where some are nil."
                               "--no-site-lisp"
                               "--batch"
                               "--insert"
-                              (org-node-worker--dir (format "file-list-%d.eld" i))
+                              (org-node-worker--tmpfile (format "file-list-%d.eld" i))
                               "--eval"
                               (format
                                "(setq files (cons %d (car (read-from-string (buffer-string)))))"
@@ -129,37 +129,37 @@ elements, the return value is still N items, where some are nil."
 (defun org-node-async--handle-finished-job (process _ i)
   (with-temp-buffer
     ;; Paste what the worker output
-    (let ((file (org-node-worker--dir (format "result-%d.eld" i))))
+    (let ((file (org-node-worker--tmpfile (format "result-%d.eld" i))))
       (if (not (file-exists-p file))
           (message "An org-node worker failed to scan files, not producing %s"
                    file)
         (insert-file-contents file)
         (delete-file file)
         ;; Execute the demands that the worker wrote
-        (let ((please-update-id-locations nil))
+        (let ((please-rescan nil))
           (dolist (demand (car (read-from-string (buffer-string))))
             (apply (car demand) (cdr demand))
             (when (eq 'org-node--forget-id-location (car demand))
-              (setq please-update-id-locations t)))
+              (setq please-rescan t)))
           ;; The last process has completed
           (when (eq (cl-incf org-node-async--done-ctr) org-node-async--jobs)
-            (when please-update-id-locations
-              (setq please-update-id-locations nil)
-              (org-id-update-id-locations)
-              (org-id-locations-save)
-              ;; in case
-              (when (listp org-id-locations)
-                (setq org-id-locations (org-id-alist-to-hash org-id-locations))))
-            (let ((n-subtrees (cl-loop for node being the hash-values of org-nodes
-                                       count (org-node-get-is-subtree node))))
-              (message "org-node: found %d files, %d subtrees and %d links in %.2fs"
-                       (- (hash-table-count org-nodes) n-subtrees)
-                       n-subtrees
-                       (+ (length (apply #'append
-                                         (hash-table-values org-node--links-table)))
-                          (length (apply #'append
-                                         (hash-table-values org-node--reflinks-table))))
-                       (float-time (time-since org-node-async--start-time))))))))))
+            (when please-rescan
+              (org-node-async--collect (org-node-files)))
+            ;; Print time elapsed.  Don't do it if cache mode is off because
+            ;; that'd be spammy as it resets all the time.
+            (when (bound-and-true-p org-node-cache-mode)
+              (let ((n-subtrees
+                     (cl-loop for node being the hash-values of org-nodes
+                              count (org-node-get-is-subtree node))))
+                (message
+                 "org-node: found %d files, %d subtrees and %d links in %.2fs"
+                 (- (hash-table-count org-nodes) n-subtrees)
+                 n-subtrees
+                 (+ (length (apply #'append
+                                   (hash-table-values org-node--links-table)))
+                    (length (apply #'append
+                                   (hash-table-values org-node--reflinks-table))))
+                 (float-time (time-since org-node-async--start-time)))))))))))
 
 (provide 'org-node-async)
 

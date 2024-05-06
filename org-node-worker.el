@@ -6,7 +6,7 @@
   (require 'cl-macs)
   (require 'subr-x))
 
-(defun org-node-worker--dir (&optional file)
+(defun org-node-worker--tmpfile (&optional file)
   "A shorthand to expand FILE in org-node's temporary directory."
   (expand-file-name (or file "")
                     (expand-file-name "org-node" (temporary-file-directory))))
@@ -196,7 +196,7 @@ by `org-node-async--collect' and do what it expects."
     (setq $vars
           (if synchronous
               variables
-            (insert-file-contents (org-node-worker--dir "work-variables.eld"))
+            (insert-file-contents (org-node-worker--tmpfile "work-variables.eld"))
             (car (read-from-string (buffer-string)))))
     (dolist (var $vars)
       (set (car var) (cdr var)))
@@ -419,24 +419,21 @@ by `org-node-async--collect' and do what it expects."
                   org-node-worker--demands))))
 
       (if synchronous
-          (let ((please-update-id-locations nil))
+          (let ((please-rescan nil))
             (while-let ((demand (pop org-node-worker--demands)))
               (apply (car demand) (cdr demand))
               (when (eq 'org-node--forget-id-location (car demand))
-                (setq please-update-id-locations t)))
-            (when please-update-id-locations
-              (org-id-update-id-locations)
-              (org-id-locations-save)
-              ;; Just in case
-              (when (listp org-id-locations)
-                (setq org-id-locations (org-id-alist-to-hash org-id-locations))))
+                (setq please-rescan t)))
+            (when please-rescan
+              (org-node-worker--collect synchronous variables)
+              (org-id-locations-save))
             ;; Cleanup
             (dolist (var $vars)
               (makunbound (car var)))
             (makunbound '$vars))
         ;; Write down the demands so `org-node-async--handle-finished-job' will
         ;; do the equivalent of above in the main Emacs process
-        (with-temp-file (org-node-worker--dir (format "result-%d.eld" i))
+        (with-temp-file (org-node-worker--tmpfile (format "result-%d.eld" i))
           (insert (prin1-to-string org-node-worker--demands)))))))
 
 (provide 'org-node-worker)
