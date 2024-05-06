@@ -147,7 +147,7 @@ that org-roam expects to have."
                 (looking-at-p "[[:space:]]*#\\+")))
           ;; On a # comment or #+keyword, skip whole line
           (goto-char (pos-eol))
-        (push `(org-node--add-link-to-tables
+        (push `(org-node-cache--add-link-to-tables
                 ,(list :src id-here
                        :pos (point)
                        :type type
@@ -277,7 +277,7 @@ alist."
                 (unless (search-forward ":end:" END t)
                   (error "Couldn't find matching :END: drawer in file %s" FILE)))
               (org-node-worker--collect-links-until END FILE-ID nil $link-re))
-            (push `(org-node--add-node-to-tables
+            (push `(org-node-cache--add-node-to-tables
                     ,(list :title FILE-TITLE
                            :level 0
                            :tags FILE-TAGS
@@ -357,7 +357,7 @@ alist."
             (push (list POS TITLE LEVEL ID) OUTLINE-DATA)
             (when ID
               (setq OLP (org-node-worker--pos->olp OUTLINE-DATA POS))
-              (push `(org-node--add-node-to-tables
+              (push `(org-node-cache--add-node-to-tables
                       ,(list :title TITLE
                              :is-subtree t
                              :level LEVEL
