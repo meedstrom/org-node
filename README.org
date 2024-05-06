@@ -68,8 +68,6 @@ For your pleasure, here's a comparison of three similar notetaking systems: all 
 
 This isn't a totally fair comparison; org-roam has an advantage in the details, see Appendix II.  With org-node I've made what I would've liked to hack on, so it's more simplistic in many aspects.
 
-I'm committed to performance, so if your =M-x org-node-reset= shows any kind of slowness, that's a bug.  Don't hesitate to reach out!
-
 ** Setup
 
 Add an init snippet like this (assuming [[https://github.com/radian-software/straight.el][straight.el]]):
@@ -123,9 +121,7 @@ In addition, if you've been struggling with slow saving of big files, consider t
 (setq org-roam-link-auto-replace nil) ;; don't look for "roam:" links on save
 #+end_src
 
-Do a =M-x org-roam-update-org-id-locations=.  (I'm looking into a more principled way to manage the org-id database, but that'll have to do for now.)
-
-With that done, try out the commands mentioned in [[https://github.com/meedstrom/org-node?tab=readme-ov-file#quick-start][Quick start]].  There's more under [[https://github.com/meedstrom/org-node?tab=readme-ov-file#toolbox][Toolbox]].  Enjoy!
+Do a =M-x org-roam-update-org-id-locations=.  With that done, try out the commands mentioned in [[https://github.com/meedstrom/org-node?tab=readme-ov-file#quick-start][Quick start]].  There's more under [[https://github.com/meedstrom/org-node?tab=readme-ov-file#toolbox][Toolbox]].  Enjoy!
 
 I'm guessing you also want the [[https://github.com/meedstrom/org-node?tab=readme-ov-file#backlink-solution-1-org-roam-buffer][org-roam-buffer]].  See next section.
 
@@ -227,6 +223,16 @@ How to see the headings' full outline paths while searching for nodes:
           title)))
 #+end_src
 
+*** Managing org-id-locations
+
+In principle, org-id.el is meant to be self-managing.  When Emacs sees an ID, it's added to the table.  In real-world practice, you can't always rely on that, so it provides settings like =org-id-extra-files=.
+
+I've found these settings quite unsatisfactory -- you need a long init snippet to set them correctly (see [[https://github.com/meedstrom/org-node?tab=readme-ov-file#appendix-iii-taking-ownership-of-org-id][Appendix III]]).  So org-node has an additional way to feed data to org-id.  Configure =org-node-extra-id-dirs=.
+
+As a bonus, it has an exclusion ruleset =org-node-extra-id-dirs-exclude= if you need it.
+
+*Org-roam users* can use =M-x org-roam-update-org-id-locations=, but to avoid having to do it again on every init, also type =M-: (org-id-locations-save)= afterwards.
+
 *** Limitations: excluding notes
 The =org-node-filter-fn= works well for ignoring TODO items that happen to have an ID, and ignoring org-drill items and that sort of thing, but beyond that, it has limited utility because unlike org-roam, *child ID nodes of an excluded node are not excluded!*
 
@@ -242,10 +248,6 @@ The point of org-id is to avoid dependence on filenames, but it's often pragmati
                  (assoc "ROAM_EXCLUDE" (org-node-get-properties node))
                  (string-search "archive" (org-node-get-file-path node))))))
 #+end_src
-
-*** Limitations: org-id
-
-In lieu of a convenient =org-roam-update-org-id-locations=, see [[https://github.com/meedstrom/org-node?tab=readme-ov-file#appendix-iii-taking-ownership-of-org-id][Appendix III]] for how to defeat org-id's idiosyncrasies, ensuring org-node knows about all the relevant ID locations.
 
 *** Toolbox
 
@@ -305,7 +307,7 @@ API comparison between org-roam and org-node.
 | Get whether this is a subtree   | =(zerop (org-roam-node-level NODE))= | =(org-node-get-is-subtree NODE)=                                                          |
 | Get subtree heading sans TODO   | =(org-roam-node-title NODE)=         | =(org-node--visit-get-true-heading NODE)=                                                 |
 | Get subtree priority            | =(org-roam-node-priority NODE)=      |                                                                                         |
-| Ensure fresh data               | =(org-roam-db-sync)=                 | =(org-node-cache-ensure-fresh)=                                                           |
+| Ensure fresh data               | =(org-roam-db-sync)=                 | =(org-node-cache-ensure)=                                                           |
 
 
 ** Appendix II: Pros of org-roam
@@ -316,7 +318,7 @@ API comparison between org-roam and org-node.
 
 2. Take the variable =org-roam-mode-sections=.  Under any ordinary Emacs Lisp package, this would just be a list of functions.  But in fact, you can add to it a cons cell of a function plus the arguments to pass to it.  I like programmability, but this is ... oriented towards people who aren't programmers, I think.
 
-   - It does make the org-roam source code a slower read.  You scratch your head and ask "Why is it made that way?"  Then you see, and you say "Ah, but /I/ don't need that!"  Well, maybe someone does.
+   - It does make the org-roam source code a slower read (a [[http://weblog.raganwald.com/2004/10/beware-of-turing-tar-pit.html][Turing tarpit]]).  You scratch your head and ask "Why is it made that way?"  Then you see, and you say "Ah, but /I/ don't need that!"  Well, maybe someone does.
 
 3. Take the variable =org-roam-node-display-templates=.  At least, others may consider this a pro, but for my tastes no.  I try to let people customize with little lambdas and provide examples of how they'd get some result or other.  This instead has the dream UI where you can just set the variable to a string "${olp} ${tags} ${title}" or some such and be done with it.  Problem is it's a new mini-DSL (domain-specific language), and when you learn it you miss out on an elisp lesson.  Convenient for beginners but also /keeps/ them beginners.
 
@@ -329,7 +331,7 @@ The challenges with org-id:
 1. The classic way to tell it where to look for IDs is adding the directories to =org-agenda-files=.
    - Unfortunately with thousands of files, this slows down the agenda something extreme.  Not an option.
 2. An alternative way is to populate =org-id-extra-files= or =org-agenda-text-search-extra-files=.
-   - See snippet A, but unfortunately with thousands of files this slows down =M-x customize-group= for org-id or org-agenda something extreme.
+   - See snippet A below, but unfortunately with thousands of files this slows down =M-x customize-group= for org-id or org-agenda something extreme.
    - Sounds like org-id could use a patch... I'll email someone about it...eventually
 3. To sidestep the small problem with #2, you could trust in org-id to keep itself updated, because it does that every time your Emacs creates or sees an ID.  You regenerate org-id-locations /once/ (or well, once every time you wipe .emacs.d).  See snippets B or C.
 4. org-id complains about duplicate IDs because it's also looking in e.g. the versioned backups generated by Logseq
@@ -361,12 +363,15 @@ Snippet A
 
 Snippet B
 #+begin_src elisp
-;; Populate org-id without setting `org-id-extra-files'. Only do it if
-;; `org-id-locations-file' is gone.
-(unless (and (null org-id-locations)
-             (file-exists-p org-id-locations-file)
-             (org-id-locations-load)
-             (hash-table-empty-p org-id-locations))
+;; Populate org-id without setting `org-id-extra-files'.  Only do it if
+;; `org-id-locations' is gone.
+(when (or (and (not (file-exists-p org-id-locations-file))
+               (null org-id-locations))
+          (if (null org-id-locations)
+              (org-id-locations-load)
+            (if (listp org-id-locations)
+                (null org-id-locations)
+              (hash-table-empty-p org-id-locations))))
   (org-id-update-id-locations
    (seq-remove (lambda (file)
                  (or (string-search "/logseq/bak/" file)
@@ -374,26 +379,31 @@ Snippet B
                (mapcan (lambda (dir)
                          (directory-files-recursively dir "\\.org$"))
                        '(;; Example values
-                         "/home/kept/notes/"
+                         "/home/kept/roam/"
                          "/home/kept/project1/"
-                         "/home/kept/project2/")))))
+                         "/home/kept/project2/"))))
+  (org-id-locations-save))
 #+end_src
 
 Snippet C
 #+begin_src elisp
 ;; Populate org-id without setting `org-id-extra-files'. Only do it if
-;; `org-id-locations-file' is gone.
-(unless (and (null org-id-locations)
-             (file-exists-p org-id-locations-file)
-             (org-id-locations-load)
-             (hash-table-empty-p org-id-locations))
+;; `org-id-locations' is gone.
+(when (or (and (not (file-exists-p org-id-locations-file))
+               (null org-id-locations))
+          (if (null org-id-locations)
+                     (org-id-locations-load)
+                   (if (listp org-id-locations)
+                       (null org-id-locations)
+                     (hash-table-empty-p org-id-locations))))
   (dolist (default-directory '(;; Example values
                                "/home/kept/notes/"
                                "/home/kept/project1/"
                                "/home/kept/project2/"))
     ;; Borrow ripgrep's ability to obey .ignore/.gitignore
     (org-id-update-id-locations
-     (split-string (shell-command-to-string "rg -ilt org :ID:") "\n" t))))
+     (split-string (shell-command-to-string "rg -ilt org :ID:") "\n" t))
+    (org-id-locations-save)))
 #+end_src
 
 

@@ -26,7 +26,7 @@ ARGS like `format'."
 
 (defun org-node-worker--pos->parent-id (oldata pos file-id)
   "Return ID of the closest ancestor heading that has an ID.
-See `org-node-worker--pos->olp' for explanation of arguments.
+See `org-node-worker--pos->olp' for explanation of OLDATA and POS.
 
 Extra argument FILE-ID is the file-level id, used as a fallback
 if no ancestor heading has an ID.  It can be nil."
@@ -213,12 +213,6 @@ by `org-node-async--collect' and do what it expects."
           (gc-cons-threshold $gc-cons-threshold)
           (coding-system-for-read $assume-coding-system)
           (coding-system-for-write $assume-coding-system)
-          (ctr 0)
-          (ctr-max (length files))
-          ;; Spamming `message' slows down things, so do it if the user has
-          ;; only 10 or so files, but if the user has 5000 files, then only
-          ;; print a message every ~25 files.
-          (ctr-chunk (max 1 (floor (- (log (length files) 1.3) 8))))
           ;; Reassigned on every iteration, so may as well re-use the memory
           ;; locations (hopefully producing less garbage) instead of making a
           ;; new let-binding every time.  Not sure how elisp works... but
@@ -227,9 +221,6 @@ by `org-node-async--collect' and do what it expects."
           TODO-STATE TAGS SCHED DEADLINE ID OLP
           PROPS FILE-TAGS FILE-ID OUTLINE-DATA TODO-RE FAR)
       (dolist (FILE files)
-        (unless $not-a-full-reset
-          (when (= 0 (% (setq ctr (1+ ctr)) ctr-chunk))
-            (message "org-node resetting... inspected %d/%d files" ctr ctr-max)))
         (if (not (file-exists-p FILE))
             ;; We got here because user deleted a file in a way that we didn't
             ;; notice.  If it was actually a rename, it'll get picked up on
@@ -419,7 +410,6 @@ by `org-node-async--collect' and do what it expects."
                            (split-string-and-unquote
                             (or (cdr (assoc "ROAM_REFS" PROPS)) ""))))
                   org-node-worker--demands))))
-
       (if synchronous
           (let ((please-rescan nil))
             (while-let ((demand (pop org-node-worker--demands)))

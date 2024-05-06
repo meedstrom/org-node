@@ -28,9 +28,8 @@
 
 ;;; Code:
 
+;; TODO Deprecate the option to run synchronous because it makes the code messier
 ;; TODO What happens when we move a subtree to a different file but save the destination before saving  the origin file?
-;; TODO Like we feed the org-roam-db, maybe feed org-id-locations too?  We can probably do it faster.  Then we can also provide saner user config.
-;; TODO Better initial setup for people with incomplete org-id
 ;; TODO Annotations for completion
 ;; TODO Completion category https://github.com/alphapapa/org-ql/issues/299
 ;; TODO Command to grep across all files
@@ -46,20 +45,6 @@
 (require 'org-node-worker)
 (require 'org-faces)
 (require 'org-macs) ;; Test a fix for #4
-
-;; Will deprecate soon
-;;;###autoload
-(defun org-node-enable ()
-  "Deprecated.
-Please add onto org-mode-hook:
-- `org-node-cache-mode'
-- `org-node-backlink-mode' (optional)"
-  (remove-hook 'org-mode-hook #'org-node-enable)
-  (add-hook 'org-mode-hook #'org-node-backlink-mode)
-  (org-node-backlink-mode)
-  (org-node-cache-mode)
-  ;; 2024-04-30
-  (message "Org-node has new recommendations for init, see README"))
 
 
 ;;; API not used inside this package
@@ -193,7 +178,7 @@ type the name of a node that does not exist:
 2. Type name of an unknown node
 3. Select your template
 4. Same as 4b earlier."
-  (org-node-cache-ensure-fresh)
+  (org-node-cache-ensure)
   (let (title node id)
     (if org-node-proposed-title
         ;; Was called from `org-node--create', so the user already typed the
@@ -305,7 +290,7 @@ gets some necessary variables."
 To behave like `org-roam-node-find' when creating new nodes, set
 `org-node-creation-fn' to `org-node-new-by-roam-capture'."
   (interactive)
-  (org-node-cache-ensure-fresh)
+  (org-node-cache-ensure)
   (let* ((input (completing-read "Node: " org-node-collection
                                  () () () 'org-node-hist))
          (node (gethash input org-node-collection)))
@@ -327,7 +312,7 @@ If you find the behavior different, perhaps you have something in
   (interactive nil org-mode)
   (unless (derived-mode-p 'org-mode)
     (user-error "Only works in org-mode buffers"))
-  (org-node-cache-ensure-fresh)
+  (org-node-cache-ensure)
   (let* ((beg nil)
          (end nil)
          (region-text (when (region-active-p)
@@ -361,7 +346,7 @@ If you find the behavior different, perhaps you have something in
 ;;;###autoload
 (defun org-node-random ()
   (interactive)
-  (org-node-cache-ensure-fresh)
+  (org-node-cache-ensure)
   (org-node--goto (nth (random (hash-table-count org-nodes))
                        (hash-table-values org-nodes))))
 
@@ -383,7 +368,7 @@ adding keywords to the things to exclude:
   (interactive nil org-mode)
   (unless (derived-mode-p 'org-mode)
     (error "Only works in org-mode buffers"))
-  (org-node-cache-ensure-fresh)
+  (org-node-cache-ensure)
   (let ((node (gethash (completing-read "Node: " org-node-collection
                                         () () () 'org-node-hist)
                        org-node-collection)))
@@ -425,7 +410,7 @@ adding keywords to the things to exclude:
   (interactive nil org-mode)
   (unless (derived-mode-p 'org-mode)
     (user-error "Only works in org-mode buffers"))
-  (org-node-cache-ensure-fresh)
+  (org-node-cache-ensure)
   (let ((node (gethash (completing-read "Node: " org-node-collection
                                         () () () 'org-node-hist)
                        org-node-collection)))
@@ -492,7 +477,7 @@ Prompt the user for each one."
   (interactive)
   (require 'org-macs) ;; Test a fix for #4
   (require 'ol)
-  (org-node-cache-ensure-fresh)
+  (org-node-cache-ensure)
   (set-face-inverse-video 'org-node-rewrite-links-face
                           (not (face-inverse-video-p 'org-link)))
   (when (org-node--consent-to-problematic-modes-for-mass-op)
@@ -568,7 +553,7 @@ Adding to that, here is an example advice to copy any inherited
   (interactive nil org-mode)
   (unless (derived-mode-p 'org-mode)
     (user-error "Only works in org-mode buffers"))
-  (org-node-cache-ensure-fresh)
+  (org-node-cache-ensure)
   (let ((dir (if org-node-ask-directory
                  (read-directory-name "Extract to new file in directory: ")
                (car (org-node--root-dirs
@@ -675,7 +660,7 @@ user completes the replacements, finally rename the file itself."
 (defun org-node-nodeify-entry ()
   "Add an ID to entry at point and run `org-node-creation-hook'."
   (interactive nil org-mode)
-  (org-node-cache-ensure-fresh)
+  (org-node-cache-ensure)
   (org-id-get-create)
   (run-hooks 'org-node-creation-hook))
 
