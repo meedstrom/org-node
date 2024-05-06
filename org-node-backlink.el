@@ -43,7 +43,7 @@ as the user command \\[org-node-backlink-regret]."
     (let ((org-node-perf-multicore nil))
       (org-node-cache-reset))
     (setq org-node-backlink--fix-files
-          (-uniq (hash-table-values org-id-locations))))
+          (org-node-files)))
   (when (or (not (= 0 org-node-backlink--fix-ctr)) ;; resume interrupted
             (and
              (y-or-n-p (format "Edit the %d files found in `org-id-locations'?"

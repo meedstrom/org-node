@@ -217,7 +217,7 @@ type the name of a node that does not exist:
       (let* ((dir (if org-node-ask-directory
                       (read-directory-name "New file in which directory? ")
                     (car (org-node--root-dirs
-                          (hash-table-values org-id-locations)))))
+                          (org-node-files)))))
              (path-to-write (file-name-concat
                              dir (funcall org-node-slug-fn title))))
         (if (or (file-exists-p path-to-write)
@@ -255,7 +255,7 @@ gets some necessary variables."
     (let* ((dir (if org-node-ask-directory
                     (read-directory-name "New file in which directory? ")
                   (car (org-node--root-dirs
-                        (hash-table-values org-id-locations)))))
+                        (org-node-files)))))
            (path-to-write (file-name-concat dir (funcall org-node-slug-fn
                                                          org-node-proposed-title))))
       (if (or (file-exists-p path-to-write)
@@ -481,7 +481,7 @@ Prompt the user for each one."
   (set-face-inverse-video 'org-node-rewrite-links-face
                           (not (face-inverse-video-p 'org-link)))
   (when (org-node--consent-to-problematic-modes-for-mass-op)
-    (dolist (file (if file (list file) (hash-table-values org-id-locations)))
+    (dolist (file (if file (list file) (org-node-files)))
       (find-file-noselect file)
       (org-with-file-buffer file
         (goto-char (point-min))
@@ -557,7 +557,7 @@ Adding to that, here is an example advice to copy any inherited
   (let ((dir (if org-node-ask-directory
                  (read-directory-name "Extract to new file in directory: ")
                (car (org-node--root-dirs
-                     (hash-table-values org-id-locations))))))
+                     (org-node-files))))))
     (save-excursion
       (org-back-to-heading t)
       (save-buffer)
@@ -615,7 +615,7 @@ interactive search-replace that updates the links.  After the
 user completes the replacements, finally rename the file itself."
   (interactive)
   (require 'wgrep)
-  (let ((root (car (org-node--root-dirs (hash-table-values org-id-locations))))
+  (let ((root (car (org-node--root-dirs (org-node-files))))
         (default-directory default-directory))
     (or (equal default-directory root)
         (if (y-or-n-p (format "Go to this folder? %s" root))

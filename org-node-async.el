@@ -1,5 +1,8 @@
 ;;; org-node-async.el -*- lexical-binding: t; -*-
 
+;; TODO: Balance the split file-lists a bit depending on file sizes?  Consult
+;; the filesystem for the size: (nth 7 (file-attributes FILE))
+
 (require 'bytecomp)
 (require 'org-node-common)
 (require 'org-node-worker)
@@ -32,7 +35,7 @@ elements, the return value is still N items, where some are nil."
 ;;       '(a v e e  q l fk k k ki i o r r  r r r r r r r r g g g  g g gg)
 ;;       4)
 
-(defun org-node-async--collect (files)
+(defun org-node-async--collect (&optional files)
   (mkdir (org-node-worker--tmpfile) t)
   (with-current-buffer (get-buffer-create " *org-node*")
     (erase-buffer))
@@ -50,14 +53,14 @@ elements, the return value is still N items, where some are nil."
                       ((or 'cygwin 'windows-nt 'ms-dos)
                        (ignore-errors
                          (with-temp-buffer
-                           (call-process
-                            "echo" nil t nil "%NUMBER_OF_PROCESSORS%")
+                           (call-process "echo" nil t nil
+                                         "%NUMBER_OF_PROCESSORS%")
                            (buffer-string)))))))))
   (let* ((lib (find-library-name "org-node-worker"))
          (native (when (and (featurep 'native-compile)
                             (native-comp-available-p))
                    (comp-el-to-eln-filename lib)))
-         (native-comp-compiler-options '("-O3"))
+         (native-comp-speed 3)
          (elc (org-node-worker--tmpfile "worker.elc")))
     ;; Pre-compile the worker, if the user's package manager didn't compile it
     ;; already, or if development is happening in org-node-worker.el.
@@ -74,25 +77,35 @@ elements, the return value is still N items, where some are nil."
                `(lambda (&rest _) ,elc)))
           (byte-compile-file lib))))
 
+
     (setq org-node-async--start-time (current-time))
     (setq org-node-async--done-ctr 0)
     (with-temp-file (org-node-worker--tmpfile "work-variables.eld")
-      (insert (prin1-to-string (append (org-node--work-variables)
-                                       org-node-async-inject-variables))))
+      (insert (prin1-to-string
+               (append (org-node--work-variables)
+                       '(($not-a-full-reset . ,(not (null files))))
+                       org-node-async-inject-variables))))
+    (setq files (or files (org-node-files)))
+
+    ;; NB: I considered keeping the processes alive to skip the spin-up
+    ;; time, but the subprocesses report `emacs-init-time' as 0.001s.
+    ;; There could be an unmeasured OS component though.  And maybe when
+    ;; loading the library?  Worth a test in the future.  Now we just spin
+    ;; up new ones every time.  Btw, how do we know these child processes
+    ;; are loading the .eln of all their lisp?
+    (while-let ((old-process (pop org-node-async--processes)))
+      (when (process-live-p old-process)
+        (delete-process old-process)))
+
     ;; Split the work over many Emacs processes
     (let ((file-lists (org-node-async--split-into-n-sublists
                        files org-node-async--jobs))
           (print-length nil))
+      ;; If user has e.g. 8 cores but only 5 files, spin up only 5 jobs
       (delq nil file-lists)
-      ;; If user has only e.g. 4 files but 8 cores, still spin up only 4 jobs.
       (setq org-node-async--jobs (min org-node-async--jobs (length file-lists)))
-      (while-let ((old-process (pop org-node-async--processes)))
-        ;; NB: I considered keeping the processes alive to skip the spin-up
-        ;; time, but the subprocesses report `emacs-init-time' as 0.001s.
-        ;; There could be an unmeasured OS component though.
-        (when (process-live-p old-process)
-          (delete-process old-process)))
       (dotimes (i org-node-async--jobs)
+        (delete-file (org-node-worker--tmpfile "result-%d.eld" 2))
         (with-temp-file (org-node-worker--tmpfile "file-list-%d.eld" i)
           (insert (prin1-to-string (pop file-lists))))
         (push (make-process
@@ -110,7 +123,7 @@ elements, the return value is still N items, where some are nil."
                               (org-node-worker--tmpfile "file-list-%d.eld" i)
                               "--eval"
                               (format
-                               "(setq files (cons %d (car (read-from-string (buffer-string)))))"
+                               "(setq $files (cons %d (car (read-from-string (buffer-string)))))"
                                i)
                               "--load"
                               (or native elc)
@@ -125,15 +138,12 @@ elements, the return value is still N items, where some are nil."
 (defvar org-node-async--done-ctr 0)
 (defvar org-node-async--jobs nil)
 
-;; TODO: Actually when the first process returns, it should just block until
-;; the last process returns. Or well, no, but if the user tries to call cache-ensure, yes.
-;; But how to ensure this blockage? There's no await.
 (defun org-node-async--handle-finished-job (process _ i)
   (when (= 0 org-node-async--done-ctr)
     ;; This used to be in `org-node-cache-reset', wiping tables before
-    ;; launching the processes, but that leads to a larger time window
-    ;; when completions are unavailable.  Instead, wipe the tables only once
-    ;; the first process starts returning.
+    ;; launching the processes, but that leads to a larger time window when
+    ;; completions are unavailable.  Instead, wait until the first process
+    ;; starts returning, then wipe the tables.
     (clrhash org-nodes)
     (clrhash org-node-collection)
     (clrhash org-node--refs-table)
@@ -144,14 +154,13 @@ elements, the return value is still N items, where some are nil."
     (let ((file (org-node-worker--tmpfile "result-%d.eld" i)))
       (if (not (file-exists-p file))
           (progn
-            (message "An org-node worker failed to scan files, not producing %s.  See buffer *org-node errors*"
+            (message "An org-node worker failed to scan files, not producing %s.  See buffer *org-node errors*."
                      file)
             (when (get-buffer "*org-node errors*")
               (kill-buffer "*org-node errors*"))
             (with-current-buffer (get-buffer-create " *org-node*")
               (rename-buffer "*org-node errors*")))
         (insert-file-contents file)
-        (delete-file file)
         ;; Execute the demands that the worker wrote
         (let ((please-rescan nil))
           (dolist (demand (car (read-from-string (buffer-string))))

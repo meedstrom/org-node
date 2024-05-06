@@ -143,11 +143,6 @@ the filename."
   :type 'hook
   :group 'org-node)
 
-(defcustom org-node-only-show-subtrees-with-id t
-  "Set nil to include all subtrees as completion candidates."
-  :group 'org-node
-  :type 'boolean)
-
 (defcustom org-node-format-candidate-fn
   (lambda (_node title)
     title)
@@ -239,7 +234,7 @@ org-id look inside versioned backup files and then complain about
   "Return a list of files findable in either `org-id-locations'
 or `org-node-extra-id-dirs' or both."
   (-union
-   (hash-table-values org-id-locations)
+   (org-node-files)
    (seq-remove
     (lambda (file) (--any-p (string-search it file) org-node-extra-id-dirs-exclude))
     ;; Abbreviating because org-id does too (wouldn't be my choice, but)
@@ -267,6 +262,7 @@ This allows use with `completing-read'.")
            when (file-equal-p file file-on-record)
            do (remhash id org-id-locations)))
 
+;; REVIEW deprecate?
 (defun org-node-die (format-string &rest args)
   "Like `error' but make sure the user sees it.
 Because not everyone has `debug-on-error' t."
@@ -274,23 +270,9 @@ Because not everyone has `debug-on-error' t."
     (display-warning 'org-node err-string :error)
     (error "%s" err-string)))
 
+;; REVIEW deprecate?
 (defconst org-node--standard-tip
   ", try `org-id-update-id-locations' or `org-roam-update-org-id-locations'")
-
-(defun org-node--init-org-id-locations-or-die ()
-  (require 'org-id)
-  ;; Sometimes `org-id-locations' decides to be an alist instead of a hash
-  ;; table...  and interestingly, when it's an alist, the filename is car, but
-  ;; when it's hash table, the filename is not the key but the value...
-  (if (or (null org-id-locations)
-          (if (hash-table-p org-id-locations)
-              (hash-table-empty-p org-id-locations)))
-      (org-id-locations-load)
-    (when (listp org-id-locations)
-      ;; Sometimes it reverts back to an alist??
-      (setq org-id-locations (org-id-alist-to-hash org-id-locations))))
-  (when (hash-table-empty-p org-id-locations)
-    (org-node-die "org-id-locations empty%s" org-node--standard-tip)))
 
 (defun org-node--root-dirs (file-list)
   "Given FILE-LIST, infer the most base root directories.
@@ -320,6 +302,7 @@ first element."
        do (cl-incf (cdr (assoc the-root dir-counters)))
        finally return (mapcar #'car (cl-sort dir-counters #'> :key #'cdr))))))
 
+;; TODO deprecate?
 (defun org-node--consent-to-problematic-modes-for-mass-op ()
   (--all-p (if (and (boundp it) (symbol-value it))
                (y-or-n-p
@@ -346,13 +329,14 @@ first element."
     ;;               (org-node-get-file-path node)
     ;;               (org-node-get-file-path (gethash id org-nodes))))
     ;; Record the node even if it has no ID
-    (puthash (or (org-node-get-id node) (format-time-string "%N"))
+    (puthash (or id (format-time-string "%N"))
              node
              org-nodes)
-    (when (or (not org-node-only-show-subtrees-with-id) (org-node-get-id node))
+    ;; Will deprecate this check when we no longer record non-IDed trees
+    (when id
       ;; Populate `org-node--refs-table'
       (dolist (ref (org-node-get-refs node))
-        (puthash ref (org-node-get-id node) org-node--refs-table))
+        (puthash ref id org-node--refs-table))
       (when (funcall org-node-filter-fn node)
         ;; Populate `org-node-collection'
         (dolist (title (cons (org-node-get-title node)
@@ -371,12 +355,13 @@ first element."
 
 ;; The purpose of $sigils is just visual, to distinguish these variables in
 ;; the body of `org-node-worker--collect'.
+;; NOTE: This function exists for historical reasons, it could now go into
+;; `org-node-async--collect', but that's a big function as it is
 (defun org-node--work-variables ()
   "Calculate an alist of variables to give to the worker process."
   (require 'org-node-worker)
   `(($keep-file-name-handlers . ,org-node-perf-keep-file-name-handlers)
     ($assume-coding-system . ,org-node-perf-assume-coding-system)
-    ($not-a-full-reset . ,(not (hash-table-empty-p org-nodes)))
     ($link-re . ,org-link-plain-re)
     ($gc-cons-threshold
      . ,(or org-node-perf-gc-cons-threshold gc-cons-threshold))
@@ -458,8 +443,8 @@ first element."
 (defalias 'org-node-get-title      #'org-node-data-title)
 (defalias 'org-node-get-todo       #'org-node-data-todo)
 
-;; 2024-05-01 Very-soft-deprecate the old "org-node" struct, badly named
-;; 2024-05-05 Soft-deprecate
+;; 2024-05-01 Very-soft-deprecate
+;; 2024-05-05 Soft-deprecate the old "org-node" struct, badly named
 (let (warned-once)
   (defun org-node-aliases    (node) (unless warned-once (display-warning 'org-node (string-fill "\nYour config uses deprecated accessors org-node-..., update to org-node-get-..." 79)) (setq warned-once t)) (org-node-get-aliases    node))
   (defun org-node-deadline   (node) (unless warned-once (display-warning 'org-node (string-fill "\nYour config uses deprecated accessors org-node-..., update to org-node-get-..." 79)) (setq warned-once t)) (org-node-get-deadline   node))
@@ -508,6 +493,7 @@ first element."
              "Command renamed on 2024-05-02: org-node-insert-heading-node to org-node-insert-heading"))
     (apply #'org-node-insert-heading args)))
 
+;; Not technically an obsoletion...  but still fundamentally uninteresting
 ;;;###autoload
 (let (warned-once)
   (defun org-node-backlinks-mode (&rest args)
