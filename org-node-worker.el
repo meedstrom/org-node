@@ -229,7 +229,7 @@ by `org-node-async--collect' and do what it expects."
             ;; next reset.  The best fix would be rewriting org-id.el so user
             ;; can specify where to look for new files and what to ignore, so
             ;; that we could just run that algorithm here.
-            (push `(org-node--forget-id-location ,forget)
+            (push `(org-node--forget-id-location ,FILE)
                   org-node-worker--demands)
           (erase-buffer)
           ;; NOTE: Used `insert-file-contents-literally' in the past,
@@ -249,8 +249,10 @@ by `org-node-async--collect' and do what it expects."
                     (progn
                       (forward-line 1)
                       (prog1 (org-node-worker--collect-properties
-                              (point) (progn (re-search-forward "^ *:end:")
-                                             (pos-bol)))
+                              (point) (if (re-search-forward "^ *:end:" nil t)
+                                          (pos-bol)
+                                        (error "Couldn't find matching :END: drawer in file %s"
+                                               FILE)))
                         (goto-char 1)))
                   nil))
           (setq FILE-TAGS
@@ -288,7 +290,8 @@ by `org-node-async--collect' and do what it expects."
             (when FILE-ID
               ;; Don't count org-super-links backlinks as forward links
               (when (re-search-forward $backlink-drawer-re END t)
-                (search-forward ":end:"))
+                (unless (search-forward ":end:" nil t)
+                  (error "Couldn't find matching :END: drawer in file %s" FILE)))
               (org-node-worker--collect-links-until END FILE-ID nil $link-re)))
           (push `(org-node--add-node-to-tables
                   ,(list :title FILE-TITLE
@@ -353,8 +356,9 @@ by `org-node-async--collect' and do what it expects."
             (setq PROPS
                   (if (re-search-forward "^[[:space:]]*:properties:" LINE+2 t)
                       (org-node-worker--collect-properties
-                       (point) (progn (re-search-forward "^[[:space:]]*:end:")
-                                      (pos-bol)))
+                       (point)  (if (re-search-forward "^[[:space:]]*:end:" nil t)
+                                    (pos-bol)
+                                  (error "Couldn't find matching :END: drawer in file %s" FILE)))
                     nil))
             (setq ID (cdr (assoc "ID" PROPS)))
             (when $not-a-full-reset
