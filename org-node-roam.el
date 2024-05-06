@@ -67,19 +67,18 @@ Designed as override advice for `org-roam-backlinks-get'."
          (node (gethash target-id org-nodes)))
     (when node
       (cl-loop
-       for ref in  (--map (replace-regexp-in-string "https:" "" it)
-                          (org-node-get-refs node))
-       as reflinks =
-       (cl-loop
-        for link-data in (gethash ref org-node--reflinks-table)
-        as src-id = (plist-get link-data :src)
-        as src-node = (gethash src-id org-nodes)
-        when src-node
-        collect (org-roam-reflink-create
-                 :ref ref
-                 :source-node (org-node--convert-to-roam src-node)
-                 :point (plist-get link-data :pos)
-                 :properties (plist-get link-data :properties)))
+       for ref in (--map (replace-regexp-in-string "https:" "" it)
+                         (org-node-get-refs node))
+       as reflinks = (cl-loop
+                      for link-data in (gethash ref org-node--reflinks-table)
+                      as src-id = (plist-get link-data :src)
+                      as src-node = (gethash src-id org-nodes)
+                      when src-node
+                      collect (org-roam-reflink-create
+                               :ref ref
+                               :source-node (org-node--convert-to-roam src-node)
+                               :point (plist-get link-data :pos)
+                               :properties (plist-get link-data :properties)))
        when reflinks append reflinks))))
 
 

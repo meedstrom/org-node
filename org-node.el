@@ -28,7 +28,7 @@
 
 ;;; Code:
 
-;; TODO Deprecate the option to run synchronous because it makes the code messier
+;; FIXME Why would the cacher work different when org is not loaded?
 ;; TODO What happens when we move a subtree to a different file but save the destination before saving  the origin file?
 ;; TODO Annotations for completion
 ;; TODO Completion category https://github.com/alphapapa/org-ql/issues/299
@@ -62,6 +62,13 @@
 
 (defvar org-node-hist nil
   "Minibuffer history.")
+
+(defun org-node-guess-or-ask-dir (prompt)
+  (if (eq t org-node-ask-directory)
+      (read-directory-name (prompt))
+    (if (stringp org-node-ask-directory)
+        org-node-ask-directory
+      (car (org-node--root-dirs (org-node-files))))))
 
 (defun org-node-convert-link-to-super (&rest _)
   "Wrapper for `org-super-links-convert-link-to-super'."
@@ -214,10 +221,7 @@ type the name of a node that does not exist:
             (when (outline-next-heading)
               (backward-char 1))))
       ;; Node does not exist; capture into new file-level node
-      (let* ((dir (if org-node-ask-directory
-                      (read-directory-name "New file in which directory? ")
-                    (car (org-node--root-dirs
-                          (org-node-files)))))
+      (let* ((dir (org-node-guess-or-ask-dir "New file in which directory? "))
              (path-to-write (file-name-concat
                              dir (funcall org-node-slug-fn title))))
         (if (or (file-exists-p path-to-write)
@@ -252,10 +256,7 @@ gets some necessary variables."
   (if (or (null org-node-proposed-title)
           (null org-node-proposed-id))
       (message "org-node-new-file is meant to be called indirectly")
-    (let* ((dir (if org-node-ask-directory
-                    (read-directory-name "New file in which directory? ")
-                  (car (org-node--root-dirs
-                        (org-node-files)))))
+    (let* ((dir (org-node-guess-or-ask-dir "New file in which directory? "))
            (path-to-write (file-name-concat dir (funcall org-node-slug-fn
                                                          org-node-proposed-title))))
       (if (or (file-exists-p path-to-write)
@@ -548,16 +549,12 @@ Adding to that, here is an example advice to copy any inherited
                 (apply fn args)
                 (org-entry-put nil \"CREATED\"
                                (or inherited-creation-date
-                                   (format-time-string \"[%F]\")))))))
-"
+                                   (format-time-string \"[%F]\")))))))"
   (interactive nil org-mode)
   (unless (derived-mode-p 'org-mode)
     (user-error "Only works in org-mode buffers"))
   (org-node-cache-ensure)
-  (let ((dir (if org-node-ask-directory
-                 (read-directory-name "Extract to new file in directory: ")
-               (car (org-node--root-dirs
-                     (org-node-files))))))
+  (let ((dir (org-node-guess-or-ask-dir "Extract to new file in directory: ")))
     (save-excursion
       (org-back-to-heading t)
       (save-buffer)
@@ -673,21 +670,21 @@ user completes the replacements, finally rename the file itself."
 
 ;;;###autoload
 (defun org-node-reset ()
+  "Wipe and rebuild the cache."
   (interactive)
-  (let ((then (current-time)))
-    (org-node-cache-reset)
-    ;; Multicore is async, so it can't report any numbers right now
-    (unless org-node-perf-multicore
-      (let ((n-subtrees (cl-loop for node being the hash-values of org-nodes
-                                 count (org-node-get-is-subtree node))))
-        (message "org-node: found %d files, %d subtrees and %d links in %.2fs"
-                 (- (hash-table-count org-nodes) n-subtrees)
-                 n-subtrees
-                 (+ (length (apply #'append
-                                   (hash-table-values org-node--links-table)))
-                    (length (apply #'append
-                                   (hash-table-values org-node--reflinks-table))))
-                 (float-time (time-since then)))))))
+  (unless org-node-cache-mode
+    (message "Maybe enable `org-node-cache-mode'"))
+  (org-node-cache-reset))
+
+;;;###autoload
+(defun org-node-forget-dir (dir)
+  (interactive "DForget all IDs in directory: ")
+  (let ((ctr 0))
+    (dolist (file (-intersection (directory-files-recursively dir "\\.org$")
+                                 (hash-table-values org-id-locations)))
+      (message "Forgetting all IDs in file... (%d) %s" (cl-incf ctr) file)
+      (org-node--forget-id-location file)))
+  (org-id-locations-save))
 
 (provide 'org-node)
 

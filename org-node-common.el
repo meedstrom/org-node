@@ -5,6 +5,7 @@
 (require 'subr-x)
 (require 'dash)
 (require 'org-id)
+(require 'org)
 
 ;; Prevent "invalid function org-with-file-buffer". Someone explains at
 ;; https://debbugs.gnu.org/cgi/bugreport.cgi?bug=46958
@@ -32,8 +33,14 @@ the symbol `utf-8-unix'.  On Macs it would be `utf-8-mac'.  If
 you access your files from several different systems, consider
 keeping this at nil, or perhaps `utf-8-auto'.
 
-On Windows, you apparently see a mix of `utf-8' and `utf-16'
-files, so don't even try to optimize this."
+On Windows, you apparently see a mix of
+`utf-8-with-signature-dos' and `utf-16-le-dos' and maybe others
+so don't even try to optimize here.
+
+Note that if some of your files happen to have BOMs (easy to
+miss!) then a setting of `utf-8-unix' means we don't find those
+files' nodes.  Best fix would be some tool that transforms the
+coding system of all your files."
   :group 'org-node
   :type '(choice symbol (const nil)))
 
@@ -80,18 +87,12 @@ between such as 1 MB is very slow."
   :group 'org-node
   :type '(choice number (const nil)))
 
-(defcustom org-node-perf-multicore t
-  "Whether to use the async, multi-threaded cacher."
-  :group 'org-node
-  :type 'boolean)
-
 (defcustom org-node-slug-fn #'org-node-slugify-as-url
   "Function to transform title into a filename.
 
 Built-in choices:
 - `org-node-slugify-as-url'
-- `org-node-slugify-like-roam'
-"
+- `org-node-slugify-like-roam'"
   :group 'org-node
   :type '(choice
           (function-item org-node-slugify-like-roam)
@@ -230,33 +231,45 @@ org-id look inside versioned backup files and then complain about
 
 
 
-(defun org-node-files ()
-  "Return a list of files findable in either `org-id-locations'
-or `org-node-extra-id-dirs' or both."
-  (-union
-   (org-node-files)
-   (seq-remove
-    (lambda (file) (--any-p (string-search it file) org-node-extra-id-dirs-exclude))
-    ;; Abbreviating because org-id does too (wouldn't be my choice, but)
-    (mapcar #'abbreviate-file-name
-            (mapcan (lambda (dir) (directory-files-recursively dir "\\.org$"))
-                    org-node-extra-id-dirs)))))
+(let (mem)
+  (defun org-node-files (&optional refresh)
+    "List files in `org-id-locations' or `org-node-extra-id-dirs'.
 
-(defvar org-nodes (make-hash-table :test #'equal :size 4000)
+If argument REFRESH is non-nil, recalculate the list.  This can
+cause a noticeable delay with thousands of files, so don't pass
+it if you are writing an user-facing command."
+    (if (and (not refresh) mem)
+        mem
+      (setq mem
+            (-union
+             (hash-table-values org-id-locations)
+             (cl-loop
+              for dir in org-node-extra-id-dirs
+              append (cl-loop
+                      for file in (directory-files-recursively dir "\\.org$")
+                      unless (cl-loop
+                              for exclude in org-node-extra-id-dirs-exclude
+                              when (string-search exclude file)
+                              return t)
+                      ;; Abbreviating because org-id does too
+                      collect (abbreviate-file-name file))))))))
+
+(defvar org-nodes (make-hash-table :test #'equal :size 5000)
   "Table associating ids with file/subtree data.
 To peek on the contents, try \\[org-node-cache-peek] a few times, which
 can demonstrate the data format.  See also the type `org-node-data'.")
 
-(defvar org-node-collection (make-hash-table :test #'equal :size 4000)
+(defvar org-node-collection (make-hash-table :test #'equal :size 5000)
   "Filtered `org-nodes', keyed not on ids but formatted titles.
 This allows use with `completing-read'.")
 
 (defun org-node--forget-id-location (file)
-  "Remove references to FILE in `org-id-locations'."
-  ;; NOTE: Do not call `org-node--init-org-id-locations-or-die' here as you
-  ;; might usually do for safety, because several invocations of this function
-  ;; may be queued, and they would undo each other's work.  These functions'
-  ;; work must be "committed" via `org-id-locations-save'.
+  "Remove references to FILE in `org-id-locations'.
+You might consider \"committing\" the effect afterwards by
+calling `org-id-locations-save'."
+  ;; NOTE: Do not insert a `org-node-cache-ensure' here as you might usually do
+  ;; for safety, because several invocations of this function would undo each
+  ;; other's work.
   (cl-loop for id being the hash-keys of org-id-locations
            using (hash-values file-on-record)
            when (file-equal-p file file-on-record)
@@ -302,7 +315,7 @@ first element."
        do (cl-incf (cdr (assoc the-root dir-counters)))
        finally return (mapcar #'car (cl-sort dir-counters #'> :key #'cdr))))))
 
-;; TODO deprecate?
+;; REVIEW deprecate?
 (defun org-node--consent-to-problematic-modes-for-mass-op ()
   (--all-p (if (and (boundp it) (symbol-value it))
                (y-or-n-p
@@ -312,75 +325,52 @@ first element."
              auto-save-visited-mode
              git-auto-commit-mode)))
 
-(defvar org-node--reflinks-table (make-hash-table :test #'equal))
+;; FIXME do not impose an uniqueness constraint... probably need to make an
+;; alist during `org-node--add-link-to-tables' and then just iter thru
+;; `org-node-refs-table' to enrich it or something.
+(defvar org-node--reflinks-table (make-hash-table :test #'equal)
+  "Table of potential reflinks.
+The table keys are just URIs such as web addresses, and the
+values a plist describing the ID-node where the link was found.
+
+The fact that a link is in this table does not mean there is a
+node with a ROAM_REFS matching that same link.  To find that out,
+you'd have to cross-reference with `org-node--refs-table'.")
+
 (defvar org-node--links-table (make-hash-table :test #'equal))
 (defvar org-node--refs-table (make-hash-table :test #'equal))
 
 ;; I feel like this could be easier to read...
+;; TODO Relocate
 (defun org-node--add-node-to-tables (node-as-plist)
-  "Add a node to `org-nodes' and maybe `org-node-collection'."
+  "Add a node to `org-nodes' and other tables."
   (let* ((node (apply #'make-org-node-data node-as-plist))
          (id (org-node-get-id node)))
-    ;; Add to `org-id-locations'
+    ;; Add to `org-id-locations' too
     (puthash id (org-node-get-file-path node) org-id-locations)
-    ;; (when (gethash id org-nodes)
-    ;;   (user-error "Duplicate ID %s in files %s and %s"
-    ;;               id
-    ;;               (org-node-get-file-path node)
-    ;;               (org-node-get-file-path (gethash id org-nodes))))
-    ;; Record the node even if it has no ID
-    (puthash (or id (format-time-string "%N"))
-             node
-             org-nodes)
-    ;; Will deprecate this check when we no longer record non-IDed trees
-    (when id
-      ;; Populate `org-node--refs-table'
+    (puthash id node org-nodes)
+    ;; Populate `org-node--refs-table'
+    (dolist (ref (org-node-get-refs node))
+      (puthash ref id org-node--refs-table))
+    (when (funcall org-node-filter-fn node)
+      ;; Populate `org-node-collection'
+      (dolist (title (cons (org-node-get-title node)
+                           (org-node-get-aliases node)))
+        (puthash (funcall org-node-format-candidate-fn node title)
+                 node
+                 org-node-collection))
+      ;; Let refs work as aliases
       (dolist (ref (org-node-get-refs node))
-        (puthash ref id org-node--refs-table))
-      (when (funcall org-node-filter-fn node)
-        ;; Populate `org-node-collection'
-        (dolist (title (cons (org-node-get-title node)
-                             (org-node-get-aliases node)))
-          (puthash (funcall org-node-format-candidate-fn node title)
-                   node
-                   org-node-collection))
-        ;; Let refs work as aliases
-        (dolist (ref (org-node-get-refs node))
-          (puthash ref node org-node-collection))))))
+        (puthash ref node org-node-collection)))))
 
+;; TODO Relocate
 (defun org-node--add-link-to-tables (link-plist path type)
+  "Record a link or reflink in the tables for those."
   (push link-plist (gethash path (if (equal type "id")
                                      org-node--links-table
                                    org-node--reflinks-table))))
 
-;; The purpose of $sigils is just visual, to distinguish these variables in
-;; the body of `org-node-worker--collect'.
-;; NOTE: This function exists for historical reasons, it could now go into
-;; `org-node-async--collect', but that's a big function as it is
-(defun org-node--work-variables ()
-  "Calculate an alist of variables to give to the worker process."
-  (require 'org-node-worker)
-  `(($keep-file-name-handlers . ,org-node-perf-keep-file-name-handlers)
-    ($assume-coding-system . ,org-node-perf-assume-coding-system)
-    ($link-re . ,org-link-plain-re)
-    ($gc-cons-threshold
-     . ,(or org-node-perf-gc-cons-threshold gc-cons-threshold))
-    ($file-todo-option-re
-     . ,(rx bol (or "#+todo: " "#+seq_todo: " "#+typ_todo: ")))
-    ($file-name-handler-alist
-     . ,(--keep (rassoc it org-node-perf-keep-file-name-handlers)
-                file-name-handler-alist))
-    ($global-todo-re
-     . ,(org-node-worker--make-todo-regexp
-         (string-join (mapcan #'cdr (default-value 'org-todo-keywords))
-                      " ")))
-    ($backlink-drawer-re
-     . ,(concat "^[[:space:]]*:"
-                (or (and (boundp 'org-super-links-backlink-into-drawer)
-                         (stringp org-super-links-backlink-into-drawer)
-                         (downcase org-super-links-backlink-into-drawer))
-                    "backlinks")
-                ":"))))
+
 
 ;; A struct was pointless while I developed the package for my own use, but
 ;; now that it has users... the problem with `plist-get' is I can never rename
@@ -391,23 +381,38 @@ first element."
 ;; deprecate or rename a plist field such as :roam-exclude, then I must hope
 ;; everyone reads the news.  By contrast if the getter is a function
 ;; `org-node-get-roam-exclude', I can override it so it emits a warning.
-(eval `(cl-defstruct org-node-data
-         "To get a node's title, use e.g. `(org-node-get-title NODE)'."
-         (aliases    nil :read-only t :type list    :documentation ,(string-fill "List of ROAM_ALIASES." 70))
-         (deadline   nil :read-only t :type string  :documentation ,(string-fill "The DEADLINE state." 70))
-         (file-path  nil :read-only t :type string  :documentation ,(string-fill "Full file path." 70))
-         (file-title nil :read-only t :type string  :documentation ,(string-fill "The title of the file where this node is.  If this node is itself a file-level node, then it is the same as the title." 70))
-         (id         nil :read-only t :type string  :documentation ,(string-fill "The ID property." 70))
-         (is-subtree nil :read-only t :type boolean :documentation ,(string-fill "Valued t if it is a subtree, nil if it is a file-level node." 70))
-         (level      nil :read-only t :type number  :documentation ,(string-fill "Outline level, i.e. the number of stars in the heading.  A file-level node has level 0." 70))
-         (olp        nil :read-only t :type list    :documentation ,(string-fill "List of ancestor headings to this node.  Naturally, this is empty if the node is a file-level node or a top-level heading." 70))
-         (pos        nil :read-only t :type number  :documentation ,(string-fill "Char position of the node.  File-level nodes always have position 1." 70))
-         (properties nil :read-only t :type list    :documentation ,(string-fill "Alist of properties from the :PROPERTIES: drawer." 70))
-         (refs       nil :read-only t :type list    :documentation ,(string-fill "List of ROAM_REFS." 70))
-         (scheduled  nil :read-only t :type string  :documentation ,(string-fill "The SCHEDULED state." 70))
-         (tags       nil :read-only t :type list    :documentation ,(string-fill "List of tags." 70))
-         (title      nil :read-only t :type string  :documentation ,(string-fill "The node's heading, or #+title if it is not a heading." 70))
-         (todo       nil :read-only t :type string  :documentation ,(string-fill "The TODO state." 70))))
+(cl-defstruct org-node-data
+  "To get e.g. a node's title, use `(org-node-get-title NODE)'."
+  (aliases    nil :read-only t :type list    :documentation
+              "List of ROAM_ALIASES.")
+  (deadline   nil :read-only t :type string  :documentation
+              "The DEADLINE state.")
+  (file-path  nil :read-only t :type string  :documentation
+              "Full file path.")
+  (file-title nil :read-only t :type string  :documentation
+              "The title of the file where this node is.")
+  (id         nil :read-only t :type string  :documentation
+              "The ID property.")
+  (is-subtree nil :read-only t :type boolean :documentation
+              "Valued t if it is a subtree, nil if it is a file-level node.")
+  (level      nil :read-only t :type number  :documentation
+              "Number of stars in the heading. File-level node always 0.")
+  (olp        nil :read-only t :type list    :documentation
+              "List of ancestor headings to this node.")
+  (pos        nil :read-only t :type number  :documentation
+              "Char position of the node. File-level node always 1.")
+  (properties nil :read-only t :type list    :documentation
+              "Alist of properties from the :PROPERTIES: drawer.")
+  (refs       nil :read-only t :type list    :documentation
+              "List of ROAM_REFS.")
+  (scheduled  nil :read-only t :type string  :documentation
+              "The SCHEDULED state.")
+  (tags       nil :read-only t :type list    :documentation
+              "List of tags.")
+  (title      nil :read-only t :type string  :documentation
+              "The node's heading, or #+title if it is not a heading.")
+  (todo       nil :read-only t :type string  :documentation
+              "The TODO state."))
 
 ;; Make getters called "org-node-get-..." instead of "org-node-data-...".
 ;;
@@ -493,7 +498,7 @@ first element."
              "Command renamed on 2024-05-02: org-node-insert-heading-node to org-node-insert-heading"))
     (apply #'org-node-insert-heading args)))
 
-;; Not technically an obsoletion...  but still fundamentally uninteresting
+;; Not technically an obsoletion...  just fundamentally uninteresting
 ;;;###autoload
 (let (warned-once)
   (defun org-node-backlinks-mode (&rest args)
