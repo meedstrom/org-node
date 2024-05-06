@@ -315,6 +315,23 @@ first element."
        do (cl-incf (cdr (assoc the-root dir-counters)))
        finally return (mapcar #'car (cl-sort dir-counters #'> :key #'cdr))))))
 
+(defun org-node--split-into-n-sublists (big-list n)
+  "Split BIG-LIST into a list of N sublists.
+
+In the special case where BIG-LIST contains fewer than N
+elements, the return value is still N items, where some are nil."
+  (let ((len (/ (length big-list) n))
+        res)
+    (dotimes (i n)
+      (push
+       (if (= i (- n 1))
+           ;; Let the last iteration just take what's left
+           big-list
+         (prog1 (take len big-list)
+           (setq big-list (nthcdr len big-list))))
+       res))
+    res))
+
 ;; REVIEW deprecate?
 (defun org-node--consent-to-problematic-modes-for-mass-op ()
   (--all-p (if (and (boundp it) (symbol-value it))
@@ -339,36 +356,6 @@ you'd have to cross-reference with `org-node--refs-table'.")
 
 (defvar org-node--links-table (make-hash-table :test #'equal))
 (defvar org-node--refs-table (make-hash-table :test #'equal))
-
-;; I feel like this could be easier to read...
-;; TODO Relocate
-(defun org-node--add-node-to-tables (node-as-plist)
-  "Add a node to `org-nodes' and other tables."
-  (let* ((node (apply #'make-org-node-data node-as-plist))
-         (id (org-node-get-id node)))
-    ;; Add to `org-id-locations' too
-    (puthash id (org-node-get-file-path node) org-id-locations)
-    (puthash id node org-nodes)
-    ;; Populate `org-node--refs-table'
-    (dolist (ref (org-node-get-refs node))
-      (puthash ref id org-node--refs-table))
-    (when (funcall org-node-filter-fn node)
-      ;; Populate `org-node-collection'
-      (dolist (title (cons (org-node-get-title node)
-                           (org-node-get-aliases node)))
-        (puthash (funcall org-node-format-candidate-fn node title)
-                 node
-                 org-node-collection))
-      ;; Let refs work as aliases
-      (dolist (ref (org-node-get-refs node))
-        (puthash ref node org-node-collection)))))
-
-;; TODO Relocate
-(defun org-node--add-link-to-tables (link-plist path type)
-  "Record a link or reflink in the tables for those."
-  (push link-plist (gethash path (if (equal type "id")
-                                     org-node--links-table
-                                   org-node--reflinks-table))))
 
 
 
