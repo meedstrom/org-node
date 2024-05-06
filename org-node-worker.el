@@ -1,18 +1,20 @@
 ;;; org-node-worker.el --- Gotta go fast -*- lexical-binding: t; -*-
 
-;; TODO Test perf of disabling case-fold-search
-
 (eval-when-compile
   (require 'cl-macs)
   (require 'subr-x))
 
-(defun org-node-worker--tmpfile (&optional file)
-  "A shorthand to expand FILE in org-node's temporary directory."
-  (expand-file-name (or file "")
+(defun org-node-worker--tmpfile (&optional basename &rest args)
+  "Return a path that puts BASENAME in a temporary directory.
+Usually it will be in /tmp/org-node/.  Also format BASENAME with
+ARGS like `format'."
+  (expand-file-name (if basename
+                        (apply #'format basename args)
+                      "")
                     (expand-file-name "org-node" (temporary-file-directory))))
 
 (defun org-node-worker--elem-index (elem list)
-  "Like `-elem-index'."
+  "Like `-elem-index', return first index of ELEM in LIST."
   (declare (pure t) (side-effect-free t))
   (let ((list list)
         (i 0))
@@ -433,8 +435,9 @@ by `org-node-async--collect' and do what it expects."
             (makunbound '$vars))
         ;; Write down the demands so `org-node-async--handle-finished-job' will
         ;; do the equivalent of above in the main Emacs process
-        (with-temp-file (org-node-worker--tmpfile (format "result-%d.eld" i))
-          (insert (prin1-to-string org-node-worker--demands)))))))
+        (with-temp-file (org-node-worker--tmpfile "result-%d.eld" i)
+          (let ((print-length nil))
+            (insert (prin1-to-string org-node-worker--demands))))))))
 
 (provide 'org-node-worker)
 

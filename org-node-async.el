@@ -83,18 +83,19 @@ elements, the return value is still N items, where some are nil."
                                        org-node-async-inject-variables))))
     ;; Split the work over many Emacs processes
     (let ((file-lists (org-node-async--split-into-n-sublists
-                       files org-node-async--jobs)))
+                       files org-node-async--jobs))
+          (print-length nil))
       (delq nil file-lists)
       ;; If user has only e.g. 4 files but 8 cores, still spin up only 4 jobs.
       (setq org-node-async--jobs (min org-node-async--jobs (length file-lists)))
       (while-let ((old-process (pop org-node-async--processes)))
         ;; NB: I considered keeping the processes alive to skip the spin-up
         ;; time, but the subprocesses report `emacs-init-time' as 0.001s.
-        ;; There could be an invisible OS component though.
+        ;; There could be an unmeasured OS component though.
         (when (process-live-p old-process)
           (delete-process old-process)))
       (dotimes (i org-node-async--jobs)
-        (with-temp-file (org-node-worker--tmpfile (format "file-list-%d.eld" i))
+        (with-temp-file (org-node-worker--tmpfile "file-list-%d.eld" i)
           (insert (prin1-to-string (pop file-lists))))
         (push (make-process
                :name (format "org-node-%d" i)
@@ -127,12 +128,27 @@ elements, the return value is still N items, where some are nil."
 (defvar org-node-async--jobs nil)
 
 (defun org-node-async--handle-finished-job (process _ i)
+  (when (= 0 org-node-async--done-ctr)
+    ;; This used to be in `org-node-cache-reset', wiping tables before
+    ;; launching the processes, but that leads to a larger time window
+    ;; when completions are unavailable.  Instead, wipe the tables only once
+    ;; the first process starts returning.
+    (clrhash org-nodes)
+    (clrhash org-node-collection)
+    (clrhash org-node--refs-table)
+    (clrhash org-node--reflinks-table)
+    (clrhash org-node--links-table))
   (with-temp-buffer
     ;; Paste what the worker output
-    (let ((file (org-node-worker--tmpfile (format "result-%d.eld" i))))
+    (let ((file (org-node-worker--tmpfile "result-%d.eld" i)))
       (if (not (file-exists-p file))
-          (message "An org-node worker failed to scan files, not producing %s"
-                   file)
+          (progn
+            (message "An org-node worker failed to scan files, not producing %s.  See buffer *org-node errors*"
+                     file)
+            (when (get-buffer "*org-node errors*")
+              (kill-buffer "*org-node errors*"))
+            (with-current-buffer (get-buffer-create " *org-node*")
+              (rename-buffer "*org-node errors*")))
         (insert-file-contents file)
         (delete-file file)
         ;; Execute the demands that the worker wrote
