@@ -253,7 +253,7 @@ by `org-node-async--collect' and do what it expects."
                 (if (re-search-forward "^ *:properties:" FAR t)
                     (progn
                       (forward-line 1)
-                      (prog1 (org-node-worker--collect-propertiest
+                      (prog1 (org-node-worker--collect-properties
                               (point) (if (re-search-forward "^ *:end:" nil t)
                                           (pos-bol)
                                         (error "Couldn't find matching :END: drawer in file %s at position %d"
