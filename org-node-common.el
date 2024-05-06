@@ -205,7 +205,47 @@ are tagged :drill:, or where the full file path contains the word
   :type 'function
   :group 'org-node)
 
+;; TODO: maybe permit .org.gpg and .org.gz
+(defcustom org-node-extra-id-dirs (list)
+  "Like `org-id-extra-files' but expressed as directories.
+
+Intended to have the same convenience as setting
+`org-agenda-files', informing org-id about every Org file that
+exists within these directories (and its subdirectories and
+sub-subdirectories and so on).
+
+For it to actually have an effect, you need to either have
+`org-node-cache-mode' active or regularly use org-node commands.
+
+To avoid accidentally picking up versioned backups or things of
+that nature, causing org-id to complain about \"duplicate\" IDs,
+see `org-node-extra-id-dirs-exclude'.")
+
+(defcustom org-node-extra-id-dirs-exclude
+  '("/logseq/bak/"
+    "/logseq/version-files/"
+    ".sync-conflict-")
+  "Substrings of file paths that cause a file to be rejected.
+This is not the same as `org-node-filter-fn', but has to do only
+with how `org-node-extra-id-dirs' is used.
+
+The variable exists only so that you have a way to avoid making
+org-id look inside versioned backup files and then complain about
+\"duplicate\" IDs.")
+
 
+
+(defun org-node-files ()
+  "Return a list of files findable in either `org-id-locations'
+or `org-node-extra-id-dirs' or both."
+  (-union
+   (hash-table-values org-id-locations)
+   (seq-remove
+    (lambda (file) (--any-p (string-search it file) org-node-extra-id-dirs-exclude))
+    ;; Abbreviating because org-id does too (wouldn't be my choice, but)
+    (mapcar #'abbreviate-file-name
+            (mapcan (lambda (dir) (directory-files-recursively dir "\\.org$"))
+                    org-node-extra-id-dirs)))))
 
 (defvar org-nodes (make-hash-table :test #'equal :size 4000)
   "Table associating ids with file/subtree data.
@@ -298,6 +338,8 @@ first element."
   "Add a node to `org-nodes' and maybe `org-node-collection'."
   (let* ((node (apply #'make-org-node-data node-as-plist))
          (id (org-node-get-id node)))
+    ;; Add to `org-id-locations'
+    (puthash id (org-node-get-file-path node) org-id-locations)
     ;; (when (gethash id org-nodes)
     ;;   (user-error "Duplicate ID %s in files %s and %s"
     ;;               id
@@ -476,6 +518,19 @@ first element."
        "Someone misspelled `org-node-backlink-mode', but I ran it for you"))
     (apply #'org-node-backlink-mode args)))
 
+;;;###autoload
+(defun org-node-enable ()
+  "Deprecated.
+Please add onto org-mode-hook:
+- `org-node-cache-mode'
+- `org-node-backlink-mode' (optional)"
+  (remove-hook 'org-mode-hook #'org-node-enable)
+  (add-hook 'org-mode-hook #'org-node-backlink-mode)
+  (org-node-backlink-mode)
+  (org-node-cache-mode)
+  ;; 2024-04-30
+  ;; 2024-05-06
+  (warn "Org-node has new recommendations for init, see README"))
 (provide 'org-node-common)
 
 ;;; org-node-common.el ends here

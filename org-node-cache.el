@@ -4,6 +4,59 @@
 (require 'org-node-async)
 (require 'org-node-worker)
 
+(defvar org-node-cache--modeless-timer (timer-create)
+  "Recurring timer used while `org-node-cache-mode' is off.")
+
+(defun org-node-cache-reset ()
+  "Wipe and rebuild the cache.
+For an user-facing command, see \\[org-node-reset]."
+  (org-node-cache-ensure nil t))
+
+(defun org-node-cache-ensure (&optional synchronous force)
+  "Ensure that `org-id-locations' and `org-nodes' are fresh.
+
+Optional argument SYNCHRONOUS means that if a reset is needed, do
+it synchronously (i.e. block Emacs until done).  Usually while
+`org-node-cache-mode' is active, no reset will be needed, but
+when that mode is off, they may happen a lot, so consider whether
+setting this to t would make sense in that context (hint: no).
+
+Optional argument FORCE means demand a reset, but let it happen
+asynchronously unless SYNCHRONOUS is also set.  When
+`org-node-cache-mode' is off, a reset is always demanded even
+when this argument is nil."
+  ;; First just make sure we've loaded org-id's stuff from disk.
+  (when (null org-id-locations)
+    (message "org-id-locations empty%s" org-node--standard-tip)
+    (when (file-exists-p org-id-locations-file)
+      (org-id-locations-load)))
+  (when (listp org-id-locations)
+    (setq org-id-locations (org-id-alist-to-hash org-id-locations)))
+  (when (hash-table-empty-p org-id-locations)
+    (org-id-locations-load)
+    (when (hash-table-empty-p org-id-locations)
+      (org-node-die "org-id-locations empty%s" org-node--standard-tip)))
+  ;; Phew!  Hell of an API, org-id.  Now for the org-node stuff.
+  (when (not org-node-cache-mode)
+    (setq force t)
+    (cancel-timer org-node-cache--modeless-timer)
+    (setq org-node-cache--modeless-timer
+          (run-with-idle-timer 45 t #'org-node-cache-reset)))
+  (when (hash-table-empty-p org-nodes)
+    (setq synchronous t force t))
+  (let ((live (-any-p #'process-live-p org-node-async--processes)))
+    (cond
+     ((and synchronous force) ;; Blocking scan requested
+      (or live (org-node-async--collect (org-node-files)))
+      (message "org-node: Caching synchronously...")
+      (mapc #'accept-process-output org-node-async--processes))
+
+     ((and (not synchronous) force) ;; Chill scan requested
+      (or live (org-node-async--collect (org-node-files))))
+
+     ((and synchronous (not force)) ;; Block only if scan ongoing
+      (mapc #'accept-process-output org-node-async--processes)))))
+
 ;;;###autoload
 (define-minor-mode org-node-cache-mode
   "Instruct on-save hooks and such things to update the cache.
@@ -23,6 +76,7 @@ time."
         (advice-add #'rename-file :after #'org-node-cache-rescan-file)
         (advice-add #'rename-file :before #'org-node-cache--handle-delete)
         (advice-add #'delete-file :before #'org-node-cache--handle-delete)
+        (cancel-timer org-node-cache--modeless-timer)
         (org-node-reset))
     (remove-hook 'after-save-hook #'org-node-cache-rescan-file)
     (advice-remove #'rename-file #'org-node-cache-rescan-file)
@@ -31,21 +85,6 @@ time."
 
 (defvar org-node-cache-reset-hook nil)
 (defvar org-node-cache-rescan-file-hook nil)
-
-(defun org-node-cache-reset ()
-  "Wipe and rebuild the cache.
-For an user-facing command, see \\[org-node-reset]."
-  (clrhash org-nodes)
-  (clrhash org-node-collection)
-  (clrhash org-node--refs-table)
-  (clrhash org-node--reflinks-table)
-  (clrhash org-node--links-table)
-  (org-node--init-org-id-locations-or-die)
-  (if org-node-perf-multicore
-      (org-node-async--collect (-uniq (hash-table-values org-id-locations)))
-    (org-node-worker--collect (-uniq (hash-table-values org-id-locations))
-                              (org-node--work-variables))
-    (run-hooks 'org-node-cache-reset-hook)))
 
 (defun org-node-cache-rescan-file (&optional _arg1 arg2 &rest _)
   "Seek nodes and links in a single file."
@@ -56,30 +95,11 @@ For an user-facing command, see \\[org-node-reset]."
                   arg2
                 (buffer-file-name))))
     (when (derived-mode-p 'org-mode)
-      ;; (org-node--init-org-id-locations-or-die)
       (org-node-worker--collect (list file) (org-node--work-variables))
       (when (boundp 'org-node-cache-scan-file-hook)
         (lwarn 'org-node :warning
                "Hook renamed: org-node-cache-scan-file-hook to org-node-cache-rescan-file-hook"))
       (run-hooks 'org-node-cache-rescan-file-hook))))
-
-;; I feel like I could merge this with
-;; `org-node--init-org-id-locations-or-die', maybe by intentionally
-;; not-covering all situations and moving some into `org-node-cache-reset'
-;; itself
-(defun org-node-cache-ensure-fresh ()
-  (org-node--init-org-id-locations-or-die)
-  ;; Once-per-session tip
-  ;; (when (and (hash-table-empty-p org-node-collection)
-  ;;              (not (member 'org-node-cache-mode org-mode-hook)))
-  ;;     (message "To speed up this command, turn on `org-node-cache-mode'"))
-  (when (or (not org-node-cache-mode)
-            (hash-table-empty-p org-node-collection))
-    (if (hash-table-empty-p org-node-collection)
-        (let ((org-node-perf-multicore nil))
-          (message "First run and no cache, caching synchronously...")
-          (org-node-cache-reset))
-      (org-node-cache-reset))))
 
 (let ((timer (timer-create)))
   (defun org-node-cache--handle-delete (&optional arg1 &rest _)
@@ -98,6 +118,15 @@ to delete several files in a row."
         (org-node--forget-id-location file-being-deleted)
         (cancel-timer timer)
         (setq timer (run-with-idle-timer 6 nil #'org-node-cache-reset))))))
+
+(defun org-node-cache-peek3 ()
+  "For debugging: peek on random members of `org-nodes'.
+See also the type `org-node-data'."
+  (interactive)
+  (let ((id-nodes (-filter #'org-node-get-id (hash-table-values org-nodes))))
+    (dotimes (_ 3)
+      (print "")
+      (cl-prin1 (nth (random (length id-nodes)) id-nodes)))))
 
 (defun org-node-cache-peek ()
   "For debugging: peek on a random member of `org-nodes'.

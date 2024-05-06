@@ -1,5 +1,6 @@
 ;;; org-node-roam.el -*- lexical-binding: t; -*-
 
+(require 'org-node-common)
 (require 'url-parse)
 (require 'ol)
 

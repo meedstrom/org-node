@@ -195,7 +195,7 @@ Designed to run on `after-change-functions'."
 See `org-node-backlink--add-in-target' - this is
 merely a wrapper that drops the input."
   (when org-node-backlink-mode
-    (org-node-cache-ensure-fresh)
+    (org-node-cache-ensure)
     (org-node-backlink--add-in-target)))
 
 (defun org-node-backlink--add-in-target (&optional part-of-mass-op)

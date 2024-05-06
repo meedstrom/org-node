@@ -41,37 +41,35 @@ elements, the return value is still N items, where some are nil."
                     (pcase system-type
                       ((or 'gnu 'gnu/linux 'gnu/kfreebsd 'berkeley-unix)
                        (if (executable-find "nproc")
-                           (shell-command-to-string
-                            "nproc --all")
+                           (shell-command-to-string "nproc --all")
                          (shell-command-to-string
                           "lscpu -p | egrep -v '^#' | wc -l")))
                       ((or 'darwin)
-                       (shell-command-to-string
-                        "sysctl -n hw.logicalcpu_max"))
+                       (shell-command-to-string "sysctl -n hw.logicalcpu_max"))
                       ;; I have no idea if this works
                       ((or 'cygwin 'windows-nt 'ms-dos)
-                       (or (ignore-errors
-                             (with-temp-buffer
-                               (call-process "echo" nil t nil "%NUMBER_OF_PROCESSORS%")
-                               (buffer-string)))
-                           (user-error "org-node: Windows not supported with `org-node-perf-multicore'"))))))))
+                       (ignore-errors
+                         (with-temp-buffer
+                           (call-process
+                            "echo" nil t nil "%NUMBER_OF_PROCESSORS%")
+                           (buffer-string)))))))))
   (let* ((lib (find-library-name "org-node-worker"))
          (native (when (and (featurep 'native-compile)
                             (native-comp-available-p))
                    (comp-el-to-eln-filename lib)))
-         ;; (precompiled-elc (funcall byte-compile-dest-file-function lib))
+         (native-comp-compiler-options '("-O3"))
          (elc (org-node-worker--tmpfile "worker.elc")))
-    ;; Pre-compile the worker, in case the user's
-    ;; package manager didn't compile already.
+    ;; Pre-compile the worker, if the user's package manager didn't compile it
+    ;; already, or if development is happening in org-node-worker.el.
     (if native
         (unless (and (file-exists-p native)
                      (file-newer-than-file-p native lib))
           (native-compile lib))
       (unless (and (file-exists-p elc)
                    (file-newer-than-file-p elc lib))
-        ;; Hard to predict that it won't end up cluttering some source
-        ;; directory if we obey `byte-compile-dest-file-function', so just put
-        ;; it in /tmp.  It's a very fast build anyway.
+        ;; If we obey `byte-compile-dest-file-function', it's hard to predict
+        ;; that the .elc won't end up cluttering some source directory, so just
+        ;; force it into /tmp.
         (let ((byte-compile-dest-file-function
                `(lambda (&rest _) ,elc)))
           (byte-compile-file lib))))
@@ -109,7 +107,7 @@ elements, the return value is still N items, where some are nil."
                               "--no-site-lisp"
                               "--batch"
                               "--insert"
-                              (org-node-worker--tmpfile (format "file-list-%d.eld" i))
+                              (org-node-worker--tmpfile "file-list-%d.eld" i)
                               "--eval"
                               (format
                                "(setq files (cons %d (car (read-from-string (buffer-string)))))"
@@ -127,6 +125,9 @@ elements, the return value is still N items, where some are nil."
 (defvar org-node-async--done-ctr 0)
 (defvar org-node-async--jobs nil)
 
+;; TODO: Actually when the first process returns, it should just block until
+;; the last process returns. Or well, no, but if the user tries to call cache-ensure, yes.
+;; But how to ensure this blockage? There's no await.
 (defun org-node-async--handle-finished-job (process _ i)
   (when (= 0 org-node-async--done-ctr)
     ;; This used to be in `org-node-cache-reset', wiping tables before
