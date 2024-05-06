@@ -156,7 +156,7 @@ that org-roam expects to have."
                 ,type)
               org-node-worker--demands)))))
 
-(defun org-node-worker--collect-properties (beg end)
+(defun org-node-worker--collect-properties (beg end file)
   "Assuming BEG and END mark the region in between a
 :PROPERTIES:...:END: drawer, collect the properties into an
 alist."
@@ -165,10 +165,15 @@ alist."
     ;; `with-restriction' is great, no perf impact and easy to reason about
     (with-restriction beg end
       (while (not (eobp))
-        (search-forward ":")
+        (unless (search-forward ":" nil t)
+          (error "Possibly malformed property drawer in %s at position %d"
+                 file (point)))
         (push (cons (upcase
                      (buffer-substring
-                      (point) (1- (search-forward ":"))))
+                      (point) (1- (if (search-forward ":" nil t)
+                                      (point)
+                                    (error "Possibly malformed property drawer in file %s at position %d"
+                                           file (point))))))
                     (string-trim
                      (buffer-substring
                       (point) (pos-eol))))
@@ -248,11 +253,12 @@ by `org-node-async--collect' and do what it expects."
                 (if (re-search-forward "^ *:properties:" FAR t)
                     (progn
                       (forward-line 1)
-                      (prog1 (org-node-worker--collect-properties
+                      (prog1 (org-node-worker--collect-propertiest
                               (point) (if (re-search-forward "^ *:end:" nil t)
                                           (pos-bol)
-                                        (error "Couldn't find matching :END: drawer in file %s"
-                                               FILE)))
+                                        (error "Couldn't find matching :END: drawer in file %s at position %d"
+                                               FILE (point)))
+                              FILE)
                         (goto-char 1)))
                   nil))
           (setq FILE-TAGS
@@ -290,7 +296,7 @@ by `org-node-async--collect' and do what it expects."
             (when FILE-ID
               ;; Don't count org-super-links backlinks as forward links
               (when (re-search-forward $backlink-drawer-re END t)
-                (unless (search-forward ":end:" nil t)
+                (unless (search-forward ":end:" END t)
                   (error "Couldn't find matching :END: drawer in file %s" FILE)))
               (org-node-worker--collect-links-until END FILE-ID nil $link-re)))
           (push `(org-node--add-node-to-tables
@@ -356,9 +362,11 @@ by `org-node-async--collect' and do what it expects."
             (setq PROPS
                   (if (re-search-forward "^[[:space:]]*:properties:" LINE+2 t)
                       (org-node-worker--collect-properties
-                       (point)  (if (re-search-forward "^[[:space:]]*:end:" nil t)
-                                    (pos-bol)
-                                  (error "Couldn't find matching :END: drawer in file %s" FILE)))
+                       (point) (if (re-search-forward "^[[:space:]]*:end:" nil t)
+                                   (pos-bol)
+                                 (error "Couldn't find matching :END: drawer in file %s at position %d"
+                                        FILE (point)))
+                       FILE)
                     nil))
             (setq ID (cdr (assoc "ID" PROPS)))
             (when $not-a-full-reset
@@ -378,7 +386,9 @@ by `org-node-async--collect' and do what it expects."
               (when ID-HERE
                 ;; Don't count org-super-links backlinks
                 (when (re-search-forward $backlink-drawer-re END t)
-                  (search-forward ":end:"))
+                  (unless (search-forward ":end:" END t)
+                    (error "Couldn't find matching :END: drawer in file %s at position %d"
+                           FILE (point))))
                 (org-node-worker--collect-links-until
                  END ID-HERE OLP-WITH-SELF $link-re)
                 ;; Gotcha... also collect links inside the heading, not
