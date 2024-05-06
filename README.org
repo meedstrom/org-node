@@ -56,7 +56,6 @@ For your pleasure, here's a comparison of three similar notetaking systems: all 
 | org-capture integration            | no          | yes                | no                   |
 | Backlinks in same window           | no          | yes                | yes                  |
 | Avoid scanning :BACKLINKS: drawers | no          | yes                | yes                  |
-| Find files/headings without ID     | no          | optional           | not applicable       |
 | Node exclusion                     | yes         | limited            | not applicable       |
 | Support =roam:= links                | yes         | no                 | no                   |
 | Warn about dead links              | no          | no                 | no                   |
@@ -285,7 +284,7 @@ API comparison between org-roam and org-node.
 |---------------------------------+------------------------------------+-----------------------------------------------------------------------------------------|
 | Get ID at point                 | =(org-roam-id-at-point)=             | =(org-entry-get nil "ID" t)=                                                              |
 | Get node at point               | =(org-roam-node-at-point)=           | =(org-node-at-point)=                                                                     |
-| Get list of files               | =(org-roam-list-files)=              | =(seq-uniq (hash-table-values org-id-locations))=                                         |
+| Get list of files               | =(org-roam-list-files)=              | =(org-node-files)=                                         |
 | Prompt user to pick a node      | =(org-roam-node-read)=               | =(org-node-read)=                                                                         |
 | Get backlink objects            | =(org-roam-backlinks-get NODE)=      | =(gethash (org-node id NODE) org-node--links-table)=                                      |
 | Get reflink objects             | =(org-roam-reflinks-get NODE)=       | =(gethash (org-node id NODE) org-node--reflinks-table)=                                   |

@@ -183,30 +183,23 @@ alist."
         (forward-line 1)))
     res))
 
+;; TODO If no ID was detected, just store OLDATA and skip to the next heading.
+;;      Do not record the subtree.
+;;
 ;; TODO Write a command that verifies that all files in id-locations are
 ;;      utf-8-unix
 ;;
 ;; TODO Consider what to do if org-id-locations stored the same file under
 ;;      different names
-(defun org-node-worker--collect (&optional synchronous variables)
-  "Scan for id-nodes across all files, adding them to `org-nodes'.
-
-The argument SYNCHRONOUS, if provided, should be a list of files
-to scan.  If not provided, assume we are in a child emacs spawned
-by `org-node-async--collect' and do what it expects."
+(defun org-node-worker--collect ()
+  "Scan for id-nodes across files, adding them to `org-nodes'."
   (with-temp-buffer
-    (setq $vars
-          (if synchronous
-              variables
-            (insert-file-contents (org-node-worker--tmpfile "work-variables.eld"))
-            (car (read-from-string (buffer-string)))))
-    (dolist (var $vars)
+    (insert-file-contents (org-node-worker--tmpfile "work-variables.eld"))
+    (dolist (var (car (read-from-string (buffer-string))))
       (set (car var) (cdr var)))
-    (if synchronous
-        (setq files synchronous)
-      ;; When async, `files' is already set by
-      ;; `org-node-async--collect'... with an extra morsel of data sent along
-      (setq i (pop files)))
+    ;; For each process, `$files' is set by `org-node-async--collect'... with an
+    ;; extra morsel of data sent along
+    (setq i (pop $files))
     (let ((case-fold-search t)
           ;; Perf
           (file-name-handler-alist $file-name-handler-alist)
@@ -216,11 +209,11 @@ by `org-node-async--collect' and do what it expects."
           ;; Reassigned on every iteration, so may as well re-use the memory
           ;; locations (hopefully producing less garbage) instead of making a
           ;; new let-binding every time.  Not sure how elisp works... but
-          ;; profiling shows a clear speedup.
+          ;; profiling shows a speedup.
           TITLE FILE-TITLE POS LEVEL HERE LINE+2
           TODO-STATE TAGS SCHED DEADLINE ID OLP
           PROPS FILE-TAGS FILE-ID OUTLINE-DATA TODO-RE FAR)
-      (dolist (FILE files)
+      (dolist (FILE $files)
         (if (not (file-exists-p FILE))
             ;; We got here because user deleted a file in a way that we didn't
             ;; notice.  If it was actually a rename, it'll get picked up on
@@ -410,24 +403,9 @@ by `org-node-async--collect' and do what it expects."
                            (split-string-and-unquote
                             (or (cdr (assoc "ROAM_REFS" PROPS)) ""))))
                   org-node-worker--demands))))
-      (if synchronous
-          (let ((please-rescan nil))
-            (while-let ((demand (pop org-node-worker--demands)))
-              (apply (car demand) (cdr demand))
-              (when (eq 'org-node--forget-id-location (car demand))
-                (setq please-rescan t)))
-            (when please-rescan
-              (org-node-worker--collect synchronous variables)
-              (org-id-locations-save))
-            ;; Cleanup
-            (dolist (var $vars)
-              (makunbound (car var)))
-            (makunbound '$vars))
-        ;; Write down the demands so `org-node-async--handle-finished-job' will
-        ;; do the equivalent of above in the main Emacs process
-        (with-temp-file (org-node-worker--tmpfile "result-%d.eld" i)
-          (let ((print-length nil))
-            (insert (prin1-to-string org-node-worker--demands))))))))
+      (with-temp-file (org-node-worker--tmpfile "result-%d.eld" i)
+        (let ((print-length nil))
+          (insert (prin1-to-string org-node-worker--demands)))))))
 
 (provide 'org-node-worker)
 

@@ -95,7 +95,7 @@ time."
                   arg2
                 (buffer-file-name))))
     (when (derived-mode-p 'org-mode)
-      (org-node-worker--collect (list file) (org-node--work-variables))
+      (org-node-async--collect (list file))
       (when (boundp 'org-node-cache-scan-file-hook)
         (lwarn 'org-node :warning
                "Hook renamed: org-node-cache-scan-file-hook to org-node-cache-rescan-file-hook"))
@@ -105,45 +105,33 @@ time."
   (defun org-node-cache--handle-delete (&optional arg1 &rest _)
     "Update org-id and org-node after an Org file is deleted.
 
-First remove any references to the file in `org-id-locations'.
+First remove any references to the file in
+`org-id-locations'. Then schedule an `org-node-cache-reset' for
+after a few idle seconds.  The delay minimizes the risk of
+bothering the user who may be trying to delete several files in a
+row."
+    (let ((file-being-deleted
+           (if (and arg1 (stringp arg1) (file-exists-p arg1))
+               arg1
+             (if (and (stringp buffer-file-name)
+                      (file-exists-p buffer-file-name))
+                 buffer-file-name
+               nil))))
+      (when file-being-deleted
+        (when (member (file-name-extension file-being-deleted)
+                      '("org" "org_archive" "gpg"))
+          (org-node--forget-id-location file-being-deleted)
+          (cancel-timer timer)
+          (setq timer (run-with-idle-timer 6 nil #'org-node-cache-reset)))))))
 
-Then schedule a rebuild of org-node caches after a few idle
-seconds.  The delay avoids bothering the user who may be trying
-to delete several files in a row."
-    (let ((file-being-deleted (if (and arg1 (file-exists-p arg1))
-                                  arg1
-                                (buffer-file-name))))
-      (when (member (file-name-extension file-being-deleted)
-                    '("org" "org_archive" "gpg"))
-        (org-node--forget-id-location file-being-deleted)
-        (cancel-timer timer)
-        (setq timer (run-with-idle-timer 6 nil #'org-node-cache-reset))))))
-
-(defun org-node-cache-peek3 ()
-  "For debugging: peek on random members of `org-nodes'.
+(defun org-node-cache-peek ()
+  "Print some random members of `org-nodes' that have IDs.
 See also the type `org-node-data'."
   (interactive)
   (let ((id-nodes (-filter #'org-node-get-id (hash-table-values org-nodes))))
     (dotimes (_ 3)
-      (print "")
+      (print '----------------------------)
       (cl-prin1 (nth (random (length id-nodes)) id-nodes)))))
-
-(defun org-node-cache-peek ()
-  "For debugging: peek on a random member of `org-nodes'.
-See also the type `org-node-data'."
-  (interactive)
-  (require 'map)
-  (require 'seq)
-  (let ((fields (--map (intern (concat "org-node-" (symbol-name it)))
-                       (map-keys (cdr (cl-struct-slot-info 'org-node-data)))))
-        (random-node (seq-random-elt
-                      (-filter #'org-node-get-id (hash-table-values org-nodes)))))
-    (message "%s"
-             (--zip-with
-              (format "(%s X) => %s\n" it other)
-              fields
-              (cl-loop for field in fields
-                       collect (funcall field random-node))))))
 
 (provide 'org-node-cache)
 
