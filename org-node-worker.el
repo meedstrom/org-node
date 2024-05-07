@@ -195,7 +195,7 @@ alist."
     (insert-file-contents (org-node-worker--tmpfile "work-variables.eld"))
     (dolist (var (car (read-from-string (buffer-string))))
       (set (car var) (cdr var)))
-    ;; For each process, an unique `$files' is set1 by
+    ;; For each process, an unique `$files' is set by
     ;; `org-node-async--collect'... with an extra morsel of data sent along
     (setq i (pop $files))
     (let ((case-fold-search t)
@@ -214,9 +214,9 @@ alist."
         (if (not (file-exists-p FILE))
             ;; We got here because user deleted a file in a way that we didn't
             ;; notice.  If it was actually a rename, it'll get picked up on
-            ;; next reset.  The best fix would be rewriting org-id.el so user
-            ;; can specify where to look for new files and what to ignore, so
-            ;; that we could just run that algorithm here.
+            ;; next reset.
+            ;; TODO: Schedule a targeted caching of any new files that appeared
+            ;; in `org-node-files' output
             (push `(org-node--forget-id-location ,FILE)
                   org-node-worker--demands)
           (erase-buffer)
@@ -398,7 +398,7 @@ alist."
                 (goto-char POS)
                 (org-node-worker--collect-links-until
                  (pos-eol) ID-HERE OLP-WITH-SELF $link-re))))))
-      (with-temp-file (org-node-worker--tmpfile "result-%d.eld" i)
+      (with-temp-file (org-node-worker--tmpfile "demands-%d.eld" i)
         (let ((print-length nil))
           (insert (prin1-to-string org-node-worker--demands)))))))
 
