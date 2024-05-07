@@ -267,10 +267,16 @@ calling `org-id-locations-save'."
   ;; NOTE: Do not insert a `org-node-cache-ensure' here as you might usually do
   ;; for safety, because several invocations of this function would undo each
   ;; other's work.
-  (cl-loop for id being the hash-keys of org-id-locations
-           using (hash-values file-on-record)
-           when (file-equal-p file file-on-record)
-           do (remhash id org-id-locations)))
+  ;; Fast version
+  (let ((alist (org-id-hash-to-alist org-id-locations)))
+    (assoc-delete-all file alist)
+    (setq org-id-locations (org-id-alist-to-hash alist)))
+  ;; Very slow version
+  ;; (cl-loop for id being the hash-keys of org-id-locations
+  ;;          using (hash-values file-on-record)
+  ;;          when (file-equal-p file file-on-record)
+  ;;          do (remhash id org-id-locations))
+  )
 
 ;; REVIEW deprecate?
 (defun org-node-die (format-string &rest args)

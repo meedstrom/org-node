@@ -133,7 +133,7 @@ to delete several files in a row."
         ;; (when org-node-dbg
         ;; (message "Advising deletion of %s" file-being-deleted))
         (message "Forgetting file %s" file-being-deleted)
-        ;; (org-node--forget-id-location file-being-deleted)
+        (org-node--forget-id-location file-being-deleted)
         (cancel-timer timer)
         (setq timer (run-with-idle-timer 6 nil #'org-node-cache-ensure nil t))))))
 
