@@ -358,11 +358,11 @@ See also the type `org-node-data'."
                                               org-node--reflinks-table)))))
               ;; (2024-05-06) NOTE In a few days, remove "w ID" (transitional)
               (message "org-node saw %d files, %d subtrees w ID, %d ID-links, %d potential reflinks in %.1fs"
-                       (float-time (time-since org-node-cache--start-time))
                        (- (hash-table-count org-nodes) n-subtrees)
                        n-subtrees
                        n-backlinks
-                       n-reflinks)))
+                       n-reflinks
+                       (float-time (time-since org-node-cache--start-time)))))
           (org-id-locations-save))))))
 
 (provide 'org-node-cache)

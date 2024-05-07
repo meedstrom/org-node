@@ -240,8 +240,6 @@ Example:
         "/home/kept/project2/")
 #+end_src
 
-As a bonus, if you need to specify an exclusion ruleset, configure =org-node-extra-id-dirs-exclude=.
-
 *** Limitations: excluding notes
 The =org-node-filter-fn= works well for ignoring TODO items that happen to have an ID, and ignoring org-drill items and that sort of thing, but beyond that, it has limited utility because unlike org-roam, *child ID nodes of an excluded node are not excluded!*
 
