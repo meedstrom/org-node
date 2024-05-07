@@ -1,4 +1,8 @@
 * org-node
+** News [2024-05-07]
+- You'll now experience less interruptions in commands
+- New variable to easily populate org-id: =org-node-extra-id-dirs=!
+
 ** News [2024-05-03]
 - org-node is now async and multi-threaded, speeding it up even more!
 
