@@ -159,16 +159,19 @@ Update the :BACKLINKS: property.  With arg REMOVE, remove it instead."
               (when prop
                 (goto-char start)
                 (let ((case-fold-search t))
-                  ;; START and END delineate an area where changes were detected, but the
-                  ;; area rarely envelops the current subtree's property drawer,
-                  ;; likely placed long before START, so search back for it
+                  ;; START and END delineate an area where changes were
+                  ;; detected, but the area rarely envelops the current
+                  ;; subtree's property drawer, likely placed long before
+                  ;; START, so search back for it
                   (save-excursion
                     (let ((id-here (org-entry-get nil "ID" t)))
-                      (when id-here
-                        (re-search-backward
-                         (concat "^[[:space:]]*:id: *" (regexp-quote id-here)))
-                        (re-search-forward "^[[:space:]]*:id: ")
-                        (org-node-backlink--update-subtree-here))))
+                      (and id-here
+                           ;; This search can fail because buffer is narrowed
+                           (re-search-backward
+                            (concat "^[[:space:]]*:id: *" (regexp-quote id-here))
+                            nil t)
+                           (re-search-forward "^[[:space:]]*:id: ")
+                           (org-node-backlink--update-subtree-here))))
                   ;; ...and if the change-area is massive, spanning multiple
                   ;; subtrees, update each one
                   (while (re-search-forward "^[[:space:]]*:id: " end t)
