@@ -136,6 +136,13 @@ Update the :BACKLINKS: property.  With arg REMOVE, remove it instead."
       (while (re-search-forward "^[[:space:]]*:id: " nil t)
         (org-node-backlink--update-subtree-here remove)))))
 
+;; TODO: Allow narrowing to have an effect, i.e. don't use
+;; `without-restriction'.  Problem is that org-entry-get will get an ID outside
+;; the region (good).  And that ID can be inherited, so we cannot just narrow
+;; to one subtree at a time.  At best, we could narrow to one top-level heading
+;; at a time.  Or not exactly top-level.  Basically, look for first heading
+;; with an ID, narrow to it plus its children, then move forward to heading of
+;; same or higher level, then repeaat.
 (defun org-node-backlink--update-changed-parts-of-buffer ()
   (when org-node-backlink-mode
     ;; Catch any error because this runs at `before-save-hook' which MUST fail
@@ -179,8 +186,8 @@ Update the :BACKLINKS: property.  With arg REMOVE, remove it instead."
                       (org-node-backlink--update-subtree-here))))
                 ;; Move on and seek the next changed area
                 (remove-text-properties start (or end eob) 'org-node-chg)
-                (setq start end))))
-          (set-marker eob nil))
+                (setq start end))
+              (set-marker eob nil))))
       (( error user-error debug )
        (lwarn 'org-node :error
               "org-node-backlink--update-changed-parts-of-buffer: %S" err)))))
