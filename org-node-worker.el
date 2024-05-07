@@ -182,8 +182,6 @@ alist."
         (forward-line 1)))
     res))
 
-;; TODO First do one search for any ID inside the file at all, so we can skip
-;;
 ;; TODO Write a command that verifies that all files in id-locations are
 ;;      utf-8-unix or whichever charset
 ;;
@@ -226,151 +224,66 @@ alist."
           ;; value for :pos when there was any Unicode in the file.  So
           ;; instead, the let-bindings above reproduce much of what it did.
           (insert-file-contents FILE)
-          (setq OUTLINE-DATA nil)
-          ;; TODO: handle a byte-order mark...
-          ;; (when (equal (buffer-substring 0 3) "\xEF\xBB\xBF"))
-          ;; Roughly like `org-end-of-meta-data' for file level
-          (setq FAR (or (re-search-forward "^ *?[^#:]" nil t) (point-max)))
-          (goto-char 1)
-          (setq PROPS
-                (if (re-search-forward "^ *:properties:" FAR t)
-                    (progn
-                      (forward-line 1)
-                      (prog1 (org-node-worker--collect-properties
-                              (point) (if (re-search-forward "^ *:end:" nil t)
-                                          (pos-bol)
-                                        (error "Couldn't find matching :END: drawer in file %s at position %d"
-                                               FILE (point)))
-                              FILE)
-                        (goto-char 1)))
-                  nil))
-          (setq FILE-TAGS
-                (if (re-search-forward "^#\\+filetags: " FAR t)
-                    (prog1 (split-string
-                            (buffer-substring (point) (pos-eol))
-                            ":" t)
-                      (goto-char 1))
-                  nil))
-          (setq TODO-RE
-                (if (re-search-forward $file-todo-option-re FAR t)
-                    (prog1
-                        (org-node-worker--make-todo-regexp
-                         (buffer-substring (point) (pos-eol)))
-                      (goto-char 1))
-                  $global-todo-re))
-          (setq FILE-TITLE
-                (if (re-search-forward "^#\\+title: " FAR t)
-                    (org-node-worker--org-link-display-format
-                     (buffer-substring (point) (pos-eol)))
-                  ;; File nodes dont strictly need #+title, fall back on filename
-                  (file-name-nondirectory FILE)))
-          (when (setq FILE-ID (cdr (assoc "ID" PROPS)))
-            (when $targeted
-              ;; This was probably called by a rename-file advice, i.e. this
-              ;; is not a full reset of all files, just a scan of 1 file
-              (push `(org-id-add-location ,FILE-ID ,FILE)
-                    org-node-worker--demands))
-            ;; Collect links
-            (let ((END (save-excursion (org-node-worker--next-heading))))
-              ;; Don't count org-super-links backlinks as forward links
-              (when (re-search-forward $backlink-drawer-re END t)
-                (unless (search-forward ":end:" END t)
-                  (error "Couldn't find matching :END: drawer in file %s" FILE)))
-              (org-node-worker--collect-links-until END FILE-ID nil $link-re))
-            (push `(org-node-cache--add-node-to-tables
-                    ,(list :title FILE-TITLE
-                           :level 0
-                           :tags FILE-TAGS
-                           :file-path FILE
-                           :pos 1
-                           :file-title FILE-TITLE
-                           :properties PROPS
-                           :id FILE-ID
-                           :aliases
-                           (split-string-and-unquote
-                            (or (cdr (assoc "ROAM_ALIASES" PROPS)) ""))
-                           :refs
-                           (split-string-and-unquote
-                            (or (cdr (assoc "ROAM_REFS" PROPS)) ""))))
-                  org-node-worker--demands))
-          ;; Loop over the file's subtrees
-          (while (org-node-worker--next-heading)
-            (setq POS (point))
-            (setq LEVEL (skip-chars-forward "*"))
-            (skip-chars-forward " ")
-            (setq HERE (point))
-            (if (looking-at TODO-RE)
-                (progn
-                  (setq TODO-STATE (buffer-substring (point) (match-end 0)))
-                  (goto-char (1+ (match-end 0)))
-                  (setq HERE (point)))
-              (setq TODO-STATE nil))
-            (if (re-search-forward " +\\(:.+:\\) *$" (pos-eol) t)
-                (progn
-                  (setq TITLE (org-node-worker--org-link-display-format
-                               (buffer-substring HERE (match-beginning 0))))
-                  (setq TAGS (split-string (match-string 1) ":" t)))
-              (setq TITLE
-                    (org-node-worker--org-link-display-format
-                     (buffer-substring HERE (pos-eol))))
-              (setq TAGS nil))
-            (setq HERE (point))
-            ;; This boundary guards against the case of working from a
-            ;; content-less heading just before another heading, and matching
-            ;; that one's metadata
-            (setq LINE+2 (progn (forward-line 2) (point)))
-            (goto-char HERE)
-            ;; TODO: look for CLOSED too. maybe more optimal algo by moving
-            ;; onto that line and just looking at the line
-            (setq SCHED
-                  (if (re-search-forward "[\n\s]SCHEDULED: " LINE+2 t)
-                      (prog1 (buffer-substring
-                              ;; \n just there for safety
-                              (point)
-                              (+ 1 (point) (skip-chars-forward "^]>\n")))
-                        (setq LINE+2 (progn (forward-line 2) (point)))
-                        (goto-char HERE))
-                    nil))
-            (setq DEADLINE
-                  (if (re-search-forward "[\n\s]DEADLINE: " LINE+2 t)
-                      (prog1 (buffer-substring
-                              (point)
-                              (+ 1 (point) (skip-chars-forward "^]>\n")))
-                        (setq LINE+2 (progn (forward-line 2) (point)))
-                        (goto-char HERE))
-                    nil))
+          ;; Verify there is at least one ID-node, otherwise skip file
+          (when (save-excursion (re-search-forward "^[[:space:]]*:id: " nil t))
+            (setq OUTLINE-DATA nil)
+            ;; Roughly like `org-end-of-meta-data' for file level
+            (setq FAR (or (re-search-forward "^ *?[^#:]" nil t) (point-max)))
+            (goto-char 1)
             (setq PROPS
-                  (if (re-search-forward "^[[:space:]]*:properties:" LINE+2 t)
-                      (org-node-worker--collect-properties
-                       (point) (if (re-search-forward "^[[:space:]]*:end:" nil t)
-                                   (pos-bol)
-                                 (error "Couldn't find matching :END: drawer in file %s at position %d"
-                                        FILE (point)))
-                       FILE)
+                  (if (re-search-forward "^ *:properties:" FAR t)
+                      (progn
+                        (forward-line 1)
+                        (prog1 (org-node-worker--collect-properties
+                                (point) (if (re-search-forward "^ *:end:" nil t)
+                                            (pos-bol)
+                                          (error "Couldn't find matching :END: drawer in file %s at position %d"
+                                                 FILE (point)))
+                                FILE)
+                          (goto-char 1)))
                     nil))
-            (setq ID (cdr (assoc "ID" PROPS)))
-            (when ID
+            (setq FILE-TAGS
+                  (if (re-search-forward "^#\\+filetags: " FAR t)
+                      (prog1 (split-string
+                              (buffer-substring (point) (pos-eol))
+                              ":" t)
+                        (goto-char 1))
+                    nil))
+            (setq TODO-RE
+                  (if (re-search-forward $file-todo-option-re FAR t)
+                      (prog1
+                          (org-node-worker--make-todo-regexp
+                           (buffer-substring (point) (pos-eol)))
+                        (goto-char 1))
+                    $global-todo-re))
+            (setq FILE-TITLE
+                  (if (re-search-forward "^#\\+title: " FAR t)
+                      (org-node-worker--org-link-display-format
+                       (buffer-substring (point) (pos-eol)))
+                    ;; File nodes dont strictly need #+title, fall back on filename
+                    (file-name-nondirectory FILE)))
+            (when (setq FILE-ID (cdr (assoc "ID" PROPS)))
               (when $targeted
-                ;; Called by a rename-file advice
-                (push `(org-id-add-location ,ID ,FILE)
-                      org-node-worker--demands)))
-            (push (list POS TITLE LEVEL ID) OUTLINE-DATA)
-            (when ID
-              (setq OLP (org-node-worker--pos->olp OUTLINE-DATA POS))
+                ;; This was probably called by a rename-file advice, i.e. this
+                ;; is not a full reset of all files, just a scan of 1 file
+                (push `(org-id-add-location ,FILE-ID ,FILE)
+                      org-node-worker--demands))
+              ;; Collect links
+              (let ((END (save-excursion (org-node-worker--next-heading))))
+                ;; Don't count org-super-links backlinks as forward links
+                (when (re-search-forward $backlink-drawer-re END t)
+                  (unless (search-forward ":end:" END t)
+                    (error "Couldn't find matching :END: drawer in file %s" FILE)))
+                (org-node-worker--collect-links-until END FILE-ID nil $link-re))
               (push `(org-node-cache--add-node-to-tables
-                      ,(list :title TITLE
-                             :is-subtree t
-                             :level LEVEL
-                             :id ID
-                             :pos POS
-                             :tags TAGS
-                             :todo TODO-STATE
+                      ,(list :title FILE-TITLE
+                             :level 0
+                             :tags FILE-TAGS
                              :file-path FILE
-                             :scheduled SCHED
-                             :deadline DEADLINE
+                             :pos 1
                              :file-title FILE-TITLE
-                             :olp OLP
                              :properties PROPS
+                             :id FILE-ID
                              :aliases
                              (split-string-and-unquote
                               (or (cdr (assoc "ROAM_ALIASES" PROPS)) ""))
@@ -378,26 +291,111 @@ alist."
                              (split-string-and-unquote
                               (or (cdr (assoc "ROAM_REFS" PROPS)) ""))))
                     org-node-worker--demands))
-            ;; Now collect links while we're here!
-            (let ((ID-HERE (or ID (org-node-worker--pos->parent-id
-                                   OUTLINE-DATA POS FILE-ID)))
-                  (END (save-excursion
-                         (org-node-worker--next-heading)
-                         (1- (point))))
-                  (OLP-WITH-SELF (append OLP (list TITLE))))
-              (when ID-HERE
-                ;; Don't count org-super-links backlinks
-                (when (re-search-forward $backlink-drawer-re END t)
-                  (unless (search-forward ":end:" END t)
-                    (error "Couldn't find matching :END: drawer in file %s at position %d"
-                           FILE (point))))
-                (org-node-worker--collect-links-until
-                 END ID-HERE OLP-WITH-SELF $link-re)
-                ;; Gotcha... also collect links inside the heading, not
-                ;; just the body text
-                (goto-char POS)
-                (org-node-worker--collect-links-until
-                 (pos-eol) ID-HERE OLP-WITH-SELF $link-re))))))
+            ;; Loop over the file's subtrees
+            (while (org-node-worker--next-heading)
+              (setq POS (point))
+              (setq LEVEL (skip-chars-forward "*"))
+              (skip-chars-forward " ")
+              (setq HERE (point))
+              (if (looking-at TODO-RE)
+                  (progn
+                    (setq TODO-STATE (buffer-substring (point) (match-end 0)))
+                    (goto-char (1+ (match-end 0)))
+                    (setq HERE (point)))
+                (setq TODO-STATE nil))
+              (if (re-search-forward " +\\(:.+:\\) *$" (pos-eol) t)
+                  (progn
+                    (setq TITLE (org-node-worker--org-link-display-format
+                                 (buffer-substring HERE (match-beginning 0))))
+                    (setq TAGS (split-string (match-string 1) ":" t)))
+                (setq TITLE
+                      (org-node-worker--org-link-display-format
+                       (buffer-substring HERE (pos-eol))))
+                (setq TAGS nil))
+              (setq HERE (point))
+              ;; This boundary guards against the case of working from a
+              ;; content-less heading just before another heading, and matching
+              ;; that one's metadata
+              (setq LINE+2 (progn (forward-line 2) (point)))
+              (goto-char HERE)
+              ;; TODO: look for CLOSED too. maybe more optimal algo by moving
+              ;; onto that line and just looking at the line
+              (setq SCHED
+                    (if (re-search-forward "[\n\s]SCHEDULED: " LINE+2 t)
+                        (prog1 (buffer-substring
+                                ;; \n just there for safety
+                                (point)
+                                (+ 1 (point) (skip-chars-forward "^]>\n")))
+                          (setq LINE+2 (progn (forward-line 2) (point)))
+                          (goto-char HERE))
+                      nil))
+              (setq DEADLINE
+                    (if (re-search-forward "[\n\s]DEADLINE: " LINE+2 t)
+                        (prog1 (buffer-substring
+                                (point)
+                                (+ 1 (point) (skip-chars-forward "^]>\n")))
+                          (setq LINE+2 (progn (forward-line 2) (point)))
+                          (goto-char HERE))
+                      nil))
+              (setq PROPS
+                    (if (re-search-forward "^[[:space:]]*:properties:" LINE+2 t)
+                        (org-node-worker--collect-properties
+                         (point) (if (re-search-forward "^[[:space:]]*:end:" nil t)
+                                     (pos-bol)
+                                   (error "Couldn't find matching :END: drawer in file %s at position %d"
+                                          FILE (point)))
+                         FILE)
+                      nil))
+              (setq ID (cdr (assoc "ID" PROPS)))
+              (when ID
+                (when $targeted
+                  ;; Called by a rename-file advice
+                  (push `(org-id-add-location ,ID ,FILE)
+                        org-node-worker--demands)))
+              (push (list POS TITLE LEVEL ID) OUTLINE-DATA)
+              (when ID
+                (setq OLP (org-node-worker--pos->olp OUTLINE-DATA POS))
+                (push `(org-node-cache--add-node-to-tables
+                        ,(list :title TITLE
+                               :is-subtree t
+                               :level LEVEL
+                               :id ID
+                               :pos POS
+                               :tags TAGS
+                               :todo TODO-STATE
+                               :file-path FILE
+                               :scheduled SCHED
+                               :deadline DEADLINE
+                               :file-title FILE-TITLE
+                               :olp OLP
+                               :properties PROPS
+                               :aliases
+                               (split-string-and-unquote
+                                (or (cdr (assoc "ROAM_ALIASES" PROPS)) ""))
+                               :refs
+                               (split-string-and-unquote
+                                (or (cdr (assoc "ROAM_REFS" PROPS)) ""))))
+                      org-node-worker--demands))
+              ;; Now collect links while we're here!
+              (let ((ID-HERE (or ID (org-node-worker--pos->parent-id
+                                     OUTLINE-DATA POS FILE-ID)))
+                    (END (save-excursion
+                           (org-node-worker--next-heading)
+                           (1- (point))))
+                    (OLP-WITH-SELF (append OLP (list TITLE))))
+                (when ID-HERE
+                  ;; Don't count org-super-links backlinks
+                  (when (re-search-forward $backlink-drawer-re END t)
+                    (unless (search-forward ":end:" END t)
+                      (error "Couldn't find matching :END: drawer in file %s at position %d"
+                             FILE (point))))
+                  (org-node-worker--collect-links-until
+                   END ID-HERE OLP-WITH-SELF $link-re)
+                  ;; Gotcha... also collect links inside the heading, not
+                  ;; just the body text
+                  (goto-char POS)
+                  (org-node-worker--collect-links-until
+                   (pos-eol) ID-HERE OLP-WITH-SELF $link-re)))))))
       (with-temp-file (org-node-worker--tmpfile "demands-%d.eld" i)
         (let ((print-length nil))
           (insert (prin1-to-string org-node-worker--demands)))))))
