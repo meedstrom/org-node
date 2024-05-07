@@ -289,14 +289,13 @@ gets some necessary variables."
 To behave like `org-roam-node-find' when creating new nodes, set
 `org-node-creation-fn' to `org-node-new-by-roam-capture'."
   (interactive)
-  (if (org-node-cache-ensure)
-      (message "Cache being built...")
-    (let* ((input (completing-read "Node: " org-node-collection
-                                   () () () 'org-node-hist))
-           (node (gethash input org-node-collection)))
-      (if node
-          (org-node--goto node)
-        (org-node--create input (org-id-new))))))
+  (org-node-cache-ensure)
+  (let* ((input (completing-read "Node: " org-node-collection
+                                 () () () 'org-node-hist))
+         (node (gethash input org-node-collection)))
+    (if node
+        (org-node--goto node)
+      (org-node--create input (org-id-new)))))
 
 ;;;###autoload
 (defun org-node-insert-link ()
