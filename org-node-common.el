@@ -205,8 +205,7 @@ Intended to have the same convenience as setting
 exists within these directories (and its subdirectories and
 sub-subdirectories and so on).
 
-For it to actually have an effect, you need to either have
-`org-node-cache-mode' active or regularly use org-node commands.
+For it to have an effect, `org-node-cache-mode' must be active.
 
 To avoid accidentally picking up versioned backups or things of
 that nature, causing org-id to complain about \"duplicate\" IDs,
@@ -264,19 +263,9 @@ This allows use with `completing-read'.")
   "Remove references to FILE in `org-id-locations'.
 You might consider \"committing\" the effect afterwards by
 calling `org-id-locations-save'."
-  ;; NOTE: Do not insert a `org-node-cache-ensure' here as you might usually do
-  ;; for safety, because several invocations of this function would undo each
-  ;; other's work.
-  ;; Fast version
   (let ((alist (org-id-hash-to-alist org-id-locations)))
     (assoc-delete-all file alist)
-    (setq org-id-locations (org-id-alist-to-hash alist)))
-  ;; Very slow version
-  ;; (cl-loop for id being the hash-keys of org-id-locations
-  ;;          using (hash-values file-on-record)
-  ;;          when (file-equal-p file file-on-record)
-  ;;          do (remhash id org-id-locations))
-  )
+    (setq org-id-locations (org-id-alist-to-hash alist))))
 
 ;; REVIEW deprecate?
 (defun org-node-die (format-string &rest args)
@@ -359,6 +348,7 @@ you'd have to cross-reference with `org-node--refs-table'.")
 
 (defvar org-node--links-table (make-hash-table :test #'equal))
 (defvar org-node--refs-table (make-hash-table :test #'equal))
+(defvar org-node--dbg nil)
 
 
 

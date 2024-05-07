@@ -114,17 +114,22 @@ These user options help you feel at home using both packages side-by-side:
 (setq org-node-creation-fn #'org-node-new-by-roam-capture)
 (setq org-node-slug-fn #'org-node-slugify-like-roam)
 (setq org-node-creation-hook nil)
-(setq org-node-extra-id-dirs (list org-roam-directory))
 #+end_src
 
-In addition, if you've been struggling with slow saving of big files, consider these org-roam settings:
+Also, either run =M-x org-roam-id-update-id-locations=, or add your =org-roam-directory= to the following variable.  It shouldn't be necessary, but upstream org-id has no real convenient setting for this...
+
+#+begin_src elisp
+(setq org-node-extra-id-dirs '(...))
+#+end_src
+
+If you've been struggling with slow saving of big files in the past, consider these org-roam settings:
 
 #+begin_src elisp
 (setq org-roam-db-update-on-save nil) ;; don't update DB on save, not needed
 (setq org-roam-link-auto-replace nil) ;; don't look for "roam:" links on save
 #+end_src
 
-Do a =M-x org-roam-update-org-id-locations=.  With that done, try out the commands mentioned in [[https://github.com/meedstrom/org-node?tab=readme-ov-file#quick-start][Quick start]].  There's more under [[https://github.com/meedstrom/org-node?tab=readme-ov-file#toolbox][Toolbox]].  Enjoy!
+With that done, try out the commands mentioned in [[https://github.com/meedstrom/org-node?tab=readme-ov-file#quick-start][Quick start]].  There's more under [[https://github.com/meedstrom/org-node?tab=readme-ov-file#toolbox][Toolbox]].  Enjoy!
 
 I'm guessing you also want the [[https://github.com/meedstrom/org-node?tab=readme-ov-file#backlink-solution-1-org-roam-buffer][org-roam-buffer]].  See next section.
 
