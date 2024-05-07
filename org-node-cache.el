@@ -114,7 +114,6 @@ current buffer file."
                  "Hook renamed: org-node-cache-scan-file-hook to org-node-cache-rescan-file-hook"))
         (run-hooks 'org-node-cache-rescan-file-hook)))))
 
-;; FIXME: Forget-id-location is way too slow
 (let ((timer (timer-create)))
   (defun org-node-cache--handle-delete (&optional file-being-deleted &rest _)
     "Update org-id and org-node after an Org file is deleted.
@@ -130,14 +129,10 @@ to delete several files in a row."
     (when file-being-deleted
       (when (--any-p (string-suffix-p it file-being-deleted)
                      '(".org" ".org_archive" ".org.gpg"))
-        ;; (when org-node-dbg
-        ;; (message "Advising deletion of %s" file-being-deleted))
-        (message "Forgetting file %s" file-being-deleted)
+        (message "Forgetting the deleted file... (%s)" file-being-deleted)
         (org-node--forget-id-location file-being-deleted)
         (cancel-timer timer)
         (setq timer (run-with-idle-timer 6 nil #'org-node-cache-ensure nil t))))))
-
-(defvar org-node-dbg t)
 
 (defun org-node-cache-peek ()
   "Print some random members of `org-nodes' that have IDs.
@@ -243,7 +238,7 @@ See also the type `org-node-data'."
            ($link-re . ,org-link-plain-re)
            ($gc-cons-threshold
             . ,(or org-node-perf-gc-cons-threshold gc-cons-threshold))
-           ($file-todo-option-re
+           ($file-option-todo-re
             . ,(rx bol (or "#+todo: " "#+seq_todo: " "#+typ_todo: ")))
            ($file-name-handler-alist
             . ,(--keep (rassoc it org-node-perf-keep-file-name-handlers)
@@ -257,7 +252,7 @@ See also the type `org-node-data'."
                        (or (and (fboundp 'org-super-links-link)
                                 (require 'org-super-links)
                                 (stringp org-super-links-backlink-into-drawer)
-                                (downcase org-super-links-backlink-into-drawer))
+                                org-super-links-backlink-into-drawer)
                            "backlinks")
                        ":")))))))
 
@@ -271,59 +266,56 @@ See also the type `org-node-data'."
       (when (process-live-p old-process)
         (delete-process old-process)))
 
-    ;; For debugging
-    ;; (if single-threaded
-    ;;     (with-temp-buffer
-    ;;       (insert (or files (org-node-files)))
-    ;;       (defvar $files (cons 0 (car (read-from-string (buffer-string)))))
-    ;;       (org-node-worker--collect))
-    ;;   )
+    ;; For debugging, run single-threaded so we can use edebug in
+    ;; org-node-worker.el
+    (if org-node--dbg
+        (progn
+          (with-temp-file (org-node-worker--tmpfile "file-list-0.eld")
+            (insert (prin1-to-string (org-node-files))))
+          (setq i 0)
+          (org-node-worker--collect)
+          (setq org-node-cache--jobs 1)
+          (org-node-cache--handle-finished-job 0 nil))
 
-    ;; Split the work over many Emacs processes
-    (let ((print-length nil)
-          (file-lists (org-node--split-into-n-sublists
-                       (or files (org-node-files t))
-                       org-node-cache--jobs)))
-      ;; If user has e.g. 8 cores but only 5 files, spin up only 5 jobs
-      (delq nil file-lists)
-      (setq org-node-cache--jobs (min org-node-cache--jobs (length file-lists)))
-      (dotimes (i org-node-cache--jobs)
-        (delete-file (org-node-worker--tmpfile "demands-%d.eld" 2))
-        (with-temp-file (org-node-worker--tmpfile "file-list-%d.eld" i)
-          (insert (prin1-to-string (pop file-lists))))
-        (push (make-process
-               :name (format "org-node-%d" i)
-               :noquery t
-               ;; REVIEW: maybe collecting their stderrs in one buffer causes
-               ;; the hang?
-               :stderr (get-buffer-create " *org-node*")
-               :command (list (file-truename
-                               (expand-file-name invocation-name
-                                                 invocation-directory))
-                              "--quick"
-                              "--no-init-file"
-                              "--no-site-lisp"
-                              "--batch"
-                              "--insert"
-                              (org-node-worker--tmpfile "file-list-%d.eld" i)
-                              "--eval"
-                              (format
-                               "(setq $files (cons %d (car (read-from-string (buffer-string)))))"
-                               i)
-                              "--load"
-                              (or native elc)
-                              "--funcall"
-                              "org-node-worker--collect")
-               :sentinel (lambda (process _event)
-                           (org-node-cache--handle-finished-job
-                            process i targeted)))
-              org-node-cache--processes)))))
+      ;; Split the work over many Emacs processes
+      (let ((print-length nil)
+            (file-lists (org-node--split-into-n-sublists
+                         (or files (org-node-files t))
+                         org-node-cache--jobs)))
+        (delq nil file-lists)
+        ;; If user has e.g. 8 cores but only 5 files, spin up only 5 jobs
+        (setq org-node-cache--jobs (min org-node-cache--jobs (length file-lists)))
+        (dotimes (i org-node-cache--jobs)
+          (delete-file (org-node-worker--tmpfile "demands-%d.eld" i))
+          (with-temp-file (org-node-worker--tmpfile "file-list-%d.eld" i)
+            (insert (prin1-to-string (pop file-lists))))
+          (push (make-process
+                 :name (format "org-node-%d" i)
+                 :noquery t
+                 :stderr (get-buffer-create " *org-node*")
+                 :command (list (file-truename
+                                 (expand-file-name invocation-name
+                                                   invocation-directory))
+                                "--quick"
+                                "--no-init-file"
+                                "--no-site-lisp"
+                                "--batch"
+                                "--eval"
+                                (format "(setq i %d)" i)
+                                "--load"
+                                (or native elc)
+                                "--funcall"
+                                "org-node-worker--collect")
+                 :sentinel (lambda (_process _event)
+                             (org-node-cache--handle-finished-job
+                              i targeted)))
+                org-node-cache--processes))))))
 
 (defvar org-node-cache--processes (list))
 (defvar org-node-cache--done-ctr 0)
 (defvar org-node-cache--jobs nil)
 
-(defun org-node-cache--handle-finished-job (process i targeted)
+(defun org-node-cache--handle-finished-job (i targeted)
   (unless targeted
     (when (= 0 org-node-cache--done-ctr)
       ;; This used to be in `org-node-cache-ensure', wiping tables before
@@ -353,9 +345,9 @@ See also the type `org-node-data'."
         (insert-file-contents file)
         ;; Execute the demands that the worker wrote
         (dolist (demand (car (read-from-string (buffer-string))))
-          (apply (car demand) (cdr demand))
           (when (eq 'org-node--forget-id-location (car demand))
-            (message "Forgetting nonexistent file... %s" (cdr demand))))
+            (message "Forgetting nonexistent file... %s" (cdr demand)))
+          (apply (car demand) (cdr demand)))
         ;; Check if this was the last process to return, then wrap-up
         (when (eq (cl-incf org-node-cache--done-ctr) org-node-cache--jobs)
           ;; Print time elapsed.  Don't do it if this was a
