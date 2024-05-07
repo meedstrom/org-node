@@ -115,6 +115,7 @@ These user options help you feel at home using both packages side-by-side:
 (setq org-node-creation-fn #'org-node-new-by-roam-capture)
 (setq org-node-slug-fn #'org-node-slugify-like-roam)
 (setq org-node-creation-hook nil)
+(setq org-node-extra-id-dirs (list org-roam-directory))
 #+end_src
 
 In addition, if you've been struggling with slow saving of big files, consider these org-roam settings:
@@ -148,7 +149,7 @@ For a full reset, equivalent to =C-u M-x org-roam-db-sync=, you can type =M-x or
 
 **** *Option 1C*.  Cut out the DB altogether.
 
-Instead of the above, do some hax:
+Do some hax:
 
 #+begin_src elisp
 (advice-add 'org-roam-backlinks-get :override
@@ -228,13 +229,18 @@ How to see the headings' full outline paths while searching for nodes:
 
 *** Managing org-id-locations
 
-In principle, org-id.el is meant to be self-managing.  When Emacs sees an ID, it's added to the table.  In real-world practice, you can't always rely on that, so it provides settings like =org-id-extra-files=.
+The upstream org-id.el exposes settings like =org-id-extra-files=.  I've found these settings quite unsatisfactory (see [[https://github.com/meedstrom/org-node?tab=readme-ov-file#appendix-iii-taking-ownership-of-org-id][Appendix III]]), so org-node has an additional way to feed data to org-id, so we won't run into "ID missing" situations".
 
-I've found these settings quite unsatisfactory -- you need a long init snippet to set them correctly (see [[https://github.com/meedstrom/org-node?tab=readme-ov-file#appendix-iii-taking-ownership-of-org-id][Appendix III]]).  So org-node has an additional way to feed data to org-id.  Configure =org-node-extra-id-dirs=.
+Example:
 
-As a bonus, it has an exclusion ruleset =org-node-extra-id-dirs-exclude= if you need it.
+#+begin_src elisp
+(setq org-node-extra-id-dirs
+      '("/home/kept/notes"
+        "/home/kept/project1/"
+        "/home/kept/project2/")
+#+end_src
 
-*Org-roam users* can use =M-x org-roam-update-org-id-locations=, but to avoid having to do it again on every init, also type =M-: (org-id-locations-save)= afterwards.
+As a bonus, if you need to specify an exclusion ruleset, configure =org-node-extra-id-dirs-exclude=.
 
 *** Limitations: excluding notes
 The =org-node-filter-fn= works well for ignoring TODO items that happen to have an ID, and ignoring org-drill items and that sort of thing, but beyond that, it has limited utility because unlike org-roam, *child ID nodes of an excluded node are not excluded!*
