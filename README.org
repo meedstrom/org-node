@@ -229,7 +229,7 @@ How to see the headings' full outline paths while searching for nodes:
 
 *** Managing org-id-locations
 
-The upstream org-id.el exposes settings like =org-id-extra-files=.  I've found these settings quite unsatisfactory (see [[https://github.com/meedstrom/org-node?tab=readme-ov-file#appendix-iii-taking-ownership-of-org-id][Appendix III]]), so org-node has an additional way to feed data to org-id, so we won't run into "ID missing" situations".
+I find unsatisfactory the config options in org-id (see [[https://github.com/meedstrom/org-node?tab=readme-ov-file#appendix-iii-taking-ownership-of-org-id][Appendix III]]), so org-node has an additional way to feed data to org-id, so we won't run into "ID missing" situations.
 
 Example:
 
