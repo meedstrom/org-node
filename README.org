@@ -1,12 +1,12 @@
 * org-node
 ** News [2024-05-07]
-- New variable to easily populate org-id: =org-node-extra-id-dirs=!
+- New variable for easily populating org-id: =org-node-extra-id-dirs=
 
 ** News [2024-05-03]
-- org-node is now async and multi-threaded, speeding it up even more!
+- =org-node-reset= is now async!
 
 ** News [2024-05-01]
-- It turns out that =org-node-reset= took dozens of seconds on some people's configs.  I /think/ it's fixed now, it should only take 0-3 seconds.  Tweak =org-node-perf-gc-cons-threshold= if you still experience it taking long.
+- It turns out that =org-node-reset= took dozens of seconds on some people's configs.  I /think/ it's fixed now.
 
 ** News [2024-04-30]
 - We no longer depend on a =BACKLINKS= property!  It is still a great way to show backlinks, so it remains as an option.
