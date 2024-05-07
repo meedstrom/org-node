@@ -44,7 +44,7 @@ coding system of all your files."
   :group 'org-node
   :type '(choice symbol (const nil)))
 
-(defcustom org-node-async-inject-variables (list)
+(defcustom org-node-inject-variables (list)
   "Alist of variable-value pairs that child processes should set.
 
 May be useful for injecting your authinfo and EasyPG settings so
@@ -232,13 +232,14 @@ org-id look inside versioned backup files and then complain about
 
 
 (let (mem)
-  (defun org-node-files (&optional refresh)
+  (defun org-node-files (&optional memoized)
     "List files in `org-id-locations' or `org-node-extra-id-dirs'.
 
+If argument MEMOIZED
 If argument REFRESH is non-nil, recalculate the list.  This can
 cause a noticeable delay with thousands of files, so don't pass
 it if you are writing an user-facing command."
-    (if (and (not refresh) mem)
+    (if (and memoized mem)
         mem
       (setq mem
             (-union

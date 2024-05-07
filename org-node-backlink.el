@@ -142,14 +142,13 @@ Update the :BACKLINKS: property.  With arg REMOVE, remove it instead."
     ;; gracefully and let the user save anyway
     (condition-case err
         (progn
-          ;; Algorithm to iterate over each change-region borrowed from
-          ;; `ws-butler-map-changes'.  Pretty odd, but elegant.  Worth knowing
-          ;; that if a bit of text has a property valued nil, that's the same
-          ;; as it not having that property at all.  So if START is in some
-          ;; unmodified territory - "org-node-chg" is valued at nil - the
-          ;; effect of this usage of `text-property-not-all' is to search until
-          ;; it is t.  Then the opposite happens, to search until it is nil
-          ;; again.
+          ;; Iterate over each change-region, algorithm borrowed from
+          ;; `ws-butler-map-changes'. Odd, but elegant.  Worth knowing that if
+          ;; some text has a property valued nil, that's the same as it not
+          ;; having that property at all.  So if START is in some unmodified
+          ;; territory - "org-node-chg" is valued at nil - the effect of this
+          ;; usage of `text-property-not-all' is to search until it is t.  Then
+          ;; the opposite happens, to search until it is nil again.
           (let ((start (point-min))
                 (eob (copy-marker (point-max)))
                 prop end)

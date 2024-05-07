@@ -18,7 +18,7 @@
 ;; Author:           Martin Edström <meedstrom91@gmail.com>
 ;; Created:          2024-04-13
 ;; Keywords:         org, hypermedia
-;; Package-Requires: ((emacs "24.4") (compat "29.1.4.5") (dash "2.19.1"))
+;; Package-Requires: ((emacs "28.1") (compat "29.1.4.5") (dash "2.19.1"))
 ;; URL:              https://github.com/meedstrom/org-node
 
 ;; This file is not part of GNU Emacs.
@@ -40,8 +40,6 @@
 (require 'org-node-cache)
 (require 'org-node-backlink)
 (require 'org-node-roam)
-(require 'org-node-async)
-(require 'org-node-worker)
 (require 'org-faces)
 (require 'org-macs) ;; Test a fix for #4
 
@@ -290,13 +288,14 @@ gets some necessary variables."
 To behave like `org-roam-node-find' when creating new nodes, set
 `org-node-creation-fn' to `org-node-new-by-roam-capture'."
   (interactive)
-  (org-node-cache-ensure)
-  (let* ((input (completing-read "Node: " org-node-collection
-                                 () () () 'org-node-hist))
-         (node (gethash input org-node-collection)))
-    (if node
-        (org-node--goto node)
-      (org-node--create input (org-id-new)))))
+  (if (org-node-cache-ensure)
+      (message "Cache being built...")
+    (let* ((input (completing-read "Node: " org-node-collection
+                                   () () () 'org-node-hist))
+           (node (gethash input org-node-collection)))
+      (if node
+          (org-node--goto node)
+        (org-node--create input (org-id-new))))))
 
 ;;;###autoload
 (defun org-node-insert-link ()
@@ -671,9 +670,7 @@ user completes the replacements, finally rename the file itself."
 (defun org-node-reset ()
   "Wipe and rebuild the cache."
   (interactive)
-  (unless org-node-cache-mode
-    (message "Maybe enable `org-node-cache-mode'"))
-  (org-node-cache-reset))
+  (org-node-cache-ensure nil t))
 
 ;;;###autoload
 (defun org-node-forget-dir (dir)
