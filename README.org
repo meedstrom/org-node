@@ -325,7 +325,7 @@ API comparison between org-roam and org-node.
 
 2. Take the variable =org-roam-mode-sections=.  Under any ordinary Emacs Lisp package, this would just be a list of functions.  But in fact, you can add to it a cons cell of a function plus the arguments to pass to it.  I like programmability, but this is ... oriented towards people who aren't programmers, I think.
 
-   - It does make the org-roam source code a slower read (a [[http://weblog.raganwald.com/2004/10/beware-of-turing-tar-pit.html][Turing tarpit]]).  You scratch your head and ask "Why is it made that way?"  Then you see, and you say "Ah, but /I/ don't need that!"  Well, maybe someone does.
+   - It does make the org-roam source code a slower read.  You scratch your head and ask "Why is it made that way?"  Then you see, and you say "Ah, but /I/ don't need that!"  Well, maybe someone does.
 
 3. Take the variable =org-roam-node-display-templates=.  At least, others may consider this a pro, but for my tastes no.  I try to let people customize with little lambdas and provide examples of how they'd get some result or other.  This instead has the dream UI where you can just set the variable to a string "${olp} ${tags} ${title}" or some such and be done with it.  Problem is it's a new mini-DSL (domain-specific language), and when you learn it you miss out on an elisp lesson.  Convenient for beginners but also /keeps/ them beginners.
 
