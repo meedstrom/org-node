@@ -23,13 +23,11 @@ time."
   (if org-node-cache-mode
       (progn
         (add-hook 'after-save-hook #'org-node-cache-rescan-file)
-        ;; (advice-add #'rename-file :after #'org-node-cache-rescan-file)
-        ;; (advice-add #'rename-file :before #'org-node-cache--handle-delete)
+        (advice-add #'rename-file :after #'org-node-cache-rescan-file)
         (advice-add #'delete-file :before #'org-node-cache--handle-delete)
         (org-node-cache-ensure nil t t))
     (remove-hook 'after-save-hook #'org-node-cache-rescan-file)
     (advice-remove #'rename-file #'org-node-cache-rescan-file)
-    (advice-remove #'rename-file #'org-node-cache--handle-delete)
     (advice-remove #'delete-file #'org-node-cache--handle-delete)))
 
 (defun org-node-cache-ensure (&optional synchronous force _polite-init)
@@ -92,29 +90,33 @@ arguments.
 (defvar org-node-cache-reset-hook nil)
 (defvar org-node-cache-rescan-file-hook nil)
 
-(defun org-node-cache-rescan-file (&optional _arg1 arg2 &rest _)
+(defun org-node-cache-rescan-file (&optional arg1 arg2 &rest _)
   "Seek nodes and links in a single file.
 Either operate on ARG2 if it seems to be a file name, else the
 current buffer file."
   ;; If triggered as advice on `rename-file', the second argument is the new
   ;; name.  Do not assume it is being done to the current buffer; it may be
   ;; called from a Dired buffer, for example.
-  (let ((file (if (and arg2 (stringp arg2) (file-exists-p arg2))
-                  arg2
-                (if (and (stringp buffer-file-name)
-                         (file-exists-p buffer-file-name))
-                    buffer-file-name
-                  nil))))
+  (let* ((file (if (and arg2 (stringp arg2) (file-exists-p arg2))
+                   arg2
+                 (if (and (stringp buffer-file-name)
+                          (file-exists-p buffer-file-name))
+                     buffer-file-name
+                   nil)))
+         (oldname (if arg2 arg1)))
     (when file
       (when (equal (file-name-extension file) "org")
         (org-node-cache--collect (list file))
+        (when oldname
+          (org-node-cache--handle-delete oldname))
         (when (boundp 'org-node-cache-scan-file-hook)
           (lwarn 'org-node :warning
                  "Hook renamed: org-node-cache-scan-file-hook to org-node-cache-rescan-file-hook"))
         (run-hooks 'org-node-cache-rescan-file-hook)))))
 
+;; FIXME: Forget-id-location is way too slow
 (let ((timer (timer-create)))
-  (defun org-node-cache--handle-delete (&optional arg1 &rest _)
+  (defun org-node-cache--handle-delete (&optional file-being-deleted &rest _)
     "Update org-id and org-node after an Org file is deleted.
 
 Expected to run prior to deletion, and operate on ARG1 if it
@@ -124,19 +126,18 @@ First remove any references to the file in `org-id-locations'.
 Then schedule a cache reset for after a few idle seconds.  The
 delay minimizes the risk of bothering the user who may be trying
 to delete several files in a row."
-    (let ((file-being-deleted
-           (if (and arg1 (stringp arg1) (file-exists-p arg1))
-               arg1
-             (if (and (stringp buffer-file-name)
-                      (file-exists-p buffer-file-name))
-                 buffer-file-name
-               nil))))
-      (when file-being-deleted
-        (when (member (file-name-extension file-being-deleted)
-                      '("org" "org_archive" "gpg"))
-          (org-node--forget-id-location file-being-deleted)
-          (cancel-timer timer)
-          (setq timer (run-with-idle-timer 6 nil #'org-node-cache-ensure nil t)))))))
+    ;; (when (eq (current-buffer) (window-buffer (selected-window)))
+    (when file-being-deleted
+      (when (--any-p (string-suffix-p it file-being-deleted)
+                     '(".org" ".org_archive" ".org.gpg"))
+        ;; (when org-node-dbg
+        ;; (message "Advising deletion of %s" file-being-deleted))
+        (message "Forgetting file %s" file-being-deleted)
+        ;; (org-node--forget-id-location file-being-deleted)
+        (cancel-timer timer)
+        (setq timer (run-with-idle-timer 6 nil #'org-node-cache-ensure nil t))))))
+
+(defvar org-node-dbg t)
 
 (defun org-node-cache-peek ()
   "Print some random members of `org-nodes' that have IDs.
@@ -178,7 +179,16 @@ See also the type `org-node-data'."
 (defvar org-node-cache--start-time nil
   "Timestamp used to measure time to rebuild the cache.")
 
-(defun org-node-cache--collect (&optional files)
+;; Wrapper to try to queue it up if it's called twice in a very short time
+(let (waiting)
+  (defun org-node-cache--collect (&optional files)
+    (if (-any-p #'process-live-p org-node-cache--processes)
+        (setq waiting (append files waiting))
+      (let ((input waiting))
+        (setq waiting nil)
+        (org-node-cache--collect* waiting)))))
+
+(defun org-node-cache--collect* (&optional files)
   (mkdir (org-node-worker--tmpfile) t)
   (with-current-buffer (get-buffer-create " *org-node*")
     (erase-buffer))
@@ -284,6 +294,8 @@ See also the type `org-node-data'."
         (push (make-process
                :name (format "org-node-%d" i)
                :noquery t
+               ;; REVIEW: maybe collecting their stderrs in one buffer causes
+               ;; the hang?
                :stderr (get-buffer-create " *org-node*")
                :command (list (file-truename
                                (expand-file-name invocation-name
