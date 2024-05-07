@@ -320,6 +320,9 @@ See also the type `org-node-data'."
       ;; launching the processes, but that leads to a larger time window when
       ;; completions are unavailable.  Instead, we've waited until the first
       ;; process starts returning, and only now wipe the tables.
+
+      ;; TODO: Should wait until the last process finishes (need to collect
+      ;; their return values all in one go)
       (clrhash org-nodes)
       (clrhash org-node-collection)
       (clrhash org-node--refs-table)
@@ -340,7 +343,9 @@ See also the type `org-node-data'."
         (insert-file-contents file)
         ;; Execute the demands that the worker wrote
         (dolist (demand (car (read-from-string (buffer-string))))
-          (apply (car demand) (cdr demand)))
+          (apply (car demand) (cdr demand))
+          (when (eq 'org-node--forget-id-location (car demand))
+            (message "Forgetting nonexistent file... %s" (cdr demand))))
         ;; Check if this was the last process to return, then wrap-up
         (when (eq (cl-incf org-node-cache--done-ctr) org-node-cache--jobs)
           ;; Print time elapsed.  Don't do it if this was a
@@ -357,7 +362,7 @@ See also the type `org-node-data'."
                                              (hash-table-values
                                               org-node--reflinks-table)))))
               ;; (2024-05-06) NOTE In a few days, remove "w ID" (transitional)
-              (message "org-node saw %d files, %d subtrees w ID, %d ID-links, %d potential reflinks in %.1fs"
+              (message "org-node saw %d files, %d subtrees w ID, %d ID-links, %d potential reflinks in %.2fs"
                        (- (hash-table-count org-nodes) n-subtrees)
                        n-subtrees
                        n-backlinks

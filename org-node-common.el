@@ -23,24 +23,17 @@ Set nil to assume that the most populous root directory in
   :group 'org-node
   :type 'boolean)
 
-(defcustom org-node-perf-assume-coding-system nil
+(defcustom org-node-perf-assume-coding-system 'utf-8-auto
   "Coding system to presume while scanning for metadata.
-This speeds up `org-node-reset'.  Set nil to let Emacs
-figure it out anew on every file.
+More specific choices can speed up `org-node-reset' - sometimes
+significantly.  Set nil to let Emacs figure it out anew on every
+file.
 
-On modern Linux systems, the correct assumption is almost always
-the symbol `utf-8-unix'.  On Macs it would be `utf-8-mac'.  If
-you access your files from several different systems, consider
-keeping this at nil, or perhaps `utf-8-auto'.
+On modern GNU/Linux and BSD systems, a good choice is almost
+always `utf-8-auto-unix'.  On Mac it would be `utf-8-auto-mac'.
 
-On Windows, you apparently see a mix of
-`utf-8-with-signature-dos' and `utf-16-le-dos' and maybe others
-so don't even try to optimize here.
-
-Note that if some of your files happen to have BOMs (easy to
-miss!) then a setting of `utf-8-unix' means we don't find those
-files' nodes.  Best fix would be some tool that transforms the
-coding system of all your files."
+On Windows this probably should be nil, or it'll fail to find
+ID-nodes, or infer wrong information about them."
   :group 'org-node
   :type '(choice symbol (const nil)))
 
@@ -231,15 +224,16 @@ org-id look inside versioned backup files and then complain about
 
 
 
+;; TODO: Diff the old value with the new value and schedule a targeted caching
+;;       of any new files that appeared.
 (let (mem)
-  (defun org-node-files (&optional memoized)
+  (defun org-node-files (&optional INSTANT)
     "List files in `org-id-locations' or `org-node-extra-id-dirs'.
 
-If argument MEMOIZED
-If argument REFRESH is non-nil, recalculate the list.  This can
-cause a noticeable delay with thousands of files, so don't pass
-it if you are writing an user-facing command."
-    (if (and memoized mem)
+With argument INSTANT t, reuse a value from the last time
+something called this function.  Else you may get a momentary
+delay when thousands of files are involved."
+    (if (and instant mem)
         mem
       (setq mem
             (-union
