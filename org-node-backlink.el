@@ -141,18 +141,19 @@ Update the :BACKLINKS: property.  With arg REMOVE, remove it instead."
     ;; Catch any error because this runs at `before-save-hook' which MUST fail
     ;; gracefully and let the user save anyway
     (condition-case err
-        (progn
-          ;; Iterate over each change-region, algorithm borrowed from
-          ;; `ws-butler-map-changes'. Odd, but elegant.  Worth knowing that if
-          ;; some text has a property valued nil, that's the same as it not
-          ;; having that property at all.  So if START is in some unmodified
-          ;; territory - "org-node-chg" is valued at nil - the effect of this
-          ;; usage of `text-property-not-all' is to search until it is t.  Then
-          ;; the opposite happens, to search until it is nil again.
-          (let ((start (point-min))
-                (eob (copy-marker (point-max)))
-                prop end)
-            (save-excursion
+        (save-excursion
+          (without-restriction
+            ;; Iterate over each change-region, algorithm borrowed from
+            ;; `ws-butler-map-changes'. Odd, but elegant.  Worth knowing that if
+            ;; you tell Emacs to search for text that has a given text-property
+            ;; with a nil value, that's the same as searching for text without
+            ;; that property at all.  So if START is in some unmodified territory
+            ;; - "org-node-chg" is valued at nil - this usage of
+            ;; `text-property-not-all' means search until it is t.  Then the
+            ;; opposite happens, to search until it is nil again.
+            (let ((start (point-min))
+                  (eob (copy-marker (point-max)))
+                  prop end)
               (while (and start (< start eob))
                 (setq prop (get-text-property start 'org-node-chg))
                 (setq end (text-property-not-all start eob 'org-node-chg prop))
@@ -178,8 +179,8 @@ Update the :BACKLINKS: property.  With arg REMOVE, remove it instead."
                       (org-node-backlink--update-subtree-here))))
                 ;; Move on and seek the next changed area
                 (remove-text-properties start (or end eob) 'org-node-chg)
-                (setq start end)))
-            (set-marker eob nil)))
+                (setq start end))))
+          (set-marker eob nil))
       (( error user-error debug )
        (lwarn 'org-node :error
               "org-node-backlink--update-changed-parts-of-buffer: %S" err)))))
