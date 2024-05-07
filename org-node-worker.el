@@ -200,6 +200,8 @@ alist."
           ;; Perf
           (file-name-handler-alist $file-name-handler-alist)
           (gc-cons-threshold $gc-cons-threshold)
+          ;; TODO: reading source for `recover-file', it sounds like the coding
+          ;; system for read can affect the system for write?
           (coding-system-for-read $assume-coding-system)
           ;; Reassigned on every iteration, so may as well re-use the memory
           ;; locations (hopefully producing less garbage) instead of making a

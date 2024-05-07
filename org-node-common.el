@@ -23,14 +23,16 @@ Set nil to assume that the most populous root directory in
   :group 'org-node
   :type 'boolean)
 
-(defcustom org-node-perf-assume-coding-system 'utf-8-auto
+;; TODO: before suggesting `utf-8-auto-unix', find out if the coding for write
+;; infers from the coding for read
+(defcustom org-node-perf-assume-coding-system nil
   "Coding system to presume while scanning for metadata.
 More specific choices can speed up `org-node-reset' - sometimes
 significantly.  Set nil to let Emacs figure it out anew on every
 file.
 
 On modern GNU/Linux and BSD systems, a good choice is almost
-always `utf-8-auto-unix'.  On Mac it would be `utf-8-auto-mac'.
+always `utf-8-unix'.  On Mac it would be `utf-8-mac'.
 
 On Windows this probably should be nil, or it'll fail to find
 ID-nodes, or infer wrong information about them."
@@ -227,7 +229,7 @@ org-id look inside versioned backup files and then complain about
 ;; TODO: Diff the old value with the new value and schedule a targeted caching
 ;;       of any new files that appeared.
 (let (mem)
-  (defun org-node-files (&optional INSTANT)
+  (defun org-node-files (&optional instant)
     "List files in `org-id-locations' or `org-node-extra-id-dirs'.
 
 With argument INSTANT t, reuse a value from the last time

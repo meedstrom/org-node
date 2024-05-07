@@ -23,8 +23,8 @@ time."
   (if org-node-cache-mode
       (progn
         (add-hook 'after-save-hook #'org-node-cache-rescan-file)
-        (advice-add #'rename-file :after #'org-node-cache-rescan-file)
-        (advice-add #'rename-file :before #'org-node-cache--handle-delete)
+        ;; (advice-add #'rename-file :after #'org-node-cache-rescan-file)
+        ;; (advice-add #'rename-file :before #'org-node-cache--handle-delete)
         (advice-add #'delete-file :before #'org-node-cache--handle-delete)
         (org-node-cache-ensure nil t t))
     (remove-hook 'after-save-hook #'org-node-cache-rescan-file)
@@ -208,11 +208,9 @@ See also the type `org-node-data'."
     ;; Pre-compile the worker, if the user's package manager didn't compile it
     ;; already, or if development is happening in org-node-worker.el.
     (if native
-        (unless (and (file-exists-p native)
-                     (file-newer-than-file-p native lib))
+        (unless (file-newer-than-file-p native lib)
           (native-compile lib))
-      (unless (and (file-exists-p elc)
-                   (file-newer-than-file-p elc lib))
+      (unless (file-newer-than-file-p elc lib)
         ;; If we obey `byte-compile-dest-file-function', it's hard to predict
         ;; that the .elc won't end up cluttering some source directory, so just
         ;; force it into /tmp.
