@@ -371,6 +371,8 @@ you'd have to cross-reference with `org-node--refs-table'.")
               "Full file path.")
   (file-title nil :read-only t :type string  :documentation
               "The title of the file where this node is.")
+  (file-title-or-basename nil :read-only t :type string  :documentation
+                          "The title of the file where this node is, or its filename if untitled.")
   (id         nil :read-only t :type string  :documentation
               "The ID property.")
   (is-subtree nil :read-only t :type boolean :documentation
@@ -416,6 +418,7 @@ you'd have to cross-reference with `org-node--refs-table'.")
 (defalias 'org-node-get-deadline   #'org-node-data-deadline)
 (defalias 'org-node-get-file-path  #'org-node-data-file-path)
 (defalias 'org-node-get-file-title #'org-node-data-file-title)
+(defalias 'org-node-get-file-title-or-basename #'org-node-data-file-title-or-basename)
 (defalias 'org-node-get-id         #'org-node-data-id)
 (defalias 'org-node-get-is-subtree #'org-node-data-is-subtree)
 (defalias 'org-node-get-level      #'org-node-data-level)
