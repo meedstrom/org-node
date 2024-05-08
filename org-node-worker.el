@@ -207,7 +207,7 @@ that org-roam expects to have."
           ;; new let-binding every time.  Not sure how elisp works... but
           ;; profiling shows a speedup.
           TITLE FILE-TITLE POS LEVEL HERE FAR
-          TODO-STATE TAGS SCHED DEADLINE ID OLP
+          TODO-STATE TAGS SCHED DEADLINE ID OLP FILE-TITLE-OR-BASENAME
           PROPS FILE-TAGS FILE-ID OUTLINE-DATA TODO-RE)
       (dolist (FILE $files)
         (if (not (file-exists-p FILE))
@@ -259,12 +259,11 @@ that org-roam expects to have."
                            (buffer-substring (point) (pos-eol)))
                         (goto-char 1))
                     $global-todo-re))
-            (setq FILE-TITLE
-                  (if (re-search-forward "^#\\+title: " FAR t)
-                      (org-node-worker--org-link-display-format
-                       (buffer-substring (point) (pos-eol)))
-                    ;; File nodes dont strictly need #+title, fall back on filename
-                    (file-name-nondirectory FILE)))
+            (setq FILE-TITLE (when (re-search-forward "^#\\+title: " FAR t)
+                               (org-node-worker--org-link-display-format
+                                (buffer-substring (point) (pos-eol)))))
+            (setq FILE-TITLE-OR-BASENAME
+                  (or FILE-TITLE (file-name-nondirectory FILE)))
             (when (setq FILE-ID (cdr (assoc "ID" PROPS)))
               (when $targeted
                 ;; This was probably called by a rename-file advice, i.e. this
@@ -287,6 +286,7 @@ that org-roam expects to have."
                              :file-path FILE
                              :pos 1
                              :file-title FILE-TITLE
+                             :file-title-or-basename FILE-TITLE-OR-BASENAME
                              :properties PROPS
                              :id FILE-ID
                              :aliases
@@ -397,6 +397,7 @@ that org-roam expects to have."
                                  :scheduled SCHED
                                  :deadline DEADLINE
                                  :file-title FILE-TITLE
+                                 :file-title-or-basename FILE-TITLE-OR-BASENAME
                                  :olp OLP
                                  :properties PROPS
                                  :aliases
