@@ -158,46 +158,41 @@ that org-roam expects to have."
                 ,type)
               org-node-worker--demands)))))
 
+
 (defun org-node-worker--collect-properties (beg end file)
-  "Assuming BEG and END mark the region in between a
-:PROPERTIES:...:END: drawer, collect the properties into an
-alist."
+  "Assuming BEG and END delimit the region in between
+:PROPERTIES:...:END:, collect the properties into an alist."
   (let (res)
-    ;; Profiled `with-restriction', no perf impact, so it's great, easy to
-    ;; reason about.  Only doubtful if you have to make large point motions to
-    ;; get the boundaries in the first place.
-    (with-restriction beg end
+    (save-restriction
+      (narrow-to-region beg end)
       (goto-char beg)
-      (let (eol)
-        (while (not (eobp))
-          (setq eol (pos-eol))
-          (unless (search-forward ":" eol t)
-            (error "Possibly malformed property drawer in %s at position %d"
-                   file (point)))
-          (push (cons (upcase
-                       (buffer-substring
-                        (point)
-                        (1- (if (search-forward ":" eol t)
-                                (point)
+      (while (not (eobp))
+        (skip-chars-forward "[:space:]")
+        (unless (looking-at-p ":")
+          (error "Possibly malformed property drawer in %s at position %d"
+                 file (point)))
+        (forward-char)
+        (push (cons (upcase
+                     (buffer-substring
+                      (point)
+                      (1- (or (search-forward ":" (pos-eol) t)
                               (error "Possibly malformed property drawer in file %s at position %d"
                                      file (point))))))
-                      (string-trim
-                       (buffer-substring
-                        (point) (pos-eol))))
-                res)
-          (forward-line 1))))
+                    (string-trim
+                     (buffer-substring
+                      (point) (pos-eol))))
+              res)
+        (forward-line 1)))
     res))
 
-;; TODO Write a command that verifies that all files in id-locations are
-;;      utf-8-unix or whichever charset
 (defun org-node-worker--collect ()
-  "Scan for id-nodes across files."
+  "Scan for ID-nodes across files."
   (with-temp-buffer
     (insert-file-contents (org-node-worker--tmpfile "work-variables.eld"))
     (dolist (var (car (read-from-string (buffer-string))))
       (set (car var) (cdr var)))
     (erase-buffer)
-    ;; The variable `i' is already set for each process, on the command line
+    ;; The variable `i' was set via the command line that launched this process
     (insert-file-contents (org-node-worker--tmpfile "file-list-%d.eld" i))
     (setq $files (car (read-from-string (buffer-string))))
     (let ((case-fold-search t)
@@ -303,6 +298,8 @@ alist."
                     org-node-worker--demands))
             ;; Loop over the file's subtrees
             (while (org-node-worker--next-heading)
+              ;; Narrow to subtree.  This is actually pointless as the code
+              ;; behaves correctly, but it may provide peace of mind.
               (with-restriction (point) (or (save-excursion
                                               (org-node-worker--next-heading))
                                             (point-max))

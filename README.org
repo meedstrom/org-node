@@ -64,7 +64,6 @@ For your pleasure, here's a comparison of three similar notetaking systems: all 
 | Warn about dead links              | no          | no                 | no                   |
 |------------------------------------+-------------+--------------------+----------------------|
 | Some query-able cache              | =org-roam-db= | =org-nodes=          | no                   |
-| Cache mandatory                    | yes         | no                 | no                   |
 | Asynchronous caching               | no          | yes                | yes (very async ;)   |
 | Time to re-cache my 2000 files     | 2m 48s      | 0m 02s             | not applicable       |
 
