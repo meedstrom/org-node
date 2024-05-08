@@ -1,5 +1,7 @@
 ;;; org-node-backlink.el -*- lexical-binding: t; -*-
 
+;; FIXME don't ask about saving a buffer
+
 (require 'org-node-common)
 (require 'org-node-cache)
 
@@ -97,37 +99,36 @@ Update the :BACKLINKS: property.  With arg REMOVE, remove it instead."
     (skip-chars-forward "[:space:]")
     (let* ((id (buffer-substring-no-properties
                 (point) (+ (point) (skip-chars-forward "^ \n"))))
-           (ROAM_REFS
-            (org-node-get-refs
-             (or (gethash id org-nodes)
-                 (if (string-blank-p id)
-                     (user-error "Blank ID property in %s" buffer-file-name)
-                   (error "ID exists but not scanned by org-node for some reason, bad syntax? The ID seems valued as \"%s\" in file %s"
-                          id buffer-file-name)))))
-           (reflinks (--map (gethash it org-node--reflinks-table)
-                            ROAM_REFS))
-           (backlinks (gethash id org-node--links-table))
-           (combined
-            (->> (append reflinks backlinks)
-                 (--map (plist-get it :src))
-                 ;; TODO Not sure how there are nils, look into it
-                 (remq 'nil)
-                 (-uniq)
-                 (-sort #'string-lessp)
-                 ;; At this point we have a sorted list of ids (sorted
-                 ;; only to reduce git diffs when the order changes) of
-                 ;; every node that links to here
-                 (--map (org-link-make-string
-                         (concat "id:" it)
-                         (org-node-get-title
-                          (or (gethash it org-nodes)
-                              (error "ID in backlink tables not known to main org-nodes table: %s"
-                                     it)))))))
-           (link-string (string-join combined "  ")))
-      (if combined
-          (unless (equal link-string (org-entry-get nil "BACKLINKS"))
-            (org-entry-put nil "BACKLINKS" link-string))
-        (org-entry-delete nil "BACKLINKS")))))
+           (node (gethash id org-nodes)))
+      ;; The node may not yet have been scanned by org-node, because it was
+      ;; created just now, in a capture buffer, which triggered a save right
+      ;; away.
+      (when node
+        (let* ((ROAM_REFS (org-node-get-refs node))
+               (reflinks (--map (gethash it org-node--reflinks-table)
+                                ROAM_REFS))
+               (backlinks (gethash id org-node--links-table))
+               (combined
+                (->> (append reflinks backlinks)
+                     (--map (plist-get it :src))
+                     ;; REVIEW There used to be some nils, check if still so
+                     (remq 'nil)
+                     (-uniq)
+                     (-sort #'string-lessp)
+                     ;; At this point we have a sorted list of ids (sorted
+                     ;; only to reduce git diffs when the order changes) of
+                     ;; every node that links to here
+                     (--map (org-link-make-string
+                             (concat "id:" it)
+                             (org-node-get-title
+                              (or (gethash it org-nodes)
+                                  (error "ID in backlink tables not known to main org-nodes table: %s"
+                                         it)))))))
+               (link-string (string-join combined "  ")))
+          (if combined
+              (unless (equal link-string (org-entry-get nil "BACKLINKS"))
+                (org-entry-put nil "BACKLINKS" link-string))
+            (org-entry-delete nil "BACKLINKS")))))))
 
 (defun org-node-backlink--update-whole-buffer (&optional remove)
   (save-excursion
