@@ -27,14 +27,13 @@
 
 ;;; Code:
 
-;; FIXME Why would the cacher work different when org is not loaded?
-;; TODO What happens when we move a subtree to a different file but save the destination before saving  the origin file?
-;; TODO Annotations for completion
-;; TODO Completion category https://github.com/alphapapa/org-ql/issues/299
+;; TODO Do not clear the tables until all processes have returned without fail
+;; TODO What happens when we move a subtree to a different file but save the destination before saving the origin file?
+;; TODO Annotations for completion?
+;; TODO Completion categories? https://github.com/alphapapa/org-ql/issues/299
 ;; TODO Command to grep across all files
 ;; TODO Command to explore feedback arc sets
-;; TODO Bit of a test suite
-;; TODO Test a custom id format involving emoji to see if that breaks regexps
+;; TODO A test suite
 
 (require 'org-node-common)
 (require 'org-node-cache)
@@ -192,7 +191,6 @@ type the name of a node that does not exist:
           (setq id org-node-proposed-id))
       ;; Was called from `org-capture', which means the user has not yet typed
       ;; the title
-
       (let ((input (completing-read "Node: " org-node-collection
                                     () () () 'org-node-hist)))
         (setq node (gethash input org-node-collection))
@@ -230,7 +228,11 @@ type the name of a node that does not exist:
                   "\n:END:"
                   "\n#+title: " title
                   "\n")
-          (run-hooks 'org-node-creation-hook))))))
+          (unwind-protect
+              (run-hooks 'org-node-creation-hook)
+            (save-buffer)
+            ;; Because we didn't use `org-id-get-create'
+            (org-id-add-location id path-to-write)))))))
 
 (defun org-node-new-by-roam-capture ()
   "Call `org-roam-capture-' with predetermined arguments.
@@ -243,8 +245,9 @@ gets some necessary variables."
       (org-node-die "Didn't create node! Either install org-roam or %s"
                     "configure `org-node-creation-fn'"))
     (require 'org-roam)
-    (org-roam-capture- :node (org-roam-node-create :title org-node-proposed-title
-                                                   :id    org-node-proposed-id))))
+    (org-roam-capture- :node (org-roam-node-create
+                              :title org-node-proposed-title
+                              :id    org-node-proposed-id))))
 
 (defun org-node-new-file ()
   "Create a file-level node.
@@ -268,7 +271,9 @@ gets some necessary variables."
                 "\n")
         (unwind-protect
             (run-hooks 'org-node-creation-hook)
-          (save-buffer))))))
+          (save-buffer)
+          ;; Because we didn't use `org-id-get-create'
+          (org-id-add-location org-node-proposed-id path-to-write))))))
 
 (defun org-node--goto (node)
   "Visit NODE."
@@ -464,10 +469,6 @@ Can also operate on a file at given PATH."
                 (when visiting-on-window
                   (set-window-buffer visiting-on-window buf))))))))))
 
-(defface org-node-rewrite-links-face
-  '((t :inherit 'org-link))
-  "Face for use in `org-node-rewrite-links-ask'.")
-
 ;;;###autoload
 (defun org-node-rewrite-links-ask (&optional file)
   "Look for links to update to match the current title.
@@ -475,6 +476,9 @@ Prompt the user for each one."
   (interactive)
   (require 'org-macs) ;; Test a fix for #4
   (require 'ol)
+  (defface org-node-rewrite-links-face
+    '((t :inherit 'org-link))
+    "Face for use in `org-node-rewrite-links-ask'.")
   (org-node-cache-ensure)
   (set-face-inverse-video 'org-node-rewrite-links-face
                           (not (face-inverse-video-p 'org-link)))

@@ -259,15 +259,16 @@ See also the type `org-node-data'."
     ;; NB: I considered keeping the processes alive to skip the spin-up
     ;; time, but the subprocesses report `emacs-init-time' as 0.001s.
     ;; There could be an unmeasured OS component though.  And maybe when
-    ;; loading the library?  Worth a test in the future.  Now we just spin
-    ;; up new ones every time.  Btw, how do we know these child processes
-    ;; are loading the .eln of all their lisp?
+    ;; loading the worker.eln? https://nullprogram.com/blog/2018/02/22/
+    ;; Worth a test in the future.  Now we just spin up new ones every time.
+    ;; Btw, can we ensure these child processes are loading the .eln variant of
+    ;; all the emacs core lisp?
     (while-let ((old-process (pop org-node-cache--processes)))
       (when (process-live-p old-process)
         (delete-process old-process)))
 
-    ;; For debugging, run single-threaded so we can use edebug in
-    ;; org-node-worker.el
+    ;; If debugging, run single-threaded so we can step through
+    ;; org-node-worker.el with edebug
     (if org-node--dbg
         (progn
           (with-temp-file (org-node-worker--tmpfile "file-list-0.eld")

@@ -7,7 +7,7 @@
 (defun org-node-worker--tmpfile (&optional basename &rest args)
   "Return a path that puts BASENAME in a temporary directory.
 Usually it will be in /tmp/org-node/.  Also format BASENAME with
-ARGS like `format'."
+ARGS like `format', which see."
   (expand-file-name (if basename
                         (apply #'format basename args)
                       "")
@@ -16,12 +16,12 @@ ARGS like `format'."
 (defun org-node-worker--elem-index (elem list)
   "Like `-elem-index', return first index of ELEM in LIST."
   (declare (pure t) (side-effect-free t))
-  (let ((list list)
-        (i 0))
-    (while (and list (not (equal elem (car-safe list))))
-      (setq i (1+ i)
-            list (cdr list)))
-    (unless (and (= 0 i) (null list))
+  (when list
+    (let ((list list)
+          (i 0))
+      (while (and list (not (equal elem (car-safe list))))
+        (setq i (1+ i)
+              list (cdr list)))
       i)))
 
 (defun org-node-worker--pos->parent-id (oldata pos file-id)
@@ -199,7 +199,7 @@ that org-roam expects to have."
           ;; Perf
           (file-name-handler-alist $file-name-handler-alist)
           (gc-cons-threshold $gc-cons-threshold)
-          ;; TODO: reading source for `recover-file', it sounds like the coding
+          ;; REVIEW: reading source for `recover-file', it sounds like the coding
           ;; system for read can affect the system for write?
           (coding-system-for-read $assume-coding-system)
           ;; Reassigned on every iteration, so may as well re-use the memory
@@ -221,9 +221,9 @@ that org-roam expects to have."
           (erase-buffer)
           ;; NOTE: Used `insert-file-contents-literally' in the past,
           ;; converting each captured substring afterwards with
-          ;; `decode-coding-string', but it still made me record the wrong
-          ;; value for :pos when there was any Unicode in the file.  So
-          ;; instead, the let-bindings above reproduce much of what it did.
+          ;; `decode-coding-string', but it still made us record the wrong
+          ;; value for POS when there was any Unicode in the file.  So
+          ;; instead, the let-bindings above reproduce much of the perf.
           (insert-file-contents FILE)
           ;; Verify there is at least one ID-node, otherwise skip file
           (when (re-search-forward "^[[:space:]]*:id: " nil t)
