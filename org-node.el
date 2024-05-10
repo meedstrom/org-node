@@ -306,13 +306,8 @@ To behave like `org-roam-node-find' when creating new nodes, set
 (defun org-node-insert-link ()
   "Insert a link to one of your ID nodes.
 
-To behave like `org-roam-node-insert' when creating new nodes,
-set `org-node-creation-fn' to
-`org-node-new-by-roam-capture'.
-
-If you find the behavior different, perhaps you have something in
-`org-roam-post-node-insert-hook'.  Then perhaps copy it to
-`org-node-insert-link-hook'."
+To behave more exactly like `org-roam-node-insert', see the
+docstring for `org-node-insert-link*'."
   (interactive nil org-mode)
   (unless (derived-mode-p 'org-mode)
     (user-error "Only works in org-mode buffers"))
@@ -344,6 +339,53 @@ If you find the behavior different, perhaps you have something in
       (insert (org-link-make-string (concat "id:" id) link-desc))
       (run-hook-with-args 'org-node-insert-link-hook id link-desc))
     ;; TODO: Delete the link if a node was not created
+    (unless node
+      (org-node--create input id))))
+
+;; TODO: dedup
+;;;###autoload
+(defun org-node-insert-link* ()
+  "Insert a link to one of your ID nodes.
+
+Unlike `org-node-insert-link', pastes the region text into the
+minibuffer.
+
+To behave like `org-roam-node-insert' when creating new nodes,
+set `org-node-creation-fn' to `org-node-new-by-roam-capture'.
+
+If you find the behavior different, perhaps you have something in
+`org-roam-post-node-insert-hook'.  Then perhaps copy it to
+`org-node-insert-link-hook'."
+  (interactive nil org-mode)
+  (unless (derived-mode-p 'org-mode)
+    (user-error "Only works in org-mode buffers"))
+  (org-node-cache-ensure)
+  (let* ((beg nil)
+         (end nil)
+         (region-text (when (region-active-p)
+                        (setq end (region-end))
+                        (goto-char (region-beginning))
+                        (skip-chars-forward "\n[:space:]")
+                        (setq beg (point))
+                        (goto-char end)
+                        (skip-chars-backward "\n[:space:]")
+                        (setq end (point))
+                        (org-link-display-format
+                         (buffer-substring-no-properties beg end))))
+         (input (completing-read "Node: " org-node-collection
+                                 () () region-text 'org-node-hist))
+         (node (gethash input org-node-collection))
+         (id (or (org-node-get-id node) (org-id-new)))
+         (link-desc (or region-text
+                        (if-let ((aliases (org-node-get-aliases node)))
+                            (--find (string-match it input) aliases))
+                        (org-node-get-title node)
+                        input)))
+    (atomic-change-group
+      (if region-text
+          (delete-region beg end))
+      (insert (org-link-make-string (concat "id:" id) link-desc))
+      (run-hook-with-args 'org-node-insert-link-hook id link-desc))
     (unless node
       (org-node--create input id))))
 
