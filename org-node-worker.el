@@ -280,7 +280,7 @@ that org-roam expects to have."
                     (error "Couldn't find matching :END: drawer in file %s" FILE)))
                 (org-node-worker--collect-links-until END FILE-ID nil $link-re))
               (push `(org-node-cache--add-node-to-tables
-                      ,(list :title FILE-TITLE
+                      ,(list :title FILE-TITLE-OR-BASENAME ;; Uhm
                              :level 0
                              :tags FILE-TAGS
                              :file-path FILE
