@@ -162,11 +162,11 @@ Update the :BACKLINKS: property.  With arg REMOVE, remove it instead."
             ;; `text-property-not-all' means search until it is t.  Then the
             ;; opposite happens, to search until it is nil again.
             (let ((start (point-min))
-                  (eob (copy-marker (point-max)))
                   prop end)
-              (while (and start (< start eob))
+              (while (and start (< start (point-max)))
                 (setq prop (get-text-property start 'org-node-chg))
-                (setq end (text-property-not-all start eob 'org-node-chg prop))
+                (setq end (text-property-not-all
+                           start (point-max) 'org-node-chg prop))
                 (when prop
                   (goto-char start)
                   (let ((case-fold-search t))
@@ -179,7 +179,8 @@ Update the :BACKLINKS: property.  With arg REMOVE, remove it instead."
                         (and id-here
                              ;; This search can fail because buffer is narrowed
                              (re-search-backward
-                              (concat "^[[:space:]]*:id: *" (regexp-quote id-here))
+                              (concat "^[[:space:]]*:id: *"
+                                      (regexp-quote id-here))
                               nil t)
                              (re-search-forward ":id: *" (pos-eol))
                              (org-node-backlink--update-subtree-here))))
@@ -189,9 +190,11 @@ Update the :BACKLINKS: property.  With arg REMOVE, remove it instead."
                                 (re-search-forward "^[[:space:]]*:id: " end t))
                       (org-node-backlink--update-subtree-here))))
                 ;; Move on and seek the next changed area
-                (remove-text-properties start (or end eob) 'org-node-chg)
-                (setq start end))
-              (set-marker eob nil))))
+                (remove-text-properties start (if end
+                                                  (min end (point-max))
+                                                (point-max))
+                                        'org-node-chg)
+                (setq start end)))))
       (( error debug )
        (if debug-on-error
            (signal (car err) (cdr err))
