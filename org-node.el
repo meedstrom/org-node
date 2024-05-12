@@ -326,11 +326,13 @@ docstring for `org-node-insert-link*'."
          (input (completing-read "Node: " org-node-collection
                                  () () () 'org-node-hist))
          (node (gethash input org-node-collection))
-         (id (or (org-node-get-id node) (org-id-new)))
+         (id (if node (org-node-get-id node) (org-id-new)))
          (link-desc (or region-text
-                        (if-let ((aliases (org-node-get-aliases node)))
-                            (--find (string-match it input) aliases))
-                        (org-node-get-title node)
+                        (when node
+                          (if-let ((aliases (org-node-get-aliases node)))
+                              (--find (string-match it input) aliases)))
+                        (when node
+                          (org-node-get-title node))
                         input)))
     (atomic-change-group
       (if region-text
@@ -374,11 +376,13 @@ If you find the behavior different, perhaps you have something in
          (input (completing-read "Node: " org-node-collection
                                  () () region-text 'org-node-hist))
          (node (gethash input org-node-collection))
-         (id (or (org-node-get-id node) (org-id-new)))
+         (id (if node (org-node-get-id node) (org-id-new)))
          (link-desc (or region-text
-                        (if-let ((aliases (org-node-get-aliases node)))
-                            (--find (string-match it input) aliases))
-                        (org-node-get-title node)
+                        (when node
+                          (if-let ((aliases (org-node-get-aliases node)))
+                              (--find (string-match it input) aliases)))
+                        (when node
+                          (org-node-get-title node))
                         input)))
     (atomic-change-group
       (if region-text
