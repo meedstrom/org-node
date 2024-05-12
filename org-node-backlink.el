@@ -181,17 +181,23 @@ Update the :BACKLINKS: property.  With arg REMOVE, remove it instead."
                              (re-search-backward
                               (concat "^[[:space:]]*:id: *" (regexp-quote id-here))
                               nil t)
-                             (re-search-forward "^[[:space:]]*:id: ")
+                             (re-search-forward ":id: *" (pos-eol))
                              (org-node-backlink--update-subtree-here))))
                     ;; ...and if the change-area is massive, spanning multiple
                     ;; subtrees, update each one
-                    (while (re-search-forward "^[[:space:]]*:id: " end t)
+                    (while (and (< (point) (or end (point-max)))
+                                (re-search-forward "^[[:space:]]*:id: " end t))
                       (org-node-backlink--update-subtree-here))))
                 ;; Move on and seek the next changed area
                 (remove-text-properties start (or end eob) 'org-node-chg)
                 (setq start end))
               (set-marker eob nil))))
-      (( error user-error debug )
+      (( error debug )
+       (if debug-on-error
+           (signal (car err) (cdr err))
+         (lwarn 'org-node :error
+                "org-node-backlink--update-changed-parts-of-buffer: %S" err)))
+      (( user-error debug )
        (lwarn 'org-node :error
               "org-node-backlink--update-changed-parts-of-buffer: %S" err)))))
 
