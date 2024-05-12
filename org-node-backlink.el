@@ -4,6 +4,7 @@
 
 (require 'org-node-common)
 (require 'org-node-cache)
+(require 'org-macs)
 
 (define-globalized-minor-mode org-node-backlink-global-mode
   org-node-backlink-mode
