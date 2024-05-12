@@ -273,7 +273,11 @@ See also the type `org-node-data'."
         (progn
           (with-temp-file (org-node-worker--tmpfile "file-list-0.eld")
             (insert (prin1-to-string (org-node-files))))
+          (delete-file (org-node-worker--tmpfile "demands-0.eld"))
+          (setq org-node-worker--demands nil)
           (setq i 0)
+          (when editorconfig-mode
+            (message "Maybe disable editorconfig-mode while debugging"))
           (org-node-worker--collect)
           (setq org-node-cache--jobs 1)
           (org-node-cache--handle-finished-job 0 nil))

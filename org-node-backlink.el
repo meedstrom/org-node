@@ -105,25 +105,26 @@ Update the :BACKLINKS: property.  With arg REMOVE, remove it instead."
       ;; away.
       (when node
         (let* ((ROAM_REFS (org-node-get-refs node))
-               (reflinks (--map (gethash it org-node--reflinks-table)
-                                ROAM_REFS))
+               (reflinks (--keep (gethash it org-node--reflinks-table)
+                                 ROAM_REFS))
                (backlinks (gethash id org-node--links-table))
                (combined
-                (->> (append reflinks backlinks)
-                     (--map (plist-get it :src))
-                     ;; REVIEW There used to be some nils, check if still so
-                     (remq 'nil)
-                     (-uniq)
-                     (-sort #'string-lessp)
-                     ;; At this point we have a sorted list of ids (sorted
-                     ;; only to reduce git diffs when the order changes) of
-                     ;; every node that links to here
-                     (--map (org-link-make-string
-                             (concat "id:" it)
-                             (org-node-get-title
-                              (or (gethash it org-nodes)
-                                  (error "ID in backlink tables not known to main org-nodes table: %s"
-                                         it)))))))
+                (thread-last
+                  (append reflinks backlinks)
+                  (--map (plist-get it :src))
+                  ;; REVIEW There used to be some nils, check if still
+                  (remq 'nil)
+                  (-uniq)
+                  (-sort #'string-lessp)
+                  ;; At this point we have a sorted list of ids (sorted
+                  ;; only to reduce git diffs when the order changes) of
+                  ;; every node that links to here.  Now format them as links.
+                  (--map (org-link-make-string
+                          (concat "id:" it)
+                          (org-node-get-title
+                           (or (gethash it org-nodes)
+                               (error "ID in backlink tables not known to main org-nodes table: %s"
+                                      it)))))))
                (link-string (string-join combined "  ")))
           (if combined
               (unless (equal link-string (org-entry-get nil "BACKLINKS"))
