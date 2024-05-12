@@ -104,7 +104,7 @@ that will match any of the keywords."
      s nil t)))
 
 (defun org-node-worker--next-heading ()
-  "Like `org-node-worker--next-heading'."
+  "Like `outline-next-heading'."
   ;; Prevent matching the same line forever
   (if (and (bolp) (not (eobp)))
       (forward-char))

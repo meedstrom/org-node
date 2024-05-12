@@ -80,7 +80,7 @@ It can be surprising which value works best.  It is possible that
 80 kB is performant, and 16 MB is performant, but something in
 between such as 1 MB is very slow."
   :group 'org-node
-  :type '(choice number (const nil)))
+  :type '(choice integer (const nil)))
 
 (defcustom org-node-slug-fn #'org-node-slugify-as-url
   "Function to transform title into a filename.
