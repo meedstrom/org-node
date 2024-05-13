@@ -418,11 +418,11 @@ adding keywords to the things to exclude:
       (insert (org-link-make-string (concat "id:" id) title))
       (set-marker m1 (1- (point)))
       (duplicate-line)
-      (goto-char (eol))
+      (goto-char (pos-eol))
       (insert (make-string (+ 1 level) ?\*) " ")
       (forward-line 1)
       (insert "#+transclude: ")
-      (goto-char (bol))
+      (goto-char (pos-bol))
       (insert " :level " (number-to-string (+ 2 level)))
       ;; If the target is a subtree rather than file-level node, I'd like to
       ;; cut out the initial heading because we already made a heading.  (And
