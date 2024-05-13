@@ -64,12 +64,15 @@ OLDATA must be in \"reverse\" order, such the last heading in the
 file is represented as the first element.  POS itself must be
 included in one of the elements."
   (declare (pure t) (side-effect-free t))
-  (let (olp
-        ;; Drop all the data about positions below POS (using `nthcdr' because
-        ;; oldata is in reverse order)
-        (data-until-pos (nthcdr (org-node-worker--elem-index (assoc pos oldata)
-                                                             oldata)
-                                oldata)))
+  (let* (olp
+         (pos-data (or (assoc pos oldata)
+                       (error "Broken algo; POS %s not found in OLDATA %s"
+                              pos oldata)))
+         ;; Drop all the data about positions below POS (using `nthcdr' because
+         ;; oldata is in reverse order)
+         (data-until-pos (nthcdr (org-node-worker--elem-index pos-data
+                                                              oldata)
+                                 oldata)))
     (let ((previous-level (caddr (car data-until-pos))))
       ;; Work backwards towards the top of the file
       ;; NOTE: Tried catch-throw and dolist, but `cl-loop' wins perf

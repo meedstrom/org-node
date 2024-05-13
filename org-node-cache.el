@@ -93,7 +93,10 @@ arguments.
 (defun org-node-cache-rescan-file (&optional arg1 arg2 &rest _)
   "Seek nodes and links in a single file.
 Either operate on ARG2 if it seems to be a file name, else the
-current buffer file."
+current buffer file.
+
+Meant as an advice for `rename-file' - to manually scan a file,
+use `org-node-cache--collect'."
   ;; If triggered as advice on `rename-file', the second argument is the new
   ;; name.  Do not assume it is being done to the current buffer; it may be
   ;; called from a Dired buffer, for example.
