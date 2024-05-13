@@ -225,6 +225,37 @@ org-id look inside versioned backup files and then complain about
 
 
 
+(defmacro org-node--with-file (file &rest body)
+  "Backport of the `org-with-file-buffer' concept.
+Also integrates `org-with-wide-buffer' behavior.
+
+If no buffer was visiting FILE, open a new one else reuse an open
+buffer, and execute BODY.
+
+If a new buffer had to be opened, save and kill it afterwards.
+Else if the buffer had been unmodified, save it."
+  (declare (indent 1))
+  ;; REVIEW: do these perf hacks or not?
+  `(let ((find-file-hook nil)
+         (after-save-hook nil)
+         (before-save-hook nil)
+         (org-agenda-files nil)
+         (org-inhibit-startup t))
+     (let* ((was-open (find-buffer-visiting ,file))
+            (was-modified (and was-open (buffer-modified-p was-open))))
+       (with-current-buffer (or was-open
+                                (delay-mode-hooks
+                                  (find-file-noselect ,file)))
+         (save-excursion
+           (without-restriction
+             ,@body))
+         (unless (and was-open was-modified)
+           (let ((save-silently t)
+                 (inhibit-message t))
+             (save-buffer)))
+         (unless was-open
+           (kill-buffer))))))
+
 ;; TODO: Diff the old value with the new value and schedule a targeted caching
 ;;       of any new files that appeared.
 (let (mem)
