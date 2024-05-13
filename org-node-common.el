@@ -7,10 +7,6 @@
 (require 'org-id)
 (require 'org)
 
-;; Prevent "invalid function org-with-file-buffer". Someone explains at
-;; https://debbugs.gnu.org/cgi/bugreport.cgi?bug=46958
-(require 'org-macs)
-
 (defgroup org-node nil
   "Support a zettelkasten of org-id files and subtrees."
   :group 'org)
