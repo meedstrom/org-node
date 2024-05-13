@@ -140,7 +140,7 @@ that org-roam expects to have."
           ;; And a lesson: set your editor to always highlight trailing spaces,
           ;; at least in the regions you have modified (PR ws-butler?)
           link-re end t)
-    (let ((type (match-string 1))
+    (let ((link-type (match-string 1))
           (path (match-string 2)))
       (if (save-excursion
             (goto-char (pos-bol))
@@ -151,38 +151,35 @@ that org-roam expects to have."
         (push `(org-node-cache--add-link-to-tables
                 ,(list :src id-here
                        :pos (point)
-                       :type type
+                       :type link-type
                        ;; Because org-roam asks for it
                        :properties (list :outline olp-with-self))
                 ,path
-                ,type)
+                ,link-type)
               org-node-worker--demands)))))
-
 
 (defun org-node-worker--collect-properties (beg end file)
   "Assuming BEG and END delimit the region in between
 :PROPERTIES:...:END:, collect the properties into an alist."
   (let (res)
-    (save-restriction
-      (narrow-to-region beg end)
-      (goto-char beg)
-      (while (not (eobp))
-        (skip-chars-forward "[:space:]")
-        (unless (looking-at-p ":")
-          (error "Possibly malformed property drawer in %s at position %d"
-                 file (point)))
-        (forward-char)
-        (push (cons (upcase
-                     (buffer-substring
-                      (point)
-                      (1- (or (search-forward ":" (pos-eol) t)
-                              (error "Possibly malformed property drawer in file %s at position %d"
-                                     file (point))))))
-                    (string-trim
-                     (buffer-substring
-                      (point) (pos-eol))))
-              res)
-        (forward-line 1)))
+    (goto-char beg)
+    (while (not (>= (point) end))
+      (skip-chars-forward "[:space:]")
+      (unless (looking-at-p ":")
+        (error "Possibly malformed property drawer in %s at position %d"
+               file (point)))
+      (forward-char)
+      (push (cons (upcase
+                   (buffer-substring
+                    (point)
+                    (1- (or (search-forward ":" (pos-eol) t)
+                            (error "Possibly malformed property drawer in file %s at position %d"
+                                   file (point))))))
+                  (string-trim
+                   (buffer-substring
+                    (point) (pos-eol))))
+            res)
+      (forward-line 1))
     res))
 
 (defun org-node-worker--collect ()
