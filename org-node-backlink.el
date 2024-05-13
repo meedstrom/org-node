@@ -71,14 +71,8 @@ as the user command \\[org-node-backlink-regret]."
            "Adding/updating :BACKLINKS:... (you may quit and resume anytime) (%d) %s"
            (cl-incf org-node-backlink--fix-ctr) file)
           (delay-mode-hooks
-            (org-with-file-buffer file
-              (org-with-wide-buffer
-               (org-node-backlink--update-whole-buffer remove))
-              (and org-file-buffer-created
-                   (buffer-modified-p)
-                   (let ((save-silently t)
-                         (inhibit-message t))
-                     (save-buffer))))))))
+            (org-node--with-file file
+              (org-node-backlink--update-whole-buffer remove))))))
     (if org-node-backlink--fix-files
         ;; Keep going
         (run-with-timer 1 nil #'org-node-backlink-fix-all remove)
@@ -226,7 +220,7 @@ merely a wrapper that drops the input."
     (org-node-cache-ensure)
     (org-node-backlink--add-in-target)))
 
-(defun org-node-backlink--add-in-target (&optional part-of-mass-op)
+(defun org-node-backlink--add-in-target ()
   "For known link at point, leave a backlink in the target node.
 Does NOT try to validate the rest of the target's backlinks."
   (unless (derived-mode-p 'org-mode)
@@ -251,9 +245,9 @@ Does NOT try to validate the rest of the target's backlinks."
           (setq file (ignore-errors
                        (org-node-get-file-path (gethash id org-nodes)))))
         (when (and id file)
-          (org-node-backlink--add-in-target-1 file id part-of-mass-op))))))
+          (org-node-backlink--add-in-target-1 file id))))))
 
-(defun org-node-backlink--add-in-target-1 (target-file target-id &optional part-of-mass-op)
+(defun org-node-backlink--add-in-target-1 (target-file target-id)
   (let ((case-fold-search t)
         (src-id (org-id-get nil nil nil t)))
     (if (not src-id)
@@ -265,50 +259,40 @@ Does NOT try to validate the rest of the target's backlinks."
                               (org-get-title)
                               (file-name-nondirectory (buffer-file-name)))))
              (src-link (concat "[[id:" src-id "][" src-title "]]")))
-        (org-with-file-buffer target-file
-          (org-with-wide-buffer
-           (let ((otm (bound-and-true-p org-transclusion-mode)))
-             (when otm (org-transclusion-mode 0))
-             (goto-char (point-min))
-             (if (not (re-search-forward
-                       (concat "^[ \t]*:id: +" (regexp-quote target-id))
-                       nil t))
-                 (push target-id org-node-backlink--fails)
-               (let ((backlinks-string (org-entry-get nil "BACKLINKS"))
-                     new-value)
-                 ;; NOTE: Not sure why, but version 2cff874 dropped some
-                 ;; backlinks and it seemed to be fixed by one or both of these
-                 ;; changes:
-                 ;; - sub `-uniq' for `delete-dups'
-                 ;; - sub `remove' for `delete'
-                 (if backlinks-string
-                     ;; Build a temp list to check we don't add the same link
-                     ;; twice. To use the builtin
-                     ;; `org-entry-add-to-multivalued-property', the link
-                     ;; descriptions would have to be free of spaces.
-                     (let ((ls (split-string (replace-regexp-in-string
-                                              "]][[:space:]]+\\[\\["
-                                              "]]\f[["
-                                              (string-trim backlinks-string))
-                                             "\f" t)))
-                       (dolist (id-dup (--filter (string-search src-id it) ls))
-                         (setq ls (remove id-dup ls)))
-                       (push src-link ls)
-                       (when (-any-p #'null ls)
-                         (org-node-die "nulls in %S" ls))
-                       ;; Prevent unnecessary work like putting the most recent
-                       ;; link in front even if it was already in the list
-                       (sort ls #'string-lessp)
-                       ;; Two spaces between links help them look distinct
-                       (setq new-value (string-join ls "  ")))
-                   (setq new-value src-link))
-                 (unless (equal backlinks-string new-value)
-                   (org-entry-put nil "BACKLINKS" new-value)
-                   (unless part-of-mass-op
-                     (and org-file-buffer-created
-                          (buffer-modified-p)
-                          (save-buffer))))
-                 (when otm (org-transclusion-mode)))))))))))
+        (org-node--with-file target-file
+          (let ((otm (bound-and-true-p org-transclusion-mode)))
+            (when otm (org-transclusion-mode 0))
+            (goto-char (point-min))
+            (if (not (re-search-forward
+                      (concat "^[ \t]*:id: +" (regexp-quote target-id))
+                      nil t))
+                (push target-id org-node-backlink--fails)
+              (let ((backlinks-string (org-entry-get nil "BACKLINKS"))
+                    new-value)
+                (if backlinks-string
+                    ;; Build a temp list to check we don't add the same link
+                    ;; twice. To use the builtin
+                    ;; `org-entry-add-to-multivalued-property', the link
+                    ;; descriptions would have to be free of spaces.
+                    (let ((ls (split-string (replace-regexp-in-string
+                                             "]][[:space:]]+\\[\\["
+                                             "]]\f[["
+                                             (string-trim backlinks-string))
+                                            "\f" t)))
+                      (dolist (id-dup (--filter (string-search src-id it) ls))
+                        (setq ls (remove id-dup ls)))
+                      (push src-link ls)
+                      (when (-any-p #'null ls)
+                        (org-node-die "nulls in %S" ls))
+                      ;; Prevent unnecessary work like putting the most recent
+                      ;; link in front even if it was already in the list
+                      (sort ls #'string-lessp)
+                      ;; Two spaces between links help them look distinct
+                      (setq new-value (string-join ls "  ")))
+                  (setq new-value src-link))
+                (unless (equal backlinks-string new-value)
+                  (org-entry-put nil "BACKLINKS" new-value))
+                (when otm (org-transclusion-mode))))))))))
 
 (provide 'org-node-backlink)
 

@@ -510,7 +510,6 @@ Can also operate on a file at given PATH."
   "Look for links to update to match the current title.
 Prompt the user for each one."
   (interactive)
-  (require 'org-macs) ;; Test a fix for #4
   (require 'ol)
   (defface org-node-rewrite-links-face
     '((t :inherit 'org-link))
@@ -520,8 +519,7 @@ Prompt the user for each one."
                           (not (face-inverse-video-p 'org-link)))
   (when (org-node--consent-to-problematic-modes-for-mass-op)
     (dolist (file (if file (list file) (org-node-files)))
-      (find-file-noselect file)
-      (org-with-file-buffer file
+      (org-node--with-file file
         (goto-char (point-min))
         (while-let ((end (re-search-forward org-link-bracket-re nil t)))
           (let* ((beg (match-beginning 0))
@@ -558,9 +556,7 @@ Prompt the user for each one."
                 ;; Give user 110+ ms to glimpse the result before moving on
                 (redisplay)
                 (sleep-for .11))
-              (goto-char end)))))))
-  (when (yes-or-no-p "Save the edited buffers?")
-    (save-some-buffers)))
+              (goto-char end))))))))
 
 ;;;###autoload
 (defun org-node-extract-subtree ()
