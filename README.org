@@ -103,7 +103,7 @@ The keys I use:
 
 To browse config options, type =M-x customize-group RET org-node RET=.
 
-Final tip for the newbie: there's no separate command for node creation!  You just use the commands above, and type the name of a node that doesn't exist.
+Final tip for the newbie: there's no separate command for creating a new node!  Reuse one of the commands above, and type the name of a node that doesn't exist.
 
 *** Use Org-roam at the same time?
 
@@ -115,7 +115,7 @@ These user options help you feel at home using both packages side-by-side:
 (setq org-node-creation-hook nil)
 #+end_src
 
-Also, either run =M-x org-roam-id-update-id-locations=, or add your =org-roam-directory= to the following variable.  It shouldn't be necessary, but upstream org-id has no real convenient setting for this...
+Also, either run =M-x org-roam-id-update-id-locations=, or add your =org-roam-directory= to the following variable.  It shouldn't be necessary, but upstream org-id has no convenient setting like this.
 
 #+begin_src elisp
 (setq org-node-extra-id-dirs '(...))
@@ -142,7 +142,7 @@ If you didn't have laggy saves, this is fine.  In other words, keep =org-roam-db
 
 **** *Option 1B*.  Tell org-node to write to the org-roam DB.
 
-The following hook keeps the database synced.
+The following hook should keep the database synced.
 
 #+begin_src elisp
 (add-hook 'org-node-cache-rescan-file-hook #'org-node-feed-file-to-roam-db)
@@ -157,6 +157,7 @@ Do some hax:
 #+begin_src elisp
 (advice-add 'org-roam-backlinks-get :override
             #'org-node--fabricate-roam-backlinks)
+
 (advice-add 'org-roam-reflinks-get :override
             #'org-node--fabricate-roam-reflinks)
 #+end_src
@@ -336,7 +337,6 @@ API comparison between org-roam and org-node.
 | Get =ROAM_ALIASES=                        | =(org-roam-node-aliases NODE)=       | =(org-node-get-aliases NODE)=                                                             |
 | Get =ROAM_EXCLUDE=                        |                                    | =(assoc "ROAM_EXCLUDE" (org-node-get-properties NODE))=, doesn't inherit parent excludes! |
 | Get whether this is a subtree           | =(zerop (org-roam-node-level NODE))= | =(org-node-get-is-subtree NODE)=                                                          |
-| Get subtree heading sans TODO           | =(org-roam-node-title NODE)=         | =(org-node--visit-get-true-heading NODE)=                                                 |
 | Get subtree priority                    | =(org-roam-node-priority NODE)=      |                                                                                         |
 | Ensure fresh data                       | =(org-roam-db-sync)=                 | =(org-node-cache-ensure)=                                                                 |
 
@@ -443,10 +443,11 @@ Bonus snippet: full reset
 #+begin_src elisp
 ;; FOR TESTING: wipe all records
 ;; You ONLY need to wipe if it won't shut up about duplicates!
-(progn (delete-file org-id-locations-file)
-       (setq org-id-locations nil)
-       (setq org-id--locations-checksum nil)
-       (setq org-agenda-text-search-extra-files nil)
-       (setq org-id-files nil)
-       (setq org-id-extra-files nil))
+(progn
+  (delete-file org-id-locations-file)
+  (setq org-id-locations nil)
+  (setq org-id--locations-checksum nil)
+  (setq org-agenda-text-search-extra-files nil)
+  (setq org-id-files nil)
+  (setq org-id-extra-files nil))
 #+end_src

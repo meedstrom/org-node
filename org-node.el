@@ -72,19 +72,6 @@
   (require 'org-super-links)
   (org-super-links-convert-link-to-super nil))
 
-(defun org-node--visit-get-true-heading (node)
-  "Visit subtree NODE and get the heading, in a way that's aware of
-buffer-local #+todo settings so the todo state is not taken as part
-of the heading."
-  (if (org-node-get-is-subtree node)
-      (delay-mode-hooks
-        (org-with-file-buffer (org-node-get-file-path node)
-          (save-excursion
-            (without-restriction
-              (goto-char (org-node-get-pos node))
-              (nth 4 (org-heading-components))))))
-    (org-node-get-title node)))
-
 (defun org-node-slugify-like-roam (title)
   "From TITLE, make a filename in the default org-roam style."
   (unless (fboundp #'org-roam-node-slug)
@@ -281,8 +268,10 @@ gets some necessary variables."
   (find-file (org-node-get-file-path node))
   (widen)
   (goto-char (org-node-get-pos node))
-  (org-reveal)
-  (recenter 5))
+  (when (org-node-get-is-subtree node)
+    (org-reveal)
+    (recenter 5)
+    (org-end-of-meta-data)))
 
 
 ;;; Commands
