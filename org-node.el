@@ -41,7 +41,6 @@
 (require 'org-node-backlink)
 (require 'org-node-roam)
 (require 'org-faces)
-(require 'org-macs) ;; Test a fix for #4
 
 
 ;;; API not used inside this package
@@ -135,9 +134,6 @@ a small wrapper such as:
   (setq org-node-proposed-title title)
   (setq org-node-proposed-id id)
   (condition-case err
-      ;; (let ((result (funcall org-node-creation-fn)))
-      ;;   (when (bufferp result)
-      ;;     (switch-to-buffer result)))
       (funcall org-node-creation-fn)
     ((t debug error)
      (setq org-node-proposed-title nil)
@@ -318,11 +314,11 @@ docstring for `org-node-insert-link*'."
          (node (gethash input org-node-collection))
          (id (if node (org-node-get-id node) (org-id-new)))
          (link-desc (or region-text
-                        (when node
-                          (if-let ((aliases (org-node-get-aliases node)))
-                              (--find (string-match it input) aliases)))
-                        (when node
-                          (org-node-get-title node))
+                        (and node
+                             (let ((aliases (org-node-get-aliases node)))
+                               (--first (string-search it input) aliases)))
+                        (and node
+                             (org-node-get-title node))
                         input)))
     (atomic-change-group
       (if region-text
@@ -338,15 +334,15 @@ docstring for `org-node-insert-link*'."
 (defun org-node-insert-link* ()
   "Insert a link to one of your ID nodes.
 
-Unlike `org-node-insert-link', pastes the region text into the
-minibuffer.
+Unlike `org-node-insert-link', emulate org-roam and paste any
+selected region text into the minibuffer.
 
-To behave like `org-roam-node-insert' when creating new nodes,
-set `org-node-creation-fn' to `org-node-new-by-roam-capture'.
+To behave like org-roam when creating new nodes, set
+`org-node-creation-fn' to `org-node-new-by-roam-capture'.
 
-If you find the behavior different, perhaps you have something in
-`org-roam-post-node-insert-hook'.  Then perhaps copy it to
-`org-node-insert-link-hook'."
+If you still find the behavior different, perhaps you had
+something in `org-roam-post-node-insert-hook'.  Perhaps copy
+it to `org-node-insert-link-hook'."
   (interactive nil org-mode)
   (unless (derived-mode-p 'org-mode)
     (user-error "Only works in org-mode buffers"))
@@ -354,13 +350,8 @@ If you find the behavior different, perhaps you have something in
   (let* ((beg nil)
          (end nil)
          (region-text (when (region-active-p)
+                        (setq beg (region-beginning))
                         (setq end (region-end))
-                        (goto-char (region-beginning))
-                        (skip-chars-forward "\n[:space:]")
-                        (setq beg (point))
-                        (goto-char end)
-                        (skip-chars-backward "\n[:space:]")
-                        (setq end (point))
                         (org-link-display-format
                          (buffer-substring-no-properties beg end))))
          (input (completing-read "Node: " org-node-collection
@@ -368,11 +359,11 @@ If you find the behavior different, perhaps you have something in
          (node (gethash input org-node-collection))
          (id (if node (org-node-get-id node) (org-id-new)))
          (link-desc (or region-text
-                        (when node
-                          (if-let ((aliases (org-node-get-aliases node)))
-                              (--find (string-match it input) aliases)))
-                        (when node
-                          (org-node-get-title node))
+                        (and node
+                             (let ((aliases (org-node-get-aliases node)))
+                               (--first (string-search it input) aliases)))
+                        (and node
+                             (org-node-get-title node))
                         input)))
     (atomic-change-group
       (if region-text
