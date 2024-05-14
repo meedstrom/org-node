@@ -220,9 +220,9 @@ And if you want the commands =org-node-find= & =org-node-insert-link= to likewis
 
 *** Managing org-id-locations
 
-I find unsatisfactory the config options in org-id (see [[https://github.com/meedstrom/org-node?tab=readme-ov-file#appendix-iii-taking-ownership-of-org-id][Appendix III]]), so org-node has an additional way to feed data to org-id, so we won't run into "ID not found" situations.
+I find unsatisfactory the config options in org-id (Why? See [[http://edstrom.dev/wjwrl/taking-ownership-of-org-id][Taking ownership of org-id]]), so org-node gives you an additional way to feed data to org-id, making sure we won't run into "ID not found" situations.
 
-Example:
+Example setting:
 
 #+begin_src elisp
 (setq org-node-extra-id-dirs
