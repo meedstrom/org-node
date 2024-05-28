@@ -182,7 +182,8 @@ of `org-node-worker--collect-links-until'."
 (defvar org-node-cache--start-time nil
   "Timestamp used to measure time to rebuild the cache.")
 
-(let (queue timer)
+(let (queue
+      (timer (timer-create)))
   (defun org-node-cache--collect (&optional files)
     "Thin wrapper for `org-node-cache--collect*'.
 Like `org-node-cache--collect*', but try to queue multiple calls
