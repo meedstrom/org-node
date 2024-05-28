@@ -205,7 +205,7 @@ being renamed at once."
 
 (defun org-node-cache--collect* (&optional files)
   (mkdir (org-node-worker--tmpfile) t)
-  (with-current-buffer (get-buffer-create " *org-node*")
+  (with-current-buffer (get-buffer-create org-node-cache--stderr)
     (erase-buffer))
   (setq org-node-cache--jobs
         (max 1 (1- (string-to-number
@@ -321,7 +321,7 @@ being renamed at once."
           (push (make-process
                  :name (format "org-node-%d" i)
                  :noquery t
-                 :stderr (get-buffer-create " *org-node*")
+                 :stderr (get-buffer-create org-node-cache--stderr)
                  :command (list (file-truename
                                  ;; True path to Emacs binary
                                  (expand-file-name invocation-name
@@ -340,6 +340,7 @@ being renamed at once."
 (defvar org-node-cache--processes (list))
 (defvar org-node-cache--done-ctr 0)
 (defvar org-node-cache--jobs nil)
+(defvar org-node-cache--stderr " *org-node*")
 
 (defun org-node-cache--handle-finished-job (i targeted)
   (unless targeted
@@ -361,12 +362,14 @@ being renamed at once."
     (let ((file (org-node-worker--tmpfile "demands-%d.eld" i)))
       (if (not (file-exists-p file))
           (progn
-            (message "An org-node worker failed to scan files, not producing %s.  See buffer *org-node errors*."
-                     file)
-            (when (get-buffer "*org-node errors*")
-              (kill-buffer "*org-node errors*"))
-            (with-current-buffer (get-buffer-create " *org-node*")
-              (rename-buffer "*org-node errors*")
+            (setq org-node-cache--stderr "*org-node errors*")
+            (message "An org-node worker failed to scan files, not producing %s.  See buffer %s."
+                     file org-node-cache--stderr)
+            ;; Had 1+ errors, so unhide the stderr buffer from now on
+            (when-let ((buf (get-buffer " *org-node*")))
+              (with-current-buffer buf
+                (rename-buffer org-node-cache--stderr)))
+            (with-current-buffer (get-buffer-create org-node-cache--stderr)
               (insert (format-time-string "\nThis output printed at %T"))))
         (insert-file-contents file)
         ;; Execute the demands that the worker wrote

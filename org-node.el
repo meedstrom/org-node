@@ -215,9 +215,7 @@ type the name of a node that does not exist:
               (run-hooks 'org-node-creation-hook)
             (save-buffer)
             ;; Because we didn't use `org-id-get-create'
-            (org-id-add-location id path-to-write)
-            ;; (org-node-cache--collect (list path-to-write))
-            ))))))
+            (org-id-add-location id path-to-write)))))))
 
 (defun org-node-new-by-roam-capture ()
   "Call `org-roam-capture-' with predetermined arguments.
