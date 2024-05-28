@@ -49,7 +49,7 @@ system migrations, it's very possible that there's a mix of
 coding systems among them.  In that case, setting this variable
 may mean that org-node fails to scan some of them."
   :group 'org-node
-  :type '(choice symbol (const nil)))
+  :type '(choice coding-system (const nil)))
 
 (defcustom org-node-perf-keep-file-name-handlers '(epa-file-handler)
   "Which file handlers to respect while scanning for ID nodes.
@@ -109,8 +109,8 @@ The option `org-capture' requires some assembly, see
 
 If you wish to write a custom function, know that during
 execution, two variables are available: `org-node-proposed-title'
-and `org-node-proposed-id'.  Use them."
-  :group 'org-node
+and `org-node-proposed-id'.  Use them.
+  :group" 'org-node
   :type '(choice
           (function-item org-node-new-file)
           (function-item org-node-new-by-roam-capture)
@@ -138,8 +138,8 @@ NOT applied by `org-node-new-by-roam-capture' -- see org-roam's
 A good member for this hook is `org-node-put-created', especially
 since the default `org-node-slug-fn' does not put a timestamp in
 the filename."
-  :type 'hook
-  :group 'org-node)
+  :group 'org-node
+  :type 'hook)
 
 (defcustom org-node-format-candidate-fn
   (lambda (_node title)
@@ -163,8 +163,7 @@ ancestors (outline path) to each node:
       (lambda (node title)
         (if-let ((olp (org-node-get-olp node)))
             (concat (string-join olp \" > \") \" > \" title)
-          title)))
-"
+          title)))"
   :group 'org-node
   :type 'function)
 
@@ -193,10 +192,9 @@ are tagged :drill:, or where the full file path contains the word
         (and (not (assoc \"ROAM_EXCLUDE\" (org-node-get-properties node)))
              (not (org-node-get-todo node))
              (not (member \"drill\" (org-node-get-tags node)))
-             (not (string-search \"archive\" (org-node-get-file-path node))))))
-"
-  :type 'function
-  :group 'org-node)
+             (not (string-search \"archive\" (org-node-get-file-path node))))))"
+  :group 'org-node
+  :type 'function)
 
 ;; TODO: maybe permit .org.gpg and .org.gz
 (defcustom org-node-extra-id-dirs (list)
@@ -204,20 +202,22 @@ are tagged :drill:, or where the full file path contains the word
 
 Intended to have the same convenience as setting
 `org-agenda-files', informing org-id about every Org file that
-exists within these directories (and its subdirectories and
+exists within these directories (and subdirectories and
 sub-subdirectories and so on).
 
 For it to have an effect, `org-node-cache-mode' must be active.
 
 To avoid accidentally picking up versioned backups, causing
 org-id to complain about \"duplicate\" IDs, configure
-`org-node-extra-id-dirs-exclude'.")
+`org-node-extra-id-dirs-exclude'."
+  :group 'org-node
+  :type '(repeat directory))
 
 (defcustom org-node-extra-id-dirs-exclude
   '("/logseq/bak/"
     "/logseq/version-files/"
     ".sync-conflict-")
-  "Substrings of file paths that cause a file to be ignored.
+  "Substrings of file paths that say a file should be ignored.
 
 This option has to do only with how to find files within
 `org-node-extra-id-dirs', so that you have a way to prevent
@@ -229,7 +229,9 @@ For all other purposes, you probably want to configure
 
 It is not necessary to exclude backups or autosaves that end in ~
 or # since `org-node-files' already only considers files that end
-in exactly \".org\".")
+in exactly \".org\"."
+  :group 'org-node
+  :type '(repeat string))
 
 
 
