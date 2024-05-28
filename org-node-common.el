@@ -63,13 +63,13 @@ encountered.  With fewer members in this list, `org-node-reset'
 can work faster."
   :group 'org-node
   :type '(choice (const :tag "Keep all" t)
-          (set
-           (function-item jka-compr-handler)
-           (function-item epa-file-handler)
-           (function-item tramp-file-name-handler)
-           (function-item tramp-completion-file-name-handler)
-           (function-item tramp-archive-file-name-handler)
-           (function-item file-name-non-special))))
+                 (set
+                  (function-item jka-compr-handler)
+                  (function-item epa-file-handler)
+                  (function-item tramp-file-name-handler)
+                  (function-item tramp-completion-file-name-handler)
+                  (function-item tramp-archive-file-name-handler)
+                  (function-item file-name-non-special))))
 
 (defcustom org-node-perf-gc-cons-threshold nil
   "Temporary override for `gc-cons-threshold'.
@@ -109,8 +109,8 @@ The option `org-capture' requires some assembly, see
 
 If you wish to write a custom function, know that during
 execution, two variables are available: `org-node-proposed-title'
-and `org-node-proposed-id'.  Use them.
-  :group" 'org-node
+and `org-node-proposed-id'.  Use them."
+  :group 'org-node
   :type '(choice
           (function-item org-node-new-file)
           (function-item org-node-new-by-roam-capture)
