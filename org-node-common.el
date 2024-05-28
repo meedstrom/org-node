@@ -15,12 +15,23 @@
   "Whether to ask the user where to save a new file node.
 
 Set nil to assume that the most populous root directory in
-`org-id-locations' is always the correct choice."
+`org-id-locations' is always the correct directory."
   :group 'org-node
   :type 'boolean)
 
-;; TODO: before suggesting `utf-8-auto-unix', find out if the coding for write
-;; infers from the coding for read
+(defcustom org-node-inject-variables (list)
+  "Alist of variable-value pairs that child processes should set.
+
+May be useful for injecting your authinfo and EasyPG settings so
+that `org-node-cache-mode' can scan for ID nodes inside .org.gpg
+files.
+
+I don't use EPG so I don't know if that's enough to make it work."
+  :group 'org-node
+  :type 'alist)
+
+;; TODO: Maybe suggest `utf-8-auto-unix', but first find out if the
+;; coding-system-for-write infers from coding-system-for-read
 (defcustom org-node-perf-assume-coding-system nil
   "Coding system to presume while scanning for metadata.
 More specific choices can speed up `org-node-reset' - sometimes
@@ -30,33 +41,26 @@ file.
 On modern GNU/Linux and BSD systems, a good choice is almost
 always `utf-8-unix'.  On Mac it would be `utf-8-mac'.
 
-On Windows this probably should be nil, or it'll fail to find
-ID-nodes, or infer wrong information about them."
+On Windows this probably should be nil.  Same if you access your
+files from multiple platforms.
+
+Note that if your Org collection is old and has survived several
+system migrations, it's very possible that there's a mix of
+coding systems among them.  In that case, setting this variable
+may mean that org-node fails to scan some of them."
   :group 'org-node
   :type '(choice symbol (const nil)))
 
-(defcustom org-node-inject-variables (list)
-  "Alist of variable-value pairs that child processes should set.
-
-May be useful for injecting your authinfo and EasyPG settings so
-that even with `org-node-perf-multicore', the child processes can
-scan for metadata inside .org.gpg files.
-
-I don't use EPG so I don't know if that's enough to make it work."
-  :group 'org-node
-  :type 'alist)
-
 (defcustom org-node-perf-keep-file-name-handlers '(epa-file-handler)
-  "Which file handlers to not ignore while scanning for metadata.
+  "Which file handlers to respect while scanning for ID nodes.
 
 Normally, `file-name-handler-alist' reacts specially to seeing
-some file names: TRAMP paths, compressed files or
-.org.gpg files.
+some file names: TRAMP paths, compressed files or .org.gpg files.
 
 It's infamous for (somewhat) slowing down the access of very many
 files, since it is a series of regexps applied to every file name
-encountered.  Temporarily eliminating members will speed up
-`org-node-reset' a bit."
+encountered.  With fewer members in this list, `org-node-reset'
+can work faster."
   :group 'org-node
   :type '(choice (const :tag "Keep all" t)
           (set
@@ -68,13 +72,14 @@ encountered.  Temporarily eliminating members will speed up
            (function-item file-name-non-special))))
 
 (defcustom org-node-perf-gc-cons-threshold nil
-  "Temporary setting for `gc-cons-threshold'.
+  "Temporary override for `gc-cons-threshold'.
 Tweak to maybe speed up `org-node-reset'.  Set nil to use the
 actual value of `gc-cons-threshold'.
 
 It can be surprising which value works best.  It is possible that
 80 kB is performant, and 16 MB is performant, but something in
-between such as 1 MB is very slow."
+between such as 1 MB is twice as slow.  Experiment to find a good
+setting."
   :group 'org-node
   :type '(choice integer (const nil)))
 
@@ -91,19 +96,20 @@ Built-in choices:
           function))
 
 (defcustom org-node-creation-fn #'org-node-new-file
-  "Function called by `org-node-find', and `org-node-insert-link' to
+  "Function called by `org-node-find' and `org-node-insert-link' to
 create a node.
 
-If you wish to write a new function, know that during execution, two
-variables are available: `org-node-proposed-title' and
-`org-node-proposed-id'.  Use them.
-
-Some options
+Some built-in options
 - `org-node-new-file'
 - `org-node-new-by-roam-capture'
 - `org-capture'
 
-Using `org-capture' requires some assembly.  See `org-node-capture-target'."
+The option `org-capture' requires some assembly, see
+`org-node-capture-target'.
+
+If you wish to write a custom function, know that during
+execution, two variables are available: `org-node-proposed-title'
+and `org-node-proposed-id'.  Use them."
   :group 'org-node
   :type '(choice
           (function-item org-node-new-file)
@@ -126,7 +132,7 @@ Functions here should not leave point outside the link."
 Applied only by `org-node-new-file', `org-node-create-subtree',
 `org-node-nodeify-entry' and `org-node-extract-subtree'.
 
-NOT run by `org-node-new-by-roam-capture' - see that package's hook
+NOT applied by `org-node-new-by-roam-capture' -- see org-roam's
 `org-roam-capture-new-node-hook' instead.
 
 A good member for this hook is `org-node-put-created', especially
@@ -194,7 +200,7 @@ are tagged :drill:, or where the full file path contains the word
 
 ;; TODO: maybe permit .org.gpg and .org.gz
 (defcustom org-node-extra-id-dirs (list)
-  "Like `org-id-extra-files' but expressed as directories.
+  "Like `org-id-extra-files', but expressed as directories.
 
 Intended to have the same convenience as setting
 `org-agenda-files', informing org-id about every Org file that
@@ -203,21 +209,27 @@ sub-subdirectories and so on).
 
 For it to have an effect, `org-node-cache-mode' must be active.
 
-To avoid accidentally picking up versioned backups or things of
-that nature, causing org-id to complain about \"duplicate\" IDs,
-see `org-node-extra-id-dirs-exclude'.")
+To avoid accidentally picking up versioned backups, causing
+org-id to complain about \"duplicate\" IDs, configure
+`org-node-extra-id-dirs-exclude'.")
 
 (defcustom org-node-extra-id-dirs-exclude
   '("/logseq/bak/"
     "/logseq/version-files/"
     ".sync-conflict-")
-  "Substrings of file paths that cause a file to be rejected.
-This is not the same as `org-node-filter-fn', but has to do only
-with how `org-node-extra-id-dirs' is used.
+  "Substrings of file paths that cause a file to be ignored.
 
-The variable exists only so that you have a way to avoid making
-org-id look inside versioned backup files and then complain about
-\"duplicate\" IDs.")
+This option has to do only with how to find files within
+`org-node-extra-id-dirs', so that you have a way to prevent
+org-id from looking inside versioned backup files and then
+complain about \"duplicate\" IDs.
+
+For all other purposes, you probably want to configure
+`org-node-filter-fn' instead.
+
+It is not necessary to exclude backups or autosaves that end in ~
+or # since `org-node-files' already only considers files that end
+in exactly \".org\".")
 
 
 
@@ -225,13 +237,17 @@ org-id look inside versioned backup files and then complain about
   "Backport of the `org-with-file-buffer' concept.
 Also integrates `org-with-wide-buffer' behavior.
 
-If no buffer was visiting FILE, open a new one else reuse an open
-buffer, and execute BODY.
+If a buffer was visiting FILE, go to that buffer, else visit it
+in a new buffer.  With that as the current buffer, execute BODY.
+Finally:
 
-If a new buffer had to be opened, save and kill it afterwards.
-Else if the buffer had been unmodified, save it."
+- If a new buffer had to be opened, save and kill it.
+- If a buffer had been open, but it was unmodified before running
+  BODY, keep it open and save any changes.
+- If a buffer had been open, and modified, keep it open and leave
+  it unsaved."
   (declare (indent 1))
-  ;; REVIEW: do these perf hacks or not?
+  ;; REVIEW: do these perf hacks or don't?
   `(let ((find-file-hook nil)
          (after-save-hook nil)
          (before-save-hook nil)
@@ -258,9 +274,10 @@ Else if the buffer had been unmodified, save it."
   (defun org-node-files (&optional instant)
     "List files in `org-id-locations' or `org-node-extra-id-dirs'.
 
-With argument INSTANT t, reuse a value from the last time
+With argument INSTANT t, reuse a result from the last time
 something called this function.  Else you may get a momentary
-delay when thousands of files are involved."
+delay when thousands of files are involved, which may not be
+desirable in an user-facing command."
     (if (and instant mem)
         mem
       (setq mem
@@ -361,9 +378,10 @@ elements, the return value is still N items, where some are nil."
              auto-save-visited-mode
              git-auto-commit-mode)))
 
-;; FIXME do not impose an uniqueness constraint... probably need to make an
-;; alist during `org-node--add-link-to-tables' and then just iter thru
-;; `org-node-refs-table' to enrich it or something.
+;; FIXME The hash table effectively imposes an uniqueness
+;; constraint... probably need to deprecate this variable, make a temporary
+;; alist during `org-node--add-link-to-tables' and then just iterate thru
+;; `org-node--refs-table' to enrich it or something.
 (defvar org-node--reflinks-table (make-hash-table :test #'equal)
   "Table of potential reflinks.
 The table keys are just URIs such as web addresses, and the
@@ -378,16 +396,18 @@ you'd have to cross-reference with `org-node--refs-table'.")
 (defvar org-node--dbg nil)
 
 
+;;; Data structure
 
-;; A struct was pointless while I developed the package for my own use, but
-;; now that it has users... the problem with `plist-get' is I can never rename
-;; any of the data fields.
+;; A struct was pointless while I developed the package for my own use, plists
+;; did fine, but now that it has users... the problem with `plist-get' is I can
+;; never rename any of the data fields.
 ;;
 ;; If you use `plist-get' to fetch a key that doesn't exist, it just quietly
 ;; returns nil, no error, no warning.  (Bad for an API!)  Let's say I want to
 ;; deprecate or rename a plist field such as :roam-exclude, then I must hope
 ;; everyone reads the news.  By contrast if the getter is a function
 ;; `org-node-get-roam-exclude', I can override it so it emits a warning.
+
 (cl-defstruct org-node-data
   "To get e.g. a node's title, use `(org-node-get-title NODE)'."
   (aliases    nil :read-only t :type list    :documentation
@@ -458,8 +478,11 @@ you'd have to cross-reference with `org-node--refs-table'.")
 (defalias 'org-node-get-title      #'org-node-data-title)
 (defalias 'org-node-get-todo       #'org-node-data-todo)
 
-;; 2024-05-01 Very-soft-deprecate
-;; 2024-05-05 Soft-deprecate the old "org-node" struct, badly named
+
+
+;;; Obsoletions
+
+;; 2024-05-05
 (let (warned-once)
   (defun org-node-aliases    (node) (unless warned-once (display-warning 'org-node (string-fill "\nYour config uses deprecated accessors org-node-..., update to org-node-get-..." 79)) (setq warned-once t)) (org-node-get-aliases    node))
   (defun org-node-deadline   (node) (unless warned-once (display-warning 'org-node (string-fill "\nYour config uses deprecated accessors org-node-..., update to org-node-get-..." 79)) (setq warned-once t)) (org-node-get-deadline   node))
@@ -477,17 +500,6 @@ you'd have to cross-reference with `org-node--refs-table'.")
   (defun org-node-title      (node) (unless warned-once (display-warning 'org-node (string-fill "\nYour config uses deprecated accessors org-node-..., update to org-node-get-..." 79)) (setq warned-once t)) (org-node-get-title      node))
   (defun org-node-todo       (node) (unless warned-once (display-warning 'org-node (string-fill "\nYour config uses deprecated accessors org-node-..., update to org-node-get-..." 79)) (setq warned-once t)) (org-node-get-todo       node)))
 
-
-;;; Other obsoletions
-
-(let (warned-once)
-  (defun org-node-cache-scan-file (&rest args)
-    (unless warned-once
-      (setq warned-once t)
-      (lwarn 'org-node :warning
-             "Function renamed on 2024-05-01: org-node-cache-scan-file to org-node-cache-rescan-file"))
-    (apply #'org-node-cache-rescan-file args)))
-
 ;;;###autoload
 (let (warned-once)
   (defun org-node-create-subtree (&rest args)
@@ -496,16 +508,6 @@ you'd have to cross-reference with `org-node--refs-table'.")
       (setq warned-once t)
       (lwarn 'org-node :warning
              "Command renamed on 2024-05-01: org-node-create-subtree to org-node-insert-heading"))
-    (apply #'org-node-insert-heading args)))
-
-;;;###autoload
-(let (warned-once)
-  (defun org-node-insert-heading-node (&rest args)
-    (interactive)
-    (unless warned-once
-      (setq warned-once t)
-      (lwarn 'org-node :warning
-             "Command renamed on 2024-05-02: org-node-insert-heading-node to org-node-insert-heading"))
     (apply #'org-node-insert-heading args)))
 
 ;; Not technically an obsoletion...  just fundamentally uninteresting
@@ -519,19 +521,6 @@ you'd have to cross-reference with `org-node--refs-table'.")
        "Someone misspelled `org-node-backlink-mode', but I ran it for you"))
     (apply #'org-node-backlink-mode args)))
 
-;;;###autoload
-(defun org-node-enable ()
-  "Deprecated.
-Please add onto org-mode-hook:
-- `org-node-cache-mode'
-- `org-node-backlink-mode' (optional)"
-  (remove-hook 'org-mode-hook #'org-node-enable)
-  (add-hook 'org-mode-hook #'org-node-backlink-mode)
-  (org-node-backlink-mode)
-  (org-node-cache-mode)
-  ;; 2024-04-30
-  ;; 2024-05-06
-  (warn "Org-node has new recommendations for init, see README"))
 (provide 'org-node-common)
 
 ;;; org-node-common.el ends here
