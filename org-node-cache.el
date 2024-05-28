@@ -1,8 +1,5 @@
 ;;; org-node-cache.el --- The beating heart -*- lexical-binding: t; -*-
 
-;; TODO: Balance the split file-lists a bit depending on file sizes?  Consult
-;; the filesystem for the size: (nth 7 (file-attributes FILE))
-
 (require 'bytecomp)
 (require 'org-node-common)
 (require 'org-node-worker)
@@ -16,10 +13,6 @@ time."
   :global t
   :group 'org-node
   (remove-hook 'org-mode-hook #'org-node-cache-mode)
-  ;; Take this opportunity to check for deprecated usage
-  (when (or (string-search "plist-get" (prin1-to-string org-node-filter-fn))
-            (string-search "plist-get" (prin1-to-string org-node-format-candidate-fn)))
-    (display-warning 'org-node (string-fill "\n2024-04-30 breaking change: node metadata comes in objects now, not plists!  This change was made because plist-get fails silently, which makes debugging more difficult.  See updated examples for org-node-filter-fn etc." 79)))
   (if org-node-cache-mode
       (progn
         (add-hook 'after-save-hook #'org-node-cache-rescan-file)
@@ -72,15 +65,18 @@ arguments.
     ;; Emacs.
     (setq synchronous (not _polite-init))
     (setq force t))
-  ;; Mandate cache-mode.  Note if this was called from cache-mode itself, the
-  ;; mode variable is already t, so this cannot result in an infinite loop.
+  ;; Mandate `org-node-cache-mode'.  Note if this was called from the
+  ;; initialization of `org-node-cache-mode' itself, the variable is already t,
+  ;; so this cannot result in an infinite loop.
   (when (not org-node-cache-mode)
     (org-node-cache-mode)
     (setq force t))
   (let ((live (-any-p #'process-live-p org-node-cache--processes)))
     (when force
+      ;; Launch the async processes
       (unless live (org-node-cache--collect)))
     (when synchronous
+      ;; Block until all processes finish
       (message "org-node caching...")
       (mapc #'accept-process-output org-node-cache--processes))
     ;; Return non-nil if a sync is ongoing, nil if "ready"
@@ -91,12 +87,12 @@ arguments.
 (defvar org-node-cache-rescan-file-hook nil)
 
 (defun org-node-cache-rescan-file (&optional arg1 arg2 &rest _)
-  "Seek nodes and links in a single file.
+  "Scan nodes and links in a single file.
 Either operate on ARG2 if it seems to be a file name, else the
 current buffer file.
 
-Meant as an advice for `rename-file' - to manually scan a file,
-use `org-node-cache--collect'."
+Meant as an advice for `rename-file'.  To manually scan a file
+from Lisp, use `org-node-cache--collect' instead."
   ;; If triggered as advice on `rename-file', the second argument is the new
   ;; name.  Do not assume it is being done to the current buffer; it may be
   ;; called from a Dired buffer, for example.
@@ -119,15 +115,15 @@ use `org-node-cache--collect'."
 
 (let ((timer (timer-create)))
   (defun org-node-cache--handle-delete (&optional file-being-deleted &rest _)
-    "Update org-id and org-node after an Org file is deleted.
+    "Update org-id and org-node when an Org file is deleted.
 
-Expected to run prior to deletion, and operate on ARG1 if it
-seems to be a filename, else the current buffer file.
+Expected to run prior to deletion, as a :before advice on
+`delete-file'.
 
 First remove any references to the file in `org-id-locations'.
-Then schedule a cache reset for after a few idle seconds.  The
-delay minimizes the risk of bothering the user who may be trying
-to delete several files in a row."
+Then schedule the cache to reset after a few idle seconds.  The
+delay minimizes the risk of bothering the user who may be in the
+proess of deleting several files in a row."
     ;; (when (eq (current-buffer) (window-buffer (selected-window)))
     (when file-being-deleted
       (when (--any-p (string-suffix-p it file-being-deleted)
@@ -139,7 +135,7 @@ to delete several files in a row."
 
 (defun org-node-cache-peek ()
   "Print some random members of `org-nodes' that have IDs.
-See also the type `org-node-data'."
+For reference, see type `org-node-data'."
   (interactive)
   (let ((id-nodes (hash-table-values org-nodes)))
     (dotimes (_ 3)
@@ -148,11 +144,17 @@ See also the type `org-node-data'."
 
 ;; I feel like this could be easier to read...
 (defun org-node-cache--add-node-to-tables (node-as-plist)
-  "Add a node to `org-nodes' and other tables."
+  "Add a node to `org-nodes' and other tables.
+The input NODE-AS-PLIST is simply a list of arguments to give to
+`make-org-node-data'.
+
+If you wish to scan a file for nodes, use the higher-level
+function `org-node-cache--collect'."
   (let* ((node (apply #'make-org-node-data node-as-plist))
          (id (org-node-get-id node)))
-    ;; Add to `org-id-locations' too
-    (puthash id (org-node-get-file-path node) org-id-locations)
+    ;; Tell org-id about the node too
+    (org-id-add-location id (org-node-get-file-path node)) ;; REVIEW perf
+    ;; (puthash id (org-node-get-file-path node) org-id-locations)
     (puthash id node org-nodes)
     ;; Populate `org-node--refs-table'
     (dolist (ref (org-node-get-refs node))
@@ -169,22 +171,36 @@ See also the type `org-node-data'."
         (puthash ref node org-node-collection)))))
 
 (defun org-node-cache--add-link-to-tables (link-plist path type)
-  "Record a link or reflink in the tables for those."
-  (push link-plist (gethash path (if (equal type "id")
-                                     org-node--links-table
-                                   org-node--reflinks-table))))
+  "Record a link or reflink into the appropriate table.
+For demonstration of LINK-PLIST, PATH and TYPE, read the source
+of `org-node-worker--collect-links-until'."
+  (push link-plist (gethash path
+                            (if (equal type "id")
+                                org-node--links-table
+                              org-node--reflinks-table))))
 
 (defvar org-node-cache--start-time nil
   "Timestamp used to measure time to rebuild the cache.")
 
-;; Wrapper to try to queue it up if it's called twice in a very short time
-(let (waiting)
+(let (queue timer)
   (defun org-node-cache--collect (&optional files)
+    "Thin wrapper for `org-node-cache--collect*'.
+Like `org-node-cache--collect*', but try to queue multiple calls
+that occur in a very short time, like when multiple files are
+being renamed at once."
+    (setq queue (append files queue))
+    ;; Let's say there are 10 calls about to happen simultaneously, but we
+    ;; don't know the future.  The first call will execute normally, and the
+    ;; next 9 calls will see that it is busy and wait, so the second run will
+    ;; scan 9 files.  Weird and could definitely be polished, but good enough.
+    ;; The important thing is that nothing is dropped.
     (if (-any-p #'process-live-p org-node-cache--processes)
-        (setq waiting (append files waiting))
-      (let ((input waiting))
-        (setq waiting nil)
-        (org-node-cache--collect* waiting)))))
+        (progn
+          (cancel-timer timer)
+          (setq timer (run-with-timer 1 nil #'org-node-cache--collect queue)))
+      (let ((queue* (-clone queue)))
+        (setq queue nil)
+        (org-node-cache--collect* queue*)))))
 
 (defun org-node-cache--collect* (&optional files)
   (mkdir (org-node-worker--tmpfile) t)
@@ -214,16 +230,14 @@ See also the type `org-node-data'."
          (elc (org-node-worker--tmpfile "worker.elc"))
          (targeted (not (null files))))
     ;; Pre-compile the worker, if the user's package manager didn't compile it
-    ;; already, or if development is happening in org-node-worker.el.
+    ;; already, or if local changes have been made to org-node-worker.el
     (if native
         (unless (file-newer-than-file-p native lib)
           (native-compile lib))
       (unless (file-newer-than-file-p elc lib)
-        ;; If we obey `byte-compile-dest-file-function', it's hard to predict
-        ;; that the .elc won't end up cluttering some source directory, so just
-        ;; force it into /tmp.
-        (let ((byte-compile-dest-file-function
-               `(lambda (&rest _) ,elc)))
+        ;; Don't obey `byte-compile-dest-file-function', because it's hard to
+        ;; predict that the .elc won't end up cluttering some source directory
+        (let ((byte-compile-dest-file-function `(lambda (&rest _) ,elc)))
           (byte-compile-file lib))))
 
     (setq org-node-cache--start-time (current-time))
@@ -232,7 +246,7 @@ See also the type `org-node-data'."
       (insert
        (prin1-to-string
         ;; The purpose of $sigils is just visual, to distinguish these
-        ;; variables in the body of `org-node-worker--collect'.
+        ;; "external" variables in the body of `org-node-worker--collect'.
         (append
          org-node-inject-variables
          `(($targeted . ,targeted)
@@ -259,13 +273,14 @@ See also the type `org-node-data'."
                            "backlinks")
                        ":")))))))
 
-    ;; NB: I considered keeping the processes alive to skip the spin-up
-    ;; time, but the subprocesses report `emacs-init-time' as 0.001s.
-    ;; There could be an unmeasured OS component though.  And maybe when
-    ;; loading the worker.eln? https://nullprogram.com/blog/2018/02/22/
-    ;; Worth a test in the future.  Now we just spin up new ones every time.
-    ;; Btw, can we ensure these child processes are loading the .eln variant of
-    ;; all the emacs core lisp?
+    ;; NB: I considered keeping the processes alive to skip the spin-up time,
+    ;; but the subprocesses report `emacs-init-time' as 0.001s.  There could be
+    ;; an unmeasured OS component though.  And maybe there's delay loading the
+    ;; worker.eln? https://nullprogram.com/blog/2018/02/22/
+    ;;
+    ;; Worth a test in the future.  Now we just start new processes every time.
+    ;; REVIEW Can we ensure these child processes are loading the .eln variant
+    ;;        of all the emacs core lisp?
     (while-let ((old-process (pop org-node-cache--processes)))
       (when (process-live-p old-process)
         (delete-process old-process)))
@@ -285,14 +300,19 @@ See also the type `org-node-data'."
           (setq org-node-cache--jobs 1)
           (org-node-cache--handle-finished-job 0 nil))
 
-      ;; Split the work over many Emacs processes
+      ;; If not debugging, split the work over many Emacs processes
+      ;; TODO: Balance the split file-lists a bit depending on file sizes?  To
+      ;;       get the size: (nth 7 (file-attributes FILE)). It's not uncommon
+      ;;       for one process to take noticeably longer because there's a
+      ;;       mega-file among them.
       (let ((print-length nil)
             (file-lists (org-node--split-into-n-sublists
                          (or files (org-node-files t))
                          org-node-cache--jobs)))
         (delq nil file-lists)
-        ;; If user has e.g. 8 cores but only 5 files, spin up only 5 jobs
-        (setq org-node-cache--jobs (min org-node-cache--jobs (length file-lists)))
+        ;; If user has e.g. 8 cores but only 5 files, run only 5 jobs
+        (setq org-node-cache--jobs
+              (min org-node-cache--jobs (length file-lists)))
         (dotimes (i org-node-cache--jobs)
           (delete-file (org-node-worker--tmpfile "demands-%d.eld" i))
           (with-temp-file (org-node-worker--tmpfile "file-list-%d.eld" i)
@@ -302,21 +322,18 @@ See also the type `org-node-data'."
                  :noquery t
                  :stderr (get-buffer-create " *org-node*")
                  :command (list (file-truename
+                                 ;; True path to Emacs binary
                                  (expand-file-name invocation-name
                                                    invocation-directory))
                                 "--quick"
                                 "--no-init-file"
                                 "--no-site-lisp"
                                 "--batch"
-                                "--eval"
-                                (format "(setq i %d)" i)
-                                "--load"
-                                (or native elc)
-                                "--funcall"
-                                "org-node-worker--collect")
+                                "--eval" (format "(setq i %d)" i)
+                                "--load" (or native elc)
+                                "--funcall" "org-node-worker--collect")
                  :sentinel (lambda (_process _event)
-                             (org-node-cache--handle-finished-job
-                              i targeted)))
+                             (org-node-cache--handle-finished-job i targeted)))
                 org-node-cache--processes))))))
 
 (defvar org-node-cache--processes (list))
@@ -330,9 +347,9 @@ See also the type `org-node-data'."
       ;; launching the processes, but that leads to a larger time window when
       ;; completions are unavailable.  Instead, we've waited until the first
       ;; process starts returning, and only now wipe the tables.
-
-      ;; TODO: Should wait until the last process finishes (need to collect
-      ;; their return values all in one go)
+      ;;
+      ;; TODO: Should wait until the last process finishes (refactor to collect
+      ;;       their return values all in one go)
       (clrhash org-nodes)
       (clrhash org-node-collection)
       (clrhash org-node--refs-table)
@@ -358,9 +375,9 @@ See also the type `org-node-data'."
           (apply (car demand) (cdr demand)))
         ;; Check if this was the last process to return, then wrap-up
         (when (eq (cl-incf org-node-cache--done-ctr) org-node-cache--jobs)
-          ;; Print time elapsed.  Don't do it if this was a
-          ;; $targeted run (operated on single file after a rename) as the
-          ;; sums would be misleading.
+          ;; Print time elapsed.  Don't do it if this was a $targeted run
+          ;; (i.e. operated on single file after a rename) as the sums would be
+          ;; misleading.
           (when (not targeted)
             (let ((n-subtrees (cl-loop
                                for node being the hash-values of org-nodes
@@ -371,8 +388,7 @@ See also the type `org-node-data'."
                   (n-reflinks (length (apply #'append
                                              (hash-table-values
                                               org-node--reflinks-table)))))
-              ;; (2024-05-06) NOTE In a few days, remove "w ID" (transitional)
-              (message "org-node saw %d files, %d subtrees w ID, %d ID-links, %d potential reflinks in %.2fs"
+              (message "org-node saw %d files, %d subtrees, %d ID-links, %d potential reflinks in %.2fs"
                        (- (hash-table-count org-nodes) n-subtrees)
                        n-subtrees
                        n-backlinks

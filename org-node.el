@@ -168,12 +168,12 @@ type the name of a node that does not exist:
   (let (title node id)
     (if org-node-proposed-title
         ;; Was called from `org-node--create', so the user already typed the
-        ;; title and no such node exists
+        ;; title and no such node exists yet
         (progn
           (setq title org-node-proposed-title)
           (setq id org-node-proposed-id))
       ;; Was called from `org-capture', which means the user has not yet typed
-      ;; the title
+      ;; the title; let them type it now
       (let ((input (completing-read "Node: " org-node-collection
                                     () () () 'org-node-hist)))
         (setq node (gethash input org-node-collection))
@@ -215,7 +215,9 @@ type the name of a node that does not exist:
               (run-hooks 'org-node-creation-hook)
             (save-buffer)
             ;; Because we didn't use `org-id-get-create'
-            (org-id-add-location id path-to-write)))))))
+            (org-id-add-location id path-to-write)
+            ;; (org-node-cache--collect (list path-to-write))
+            ))))))
 
 (defun org-node-new-by-roam-capture ()
   "Call `org-roam-capture-' with predetermined arguments.
@@ -223,7 +225,7 @@ Meant to be called as `org-node-creation-fn', during which it
 gets some necessary variables."
   (if (or (null org-node-proposed-title)
           (null org-node-proposed-id))
-      (message "org-node-new-by-roam-capture is meant to be called indirectly")
+      (message "`org-node-new-by-roam-capture' is meant to be called indirectly via `org-node--create'")
     (unless (fboundp #'org-roam-capture-)
       (org-node-die "Didn't create node! Either install org-roam or %s"
                     "configure `org-node-creation-fn'"))

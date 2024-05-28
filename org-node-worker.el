@@ -94,11 +94,12 @@ that will match any of the keywords."
                  (replace-regexp-in-string "(.*?)" "")
                  (replace-regexp-in-string "[^ [:alpha:]]" "")
                  (string-trim)
-                 (string-split)
+                 (split-string)
                  (regexp-opt))))
 
 (defun org-node-worker--org-link-display-format (s)
   "Copy-pasted from `org-link-display-format'."
+  (declare (pure t) (side-effect-free t))
   (save-match-data
     (replace-regexp-in-string
      ;; Pasted from `org-link-bracket-re'
