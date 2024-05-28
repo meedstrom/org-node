@@ -262,7 +262,7 @@ being renamed at once."
                        file-name-handler-alist))
            ($global-todo-re
             . ,(org-node-worker--make-todo-regexp
-                (string-join (mapcan #'cdr (default-value 'org-todo-keywords))
+                (string-join (-mapcat #'cdr (default-value 'org-todo-keywords))
                              " ")))
            ($backlink-drawer-re
             . ,(concat "^[[:space:]]*:"
