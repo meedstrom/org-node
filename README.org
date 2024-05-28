@@ -1,29 +1,15 @@
 * org-node
-** News [2024-05-07]
-- It was unclear how to ensure that org-id knows about all IDs, so new variable: =org-node-extra-id-dirs=!
-
-** News [2024-05-03]
-- =org-node-reset= is now async!
-
-** News [2024-05-01]
-- It turns out that =org-node-reset= took dozens of seconds on some people's configs.  I /think/ it's fixed now.
-
-** News [2024-04-30]
-- We no longer depend on a =BACKLINKS= property!  It is still a great way to show backlinks, so it remains as an option.
-- Renamed =CACHED_BACKLINKS= to just =BACKLINKS=.  One =M-x org-node-backlink-fix-all= will take care of the rename, or you can remove them all with =M-x org-node-backlink-regret=.
-- *Breaking API change* -- nodes are objects now, not plists!  The software can't give you a deprecation notice, because plists fail silently (that's why the change).  See updated examples for =org-node-filter-fn= etc.
-
 ** What's all this
 
 I found org-roam too slow, so I made [[https://github.com/meedstrom/quickroam][quickroam]].  And that idea spun off into this package, a standalone thing.  I hope it's also easier to learn.
 
 - *If you were using org-roam*, there is nothing to migrate.  You can use both packages.  It's exactly the same on-disk format: "notes" are identified by their org-id.
 
-  Thanks to shims, you can even *skip syncing the org-roam DB* but still use its features, like the rich backlinks buffer and org-roam-capture!
+  With optional shims, you can even *skip syncing the org-roam DB* but still use its rich backlinks buffer and org-roam-capture!
 
   In pursuit of being "just org-id", this package has no equivalent setting to =org-roam-directory= -- it just looks up =org-id-locations=.
 
-- *If you were not using org-roam*, maybe think of it as a limited, focused [[https://github.com/alphapapa/org-ql][org-ql]].  If you were the sort of person to prefer ID-links over file links or any other type of link, you're in the right place!  Now you can truly rely on IDs, and forget about filenames and hierarchies and directory structures -- as long as you've assigned an ID to something, you can find it later.
+- *If you were not using org-roam*, maybe think of it as a limited, focused [[https://github.com/alphapapa/org-ql][org-ql]].  If you were the sort of person to prefer ID-links over file links or any other type of link, you're in the right place!  Now you can rely on IDs, and forget about filenames and hierarchies and directory structures -- as long as you've assigned an ID to something, you can find it later.
 
   And you can still keep doing hierarchies and structures, where that brings you joy, unlike systems that mandate limitations like "one note per file".
 
@@ -31,13 +17,15 @@ I found org-roam too slow, so I made [[https://github.com/meedstrom/quickroam][q
 
 My life can be divided into two periods "*before org-roam*" and "*after org-roam*".  I crossed a kind of gap once I got a good way to link between my notes.  It's odd to remember when I just relied on browsing hierarchies of subtrees -- what a strange way to do things!
 
-At the core, all the "notetaking packages" (orgrr/zk/deft/org-roam/denote/...) try to help you with this: make it easy to link between notes.
+I used to lose track of things I had written only to rediscover them years later, buried under some deeply nested heading.  The org-roam method made it easier to actually *build on my own work*.
 
-Right off the bat, that imposes two requirements: a method to search for notes, since you can't link to something you can't search for, and a decision about exactly what kinds of things should turn up as search hits.
+At the core, all the "notetaking packages" (orgrr/zk/deft/org-roam/denote/...) try to help you with this: make it easy to link between notes /and/ make them easy to explore.
+
+Right off the bat, that imposes two requirements: a method to search for notes, since you can't link to something you can't search for, and a design-philosophy about exactly what kinds of things should turn up as search hits.
 
 Just searching for Org files is too coarse, and just searching for any subtree anywhere brings in too much clutter.
 
-Here's what org-roam invented.  It turns out that if you limit the search hits to just those files and subtrees you've deigned to assign an org-id -- which roughly maps to everything you've ever thought it was worth linking to -- it filters out the noise excellently.
+Here's what org-roam invented.  It turns out that if you limit the search-hits to just those files and subtrees you've deigned to assign an org-id -- which roughly maps to everything you've ever thought it was worth linking to -- it filters out the noise excellently.
 
 Once a subtree has an ID you can link to, it's a "node" because it has joined the wider graph, the network of linked nodes.  I wish the English language had more distinct sounds for the words "node" and "note", but to clarify, I'll say "ID-node" when the distinction matters.
 
@@ -45,26 +33,26 @@ Once a subtree has an ID you can link to, it's a "node" because it has joined th
 
 For your pleasure, here's a comparison of three similar notetaking systems: all permitting org-id as first-class citizen and not locking you into an "one-note-per-file" concept.
 
-|                                    | org-roam    | org-node           | [[https://github.com/toshism/org-super-links][org-super-links]]      |
-|------------------------------------+-------------+--------------------+----------------------|
-| Backlinks                          | yes         | yes                | yes                  |
-| Node search and insert             | yes         | yes                | no (suggests org-ql) |
-| Node aliases                       | yes         | yes                | not applicable       |
-| Rich backlinks buffer              | yes         | yes (org-roam's)   | no                   |
-| Reflinks                           | yes         | yes (as backlinks) | no                   |
-| Ref search                         | yes         | yes (as aliases)   | no                   |
-| Extract subtree to new file        | yes         | yes                | no                   |
-| Can configure rich completions     | yes         | yes                | not applicable       |
-| org-roam-capture integration       | yes         | yes                | no                   |
-| org-capture integration            | no          | yes                | no                   |
-| Backlinks in same window           | no          | yes                | yes                  |
-| Avoid scanning :BACKLINKS: drawers | no          | yes                | yes                  |
-| Node exclusion                     | yes         | limited            | not applicable       |
-| Support =roam:= links                | yes         | no                 | no                   |
-|------------------------------------+-------------+--------------------+----------------------|
-| Some query-able cache              | =org-roam-db= | =org-nodes=          | no                   |
-| Asynchronous caching               | no          | yes                | yes (very async ;)   |
-| Time to re-cache my 2000 files     | 2m 48s      | 0m 02s             | not applicable       |
+|                                   | org-roam    | org-node           | [[https://github.com/toshism/org-super-links][org-super-links]]      |
+|-----------------------------------+-------------+--------------------+----------------------|
+| Backlinks                         | yes         | yes                | yes                  |
+| Node search and insert            | yes         | yes                | no (suggests org-ql) |
+| Node aliases                      | yes         | yes                | not applicable       |
+| Rich backlinks buffer             | yes         | yes (org-roam's)   | no                   |
+| Reflinks                          | yes         | yes (as backlinks) | no                   |
+| Ref search                        | yes         | yes (as aliases)   | no                   |
+| Extract subtree to new file       | yes         | yes                | no                   |
+| Can configure rich completions    | yes         | yes                | not applicable       |
+| org-roam-capture integration      | yes         | yes                | no                   |
+| org-capture integration           | no          | yes                | no                   |
+| Backlinks in same window          | no          | yes                | yes                  |
+| Avoid double-counting :BACKLINKS: | no          | yes                | yes                  |
+| Node exclusion                    | yes         | limited            | not applicable       |
+| Support =roam:= links               | yes         | no                 | no                   |
+|-----------------------------------+-------------+--------------------+----------------------|
+| Some query-able cache             | =org-roam-db= | =org-nodes=          | no                   |
+| Asynchronous caching              | no          | yes                | yes (very async ;))  |
+| Time to re-cache my 2000 files    | 2m 48s      | 0m 02s             | not applicable       |
 
 This isn't a totally fair comparison; org-roam has an advantage in the details, see Appendix II.  With org-node I've made what I would've liked to hack on, so it's more simplistic in many aspects.
 
@@ -116,7 +104,7 @@ These user options help you feel at home using both packages side-by-side:
 Also, either run =M-x org-roam-id-update-id-locations=, or add your =org-roam-directory= to the following variable.  It shouldn't be necessary, but upstream org-id has no convenient setting like this.
 
 #+begin_src elisp
-(setq org-node-extra-id-dirs '(...))
+(setq org-node-extra-id-dirs '("~/org/")) ;; ...
 #+end_src
 
 If you've been struggling with slow saving of big files in the past, consider these org-roam settings:
@@ -138,6 +126,7 @@ Want to keep using =M-x org-roam-buffer-toggle=?
 
 If you didn't have laggy saves, this is fine.  In other words, keep =org-roam-db-update-on-save= at t.
 
+
 **** *Option 1B*.  Tell org-node to write to the org-roam DB.
 
 The following hook should keep the database synced.
@@ -148,9 +137,10 @@ The following hook should keep the database synced.
 
 For a full reset, equivalent to =C-u M-x org-roam-db-sync=, you can type =M-x org-node-feed-roam-db=.  It's still slow, but interestingly, all the slowness comes from EmacSQL or SQLite.  If someone figures out how to optimize that, please let me know!
 
+
 **** *Option 1C*.  Cut out the DB altogether.
 
-Do some hax:
+Have some hax:
 
 #+begin_src elisp
 (advice-add 'org-roam-backlinks-get :override
@@ -161,7 +151,7 @@ Do some hax:
 #+end_src
 
 ** Backlink solution 2: inside the file
-I love these solutions because I rarely have the screen space to display a backlink buffer.
+I like these solutions because I rarely have the screen space to display a backlink buffer.
 
 **** *Option 2A*.  Let org-node add a =:BACKLINKS:= property to all nodes.
 
@@ -172,6 +162,7 @@ Then start using the minor mode =org-node-backlink-mode=, which keeps these prop
 #+begin_src elisp
 (add-hook 'org-mode-hook #'org-node-backlink-mode)
 #+end_src
+
 
 **** *Option 2B.*  Let [[https://github.com/toshism/org-super-links][org-super-links]] manage a =:BACKLINKS:...:END:= drawer.
 
