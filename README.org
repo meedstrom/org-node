@@ -55,7 +55,7 @@ For your pleasure, here's a comparison of three similar notetaking systems: all 
 | Asynchronous caching              | --          | yes                | yes, very async ;)   |
 | Time to re-cache my 2000 files    | 2m 48s      | 0m 02s             | not applicable       |
 
-** Setup
+* Setup
 
 Add an init snippet like this (assuming [[https://github.com/radian-software/straight.el][straight.el]]):
 
@@ -70,8 +70,6 @@ Add an init snippet like this (assuming [[https://github.com/radian-software/str
 If you're new to these concepts, fear not.  The main things for day-to-day operation are two verbs: "find" and "insert-link".
 
 Pick some good keys and try them out, and you can come back to this README later---or never.
-
-The keys I use:
 
 #+begin_src elisp
 (global-set-key (kbd "<f2> f") #'org-node-find)
@@ -89,7 +87,7 @@ To browse config options, type =M-x customize-group RET org-node RET=.
 
 Final tip for the newbie: there's no separate command for creating a new node!  Reuse one of the commands above, and type the name of a node that doesn't exist.
 
-*** Use Org-roam at the same time?
+** Use Org-roam at the same time?
 
 These user options help you feel at home using both packages side-by-side:
 
@@ -98,7 +96,7 @@ These user options help you feel at home using both packages side-by-side:
 (setq org-node-slug-fn #'org-node-slugify-like-roam)
 #+end_src
 
-Also, either run =M-x org-roam-id-update-id-locations=, or add your =org-roam-directory= to the following variable.  Ideally org-id would manage itself, but it's a backup system.
+Also, either run =M-x org-roam-id-update-id-locations=, or edit the following variable to include =org-roam-directory=.  Ideally org-id would manage itself, but it doesn't do it super-well, and this is insurance.
 
 #+begin_src elisp
 (setq org-node-extra-id-dirs '("~/org/")) ;; ... assuming that's your org-roam-directory
@@ -230,9 +228,9 @@ How to see the headings' full outline paths while searching for nodes:
           title)))
 #+end_src
 
-When tinkering with this expression, test the result by evalling the form and doing a =M-x org-node-reset=.
+(When tinkering with this expression, test the result by evalling the form and doing a =M-x org-node-reset=.)
 
-A variant I like, that greys out the ancestor headings, and includes the file title:
+A variant I like, that greys out the ancestor headings and includes the file title:
 
 #+begin_src elisp
 (setq org-node-format-candidate-fn
@@ -251,9 +249,9 @@ A variant I like, that greys out the ancestor headings, and includes the file ti
 
 
 *** Limitation: excluding notes
-The =org-node-filter-fn= works well for ignoring TODO items that happen to have an ID, and ignoring org-drill items and that sort of thing, but beyond that, it has limited utility because unlike org-roam, *child ID nodes of an excluded node are not excluded!*
+The option =org-node-filter-fn= works well for ignoring TODO items that happen to have an ID, and ignoring org-drill items and that sort of thing, but beyond that, it has limited utility because unlike org-roam, *child ID nodes of an excluded node are not excluded!*
 
-So let's say you have a big archive file, fulla IDs, and you want to exclude all of it.  Putting a =:ROAM_EXCLUDE: t= at the top won't do it.  As it stands, what I'd suggest is unfortunately, look at the file name.
+So let's say you have a big archive file, fulla IDs, and you want to exclude all of them from the minibuffer completions.  Putting a =:ROAM_EXCLUDE: t= at the top won't do it.  As it stands, what I'd suggest is unfortunately, look at the file name.
 
 While the point of org-id is to avoid dependence on filenames, it's often pragmatic to let up on purism just a bit :-) It works well for me to filter out any file or directory that happens to contain "archive" in the name, via the last line here:
 
@@ -267,6 +265,8 @@ While the point of org-id is to avoid dependence on filenames, it's often pragma
 #+end_src
 
 *** Toolbox
+
+Commands:
 
 - =org-node-find=
 - =org-node-insert-link=
