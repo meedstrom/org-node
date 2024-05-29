@@ -64,7 +64,7 @@
       (read-directory-name (prompt))
     (if (stringp org-node-ask-directory)
         org-node-ask-directory
-      (car (org-node--root-dirs (org-node-files))))))
+      (car (org-node--root-dirs (org-node-files t))))))
 
 (defun org-node-convert-link-to-super (&rest _)
   "Wrapper for `org-super-links-convert-link-to-super'."
