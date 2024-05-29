@@ -5,13 +5,13 @@ I found org-roam too slow, so I made [[https://github.com/meedstrom/quickroam][q
 
 - *If you were using org-roam*, there is nothing to migrate.  You can use both packages.  It's exactly the same on-disk format: "notes" are identified by their org-id.
 
-  With optional shims, you can even *skip syncing the org-roam DB* but still use its rich backlinks buffer and org-roam-capture!
+  With optional shims, you can even *skip syncing the org-roam DB* and continue using its rich backlinks buffer and org-roam-capture!
 
   In pursuit of being "just org-id", this package has no equivalent setting to =org-roam-directory= -- it just looks up =org-id-locations=.
 
 - *If you were not using org-roam*, maybe think of it as a limited, focused [[https://github.com/alphapapa/org-ql][org-ql]].  If you were the sort of person to prefer ID-links over file links or any other type of link, you're in the right place!  Now you can rely on IDs, and forget about filenames and hierarchies and directory structures -- as long as you've assigned an ID to something, you can find it later.
 
-  And you can still keep doing hierarchies and structures, where that brings you joy, unlike systems that mandate limitations like "one note per file".
+  And you can still keep doing subtree hierarchies, where that brings you joy, unlike systems that mandate limitations like "one note per file".
 
 ** What's a "node"?
 
@@ -19,7 +19,7 @@ My life can be divided into two periods "*before org-roam*" and "*after org-roam
 
 # I used to lose track of things I had written only to rediscover them years later, buried under some deeply nested heading.  The org-roam method made it easier to actually *build on my own work*.
 
-At the core, all the "notetaking packages" (orgrr/zk/deft/org-roam/denote/...) try to help you with this: make it easy to link between notes and easy to explore.
+At the core, all the "notetaking packages" (orgrr/zk/deft/org-roam/denote/...) try to help you with this: make it easy to link between notes.
 
 Right off the bat, that imposes two requirements: a method to search for notes, since you can't link to something you can't search for, and a design-philosophy about exactly what kinds of things should turn up as search hits.
 
@@ -96,7 +96,7 @@ These user options help you feel at home using both packages side-by-side:
 (setq org-node-slug-fn #'org-node-slugify-like-roam)
 #+end_src
 
-Also, either run =M-x org-roam-id-update-id-locations=, or edit the following variable to include =org-roam-directory=.  Ideally org-id would manage itself, but it doesn't do it super-well, and this is insurance.
+Also, either run =M-x org-roam-update-org-id-locations=, or edit the following option so it includes your =org-roam-directory=.  Ideally org-id would manage itself, but it doesn't do it super-well, and this is insurance.
 
 #+begin_src elisp
 (setq org-node-extra-id-dirs '("~/org/")) ;; ... assuming that's your org-roam-directory
@@ -109,7 +109,7 @@ If you've been struggling with slow saving of big files in the past, consider th
 (setq org-roam-link-auto-replace nil) ;; don't look for "roam:" links on save
 #+end_src
 
-With that done, try out the commands mentioned in [[https://github.com/meedstrom/org-node?tab=readme-ov-file#quick-start][Quick start]].  There's more under [[https://github.com/meedstrom/org-node?tab=readme-ov-file#toolbox][Toolbox]].  Enjoy!
+With that done, try out the commands already mentioned in [[https://github.com/meedstrom/org-node?tab=readme-ov-file#quick-start][Quick start]].  There's more under [[https://github.com/meedstrom/org-node?tab=readme-ov-file#toolbox][Toolbox]].  Enjoy!
 
 If you also want the org-roam-buffer, see the next section.
 
