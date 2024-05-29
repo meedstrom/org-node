@@ -307,11 +307,10 @@ being renamed at once."
       ;;       for one process to take noticeably longer because there's a
       ;;       mega-file among them.
       (let ((print-length nil)
-            (file-lists (org-node--split-into-n-sublists
-                         (or files (org-node-files))
-                         ;; (or files (org-node-files t))
-                         org-node-cache--jobs)))
-        (delq nil file-lists)
+            (print-level nil)
+            (file-lists (delq nil (org-node--split-into-n-sublists
+                                   (or files (org-node-files))
+                                   org-node-cache--jobs))))
         ;; If user has e.g. 8 cores but only 5 files, run only 5 jobs
         (setq org-node-cache--jobs
               (min org-node-cache--jobs (length file-lists)))
