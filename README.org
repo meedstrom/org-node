@@ -113,7 +113,7 @@ With that done, try out the commands mentioned in [[https://github.com/meedstrom
 
 If you also want the org-roam-buffer, see the next section.
 
-** Backlink solution 1: org-roam-buffer
+** Backlink solution 1: borrowing org-roam's backlink buffer
 
 Want to keep using =M-x org-roam-buffer-toggle=?
 
@@ -145,7 +145,7 @@ Yes, it's possible!
             #'org-node--fabricate-roam-reflinks)
 #+end_src
 
-** Backlink solution 2: inside the file
+** Backlink solution 2: printed inside the file
 I like these solutions because I rarely have the screen space to display a backlink buffer.
 
 **** *Option 2A*.  Let org-node add a =:BACKLINKS:= property to all nodes.
@@ -249,9 +249,9 @@ A variant I like, that greys out the ancestor headings and includes the file tit
 
 
 *** Limitation: excluding notes
-The option =org-node-filter-fn= works well for ignoring TODO items that happen to have an ID, and ignoring org-drill items and that sort of thing, but beyond that, it has limited utility because unlike org-roam, *child ID nodes of an excluded node are not excluded!*
+The option =org-node-filter-fn= works well for excluding TODO items that happen to have an ID, and excluding org-drill items and that sort of thing, but beyond that, it has limited utility because unlike org-roam, *child ID nodes of an excluded node are not excluded!*
 
-So let's say you have a big archive file, fulla IDs, and you want to exclude all of them from the minibuffer completions.  Putting a =:ROAM_EXCLUDE: t= at the top won't do it.  As it stands, what I'd suggest is unfortunately, look at the file name.
+So let's say you have a big archive file, fulla IDs, and you want to exclude all of them from appearing as search hits.  Putting a =:ROAM_EXCLUDE: t= at the top won't do it.  As it stands, what I'd suggest is unfortunately, look at the file name.
 
 While the point of org-id is to avoid dependence on filenames, it's often pragmatic to let up on purism just a bit :-) It works well for me to filter out any file or directory that happens to contain "archive" in the name, via the last line here:
 
