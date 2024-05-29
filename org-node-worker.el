@@ -109,34 +109,38 @@ that will match any of the keywords."
 
 (defun org-node-worker--next-heading ()
   "Like `outline-next-heading'."
-  ;; Prevent matching the same line forever
   (if (and (bolp) (not (eobp)))
+      ;; Prevent matching the same line forever
       (forward-char))
   (if (re-search-forward "^\\*+ " nil 'move)
       (goto-char (pos-bol))))
 
 (defvar org-node-worker--demands nil
-  "Alist of functions and arguments to execute.
+  "Alist of functions and arguments to execute in the main Emacs.
 
-With `org-node-perf-multicore' non-nil, each subprocess builds
-its own instance of this variable and then writes it to a file
-for reading by the mother Emacs process.")
+Each subprocess builds its own instance of this variable and then
+writes it to a file for reading by the mother Emacs process.")
 
 (defun org-node-worker--collect-links-until (end id-here olp-with-self link-re)
   "From here to buffer position END, look for forward-links.
-Use these links to populate tables `org-node--links-table' and
-`org-node--reflinks-table'.
+Ensure these links will be used to populate tables
+`org-node--links-table' and `org-node--reflinks-table' in the
+main Emacs process.
 
-Argument ID-HERE is the ID of the subtree where this function
-will presumably be executed (or that of an ancestor subtree, if
-the current subtree has none).
+Argument ID-HERE is the ID of the subtree where this function is
+being executed (or that of an ancestor subtree, if the current
+subtree has none), and will be put in each link's metadata.
 
 It is important that END does not extend past any sub-heading, as
 the subheading potentially has an ID of its own.
 
 Argument OLP-WITH-SELF is the outline path to the current
 subtree, with its own heading tacked onto the end.  This is data
-that org-roam expects to have."
+that org-roam expects to have.
+
+Argument LINK-RE is expected to be the value of
+`org-link-plain-re', passed in this way only so that the child
+process does not have to load org.el."
   (while (re-search-forward
           ;; NOTE: There was a hair-pulling bug here because I pasted the
           ;; evalled value of `org-link-plain-re', but whitespace cleaners
@@ -200,8 +204,9 @@ that org-roam expects to have."
           ;; Perf
           (file-name-handler-alist $file-name-handler-alist)
           (gc-cons-threshold $gc-cons-threshold)
-          ;; REVIEW: reading source for `recover-file', it sounds like the coding
-          ;; system for read can affect the system for write?
+          ;; REVIEW: reading source for `recover-file', it sounds like the
+          ;; coding system for read can affect the system for write? If so, how
+          ;; to pick a sane system for write?
           (coding-system-for-read $assume-coding-system)
           ;; Reassigned on every iteration, so may as well re-use the memory
           ;; locations (hopefully producing less garbage) instead of making a
@@ -213,33 +218,34 @@ that org-roam expects to have."
       (dolist (FILE $files)
         (if (not (file-exists-p FILE))
             ;; We got here because user deleted a file in a way that we didn't
-            ;; notice.  If it was actually a rename, it'll get picked up on
-            ;; next reset.
+            ;; notice.  If it was actually a rename done outside Emacs, it'll
+            ;; get picked up on next reset.
             ;; TODO: Schedule a targeted caching of any new files that appeared
             ;; in `org-node-files' output
             (push `(org-node--forget-id-location ,FILE)
                   org-node-worker--demands)
           (erase-buffer)
-          ;; NOTE: Used `insert-file-contents-literally' in the past,
+          ;; NOTE: Here I used `insert-file-contents-literally' in the past,
           ;; converting each captured substring afterwards with
-          ;; `decode-coding-string', but it still made us record the wrong
-          ;; value for POS when there was any Unicode in the file.  So
-          ;; instead, the let-bindings above reproduce much of the perf.
+          ;; `decode-coding-string', but it still made us record wrong values
+          ;; for POS when there was any Unicode in the file.  So instead, the
+          ;; above let-bindings for coding system etc regain much of the
+          ;; performance that it had.
           (insert-file-contents FILE)
           ;; Verify there is at least one ID-node, otherwise skip file
           (when (re-search-forward "^[[:space:]]*:id: " nil t)
-            (goto-char (point-min))
+            (goto-char 1)
             (setq OUTLINE-DATA nil)
             ;; Roughly like `org-end-of-meta-data' for file level
             (setq FAR (or (re-search-forward "^ *?[^#:]" nil t) (point-max)))
             (goto-char 1)
             (setq PROPS
-                  (if (re-search-forward "^ *:properties:" FAR t)
+                  (if (re-search-forward "^[[:space:]]*:properties:" FAR t)
                       (progn
                         (forward-line 1)
                         (prog1 (org-node-worker--collect-properties
                                 (point)
-                                (if (re-search-forward "^ *:end:" nil t)
+                                (if (re-search-forward "^[[:space:]]*:end:" nil t)
                                     (pos-bol)
                                   (error "Couldn't find matching :END: drawer in file %s at position %d"
                                          FILE (point)))
@@ -297,6 +303,7 @@ that org-roam expects to have."
                              (split-string-and-unquote
                               (or (cdr (assoc "ROAM_REFS" PROPS)) ""))))
                     org-node-worker--demands))
+
             ;; Loop over the file's subtrees
             (while (org-node-worker--next-heading)
               (setq POS (point))
@@ -321,14 +328,15 @@ that org-roam expects to have."
               ;; Now we must be careful.  Imagine this subtree is just a
               ;; heading, empty of content, and the very next line is another
               ;; heading.  Gotta go forward 1 line, see if it is a
-              ;; planning-line (i.e. not a heading), and if it is, then go
-              ;; forward 1 more line, and if that is a :PROPERTIES: line, then
-              ;; we know it belongs to the current subtree.  If we had just
-              ;; allowed the search for :PROPERTIES: to cross 2 lines, we could
-              ;; have matched a property drawer for the wrong heading.  Of
-              ;; course `with-restriction' could guard us against this kind of
-              ;; thing, but with this algorithm as solid as it is, that'd be a
-              ;; superfluous instruction.
+              ;; planning-line, and if it is, then go forward 1 more line, and
+              ;; if that is a :PROPERTIES: line, then we know it belongs to the
+              ;; current subtree.  If we had just allowed the search for
+              ;; :PROPERTIES: to cross 2 lines, we could have matched a
+              ;; property drawer for the wrong heading.  Of course
+              ;; `narrow-to-region' could guard us against this kind of thing,
+              ;; but with this algorithm as solid as it is now, that'd be a
+              ;; superfluous instruction that just increases the amount of
+              ;; large point motions.
               (forward-line 1)
               (setq HERE (point))
               (setq FAR (pos-eol))
@@ -404,8 +412,9 @@ that org-roam expects to have."
                                 (or (cdr (assoc "ROAM_REFS" PROPS)) ""))))
                       org-node-worker--demands))
               ;; Now collect links while we're here!
-              ;; REVIEW: Oddly, the number of ID-links changes when we do a
-              ;; save-restriction and narrow to a subtree at a time
+              ;; REVIEW: Oddly, the number of ID-links drops somewhat when I do
+              ;; a save-restriction and narrow to a subtree at a time. Why
+              ;; might that be?
               (let ((ID-HERE (or ID (org-node-worker--pos->parent-id
                                      OUTLINE-DATA POS FILE-ID)))
                     (END (save-excursion
@@ -426,7 +435,8 @@ that org-roam expects to have."
                   (org-node-worker--collect-links-until
                    (pos-eol) ID-HERE OLP-WITH-SELF $link-re)))))))
       (with-temp-file (org-node-worker--tmpfile "demands-%d.eld" i)
-        (let ((print-length nil))
+        (let ((print-length nil)
+              (print-level nil))
           (insert (prin1-to-string org-node-worker--demands)))))))
 
 (provide 'org-node-worker)
