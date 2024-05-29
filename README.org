@@ -33,26 +33,27 @@ Once a subtree has an ID you can link to, it's a "node" because it has joined th
 
 For your pleasure, here's a comparison of three similar notetaking systems: all permitting org-id as first-class citizen and not locking you into an "one-note-per-file" concept.
 
-|                                   | org-roam    | org-node           | [[https://github.com/toshism/org-super-links][org-super-links]]     |
-|-----------------------------------+-------------+--------------------+---------------------|
-| Backlinks                         | yes         | yes                | yes                 |
+|                                   | org-roam    | org-node           | [[https://github.com/toshism/org-super-links][org-super-links]]      |
+|-----------------------------------+-------------+--------------------+----------------------|
+| Backlinks                         | yes         | yes                | yes                  |
 | Node search and insert            | yes         | yes                | -- (suggests org-ql) |
-| Node aliases                      | yes         | yes                | not applicable      |
+| Node aliases                      | yes         | yes                | not applicable       |
 | Rich backlinks buffer             | yes         | yes (org-roam's)   | --                   |
 | Reflinks                          | yes         | yes (as backlinks) | --                   |
 | Ref search                        | yes         | yes (as aliases)   | --                   |
 | Extract subtree to new file       | yes         | yes                | --                   |
-| Can configure rich completions    | yes         | yes                | not applicable      |
+| Can configure rich completions    | yes         | yes                | not applicable       |
 | org-roam-capture integration      | yes         | yes                | --                   |
-| org-capture integration           | --           | yes                | --                   |
-| Backlinks in same window          | --           | yes                | yes                 |
-| Avoid double-counting :BACKLINKS: | --           | yes                | yes                 |
-| Node exclusion                    | yes         | limited            | not applicable      |
-| Support =roam:= links               | yes         | --                  | --                   |
-|-----------------------------------+-------------+--------------------+---------------------|
+| org-capture integration           | --          | yes                | --                   |
+| Backlinks in same window          | --          | yes                | yes                  |
+| Avoid double-counting :BACKLINKS: | --          | yes                | yes                  |
+| Node exclusion                    | yes         | limited            | not applicable       |
+| Support =roam:= links               | yes         | --                 | --                   |
+| Support roam citations ([[https://github.com/meedstrom/org-node/issues/6][#6]])       | yes         | --                 | --                   |
+|-----------------------------------+-------------+--------------------+----------------------|
 | Some query-able cache             | =org-roam-db= | =org-nodes=          | --                   |
-| Asynchronous caching              | --           | yes                | yes, very async ;)  |
-| Time to re-cache my 2000 files    | 2m 48s      | 0m 02s             | not applicable      |
+| Asynchronous caching              | --          | yes                | yes, very async ;)   |
+| Time to re-cache my 2000 files    | 2m 48s      | 0m 02s             | not applicable       |
 
 ** Setup
 
@@ -66,9 +67,7 @@ Add an init snippet like this (assuming [[https://github.com/radian-software/str
 
 ** Quick start
 
-If you're new to these concepts, fear not.  The main things for day-to-day operation are two commands: "find" and "insert-link".
-
-# (OK if you love [[https://github.com/meedstrom/org-node?tab=readme-ov-file#org-capture][org-capture]], you might end up using that a lot too, but you know who you are.)
+If you're new to these concepts, fear not.  The main things for day-to-day operation are two verbs: "find" and "insert-link".
 
 Pick some good keys and try them out, and you can come back to this README later---or never.
 
@@ -79,7 +78,7 @@ The keys I use:
 (global-set-key (kbd "<f2> i") #'org-node-insert-link)
 #+end_src
 
-(I like F2, but if you don't, maybe M-s?)
+(If you don't like F2, maybe M-s?)
 
 #+begin_src elisp
 (global-set-key (kbd "M-s f") #'org-node-find)
@@ -256,13 +255,13 @@ The =org-node-filter-fn= works well for ignoring TODO items that happen to have 
 
 So let's say you have a big archive file, fulla IDs, and you want to exclude all of it.  Putting a =:ROAM_EXCLUDE: t= at the top won't do it.  As it stands, what I'd suggest is unfortunately, look at the file name.
 
-The point of org-id is to avoid dependence on filenames, but it's often pragmatic to let up on purism just a bit :-) It works well for me to filter out any file or directory that happens to contain "archive" in the name:
+While the point of org-id is to avoid dependence on filenames, it's often pragmatic to let up on purism just a bit :-) It works well for me to filter out any file or directory that happens to contain "archive" in the name, via the last line here:
 
 #+begin_src elisp
 (setq org-node-filter-fn
       (lambda (node)
         (not (or (org-node-get-todo node) ;; Ignore headings with todo state
-                 (member "drill" (org-node-get-tags node))
+                 (member "drill" (org-node-get-tags node)) ;; Ignore :drill:
                  (assoc "ROAM_EXCLUDE" (org-node-get-properties node))
                  (string-search "archive" (org-node-get-file-path node))))))
 #+end_src
@@ -273,8 +272,6 @@ The point of org-id is to avoid dependence on filenames, but it's often pragmati
 - =org-node-insert-link=
 - =org-node-insert-transclusion=
 - =org-node-insert-transclusion-as-subtree=
-- =org-node-extract-subtree=
-  - A bizarro counterpart to =org-roam-extract-subtree=.  Export a subtree at point into a file-level node, leave a link where it was, and show the new file as the current buffer.
 - =org-node-rename-file-by-title=
   - Auto-rename the file based on the current =#+title=
 - =org-node-rewrite-links-ask=
@@ -282,6 +279,8 @@ The point of org-id is to avoid dependence on filenames, but it's often pragmati
 - =org-node-rename-asset-and-rewrite-links=
   - Interactively rename an asset such as an image file and try to update all Org links to them.  Requires [[https://github.com/mhayashi1120/Emacs-wgrep][wgrep]].
     - NOTE: For now, it only looks for links inside the root directory that it prompts you for, and sub and sub-subdirectories and so on -- but won't find a link in a completely different place.  Like if you have Org files under /media linking to assets in /home, those links won't be updated.
+- =org-node-extract-subtree=
+  - A bizarro counterpart to =org-roam-extract-subtree=.  Export a subtree at point into a file-level node, leave a link where it was, and show the new file as the current buffer.
 - =org-node-random=
   - Visit a random node
 - =org-node-nodeify-entry=
@@ -289,7 +288,7 @@ The point of org-id is to avoid dependence on filenames, but it's often pragmati
 - =org-node-insert-heading=
   - (Trivial) Insert a new heading with an ID (and run org-node-creation-hook)
 - =org-node-backlink-fix-all=
-  - Add =BACKLINKS= property to every node everywhere (takes a while)
+  - Add =BACKLINKS= property to all nodes everywhere (takes a while)
 - =org-node-backlink-regret=
   - In case you regret the =BACKLINKS= properties -- remove them all
 
@@ -303,11 +302,11 @@ API comparison between org-roam and org-node.
 | Get node at point                       | =(org-roam-node-at-point)=           | =(org-node-at-point)=                                                                     |
 | Get list of files                       | =(org-roam-list-files)=              | =(org-node-files)=                                                                        |
 | Prompt user to pick a node              | =(org-roam-node-read)=               | =(org-node-read)=                                                                         |
-| Get backlink objects                    | =(org-roam-backlinks-get NODE)=      | =(gethash (org-node id NODE) org-node--links-table)=                                      |
-| Get reflink objects                     | =(org-roam-reflinks-get NODE)=       | =(gethash (org-node id NODE) org-node--reflinks-table)=                                   |
+| Get backlink objects                    | =(org-roam-backlinks-get NODE)=      | =(gethash (org-node-get-id NODE) org-node--links-table)=                                  |
+| Get reflink objects                     | =(org-roam-reflinks-get NODE)=       | =(gethash (org-node-get-id NODE) org-node--reflinks-table)=                               |
 | Get title                               | =(org-roam-node-title NODE)=         | =(org-node-get-title NODE)=                                                               |
 | Get title of file where NODE is         | =(org-roam-node-file-title NODE)=    | =(org-node-get-file-title NODE)=                                                          |
-| Get title /or/ name of file where NODE is |                                    | =(org-node-get-file-title-or-basename NODE)=                                            |
+| Get title /or/ name of file where NODE is |                                    | =(org-node-get-file-title-or-basename NODE)=                                              |
 | Get ID                                  | =(org-roam-node-id NODE)=            | =(org-node-get-id NODE)=                                                                  |
 | Get filename                            | =(org-roam-node-file NODE)=          | =(org-node-get-file-path NODE)=                                                           |
 | Get tags                                | =(org-roam-node-tags NODE)=          | =(org-node-get-tags NODE)=, no inherited tags                                             |
