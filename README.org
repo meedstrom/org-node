@@ -17,9 +17,9 @@ I found org-roam too slow, so I made [[https://github.com/meedstrom/quickroam][q
 
 My life can be divided into two periods "*before org-roam*" and "*after org-roam*".  I crossed a kind of gap once I got a good way to link between my notes.  It's odd to remember when I just relied on browsing hierarchies of subtrees -- what a strange way to do things!
 
-I used to lose track of things I had written only to rediscover them years later, buried under some deeply nested heading.  The org-roam method made it easier to actually *build on my own work*.
+# I used to lose track of things I had written only to rediscover them years later, buried under some deeply nested heading.  The org-roam method made it easier to actually *build on my own work*.
 
-At the core, all the "notetaking packages" (orgrr/zk/deft/org-roam/denote/...) try to help you with this: make it easy to link between notes /and/ make them easy to explore.
+At the core, all the "notetaking packages" (orgrr/zk/deft/org-roam/denote/...) try to help you with this: make it easy to link between notes and easy to explore.
 
 Right off the bat, that imposes two requirements: a method to search for notes, since you can't link to something you can't search for, and a design-philosophy about exactly what kinds of things should turn up as search hits.
 
@@ -140,7 +140,7 @@ For a full reset, equivalent to =C-u M-x org-roam-db-sync=, you can type =M-x or
 
 **** *Option 1C*.  Cut out the DB altogether.
 
-Have some hax:
+Yes, it's possible!
 
 #+begin_src elisp
 (advice-add 'org-roam-backlinks-get :override
