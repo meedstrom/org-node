@@ -308,7 +308,8 @@ being renamed at once."
       ;;       mega-file among them.
       (let ((print-length nil)
             (file-lists (org-node--split-into-n-sublists
-                         (or files (org-node-files t))
+                         (or files (org-node-files))
+                         ;; (or files (org-node-files t))
                          org-node-cache--jobs)))
         (delq nil file-lists)
         ;; If user has e.g. 8 cores but only 5 files, run only 5 jobs
