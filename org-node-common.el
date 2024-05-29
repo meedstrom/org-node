@@ -63,13 +63,13 @@ encountered.  With fewer members in this list, `org-node-reset'
 can work faster."
   :group 'org-node
   :type '(choice (const :tag "Keep all" t)
-                 (set
-                  (function-item jka-compr-handler)
-                  (function-item epa-file-handler)
-                  (function-item tramp-file-name-handler)
-                  (function-item tramp-completion-file-name-handler)
-                  (function-item tramp-archive-file-name-handler)
-                  (function-item file-name-non-special))))
+          (set
+           (function-item jka-compr-handler)
+           (function-item epa-file-handler)
+           (function-item tramp-file-name-handler)
+           (function-item tramp-completion-file-name-handler)
+           (function-item tramp-archive-file-name-handler)
+           (function-item file-name-non-special))))
 
 (defcustom org-node-perf-gc-cons-threshold nil
   "Temporary override for `gc-cons-threshold'.
@@ -354,20 +354,16 @@ first element."
        finally return (mapcar #'car (cl-sort dir-counters #'> :key #'cdr))))))
 
 (defun org-node--split-into-n-sublists (big-list n)
-  "Split BIG-LIST into a list of N sublists.
-
-In the special case where BIG-LIST contains fewer than N
-elements, the return value is still N items, where some are nil."
+  "Split BIG-LIST into a list of N sublists."
   (let ((len (/ (length big-list) n))
         res)
     (dotimes (i n)
-      (push
-       (if (= i (- n 1))
-           ;; Let the last iteration just take what's left
-           big-list
-         (prog1 (take len big-list)
-           (setq big-list (nthcdr len big-list))))
-       res))
+      (let ((sublist (if (= i (- n 1))
+                         ;; Let the last iteration just take what's left
+                         big-list
+                       (prog1 (take len big-list)
+                         (setq big-list (nthcdr len big-list))))))
+        (when sublist (push sublist res))))
     res))
 
 ;; REVIEW deprecate?

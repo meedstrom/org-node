@@ -11,13 +11,13 @@ I found org-roam too slow, so I made [[https://github.com/meedstrom/quickroam][q
 
 - *If you were not using org-roam*, maybe think of it as a limited, focused [[https://github.com/alphapapa/org-ql][org-ql]].  If you were the sort of person to prefer ID-links over file links or any other type of link, you're in the right place!  Now you can rely on IDs, and forget about filenames and hierarchies and directory structures -- as long as you've assigned an ID to something, you can find it later.
 
-  And you can still keep doing subtree hierarchies, where that brings you joy, unlike systems that mandate limitations like "one note per file".
+  And you can still keep doing hierarchies, where that brings you joy, unlike systems that mandate limitations like "one note per file".
 
 ** What's a "node"?
 
 My life can be divided into two periods "*before org-roam*" and "*after org-roam*".  I crossed a kind of gap once I got a good way to link between my notes.  It's odd to remember when I just relied on browsing hierarchies of subtrees -- what a strange way to do things!
 
-# I used to lose track of things I had written only to rediscover them years later, buried under some deeply nested heading.  The org-roam method made it easier to actually *build on my own work*.
+I used to lose things I had written, buried under some forgotten heading in a forgotten file in a forgotten directory.  The org-roam method let me *find and build on my own work*, instead of repeating [[https://en.wikipedia.org/wiki/Cryptomnesia][cryptomnesia]] on square one forever.
 
 At the core, all the "notetaking packages" (orgrr/zk/deft/org-roam/denote/...) try to help you with this: make it easy to link between notes.
 
@@ -166,6 +166,8 @@ I /think/ the following should work. Totally untested, let me know!
 #+begin_src elisp
 (add-hook 'org-node-insert-link-hook #'org-node-convert-link-to-super)
 #+end_src
+
+Alas, this is mainly directed towards people were already using org-super-links (... or people who just now started assigning org-ids), as there is not yet a bulk command to add drawers to all nodes. ([[https://github.com/toshism/org-super-links/issues/93][Issue 93]])
 
 ** Misc
 *** Org-capture
