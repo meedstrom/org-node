@@ -250,7 +250,7 @@ Finally:
   BODY, keep it open and save any changes.
 - If a buffer had been open, and modified, keep it open and leave
   it unsaved."
-  (declare (indent 1))
+  (declare (indent 1) (debug t))
   ;; REVIEW: do these perf hacks or don't?
   `(let ((find-file-hook nil)
          (after-save-hook nil)

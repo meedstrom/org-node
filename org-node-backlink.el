@@ -130,6 +130,13 @@ Update the :BACKLINKS: property.  With arg REMOVE, remove it instead."
                 (org-entry-put nil "BACKLINKS" link-string))
             (org-entry-delete nil "BACKLINKS")))))))
 
+(defun org-node-backlink--flag-change (beg end _)
+  "Propertize changed text, for use by `org-node-backlink-mode'.
+Designed to run on `after-change-functions'."
+  (when (derived-mode-p 'org-mode)
+    (with-silent-modifications
+      (put-text-property beg end 'org-node-chg t))))
+
 ;; TODO: Allow narrowing to have an effect, i.e. don't use
 ;; `without-restriction'.  Problem is that org-entry-get will get an ID outside
 ;; the region (good).  And that ID can be inherited, so we cannot just narrow
@@ -144,48 +151,52 @@ Update the :BACKLINKS: property.  With arg REMOVE, remove it instead."
     (condition-case err
         (save-excursion
           (without-restriction
-            ;; Iterate over each change-region, algorithm borrowed from
-            ;; `ws-butler-map-changes'. Odd, but elegant.  Worth knowing that if
+            ;; Iterate over each change-region.  Algorithm borrowed from
+            ;; `ws-butler-map-changes', odd but elegant.  Worth knowing that if
             ;; you tell Emacs to search for text that has a given text-property
             ;; with a nil value, that's the same as searching for text without
-            ;; that property at all.  So if START is in some unmodified territory
-            ;; - "org-node-chg" is valued at nil - this usage of
-            ;; `text-property-not-all' means search until it is t.  Then the
-            ;; opposite happens, to search until it is nil again.
-            (let ((start (point-min))
-                  prop end)
+            ;; that property at all.  So if START is in some unmodified
+            ;; territory -- "org-node-chg" is valued at nil -- this way of
+            ;; calling `text-property-not-all' means search until it is t.
+            ;; Then the opposite happens, to search until it is nil again.
+            (let ((start (point-min-marker))
+                  (end (make-marker))
+                  (case-fold-search t)
+                  prop)
               (while (and start (< start (point-max)))
                 (setq prop (get-text-property start 'org-node-chg))
-                (setq end (text-property-not-all
-                           start (point-max) 'org-node-chg prop))
+                (set-marker end (or (text-property-not-all start
+                                                           (point-max)
+                                                           'org-node-chg
+                                                           prop)
+                                    (point-max)))
                 (when prop
                   (goto-char start)
-                  (let ((case-fold-search t))
-                    ;; START and END delineate an area where changes were
-                    ;; detected, but the area rarely envelops the current
-                    ;; subtree's property drawer, likely placed long before
-                    ;; START, so search back for it
-                    (save-excursion
-                      (let ((id-here (org-entry-get nil "ID" t)))
-                        (and id-here
-                             ;; This search can fail because buffer is narrowed
-                             (re-search-backward
-                              (concat "^[[:space:]]*:id: *"
-                                      (regexp-quote id-here))
-                              nil t)
-                             (re-search-forward ":id: *" (pos-eol))
-                             (org-node-backlink--update-subtree-here))))
-                    ;; ...and if the change-area is massive, spanning multiple
-                    ;; subtrees, update each one
-                    (while (and (< (point) (or end (point-max)))
-                                (re-search-forward "^[[:space:]]*:id: " end t))
-                      (org-node-backlink--update-subtree-here))))
+                  ;; START and END delineate an area where changes were
+                  ;; detected, but the area rarely envelops the current
+                  ;; subtree's property drawer, likely placed long before
+                  ;; START, so search back for it
+                  (save-excursion
+                    (let ((id-here (org-entry-get nil "ID" t)))
+                      (and id-here
+                           ;; This search can fail if buffer is narrowed
+                           (re-search-backward
+                            (concat "^[[:space:]]*:id: *"
+                                    (regexp-quote id-here))
+                            nil t)
+                           (re-search-forward ":id: *" (pos-eol))
+                           (org-node-backlink--update-subtree-here))))
+                  ;; ...and if the change-area is massive, spanning multiple
+                  ;; subtrees, update each one
+                  (while (and (< (point) end)
+                              (re-search-forward
+                               "^[[:space:]]*:id: " end t))
+                    (org-node-backlink--update-subtree-here))
+                  (remove-text-properties start end 'org-node-chg))
                 ;; Move on and seek the next changed area
-                (remove-text-properties start (if end
-                                                  (min end (point-max))
-                                                (point-max))
-                                        'org-node-chg)
-                (setq start end)))))
+                (set-marker start (marker-position end)))
+              (set-marker start nil)
+              (set-marker end nil))))
       (( error debug )
        (if debug-on-error
            (signal (car err) (cdr err))
@@ -194,13 +205,6 @@ Update the :BACKLINKS: property.  With arg REMOVE, remove it instead."
       (( user-error debug )
        (lwarn 'org-node :error
               "org-node-backlink--update-changed-parts-of-buffer: %S" err)))))
-
-(defun org-node-backlink--flag-change (beg end _)
-  "Propertize changed text, for use by `org-node-backlink-mode'.
-Designed to run on `after-change-functions'."
-  (when (derived-mode-p 'org-mode)
-    (with-silent-modifications
-      (put-text-property beg end 'org-node-chg t))))
 
 
 ;;; Link-insertion advice
@@ -246,7 +250,7 @@ Does NOT try to validate the rest of the target's backlinks."
 
 (defun org-node-backlink--add-in-target-1 (target-file target-id)
   (let ((case-fold-search t)
-        (src-id (org-id-get nil nil nil t)))
+        (src-id (org-entry-get nil "ID" t)))
     (if (not src-id)
         (message "Unable to find ID in file, so it won't get backlinks: %s"
                  (buffer-file-name))
@@ -255,7 +259,7 @@ Does NOT try to validate the rest of the target's backlinks."
                           (or (org-get-heading t t t t)
                               (org-get-title)
                               (file-name-nondirectory (buffer-file-name)))))
-             (src-link (concat "[[id:" src-id "][" src-title "]]")))
+             (src-link (org-link-make-string (concat "id:" src-id) src-title)))
         (org-node--with-file target-file
           (let ((otm (bound-and-true-p org-transclusion-mode)))
             (when otm (org-transclusion-mode 0))
@@ -264,32 +268,34 @@ Does NOT try to validate the rest of the target's backlinks."
                       (concat "^[ \t]*:id: +" (regexp-quote target-id))
                       nil t))
                 (push target-id org-node-backlink--fails)
-              (let ((backlinks-string (org-entry-get nil "BACKLINKS"))
-                    new-value)
-                (if backlinks-string
-                    ;; Build a temp list to check we don't add the same link
-                    ;; twice. To use the builtin
-                    ;; `org-entry-add-to-multivalued-property', the link
-                    ;; descriptions would have to be free of spaces.
-                    (let ((ls (split-string (replace-regexp-in-string
-                                             "]][[:space:]]+\\[\\["
-                                             "]]\f[["
-                                             (string-trim backlinks-string))
-                                            "\f" t)))
-                      (dolist (id-dup (--filter (string-search src-id it) ls))
-                        (setq ls (remove id-dup ls)))
-                      (push src-link ls)
-                      (when (-any-p #'null ls)
-                        (org-node-die "nulls in %S" ls))
-                      ;; Prevent unnecessary work like putting the most recent
-                      ;; link in front even if it was already in the list
-                      (sort ls #'string-lessp)
-                      ;; Two spaces between links help them look distinct
-                      (setq new-value (string-join ls "  ")))
-                  (setq new-value src-link))
-                (unless (equal backlinks-string new-value)
-                  (org-entry-put nil "BACKLINKS" new-value))
-                (when otm (org-transclusion-mode))))))))))
+              (org-node-backlink--add-here src-link src-id)
+              (when otm (org-transclusion-mode)))))))))
+
+(defun org-node-backlink--add-here (src-link src-id)
+  (let ((backlinks-string (org-entry-get nil "BACKLINKS"))
+        new-value)
+    (if backlinks-string
+        ;; Build a temp list to check we don't add the same link twice.  There
+        ;; is an Org builtin `org-entry-add-to-multivalued-property', but we
+        ;; cannot use it since the link descriptions may contain spaces.
+        (let ((links (split-string (replace-regexp-in-string
+                                    "]][[:space:]]+\\[\\["
+                                    "]]\f[["
+                                    (string-trim backlinks-string))
+                                   "\f" t)))
+          (dolist (dup (--filter (string-search src-id it) links))
+            (setq links (remove dup links)))
+          (push src-link links)
+          (when (-any-p #'null links)
+            (org-node-die "nils in %S" links))
+          ;; Enforce deterministic order to prevent unnecessarily reordering
+          ;; every time a node is linked that already has the backlink
+          (sort links #'string-lessp)
+          ;; Two spaces between links help them look distinct
+          (setq new-value (string-join links "  ")))
+      (setq new-value src-link))
+    (unless (equal backlinks-string new-value)
+      (org-entry-put nil "BACKLINKS" new-value))))
 
 (provide 'org-node-backlink)
 
