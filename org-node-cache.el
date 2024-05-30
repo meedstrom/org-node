@@ -1,5 +1,9 @@
 ;;; org-node-cache.el --- The beating heart -*- lexical-binding: t; -*-
 
+;; TODO Test perf of keeping alive the child processes to skip spin-up
+;; REVIEW Ensure that the child processes are loading the .eln variant of all
+;;        the emacs core lisp
+
 (require 'bytecomp)
 (require 'org-node-common)
 (require 'org-node-worker)
@@ -27,17 +31,15 @@ time."
   "Ensure that `org-id-locations' and `org-nodes' are fresh.
 
 Initialize `org-id-locations' if it is not already, and ensure it
-is a hash table \\(not an alist as it sometimes decides to be).
-Make sure `org-node-cache-mode' is on.
+is a hash table \(not an alist as it sometimes decides to be).
+Make sure `org-node-cache-mode' is enabled.
 
 Optional argument SYNCHRONOUS t means that if a reset is needed
-or ongoing, to block Emacs until it is done.  When SYNCHRONOUS
-nil, immediately return with a non-nil value if a reset is
-underway, a nil value otherwise.
+or ongoing, to block Emacs until it is done.
 
-Optional argument FORCE means force a reset to happen (but let it
-happen asynchronously unless SYNCHRONOUS is also set).  Will not
-interrupt an already ongoing reset.
+Optional argument FORCE t means force a reset to happen \(but let
+it happen asynchronously unless SYNCHRONOUS is also set).  Will
+not interrupt an already ongoing reset.
 
 Usually when FORCE is nil, this function effectively no-ops, so
 it is safe to put at the start of any command that uses org-node
@@ -78,10 +80,7 @@ arguments.
     (when synchronous
       ;; Block until all processes finish
       (message "org-node caching...")
-      (mapc #'accept-process-output org-node-cache--processes))
-    ;; Return non-nil if a sync is ongoing, nil if "ready"
-    (when (or live force)
-      org-node-cache--processes)))
+      (mapc #'accept-process-output org-node-cache--processes))))
 
 (defvar org-node-cache-reset-hook nil)
 (defvar org-node-cache-rescan-file-hook nil)
@@ -91,26 +90,23 @@ arguments.
 Either operate on ARG2 if it seems to be a file name, else the
 current buffer file.
 
-Meant as an advice for `rename-file'.  To manually scan a file
-from Lisp, use `org-node-cache--scan' instead."
+Meant for `after-save-hook' or `rename-file' advice.  To manually
+scan a file from Lisp, use `org-node-cache--scan' instead."
   ;; If triggered as advice on `rename-file', the second argument is the new
   ;; name.  Do not assume it is being done to the current buffer; it may be
   ;; called from a Dired buffer, for example.
-  (let* ((file (if (and arg2 (stringp arg2) (file-exists-p arg2))
-                   arg2
-                 (if (and (stringp buffer-file-name)
-                          (file-exists-p buffer-file-name))
-                     buffer-file-name
-                   nil)))
-         (oldname (if arg2 arg1)))
+  (let ((file (if (and (stringp arg2) (file-exists-p arg2))
+                  arg2
+                (if (and (stringp buffer-file-name)
+                         (file-exists-p buffer-file-name))
+                    buffer-file-name
+                  nil)))
+        (oldname (if arg2 arg1)))
     (when file
       (when (equal (file-name-extension file) "org")
         (org-node-cache--scan (list file))
         (when oldname
           (org-node-cache--handle-delete oldname))
-        (when (boundp 'org-node-cache-scan-file-hook)
-          (lwarn 'org-node :warning
-                 "Hook renamed: org-node-cache-scan-file-hook to org-node-cache-rescan-file-hook"))
         (run-hooks 'org-node-cache-rescan-file-hook)))))
 
 (let ((timer (timer-create)))
@@ -180,50 +176,30 @@ of `org-node-worker--collect-links-until'."
                               org-node--reflinks-table))))
 
 
-(defvar org-node-cache--processes nil)
-(defvar org-node-cache--done-ctr nil)
-(defvar org-node-cache--jobs nil)
-(defvar org-node-cache--stderr " *org-node*")
+(defvar org-node-cache--processes nil
+  "List of subprocesses.")
+(defvar org-node-cache--done-ctr 0
+  "Count of finished subprocesses.")
+(defvar org-node-cache--stderr " *org-node*"
+  "Name of buffer for the subprocesses stderr.")
 (defvar org-node-cache--start-time nil
-  "Timestamp for measuring time spent caching.")
-
-(defun org-node-cache--count-logical-cores ()
-  "Count the available processor cores, minus 1."
-  (max 1 (1- (string-to-number
-              (pcase system-type
-                ((or 'gnu 'gnu/linux 'gnu/kfreebsd 'berkeley-unix)
-                 (if (executable-find "nproc")
-                     (shell-command-to-string "nproc --all")
-                   (shell-command-to-string
-                    "lscpu -p | egrep -v '^#' | wc -l")))
-                ((or 'darwin)
-                 (shell-command-to-string "sysctl -n hw.logicalcpu_max"))
-                ;; No idea if this works
-                ((or 'cygwin 'windows-nt 'ms-dos)
-                 (ignore-errors
-                   (with-temp-buffer
-                     (call-process "echo" nil t nil
-                                   "%NUMBER_OF_PROCESSORS%")
-                     (buffer-string)))))))))
+  "Timestamp used to measure time it took to rebuild cache.")
 
 (let ((queue nil)
       (timer (timer-create)))
   (defun org-node-cache--scan (&optional files)
     "Thin wrapper for `org-node-cache--scan*'.
-Like `org-node-cache--scan*', but try to queue multiple calls
-that occur in a very short time, like when multiple files are
+Like `org-node-cache--scan*', but try to bundle multiple calls
+that occur in a short time, like when multiple files are
 being renamed at once."
+    ;; Weird algorithm, but the important thing is that no calls are dropped.
     (setq queue (append files queue))
-    ;; Let's say there are 10 calls about to happen simultaneously, but we
-    ;; don't know the future.  The first call will execute normally, and the
-    ;; next 9 calls will see that it is busy and wait, so the second run will
-    ;; scan 9 files.  Weird logic and could definitely be polished, but the
-    ;; important thing is that nothing is dropped.
     (if (-any-p #'process-live-p org-node-cache--processes)
+        ;; Retry soon
         (progn
-          ;; Retry soon
           (cancel-timer timer)
           (setq timer (run-with-timer 1 nil #'org-node-cache--scan queue)))
+      ;; Scan now
       (let ((queue* (-clone queue)))
         (setq queue nil)
         (org-node-cache--scan* queue*)))))
@@ -231,24 +207,23 @@ being renamed at once."
 (defun org-node-cache--scan* (&optional files)
   (mkdir (org-node-worker--tmpfile) t)
   (let* ((lib (find-library-name "org-node-worker"))
-         (eln-path (when (and (featurep 'native-compile)
-                              (native-comp-available-p))
-                     (comp-el-to-eln-filename lib)))
+         (eln-path (and (featurep 'native-compile)
+                        (native-comp-available-p)
+                        (comp-el-to-eln-filename lib)))
          (elc-path (org-node-worker--tmpfile "worker.elc"))
          (targeted (not (null files))))
-    ;; Pre-compile org-node-worker.el, if the user's package manager didn't
-    ;; compile it already, or if local changes have been made
+    ;; Pre-compile org-node-worker.el, in case the user's package manager
+    ;; didn't compile it already, or if local changes have been made
     (if eln-path
         (unless (file-newer-than-file-p eln-path lib)
           (native-compile lib))
+      ;; No native-comp, make an .elc
       (unless (file-newer-than-file-p elc-path lib)
-        ;; Override `byte-compile-dest-file-function', otherwise it's hard to
-        ;; predict that the .elc won't end up cluttering some source directory.
-        ;; Fortunately, .elc compiles fast.
+        ;; Hardcode the location so it won't clutter some source directory
         (let ((byte-compile-dest-file-function `(lambda (&rest _) ,elc-path)))
           (byte-compile-file lib))))
 
-    ;; Prep
+    ;; Prep for new scan
     (setq org-node-cache--start-time (current-time))
     (setq org-node-cache--done-ctr 0)
     (with-current-buffer (get-buffer-create org-node-cache--stderr)
@@ -285,12 +260,7 @@ being renamed at once."
                        ":")))))))
 
     ;; NB: I considered keeping the processes alive to skip the spin-up time,
-    ;; but the subprocesses report `emacs-init-time' as 0.001s.  There could be
-    ;; an unmeasured OS component though, and maybe delay loading the
-    ;; worker.eln? https://nullprogram.com/blog/2018/02/22/
-    ;; Worth a test in the future.  Now we just start new processes every time.
-    ;; REVIEW Can we ensure these child processes are loading the .eln variant
-    ;;        of all the emacs core lisp?
+    ;; but the subprocesses report `emacs-init-time' as 0.001s.
     (while-let ((old-process (pop org-node-cache--processes)))
       (when (process-live-p old-process)
         (delete-process old-process)))
@@ -307,22 +277,16 @@ being renamed at once."
           (when editorconfig-mode
             (message "Maybe disable editorconfig-mode while debugging"))
           (org-node-worker--collect)
-          (setq org-node-cache--jobs 1)
-          (org-node-cache--handle-finished-job 0 nil))
+          (org-node-cache--handle-finished-job nil 1))
 
       ;; If not debugging, split the work over many Emacs processes
-      ;; TODO: Balance the split file-lists a bit depending on file sizes?  To
-      ;;       get the size: (nth 7 (file-attributes FILE)). It's not uncommon
-      ;;       for one process to take noticeably longer because there's a
-      ;;       mega-file among them.
-      (let ((print-length nil)
-            (print-level nil)
-            (file-lists
-             (org-node--split-into-n-sublists (or files (org-node-files))
-                                              org-node-cache--jobs)))
-        (setq org-node-cache--jobs (min (org-node-cache--count-logical-cores)
-                                        (length file-lists)))
-        (dotimes (i org-node-cache--jobs)
+      (let* ((print-length nil)
+             (print-level nil)
+             (file-lists (org-node-cache--split-file-list
+                          (or files (org-node-files))
+                          (org-node-cache--count-logical-cores)))
+             (n-jobs (length file-lists)))
+        (dotimes (i n-jobs)
           (delete-file (org-node-worker--tmpfile "demands-%d.eld" i))
           (with-temp-file (org-node-worker--tmpfile "file-list-%d.eld" i)
             (insert (prin1-to-string (pop file-lists))))
@@ -342,66 +306,129 @@ being renamed at once."
                                 "--load" (or eln-path elc-path)
                                 "--funcall" "org-node-worker--collect")
                  :sentinel (lambda (_process _event)
-                             (org-node-cache--handle-finished-job i targeted)))
+                             (org-node-cache--handle-finished-job
+                              targeted n-jobs)))
                 org-node-cache--processes))))))
 
-(defun org-node-cache--handle-finished-job (i targeted)
-  (unless targeted
-    (when (= 0 org-node-cache--done-ctr)
-      ;; This used to be in `org-node-cache-ensure', wiping tables before
-      ;; launching the processes, but that leads to a larger time window when
-      ;; completions are unavailable.  Instead, we've waited until the first
-      ;; process starts returning, and only now wipe the tables.
-      ;;
-      ;; TODO: Should wait until the last process finishes (refactor to handle
-      ;;       their outputs all in one go)
+(defun org-node-cache--handle-finished-job (targeted n-jobs)
+  "Check if this was the last process to return, then wrap-up."
+  (with-current-buffer (get-buffer-create org-node-cache--stderr)
+    (goto-char (point-min))
+    (insert (format-time-string "\n%T.%3N")))
+  (when (eq (cl-incf org-node-cache--done-ctr) n-jobs)
+    (unless targeted
       (clrhash org-nodes)
       (clrhash org-node-collection)
       (clrhash org-node--refs-table)
       (clrhash org-node--reflinks-table)
-      (clrhash org-node--links-table)))
-  (with-temp-buffer
-    ;; Paste what the worker output
-    (let ((file (org-node-worker--tmpfile "demands-%d.eld" i)))
-      (if (not (file-exists-p file))
-          (progn
-            (setq org-node-cache--stderr "*org-node errors*")
-            (message "An org-node worker failed to scan files, not producing %s.  See buffer %s."
-                     file org-node-cache--stderr)
-            ;; Had 1+ errors, so unhide the stderr buffer from now on
-            (when-let ((buf (get-buffer " *org-node*")))
-              (with-current-buffer buf
-                (rename-buffer org-node-cache--stderr)))
-            (with-current-buffer (get-buffer-create org-node-cache--stderr)
-              (insert (format-time-string "\nThis output printed at %T"))))
-        (insert-file-contents file)
-        ;; Execute the demands that the worker wrote
-        (dolist (demand (car (read-from-string (buffer-string))))
-          (when (eq 'org-node--forget-id-location (car demand))
-            (message "Forgetting nonexistent file... %s" (cdr demand)))
-          (apply (car demand) (cdr demand)))
-        ;; Check if this was the last process to return, then wrap-up
-        (when (eq (cl-incf org-node-cache--done-ctr) org-node-cache--jobs)
-          ;; Print time elapsed.  Don't do it if this was a $targeted run
-          ;; (i.e. operated on single file after a rename) as the sums would be
-          ;; misleading.
-          (when (not targeted)
-            (let ((n-subtrees (cl-loop
-                               for node being the hash-values of org-nodes
-                               count (org-node-get-is-subtree node)))
-                  (n-backlinks (length (apply #'append
-                                              (hash-table-values
-                                               org-node--links-table))))
-                  (n-reflinks (length (apply #'append
-                                             (hash-table-values
-                                              org-node--reflinks-table)))))
-              (message "org-node saw %d files, %d subtrees, %d ID-links, %d potential reflinks in %.2fs"
-                       (- (hash-table-count org-nodes) n-subtrees)
-                       n-subtrees
-                       n-backlinks
-                       n-reflinks
-                       (float-time (time-since org-node-cache--start-time)))))
-          (org-id-locations-save))))))
+      (clrhash org-node--links-table))
+    (dotimes (i n-jobs)
+      (let ((file (org-node-worker--tmpfile "demands-%d.eld" i)))
+        (if (not (file-exists-p file))
+            (progn
+              ;; Had 1+ errors, so unhide the stderr buffer from now on
+              (let ((buf (get-buffer " *org-node*")))
+                (when buf
+                  (setq org-node-cache--stderr "*org-node errors*")
+                  (with-current-buffer buf
+                    (rename-buffer org-node-cache--stderr))))
+              (message "An org-node worker failed to scan files, not producing %s.  See buffer %s."
+                       file org-node-cache--stderr))
+          ;; Execute the demands that the worker wrote
+          (with-temp-buffer
+            (insert-file-contents file)
+            (dolist (demand (car (read-from-string (buffer-string))))
+              (when (eq 'org-node--forget-id-location (car demand))
+                ;; Special case
+                (message "Forgetting nonexistent file... %s" (cdr demand)))
+              (apply (car demand) (cdr demand)))))))
+    (unless targeted
+      (org-node-cache--print-elapsed))
+    (org-id-locations-save)))
+
+(defun org-node-cache--print-elapsed ()
+  "Print time elapsed since `org-node-cache--start-time'.
+Also report statistics about the content of `org-nodes'."
+  (let ((n-subtrees (cl-loop
+                     for node being the hash-values of org-nodes
+                     count (org-node-get-is-subtree node)))
+        (n-backlinks (length (apply #'append
+                                    (hash-table-values
+                                     org-node--links-table))))
+        (n-reflinks (length (apply #'append
+                                   (hash-table-values
+                                    org-node--reflinks-table)))))
+    (message "org-node saw %d files, %d subtrees, %d ID-links, %d potential reflinks in %.2fs"
+             (- (hash-table-count org-nodes) n-subtrees)
+             n-subtrees
+             n-backlinks
+             n-reflinks
+             (float-time (time-since org-node-cache--start-time)))))
+
+(defun org-node-cache--split-file-list (files n)
+  "Split FILES into a list of N lists of files.
+
+Take their file-sizes into account, so that a third of those N
+lists are short lists of big files, while the other two-thirds
+are long lists of small files.  The single biggest file will tend
+to be isolated into a list of one member.
+
+Since each sublist is meant to be given to one child process,
+this balancing reduces the risk that one process takes noticably
+longer due to being saddled with a mega-file in addition to the
+average workload."
+  (let ((max-reserved-cores (/ n 3))
+        (biggest 0)
+        big-files small-files lists-of-big-files lists-of-small-files)
+    (setq n (- n max-reserved-cores))
+    (if (= 0 max-reserved-cores)
+        (setq small-files files)
+      ;; Construct a little list BIG-FILES which will definitely have the
+      ;; biggest files as members on top, and some stragglers at the bottom
+      (dolist (file files)
+        (let ((size (file-attribute-size (file-attributes file))))
+          (if (> biggest size)
+              (push file small-files)
+            (setq biggest size)
+            (push (cons size file) big-files))))
+      ;; Reserve some cores for scanning the biggest files
+      (while (and big-files (> max-reserved-cores (length lists-of-big-files)))
+        (let (sublist)
+          (while (and big-files
+                      (>= biggest
+                          (apply #'+ (caar big-files) (mapcar #'car sublist))))
+            (push (pop big-files) sublist))
+          (push (mapcar #'cdr sublist) lists-of-big-files))))
+    ;; Make lists of the rest
+    (let ((len (/ (length small-files) n)))
+      (dotimes (i n)
+        (let ((sublist (if (= i (- n 1))
+                           ;; Let the last iteration just take what's left
+                           small-files
+                         (prog1 (take len small-files)
+                           (setq small-files (-drop len small-files))))))
+          (when sublist (push sublist lists-of-small-files))))
+      (append lists-of-big-files
+              lists-of-small-files))))
+
+(defun org-node-cache--count-logical-cores ()
+  "Count the available processor cores, minus 1."
+  (max 1 (1- (string-to-number
+              (pcase system-type
+                ((or 'gnu 'gnu/linux 'gnu/kfreebsd 'berkeley-unix)
+                 (if (executable-find "nproc")
+                     (shell-command-to-string "nproc --all")
+                   (shell-command-to-string
+                    "lscpu -p | egrep -v '^#' | wc -l")))
+                ((or 'darwin)
+                 (shell-command-to-string "sysctl -n hw.logicalcpu_max"))
+                ;; No idea if this works
+                ((or 'cygwin 'windows-nt 'ms-dos)
+                 (ignore-errors
+                   (with-temp-buffer
+                     (call-process "echo" nil t nil
+                                   "%NUMBER_OF_PROCESSORS%")
+                     (buffer-string)))))))))
 
 (provide 'org-node-cache)
 
