@@ -39,6 +39,12 @@
 (defvar org-node-backlink--fix-ctr 0)
 (defvar org-node-backlink--fix-files nil)
 
+(defun org-node-backlink-regret ()
+  "Visit all IDs in `org-id-locations' and remove the :BACKLINKS:
+property."
+  (interactive)
+  (org-node-backlink-fix-all 'remove))
+
 (defun org-node-backlink-fix-all (&optional remove)
   "Add :BACKLINKS: property to all nodes known to `org-id-locations'.
 Optional argument REMOVE means remove them instead, the same
@@ -76,11 +82,12 @@ as the user command \\[org-node-backlink-regret]."
       ;; Reset
       (setq org-node-backlink--fix-ctr 0))))
 
-(defun org-node-backlink-regret (dir)
-  "Remove Org properties :BACKLINKS: and :CACHED_BACKLINKS: from all
-files known to `org-id-locations'."
-  (interactive)
-  (org-node-backlink-fix-all 'remove))
+(defun org-node-backlink--update-whole-buffer (&optional remove)
+  (save-excursion
+    (goto-char (point-min))
+    (let ((case-fold-search t))
+      (while (re-search-forward "^[[:space:]]*:id: " nil t)
+        (org-node-backlink--update-subtree-here remove)))))
 
 (defun org-node-backlink--update-subtree-here (&optional remove)
   "Assumes point is at an :ID: line!
@@ -122,13 +129,6 @@ Update the :BACKLINKS: property.  With arg REMOVE, remove it instead."
               (unless (equal link-string (org-entry-get nil "BACKLINKS"))
                 (org-entry-put nil "BACKLINKS" link-string))
             (org-entry-delete nil "BACKLINKS")))))))
-
-(defun org-node-backlink--update-whole-buffer (&optional remove)
-  (save-excursion
-    (goto-char (point-min))
-    (let ((case-fold-search t))
-      (while (re-search-forward "^[[:space:]]*:id: " nil t)
-        (org-node-backlink--update-subtree-here remove)))))
 
 ;; TODO: Allow narrowing to have an effect, i.e. don't use
 ;; `without-restriction'.  Problem is that org-entry-get will get an ID outside
