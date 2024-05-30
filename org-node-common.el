@@ -33,21 +33,23 @@ I don't use EPG so I don't know if that's enough to make it work."
 ;; TODO: Maybe suggest `utf-8-auto-unix', but first find out if the
 ;; coding-system-for-write infers from coding-system-for-read
 (defcustom org-node-perf-assume-coding-system nil
-  "Coding system to presume while scanning for metadata.
-More specific choices can speed up `org-node-reset' - sometimes
-significantly.  Set nil to let Emacs figure it out anew on every
-file.
+  "Coding system to assume while scanning ID nodes.
 
-On modern GNU/Linux and BSD systems, a good choice is almost
-always `utf-8-unix'.  On Mac it would be `utf-8-mac'.
+Picking a specific coding system can speed up `org-node-reset',
+sometimes significantly.  Set nil to let Emacs figure it out anew
+on every file.
+
+Modern GNU/Linux and BSD systems almost always encode new files
+as `utf-8-unix'.  On Mac it would be `utf-8-mac'.
 
 On Windows this probably should be nil.  Same if you access your
 files from multiple platforms.
 
 Note that if your Org collection is old and has survived several
-system migrations, it's very possible that there's a mix of
-coding systems among them.  In that case, setting this variable
-may mean that org-node fails to scan some of them."
+system migrations, or some of it was generated via Pandoc
+conversion or downloaded, it's very possible that there's a mix
+of coding systems among them.  In that case, setting this
+variable non-nil may cause org-node to fail to scan some of them."
   :group 'org-node
   :type '(choice coding-system (const nil)))
 
@@ -352,19 +354,6 @@ first element."
        as the-root = (--find (string-prefix-p it file) directories)
        do (cl-incf (cdr (assoc the-root dir-counters)))
        finally return (mapcar #'car (cl-sort dir-counters #'> :key #'cdr))))))
-
-(defun org-node--split-into-n-sublists (big-list n)
-  "Split BIG-LIST into a list of N sublists."
-  (let ((len (/ (length big-list) n))
-        res)
-    (dotimes (i n)
-      (let ((sublist (if (= i (- n 1))
-                         ;; Let the last iteration just take what's left
-                         big-list
-                       (prog1 (take len big-list)
-                         (setq big-list (nthcdr len big-list))))))
-        (when sublist (push sublist res))))
-    res))
 
 ;; REVIEW deprecate?
 (defun org-node--consent-to-problematic-modes-for-mass-op ()
