@@ -378,9 +378,12 @@ The fact that a link is in this table does not mean there is a
 node with a ROAM_REFS matching that same link.  To find that out,
 you'd have to cross-reference with `org-node--refs-table'.")
 
-(defvar org-node--links-table (make-hash-table :test #'equal))
-(defvar org-node--refs-table (make-hash-table :test #'equal))
-(defvar org-node--dbg nil)
+(defvar org-node--links-table (make-hash-table :test #'equal)
+  "Table of links with a source ID and destination ID.")
+(defvar org-node--refs-table (make-hash-table :test #'equal)
+  "Table of ROAM_REFS and the IDs where they can be found.")
+(defvar org-node--dbg nil
+  "Whether to run in a way suitable for debugging.")
 
 
 ;;; Data structure

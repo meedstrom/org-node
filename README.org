@@ -31,7 +31,7 @@ Once a subtree has an ID you can link to, it's a "node" because it has joined th
 
 ** Feature matrix
 
-For your pleasure, here's a comparison of three similar notetaking systems: all permitting org-id as first-class citizen and not locking you into an "one-note-per-file" concept.
+A comparison of three similar systems, all permitting org-id as first-class citizen and not locking you into an "one-note-per-file" concept.
 
 |                                   | org-roam    | org-node           | [[https://github.com/toshism/org-super-links][org-super-links]]      |
 |-----------------------------------+-------------+--------------------+----------------------|
@@ -145,7 +145,7 @@ Yes, it's possible!
             #'org-node--fabricate-roam-reflinks)
 #+end_src
 
-** Backlink solution 2: printed inside the file
+** Backlink solution 2: printing inside the file
 I like these solutions because I rarely have the screen space to display a backlink buffer.
 
 **** *Option 2A*.  Let org-node add a =:BACKLINKS:= property to all nodes.
@@ -167,7 +167,7 @@ I /think/ the following should work. Totally untested, let me know!
 (add-hook 'org-node-insert-link-hook #'org-node-convert-link-to-super)
 #+end_src
 
-Alas, this is mainly directed towards people were already using org-super-links (... or people who just now started assigning org-ids), as there is not yet a bulk command to add drawers to all nodes. ([[https://github.com/toshism/org-super-links/issues/93][Issue 93]])
+Alas, this is mainly directed towards people were using org-super-links from the beginning, as there is not yet a bulk command to add drawers to all nodes. ([[https://github.com/toshism/org-super-links/issues/93][Issue 93]])
 
 ** Misc
 *** Org-capture
@@ -192,8 +192,9 @@ Here are some example capture templates. The secret sauce is =(function org-node
          :jump-to-captured t
          :immediate-finish t)
 
-        ;; Sometimes useful with `org-node-insert-link' to make a stub
-        ("ni" "Instantly create ID node without content & without visiting"
+        ;; Sometimes useful with `org-node-insert-link' to make a stub you'll
+        ;; fill in later
+        ("ni" "Instantly create stub ID node without visiting"
          plain (function org-node-capture-target) nil
          :immediate-finish t)))
 #+end_src
