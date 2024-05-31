@@ -1,5 +1,9 @@
 ;;; org-node-backlink.el -*- lexical-binding: t; -*-
 
+;; FIXME I believe that when you remove a link, then
+;;       `org-node-cache-rescan-file' is not enough to remove the link from
+;;       the link table.  It gets corrected only on reset.
+
 (require 'org-node-common)
 (require 'org-node-cache)
 
@@ -111,8 +115,6 @@ Update the :BACKLINKS: property.  With arg REMOVE, remove it instead."
                 (thread-last
                   (append reflinks backlinks)
                   (--map (plist-get it :src))
-                  ;; REVIEW There used to be some nils, check if still
-                  (remq 'nil)
                   (-uniq)
                   (-sort #'string-lessp)
                   ;; At this point we have a sorted list of ids (sorted

@@ -1,13 +1,16 @@
 ;;; org-node-worker.el --- Gotta go fast -*- lexical-binding: t; -*-
 
+;; TODO Ignore statistics cookies in headings
+
 (eval-when-compile
   (require 'cl-macs)
   (require 'subr-x))
 
 (defun org-node-worker--tmpfile (&optional basename &rest args)
   "Return a path that puts BASENAME in a temporary directory.
-Usually it will be in /tmp/org-node/.  Also format BASENAME with
-ARGS like `format', which see."
+Usually the result will be /tmp/org-node/BASENAME, but it depends
+on the output of `temporary-file-directory'.  Also format
+BASENAME with ARGS like `format', which see."
   (expand-file-name (if basename
                         (apply #'format basename args)
                       "")
@@ -32,9 +35,9 @@ Extra argument FILE-ID is the file-level id, used as a fallback
 if no ancestor heading has an ID.  It can be nil."
   (declare (pure t) (side-effect-free t))
   (let (;; Drop all the data about positions below POS
-        (data-until-pos (nthcdr (org-node-worker--elem-index (assoc pos oldata)
-                                                             oldata)
-                                oldata)))
+        (data-until-pos
+         (nthcdr (org-node-worker--elem-index (assoc pos oldata) oldata)
+                 oldata)))
     (let ((previous-level (nth 2 (car data-until-pos))))
       ;; Work backwards towards the top of the file
       (cl-loop for row in data-until-pos
@@ -48,7 +51,7 @@ if no ancestor heading has an ID.  It can be nil."
 
 (defun org-node-worker--pos->olp (oldata pos)
   "Given buffer position POS, return the Org outline path.
-Result should be like that from `org-get-outline-path'.
+Result should look like a result from `org-get-outline-path'.
 
 Argument OLDATA must be of a form looking like
  ((373 \"A subheading\" 2)
@@ -60,9 +63,10 @@ where the car of each element represents a buffer position, the cadr the
 heading title, and the caddr the outline depth i.e. the number of
 asterisks in the heading at that location.
 
-OLDATA must be in \"reverse\" order, such the last heading in the
-file is represented as the first element.  POS itself must be
-included in one of the elements."
+As apparent in the example, OLDATA is expected in \"reverse\"
+order, such that the last heading in the file is represented in
+the first element.  An exact match for POS must also be included
+in one of the elements."
   (declare (pure t) (side-effect-free t))
   (let* (olp
          (pos-data (or (assoc pos oldata)
@@ -70,8 +74,7 @@ included in one of the elements."
                               pos oldata)))
          ;; Drop all the data about positions below POS (using `nthcdr' because
          ;; oldata is in reverse order)
-         (data-until-pos (nthcdr (org-node-worker--elem-index pos-data
-                                                              oldata)
+         (data-until-pos (nthcdr (org-node-worker--elem-index pos-data oldata)
                                  oldata)))
     (let ((previous-level (caddr (car data-until-pos))))
       ;; Work backwards towards the top of the file
@@ -191,111 +194,221 @@ process does not have to load org.el."
     res))
 
 (defun org-node-worker--collect ()
-  "Scan for ID-nodes across files."
-  (with-temp-buffer
-    (insert-file-contents (org-node-worker--tmpfile "work-variables.eld"))
-    (dolist (var (car (read-from-string (buffer-string))))
-      (set (car var) (cdr var)))
-    (erase-buffer)
-    ;; The variable `i' was set via the command line that launched this process
-    (insert-file-contents (org-node-worker--tmpfile "file-list-%d.eld" i))
-    (setq $files (car (read-from-string (buffer-string))))
-    (let ((case-fold-search t)
-          ;; Perf
-          (file-name-handler-alist $file-name-handler-alist)
-          (gc-cons-threshold $gc-cons-threshold)
-          ;; REVIEW: reading source for `recover-file', it sounds like the
-          ;; coding system for read can affect the system for write? If so, how
-          ;; to pick a sane system for write?
-          (coding-system-for-read $assume-coding-system)
-          ;; Reassigned on every iteration, so may as well re-use the memory
-          ;; locations (hopefully producing less garbage) instead of making a
-          ;; new let-binding every time.  Not sure how elisp works... but
-          ;; profiling shows a speedup.
-          TITLE FILE-TITLE POS LEVEL HERE FAR
-          TODO-STATE TAGS SCHED DEADLINE ID OLP FILE-TITLE-OR-BASENAME
-          PROPS FILE-TAGS FILE-ID OUTLINE-DATA TODO-RE)
-      (dolist (FILE $files)
-        (if (not (file-exists-p FILE))
-            ;; We got here because user deleted a file in a way that we didn't
-            ;; notice.  If it was actually a rename done outside Emacs, it'll
-            ;; get picked up on next reset.
-            ;; TODO: Schedule a targeted caching of any new files that appeared
-            ;; in `org-node-files' output
-            (push `(org-node--forget-id-location ,FILE)
-                  org-node-worker--demands)
-          (erase-buffer)
-          ;; NOTE: Here I used `insert-file-contents-literally' in the past,
-          ;; converting each captured substring afterwards with
-          ;; `decode-coding-string', but it still made us record wrong values
-          ;; for POS when there was any Unicode in the file.  So instead, the
-          ;; above let-bindings for coding system etc regain much of the
-          ;; performance that it had.
-          (insert-file-contents FILE)
-          ;; Verify there is at least one ID-node, otherwise skip file
-          (when (re-search-forward "^[[:space:]]*:id: " nil t)
-            (goto-char 1)
-            (setq OUTLINE-DATA nil)
-            ;; Roughly like `org-end-of-meta-data' for file level
-            (setq FAR (or (re-search-forward "^ *?[^#:]" nil t) (point-max)))
-            (goto-char 1)
+  "Dangerous!
+Scan for ID-nodes across files, assuming there's available info
+in files written by `org-node-cache--scan'.  Assume the current
+buffer is a temp buffer."
+  (insert-file-contents (org-node-worker--tmpfile "work-variables.eld"))
+  (dolist (var (car (read-from-string (buffer-string))))
+    (set (car var) (cdr var)))
+  (erase-buffer)
+  ;; The variable `i' was set via the command line that launched this process
+  (insert-file-contents (org-node-worker--tmpfile "file-list-%d.eld" i))
+  (setq $files (car (read-from-string (buffer-string))))
+  (let ((case-fold-search t)
+        ;; Perf
+        (file-name-handler-alist $file-name-handler-alist)
+        (gc-cons-threshold $gc-cons-threshold)
+        ;; REVIEW: reading source for `recover-file', it sounds like the
+        ;; coding system for read can affect the system for write? If so, how
+        ;; to pick a sane system for write?
+        (coding-system-for-read $assume-coding-system)
+        ;; Reassigned on every iteration, so may as well re-use the memory
+        ;; locations (hopefully producing less garbage) instead of making a
+        ;; new let-binding every time.  Not sure how elisp works... but
+        ;; profiling shows a speedup.
+        TITLE FILE-TITLE POS LEVEL HERE FAR
+        TODO-STATE TAGS SCHED DEADLINE ID OLP FILE-TITLE-OR-BASENAME
+        PROPS FILE-TAGS FILE-ID OUTLINE-DATA TODO-RE)
+    (dolist (FILE $files)
+      (if (not (file-exists-p FILE))
+          ;; We got here because user deleted a file in a way that we didn't
+          ;; notice.  If it was actually a rename done outside Emacs, it'll
+          ;; get picked up on next reset.
+          ;; TODO: Schedule a targeted caching of any new files that appeared
+          ;; in `org-node-files' output
+          (push `(org-node--forget-id-location ,FILE)
+                org-node-worker--demands)
+        (erase-buffer)
+        ;; NOTE: Here I used `insert-file-contents-literally' in the past,
+        ;; converting each captured substring afterwards with
+        ;; `decode-coding-string', but it still made us record wrong values
+        ;; for POS when there was any Unicode in the file.  So instead, the
+        ;; above let-bindings for coding system etc regain much of the
+        ;; performance that it had.
+        (insert-file-contents FILE)
+        ;; Verify there is at least one ID-node, otherwise skip file
+        (when (re-search-forward "^[[:space:]]*:id: " nil t)
+          (goto-char 1)
+          (setq OUTLINE-DATA nil)
+          ;; Roughly like `org-end-of-meta-data' for file level
+          (setq FAR (or (re-search-forward "^ *?[^#:]" nil t) (point-max)))
+          (goto-char 1)
+          (setq PROPS
+                (if (re-search-forward "^[[:space:]]*:properties:" FAR t)
+                    (progn
+                      (forward-line 1)
+                      (prog1 (org-node-worker--collect-properties
+                              (point)
+                              (if (re-search-forward "^[[:space:]]*:end:" nil t)
+                                  (pos-bol)
+                                (error "Couldn't find matching :END: drawer in file %s at position %d"
+                                       FILE (point)))
+                              FILE)
+                        (goto-char 1)))
+                  nil))
+          (setq FILE-TAGS
+                (if (re-search-forward "^#\\+filetags: " FAR t)
+                    (prog1 (split-string
+                            (buffer-substring (point) (pos-eol))
+                            ":" t)
+                      (goto-char 1))
+                  nil))
+          (setq TODO-RE
+                (if (re-search-forward $file-option-todo-re FAR t)
+                    (prog1
+                        (org-node-worker--make-todo-regexp
+                         (buffer-substring (point) (pos-eol)))
+                      (goto-char 1))
+                  $global-todo-re))
+          (setq FILE-TITLE (when (re-search-forward "^#\\+title: " FAR t)
+                             (org-node-worker--org-link-display-format
+                              (buffer-substring (point) (pos-eol)))))
+          (setq FILE-TITLE-OR-BASENAME
+                (or FILE-TITLE (file-name-nondirectory FILE)))
+          (when (setq FILE-ID (cdr (assoc "ID" PROPS)))
+            (when $targeted
+              ;; This was probably called by a rename-file advice, i.e. this
+              ;; is not a full reset of all files, just a scan of 1 file
+              (push `(org-id-add-location ,FILE-ID ,FILE)
+                    org-node-worker--demands))
+            ;; Collect links
+            (let ((END (save-excursion
+                         (when (org-node-worker--next-heading)
+                           (1- (point))))))
+              ;; Don't count org-super-links backlinks as forward links
+              (when (re-search-forward $backlink-drawer-re END t)
+                (unless (search-forward ":end:" END t)
+                  (error "Couldn't find matching :END: drawer in file %s" FILE)))
+              (org-node-worker--collect-links-until END FILE-ID nil $link-re))
+            (push `(org-node-cache--add-node-to-tables
+                    ,(list :title FILE-TITLE-OR-BASENAME ;; Uhm
+                           :level 0
+                           :tags FILE-TAGS
+                           :file-path FILE
+                           :pos 1
+                           :file-title FILE-TITLE
+                           :file-title-or-basename FILE-TITLE-OR-BASENAME
+                           :properties PROPS
+                           :id FILE-ID
+                           :aliases
+                           (split-string-and-unquote
+                            (or (cdr (assoc "ROAM_ALIASES" PROPS)) ""))
+                           :refs
+                           (split-string-and-unquote
+                            (or (cdr (assoc "ROAM_REFS" PROPS)) ""))))
+                  org-node-worker--demands))
+
+          ;; Loop over the file's subtrees
+          (while (org-node-worker--next-heading)
+            (setq POS (point))
+            (setq LEVEL (skip-chars-forward "*"))
+            (skip-chars-forward " ")
+            (setq HERE (point))
+            (if (looking-at TODO-RE)
+                (progn
+                  (setq TODO-STATE (buffer-substring (point) (match-end 0)))
+                  (goto-char (1+ (match-end 0)))
+                  (setq HERE (point)))
+              (setq TODO-STATE nil))
+            (if (re-search-forward " +\\(:.+:\\) *$" (pos-eol) t)
+                (progn
+                  (setq TITLE (org-node-worker--org-link-display-format
+                               (buffer-substring HERE (match-beginning 0))))
+                  (setq TAGS (split-string (match-string 1) ":" t)))
+              (setq TITLE
+                    (org-node-worker--org-link-display-format
+                     (buffer-substring HERE (pos-eol))))
+              (setq TAGS nil))
+            ;; Now we must be careful.  Imagine this subtree is just a
+            ;; heading, empty of content, and the very next line is another
+            ;; heading.  Gotta go forward 1 line, see if it is a
+            ;; planning-line, and if it is, then go forward 1 more line, and
+            ;; if that is a :PROPERTIES: line, then we know it belongs to the
+            ;; current subtree.  If we had just allowed the search for
+            ;; :PROPERTIES: to cross 2 lines, we could have matched a
+            ;; property drawer for the wrong heading.  Of course
+            ;; `narrow-to-region' could guard us against this kind of thing,
+            ;; but with this algorithm as solid as it is now, that'd be a
+            ;; superfluous instruction that just increases the amount of
+            ;; large point motions.
+            (forward-line 1)
+            (setq HERE (point))
+            (setq FAR (pos-eol))
+            (setq SCHED
+                  (if (re-search-forward "[[:space:]]*SCHEDULED:" FAR t)
+                      (prog1 (buffer-substring
+                              ;; \n just there for safety
+                              (point)
+                              (+ 1 (point) (skip-chars-forward "^]>\n")))
+                        (goto-char HERE))
+                    nil))
+            (setq DEADLINE
+                  (if (re-search-forward "[[:space:]]*DEADLINE:" FAR t)
+                      (prog1 (buffer-substring
+                              (point)
+                              (+ 1 (point) (skip-chars-forward "^]>\n")))
+                        (goto-char HERE))
+                    nil))
+            (when (or SCHED
+                      DEADLINE
+                      (re-search-forward "[[:space:]]*CLOSED:" FAR t))
+              ;; Alright, so there was a planning-line, meaning any
+              ;; :PROPERTIES: must be on the next line.
+              (forward-line 1)
+              (setq FAR (pos-eol)))
             (setq PROPS
                   (if (re-search-forward "^[[:space:]]*:properties:" FAR t)
                       (progn
                         (forward-line 1)
-                        (prog1 (org-node-worker--collect-properties
-                                (point)
-                                (if (re-search-forward "^[[:space:]]*:end:" nil t)
-                                    (pos-bol)
-                                  (error "Couldn't find matching :END: drawer in file %s at position %d"
-                                         FILE (point)))
-                                FILE)
-                          (goto-char 1)))
+                        (org-node-worker--collect-properties
+                         (point)
+                         ;; TODO: Can we better handle a missing :END:?
+                         ;; Thinking the function above can do verification.
+                         (if (re-search-forward "^[[:space:]]*:end:" nil t)
+                             (prog1 (pos-bol)
+                               ;; For safety in case seeking :END: landed us
+                               ;; way down the file.  Some error will hopefully
+                               ;; be printed about this subtree, but we can
+                               ;; keep going sanely from here on.
+                               (goto-char FAR))
+                           (error "Couldn't find matching :END: drawer in file %s at position %d"
+                                  FILE (point)))
+                         FILE))
                     nil))
-            (setq FILE-TAGS
-                  (if (re-search-forward "^#\\+filetags: " FAR t)
-                      (prog1 (split-string
-                              (buffer-substring (point) (pos-eol))
-                              ":" t)
-                        (goto-char 1))
-                    nil))
-            (setq TODO-RE
-                  (if (re-search-forward $file-option-todo-re FAR t)
-                      (prog1
-                          (org-node-worker--make-todo-regexp
-                           (buffer-substring (point) (pos-eol)))
-                        (goto-char 1))
-                    $global-todo-re))
-            (setq FILE-TITLE (when (re-search-forward "^#\\+title: " FAR t)
-                               (org-node-worker--org-link-display-format
-                                (buffer-substring (point) (pos-eol)))))
-            (setq FILE-TITLE-OR-BASENAME
-                  (or FILE-TITLE (file-name-nondirectory FILE)))
-            (when (setq FILE-ID (cdr (assoc "ID" PROPS)))
+            (setq ID (cdr (assoc "ID" PROPS)))
+            (push (list POS TITLE LEVEL ID) OUTLINE-DATA) ;; nil ID allowed
+            (when ID
               (when $targeted
-                ;; This was probably called by a rename-file advice, i.e. this
-                ;; is not a full reset of all files, just a scan of 1 file
-                (push `(org-id-add-location ,FILE-ID ,FILE)
+                ;; Called by a rename-file advice
+                (push `(org-id-add-location ,ID ,FILE)
                       org-node-worker--demands))
-              ;; Collect links
-              (let ((END (save-excursion
-                           (when (org-node-worker--next-heading)
-                             (1- (point))))))
-                ;; Don't count org-super-links backlinks as forward links
-                (when (re-search-forward $backlink-drawer-re END t)
-                  (unless (search-forward ":end:" END t)
-                    (error "Couldn't find matching :END: drawer in file %s" FILE)))
-                (org-node-worker--collect-links-until END FILE-ID nil $link-re))
+              (setq OLP (org-node-worker--pos->olp OUTLINE-DATA POS))
               (push `(org-node-cache--add-node-to-tables
-                      ,(list :title FILE-TITLE-OR-BASENAME ;; Uhm
-                             :level 0
-                             :tags FILE-TAGS
+                      ,(list :title TITLE
+                             :is-subtree t
+                             :level LEVEL
+                             :id ID
+                             :pos POS
+                             :tags TAGS
+                             :todo TODO-STATE
                              :file-path FILE
-                             :pos 1
+                             :scheduled SCHED
+                             :deadline DEADLINE
                              :file-title FILE-TITLE
                              :file-title-or-basename FILE-TITLE-OR-BASENAME
+                             :olp OLP
                              :properties PROPS
-                             :id FILE-ID
                              :aliases
                              (split-string-and-unquote
                               (or (cdr (assoc "ROAM_ALIASES" PROPS)) ""))
@@ -303,141 +416,33 @@ process does not have to load org.el."
                              (split-string-and-unquote
                               (or (cdr (assoc "ROAM_REFS" PROPS)) ""))))
                     org-node-worker--demands))
-
-            ;; Loop over the file's subtrees
-            (while (org-node-worker--next-heading)
-              (setq POS (point))
-              (setq LEVEL (skip-chars-forward "*"))
-              (skip-chars-forward " ")
-              (setq HERE (point))
-              (if (looking-at TODO-RE)
-                  (progn
-                    (setq TODO-STATE (buffer-substring (point) (match-end 0)))
-                    (goto-char (1+ (match-end 0)))
-                    (setq HERE (point)))
-                (setq TODO-STATE nil))
-              (if (re-search-forward " +\\(:.+:\\) *$" (pos-eol) t)
-                  (progn
-                    (setq TITLE (org-node-worker--org-link-display-format
-                                 (buffer-substring HERE (match-beginning 0))))
-                    (setq TAGS (split-string (match-string 1) ":" t)))
-                (setq TITLE
-                      (org-node-worker--org-link-display-format
-                       (buffer-substring HERE (pos-eol))))
-                (setq TAGS nil))
-              ;; Now we must be careful.  Imagine this subtree is just a
-              ;; heading, empty of content, and the very next line is another
-              ;; heading.  Gotta go forward 1 line, see if it is a
-              ;; planning-line, and if it is, then go forward 1 more line, and
-              ;; if that is a :PROPERTIES: line, then we know it belongs to the
-              ;; current subtree.  If we had just allowed the search for
-              ;; :PROPERTIES: to cross 2 lines, we could have matched a
-              ;; property drawer for the wrong heading.  Of course
-              ;; `narrow-to-region' could guard us against this kind of thing,
-              ;; but with this algorithm as solid as it is now, that'd be a
-              ;; superfluous instruction that just increases the amount of
-              ;; large point motions.
-              (forward-line 1)
-              (setq HERE (point))
-              (setq FAR (pos-eol))
-              (setq SCHED
-                    (if (re-search-forward "[[:space:]]*SCHEDULED:" FAR t)
-                        (prog1 (buffer-substring
-                                ;; \n just there for safety
-                                (point)
-                                (+ 1 (point) (skip-chars-forward "^]>\n")))
-                          (goto-char HERE))
-                      nil))
-              (setq DEADLINE
-                    (if (re-search-forward "[[:space:]]*DEADLINE:" FAR t)
-                        (prog1 (buffer-substring
-                                (point)
-                                (+ 1 (point) (skip-chars-forward "^]>\n")))
-                          (goto-char HERE))
-                      nil))
-              (when (or SCHED
-                        DEADLINE
-                        (re-search-forward "[[:space:]]*CLOSED:" FAR t))
-                ;; Alright, so there was a planning-line, meaning any
-                ;; :PROPERTIES: must be on the next line.
-                (forward-line 1)
-                (setq FAR (pos-eol)))
-              (setq PROPS
-                    (if (re-search-forward "^[[:space:]]*:properties:" FAR t)
-                        (progn
-                          (forward-line 1)
-                          (org-node-worker--collect-properties
-                           (point)
-                           ;; TODO: Can we better handle a missing :END:?
-                           ;; Thinking the function above can do verification.
-                           (if (re-search-forward "^[[:space:]]*:end:" nil t)
-                               (prog1 (pos-bol)
-                                 ;; For safety in case seeking :END: landed us
-                                 ;; way down the file.  Some error will hopefully
-                                 ;; be printed about this subtree, but we can
-                                 ;; keep going sanely from here on.
-                                 (goto-char FAR))
-                             (error "Couldn't find matching :END: drawer in file %s at position %d"
-                                    FILE (point)))
-                           FILE))
-                      nil))
-              (setq ID (cdr (assoc "ID" PROPS)))
-              (push (list POS TITLE LEVEL ID) OUTLINE-DATA) ;; nil ID allowed
-              (when ID
-                (when $targeted
-                  ;; Called by a rename-file advice
-                  (push `(org-id-add-location ,ID ,FILE)
-                        org-node-worker--demands))
-                (setq OLP (org-node-worker--pos->olp OUTLINE-DATA POS))
-                (push `(org-node-cache--add-node-to-tables
-                        ,(list :title TITLE
-                               :is-subtree t
-                               :level LEVEL
-                               :id ID
-                               :pos POS
-                               :tags TAGS
-                               :todo TODO-STATE
-                               :file-path FILE
-                               :scheduled SCHED
-                               :deadline DEADLINE
-                               :file-title FILE-TITLE
-                               :file-title-or-basename FILE-TITLE-OR-BASENAME
-                               :olp OLP
-                               :properties PROPS
-                               :aliases
-                               (split-string-and-unquote
-                                (or (cdr (assoc "ROAM_ALIASES" PROPS)) ""))
-                               :refs
-                               (split-string-and-unquote
-                                (or (cdr (assoc "ROAM_REFS" PROPS)) ""))))
-                      org-node-worker--demands))
-              ;; Now collect links while we're here!
-              ;; REVIEW: Oddly, the number of ID-links drops somewhat when I do
-              ;; a save-restriction and narrow to a subtree at a time. Why
-              ;; might that be?
-              (let ((ID-HERE (or ID (org-node-worker--pos->parent-id
-                                     OUTLINE-DATA POS FILE-ID)))
-                    (END (save-excursion
-                           (when (org-node-worker--next-heading)
-                             (1- (point)))))
-                    (OLP-WITH-SELF (append OLP (list TITLE))))
-                (when ID-HERE
-                  ;; Don't count org-super-links backlinks
-                  (when (re-search-forward $backlink-drawer-re END t)
-                    (unless (search-forward ":end:" END t)
-                      (error "Couldn't find matching :END: drawer in file %s at position %d"
-                             FILE (point))))
-                  (org-node-worker--collect-links-until
-                   END ID-HERE OLP-WITH-SELF $link-re)
-                  ;; Gotcha... also collect links inside the heading, not
-                  ;; just the body text
-                  (goto-char POS)
-                  (org-node-worker--collect-links-until
-                   (pos-eol) ID-HERE OLP-WITH-SELF $link-re)))))))
-      (with-temp-file (org-node-worker--tmpfile "demands-%d.eld" i)
-        (let ((print-length nil)
-              (print-level nil))
-          (insert (prin1-to-string org-node-worker--demands)))))))
+            ;; Now collect links while we're here!
+            ;; REVIEW: Oddly, the number of ID-links drops somewhat when I do
+            ;; a save-restriction and narrow to a subtree at a time. Why
+            ;; might that be?
+            (let ((ID-HERE (or ID (org-node-worker--pos->parent-id
+                                   OUTLINE-DATA POS FILE-ID)))
+                  (END (save-excursion
+                         (when (org-node-worker--next-heading)
+                           (1- (point)))))
+                  (OLP-WITH-SELF (append OLP (list TITLE))))
+              (when ID-HERE
+                ;; Don't count org-super-links backlinks
+                (when (re-search-forward $backlink-drawer-re END t)
+                  (unless (search-forward ":end:" END t)
+                    (error "Couldn't find matching :END: drawer in file %s at position %d"
+                           FILE (point))))
+                (org-node-worker--collect-links-until
+                 END ID-HERE OLP-WITH-SELF $link-re)
+                ;; Gotcha... also collect links inside the heading, not
+                ;; just the body text
+                (goto-char POS)
+                (org-node-worker--collect-links-until
+                 (pos-eol) ID-HERE OLP-WITH-SELF $link-re)))))))
+    (with-temp-file (org-node-worker--tmpfile "demands-%d.eld" i)
+      (let ((print-length nil)
+            (print-level nil))
+        (insert (prin1-to-string org-node-worker--demands))))))
 
 (provide 'org-node-worker)
 

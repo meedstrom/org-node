@@ -267,7 +267,7 @@ being renamed at once."
 
     (if org-node--dbg
         ;; Special case: if debugging, run single-threaded so we can step
-        ;; through org-node-worker.el with edebug
+        ;; through the org-node-worker.el functions with edebug
         (progn
           (with-temp-file (org-node-worker--tmpfile "file-list-0.eld")
             (insert (prin1-to-string (org-node-files))))
@@ -276,8 +276,10 @@ being renamed at once."
           (setq i 0)
           (when editorconfig-mode
             (message "Maybe disable editorconfig-mode while debugging"))
+          (pop-to-buffer (get-buffer-create "*org-node debug*"))
+          (erase-buffer)
           (org-node-worker--collect)
-          (org-node-cache--handle-finished-job nil 1))
+          (org-node-cache--handle-finished-job targeted 1))
 
       ;; If not debugging, split the work over many Emacs processes
       (let* ((print-length nil)
@@ -299,9 +301,9 @@ being renamed at once."
                                  (expand-file-name invocation-name
                                                    invocation-directory))
                                 "--quick"
-                                "--no-init-file"
-                                "--no-site-lisp"
                                 "--batch"
+                                "--eval" (format "(setq temporary-file-directory \"%s\")"
+                                                 temporary-file-directory)
                                 "--eval" (format "(setq i %d)" i)
                                 "--load" (or eln-path elc-path)
                                 "--funcall" "org-node-worker--collect")

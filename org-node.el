@@ -45,9 +45,13 @@
 ;;; API not used inside this package
 
 (defun org-node-at-point ()
-  (gethash (org-id-get nil nil nil t) org-nodes))
+  "Return the ID-node at point.
+This may refer to the current heading, else an ancestor heading,
+else the file-level node."
+  (gethash (org-entry-get nil "ID" t) org-nodes))
 
 (defun org-node-read ()
+  "Prompt for a known node."
   (gethash (completing-read "Node: " org-node-collection
                             () () () 'org-node-hist)
            org-node-collection))
@@ -59,6 +63,8 @@
   "Minibuffer history.")
 
 (defun org-node-guess-or-ask-dir (prompt)
+  "Maybe ask for a directory, prompting with PROMPT.
+Behavior depends on the setting of `org-node-ask-directory'."
   (if (eq t org-node-ask-directory)
       (read-directory-name (prompt))
     (if (stringp org-node-ask-directory)
@@ -141,6 +147,16 @@ a small wrapper such as:
     (:success
      (setq org-node-proposed-title nil)
      (setq org-node-proposed-id nil))))
+
+(defun org-node--goto (node)
+  "Visit NODE."
+  (find-file (org-node-get-file-path node))
+  (widen)
+  (goto-char (org-node-get-pos node))
+  (when (org-node-get-is-subtree node)
+    (org-reveal)
+    (recenter 5)
+    (org-end-of-meta-data)))
 
 (defun org-node-capture-target ()
   "Can be used as TARGET in a capture template.
@@ -257,16 +273,6 @@ gets some necessary variables."
           (save-buffer)
           ;; Because we didn't use `org-id-get-create'
           (org-id-add-location org-node-proposed-id path-to-write))))))
-
-(defun org-node--goto (node)
-  "Visit NODE."
-  (find-file (org-node-get-file-path node))
-  (widen)
-  (goto-char (org-node-get-pos node))
-  (when (org-node-get-is-subtree node)
-    (org-reveal)
-    (recenter 5)
-    (org-end-of-meta-data)))
 
 
 ;;; Commands
