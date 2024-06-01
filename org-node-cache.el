@@ -22,33 +22,30 @@ time."
         (add-hook 'after-save-hook #'org-node-cache-rescan-file)
         (advice-add #'rename-file :after #'org-node-cache-rescan-file)
         (advice-add #'delete-file :before #'org-node-cache--handle-delete)
-        (org-node-cache-ensure nil t t))
+        (org-node-cache-ensure 'async t))
     (remove-hook 'after-save-hook #'org-node-cache-rescan-file)
     (advice-remove #'rename-file #'org-node-cache-rescan-file)
     (advice-remove #'delete-file #'org-node-cache--handle-delete)))
 
-(defun org-node-cache-ensure (&optional synchronous force _polite-init)
+(defun org-node-cache-ensure (&optional synchronous force)
   "Ensure that `org-id-locations' and `org-nodes' are fresh.
 
 Initialize `org-id-locations' if it is not already, and ensure it
-is a hash table \(not an alist as it sometimes decides to be).
+is a hash table (not an alist, as it sometimes decides to be).
 Make sure `org-node-cache-mode' is enabled.
 
 Optional argument SYNCHRONOUS t means that if a reset is needed
-or ongoing, to block Emacs until it is done.
+or ongoing, to block Emacs until it is done.  When the argument
+is nil or the symbol `async', return immediately.
 
-Optional argument FORCE t means force a reset to happen \(but let
+Optional argument FORCE t means force a reset to happen (but let
 it happen asynchronously unless SYNCHRONOUS is also set).  Will
 not interrupt an already ongoing reset.
 
 Usually when FORCE is nil, this function effectively no-ops, so
-it is safe to put at the start of any command that uses org-node
-stuff.
-
-On a first-time run, force a synchronous reset no matter the
-arguments.
-
-\(fn &optional SYNCHRONOUS FORCE)"
+it is safe to put at the start of any user command.  It only
+really interferes with user experience if SYNCHRONOUS t and it
+takes your computer long to finish \\[org-node-reset]."
   ;; First just make sure we've loaded org-id's stuff from disk.
   (when (null org-id-locations)
     (when (file-exists-p org-id-locations-file)
@@ -65,8 +62,10 @@ arguments.
     ;; block Emacs until we've built a completion table.  Otherwise if we are
     ;; here because activating `org-node-cache-mode' got us here, do not block
     ;; Emacs.
-    (setq synchronous (not _polite-init))
+    (setq synchronous (if (eq synchronous 'async) nil t))
     (setq force t))
+  (when (eq synchronous 'async)
+    (setq synchronous nil))
   ;; Mandate `org-node-cache-mode'.  Note if this was called from the
   ;; initialization of `org-node-cache-mode' itself, the variable is already t,
   ;; so this cannot result in an infinite loop.
