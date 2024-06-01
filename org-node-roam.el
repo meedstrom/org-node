@@ -222,7 +222,7 @@ Designed as override advice for `org-roam-backlinks-get'."
   (delete-file org-roam-db-location)
   (emacsql-with-transaction (org-roam-db)
     (cl-loop
-     with nodes = (-filter #'org-node-id (hash-table-values org-nodes))
+     with nodes = (-filter #'org-node-get-id (hash-table-values org-nodes))
      with ctr = 0
      with max = (length nodes)
      for node in nodes
