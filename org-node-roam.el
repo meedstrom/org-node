@@ -216,6 +216,7 @@ Designed as override advice for `org-roam-backlinks-get'."
 (defun org-node-feed-roam-db ()
   (interactive)
   (require 'org-roam)
+  (require 'emacsql)
   (org-roam-db-clear-all)
   (org-roam-db--close)
   (delete-file org-roam-db-location)
@@ -232,6 +233,7 @@ Designed as override advice for `org-roam-backlinks-get'."
      (org-node--feed-links-to-roam-db (org-node-get-id node)))))
 
 (defun org-node-feed-file-to-roam-db ()
+  (require 'emacsql)
   (emacsql-with-transaction (org-roam-db)
     (cl-loop with file = (buffer-file-name)
              for node being the hash-values of org-nodes
