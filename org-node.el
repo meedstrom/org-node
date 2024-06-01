@@ -27,11 +27,13 @@
 
 ;;; Code:
 
+;; TODO Do not clear the tables until all processes have returned without fail
 ;; TODO What happens when we move a subtree to a different file but save the destination before saving the origin file?
 ;; TODO Annotations for completion?
 ;; TODO Completion categories? https://github.com/alphapapa/org-ql/issues/299
 ;; TODO Command to grep across all files
 ;; TODO Command to explore feedback arc sets
+;; TODO A test suite
 
 (require 'org-node-common)
 (require 'org-node-cache)
@@ -282,7 +284,7 @@ gets some necessary variables."
 To behave like `org-roam-node-find' when creating new nodes, set
 `org-node-creation-fn' to `org-node-new-by-roam-capture'."
   (interactive)
-  (org-node-cache-ensure t)
+  (org-node-cache-ensure)
   (let* ((input (completing-read "Node: " org-node-collection
                                  () () () 'org-node-hist))
          (node (gethash input org-node-collection)))
@@ -379,7 +381,7 @@ it to `org-node-insert-link-hook'."
 ;;;###autoload
 (defun org-node-random ()
   (interactive)
-  (org-node-cache-ensure t)
+  (org-node-cache-ensure)
   (org-node--goto (nth (random (hash-table-count org-nodes))
                        (hash-table-values org-nodes))))
 
