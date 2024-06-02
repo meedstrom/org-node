@@ -271,6 +271,7 @@ being renamed at once."
           (with-temp-file (org-node-worker--tmpfile "file-list-0.eld")
             (insert (prin1-to-string (org-node-files))))
           (delete-file (org-node-worker--tmpfile "demands-0.eld"))
+          (delete-file (org-node-worker--tmpfile "errors-0.eld"))
           (setq org-node-worker--demands nil)
           (setq i 0)
           (when editorconfig-mode
@@ -289,6 +290,7 @@ being renamed at once."
              (n-jobs (length file-lists)))
         (dotimes (i n-jobs)
           (delete-file (org-node-worker--tmpfile "demands-%d.eld" i))
+          (delete-file (org-node-worker--tmpfile "errors-%d.eld" i))
           (with-temp-file (org-node-worker--tmpfile "file-list-%d.eld" i)
             (insert (prin1-to-string (pop file-lists))))
           (push (make-process
@@ -324,8 +326,11 @@ being renamed at once."
       (clrhash org-node--reflinks-table)
       (clrhash org-node--links-table))
     (dotimes (i n-jobs)
-      (let ((file (org-node-worker--tmpfile "demands-%d.eld" i)))
-        (if (not (file-exists-p file))
+      (let ((demands-file (org-node-worker--tmpfile "demands-%d.eld" i))
+            (err-file (org-node-worker--tmpfile "errors-%d.eld" i)))
+        (when (file-exists-p err-file)
+          (message "org-node: problems scanning some files, see %s" err-file))
+        (if (not (file-exists-p demands-file))
             (progn
               ;; Had 1+ errors, so unhide the stderr buffer from now on
               (let ((buf (get-buffer " *org-node*")))
@@ -333,11 +338,11 @@ being renamed at once."
                   (setq org-node-cache--stderr "*org-node errors*")
                   (with-current-buffer buf
                     (rename-buffer org-node-cache--stderr))))
-              (message "An org-node worker failed to scan files, not producing %s.  See buffer %s."
-                       file org-node-cache--stderr))
+              (message "An org-node worker failed to scan files, not producing %s.  See buffer %s"
+                       demands-file org-node-cache--stderr))
           ;; Execute the demands that the worker wrote
           (with-temp-buffer
-            (insert-file-contents file)
+            (insert-file-contents demands-file)
             (dolist (demand (car (read-from-string (buffer-string))))
               (when (eq 'org-node--forget-id-location (car demand))
                 ;; Special case
