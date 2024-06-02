@@ -445,7 +445,8 @@ buffer is a temp buffer."
          ;; file, report the problem and continue to the next file
          (let ((print-length nil)
                (print-level nil))
-           (write-region (concat "\n\n" (prin1-to-string err))
+           (write-region (concat "\n\nProblems scanning " FILE ":"
+                                 "\n" (prin1-to-string err))
                          nil
                          (org-node-worker--tmpfile "errors-%d.eld" i)
                          'append)))))
