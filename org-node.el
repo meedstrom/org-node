@@ -28,13 +28,11 @@
 
 ;;; Code:
 
-;; TODO Do not clear the tables until all processes have returned without fail
 ;; TODO What happens when we move a subtree to a different file but save the destination before saving the origin file?
 ;; TODO Annotations for completion?
 ;; TODO Completion categories? https://github.com/alphapapa/org-ql/issues/299
 ;; TODO Command to grep across all files
 ;; TODO Command to explore feedback arc sets
-;; TODO A test suite
 
 (require 'org-node-common)
 (require 'org-node-cache)
@@ -706,12 +704,48 @@ user completes the replacements, finally rename the file itself."
 ;;;###autoload
 (defun org-node-forget-dir (dir)
   (interactive "DForget all IDs in directory: ")
+  (org-node-cache-ensure t)
   (let ((ctr 0))
     (dolist (file (-intersection (directory-files-recursively dir "\\.org$")
                                  (hash-table-values org-id-locations)))
       (message "Forgetting all IDs in file... (%d) %s" (cl-incf ctr) file)
       (org-node--forget-id-location file)))
   (org-id-locations-save))
+
+;; TODO: use a real tabulated-list
+;;;###autoload
+(defun org-node-lint-all-files ()
+  (interactive)
+  (org-node-cache-ensure t)
+  (let ((ctr 0)
+        (warnings nil)
+        (report-buffer (get-buffer-create "*org-node lint report*"))
+        (files (-uniq (hash-table-values org-id-locations))))
+    (display-buffer report-buffer)
+    (with-current-buffer report-buffer
+      (erase-buffer)
+      (insert "Org-Lint Results"
+              "\nTip: for a file with a lot of warnings, it may be more convenient to go there and type M-x org-lint"
+              "\n\nFile\tLine number\tTrust level\tWarning"))
+    (dolist (file files)
+      (message "Linting file... (%d/%d) %s"
+               (cl-incf ctr) (length files) file)
+      (org-node--with-file file
+        (setq warnings (org-lint)))
+      (when warnings
+        (with-current-buffer report-buffer
+          (goto-char (point-max))
+          (dolist (warning warnings)
+            (let ((arr (cadr warning)))
+              (insert "\n"
+                      file "\t"
+                      (elt arr 0) "\t"
+                      (elt arr 1) "\t"
+                      (elt arr 2)))))
+        (redisplay)))
+    (when (= 0 (buffer-size report-buffer))
+      (kill-buffer report-buffer)
+      (message "All good, no lint warnings!"))))
 
 (provide 'org-node)
 
