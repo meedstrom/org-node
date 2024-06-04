@@ -61,16 +61,16 @@ else the file-level node."
   "Minibuffer history.")
 
 (defun org-node-guess-or-ask-dir (prompt)
-  "Maybe ask for a directory, prompting with PROMPT.
-Behavior depends on the setting of `org-node-ask-directory'."
+  "Maybe prompt for a directory, and if so, show string PROMPT.
+Behavior depends on the user option `org-node-ask-directory'."
   (if (eq t org-node-ask-directory)
-      (read-directory-name (prompt))
+      (read-directory-name prompt)
     (if (stringp org-node-ask-directory)
         org-node-ask-directory
       (car (org-node--root-dirs (org-node-files t))))))
 
 (defun org-node-convert-link-to-super (&rest _)
-  "Wrapper for `org-super-links-convert-link-to-super'."
+  "Drop input and call `org-super-links-convert-link-to-super'."
   (require 'org-super-links)
   (org-super-links-convert-link-to-super nil))
 
