@@ -219,7 +219,7 @@ buffer is a temp buffer."
         ;; profiling shows a speedup.
         TITLE FILE-TITLE POS LEVEL HERE FAR
         TODO-STATE TAGS SCHED DEADLINE ID OLP FILE-TITLE-OR-BASENAME
-        PROPS FILE-TAGS FILE-ID OUTLINE-DATA TODO-RE)
+        PROPS FILE-TAGS FILE-ID OUTLINE-DATA TODO-RE FILE-TODO-SETTINGS)
     (dolist (FILE $files)
       (condition-case err
           (if (not (file-exists-p FILE))
@@ -267,10 +267,16 @@ buffer is a temp buffer."
                       nil))
               (setq TODO-RE
                     (if (re-search-forward $file-option-todo-re FAR t)
-                        (prog1
-                            (org-node-worker--make-todo-regexp
-                             (buffer-substring (point) (pos-eol)))
-                          (goto-char 1))
+                        (progn
+                          (setq FILE-TODO-SETTINGS nil)
+                          ;; Because you can have multiple #+todo: lines...
+                          (while (progn
+                                   (push (buffer-substring (point) (pos-eol)) FILE-TODO-SETTINGS)
+                                   (re-search-forward $file-option-todo-re FAR t)))
+                          (prog1
+                              (org-node-worker--make-todo-regexp
+                               (string-join FILE-TODO-SETTINGS " "))
+                            (goto-char 1)))
                       $global-todo-re))
               (setq FILE-TITLE (when (re-search-forward "^#\\+title: " FAR t)
                                  (org-node-worker--org-link-display-format
