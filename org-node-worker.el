@@ -316,12 +316,13 @@ buffer is a temp buffer."
                 (setq LEVEL (skip-chars-forward "*"))
                 (skip-chars-forward " ")
                 (setq HERE (point))
-                (if (looking-at TODO-RE)
-                    (progn
-                      (setq TODO-STATE (buffer-substring (point) (match-end 0)))
-                      (goto-char (1+ (match-end 0)))
-                      (setq HERE (point)))
-                  (setq TODO-STATE nil))
+                (let ((case-fold-search nil))
+                  (if (looking-at TODO-RE)
+                      (progn
+                        (setq TODO-STATE (buffer-substring (point) (match-end 0)))
+                        (goto-char (1+ (match-end 0)))
+                        (setq HERE (point)))
+                    (setq TODO-STATE nil)))
                 (if (re-search-forward " +\\(:.+:\\) *$" (pos-eol) t)
                     (progn
                       (setq TITLE (org-node-worker--org-link-display-format
