@@ -260,7 +260,7 @@ Does NOT try to validate the rest of the target's backlinks."
                 (without-restriction
                   (re-search-backward (concat "^[ \t]*:id: +" src-id))
                   (or (org-get-heading t t t t)
-                      (org-get-title)
+                      (cadar (org-collect-keywords '("TITLE")))
                       (file-name-nondirectory buffer-file-name)))))
              (src-link (org-link-make-string (concat "id:" src-id) src-title)))
         (org-node--with-file target-file

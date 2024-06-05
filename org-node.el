@@ -469,7 +469,7 @@ Can also operate on a file at given PATH."
     (setq path (buffer-file-name)))
   (unless (equal "org" (file-name-extension path))
     (user-error "File doesn't end in .org: %s" path))
-  (let* ((title (org-get-title))
+  (let* ((title (cadar (org-collect-keywords '("TITLE"))))
          (name (file-name-nondirectory path))
          (new-path (file-name-concat (file-name-directory path)
                                      (funcall org-node-slug-fn title)))
