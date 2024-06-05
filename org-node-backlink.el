@@ -210,8 +210,8 @@ Designed to run on `after-change-functions'."
 
 
 ;;; Link-insertion advice
-;; TODO: Simplify
 
+;; DEPRECATED
 (defvar org-node-backlink--fails nil
   "List of IDs that could not be resolved.")
 
@@ -227,7 +227,7 @@ merely a wrapper that drops the input."
   "For known link at point, leave a backlink in the target node.
 Does NOT try to validate the rest of the target's backlinks."
   (unless (derived-mode-p 'org-mode)
-    (user-error "Only works in org-mode buffers"))
+    (error "Called in non-org buffer"))
   (let ((elm (org-element-context)))
     (let ((path (org-element-property :path elm))
           (type (org-element-property :type elm))
@@ -253,13 +253,15 @@ Does NOT try to validate the rest of the target's backlinks."
 (defun org-node-backlink--add-in-target-1 (target-file target-id)
   (let ((case-fold-search t)
         (src-id (org-entry-get nil "ID" t)))
-    (when (and src-id (not (equal src-id target-id)))
-      (let* ((src-title (save-excursion
-                          (without-restriction
-                            (re-search-backward (concat "^[ \t]*:id: +" src-id))
-                            (or (org-get-heading t t t t)
-                                (org-get-title)
-                                (file-name-nondirectory (buffer-file-name))))))
+    (when (and src-id
+               (not (equal src-id target-id)))
+      (let* ((src-title
+              (save-excursion
+                (without-restriction
+                  (re-search-backward (concat "^[ \t]*:id: +" src-id))
+                  (or (org-get-heading t t t t)
+                      (org-get-title)
+                      (file-name-nondirectory buffer-file-name)))))
              (src-link (org-link-make-string (concat "id:" src-id) src-title)))
         (org-node--with-file target-file
           (let ((otm (bound-and-true-p org-transclusion-mode)))
