@@ -253,27 +253,24 @@ Does NOT try to validate the rest of the target's backlinks."
 (defun org-node-backlink--add-in-target-1 (target-file target-id)
   (let ((case-fold-search t)
         (src-id (org-entry-get nil "ID" t)))
-    (if (not src-id)
-        (message "Unable to find ID in file, so it won't get backlinks: %s"
-                 (buffer-file-name))
-      (unless (equal src-id target-id)
-        (let* ((src-title (save-excursion
-                            (without-restriction
-                              (re-search-backward (concat "^[ \t]*:id: +" src-id))
-                              (or (org-get-heading t t t t)
-                                  (org-get-title)
-                                  (file-name-nondirectory (buffer-file-name))))))
-               (src-link (org-link-make-string (concat "id:" src-id) src-title)))
-          (org-node--with-file target-file
-            (let ((otm (bound-and-true-p org-transclusion-mode)))
-              (when otm (org-transclusion-mode 0))
-              (goto-char (point-min))
-              (if (not (re-search-forward
-                        (concat "^[ \t]*:id: +" (regexp-quote target-id))
-                        nil t))
-                  (push target-id org-node-backlink--fails)
-                (org-node-backlink--add-here src-link src-id)
-                (when otm (org-transclusion-mode))))))))))
+    (when (and src-id (not (equal src-id target-id)))
+      (let* ((src-title (save-excursion
+                          (without-restriction
+                            (re-search-backward (concat "^[ \t]*:id: +" src-id))
+                            (or (org-get-heading t t t t)
+                                (org-get-title)
+                                (file-name-nondirectory (buffer-file-name))))))
+             (src-link (org-link-make-string (concat "id:" src-id) src-title)))
+        (org-node--with-file target-file
+          (let ((otm (bound-and-true-p org-transclusion-mode)))
+            (when otm (org-transclusion-mode 0))
+            (goto-char (point-min))
+            (if (not (re-search-forward
+                      (concat "^[ \t]*:id: +" (regexp-quote target-id))
+                      nil t))
+                (push target-id org-node-backlink--fails)
+              (org-node-backlink--add-here src-link src-id)
+              (when otm (org-transclusion-mode)))))))))
 
 (defun org-node-backlink--add-here (src-link src-id)
   (let ((backlinks-string (org-entry-get nil "BACKLINKS"))
