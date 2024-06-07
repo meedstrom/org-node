@@ -4,6 +4,14 @@
 ;;       `org-node-cache-rescan-file' is not enough to remove the link from
 ;;       the link table.  It gets corrected only on reset.
 
+;; FIXME Sometimes a backlink is correctly added and then immediately removed
+;;       upon saving the target file, because the cache is not in sync
+;;       (specifically the links tables).  Can be solved by either saving the
+;;       current buffer every time a link is inserted (not user-friendly), or
+;;       adding some placeholder in the tables.  In fact, add a placeholder to
+;;       `org-nodes' as well in case `org-id-get' finds an ID that isn't there
+;;       (it was prboably freshly created and file has not been saved yet)
+
 (require 'org-node-common)
 (require 'org-node-cache)
 
@@ -41,7 +49,7 @@
                  #'org-node-backlink--add-in-target-a t)))
 
 (defvar org-node-backlink--fix-ctr 0)
-(defvar org-node-backlink--fix-files nil)
+(defvar org-node-backlink--files-to-fix nil)
 
 (defun org-node-backlink-regret ()
   "Visit all IDs in `org-id-locations' and remove the :BACKLINKS:
@@ -52,17 +60,20 @@ property."
 (defun org-node-backlink-fix-all (&optional remove)
   "Add :BACKLINKS: property to all nodes known to `org-id-locations'.
 Optional argument REMOVE means remove them instead, the same
-as the user command \\[org-node-backlink-regret]."
+as the user command \\[org-node-backlink-regret].
+
+Can be canceled midway through and resumed later.  With
+\\[universal-argument], start over."
   (interactive)
-  (when (or (null org-node-backlink--fix-files) current-prefix-arg)
+  (when (or (null org-node-backlink--files-to-fix) current-prefix-arg)
     ;; Start over
     (org-node-cache-ensure t t)
-    (setq org-node-backlink--fix-files
+    (setq org-node-backlink--files-to-fix
           (-uniq (hash-table-values org-id-locations))))
   (when (or (not (= 0 org-node-backlink--fix-ctr)) ;; resume interrupted
             (and
              (y-or-n-p (format "Edit the %d files found in `org-id-locations'?"
-                               (length org-node-backlink--fix-files)))
+                               (length org-node-backlink--files-to-fix)))
              (y-or-n-p "You understand that this may trigger your auto git-commit systems and similar?")))
     (let ((find-file-hook nil)
           (org-mode-hook nil)
@@ -73,14 +84,13 @@ as the user command \\[org-node-backlink-regret]."
       ;; Do 1000 at a time, because Emacs cries about opening too many file
       ;; buffers in one loop
       (dotimes (_ 1000)
-        (when-let ((file (pop org-node-backlink--fix-files)))
-          (message
-           "Adding/updating :BACKLINKS:... (you may quit and resume anytime) (%d) %s"
-           (cl-incf org-node-backlink--fix-ctr) file)
+        (when-let ((file (pop org-node-backlink--files-to-fix)))
+          (message "Adding/updating :BACKLINKS:... (you may quit and resume anytime) (%d) %s"
+                   (cl-incf org-node-backlink--fix-ctr) file)
           (delay-mode-hooks
             (org-node--with-file file
               (org-node-backlink--update-whole-buffer remove))))))
-    (if org-node-backlink--fix-files
+    (if org-node-backlink--files-to-fix
         ;; Keep going
         (run-with-timer 1 nil #'org-node-backlink-fix-all remove)
       ;; Reset
@@ -201,12 +211,12 @@ Designed to run on `after-change-functions'."
               (set-marker end nil))))
       (( error debug )
        (if debug-on-error
+           ;; Sorry, people who set `debug-on-error' permanently to t, but you
+           ;; asked for it
            (signal (car err) (cdr err))
-         (lwarn 'org-node :error
-                "org-node-backlink--update-changed-parts-of-buffer: %S" err)))
+         (message "org-node: Updating backlinks ran into an issue: %S" err)))
       (( user-error debug )
-       (lwarn 'org-node :error
-              "org-node-backlink--update-changed-parts-of-buffer: %S" err)))))
+       (message "org-node: Updating backlinks ran into an issue: %S" err)))))
 
 
 ;;; Link-insertion advice
@@ -299,6 +309,16 @@ Does NOT try to validate the rest of the target's backlinks."
       (setq new-value src-link))
     (unless (equal backlinks-string new-value)
       (org-entry-put nil "BACKLINKS" new-value))))
+
+;;;###autoload
+(let (warned-once)
+  (defun org-node-backlinks-mode (&rest args)
+    (unless warned-once
+      (setq warned-once t)
+      (run-with-timer
+       .1 nil #'display-warning 'org-node
+       "Your config may have misspelled `org-node-backlink-mode' as `org-node-backlinks-mode'"))
+    (apply #'org-node-backlink-mode args)))
 
 (provide 'org-node-backlink)
 

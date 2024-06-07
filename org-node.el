@@ -27,7 +27,11 @@
 
 ;;; Code:
 
-;; TODO What happens when we move a subtree to a different file but save the destination before saving the origin file?
+;; TODO Option to do a first-level heading by default instead of file-level id
+;; TODO Renaming subtrees and saving them now simply grows the
+;;      org-node-collection so it holds both old and new names -- how to fix?
+;; TODO What happens when we move a subtree to a different file but save the
+;;      destination before saving the origin file?
 ;; TODO Annotations for completion?
 ;; TODO Completion categories? https://github.com/alphapapa/org-ql/issues/299
 ;; TODO Command to grep across all files
@@ -85,19 +89,24 @@ Behavior depends on the user option `org-node-ask-directory'."
           ".org"))
 
 (defun org-node-slugify-as-url (title)
-  "From TITLE, make a filename suitable as URL component.
+  "From TITLE, make a filename that looks nice as URL component.
 
 A title like \"Löb's Theorem\" becomes \"lobs-theorem.org\".
-Note that it retains Unicode symbols classified as alphabetic
-or numeric, so for example kanji and Greek letters remain.
+Note that while diacritical marks are stripped, it retains
+Unicode symbols classified as alphabetic or numeric, so for
+example kanji and Greek letters remain.
 
 As a surprise, it does NOT preface the name with a timestamp like
 many zettelkasten packages do.  If you want that, you can use
 a small wrapper such as:
 
-(setq org-node-slug-fn (lambda (title)
-                        (concat (format-time-string \"%Y%m%d%H%M%S-\")
-                                (org-node-slugify-as-url title))))"
+(setq org-node-slug-fn
+      (lambda (title)
+       (concat (format-time-string \"%Y%m%d%H%M%S-\")
+               (org-node-slugify-as-url title))))
+
+Applying the above to \"Löb's Theorem\" results in something like
+\"20240604223645-lobs-theorem.org\"."
   (concat
    (thread-last title
                 (string-glyph-decompose)
@@ -138,7 +147,7 @@ a small wrapper such as:
   (setq org-node-proposed-id id)
   (condition-case err
       (funcall org-node-creation-fn)
-    ((t debug error)
+    (( t debug error )
      (setq org-node-proposed-title nil)
      (setq org-node-proposed-id nil)
      (signal (car err) (cdr err)))
@@ -171,8 +180,9 @@ In simple terms, let's say you have a template targeting
     into there.
 
 Additionally, if you've set (setq org-node-creation-fn #'org-capture),
-commands like `org-node-find' will also outsource to capture when you
-type the name of a node that does not exist:
+commands like `org-node-find' will outsource to org-capture when you
+type the name of a node that does not exist.  That enables this
+\"inverted\" workflow:
 
 1. Run M-x org-node-find
 2. Type name of an unknown node
@@ -344,8 +354,8 @@ To behave like org-roam when creating new nodes, set
 `org-node-creation-fn' to `org-node-new-by-roam-capture'.
 
 If you still find the behavior different, perhaps you had
-something in `org-roam-post-node-insert-hook'.  Perhaps copy
-it to `org-node-insert-link-hook'."
+something in `org-roam-post-node-insert-hook'.  Configure
+`org-node-insert-link-hook' the same way."
   (interactive nil org-mode)
   (unless (derived-mode-p 'org-mode)
     (user-error "Only works in org-mode buffers"))
@@ -378,6 +388,7 @@ it to `org-node-insert-link-hook'."
 
 ;;;###autoload
 (defun org-node-random ()
+  "Visit a random node."
   (interactive)
   (org-node-cache-ensure)
   (org-node--goto (nth (random (hash-table-count org-nodes))
@@ -396,8 +407,7 @@ but adapt to the surrounding outline level.  I recommend
 adding keywords to the things to exclude:
 
 (setq org-transclusion-exclude-elements
-       '(property-drawer comment keyword))
-"
+      '(property-drawer comment keyword))"
   (interactive nil org-mode)
   (unless (derived-mode-p 'org-mode)
     (error "Only works in org-mode buffers"))
@@ -421,7 +431,7 @@ adding keywords to the things to exclude:
       ;; If the target is a subtree rather than file-level node, I'd like to
       ;; cut out the initial heading because we already made a heading.  (And
       ;; we made the heading so that this transclusion will count as a
-      ;; backlink, plus it makes sense on export to HTML).
+      ;; backlink, plus it makes more sense to me on export to HTML).
       ;;
       ;; Unfortunately the :lines trick would prevent
       ;; `org-transclusion-exclude-elements' from having an effect, and the
@@ -430,9 +440,8 @@ adding keywords to the things to exclude:
       ;; `org-transclusion-exclude-elements', or make a different argument like
       ;; ":no-initial-heading"
       ;;
-      ;; For now, just let it nest an extra heading. Looks odd but doesn't
+      ;; For now, just let it nest an extra heading. Looks odd, but doesn't
       ;; break things.
-
       (goto-char (marker-position m1))
       (set-marker m1 nil)
       (run-hook-with-args 'org-node-insert-link-hook id title))))
@@ -461,7 +470,9 @@ adding keywords to the things to exclude:
 ;;;###autoload
 (defun org-node-rename-file-by-title (&optional path)
   "Rename the current file according to `org-node-slug-fn'.
-Can also operate on a file at given PATH."
+
+When called from Lisp, can take argument PATH to operate on the
+file located there."
   (interactive nil org-mode)
   (unless (derived-mode-p 'org-mode)
     (user-error "Only works in org-mode buffers"))
@@ -500,23 +511,25 @@ Can also operate on a file at given PATH."
 
 ;;;###autoload
 (defun org-node-rewrite-links-ask (&optional file)
-  "Look for links to update to match the current title.
-Prompt the user for each one."
+  "Search all files for ID-links where the link description has
+gotten out of sync from the destination's title.
+
+At each link, prompt for user consent, then auto-update it so it
+reflects the current title."
   (interactive)
   (require 'ol)
   (defface org-node-rewrite-links-face
-    '((t :inherit 'org-link))
+    '((t :inherit 'org-link
+       :inverse-video (not (face-inverse-video-p 'org-link))))
     "Face for use in `org-node-rewrite-links-ask'.")
   (org-node-cache-ensure)
-  (set-face-inverse-video 'org-node-rewrite-links-face
-                          (not (face-inverse-video-p 'org-link)))
   (when (org-node--consent-to-problematic-modes-for-mass-op)
-    (dolist (file (if file (list file) (org-node-files)))
+    (dolist (file (if file (list file) (org-node-files t)))
       (org-node--with-file file
         (goto-char (point-min))
         (while-let ((end (re-search-forward org-link-bracket-re nil t)))
           (let* ((beg (match-beginning 0))
-                 (link (match-string 0))
+                 (link (substring-no-properties (match-string 0)))
                  (parts (split-string link "]\\["))
                  (target (substring (car parts) 2))
                  (desc (when (cadr parts)
@@ -529,13 +542,12 @@ Prompt the user for each one."
                  (answered-yes nil))
             (when (and id node desc
                        (not (string-equal-ignore-case desc true-title))
-                       (not (member-ignore-case desc
-                                                (org-node-get-aliases node))))
+                       (not (member-ignore-case
+                             desc (org-node-get-aliases node))))
               (switch-to-buffer (current-buffer))
               (org-reveal)
               (recenter)
               (highlight-regexp (rx (literal link)) 'org-node-rewrite-links-face)
-              ;; (highlight-regexp (rx (literal link)))
               (unwind-protect
                   (setq answered-yes (y-or-n-p
                                       (format "Rewrite link? Will become: \"%s\""
@@ -547,10 +559,12 @@ Prompt the user for each one."
                   (delete-region beg end)
                   (insert (org-link-make-string target true-title)))
                 ;; Give user 110+ ms to glimpse the result before moving on
+                ;; so they have a chance to see if something went wildly wrong
                 (redisplay)
                 (sleep-for .11))
               (goto-char end))))))))
 
+;; TODO: check what happens with invisible stuff
 ;;;###autoload
 (defun org-node-extract-subtree ()
   "Extract subtree at point into a file of its own.
@@ -558,27 +572,33 @@ Leave a link in the source file, and show the newly created buffer.
 
 You may find it a common situation that the subtree had not yet
 been assigned an ID or any other property that you normally
-assign.  Thus, this creates an ID for you, copies over
-any inherited tags, and runs `org-node-creation-hook'.
+assign.  Thus, this creates an ID for you if there was no ID,
+copies over any inherited tags, and runs
+`org-node-creation-hook'.
 
-Adding to that, here is an example advice to copy any inherited
-\"CREATED\" property, if an ancestor has such a property:
+Adding to that, see below for an example advice that copies any
+inherited \"CREATED\" property, if an ancestor has such a
+property.  It is subjective whether you'd want this behavior, but
+it can be desirable if you know the subtree had been part of the
+source file for ages so that you see the ancestor's creation-date
+as more \"truthful\".
 
 (advice-add 'org-node-extract-subtree :around
-            (defun my-inherit-creation-date (fn &rest args)
+            (defun my-inherit-creation-date (orig-fn &rest args)
               (let ((inherited-creation-date
                      (save-excursion
                        (while (not (or (org-entry-get nil \"CREATED\")
                                        (bobp)))
                          (org-up-heading-or-point-min))
                        (org-entry-get nil \"CREATED\"))))
-                (apply fn args)
+                (apply orig-fn args)
+                ;; Now in the new buffer
                 (org-entry-put nil \"CREATED\"
                                (or inherited-creation-date
                                    (format-time-string \"[%F]\")))))))"
   (interactive nil org-mode)
   (unless (derived-mode-p 'org-mode)
-    (user-error "Only works in org-mode buffers"))
+    (user-error "This command expects an org-mode buffer"))
   (org-node-cache-ensure)
   (let ((dir (org-node-guess-or-ask-dir "Extract to new file in directory: ")))
     (save-excursion
@@ -590,10 +610,12 @@ Adding to that, here is an example advice to copy any inherited
              (boundary (save-excursion
                          (org-end-of-meta-data t)
                          (point)))
-             ;; Why is category autocreated by `org-entry-properties'...
-             (category (save-excursion
-                         (when (search-forward ":category:" boundary t)
-                           (org-entry-get nil "CATEGORY"))))
+             ;; Why is category autocreated by `org-entry-properties'...  It's
+             ;; an invisible property that's always present and usually not
+             ;; interesting, unless user has entered some explicit value
+             (explicit-category (save-excursion
+                                  (when (search-forward ":category:" boundary t)
+                                    (org-entry-get nil "CATEGORY"))))
              (properties (--filter (not (equal "CATEGORY" (car it)))
                                    (org-entry-properties nil 'standard)))
              (path-to-write (file-name-concat
@@ -637,6 +659,8 @@ the user a wgrep buffer of the search hits, and start an
 interactive search-replace that updates the links.  After the
 user completes the replacements, finally rename the file itself."
   (interactive)
+  (unless (fboundp 'wgrep-change-to-wgrep-mode)
+    (user-error "This command requires the wgrep package"))
   (require 'wgrep)
   (let ((root (car (org-node--root-dirs (org-node-files))))
         (default-directory default-directory))
@@ -674,7 +698,7 @@ user completes the replacements, finally rename the file itself."
 
 ;;;###autoload
 (defun org-node-insert-heading ()
-  "Insert a heading with ID and properties."
+  "Insert a heading with ID and run `org-node-creation-hook'."
   (interactive nil org-mode)
   (org-insert-heading)
   (org-node-nodeify-entry))
@@ -725,7 +749,7 @@ user completes the replacements, finally rename the file itself."
       (erase-buffer)
       (insert "Org-Lint Results"
               "\nTip: for a file with a lot of warnings, it may be more convenient to go there and type M-x org-lint"
-              "\n\nFile\tLine number\tTrust level\tWarning"))
+              "\n\nFile\t Line number\t Trust level\t Warning"))
     (dolist (file files)
       (message "Linting file... (%d/%d) %s"
                (cl-incf ctr) (length files) file)
@@ -735,14 +759,18 @@ user completes the replacements, finally rename the file itself."
         (with-current-buffer report-buffer
           (goto-char (point-max))
           (dolist (warning warnings)
-            (let ((arr (cadr warning)))
+            (let ((array (cadr warning)))
               (insert "\n"
                       file "\t"
-                      (elt arr 0) "\t"
-                      (elt arr 1) "\t"
-                      (elt arr 2)))))
+                      (elt array 0) "\t"
+                      (elt array 1) "\t"
+                      (elt array 2)))))
         (redisplay)))
-    (when (= 0 (buffer-size report-buffer))
+    (when (with-current-buffer report-buffer
+            (save-excursion
+              (goto-char (point-min))
+              (forward-line 4)
+              (eobp)))
       (kill-buffer report-buffer)
       (message "All good, no lint warnings!"))))
 

@@ -53,7 +53,7 @@ variable non-nil may cause org-node to fail to scan some of them."
   :group 'org-node
   :type '(choice coding-system (const nil)))
 
-(defcustom org-node-perf-keep-file-name-handlers '(epa-file-handler)
+(defcustom org-node-perf-keep-file-name-handlers nil
   "Which file handlers to respect while scanning for ID nodes.
 
 Normally, `file-name-handler-alist' reacts specially to seeing
@@ -61,8 +61,7 @@ some file names: TRAMP paths, compressed files or .org.gpg files.
 
 It's infamous for (somewhat) slowing down the access of very many
 files, since it is a series of regexps applied to every file name
-encountered.  With fewer members in this list, `org-node-reset'
-can work faster."
+visited.  The smaller this list, the faster `org-node-reset'."
   :group 'org-node
   :type '(choice (const :tag "Keep all" t)
           (set
@@ -99,19 +98,21 @@ Built-in choices:
 
 (defcustom org-node-creation-fn #'org-node-new-file
   "Function called by `org-node-find' and `org-node-insert-link' to
-create a node.
+create a node that does not yet exist.
 
-Some built-in options
+Built-in choices:
 - `org-node-new-file'
 - `org-node-new-by-roam-capture'
 - `org-capture'
 
-The option `org-capture' requires some assembly, see
-`org-node-capture-target'.
+If you choose `org-capture' here, configure
+`org-capture-templates' such that some capture templates use
+`org-node-capture-target' as their target, else it is pointless.
 
-If you wish to write a custom function, know that during
-execution, two variables are available: `org-node-proposed-title'
-and `org-node-proposed-id'.  Use them."
+If you wish to write a custom function instead of any of the
+above three choies, know that two variables are set at the time
+the function is called: `org-node-proposed-title' and
+`org-node-proposed-id', which you are expected to respect."
   :group 'org-node
   :type '(choice
           (function-item org-node-new-file)
@@ -198,57 +199,68 @@ are tagged :drill:, or where the full file path contains the word
   :group 'org-node
   :type 'function)
 
-;; TODO: maybe permit .org.gpg and .org.gz
 (defcustom org-node-extra-id-dirs (list)
-  "Like `org-id-extra-files', but expressed as directories.
+  "Directories in which to look for Org files to search for IDs.
 
-Intended to have the same convenience as setting
-`org-agenda-files', informing org-id about every Org file that
-exists within these directories (and subdirectories and
-sub-subdirectories and so on).
+Same idea as `org-id-extra-files', but specify directories to
+achieve a similar convenience to `org-agenda-files'.
 
-For it to have an effect, `org-node-cache-mode' must be active.
+Unlike with `org-agenda-files', directories listed here may be
+scanned again in order to find new files that have appeared.
 
-To avoid accidentally picking up versioned backups, causing
-org-id to complain about \"duplicate\" IDs, configure
-`org-node-extra-id-dirs-exclude'."
+These directories are only scanned as long as
+`org-node-cache-mode' is active.  They are scanned
+recursively (looking in subdirectories, sub-subdirectories etc).
+
+To avoid accidentally picking up duplicate files such as
+versioned backups, causing org-id to complain about \"duplicate
+IDs\", configure `org-node-extra-id-dirs-exclude'.
+
+Tip: If it happened anyway, try \\[org-node-forget-dir].  Merely
+removing a directory from this list does not forget the IDs
+already found."
   :group 'org-node
   :type '(repeat directory))
 
+;; TODO: figure out how to permit .org.gpg and fail gracefully if
+;;       the EPG settings are insufficient
+;; TODO: test permitting .org.gz
 (defcustom org-node-extra-id-dirs-exclude
   '("/logseq/bak/"
     "/logseq/version-files/"
     ".sync-conflict-")
-  "Substrings of file paths that say a file should be ignored.
+  "Substrings of file paths to avoid checking for IDs.
 
-This option has to do only with how to find files within
-`org-node-extra-id-dirs', so that you have a way to prevent
-org-id from looking inside versioned backup files and then
-complain about \"duplicate\" IDs.
+This option only influences how the function `org-node-files'
+should seek files found in `org-node-extra-id-dirs'.  It is meant
+as a way to avoid collecting IDs inside versioned backup files
+causing org-id to complain about \"duplicate IDs\".
 
-For all other purposes, you probably want to configure
-`org-node-filter-fn' instead.
+For all other \"excludey\" purposes, you probably want to
+configure `org-node-filter-fn' instead.
 
 It is not necessary to exclude backups or autosaves that end in ~
-or # since `org-node-files' already only considers files that end
-in exactly \".org\"."
+or # or .bak since `org-node-files' only considers files that end
+in precisely \".org\" anyway."
   :group 'org-node
   :type '(repeat string))
 
 
 
 (defmacro org-node--with-file (file &rest body)
-  "Backport of the `org-with-file-buffer' concept.
-Also integrates `org-with-wide-buffer' behavior.
+  "Pseudo-backport of Emacs 29 `org-with-file-buffer'.
+Also integrates `org-with-wide-buffer' behavior and some
+magic around saving.
 
-If a buffer was visiting FILE, go to that buffer, else visit it
-in a new buffer.  With that as the current buffer, execute BODY.
-Finally:
+In short, if a buffer was visiting FILE, go to that existing
+buffer, else visit FILE in a new buffer, in which case ignore
+`org-mode-hook' and the usual Org startup checks.  With that as
+the current buffer, execute BODY.  Finally:
 
-- If a new buffer had to be opened, save and kill it.
-- If a buffer had been open, but it was unmodified before running
-  BODY, keep it open and save any changes.
-- If a buffer had been open, and modified, keep it open and leave
+- If a new buffer had to be opened: save and kill it.
+- If a buffer had been open, but it was unmodified before
+  executing BODY: leave it open and save any changes.
+- If a buffer had been open, and modified: leave it open and leave
   it unsaved."
   (declare (indent 1) (debug t))
   ;; REVIEW: do these perf hacks or don't?
@@ -275,14 +287,12 @@ Finally:
 ;; TODO: Diff the old value with the new value and schedule a targeted caching
 ;;       of any new files that appeared.
 (let (mem)
-  (defun org-node-files (&optional instant)
+  (defun org-node-files (&optional memoized)
     "List files in `org-id-locations' or `org-node-extra-id-dirs'.
 
-With argument INSTANT t, reuse a result from the last time
-something called this function.  Else you may get a momentary
-delay when thousands of files are involved, which may not be
-desirable in an user-facing command."
-    (if (and instant mem)
+With argument MEMOIZED t, reuse a result from the last time
+something called this function, returning instantly."
+    (if (and memoized mem)
         mem
       (setq mem
             (-union
@@ -388,9 +398,9 @@ you'd have to cross-reference with `org-node--refs-table'.")
 
 ;;; Data structure
 
-;; A struct was pointless while I developed the package for my own use, plists
-;; did fine, but now that it has users... the problem with `plist-get' is I can
-;; never rename any of the data fields.
+;; While I developed the package for my own use, I didn't need a struct.
+;; Plists did fine, but now that it has users... the problem with `plist-get'
+;; is I can never rename any of the data fields.
 ;;
 ;; If you use `plist-get' to fetch a key that doesn't exist, it just quietly
 ;; returns nil, no error, no warning.  (Bad for an API!)  Let's say I want to
@@ -399,7 +409,34 @@ you'd have to cross-reference with `org-node--refs-table'.")
 ;; `org-node-get-roam-exclude', I can override it so it emits a warning.
 
 (cl-defstruct org-node-data
-  "To get e.g. a node's title, use `(org-node-get-title NODE)'."
+  "An org-node data object holds information about an Org ID
+node.  By the term \"Org ID node\", we mean either a subtree with
+an ID property, or a file with a file-level ID property.  The
+information is stored in slots listed below.
+
+For each slot, there exists an accessor function
+\"org-node-get-FIELD\".
+
+For example, the field \"deadline\" has an accessor
+`org-node-get-deadline'.  So you would type
+\"(org-node-get-deadline NODE)\", where NODE is one of the
+elements of the `hash-table-values' of `org-nodes'.
+
+(Technically, there also exists a function alias to
+`org-node-get-deadline', called `org-node-data-deadline', but its
+use is discouraged.)
+
+For real-world usage of these accessors, see examples in the
+documentation of `org-node-filter-fn', the documentation of
+`org-node-format-candidate-fn', or the package README.
+
+You may be able to find the README by typing:
+
+    M-x find-library RET org-node RET
+
+or you can visit the homepage:
+
+    https://github.com/meedstrom/org-node"
   (aliases    nil :read-only t :type list    :documentation
               "List of ROAM_ALIASES.")
   (deadline   nil :read-only t :type string  :documentation
@@ -438,19 +475,17 @@ you'd have to cross-reference with `org-node--refs-table'.")
 ;; It's one letter shorter, and a verb.  Function names read better as verbs,
 ;; and while it may not be necessary for a struct accessor, then consider an
 ;; accessor like "org-node-data-title": what does this mean?  The title of the
-;; data, or the title of the node?  Much less confusion with
-;; "org-node-get-title"!
+;; data, or the title of the node?
 ;;
 ;; Of course it could've been just "org-node-title", which is free of the above
 ;; confusion, but has its own issues.  First (1) the package itself is also
 ;; called "org-node", so this pollutes the namespace.  When you search for
-;; functions, you're unsure what's a struct accessor and what may be commands
-;; that have nothing to do with the struct.
+;; functions and variables, you're unsure what's related to the struct and
+;; what's not.
 ;;
 ;; Additionally (2), it's good to distinguish the concept of an ID node
 ;; (meaning an Org file, or a heading in an Org file) from the concept of a
-;; metadata object about that ID node.  The sentence "snow is white" is true if
-;; and only if snow is white, and all that.
+;; metadata object holding info about that ID node.
 (defalias 'org-node-get-aliases    #'org-node-data-aliases)
 (defalias 'org-node-get-deadline   #'org-node-data-deadline)
 (defalias 'org-node-get-file-path  #'org-node-data-file-path)
