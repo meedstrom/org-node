@@ -6,6 +6,10 @@
   (require 'cl-macs)
   (require 'subr-x))
 
+(defmacro org-node-worker--while-progn (&rest body)
+  "Lets you indent less than a (while (progn)) form."
+  `(while (progn ,@body)))
+
 (defun org-node-worker--tmpfile (&optional basename &rest args)
   "Return a path that puts BASENAME in a temporary directory.
 Usually the result will be /tmp/org-node/BASENAME, but it depends
@@ -240,7 +244,9 @@ buffer is a temp buffer."
               (goto-char 1)
               (setq OUTLINE-DATA nil)
               ;; Roughly like `org-end-of-meta-data' for file level
-              (setq FAR (or (re-search-forward "^ *?[^#:]" nil t) (point-max)))
+              (if (re-search-forward "^ *?[^#:]" nil t)
+                  (setq FAR (1- (point)))
+                (setq FAR (point-max)))
               (goto-char 1)
               (setq PROPS
                     (if (re-search-forward "^[[:space:]]*:properties:" FAR t)
@@ -314,136 +320,141 @@ buffer is a temp buffer."
                       org-node-worker--demands))
 
               ;; Loop over the file's subtrees
-              (while (org-node-worker--next-heading)
-                (setq POS (point))
-                (setq LEVEL (skip-chars-forward "*"))
-                (skip-chars-forward " ")
-                (setq HERE (point))
-                (let ((case-fold-search nil))
-                  (if (looking-at TODO-RE)
-                      (progn
-                        (setq TODO-STATE (buffer-substring (point) (match-end 0)))
-                        (goto-char (1+ (match-end 0)))
-                        (setq HERE (point)))
-                    (setq TODO-STATE nil)))
-                (if (re-search-forward " +\\(:.+:\\) *$" (pos-eol) t)
-                    (progn
-                      (setq TITLE (org-node-worker--org-link-display-format
-                                   (buffer-substring HERE (match-beginning 0))))
-                      (setq TAGS (split-string (match-string 1) ":" t)))
-                  (setq TITLE
-                        (org-node-worker--org-link-display-format
-                         (buffer-substring HERE (pos-eol))))
-                  (setq TAGS nil))
-                ;; Now we must be careful.  Imagine this subtree is just a
-                ;; heading, empty of content, and the very next line is another
-                ;; heading.  Gotta go forward 1 line, see if it is a
-                ;; planning-line, and if it is, then go forward 1 more line, and
-                ;; if that is a :PROPERTIES: line, then we know it belongs to the
-                ;; current subtree.  If we had just allowed the search for
-                ;; :PROPERTIES: to cross 2 lines, we could have matched a
-                ;; property drawer for the wrong heading.  Of course
-                ;; `narrow-to-region' could guard us against this kind of thing,
-                ;; but with this algorithm as solid as it is now, that'd be a
-                ;; superfluous instruction that just increases the amount of
-                ;; large point motions.
-                (forward-line 1)
-                (setq HERE (point))
-                (setq FAR (pos-eol))
-                (setq SCHED
-                      (if (re-search-forward "[[:space:]]*SCHEDULED:" FAR t)
-                          (prog1 (buffer-substring
-                                  ;; \n just there for safety
-                                  (point)
-                                  (+ 1 (point) (skip-chars-forward "^]>\n")))
-                            (goto-char HERE))
-                        nil))
-                (setq DEADLINE
-                      (if (re-search-forward "[[:space:]]*DEADLINE:" FAR t)
-                          (prog1 (buffer-substring
-                                  (point)
-                                  (+ 1 (point) (skip-chars-forward "^]>\n")))
-                            (goto-char HERE))
-                        nil))
-                (when (or SCHED
-                          DEADLINE
-                          (re-search-forward "[[:space:]]*CLOSED:" FAR t))
-                  ;; Alright, so there was a planning-line, meaning any
-                  ;; :PROPERTIES: must be on the next line.
-                  (forward-line 1)
-                  (setq FAR (pos-eol)))
-                (setq PROPS
-                      (if (re-search-forward "^[[:space:]]*:properties:" FAR t)
-                          (progn
-                            (forward-line 1)
-                            (org-node-worker--collect-properties
-                             (point)
-                             ;; TODO: Can we better handle a missing :END:?
-                             ;; Thinking the function above can do verification.
-                             (if (re-search-forward "^[[:space:]]*:end:" nil t)
-                                 (prog1 (pos-bol)
-                                   ;; For safety in case seeking :END: landed us
-                                   ;; way down the file.  Some error will hopefully
-                                   ;; be printed about this subtree, but we can
-                                   ;; keep going sanely from here on.
-                                   (goto-char FAR))
-                               (error "Couldn't find matching :END: drawer in file %s at position %d"
-                                      FILE (point)))
-                             FILE))
-                        nil))
-                (setq ID (cdr (assoc "ID" PROPS)))
-                (push (list POS TITLE LEVEL ID) OUTLINE-DATA) ;; nil ID allowed
-                (when ID
-                  (when $targeted
-                    ;; Called by a rename-file advice
-                    (push `(org-id-add-location ,ID ,FILE)
-                          org-node-worker--demands))
-                  (setq OLP (org-node-worker--pos->olp OUTLINE-DATA POS))
-                  (push `(org-node-cache--add-node-to-tables
-                          ,(list :title TITLE
-                                 :is-subtree t
-                                 :level LEVEL
-                                 :id ID
-                                 :pos POS
-                                 :tags TAGS
-                                 :todo TODO-STATE
-                                 :file-path FILE
-                                 :scheduled SCHED
-                                 :deadline DEADLINE
-                                 :file-title FILE-TITLE
-                                 :file-title-or-basename FILE-TITLE-OR-BASENAME
-                                 :olp OLP
-                                 :properties PROPS
-                                 :aliases
-                                 (split-string-and-unquote
-                                  (or (cdr (assoc "ROAM_ALIASES" PROPS)) ""))
-                                 :refs
-                                 (split-string-and-unquote
-                                  (or (cdr (assoc "ROAM_REFS" PROPS)) ""))))
-                        org-node-worker--demands))
-                ;; Now collect links while we're here!
-                ;; REVIEW: Oddly, the number of ID-links drops somewhat when I do
-                ;; a save-restriction and narrow to a subtree at a time. Why
-                ;; might that be?
-                (let ((ID-HERE (or ID (org-node-worker--pos->parent-id
-                                       OUTLINE-DATA POS FILE-ID))))
-                  (when ID-HERE
-                    (let ((END (save-excursion
-                                 (when (org-node-worker--next-heading)
-                                   (1- (point)))))
-                          (OLP-WITH-SELF (append OLP (list TITLE))))
-                      ;; Don't count org-super-links backlinks
-                      (when (re-search-forward $backlink-drawer-re END t)
-                        (unless (search-forward ":end:" END t)
-                          (error "Couldn't find matching :END: drawer in file %s at position %d"
-                                 FILE (point))))
-                      (org-node-worker--collect-links-until
-                       END ID-HERE OLP-WITH-SELF $link-re)
-                      ;; Gotcha... also collect links inside the heading, not
-                      ;; just the body text
-                      (goto-char POS)
-                      (org-node-worker--collect-links-until
-                       (pos-eol) ID-HERE OLP-WITH-SELF $link-re)))))))
+              ;; This initial condition supports the special case where
+              ;; the very first line of a file is a heading
+              (when (or (looking-at-p "\\*")
+                        (org-node-worker--next-heading))
+                (org-node-worker--while-progn
+                 (setq POS (point))
+                 (setq LEVEL (skip-chars-forward "*"))
+                 (skip-chars-forward " ")
+                 (setq HERE (point))
+                 (let ((case-fold-search nil))
+                   (if (looking-at TODO-RE)
+                       (progn
+                         (setq TODO-STATE (buffer-substring (point) (match-end 0)))
+                         (goto-char (1+ (match-end 0)))
+                         (setq HERE (point)))
+                     (setq TODO-STATE nil)))
+                 (if (re-search-forward " +\\(:.+:\\) *$" (pos-eol) t)
+                     (progn
+                       (setq TITLE (org-node-worker--org-link-display-format
+                                    (buffer-substring HERE (match-beginning 0))))
+                       (setq TAGS (split-string (match-string 1) ":" t)))
+                   (setq TITLE
+                         (org-node-worker--org-link-display-format
+                          (buffer-substring HERE (pos-eol))))
+                   (setq TAGS nil))
+                 ;; Now we must be careful.  Imagine this subtree is just a
+                 ;; heading, empty of content, and the very next line is another
+                 ;; heading.  Gotta go forward 1 line, see if it is a
+                 ;; planning-line, and if it is, then go forward 1 more line, and
+                 ;; if that is a :PROPERTIES: line, then we know it belongs to the
+                 ;; current subtree.  If we had just allowed the search for
+                 ;; :PROPERTIES: to cross 2 lines, we could have matched a
+                 ;; property drawer for the wrong heading.  Of course
+                 ;; `narrow-to-region' could guard us against this kind of thing,
+                 ;; but with this algorithm as solid as it is now, that'd be a
+                 ;; superfluous instruction that just increases the amount of
+                 ;; large point motions.
+                 (forward-line 1)
+                 (setq HERE (point))
+                 (setq FAR (pos-eol))
+                 (setq SCHED
+                       (if (re-search-forward "[[:space:]]*SCHEDULED:" FAR t)
+                           (prog1 (buffer-substring
+                                   ;; \n just there for safety
+                                   (point)
+                                   (+ 1 (point) (skip-chars-forward "^]>\n")))
+                             (goto-char HERE))
+                         nil))
+                 (setq DEADLINE
+                       (if (re-search-forward "[[:space:]]*DEADLINE:" FAR t)
+                           (prog1 (buffer-substring
+                                   (point)
+                                   (+ 1 (point) (skip-chars-forward "^]>\n")))
+                             (goto-char HERE))
+                         nil))
+                 (when (or SCHED
+                           DEADLINE
+                           (re-search-forward "[[:space:]]*CLOSED:" FAR t))
+                   ;; Alright, so there was a planning-line, meaning any
+                   ;; :PROPERTIES: must be on the next line.
+                   (forward-line 1)
+                   (setq FAR (pos-eol)))
+                 (setq PROPS
+                       (if (re-search-forward "^[[:space:]]*:properties:" FAR t)
+                           (progn
+                             (forward-line 1)
+                             (org-node-worker--collect-properties
+                              (point)
+                              ;; TODO: Can we better handle a missing :END:?
+                              ;; Thinking the function above can do verification.
+                              (if (re-search-forward "^[[:space:]]*:end:" nil t)
+                                  (prog1 (pos-bol)
+                                    ;; For safety in case seeking :END: landed us
+                                    ;; way down the file.  Some error will hopefully
+                                    ;; be printed about this subtree, but we can
+                                    ;; keep going sanely from here on.
+                                    (goto-char FAR))
+                                (error "Couldn't find matching :END: drawer in file %s at position %d"
+                                       FILE (point)))
+                              FILE))
+                         nil))
+                 (setq ID (cdr (assoc "ID" PROPS)))
+                 (push (list POS TITLE LEVEL ID) OUTLINE-DATA) ;; nil ID allowed
+                 (when ID
+                   (when $targeted
+                     ;; Called by a rename-file advice
+                     (push `(org-id-add-location ,ID ,FILE)
+                           org-node-worker--demands))
+                   (setq OLP (org-node-worker--pos->olp OUTLINE-DATA POS))
+                   (push `(org-node-cache--add-node-to-tables
+                           ,(list :title TITLE
+                                  :is-subtree t
+                                  :level LEVEL
+                                  :id ID
+                                  :pos POS
+                                  :tags TAGS
+                                  :todo TODO-STATE
+                                  :file-path FILE
+                                  :scheduled SCHED
+                                  :deadline DEADLINE
+                                  :file-title FILE-TITLE
+                                  :file-title-or-basename FILE-TITLE-OR-BASENAME
+                                  :olp OLP
+                                  :properties PROPS
+                                  :aliases
+                                  (split-string-and-unquote
+                                   (or (cdr (assoc "ROAM_ALIASES" PROPS)) ""))
+                                  :refs
+                                  (split-string-and-unquote
+                                   (or (cdr (assoc "ROAM_REFS" PROPS)) ""))))
+                         org-node-worker--demands))
+                 ;; Now collect links while we're here!
+                 ;; REVIEW: Oddly, the number of ID-links drops somewhat when I do
+                 ;; a save-restriction and narrow to a subtree at a time. Why
+                 ;; might that be?
+                 (let ((ID-HERE (or ID (org-node-worker--pos->parent-id
+                                        OUTLINE-DATA POS FILE-ID))))
+                   (when ID-HERE
+                     (let ((END (save-excursion
+                                  (when (org-node-worker--next-heading)
+                                    (1- (point)))))
+                           (OLP-WITH-SELF (append OLP (list TITLE))))
+                       ;; Don't count org-super-links backlinks
+                       (when (re-search-forward $backlink-drawer-re END t)
+                         (unless (search-forward ":end:" END t)
+                           (error "Couldn't find matching :END: drawer in file %s at position %d"
+                                  FILE (point))))
+                       (org-node-worker--collect-links-until
+                        END ID-HERE OLP-WITH-SELF $link-re)
+                       ;; Gotcha... also collect links inside the heading, not
+                       ;; just the body text
+                       (goto-char POS)
+                       (org-node-worker--collect-links-until
+                        (pos-eol) ID-HERE OLP-WITH-SELF $link-re))))
+                 (org-node-worker--next-heading)))))
 
         (( t error debug )
          ;; Don't crash the whole process when there is a problem scanning one
