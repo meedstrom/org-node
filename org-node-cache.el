@@ -1,6 +1,7 @@
 ;;; org-node-cache.el --- The beating heart -*- lexical-binding: t; -*-
 
 ;; TODO Test perf of keeping alive the child processes to skip spin-up
+;; TODO Maybe set gc-cons-threshold in child processes to most-positive-fixnum
 ;; REVIEW Ensure that the child processes are loading the .eln variant of all
 ;;        the emacs core lisp
 
@@ -126,7 +127,7 @@ proess of deleting several files in a row."
         (message "Forgetting the deleted file... (%s)" file-being-deleted)
         (org-node--forget-id-location file-being-deleted)
         (cancel-timer timer)
-        (setq timer (run-with-idle-timer 6 nil #'org-node-cache-ensure nil t))))))
+        (setq timer (run-with-idle-timer 4 nil #'org-node-cache-ensure nil t))))))
 
 (defun org-node-cache-peek ()
   "Print some random members of `org-nodes' that have IDs.
@@ -169,10 +170,9 @@ function `org-node-cache--scan'."
   "Record a link or reflink into the appropriate table.
 For demonstration of LINK-PLIST, PATH and TYPE, read the source
 of `org-node-worker--collect-links-until'."
-  (push link-plist (gethash path
-                            (if (equal type "id")
-                                org-node--links-table
-                              org-node--reflinks-table))))
+  (push link-plist (gethash path (if (equal type "id")
+                                     org-node--links-table
+                                   org-node--reflinks-table))))
 
 
 (defvar org-node-cache--processes nil

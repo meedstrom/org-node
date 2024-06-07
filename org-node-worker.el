@@ -78,7 +78,7 @@ in one of the elements."
                                  oldata)))
     (let ((previous-level (caddr (car data-until-pos))))
       ;; Work backwards towards the top of the file
-      ;; NOTE: Tried catch-throw and dolist, but `cl-loop' wins perf
+      ;; NOTE: Tried catch-while-throw and dolist, but `cl-loop' wins at perf
       (cl-loop for row in data-until-pos
                when (> previous-level (caddr row))
                do (setq previous-level (caddr row))
@@ -88,21 +88,18 @@ in one of the elements."
                return nil))
     olp))
 
-(defun org-node-worker--make-todo-regexp (todo-string)
-  "Make a regexp based on TODO-STRING,
-that will match any of the keywords."
-  (declare (pure t) (side-effect-free t))
-  (save-match-data
-    (thread-last todo-string
-                 (replace-regexp-in-string "(.*?)" "")
-                 (replace-regexp-in-string "[^ [:alpha:]]" "")
-                 (string-trim)
-                 (split-string)
-                 (regexp-opt))))
+(defun org-node-worker--make-todo-regexp (keywords-string)
+  "Make a regexp based on KEYWORDS-STRING,
+that will match any of the TODO keywords within."
+  (thread-last keywords-string
+               (replace-regexp-in-string "(.*?)" "")
+               (string-replace "|" "")
+               (string-trim)
+               (split-string)
+               (regexp-opt)))
 
 (defun org-node-worker--org-link-display-format (s)
   "Copy-pasted from `org-link-display-format'."
-  (declare (pure t) (side-effect-free t))
   (save-match-data
     (replace-regexp-in-string
      ;; Pasted from `org-link-bracket-re'
@@ -447,7 +444,8 @@ buffer is a temp buffer."
                       (goto-char POS)
                       (org-node-worker--collect-links-until
                        (pos-eol) ID-HERE OLP-WITH-SELF $link-re)))))))
-        (( error )
+
+        (( t error debug )
          ;; Don't crash the whole process when there is a problem scanning one
          ;; file, report the problem and continue to the next file
          (let ((print-length nil)
