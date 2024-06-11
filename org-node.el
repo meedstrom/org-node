@@ -27,14 +27,10 @@
 
 ;;; Code:
 
-;; TODO Option to do a first-level heading by default instead of file-level id
-;; TODO Renaming subtrees and saving them now simply grows the
-;;      org-node-collection so it holds both old and new names -- how to fix?
-;; TODO What happens when we move a subtree to a different file but save the
-;;      destination before saving the origin file?
-;; TODO Annotations for completion?
-;; TODO Completion categories? https://github.com/alphapapa/org-ql/issues/299
-;; TODO Command to grep across all files
+;; TODO What happens when user manually moves a subtree to a different file
+;;      then saves the destination before saving the origin file?
+;;      - The nodes table would be correct, but maybe not completion collection
+;; TODO Annotations for completion? Completion categories? https://github.com/alphapapa/org-ql/issues/299
 ;; TODO Command to explore feedback arc sets
 
 (require 'org-node-common)
@@ -82,7 +78,7 @@ Behavior depends on the user option `org-node-ask-directory'."
   "From TITLE, make a filename in the default org-roam style."
   (unless (fboundp #'org-roam-node-slug)
     (user-error
-     "Didn't create node! Install org-roam or configure `org-node-slug-fn'"))
+     "Didn't create node! Install org-roam or configure `org-node-filename-fn'"))
   (require 'org-roam-node)
   (concat (format-time-string "%Y%m%d%H%M%S-")
           (org-roam-node-slug (org-roam-node-create :title title))
@@ -100,7 +96,7 @@ As a surprise, it does NOT preface the name with a timestamp like
 many zettelkasten packages do.  If you want that, you can use
 a small wrapper such as:
 
-(setq org-node-slug-fn
+(setq org-node-filename-fn
       (lambda (title)
        (concat (format-time-string \"%Y%m%d%H%M%S-\")
                (org-node-slugify-as-url title))))
@@ -130,7 +126,7 @@ Applying the above to \"Löb's Theorem\" results in something like
 ;; (org-node-slugify-as-url "\"But there's still a chance, right?\"")
 ;; (org-node-slugify-as-url "Löb's Theorem")
 ;; (org-node-slugify-as-url "How to convince me that 2 + 2 = 3")
-;; (org-node-slugify-as-url "C. S. Peirce")
+;; (org-node-slugify-as-url "E. T. Jaynes")
 ;; (org-node-slugify-as-url "Amnesic recentf, org-id-locations? Solution: Run kill-emacs-hook periodically.")
 ;; (org-node-slugify-as-url "Slimline/\"pizza box\" computer chassis")
 ;; (org-node-slugify-as-url "#emacs")
@@ -157,20 +153,25 @@ Applying the above to \"Löb's Theorem\" results in something like
 
 (defun org-node--goto (node)
   "Visit NODE."
-  (find-file (org-node-get-file-path node))
-  (widen)
-  (goto-char (org-node-get-pos node))
-  (when (org-node-get-is-subtree node)
-    (org-reveal)
-    (recenter 5)
-    (org-end-of-meta-data)))
+  (let ((file (org-node-get-file-path node)))
+    (if (file-exists-p file)
+        (progn
+          (find-file file)
+          (widen)
+          (goto-char (org-node-get-pos node))
+          (when (org-node-get-is-subtree node)
+            (org-fold-show-context)))
+      (message "This node's file is missing, re-scanning all dirs...")
+      (org-node-cache--scan-all))))
 
 (defun org-node-capture-target ()
-  "Can be used as TARGET in a capture template.
-See `org-capture-templates' for what TARGET means.
+  "Can be used as target in a capture template.
+See `org-capture-templates' for more info about targets.
 
-In simple terms, let's say you have a template targeting
-`(function org-node-capture-target)'.  Here's a possible workflow:
+In simple terms, let's say you have configured
+`org-capture-templates' so it has a template that
+targets `(function org-node-capture-target)'.  Now here's a
+possible workflow:
 
 1. Run M-x org-capture
 2. Select your template
@@ -222,65 +223,78 @@ type the name of a node that does not exist.  That enables this
             ;; without swallowing content that was already there.
             (when (outline-next-heading)
               (backward-char 1))))
-      ;; Node does not exist; capture into new file-level node
+      ;; Node does not exist; capture into new file
       (let* ((dir (org-node-guess-or-ask-dir "New file in which directory? "))
              (path-to-write (file-name-concat
-                             dir (funcall org-node-slug-fn title))))
+                             dir (funcall org-node-filename-fn title))))
         (if (or (file-exists-p path-to-write)
                 (find-buffer-visiting path-to-write))
             (error "File or buffer already exists: %s" path-to-write)
           (find-file path-to-write)
-          (insert ":PROPERTIES:"
-                  "\n:ID:       " id
-                  "\n:END:"
-                  "\n#+title: " title
-                  "\n")
+          (if org-node-make-file-level-nodes
+              (insert ":PROPERTIES:"
+                      "\n:ID:       " id
+                      "\n:END:"
+                      "\n#+title: " title
+                      "\n")
+            (insert "* " title
+                    "\n:PROPERTIES:"
+                    "\n:ID:       " id
+                    "\n:END:"
+                    "\n"))
           (unwind-protect
               (run-hooks 'org-node-creation-hook)
             (save-buffer)
-            ;; Because we didn't use `org-id-get-create'
-            (org-id-add-location id path-to-write)))))))
+            (org-node-cache--scan-targeted (list path-to-write))))))))
 
 (defun org-node-new-by-roam-capture ()
   "Call `org-roam-capture-' with predetermined arguments.
-Meant to be called as `org-node-creation-fn', during which it
-gets some necessary variables."
+Meant to be called indirectly as `org-node-creation-fn', at which
+time some necessary variables are set."
   (if (or (null org-node-proposed-title)
           (null org-node-proposed-id))
       (message "`org-node-new-by-roam-capture' is meant to be called indirectly via `org-node--create'")
     (unless (fboundp #'org-roam-capture-)
-      (org-node-die "Didn't create node! Either install org-roam or %s"
-                    "configure `org-node-creation-fn'"))
+      (org-node--die "Didn't create node! Either install org-roam or %s"
+                     "configure `org-node-creation-fn'"))
     (require 'org-roam)
     (org-roam-capture- :node (org-roam-node-create
                               :title org-node-proposed-title
-                              :id    org-node-proposed-id))))
+                              :id    org-node-proposed-id))
+    (org-node-cache--scan-new-or-modified)))
 
 (defun org-node-new-file ()
   "Create a file-level node.
-Meant to be called as `org-node-creation-fn', during which it
-gets some necessary variables."
+Meant to be called indirectly as `org-node-creation-fn', during
+which it gets some necessary variables."
   (if (or (null org-node-proposed-title)
           (null org-node-proposed-id))
       (message "org-node-new-file is meant to be called indirectly")
     (let* ((dir (org-node-guess-or-ask-dir "New file in which directory? "))
-           (path-to-write (file-name-concat dir (funcall org-node-slug-fn
-                                                         org-node-proposed-title))))
+           (path-to-write (file-name-concat dir
+                                            (funcall org-node-filename-fn
+                                                     org-node-proposed-title))))
       (if (or (file-exists-p path-to-write)
               (find-buffer-visiting path-to-write))
           (message "A file or buffer already exists for path %s"
                    (file-name-nondirectory path-to-write))
         (find-file path-to-write)
-        (insert ":PROPERTIES:"
-                "\n:ID:       " org-node-proposed-id
-                "\n:END:"
-                "\n#+title: " org-node-proposed-title
-                "\n")
+        (if org-node-make-file-level-nodes
+            (insert ":PROPERTIES:"
+                    "\n:ID:       " org-node-proposed-id
+                    "\n:END:"
+                    "\n#+title: " org-node-proposed-title
+                    "\n")
+          (insert "* " org-node-proposed-title
+                  "\n:PROPERTIES:"
+                  "\n:ID:       " org-node-proposed-id
+                  "\n:END:"
+                  "\n"))
         (unwind-protect
             (run-hooks 'org-node-creation-hook)
           (save-buffer)
-          ;; Because we didn't use `org-id-get-create'
-          (org-id-add-location org-node-proposed-id path-to-write))))))
+          (org-id-add-location org-node-proposed-id path-to-write) ;; Redundant
+          (org-node-cache--scan-targeted (list path-to-write)))))))
 
 
 ;;; Commands
@@ -469,7 +483,7 @@ adding keywords to the things to exclude:
 
 ;;;###autoload
 (defun org-node-rename-file-by-title (&optional path)
-  "Rename the current file according to `org-node-slug-fn'.
+  "Rename the current file according to `org-node-filename-fn'.
 
 When called from Lisp, can take argument PATH to operate on the
 file located there."
@@ -483,7 +497,7 @@ file located there."
   (let* ((title (cadar (org-collect-keywords '("TITLE"))))
          (name (file-name-nondirectory path))
          (new-path (file-name-concat (file-name-directory path)
-                                     (funcall org-node-slug-fn title)))
+                                     (funcall org-node-filename-fn title)))
          (visiting (find-buffer-visiting path))
          (visiting-on-window (and visiting (get-buffer-window visiting))))
     (if (equal path new-path)
@@ -564,7 +578,7 @@ reflects the current title."
                 (sleep-for .11))
               (goto-char end))))))))
 
-;; TODO: check what happens with invisible stuff
+;; TODO: check what happens with Org invisible regions interfere
 ;;;###autoload
 (defun org-node-extract-subtree ()
   "Extract subtree at point into a file of its own.
@@ -583,7 +597,7 @@ it can be desirable if you know the subtree had been part of the
 source file for ages so that you see the ancestor's creation-date
 as more \"truthful\".
 
-(advice-add 'org-node-extract-subtree :around
+(advice-add \\='org-node-extract-subtree :around
             (defun my-inherit-creation-date (orig-fn &rest args)
               (let ((inherited-creation-date
                      (save-excursion
@@ -595,15 +609,19 @@ as more \"truthful\".
                 ;; Now in the new buffer
                 (org-entry-put nil \"CREATED\"
                                (or inherited-creation-date
-                                   (format-time-string \"[%F]\")))))))"
+                                   (format-time-string \"[%F %a]\")))))))"
   (interactive nil org-mode)
   (unless (derived-mode-p 'org-mode)
     (user-error "This command expects an org-mode buffer"))
   (org-node-cache-ensure)
   (let ((dir (org-node-guess-or-ask-dir "Extract to new file in directory: ")))
     (save-excursion
+      (when (org-invisible-p)
+        (user-error "Better not run this command in an invisible region"))
       (org-back-to-heading t)
       (save-buffer)
+      (when (org-invisible-p)
+        (user-error "Better not run this command in an invisible region"))
       (let* ((tags (org-get-tags))
              (title (org-get-heading t t t t))
              (id (org-id-get-create))
@@ -619,45 +637,54 @@ as more \"truthful\".
              (properties (--filter (not (equal "CATEGORY" (car it)))
                                    (org-entry-properties nil 'standard)))
              (path-to-write (file-name-concat
-                             dir (funcall org-node-slug-fn title))))
+                             dir (funcall org-node-filename-fn title))))
         (if (file-exists-p path-to-write)
             (message "A file already exists named %s" path-to-write)
           (org-cut-subtree)
-          ;; Leave a link where the subtree was
-          (open-line 1)
-          (insert (format-time-string "[%F] Created ")
-                  (org-link-make-string (concat "id:" id) title))
+          ;; Leave a link under the parent heading pointing to the subheading
+          ;; that was extracted.
+          (save-excursion
+            (org-up-heading-safe)
+            (when (org-at-heading-p)
+              (org-end-of-meta-data t))
+            (open-line 1)
+            (insert (format-time-string "[%F] Created ")
+                    (org-link-make-string (concat "id:" id) title)
+                    "\n"))
           (save-buffer)
           (find-file path-to-write)
           (org-paste-subtree)
           (save-buffer)
-          (goto-char (point-min))
-          (org-end-of-meta-data t)
-          (kill-region (point-min) (point))
-          (org-map-region #'org-promote (point-min) (point-max))
-          (insert
-           ":PROPERTIES:\n"
-           (string-join (--map (concat ":" (car it) ": " (cdr it)) properties)
-                        "\n")
-           "\n:END:"
-           (if category
-               (concat "\n#+category: " category)
-             "")
-           (if tags
-               (concat "\n#+filetags: :" (string-join tags ":") ":")
-             "")
-           "\n#+title: " title
-           "\n")
+          (when org-node-make-file-level-nodes
+            ;; Replace the root heading and its properties with file-level
+            ;; keywords &c.
+            (goto-char (point-min))
+            (org-end-of-meta-data t)
+            (kill-region (point-min) (point))
+            (org-map-region #'org-promote (point-min) (point-max))
+            (insert
+             ":PROPERTIES:\n"
+             (string-join (--map (concat ":" (car it) ": " (cdr it)) properties)
+                          "\n")
+             "\n:END:"
+             (if explicit-category
+                 (concat "\n#+category: " explicit-category)
+               "")
+             (if tags
+                 (concat "\n#+filetags: :" (string-join tags ":") ":")
+               "")
+             "\n#+title: " title
+             "\n"))
           (run-hooks 'org-node-creation-hook)
           (save-buffer))))))
 
 ;;;###autoload
 (defun org-node-rename-asset-and-rewrite-links ()
   "Prompt for an asset such as an image file to be renamed, then
-search recursively for Org files with a link to that asset, give
-the user a wgrep buffer of the search hits, and start an
-interactive search-replace that updates the links.  After the
-user completes the replacements, finally rename the file itself."
+search recursively for Org files with a link to that asset, open
+a wgrep buffer of the search hits, and start an interactive
+search-replace that updates the links.  After the user consents
+to replacing all the links, finally rename the asset file itself."
   (interactive)
   (unless (fboundp 'wgrep-change-to-wgrep-mode)
     (user-error "This command requires the wgrep package"))
@@ -687,9 +714,10 @@ user completes the replacements, finally rename the file itself."
                                 (buffer-list)))
          (wgrep-change-to-wgrep-mode)
          (goto-char (point-min))
+         ;; Interactive replaces
          (query-replace filename new)
-         ;; NOTE: If the user quits the replaces with C-g, this code won't run,
-         ;;       which is good.
+         ;; NOTE: If the user quits the replaces with C-g, the following code
+         ;;       never runs, which is good.
          (when (buffer-modified-p)
            (wgrep-finish-edit)
            (rename-file filename new)
@@ -704,19 +732,25 @@ user completes the replacements, finally rename the file itself."
   (org-node-nodeify-entry))
 
 ;;;###autoload
-(defun org-node-nodeify-entry ()
+(defun org-nodeify-entry ()
   "Add an ID to entry at point and run `org-node-creation-hook'."
   (interactive nil org-mode)
   (org-node-cache-ensure)
   (org-id-get-create)
-  (run-hooks 'org-node-creation-hook))
+  (run-hooks 'org-node-creation-hook)
+  (org-node-cache--dirty-rescan-heading-at-point))
+
+(defalias 'org-node-nodeify-entry 'org-nodeify-entry)
 
 ;;;###autoload
 (defun org-node-put-created ()
   "Add a CREATED property to entry at point, if none already."
   (interactive nil org-mode)
   (unless (org-entry-get nil "CREATED")
-    (org-entry-put nil "CREATED" (format-time-string "[%F]"))))
+    (org-entry-put nil "CREATED" (concat "["
+                                         (format-time-string
+                                          (car org-timestamp-formats))
+                                         "]"))))
 
 ;;;###autoload
 (defun org-node-reset ()
@@ -728,16 +762,19 @@ user completes the replacements, finally rename the file itself."
 (defun org-node-forget-dir (dir)
   (interactive "DForget all IDs in directory: ")
   (org-node-cache-ensure t)
-  (let ((ctr 0))
-    (dolist (file (-intersection (directory-files-recursively dir "\\.org$")
-                                 (hash-table-values org-id-locations)))
-      (message "Forgetting all IDs in file... (%d) %s" (cl-incf ctr) file)
-      (org-node--forget-id-location file)))
-  (org-id-locations-save))
+  (let ((files (-intersection (directory-files-recursively dir "\\.org$")
+                              (hash-table-values org-id-locations))))
+    (when files
+      (message "Forgetting all IDs in directory... (%s)" dir)
+      (org-node--forget-id-locations files)
+      (org-id-locations-save)
+      (org-node-reset))))
 
 ;; TODO: use a real tabulated-list
+;; TODO: keep buffer open where problems were found
 ;;;###autoload
 (defun org-node-lint-all-files ()
+  "Run `org-lint' on all known Org files, and report results."
   (interactive)
   (org-node-cache-ensure t)
   (let ((ctr 0)
@@ -773,6 +810,93 @@ user completes the replacements, finally rename the file itself."
               (eobp)))
       (kill-buffer report-buffer)
       (message "All good, no lint warnings!"))))
+
+;;;###autoload
+(defun org-node-grep ()
+  (interactive)
+  (unless (fboundp #'consult--grep)
+    (user-error "This command requires the consult package"))
+  (org-node-cache-ensure)
+  (consult--grep "Grep across all files known to org-node"
+                 #'consult--grep-make-builder
+                 (org-node-files)
+                 (when (region-active-p)
+                   (buffer-substring-no-properties
+                    (region-beginning) (region-end)))))
+
+;; function separated out for edebug QoL
+(defun org-node--collect-digraph ()
+  (cl-loop
+   for target-id being the hash-keys of org-node--links-table
+   using (hash-values link-plists)
+   append (cl-loop
+           for link-plist in link-plists
+           collect (concat target-id "\t" (plist-get link-plist :src)))))
+
+;; TODO use tabulated-list-mode
+(defun org-node-list-feedback-arcs ()
+  "Calculate a feedback arc set of forward id-links.
+
+Explanation: https://edstrom.dev/zvjjm/slipbox-workflow#ttqyc
+
+A feedback arc set is a set of links such that if they are all
+cut (though sometimes it suffices to reverse them rather than cut
+them), the remaining links in the network will constitute a
+DAG (directed acyclic graph).
+
+Requires GNU R installed, with R packages tidyverse and igraph."
+  (interactive)
+  (unless (executable-find "Rscript")
+    (user-error
+     "This command requires GNU R, with R packages tidyverse and igraph"))
+  (let ((r-script (org-node-worker--tmpfile "analyze_feedback_arcs.R"))
+        (digraph-tsv (org-node-worker--tmpfile "id_node_digraph.tsv")))
+    (write-region
+     "library(stringr)
+library(readr)
+library(igraph)
+
+tsv <- commandArgs(TRUE)[1]
+
+g <- graph_from_data_frame(
+  read_tsv(tsv),
+  directed = TRUE
+)
+
+# so many... too greedy algo?
+fas1 <- feedback_arc_set(g, algo = \"approx_eades\")
+fas1
+
+lisp_data <- str_c(\"(\\\"\", as_ids(fas1), \"\\\")\") |>
+  str_replace(\"\\\\|\", \"\\\" . \\\"\") |>
+  str_flatten(\"\n \") |>
+  (function(x) {
+    str_c(\"(\", x, \")\")
+  })()
+
+write_file(lisp_data, file.path(dirname(tsv), \"feedback-arcs.eld\"))
+" nil r-script)
+    (write-region
+     (concat
+      "src\tdest\n"
+      (string-join (org-node--collect-digraph) "\n"))
+     nil
+     digraph-tsv)
+    (with-temp-buffer
+      (unless (= 0 (call-process "Rscript" nil t nil r-script digraph-tsv))
+        (error "%s" (buffer-string)))
+      (erase-buffer)
+      (insert-file-contents (org-node-worker--tmpfile "feedback-arcs.eld"))
+      (setq feedbacks (car (read-from-string (buffer-string)))))
+    (display-buffer
+     (with-current-buffer (get-buffer-create "*feedback arcs*")
+       (erase-buffer)
+       (insert
+        (cl-loop
+         for (src . dest) in feedbacks
+         concat (concat "\n" (org-node-get-title (gethash src org-nodes))
+                        " --> " (org-node-get-title (gethash dest org-nodes)))))
+       (current-buffer)))))
 
 (provide 'org-node)
 
