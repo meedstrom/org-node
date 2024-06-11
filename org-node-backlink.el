@@ -4,16 +4,19 @@
 ;;       `org-node-cache-rescan-file' is not enough to remove the link from
 ;;       the link table.  It gets corrected only on reset.
 
-;; FIXME Sometimes a backlink is correctly added and then immediately removed
-;;       upon saving the target file, because the cache is not in sync
-;;       (specifically the links tables).  Can be solved by either saving the
-;;       current buffer every time a link is inserted (not user-friendly), or
-;;       adding some placeholder in the tables.  In fact, add a placeholder to
-;;       `org-nodes' as well in case `org-id-get' finds an ID that isn't there
-;;       (it was prboably freshly created and file has not been saved yet)
 
 (require 'org-node-common)
 (require 'org-node-cache)
+(require 'cl-macs)
+
+;;;###autoload
+(let (warned-once)
+  (defun org-node-backlinks-mode (&rest args)
+    (unless warned-once
+      (setq warned-once t)
+      (run-with-timer .1 nil #'display-warning 'org-node
+                      "Your config may have misspelled `org-node-backlink-mode' as `org-node-backlinks-mode'"))
+    (apply #'org-node-backlink-mode args)))
 
 (define-globalized-minor-mode org-node-backlink-global-mode
   org-node-backlink-mode
@@ -28,32 +31,32 @@
   (if org-node-backlink-mode
       (progn
         (add-hook 'org-roam-post-node-insert-hook
-                  #'org-node-backlink--add-in-target-a -99 t)
+                  #'org-node-backlink--add-in-target -99 t)
         (add-hook 'org-node-insert-link-hook
-                  #'org-node-backlink--add-in-target-a -99 t)
+                  #'org-node-backlink--add-in-target -99 t)
         (add-hook 'after-change-functions
                   #'org-node-backlink--flag-change nil t)
         (add-hook 'before-save-hook
-                  #'org-node-backlink--update-changed-parts-of-buffer nil t)
+                  #'org-node-backlink--fix-changed-parts-of-buffer nil t)
         ;; It seems advices cannot be buffer-local, but it's OK, this fn
         ;; does nothing if this mode isn't active in the current buffer.
         (advice-add 'org-insert-link :after
-                    #'org-node-backlink--add-in-target-a))
+                    #'org-node-backlink--add-in-target)
+        (org-node-cache-ensure 'must-async))
+    (remove-hook 'org-roam-post-node-insert-hook
+                 #'org-node-backlink--add-in-target t)
+    (remove-hook 'org-node-insert-link-hook
+                 #'org-node-backlink--add-in-target t)
     (remove-hook 'after-change-functions
                  #'org-node-backlink--flag-change t)
     (remove-hook 'before-save-hook
-                 #'org-node-backlink--update-changed-parts-of-buffer t)
-    (remove-hook 'org-roam-post-node-insert-hook
-                 #'org-node-backlink--add-in-target-a t)
-    (remove-hook 'org-node-insert-link-hook
-                 #'org-node-backlink--add-in-target-a t)))
+                 #'org-node-backlink--fix-changed-parts-of-buffer t)))
 
 (defvar org-node-backlink--fix-ctr 0)
 (defvar org-node-backlink--files-to-fix nil)
 
 (defun org-node-backlink-regret ()
-  "Visit all IDs in `org-id-locations' and remove the :BACKLINKS:
-property."
+  "Visit all `org-id-locations' and remove :BACKLINKS: property."
   (interactive)
   (org-node-backlink-fix-all 'remove))
 
@@ -74,39 +77,33 @@ Can be canceled midway through and resumed later.  With
             (and
              (y-or-n-p (format "Edit the %d files found in `org-id-locations'?"
                                (length org-node-backlink--files-to-fix)))
-             (y-or-n-p "You understand that this may trigger your auto git-commit systems and similar?")))
-    (let ((find-file-hook nil)
-          (org-mode-hook nil)
-          (after-save-hook nil)
-          (before-save-hook nil)
-          (org-agenda-files nil)
-          (org-inhibit-startup t))
-      ;; Do 1000 at a time, because Emacs cries about opening too many file
-      ;; buffers in one loop
-      (dotimes (_ 1000)
-        (when-let ((file (pop org-node-backlink--files-to-fix)))
-          (message "Adding/updating :BACKLINKS:... (you may quit and resume anytime) (%d) %s"
-                   (cl-incf org-node-backlink--fix-ctr) file)
-          (delay-mode-hooks
-            (org-node--with-file file
-              (org-node-backlink--update-whole-buffer remove))))))
+             (y-or-n-p (string-fill "You understand that this may trigger your auto git-commit systems and similar because many files are about to be edited and saved?"
+                                    fill-column))))
+    ;; Do 1000 at a time, because Emacs cries about opening too many file
+    ;; buffers in one loop
+    (dotimes (_ 1000)
+      (when-let ((file (pop org-node-backlink--files-to-fix)))
+        (message "Adding/updating :BACKLINKS:... (you may quit and resume anytime) (%d) %s"
+                 (cl-incf org-node-backlink--fix-ctr) file)
+        (org-node--with-file file
+          (org-node-backlink--fix-whole-buffer remove))))
     (if org-node-backlink--files-to-fix
         ;; Keep going
         (run-with-timer 1 nil #'org-node-backlink-fix-all remove)
       ;; Reset
       (setq org-node-backlink--fix-ctr 0))))
 
-(defun org-node-backlink--update-whole-buffer (&optional remove)
+(defun org-node-backlink--fix-whole-buffer (&optional remove)
   (save-excursion
     (goto-char (point-min))
     (let ((case-fold-search t))
       (while (re-search-forward "^[[:space:]]*:id: " nil t)
-        (org-node-backlink--update-subtree-here remove)))))
+        (org-node-backlink--fix-subtree-here remove)))))
 
-(defun org-node-backlink--update-subtree-here (&optional remove)
-  "Assumes point is at an :ID: line!
-Update the :BACKLINKS: property.  With arg REMOVE, remove it instead."
-  (org-entry-delete nil "CACHED_BACKLINKS")  ;; Old name, get rid of it
+(defun org-node-backlink--fix-subtree-here (&optional remove)
+  "Assume point is at an :ID: line, after the \":ID:\" substring,
+then update the :BACKLINKS: property in this entry.  With arg
+REMOVE, remove it instead."
   (if remove
       (org-entry-delete nil "BACKLINKS")
     (skip-chars-forward "[:space:]")
@@ -114,9 +111,14 @@ Update the :BACKLINKS: property.  With arg REMOVE, remove it instead."
                 (point) (+ (point) (skip-chars-forward "^ \n"))))
            (node (gethash id org-nodes)))
       ;; The node may not yet have been scanned by org-node, because it was
-      ;; created just now, in a capture buffer, which triggered a save right
-      ;; away.
+      ;; created just now, in a capture buffer which triggered a save hook
+      ;; which led us here.  There's probably an async process looking at it
+      ;; right now but we're slightly too early.  In fact, I wager this happens
+      ;; every time, so backlinks are always added using slightly outdated
+      ;; metadata. TODO: Maybe don't run on save hook but rather on
+      ;; handle-finished-job?
       (when node
+        ;; Make the full string to which the :BACKLINKS: property should be set
         (let* ((ROAM_REFS (org-node-get-refs node))
                (reflinks (--keep (gethash it org-node--reflinks-table)
                                  ROAM_REFS))
@@ -142,13 +144,6 @@ Update the :BACKLINKS: property.  With arg REMOVE, remove it instead."
                 (org-entry-put nil "BACKLINKS" link-string))
             (org-entry-delete nil "BACKLINKS")))))))
 
-(defun org-node-backlink--flag-change (beg end _)
-  "Propertize changed text, for use by `org-node-backlink-mode'.
-Designed to run on `after-change-functions'."
-  (when (derived-mode-p 'org-mode)
-    (with-silent-modifications
-      (put-text-property beg end 'org-node-chg t))))
-
 ;; TODO: Allow narrowing to have an effect, i.e. don't use
 ;; `without-restriction'.  Problem is that org-entry-get will get an ID outside
 ;; the region (good).  And that ID can be inherited, so we cannot just narrow
@@ -156,7 +151,11 @@ Designed to run on `after-change-functions'."
 ;; at a time.  Or not exactly top-level.  Basically, look for first heading
 ;; with an ID, narrow to it plus its children, then move forward to heading of
 ;; same or higher level, then repeaat.
-(defun org-node-backlink--update-changed-parts-of-buffer ()
+(defun org-node-backlink--fix-changed-parts-of-buffer ()
+  "Look for areas flagged by `org-node-backlink--flag-change' and
+run `org-node-backlink--fix-subtree-here' on the affected
+subtrees.  For a huge file, this is much faster than using
+`org-node-backlink--fix-whole-buffer'."
   (when org-node-backlink-mode
     ;; Catch any error because this runs at `before-save-hook' which MUST fail
     ;; gracefully and let the user save anyway
@@ -168,7 +167,7 @@ Designed to run on `after-change-functions'."
             ;; you tell Emacs to search for text that has a given text-property
             ;; with a nil value, that's the same as searching for text without
             ;; that property at all.  So if START is in some unmodified
-            ;; territory -- "org-node-chg" is valued at nil -- this way of
+            ;; territory -- "org-node-flag" is valued at nil -- this way of
             ;; calling `text-property-not-all' means search until it is t.
             ;; Then the opposite happens, to search until it is nil again.
             (let ((start (point-min-marker))
@@ -176,11 +175,9 @@ Designed to run on `after-change-functions'."
                   (case-fold-search t)
                   prop)
               (while (and start (< start (point-max)))
-                (setq prop (get-text-property start 'org-node-chg))
-                (set-marker end (or (text-property-not-all start
-                                                           (point-max)
-                                                           'org-node-chg
-                                                           prop)
+                (setq prop (get-text-property start 'org-node-flag))
+                (set-marker end (or (text-property-not-all
+                                     start (point-max) 'org-node-flag prop)
                                     (point-max)))
                 (when prop
                   (goto-char start)
@@ -197,14 +194,14 @@ Designed to run on `after-change-functions'."
                                     (regexp-quote id-here))
                             nil t)
                            (re-search-forward ":id: *" (pos-eol))
-                           (org-node-backlink--update-subtree-here))))
+                           (org-node-backlink--fix-subtree-here))))
                   ;; ...and if the change-area is massive, spanning multiple
                   ;; subtrees, update each one
                   (while (and (< (point) end)
                               (re-search-forward
                                "^[[:space:]]*:id: " end t))
-                    (org-node-backlink--update-subtree-here))
-                  (remove-text-properties start end 'org-node-chg))
+                    (org-node-backlink--fix-subtree-here))
+                  (remove-text-properties start end 'org-node-flag))
                 ;; Move on and seek the next changed area
                 (set-marker start (marker-position end)))
               (set-marker start nil)
@@ -218,47 +215,73 @@ Designed to run on `after-change-functions'."
       (( user-error debug )
        (message "org-node: Updating backlinks ran into an issue: %S" err)))))
 
+(defun org-node-backlink--flag-change (beg end _)
+  "Propertize changed text, for use by `org-node-backlink-mode'.
+Designed to run on `after-change-functions'."
+  (when (derived-mode-p 'org-mode)
+    (with-silent-modifications
+      (put-text-property beg end 'org-node-flag t))))
+
 
 ;;; Link-insertion advice
+;;
+;; This stuff is separate logic from the save-hook
+;; `org-node-backlink--fix-changed-parts-of-buffer', because that operates on
+;; the file being saved -- in other words, the file is navel-gazing its own
+;; content to see if it looks correct according to links tables.  Technically
+;; that would be enough to result in correct backlinks everywhere if you just
+;; run it on all files, and that's more-or-less how `org-node-backlink-fix-all'
+;; works, but we don't want to do that all the time.
+;;
+;; By contrast, the below code does not look up tables, just reacts to the
+;; exact link being inserted, which has two benefits:
+;;
+;; 1. You can observe backlinks appearing in realtime before a buffer is saved
+;;
+;; 2. It's actually necessary because a link being inserted does not call for
+;;    us to check the current buffer but rather to visit and edit the target
+;;    file.  If we didn't have the below code we'd have save the current buffer
+;;    (in order to update tables) and then open the target file and run
+;;    `org-node-backlink--fix-whole-buffer', which can easily take a while for
+;;    a big target file.
 
-;; DEPRECATED
+;; TODO Report when it has members
 (defvar org-node-backlink--fails nil
   "List of IDs that could not be resolved.")
 
-(defun org-node-backlink--add-in-target-a (&rest _)
-  "Meant as advice after any command that inserts a link.
-See `org-node-backlink--add-in-target' - this is
-merely a wrapper that drops the input."
-  (when org-node-backlink-mode
-    (org-node-cache-ensure)
-    (org-node-backlink--add-in-target)))
+;; FIXME Sometimes a backlink is correctly added and then immediately removed
+;;       upon saving the target file, because the cache is not in sync
+;;       (specifically the links tables).  Can be solved by either saving the
+;;       current buffer every time a link is inserted (not user-friendly), or
+;;       adding some placeholder in the tables.  In fact, add a placeholder to
+;;       `org-nodes' as well in case `org-id-get' finds an ID that isn't there
+;;       (it was prboably freshly created and file has not been saved yet)
 
-(defun org-node-backlink--add-in-target ()
-  "For known link at point, leave a backlink in the target node.
-Does NOT try to validate the rest of the target's backlinks."
+
+(defun org-node-backlink--add-in-target (&rest _)
+  "For known link at point, leave a backlink in the target node."
   (unless (derived-mode-p 'org-mode)
     (error "Called in non-org buffer"))
-  (let ((elm (org-element-context)))
-    (let ((path (org-element-property :path elm))
-          (type (org-element-property :type elm))
-          id file)
-      (when (and path type)
-        (if (equal "id" type)
-            ;; Classic backlink
-            (progn
-              (setq id path)
-              (setq file (org-id-find-id-file id))
-              (unless file
-                (push id org-node-backlink--fails)
-                (user-error "ID not found \"%s\"%s"
-                            id
-                            org-node--standard-tip)))
-          ;; "Reflink"
-          (setq id (gethash (concat type ":" path) org-node--refs-table))
-          (setq file (ignore-errors
-                       (org-node-get-file-path (gethash id org-nodes)))))
-        (when (and id file)
-          (org-node-backlink--add-in-target-1 file id))))))
+  (when org-node-backlink-mode
+    (org-node-cache-ensure)
+    (let ((elm (org-element-context)))
+      (let ((path (org-element-property :path elm))
+            (type (org-element-property :type elm))
+            id file)
+        (when (and path type)
+          (if (equal "id" type)
+              ;; Classic backlink
+              (progn
+                (setq id path)
+                (setq file (org-id-find-id-file id)))
+            ;; "Reflink"
+            (setq id (gethash (concat type ":" path) org-node--refs-table))
+            (setq file (ignore-errors
+                         (org-node-get-file-path (gethash id org-nodes)))))
+          (when (null file)
+            (push id org-node-backlink--fails))
+          (when (and id file)
+            (org-node-backlink--add-in-target-1 file id)))))))
 
 (defun org-node-backlink--add-in-target-1 (target-file target-id)
   (let ((case-fold-search t)
@@ -300,7 +323,7 @@ Does NOT try to validate the rest of the target's backlinks."
             (setq links (remove dup links)))
           (push src-link links)
           (when (-any-p #'null links)
-            (org-node-die "nils in %S" links))
+            (org-node--die "nils in %S" links))
           ;; Enforce deterministic order to prevent unnecessarily reordering
           ;; every time a node is linked that already has the backlink
           (sort links #'string-lessp)
@@ -308,17 +331,12 @@ Does NOT try to validate the rest of the target's backlinks."
           (setq new-value (string-join links "  ")))
       (setq new-value src-link))
     (unless (equal backlinks-string new-value)
-      (org-entry-put nil "BACKLINKS" new-value))))
-
-;;;###autoload
-(let (warned-once)
-  (defun org-node-backlinks-mode (&rest args)
-    (unless warned-once
-      (setq warned-once t)
-      (run-with-timer
-       .1 nil #'display-warning 'org-node
-       "Your config may have misspelled `org-node-backlink-mode' as `org-node-backlinks-mode'"))
-    (apply #'org-node-backlink-mode args)))
+      (let ((inhibit-modification-hooks t))
+        (org-entry-put nil "BACKLINKS" new-value))
+      ;; TODO Placeholder to prevent deletion when saving the "wrong" buffer
+      ;; first
+      ;; (puthash src-id nil org-node--links-table) ??
+      )))
 
 (provide 'org-node-backlink)
 

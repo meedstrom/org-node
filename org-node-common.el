@@ -1,5 +1,9 @@
 ;;; org-node-common.el -*- lexical-binding: t; -*-
 
+;; TODO The perf-* user options now seem to have almost no effect, there must
+;;      be significant overhead from just running the child processes -
+;;      eliminate it
+
 (require 'compat)
 (require 'cl-lib)
 (require 'subr-x)
@@ -11,6 +15,15 @@
   "Support a zettelkasten of org-id files and subtrees."
   :group 'org)
 
+(defcustom org-node-rescan-hook nil
+  "Hook run after scanning specific files.
+It is not run after a full cache reset, only after a file is
+saved or renamed, causing an incremental update to the cache.
+
+Called with one argument: the list of files re-scanned."
+  :group 'org-node
+  :type 'hook)
+
 (defcustom org-node-ask-directory nil
   "Whether to ask the user where to save a new file node.
 
@@ -19,18 +32,38 @@ Set nil to assume that the most populous root directory in
   :group 'org-node
   :type 'boolean)
 
+(defcustom org-node-make-file-level-nodes t
+  "If t, write a file-level title and property drawer when
+making a new file, otherwise write a more traditional top-level
+heading.
+
+This affects the behavior of `org-node-new-file',
+`org-node-extract-subtree', and `org-node-capture-target'.
+
+If you change your mind about this setting, the Org-roam commands
+`org-roam-promote-entire-buffer' and
+`org-roam-demote-entire-buffer' can help you transition the files
+you have made along the way.
+
+Be aware that a nil setting may not yet be supported everywhere,
+such as `org-node-rename-file-by-title'."
+  :group 'org-node
+  :type 'boolean)
+
 (defcustom org-node-inject-variables (list)
   "Alist of variable-value pairs that child processes should set.
 
 May be useful for injecting your authinfo and EasyPG settings so
-that `org-node-cache-mode' can scan for ID nodes inside .org.gpg
-files.
+that org-node can scan for ID nodes inside .org.gpg files.
 
-I don't use EPG so I don't know if that's enough to make it work."
+I don't use EPG so I don't know if that's enough to make it work.
+Probably not.  Get me working on it by dropping me a line on
+https://github.com/meedstrom/org-node/issues or Mastodon:
+@meedstrom@emacs.ch."
   :group 'org-node
   :type 'alist)
 
-;; TODO: Maybe suggest `utf-8-auto-unix', but first find out if the
+;; TODO Maybe suggest `utf-8-auto-unix', but first find out if the
 ;; coding-system-for-write infers from coding-system-for-read
 (defcustom org-node-perf-assume-coding-system nil
   "Coding system to assume while scanning ID nodes.
@@ -72,20 +105,20 @@ visited.  The smaller this list, the faster `org-node-reset'."
            (function-item tramp-archive-file-name-handler)
            (function-item file-name-non-special))))
 
-(defcustom org-node-perf-gc-cons-threshold nil
-  "Temporary override for `gc-cons-threshold'.
-Tweak to maybe speed up `org-node-reset'.  Set nil to use the
-actual value of `gc-cons-threshold'.
+;; (defcustom org-node-perf-gc-cons-threshold nil
+;;   "Temporary override for `gc-cons-threshold'.
+;; Tweak to maybe speed up `org-node-reset'.  Set nil to use the
+;; actual value of `gc-cons-threshold'.
 
-It can be surprising which value works best.  It is possible that
-80 kB is performant, and 16 MB is performant, but something in
-between such as 1 MB is twice as slow.  Experiment to find a good
-setting."
-  :group 'org-node
-  :type '(choice integer (const nil)))
+;; It can be surprising which value works best.  It is possible that
+;; 80 kB is performant, and 16 MB is performant, but something in
+;; between such as 1 MB is twice as slow.  Experiment to find a good
+;; setting."
+;;   :group 'org-node
+;;   :type '(choice integer (const nil)))
 
-(defcustom org-node-slug-fn #'org-node-slugify-as-url
-  "Function to transform title into a filename.
+(defcustom org-node-filename-fn #'org-node-slugify-as-url
+  "Function taking a #+TITLE and returning a filename.
 
 Built-in choices:
 - `org-node-slugify-as-url'
@@ -123,23 +156,24 @@ the function is called: `org-node-proposed-title' and
 (defcustom org-node-insert-link-hook ()
   "Hook run after inserting a link to an Org-ID node.
 
-Two arguments provided: the ID and the link description.
+Called with two arguments: the ID and the link description.
 
-Functions here should not leave point outside the link."
+Point will be positioned at the link."
   :group 'org-node
   :type 'hook)
 
 (defcustom org-node-creation-hook '(org-node-put-created)
   "Hook run with point in the newly created buffer or entry.
 
-Applied only by `org-node-new-file', `org-node-create-subtree',
-`org-node-nodeify-entry' and `org-node-extract-subtree'.
+Applied only by `org-node-new-file', `org-node-capture-target',
+`org-node-insert-heading', `org-node-nodeify-entry' and
+`org-node-extract-subtree'.
 
 NOT applied by `org-node-new-by-roam-capture' -- see org-roam's
 `org-roam-capture-new-node-hook' instead.
 
 A good member for this hook is `org-node-put-created', especially
-since the default `org-node-slug-fn' does not put a timestamp in
+since the default `org-node-filename-fn' does not put a timestamp in
 the filename."
   :group 'org-node
   :type 'hook)
@@ -194,16 +228,16 @@ are tagged :drill:, or where the full file path contains the word
       (lambda (node)
         (and (not (assoc \"ROAM_EXCLUDE\" (org-node-get-properties node)))
              (not (org-node-get-todo node))
-             (not (member \"drill\" (org-node-get-tags node)))
-             (not (string-search \"archive\" (org-node-get-file-path node))))))"
+             (not (string-search \"archive\" (org-node-get-file-path node)))
+             (not (member \"drill\" (org-node-get-tags node))))))"
   :group 'org-node
   :type 'function)
 
 (defcustom org-node-extra-id-dirs (list)
-  "Directories in which to look for Org files to search for IDs.
+  "Directories in which to search Org files for IDs.
 
-Same idea as `org-id-extra-files', but specify directories to
-achieve a similar convenience to `org-agenda-files'.
+Same idea as `org-id-extra-files', but specifies only directories
+to achieve a similar convenience to `org-agenda-files'.
 
 Unlike with `org-agenda-files', directories listed here may be
 scanned again in order to find new files that have appeared.
@@ -216,9 +250,16 @@ To avoid accidentally picking up duplicate files such as
 versioned backups, causing org-id to complain about \"duplicate
 IDs\", configure `org-node-extra-id-dirs-exclude'.
 
-Tip: If it happened anyway, try \\[org-node-forget-dir].  Merely
-removing a directory from this list does not forget the IDs
-already found."
+Tip: If it happened anyway, try \\[org-node-forget-dir], because
+merely removing a directory from this list does not forget the
+IDs already found.
+
+Warning: If you have custom elements in `directory-abbrev-alist',
+none of them should match the part of a file path that comes
+after one of the dirs listed here.  This is because upstream
+Org-id applies `abbreviate-file-name' to all files, but that is
+an expensive operation which Org-node opted against - it will
+only do it up to the directory."
   :group 'org-node
   :type '(repeat directory))
 
@@ -229,7 +270,7 @@ already found."
   '("/logseq/bak/"
     "/logseq/version-files/"
     ".sync-conflict-")
-  "Substrings of file paths to avoid checking for IDs.
+  "Path substrings of files that should not be searched for IDs.
 
 This option only influences how the function `org-node-files'
 should seek files found in `org-node-extra-id-dirs'.  It is meant
@@ -284,8 +325,6 @@ the current buffer, execute BODY.  Finally:
          (unless was-open
            (kill-buffer))))))
 
-;; TODO: Diff the old value with the new value and schedule a targeted caching
-;;       of any new files that appeared.
 (let (mem)
   (defun org-node-files (&optional memoized)
     "List files in `org-id-locations' or `org-node-extra-id-dirs'.
@@ -300,7 +339,9 @@ something called this function, returning instantly."
              (cl-loop
               for dir in org-node-extra-id-dirs
               append (cl-loop
-                      for file in (directory-files-recursively dir "\\.org$")
+                      for file in (directory-files-recursively
+                                   dir (rx (or ".org" ".org_archive") eos)
+                                   nil t)
                       unless (cl-loop
                               for exclude in org-node-extra-id-dirs-exclude
                               when (string-search exclude file)
@@ -308,41 +349,43 @@ something called this function, returning instantly."
                       ;; Abbreviating because org-id does too
                       collect (abbreviate-file-name file))))))))
 
-(defvar org-nodes (make-hash-table :test #'equal :size 5000)
+;; REVIEW consider a rename
+;;        or maybe rename the other tables so they dont end in -table?
+(defvar org-nodes (make-hash-table :test #'equal :size 1000)
   "Table associating ids with file/subtree data.
 To peek on the contents, try \\[org-node-cache-peek] a few times, which
 can demonstrate the data format.  See also the type `org-node-data'.")
 
-(defvar org-node-collection (make-hash-table :test #'equal :size 5000)
+(defvar org-node-collection (make-hash-table :test #'equal :size 1000)
   "Filtered `org-nodes', keyed not on ids but formatted titles.
 This allows use with `completing-read'.")
 
-(defun org-node--forget-id-location (file)
-  "Remove references to FILE in `org-id-locations'.
+(defun org-node--forget-id-locations (files)
+  "Remove references to FILES in `org-id-locations'.
 You might consider \"committing\" the effect afterwards by
 calling `org-id-locations-save'."
   (let ((alist (org-id-hash-to-alist org-id-locations)))
-    (assoc-delete-all file alist)
+    (cl-loop for file in files
+             do (assoc-delete-all file alist))
     (setq org-id-locations (org-id-alist-to-hash alist))))
 
-;; REVIEW deprecate?
-(defun org-node-die (format-string &rest args)
+(defun org-node--die (format-string &rest args)
   "Like `error' but make sure the user sees it.
-Because not everyone has `debug-on-error' t."
+Because not everyone has `debug-on-error' t - in fact, that's
+nil by default, and then errors are very easy to miss."
   (let ((err-string (apply #'format format-string args)))
     (display-warning 'org-node err-string :error)
     (error "%s" err-string)))
 
-;; REVIEW deprecate?
-(defconst org-node--standard-tip
-  ", try `org-id-update-id-locations' or `org-roam-update-org-id-locations'")
-
+;; Test by evalling:
+;; (org-node--root-dirs (hash-table-values org-id-locations))
 (defun org-node--root-dirs (file-list)
   "Given FILE-LIST, infer the most base root directories.
 
 In many cases, if FILE-LIST is the `hash-table-values' of
-`org-id-locations', this function will spit out a list of one item
-because many people keep their Org files in one root directory.
+`org-id-locations', this function will spit out a list of one
+item because many people keep their Org files in one root
+directory (with various subdirectories).
 
 If it finds more than one root, it sorts by count of files they
 contain, so that the most populous root directory will be the
@@ -375,23 +418,27 @@ first element."
              auto-save-visited-mode
              git-auto-commit-mode)))
 
-;; FIXME The hash table effectively imposes an uniqueness
-;; constraint... probably need to deprecate this variable, make a temporary
-;; alist during `org-node--add-link-to-tables' and then just iterate thru
-;; `org-node--refs-table' to enrich it or something.
-(defvar org-node--reflinks-table (make-hash-table :test #'equal)
+(defvar org-node--reflinks-table (make-hash-table :test #'equal :size 1000)
   "Table of potential reflinks.
-The table keys are just URIs such as web addresses, and the
-values a plist describing the ID-node where the link was found.
+
+The table keys are URIs such as web addresses, and the
+corresponding table value is a list of plists describing each
+ID-node where a link was found to that destination.
 
 The fact that a link is in this table does not mean there is a
 node with a ROAM_REFS matching that same link.  To find that out,
 you'd have to cross-reference with `org-node--refs-table'.")
 
-(defvar org-node--links-table (make-hash-table :test #'equal)
-  "Table of links with a source ID and destination ID.")
-(defvar org-node--refs-table (make-hash-table :test #'equal)
+(defvar org-node--links-table (make-hash-table :test #'equal :size 1000)
+  "Table of links with a source ID and destination ID.
+
+The table keys are destination IDs, and the corresponding table
+value is a list of plists describing each ID-node where a link
+was found to that destination.")
+
+(defvar org-node--refs-table (make-hash-table :test #'equal :size 1000)
   "Table of ROAM_REFS and the IDs where they can be found.")
+
 (defvar org-node--dbg nil
   "Whether to run in a way suitable for debugging.")
 
@@ -437,37 +484,37 @@ You may be able to find the README by typing:
 or you can visit the homepage:
 
     https://github.com/meedstrom/org-node"
-  (aliases    nil :read-only t :type list    :documentation
+  (aliases    nil :read-only t :type List_of_strings :documentation
               "List of ROAM_ALIASES.")
-  (deadline   nil :read-only t :type string  :documentation
+  (deadline   nil :read-only t :type String :documentation
               "The DEADLINE state.")
-  (file-path  nil :read-only t :type string  :documentation
+  (file-path  nil :read-only t :type String :documentation
               "Full file path.")
-  (file-title nil :read-only t :type string  :documentation
-              "The title of the file where this node is.")
-  (file-title-or-basename nil :read-only t :type string  :documentation
+  (file-title nil :read-only t :type String :documentation
+              "The #+title of the file where this node is. May be nil.")
+  (file-title-or-basename nil :read-only t :type String  :documentation
                           "The title of the file where this node is, or its filename if untitled.")
-  (id         nil :read-only t :type string  :documentation
+  (id         nil :read-only t :type String :documentation
               "The ID property.")
-  (is-subtree nil :read-only t :type boolean :documentation
+  (is-subtree nil :read-only t :type Boolean :documentation
               "Valued t if it is a subtree, nil if it is a file-level node.")
-  (level      nil :read-only t :type number  :documentation
+  (level      nil :read-only t :type Integer :documentation
               "Number of stars in the heading. File-level node always 0.")
-  (olp        nil :read-only t :type list    :documentation
+  (olp        nil :read-only t :type List_of_strings :documentation
               "List of ancestor headings to this node.")
-  (pos        nil :read-only t :type number  :documentation
+  (pos        nil :read-only t :type Integer :documentation
               "Char position of the node. File-level node always 1.")
-  (properties nil :read-only t :type list    :documentation
+  (properties nil :read-only t :type Alist :documentation
               "Alist of properties from the :PROPERTIES: drawer.")
-  (refs       nil :read-only t :type list    :documentation
+  (refs       nil :read-only t :type List_of_strings :documentation
               "List of ROAM_REFS.")
-  (scheduled  nil :read-only t :type string  :documentation
+  (scheduled  nil :read-only t :type String :documentation
               "The SCHEDULED state.")
-  (tags       nil :read-only t :type list    :documentation
+  (tags       nil :read-only t :type List_of_strings :documentation
               "List of tags.")
-  (title      nil :read-only t :type string  :documentation
-              "The node's heading, or #+title if it is not a heading.")
-  (todo       nil :read-only t :type string  :documentation
+  (title      nil :read-only t :type String :documentation
+              "The node's heading, or #+title if it is not a subtree.")
+  (todo       nil :read-only t :type String :documentation
               "The TODO state."))
 
 ;; Make getters called "org-node-get-..." instead of "org-node-data-...".
@@ -508,43 +555,35 @@ or you can visit the homepage:
 ;;; Obsoletions
 
 ;; 2024-05-05
-(let (warned-once)
-  (defun org-node-aliases    (node) (unless warned-once (display-warning 'org-node (string-fill "\nYour config uses deprecated accessors org-node-..., update to org-node-get-..." 79)) (setq warned-once t)) (org-node-get-aliases    node))
-  (defun org-node-deadline   (node) (unless warned-once (display-warning 'org-node (string-fill "\nYour config uses deprecated accessors org-node-..., update to org-node-get-..." 79)) (setq warned-once t)) (org-node-get-deadline   node))
-  (defun org-node-file-path  (node) (unless warned-once (display-warning 'org-node (string-fill "\nYour config uses deprecated accessors org-node-..., update to org-node-get-..." 79)) (setq warned-once t)) (org-node-get-file-path  node))
-  (defun org-node-file-title (node) (unless warned-once (display-warning 'org-node (string-fill "\nYour config uses deprecated accessors org-node-..., update to org-node-get-..." 79)) (setq warned-once t)) (org-node-get-file-title node))
-  (defun org-node-id         (node) (unless warned-once (display-warning 'org-node (string-fill "\nYour config uses deprecated accessors org-node-..., update to org-node-get-..." 79)) (setq warned-once t)) (org-node-get-id         node))
-  (defun org-node-is-subtree (node) (unless warned-once (display-warning 'org-node (string-fill "\nYour config uses deprecated accessors org-node-..., update to org-node-get-..." 79)) (setq warned-once t)) (org-node-get-is-subtree node))
-  (defun org-node-level      (node) (unless warned-once (display-warning 'org-node (string-fill "\nYour config uses deprecated accessors org-node-..., update to org-node-get-..." 79)) (setq warned-once t)) (org-node-get-level      node))
-  (defun org-node-olp        (node) (unless warned-once (display-warning 'org-node (string-fill "\nYour config uses deprecated accessors org-node-..., update to org-node-get-..." 79)) (setq warned-once t)) (org-node-get-olp        node))
-  (defun org-node-pos        (node) (unless warned-once (display-warning 'org-node (string-fill "\nYour config uses deprecated accessors org-node-..., update to org-node-get-..." 79)) (setq warned-once t)) (org-node-get-pos        node))
-  (defun org-node-properties (node) (unless warned-once (display-warning 'org-node (string-fill "\nYour config uses deprecated accessors org-node-..., update to org-node-get-..." 79)) (setq warned-once t)) (org-node-get-properties node))
-  (defun org-node-refs       (node) (unless warned-once (display-warning 'org-node (string-fill "\nYour config uses deprecated accessors org-node-..., update to org-node-get-..." 79)) (setq warned-once t)) (org-node-get-refs       node))
-  (defun org-node-scheduled  (node) (unless warned-once (display-warning 'org-node (string-fill "\nYour config uses deprecated accessors org-node-..., update to org-node-get-..." 79)) (setq warned-once t)) (org-node-get-scheduled  node))
-  (defun org-node-tags       (node) (unless warned-once (display-warning 'org-node (string-fill "\nYour config uses deprecated accessors org-node-..., update to org-node-get-..." 79)) (setq warned-once t)) (org-node-get-tags       node))
-  (defun org-node-title      (node) (unless warned-once (display-warning 'org-node (string-fill "\nYour config uses deprecated accessors org-node-..., update to org-node-get-..." 79)) (setq warned-once t)) (org-node-get-title      node))
-  (defun org-node-todo       (node) (unless warned-once (display-warning 'org-node (string-fill "\nYour config uses deprecated accessors org-node-..., update to org-node-get-..." 79)) (setq warned-once t)) (org-node-get-todo       node)))
+;; 2024-06-07
+(defun org-node-aliases    (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-aliases,     update to org-node-get-aliases   " 78)))
+(defun org-node-deadline   (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-deadline,    update to org-node-get-deadline  " 78)))
+(defun org-node-file-path  (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-file-path,   update to org-node-get-file-path " 78)))
+(defun org-node-file-title (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-file-title,  update to org-node-get-file-title" 78)))
+(defun org-node-id         (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-id,          update to org-node-get-id        " 78)))
+(defun org-node-is-subtree (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-is-subtree,  update to org-node-get-is-subtree" 78)))
+(defun org-node-level      (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-level,       update to org-node-get-level     " 78)))
+(defun org-node-olp        (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-olp,         update to org-node-get-olp       " 78)))
+(defun org-node-pos        (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-pos,         update to org-node-get-pos       " 78)))
+(defun org-node-properties (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-properties,  update to org-node-get-properties" 78)))
+(defun org-node-refs       (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-refs,        update to org-node-get-refs      " 78)))
+(defun org-node-scheduled  (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-scheduled,   update to org-node-get-scheduled " 78)))
+(defun org-node-tags       (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-tags,        update to org-node-get-tags      " 78)))
+(defun org-node-title      (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-title,       update to org-node-get-title     " 78)))
+(defun org-node-todo       (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-todo,        update to org-node-get-todo      " 78)))
 
-;;;###autoload
-(let (warned-once)
-  (defun org-node-create-subtree (&rest args)
-    (interactive)
-    (unless warned-once
-      (setq warned-once t)
-      (lwarn 'org-node :warning
-             "Command renamed on 2024-05-01: org-node-create-subtree to org-node-insert-heading"))
-    (apply #'org-node-insert-heading args)))
+(define-obsolete-function-alias
+  'org-node-slug-fn 'org-node-filename-fn "2024-06-08")
 
-;; Not technically an obsoletion...  just fundamentally uninteresting
-;;;###autoload
-(let (warned-once)
-  (defun org-node-backlinks-mode (&rest args)
-    (unless warned-once
-      (setq warned-once t)
-      (run-with-timer
-       .1 nil #'lwarn 'org-node :warning
-       "Someone misspelled `org-node-backlink-mode', but I ran it for you"))
-    (apply #'org-node-backlink-mode args)))
+(define-obsolete-variable-alias
+  'org-node-cache-rescan-file-hook 'org-node-rescan-hook "2024-06-07")
+
+;; 2024-06-07
+(add-hook 'org-node-rescan-hook #'org-node--deprecate-rescan-hook-old-usage)
+(defun org-node--deprecate-rescan-hook-old-usage (&optional files)
+  "Emit a warning for deprecated usage."
+  (when (null files)
+    (display-warning 'org-node (string-fill "\nBreaking change: The hook `org-node-cache-rescan-file-hook' is no longer called with any specific buffer current, and instead passes the list of files scanned (one argument, not zero), and is renamed to `org-node-rescan-hook'" 78))))
 
 (provide 'org-node-common)
 

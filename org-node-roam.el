@@ -4,13 +4,29 @@
 (require 'url-parse)
 (require 'ol)
 
-;;; Method 1: no DB at all
+(define-obsolete-function-alias
+  'org-node--convert-to-roam 'org-node-roam--fake-node "2024-06-07")
 
-;; To make `org-roam-buffer-toggle' work without any DB, eval this:
-;; (advice-add 'org-roam-backlinks-get :override #'org-node--fabricate-roam-backlinks)
+(define-obsolete-function-alias
+  'org-node--fabricate-roam-backlinks 'org-node-roam-fake-backlinks "2024-06-07")
 
-(defun org-node--convert-to-roam (node)
-  "Construct an org-roam-node object from NODE."
+(define-obsolete-function-alias
+  'org-node--fabricate-roam-reflinks 'org-node-roam-fake-reflinks "2024-06-07")
+
+(define-obsolete-function-alias
+  'org-node-feed-file-to-roam-db 'org-node-roam-db-feed "2024-06-07")
+
+(define-obsolete-function-alias
+  'org-node-feed-roam-db 'org-node-roam-db-reset "2024-06-07")
+
+;;; Method 1: Fake roam backlinks, no SQLite
+
+;; To make M-x org-roam-buffer-toggle work without a DB, eval these:
+;; (advice-add 'org-roam-backlinks-get :override #'org-node-roam-fake-backlinks)
+;; (advice-add 'org-roam-reflinks-get :override #'org-node-roam-fake-reflinks)
+
+(defun org-node-roam--fake-node (node)
+  "Construct an org-roam-node object from org-node node NODE."
   (require 'org-roam)
   (org-roam-node-create
    :file (org-node-get-file-path node)
@@ -34,15 +50,16 @@
    :point (org-node-get-pos node)
    :properties (org-node-get-properties node)))
 
-;; Eval to see the form
+
+;; Eval to see examples of what it has to work with...
 ;; (seq-random-elt (hash-table-keys org-node--links-table))
 ;; (seq-random-elt (hash-table-values org-node--links-table))
 
-(defun org-node--fabricate-roam-backlinks (roam-target-node &rest _)
-  "Return org-roam-backlink objects targeting ROAM-OBJECT.
+(defun org-node-roam-fake-backlinks (target-roam-node &rest _)
+  "Return org-roam-backlink objects targeting TARGET-ROAM-NODE.
 Designed as override advice for `org-roam-backlinks-get'."
   (require 'org-roam)
-  (let ((target-id (org-roam-node-id roam-target-node)))
+  (let ((target-id (org-roam-node-id target-roam-node)))
     (when target-id
       (cl-loop
        for link-data in (gethash target-id org-node--links-table)
@@ -50,20 +67,21 @@ Designed as override advice for `org-roam-backlinks-get'."
        as src-node = (gethash src-id org-nodes)
        when src-node
        collect (org-roam-backlink-create
-                :target-node roam-target-node
-                :source-node (org-node--convert-to-roam src-node)
+                :target-node target-roam-node
+                :source-node (org-node-roam--fake-node src-node)
                 :point (plist-get link-data :pos)
                 :properties (plist-get link-data :properties))))))
 
-;; Eval to see the form
+
+;; Eval to see examples of what it has to work with...
 ;; (seq-random-elt (hash-table-keys org-node--reflinks-table))
 ;; (seq-random-elt (hash-table-values org-node--reflinks-table))
 
-(defun org-node--fabricate-roam-reflinks (roam-target-node &rest _)
-  "Return org-roam-backlink objects targeting ROAM-OBJECT.
-Designed as override advice for `org-roam-backlinks-get'."
+(defun org-node-roam-fake-reflinks (target-roam-node &rest _)
+  "Return org-roam-reflink objects targeting TARGET-ROAM-NODE.
+Designed as override advice for `org-roam-reflinks-get'."
   (require 'org-roam)
-  (let* ((target-id (org-roam-node-id roam-target-node))
+  (let* ((target-id (org-roam-node-id target-roam-node))
          (node (gethash target-id org-nodes)))
     (when node
       (cl-loop
@@ -76,7 +94,7 @@ Designed as override advice for `org-roam-backlinks-get'."
                       when src-node
                       collect (org-roam-reflink-create
                                :ref ref
-                               :source-node (org-node--convert-to-roam src-node)
+                               :source-node (org-node-roam--fake-node src-node)
                                :point (plist-get link-data :pos)
                                :properties (plist-get link-data :properties)))
        when reflinks append reflinks))))
@@ -84,8 +102,8 @@ Designed as override advice for `org-roam-backlinks-get'."
 
 ;;; Method 2: feed the DB
 
-(defun org-node--ref->list (ref node-id)
-  "Worker code adapted from `org-roam-db-insert-refs'"
+(defun org-node-roam--ref->list (ref node-id)
+  "Code adapted from `org-roam-db-insert-refs'"
   (let (rows)
     (cond (;; @citeKey
            (string-prefix-p "@" ref)
@@ -125,26 +143,26 @@ Designed as override advice for `org-roam-backlinks-get'."
                   (buffer-file-name) (point) ref)))
     rows))
 
-(defun org-node--feed-node-to-roam-db (node)
-  (let ((id (org-node-get-id node))
-        (file-path (org-node-get-file-path node))
+(defun org-node-roam--db-add-node (node)
+  (let ((id         (org-node-get-id node))
+        (file-path  (org-node-get-file-path node))
         (file-title (org-node-get-file-title node))
-        (tags (org-node-get-tags node))
-        (aliases (org-node-get-aliases node))
-        (roam-refs (org-node-get-refs node))
-        (title (org-node-get-title node))
+        (tags       (org-node-get-tags node))
+        (aliases    (org-node-get-aliases node))
+        (roam-refs  (org-node-get-refs node))
+        (title      (org-node-get-title node))
         (properties (org-node-get-properties node))
-        (level (org-node-get-level node))
-        (todo (org-node-get-todo node))
+        (level      (org-node-get-level node))
+        (todo       (org-node-get-todo node))
         (is-subtree (org-node-get-is-subtree node))
-        (olp (org-node-get-olp node))
-        (pos (org-node-get-pos node)))
-    ;; `org-roam-db-insert-file'
+        (olp        (org-node-get-olp node))
+        (pos        (org-node-get-pos node)))
+    ;; See `org-roam-db-insert-file'
     (org-roam-db-query
      [:insert :into files
       :values $v1]
      (list (vector file-path file-title "" "" "")))
-    ;; `org-roam-db-insert-aliases'
+    ;; See `org-roam-db-insert-aliases'
     (when aliases
       (org-roam-db-query
        [:insert :into aliases
@@ -152,7 +170,7 @@ Designed as override advice for `org-roam-backlinks-get'."
        (mapcar (lambda (alias)
                  (vector id alias))
                aliases)))
-    ;; `org-roam-db-insert-tags'
+    ;; See `org-roam-db-insert-tags'
     ;; FIXME there's no inheritance
     (when tags
       (org-roam-db-query
@@ -161,9 +179,9 @@ Designed as override advice for `org-roam-backlinks-get'."
        (mapcar (lambda (tag)
                  (vector id tag))
                tags)))
-    ;; `org-roam-db-insert-node-data'
+    ;; See `org-roam-db-insert-node-data'
     (when is-subtree
-      (let ((priority nil)
+      (let ((priority nil) ;; TODO
             (scheduled (when-let ((scheduled (org-node-get-scheduled node)))
                          (format-time-string
                           "%FT%T%z"
@@ -178,7 +196,7 @@ Designed as override advice for `org-roam-backlinks-get'."
           :values $v1]
          (vector id file-path level pos todo priority
                  scheduled deadline title properties olp))))
-    ;; `org-roam-db-insert-file-node'
+    ;; See `org-roam-db-insert-file-node'
     (when (not is-subtree)
       (let ((pos 1)
             (todo nil)
@@ -191,17 +209,17 @@ Designed as override advice for `org-roam-backlinks-get'."
           :values $v1]
          (vector id file-path level pos todo priority
                  scheduled deadline title properties olp))))
-    ;; `org-roam-db-insert-refs'
+    ;; See `org-roam-db-insert-refs'
     (dolist (ref-link roam-refs)
-      (dolist (individual-ref (org-node--ref->list ref-link id))
+      (dolist (individual-ref (org-node-roam--ref->list ref-link id))
         (org-roam-db-query [:insert :into refs
                             :values $v1]
                            individual-ref)))
-    ;; `org-roam-db-insert-citation'
+    ;; See `org-roam-db-insert-citation'
     ;; TODO once we have that info
     ))
 
-(defun org-node--feed-links-to-roam-db (target-id)
+(defun org-node-roam--db-add-links (target-id)
   (let ((backlinks (gethash target-id org-node--links-table)))
     (dolist (backlink backlinks)
       ;; See `org-roam-db-insert-link'
@@ -213,7 +231,7 @@ Designed as override advice for `org-roam-backlinks-get'."
                                  (plist-get backlink :type)
                                  (plist-get backlink :properties))))))
 
-(defun org-node-feed-roam-db ()
+(defun org-node-roam-db-reset ()
   (interactive)
   (require 'org-roam)
   (require 'emacsql)
@@ -221,28 +239,24 @@ Designed as override advice for `org-roam-backlinks-get'."
   (org-roam-db--close)
   (delete-file org-roam-db-location)
   (emacsql-with-transaction (org-roam-db)
-    (cl-loop
-     with nodes = (-filter #'org-node-get-id (hash-table-values org-nodes))
-     with ctr = 0
-     with max = (length nodes)
-     for node in nodes
-     do (when (= 0 (% (cl-incf ctr) 10))
-          (message "Inserting into %s... %d/%d"
-                   org-roam-db-location ctr max))
-     (org-node--feed-node-to-roam-db node)
-     (org-node--feed-links-to-roam-db (org-node-get-id node)))))
+    (cl-loop with ctr = 0
+             with max = (hash-table-count org-nodes)
+             for node being the hash-values of org-nodes
+             do (when (= 0 (% (cl-incf ctr) 10))
+                  (message "Inserting into %s... %d/%d"
+                           org-roam-db-location ctr max))
+             (org-node-roam--db-add-node node)
+             (org-node-roam--db-add-links (org-node-get-id node)))))
 
-(defun org-node-feed-file-to-roam-db ()
+(defun org-node-roam-db-feed (&optional files)
+  (require 'org-roam)
   (require 'emacsql)
   (emacsql-with-transaction (org-roam-db)
-    (cl-loop with file = (buffer-file-name)
-             for node being the hash-values of org-nodes
-             when (equal file (org-node-get-file-path node))
+    (cl-loop for node being the hash-values of org-nodes
+             when (member (org-node-get-file-path node) files)
              do
-             (let ((id (org-node-get-id node)))
-               (org-node--feed-node-to-roam-db node)
-               (org-node--feed-links-to-roam-db id)
-               ))))
+             (org-node-roam--db-add-node node)
+             (org-node-roam--db-add-links (org-node-get-id node)))))
 
 (provide 'org-node-roam)
 
