@@ -235,6 +235,12 @@ in exactly \".org\"."
   :group 'org-node
   :type '(repeat string))
 
+(defcustom org-node-completion-everywhere
+  nil
+  "When non-nil, provide completion in all org-mode buffers."
+  :group 'org-node
+  :type 'string)
+
 
 
 (defmacro org-node--with-file (file &rest body)
