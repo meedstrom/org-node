@@ -250,7 +250,6 @@ A variant I like, that greys out the ancestor headings and includes the file tit
           title)))
 #+end_src
 
-
 *** Limitation: excluding notes
 The option =org-node-filter-fn= works well for excluding TODO items that happen to have an ID, and excluding org-drill items and that sort of thing, but beyond that, it has limited utility because unlike org-roam, *child ID nodes of an excluded node are not excluded!*
 
@@ -265,6 +264,22 @@ While the point of org-id is to avoid dependence on filenames, it's often pragma
                  (member "drill" (org-node-get-tags node)) ;; Ignore :drill:
                  (assoc "ROAM_EXCLUDE" (org-node-get-properties node))
                  (string-search "archive" (org-node-get-file-path node))))))
+#+end_src
+
+*** Completion
+
+Enable link completion in all =org-mode= buffers with:
+
+#+begin_src elisp
+(setq
+ org-node-completion-everywhere t)
+#+end_src
+
+You'll need to disable =org-roam='s completion as well, if you're running =org-roam=:
+
+#+begin_src elisp
+(setq
+ org-roam-completion-everywhere nil)
 #+end_src
 
 *** Toolbox

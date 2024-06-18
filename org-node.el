@@ -273,6 +273,49 @@ gets some necessary variables."
           ;; Because we didn't use `org-id-get-create'
           (org-id-add-location org-node-proposed-id path-to-write))))))
 
+(defun org-node-complete-at-point ()
+  "Complete symbol from cache."
+  (when (and
+         org-node-completion-everywhere
+         (eq major-mode 'org-mode)
+         (thing-at-point 'word)
+         (not (org-in-src-block-p))
+         (not (save-match-data (org-in-regexp org-link-any-re))))
+    (let ((bounds
+           (bounds-of-thing-at-point 'word)))
+      (list
+       (car bounds)
+       (cdr bounds)
+       (hash-table-keys
+        org-node-collection)
+       :exit-function
+       (lambda (str _status)
+         (let ((node
+                (gethash
+                 str
+                 org-node-collection)))
+           (delete-char
+            (- (length str)))
+           (insert
+            "[[id:"
+            (org-node-get-id node)
+            "]["
+            (or
+             (and node
+                  (let ((aliases (org-node-get-aliases node)))
+                    (--first (string-search it str) aliases)))
+             (and node
+                  (org-node-get-title node))
+             str)
+            "]]")))
+       ;; Proceed with the next completion function if the returned titles
+       ;; do not match. This allows the default Org capfs or custom capfs
+       ;; of lower priority to run.
+       :exclusive 'no))))
+(add-hook
+ 'completion-at-point-functions
+ #'org-node-complete-at-point)
+
 
 ;;; Commands
 
@@ -323,6 +366,7 @@ docstring for `org-node-insert-link*'."
                                (--first (string-search it input) aliases)))
                         (and node
                              (org-node-get-title node))
+
                         input)))
     (atomic-change-group
       (if region-text
