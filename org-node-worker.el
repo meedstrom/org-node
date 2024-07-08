@@ -1,25 +1,96 @@
 ;;; org-node-worker.el --- Gotta go fast -*- lexical-binding: t; -*-
 
-;; TODO Ignore statistics cookies in headings
-;; TODO Ignore priority state in headings
+;; TODO try not writing 6 file lists, just one and access correct list with
+;;      cdr assq i ...
 
 (eval-when-compile
   (require 'cl-macs)
   (require 'subr-x))
 
-(defun org-node-worker--tmpfile (&optional basename &rest args)
-  "Return a path that puts BASENAME in a temporary directory.
-Usually the result will be /tmp/org-node/BASENAME, but it depends
-on the output of `temporary-file-directory'.  Also format
-BASENAME with ARGS like `format', which see."
-  (expand-file-name (if basename
-                        (apply #'format basename args)
-                      "")
-                    (expand-file-name "org-node" (temporary-file-directory))))
+(cl-defstruct (org-node-data (:constructor org-node-data--create)
+                             (:copier nil))
+  "An org-node data object holds information about an Org ID
+node.  By the term \"Org ID node\", we mean either a subtree with
+an ID property, or a file with a file-level ID property.  The
+information is stored in slots listed below.
 
-(defun org-node-worker--elem-index (elem list)
+For each slot, there exists an accessor function
+\"org-node-get-FIELD\".
+
+For example, the field \"deadline\" has an accessor
+`org-node-get-deadline'.  So you would type
+\"(org-node-get-deadline NODE)\", where NODE is one of the
+elements of the `hash-table-values' of `org-nodes'.
+
+(Technically, there also exists a function alias to
+`org-node-get-deadline', called `org-node-data-deadline', but its
+use is discouraged.)
+
+For real-world usage of these accessors, see examples in the
+documentation of `org-node-filter-fn', the documentation of
+`org-node-format-candidate-fn', or the package README.
+
+You may be able to find the README by typing:
+
+    M-x find-library RET org-node RET
+
+or you can visit the homepage:
+
+    https://github.com/meedstrom/org-node"
+  (aliases    nil :read-only t :type List_of_strings :documentation
+              "List of ROAM_ALIASES.")
+  (deadline   nil :read-only t :type String :documentation
+              "The DEADLINE state.")
+  (file-path  nil :read-only t :type String :documentation
+              "Full file path.")
+  (file-title nil :read-only t :type String :documentation
+              "The #+title of the file where this node is. May be nil.")
+  (file-title-or-basename nil :read-only t :type String  :documentation
+                          "The title of the file where this node is, or its filename if untitled.")
+  (id         nil :read-only t :type String :documentation
+              "The ID property.")
+  (is-subtree nil :read-only t :type Boolean :documentation
+              "Valued t if it is a subtree, nil if it is a file-level node.")
+  (level      nil :read-only t :type Integer :documentation
+              "Number of stars in the heading. File-level node always 0.")
+  (olp        nil :read-only t :type List_of_strings :documentation
+              "List of ancestor headings to this node.")
+  (pos        nil :read-only t :type Integer :documentation
+              "Char position of the node. File-level node always 1.")
+  (properties nil :read-only t :type Alist :documentation
+              "Alist of properties from the :PROPERTIES: drawer.")
+  (priority nil :read-only t :type String :documentation
+            "Priority such as [#A], as a string.")
+  (refs       nil :read-only t :type List_of_strings :documentation
+              "List of ROAM_REFS.")
+  (scheduled  nil :read-only t :type String :documentation
+              "The SCHEDULED state.")
+  (tags       nil :read-only t :type List_of_strings :documentation
+              "List of tags.")
+  (title      nil :read-only t :type String :documentation
+              "The node's heading, or #+title if it is not a subtree.")
+  (todo       nil :read-only t :type String :documentation
+              "The TODO state."))
+
+;; Note to self: file-name-concat is probably faster than expand-file-name when
+;; we do not need to convert the filename to absolute anyway.  Basically even
+;; better than setting file-name-handler-alist to nil.
+(defsubst org-node-worker--tmpfile (&optional basename &rest args)
+  "Return a path that puts BASENAME in a temporary directory.
+
+On most systems, the resulting string will be
+/tmp/org-node/BASENAME, but it depends on the output of
+`temporary-file-directory'.  Also as a nicety, pass BASENAME and
+ARGS through `format' first."
+  (file-name-concat (temporary-file-directory)
+                    "org-node"
+                    (if basename
+                        (apply #'format basename args)
+                      "")))
+
+(defsubst org-node-worker--elem-index (elem list)
   "Like `-elem-index', return first index of ELEM in LIST."
-  (declare (pure t) (side-effect-free t))
+  ;; (declare (pure t) (side-effect-free t))
   (when list
     (let ((list list)
           (i 0))
@@ -28,13 +99,13 @@ BASENAME with ARGS like `format', which see."
               list (cdr list)))
       i)))
 
-(defun org-node-worker--pos->parent-id (oldata pos file-id)
+(defsubst org-node-worker--pos->parent-id (oldata pos file-id)
   "Return ID of the closest ancestor heading that has an ID.
 See `org-node-worker--pos->olp' for explanation of OLDATA and POS.
 
 Extra argument FILE-ID is the file-level id, used as a fallback
 if no ancestor heading has an ID.  It can be nil."
-  (declare (pure t) (side-effect-free t))
+  ;; (declare (pure t) (side-effect-free t))
   (let (;; Drop all the data about positions below POS
         (data-until-pos
          (nthcdr (org-node-worker--elem-index (assoc pos oldata) oldata)
@@ -50,7 +121,7 @@ if no ancestor heading has an ID.  It can be nil."
                ;; Even the top-level heading had no id
                if (= 1 previous-level) return file-id))))
 
-(defun org-node-worker--pos->olp (oldata pos)
+(defsubst org-node-worker--pos->olp (oldata pos)
   "Given buffer position POS, return the Org outline path.
 Result should look like a result from `org-get-outline-path'.
 
@@ -68,7 +139,7 @@ As apparent in the example, OLDATA is expected in \"reverse\"
 order, such that the last heading in the file is represented in
 the first element.  An exact match for POS must also be included
 in one of the elements."
-  (declare (pure t) (side-effect-free t))
+  ;; (declare (pure t) (side-effect-free t))
   (let* (olp
          (pos-data (or (assoc pos oldata)
                        (error "Broken algo: POS %s not found in OLDATA %s"
@@ -89,7 +160,7 @@ in one of the elements."
                return nil))
     olp))
 
-(defun org-node-worker--make-todo-regexp (keywords-string)
+(defsubst org-node-worker--make-todo-regexp (keywords-string)
   "Make a regexp based on KEYWORDS-STRING,
 that will match any of the TODO keywords within."
   (thread-last keywords-string
@@ -99,7 +170,7 @@ that will match any of the TODO keywords within."
                (split-string)
                (regexp-opt)))
 
-(defun org-node-worker--org-link-display-format (s)
+(defsubst org-node-worker--org-link-display-format (s)
   "Copy-pasted from `org-link-display-format'."
   (save-match-data
     (replace-regexp-in-string
@@ -112,7 +183,7 @@ that will match any of the TODO keywords within."
   "Lets you indent less than a (while (progn)) form."
   `(while (progn ,@body)))
 
-(defun org-node-worker--next-heading ()
+(defsubst org-node-worker--next-heading ()
   "Similar to `outline-next-heading'.
 In the special case where point is at the beginning of the buffer
 and there is a heading there, just return t without moving point."
@@ -128,14 +199,13 @@ and there is a heading there, just return t without moving point."
   "List of results to pass back to the main Emacs.")
 
 (defvar org-node-worker--result-missing-files nil)
-
 (defvar org-node-worker--result-found-nodes nil)
-(defvar org-node-worker--result-found-files nil)
+(defvar org-node-worker--result-mtimes nil)
+;; (defvar org-node-worker--result-found-ids nil)
+(defvar org-node-worker--result-found-id-links nil)
+(defvar org-node-worker--result-found-reflinks nil)
 
-(defvar org-node-worker--result-found-ids nil)
-(defvar org-node-worker--result-found-links nil)
-
-(defun org-node-worker--collect-links-until (end id-here olp-with-self link-re)
+(defsubst org-node-worker--collect-links-until (end id-here olp-with-self link-re)
   "From here to buffer position END, look for forward-links.
 Ensure these links will be used to populate tables
 `org-node--links-table' and `org-node--reflinks-table' in the
@@ -170,16 +240,17 @@ process does not have to load org.el."
                 (looking-at-p "[[:space:]]*#\\+")))
           ;; On a # comment or #+keyword, skip whole line
           (goto-char (pos-eol))
-        (push (list (list :src id-here
-                          :pos (point)
-                          :type link-type
-                          ;; Because org-roam asks for it
-                          :properties (list :outline olp-with-self))
-                    path
-                    link-type)
-              org-node-worker--result-found-links)))))
+        (push (list :origin id-here
+                    :pos (point)
+                    :type link-type
+                    :dest path
+                    ;; Because org-roam asks for it
+                    :properties (list :outline olp-with-self))
+              (if (equal "id" link-type)
+                  org-node-worker--result-found-id-links
+                org-node-worker--result-found-reflinks))))))
 
-(defun org-node-worker--collect-properties (beg end file)
+(defsubst org-node-worker--collect-properties (beg end file)
   "Assuming BEG and END delimit the region in between
 :PROPERTIES:...:END:, collect the properties into an alist."
   (let (res)
@@ -204,17 +275,18 @@ process does not have to load org.el."
     res))
 
 (defun org-node-worker--collect ()
-  "Dangerous!
-Scan for ID-nodes across files, assuming there's available info
-in files written by `org-node-cache--scan'.  Assume the current
-buffer is a temp buffer."
+  "Dangerous!  Assumes the current buffer is a temp buffer!
+
+Using info in the temp files prepared by `org-node-cache--scan',
+scan for ID-nodes and links in all Org files given in the file
+list, and write results to another temp file."
   (insert-file-contents (org-node-worker--tmpfile "work-variables.eld"))
   (dolist (var (car (read-from-string (buffer-string))))
     (set (car var) (cdr var)))
   (erase-buffer)
   ;; The variable `i' was set via the command line that launched this process
   (insert-file-contents (org-node-worker--tmpfile "file-list-%d.eld" i))
-  (setq $files (car (read-from-string (buffer-string))))
+  (setq $files (read (buffer-string)))
   (let ((case-fold-search t)
         ;; Perf
         ;; (gc-cons-threshold $gc-cons-threshold)
@@ -223,21 +295,22 @@ buffer is a temp buffer."
         ;; coding system for read can affect the system for write? If so, how
         ;; to pick a sane system for write?
         (coding-system-for-read $assume-coding-system)
-        ;; Reassigned on every iteration, so may as well re-use the memory
-        ;; locations (hopefully producing less garbage) instead of making a
-        ;; new let-binding every time.  Not sure how elisp works... but
-        ;; profiling shows a speedup.
-        TITLE FILE-TITLE POS LEVEL HERE FAR
-        TODO-STATE TAGS SCHED DEADLINE ID OLP FILE-TITLE-OR-BASENAME
-        PROPS FILE-TAGS FILE-ID OUTLINE-DATA TODO-RE FILE-TODO-SETTINGS)
+        ;; Assigned on every iteration, so may as well let-bind once, hopefully
+        ;; producing less garbage.  Not sure how elisp works... but profiling
+        ;; shows a speedup.
+        POS HERE FAR OUTLINE-DATA MTIME
+        TITLE FILE-TITLE FILE-TITLE-OR-BASENAME
+        TODO-STATE TODO-RE FILE-TODO-SETTINGS
+        TAGS FILE-TAGS ID FILE-ID SCHED DEADLINE OLP PRIORITY LEVEL PROPS)
     (dolist (FILE $files)
       (condition-case err
-          (if (not (file-exists-p FILE))
-              ;; We got here because user deleted a file in a way that we didn't
-              ;; notice.  If it was actually a rename done outside Emacs, it'll
-              ;; get picked up on next reset.
+          (if (not (setq MTIME (file-attribute-modification-time
+                                (file-attributes FILE))))
+              ;; We got here because user deleted a file in a way that we
+              ;; didn't notice.  If it was actually a rename done outside
+              ;; Emacs, the new name will get picked up on next reset.
               (push FILE org-node-worker--result-missing-files)
-            (push FILE org-node-worker--result-found-files)
+            (push (cons FILE MTIME) org-node-worker--result-mtimes)
             (erase-buffer)
             ;; NOTE: Here I used `insert-file-contents-literally' in the past,
             ;; converting each captured substring afterwards with
@@ -294,32 +367,33 @@ buffer is a temp buffer."
               (setq FILE-TITLE-OR-BASENAME
                     (or FILE-TITLE (file-name-nondirectory FILE)))
               (when (setq FILE-ID (cdr (assoc "ID" PROPS)))
-                (push FILE-ID org-node-worker--result-found-ids)
+                ;; (push FILE-ID org-node-worker--result-found-ids)
                 ;; Collect links
                 (let ((END (save-excursion
                              (when (org-node-worker--next-heading)
                                (1- (point))))))
                   ;; Don't count org-super-links backlinks as forward links
                   (when (re-search-forward $backlink-drawer-re END t)
-                    (unless (search-forward ":end:" END t)
-                      (error "Couldn't find matching :END: drawer in file %s" FILE)))
+                    (or (search-forward ":end:" END t)
+                        (error "Couldn't find matching :END: drawer in file %s" FILE)))
                   (org-node-worker--collect-links-until
                    END FILE-ID nil $link-re))
-                (push (list :title FILE-TITLE-OR-BASENAME ;; Uhm
-                            :level 0
-                            :tags FILE-TAGS
-                            :file-path FILE
-                            :pos 1
-                            :file-title FILE-TITLE
-                            :file-title-or-basename FILE-TITLE-OR-BASENAME
-                            :properties PROPS
-                            :id FILE-ID
-                            :aliases
-                            (split-string-and-unquote
-                             (or (cdr (assoc "ROAM_ALIASES" PROPS)) ""))
-                            :refs
-                            (split-string-and-unquote
-                             (or (cdr (assoc "ROAM_REFS" PROPS)) "")))
+                (push (org-node-data--create
+                       :title FILE-TITLE-OR-BASENAME ;; Uhm
+                       :level 0
+                       :tags FILE-TAGS
+                       :file-path FILE
+                       :pos 1
+                       :file-title FILE-TITLE
+                       :file-title-or-basename FILE-TITLE-OR-BASENAME
+                       :properties PROPS
+                       :id FILE-ID
+                       :aliases
+                       (split-string-and-unquote
+                        (or (cdr (assoc "ROAM_ALIASES" PROPS)) ""))
+                       :refs
+                       (split-string-and-unquote
+                        (or (cdr (assoc "ROAM_REFS" PROPS)) "")))
                       org-node-worker--result-found-nodes))
 
               ;; This initial condition supports the special case where
@@ -337,9 +411,23 @@ buffer is a temp buffer."
                         (if (looking-at TODO-RE)
                             (progn
                               (setq TODO-STATE (buffer-substring (point) (match-end 0)))
-                              (goto-char (1+ (match-end 0)))
+                              (goto-char (match-end 0))
+                              (skip-chars-forward " ")
                               (setq HERE (point)))
-                          (setq TODO-STATE nil)))
+                          (setq TODO-STATE nil))
+                        (if (looking-at "\\[#[A-Z0-9]+\\]")
+                            (progn
+                              (setq PRIORITY (match-string 0))
+                              (goto-char (match-end 0))
+                              (skip-chars-forward " ")
+                              (setq HERE (point)))
+                          (setq PRIORITY nil)))
+                      ;; Skip statistics-cookie such as "[2/10]"
+                      (when (looking-at "\\[[0-9]*/[0-9]*\\]")
+                        (goto-char (match-end 0))
+                        (skip-chars-forward " ")
+                        (setq HERE (point)))
+                      ;; Tags in heading
                       (if (re-search-forward " +\\(:.+:\\) *$" (pos-eol) t)
                           (progn
                             (setq TITLE (org-node-worker--org-link-display-format
@@ -408,33 +496,35 @@ buffer is a temp buffer."
                       (setq ID (cdr (assoc "ID" PROPS)))
                       (push (list POS TITLE LEVEL ID) OUTLINE-DATA) ;; nil ID allowed
                       (when ID
-                        (push ID org-node-worker--result-found-ids)
+                        ;; (push ID org-node-worker--result-found-ids)
                         (setq OLP (org-node-worker--pos->olp OUTLINE-DATA POS))
-                        (push (list :title TITLE
-                                    :is-subtree t
-                                    :level LEVEL
-                                    :id ID
-                                    :pos POS
-                                    :tags TAGS
-                                    :todo TODO-STATE
-                                    :file-path FILE
-                                    :scheduled SCHED
-                                    :deadline DEADLINE
-                                    :file-title FILE-TITLE
-                                    :file-title-or-basename FILE-TITLE-OR-BASENAME
-                                    :olp OLP
-                                    :properties PROPS
-                                    :aliases
-                                    (split-string-and-unquote
-                                     (or (cdr (assoc "ROAM_ALIASES" PROPS)) ""))
-                                    :refs
-                                    (split-string-and-unquote
-                                     (or (cdr (assoc "ROAM_REFS" PROPS)) "")))
+                        (push (org-node-data--create
+                               :title TITLE
+                               :is-subtree t
+                               :level LEVEL
+                               :id ID
+                               :pos POS
+                               :tags TAGS
+                               :todo TODO-STATE
+                               :file-path FILE
+                               :scheduled SCHED
+                               :deadline DEADLINE
+                               :file-title FILE-TITLE
+                               :file-title-or-basename FILE-TITLE-OR-BASENAME
+                               :olp OLP
+                               :properties PROPS
+                               :priority PRIORITY
+                               :aliases
+                               (split-string-and-unquote
+                                (or (cdr (assoc "ROAM_ALIASES" PROPS)) ""))
+                               :refs
+                               (split-string-and-unquote
+                                (or (cdr (assoc "ROAM_REFS" PROPS)) "")))
                               org-node-worker--result-found-nodes))
                       ;; Now collect links while we're here!
-                      ;; REVIEW: Oddly, the number of ID-links drops somewhat when I do
-                      ;; a save-restriction and narrow to a subtree at a time. Why
-                      ;; might that be?
+                      ;; REVIEW: Oddly, the number of ID-links drops somewhat
+                      ;; when I do a save-restriction and narrow to a subtree
+                      ;; at a time. Why might that be?
                       (let ((ID-HERE (or ID (org-node-worker--pos->parent-id
                                              OUTLINE-DATA POS FILE-ID))))
                         (when ID-HERE
@@ -444,9 +534,9 @@ buffer is a temp buffer."
                                 (OLP-WITH-SELF (append OLP (list TITLE))))
                             ;; Don't count org-super-links backlinks
                             (when (re-search-forward $backlink-drawer-re END t)
-                              (unless (search-forward ":end:" END t)
-                                (error "Couldn't find matching :END: drawer in file %s at position %d"
-                                       FILE (point))))
+                              (or (search-forward ":end:" END t)
+                                  (error "Couldn't find matching :END: drawer in file %s at position %d"
+                                         FILE (point))))
                             (org-node-worker--collect-links-until
                              END ID-HERE OLP-WITH-SELF $link-re)
                             ;; Gotcha... also collect links inside the heading, not
@@ -470,12 +560,12 @@ buffer is a temp buffer."
     (let ((print-length nil)
           (print-level nil))
       (write-region
-       (prin1-to-string
-        (list (cons 'missing-files org-node-worker--result-missing-files)
-              (cons 'found-links org-node-worker--result-found-links)
-              (cons 'found-files org-node-worker--result-found-files)
-              (cons 'found-ids org-node-worker--result-found-ids)
-              (cons 'found-nodes org-node-worker--result-found-nodes)))
+       (prin1-to-string (list org-node-worker--result-missing-files
+                              org-node-worker--result-mtimes
+                              org-node-worker--result-found-nodes
+                              ;; org-node-worker--result-found-ids
+                              org-node-worker--result-found-id-links
+                              org-node-worker--result-found-reflinks))
        nil
        (org-node-worker--tmpfile "demands-%d.eld" i)))))
 
