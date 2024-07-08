@@ -4,70 +4,115 @@
 ;; - That all nodes have all required properties non-nil (e.g. :title)
 ;; ...
 
-(require 'buttercup)
+(require 'ert)
 
-(describe "Test pos->parent-id"
-          (it ""
-              (let ((olp '((373 "A subheading" 2 "33dd")
-                           (250 "A top heading" 1 "d3")
-                           (199 "Another top heading" 1)
-                           (123 "First heading in the file is apparently third-level" 3))))
-                (expect (org-node-worker--pos->parent-id
+(ert-deftest oldata-fns ()
+  (let ((olp '((3730 "A subheading" 2 "33dd")
+               (2503 "A top heading" 1 "d3rh")
+               (1300 "A sub-subheading" 3 "d3csae")
+               (1001 "A subheading" 2 "d3")
+               (199 "Another top heading" 1)
+               (123 "First heading in file is apparently third-level" 3))))
+    (should (equal (org-node-worker--pos->olp olp 1300)
+                   '("Another top heading" "A subheading")))
+    (should (equal (org-node-worker--pos->olp olp 2503)
+                   nil))
+    (should-error (org-node-worker--pos->olp olp 2500))
+    (should (equal (org-node-worker--pos->parent-id olp 1300 nil)
+                   "d3"))))
 
-                         373
-                         nil)
-                        :to-be "d3"))))
+;; (describe "Various functions"
+;;           (it ""
+;;               (expect (length (org-node--split-into-n-sublists
+;;                                '(a v e e) 7))
+;;                       :to-be 7)
+;;               (expect (length (remq nil (org-node--split-into-n-sublists
+;;                                          '(a v e e) 7)))
+;;                       :to-be 1)
+;;               (expect (length
+;;                        (org-node--split-into-n-sublists
+;;                         '(a v e e q l fk k k ki i o r r r r r r r r r r g g g g g gg)
+;;                         4))
+;;                       :to-be 4)))
 
+;; (describe "Parse testfile2.org"
+;;           (if (gethash "bb02315f-f329-4566-805e-1bf17e6d892d" org-nodes)
+;;               (org-node-cache--rescan-file-a nil "testfile2.org")
+;;             (org-node-cache--scan-targeted (list "testfile2.org")))
+;;           (mapc #'accept-process-output org-node-cache--processes)
+;;           (it "Etc"
+;;               (let ((node (gethash "bb02315f-f329-4566-805e-1bf17e6d892d" org-nodes)))
+;;                 (expect (org-node-get-olp node)
+;;                         :to-equal nil)
+;;                 (expect (org-node-get-file-title node)
+;;                         :to-equal "Title")
+;;                 (expect (org-node-get-todo node)
+;;                         :to-equal "TODO"))
+;;               (let ((node (gethash "d28cf9b9-d546-46b0-8615-9880a4d2463d" org-nodes)))
+;;                 (expect (org-node-get-olp node)
+;;                         :to-equal '("1st-level" "2nd-level")))))
 
-;; Hm... actually should error when passed an assoc not exist
+(ert-deftest parse-testfile2.org ()
+  (org-node-cache--scan-targeted (list "testfile2.org"))
+  (org-node-cache-ensure t)
+  (let ((node (gethash "bb02315f-f329-4566-805e-1bf17e6d892d" org-nodes)))
+    (should (equal (org-node-get-olp node) nil))
+    (should (equal (org-node-get-file-title node) "Title"))
+    (should (equal (org-node-get-todo node) "CUSTOMDONE"))
+    (should (equal (org-node-get-scheduled node) "<2024-06-17 Mon>")))
+  (let ((node (gethash "d28cf9b9-d546-46b0-8615-9880a4d2463d" org-nodes)))
+    (should (equal (org-node-get-olp node) '("1st-level" "TODO 2nd-level, invalid todo state")))
+    (should (equal (org-node-get-title node) "3rd-level, has ID"))
+    (should (equal (org-node-get-todo node) nil))))
 
-(describe "Test oldata fns"
-          :var ((olp '((3730 "A subheading" 2 "33dd")
-                       (2503 "A top heading" 1 "d3rh")
-                       (1300 "A sub-subheading" 3 "d3csae")
-                       (1001 "A subheading" 2 "d3")
-                       (199 "Another top heading" 1)
-                       (123 "First heading in file is apparently third-level" 3))))
-          (it "Test pos->olp"
-              (expect (org-node-worker--pos->olp olp 1300)
-                      :to-equal '("Another top heading" "A subheading"))
-              (expect (org-node-worker--pos->olp olp 2503)
-                      :to-equal nil)
-              (expect (org-node-worker--pos->olp olp 2500)
-                      :to-throw))
+(ert-deftest multiple-id-dirs ()
+  (mkdir "/tmp/org-node/test1" t)
+  (mkdir "/tmp/org-node/test2" t)
+  (write-region "" nil "/tmp/org-node/test2/emptyfile.org")
+  (write-region "" nil "/tmp/org-node/test2/emptyfile2.org")
+  (write-region "" nil "/tmp/org-node/test1/emptyfile3.org")
+  (let ((org-id-locations (make-hash-table :test #'equal))
+        (org-node-extra-id-dirs '("/tmp/org-node/test1/"
+                                  "/tmp/org-node/test2/"))
+        (org-node-ask-directory nil))
+    (should (equal (car (org-node--root-dirs (org-node-files)))
+                   "/tmp/org-node/test2/"))))
 
-          (it "Test pos->parent-id"
-              (expect (org-node-worker--pos->parent-id olp 1300 nil)
-                      :to-equal "d3")))
+(ert-deftest goto-random ()
+  (require 'seq)
+  (org-node-cache--scan-targeted (list "testfile2.org"))
+  (org-node-cache-ensure t)
+  (let ((node (seq-random-elt (hash-table-values org-nodes))))
+    (org-node--goto node)
+    (should (equal (point) (org-node-get-pos node)))
+    (should (equal (abbreviate-file-name (buffer-file-name))
+                   (org-node-get-file-path node)))))
 
-
-(describe "Various functions"
-          (it ""
-              (expect (length (org-node--split-into-n-sublists
-                               '(a v e e) 7))
-                      :to-be 7)
-              (expect (length (remq nil (org-node--split-into-n-sublists
-                                         '(a v e e) 7)))
-                      :to-be 1)
-              (expect (length
-                       (org-node--split-into-n-sublists
-                        '(a v e e q l fk k k ki i o r r r r r r r r r r g g g g g gg)
-                        4))
-                      :to-be 4)))
-
-(describe "Parse testfile2.org"
-          (if (gethash "bb02315f-f329-4566-805e-1bf17e6d892d" org-nodes)
-              (org-node-cache--rescan-file-a nil "testfile2.org")
-            (org-node-cache--scan-targeted (list "testfile2.org")))
-          (mapc #'accept-process-output org-node-cache--processes)
-          (it "Etc"
-              (let ((node (gethash "bb02315f-f329-4566-805e-1bf17e6d892d" org-nodes)))
-                (expect (org-node-get-olp node)
-                        :to-equal nil)
-                (expect (org-node-get-file-title node)
-                        :to-equal "Title")
-                (expect (org-node-get-todo node)
-                        :to-equal "TODO"))
-              (let ((node (gethash "d28cf9b9-d546-46b0-8615-9880a4d2463d" org-nodes)))
-                (expect (org-node-get-olp node)
-                        :to-equal '("1st-level" "2nd-level")))))
+(ert-deftest various ()
+  (let ((org-node-ask-directory "/tmp/org-node/test/")
+        ;; NOTE you should manually test the other creation-fns
+        (org-node-creation-fn #'org-node-new-file))
+    (delete-directory org-node-ask-directory t)
+    ;; (should-error (org-node--create "New node" "not-an-uuid1234"))
+    (mkdir org-node-ask-directory t)
+    (org-node--create "New node" "not-an-uuid1234")
+    (org-node-cache-ensure t)
+    (let ((node (gethash "not-an-uuid1234" org-nodes)))
+      (org-node--goto node)
+      (should (file-equal-p default-directory org-node-ask-directory))
+      (should (equal (org-node-get-id node) (org-entry-get nil "ID" t)))
+      (should (equal (org-node-get-id node) "not-an-uuid1234"))
+      (should (equal (org-node-get-title node) "New node"))
+      (should (equal (org-node-get-file-title node) "New node"))
+      (should (equal (org-node-get-file-title-or-basename node) "New node"))
+      )
+    (let ((org-node-make-file-level-nodes nil))
+      (org-node--create "A top-level heading" "not-an-uuid5678")
+      (org-node-cache-ensure t)
+      (let ((node (gethash "not-an-uuid5678" org-nodes))
+            (expected-filename (funcall org-node-filename-fn "A top-level heading")))
+        (should (equal (org-node-get-title node) "A top-level heading"))
+        (should (equal (org-node-get-file-title node) expected-filename))
+        (should (equal (org-node-get-file-title-or-basename node) expected-filename))))
+    )
+  )

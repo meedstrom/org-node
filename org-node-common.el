@@ -27,8 +27,10 @@ Called with one argument: the list of files re-scanned."
 (defcustom org-node-ask-directory nil
   "Whether to ask the user where to save a new file node.
 
-Set nil to assume that the most populous root directory in
-`org-id-locations' is always the correct directory."
+- Symbol nil: put file in the most populous root directory in
+       `org-id-locations' without asking
+- String: a directory path in which to put the file
+- Symbol t: ask every time, starting from the current directory"
   :group 'org-node
   :type 'boolean)
 
@@ -43,10 +45,7 @@ This affects the behavior of `org-node-new-file',
 If you change your mind about this setting, the Org-roam commands
 `org-roam-promote-entire-buffer' and
 `org-roam-demote-entire-buffer' can help you transition the files
-you have made along the way.
-
-Be aware that a nil setting may not yet be supported everywhere,
-such as `org-node-rename-file-by-title'."
+you have made along the way."
   :group 'org-node
   :type 'boolean)
 
@@ -105,17 +104,17 @@ visited.  The smaller this list, the faster `org-node-reset'."
            (function-item tramp-archive-file-name-handler)
            (function-item file-name-non-special))))
 
-;; (defcustom org-node-perf-gc-cons-threshold nil
-;;   "Temporary override for `gc-cons-threshold'.
-;; Tweak to maybe speed up `org-node-reset'.  Set nil to use the
-;; actual value of `gc-cons-threshold'.
+(defcustom org-node-perf-gc-cons-threshold most-positive-fixnum
+  "Temporary override for `gc-cons-threshold'.
+Tweak to maybe speed up `org-node-reset'.  Set nil to use the
+actual value of `gc-cons-threshold'.
 
-;; It can be surprising which value works best.  It is possible that
-;; 80 kB is performant, and 16 MB is performant, but something in
-;; between such as 1 MB is twice as slow.  Experiment to find a good
-;; setting."
-;;   :group 'org-node
-;;   :type '(choice integer (const nil)))
+It can be surprising which value works best.  It is possible that
+80 kB is performant, and 16 MB is performant, but something in
+between such as 1 MB is twice as slow.  Experiment to find a good
+setting."
+  :group 'org-node
+  :type '(choice integer (const nil)))
 
 (defcustom org-node-filename-fn #'org-node-slugify-as-url
   "Function taking a #+TITLE and returning a filename.
@@ -153,7 +152,7 @@ the function is called: `org-node-proposed-title' and
           (function-item org-capture)
           function))
 
-(defcustom org-node-insert-link-hook ()
+(defcustom org-node-insert-link-hook '()
   "Hook run after inserting a link to an Org-ID node.
 
 Called with two arguments: the ID and the link description.
@@ -172,13 +171,13 @@ Applied only by `org-node-new-file', `org-node-capture-target',
 NOT applied by `org-node-new-by-roam-capture' -- see org-roam's
 `org-roam-capture-new-node-hook' instead.
 
-A good member for this hook is `org-node-put-created', especially
-since the default `org-node-filename-fn' does not put a timestamp in
-the filename."
+A good member to put in this hook is `org-node-put-created',
+especially since the default `org-node-filename-fn' does not put
+a timestamp in the filename."
   :group 'org-node
   :type 'hook)
 
-(defcustom org-node-format-candidate-fn
+(defcustom org-node-format-fn
   (lambda (_node title)
     title)
   "Function to return a string to represent a given node.
@@ -196,13 +195,15 @@ from \\[org-node-cache-peek] and specified in the type
 The following example will make the completions display the
 ancestors (outline path) to each node:
 
-(setq org-node-format-candidate-fn
+(setq org-node-format-fn
       (lambda (node title)
         (if-let ((olp (org-node-get-olp node)))
             (concat (string-join olp \" > \") \" > \" title)
           title)))"
   :group 'org-node
   :type 'function)
+
+(defvaralias 'org-node-format-candidate-fn 'org-node-format-fn)
 
 (defcustom org-node-filter-fn
   (lambda (node)
@@ -264,8 +265,7 @@ only do it up to the directory."
   :type '(repeat directory))
 
 ;; TODO: figure out how to permit .org.gpg and fail gracefully if
-;;       the EPG settings are insufficient
-;; TODO: test permitting .org.gz
+;;       the EPG settings are insufficient. easier to test with .org.gz first
 (defcustom org-node-extra-id-dirs-exclude
   '("/logseq/bak/"
     "/logseq/version-files/"
@@ -288,43 +288,58 @@ in precisely \".org\" anyway."
 
 
 
-(defmacro org-node--with-file (file &rest body)
+(defun org-node--record-link-at-point (id _desc)
+  (when (derived-mode-p 'org-mode)
+    (when-let ((origin (org-entry-get nil "ID" t)))
+      (push (list :origin origin
+                  :pos (point)
+                  :type "id"
+                  :dest id
+                  :properties (list :outline (ignore-errors
+                                               (org-get-outline-path t))))
+            (gethash id org-node--links-table)))))
+
+;; NOTE Very important macro for the backlink mode because backlink insertion
+;;      opens an Org file, and if that is slow, then every link insertion is.
+(defmacro org-node--with-quick-file-buffer (file &rest body)
   "Pseudo-backport of Emacs 29 `org-with-file-buffer'.
-Also integrates `org-with-wide-buffer' behavior and some
-magic around saving.
+Also integrates `org-with-wide-buffer' behavior, some
+magic around saving, and tries to open FILE quickly.
 
 In short, if a buffer was visiting FILE, go to that existing
 buffer, else visit FILE in a new buffer, in which case ignore
 `org-mode-hook' and the usual Org startup checks.  With that as
-the current buffer, execute BODY.  Finally:
+the current buffer, temporarly `widen' it, execute BODY, then
+restore point.  Finally:
 
-- If a new buffer had to be opened: save and kill it.
-- If a buffer had been open, but it was unmodified before
-  executing BODY: leave it open and save any changes.
-- If a buffer had been open, and modified: leave it open and leave
-  it unsaved."
+- If a new buffer had to be opened: save and kill it.  Mandatory
+  because buffers opened in the quick way look \"wrong\" as many
+  hooks did not run, e.g. no indent-mode, no visual wrap etc.
+- If a buffer had been open: leave it open and leave it unsaved."
   (declare (indent 1) (debug t))
-  ;; REVIEW: do these perf hacks or don't?
   `(let ((find-file-hook nil)
+         (org-element-use-cache nil) ;; generally safer
          (after-save-hook nil)
+         (kill-buffer-hook nil) ;; prevent save-place-mode
          (before-save-hook nil)
          (org-agenda-files nil)
          (org-inhibit-startup t))
-     (let* ((was-open (find-buffer-visiting ,file))
-            (was-modified (and was-open (buffer-modified-p was-open))))
+     (let ((was-open (find-buffer-visiting ,file)))
        (with-current-buffer (or was-open
                                 (delay-mode-hooks
                                   (find-file-noselect ,file)))
          (save-excursion
            (without-restriction
              ,@body))
-         (unless (and was-open was-modified)
-           (let ((save-silently t)
-                 (inhibit-message t))
-             (save-buffer)))
          (unless was-open
+           (when (buffer-modified-p)
+             (let ((save-silently t)
+                   (inhibit-message t))
+               (save-buffer)))
            (kill-buffer))))))
 
+;; TODO: save 50ms by recording only unabbreviated file names in mem and the
+;; ..mtime-table, and only abbreviating once inside the ..scan fn
 (let (mem)
   (defun org-node-files (&optional memoized)
     "List files in `org-id-locations' or `org-node-extra-id-dirs'.
@@ -336,21 +351,20 @@ something called this function, returning instantly."
       (setq mem
             (-union
              (hash-table-values org-id-locations)
-             (cl-loop
-              for dir in org-node-extra-id-dirs
-              append (cl-loop
-                      for file in (directory-files-recursively
-                                   dir (rx (or ".org" ".org_archive") eos)
-                                   nil t)
-                      unless (cl-loop
-                              for exclude in org-node-extra-id-dirs-exclude
-                              when (string-search exclude file)
-                              return t)
-                      ;; Abbreviating because org-id does too
-                      collect (abbreviate-file-name file))))))))
+             (let ((file-name-handler-alist nil))
+               (cl-loop
+                for dir in org-node-extra-id-dirs
+                append (cl-loop
+                        for file in (directory-files-recursively
+                                     dir (rx (or ".org" ".org_archive") eos)
+                                     nil t)
+                        unless (cl-loop
+                                for exclude in org-node-extra-id-dirs-exclude
+                                when (string-search exclude file)
+                                return t)
+                        ;; Abbreviating because org-id does too
+                        collect (abbreviate-file-name file)))))))))
 
-;; REVIEW consider a rename
-;;        or maybe rename the other tables so they dont end in -table?
 (defvar org-nodes (make-hash-table :test #'equal :size 1000)
   "Table associating ids with file/subtree data.
 To peek on the contents, try \\[org-node-cache-peek] a few times, which
@@ -363,16 +377,18 @@ This allows use with `completing-read'.")
 (defun org-node--forget-id-locations (files)
   "Remove references to FILES in `org-id-locations'.
 You might consider \"committing\" the effect afterwards by
-calling `org-id-locations-save'."
-  (let ((alist (org-id-hash-to-alist org-id-locations)))
-    (cl-loop for file in files
-             do (assoc-delete-all file alist))
-    (setq org-id-locations (org-id-alist-to-hash alist))))
+calling `org-id-locations-save', which this function does not do."
+  (when files
+    ;; (setq org-id-files (-difference org-id-files files)) ;; Redundant
+    (let ((alist (org-id-hash-to-alist org-id-locations)))
+      (cl-loop for file in files
+               do (assoc-delete-all file alist))
+      (setq org-id-locations (org-id-alist-to-hash alist)))))
 
 (defun org-node--die (format-string &rest args)
   "Like `error' but make sure the user sees it.
-Because not everyone has `debug-on-error' t - in fact, that's
-nil by default, and then errors are very easy to miss."
+Useful because not everyone has `debug-on-error' t, and then
+errors are very easy to miss."
   (let ((err-string (apply #'format format-string args)))
     (display-warning 'org-node err-string :error)
     (error "%s" err-string)))
@@ -409,16 +425,15 @@ first element."
        finally return (mapcar #'car (cl-sort dir-counters #'> :key #'cdr))))))
 
 ;; REVIEW deprecate?
-(defun org-node--consent-to-problematic-modes-for-mass-op ()
+(defun org-node--consent-to-problematic-modes-for-mass-edit ()
   (--all-p (if (and (boundp it) (symbol-value it))
                (y-or-n-p
                 (format "%S is active - proceed anyway?" it))
              t)
-           '(auto-save-mode
-             auto-save-visited-mode
+           '(auto-save-visited-mode
              git-auto-commit-mode)))
 
-(defvar org-node--reflinks-table (make-hash-table :test #'equal :size 1000)
+(defvar org-node--potential-reflinks (make-hash-table :test #'equal :size 1000)
   "Table of potential reflinks.
 
 The table keys are URIs such as web addresses, and the
@@ -455,7 +470,8 @@ was found to that destination.")
 ;; everyone reads the news.  By contrast if the getter is a function
 ;; `org-node-get-roam-exclude', I can override it so it emits a warning.
 
-(cl-defstruct org-node-data
+(cl-defstruct (org-node-data (:constructor org-node-data--create)
+                             (:copier nil))
   "An org-node data object holds information about an Org ID
 node.  By the term \"Org ID node\", we mean either a subtree with
 an ID property, or a file with a file-level ID property.  The
@@ -506,6 +522,8 @@ or you can visit the homepage:
               "Char position of the node. File-level node always 1.")
   (properties nil :read-only t :type Alist :documentation
               "Alist of properties from the :PROPERTIES: drawer.")
+  (priority nil :read-only t :type String :documentation
+            "Priority such as [#A], as a string.")
   (refs       nil :read-only t :type List_of_strings :documentation
               "List of ROAM_REFS.")
   (scheduled  nil :read-only t :type String :documentation
@@ -572,7 +590,7 @@ or you can visit the homepage:
 (defun org-node-title      (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-title,       update to org-node-get-title     " 78)))
 (defun org-node-todo       (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-todo,        update to org-node-get-todo      " 78)))
 
-(define-obsolete-function-alias
+(define-obsolete-variable-alias
   'org-node-slug-fn 'org-node-filename-fn "2024-06-08")
 
 (define-obsolete-variable-alias

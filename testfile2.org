@@ -2,6 +2,7 @@
 :ID:       dc9dbb63-3abc-490f-a994-539079eb732c
 :END:
 #+title: Title
+#+todo: CUSTOMTODO | CUSTOMDONE
 
 * 1st-level
 ** 2nd-level, has ID
@@ -15,14 +16,15 @@
 :ID:       5172902f-c9d3-43f2-990e-94c9339281a0
 :CREATED:  [2024-05-13]
 :END:
-* TODO 1st-level, has ID, has TODO
+* CUSTOMDONE 1st-level, has ID, has TODO
+SCHEDULED: <2024-06-17 Mon> CLOSED: <2024-06-18 Tue>
 :PROPERTIES:
 :ID:       bb02315f-f329-4566-805e-1bf17e6d892d
 :END:
 ** 2nd-level
 *** 3rd-level
-* DONE 1st-level
-** TODO 2nd-level
+* CUSTOMTODO 1st-level
+** TODO 2nd-level, invalid todo state
 *** 3rd-level, has ID
 :PROPERTIES:
 :ID:       d28cf9b9-d546-46b0-8615-9880a4d2463d

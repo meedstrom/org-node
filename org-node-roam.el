@@ -1,17 +1,17 @@
-;;; org-node-roam.el -*- lexical-binding: t; -*-
+;;; org-node-roam.el --- Rudimentary Org-roam replica -*- lexical-binding: t; -*-
 
 (require 'org-node-common)
 (require 'url-parse)
 (require 'ol)
 
 (define-obsolete-function-alias
-  'org-node--convert-to-roam 'org-node-roam--fake-node "2024-06-07")
+  'org-node--convert-to-roam 'org-node-roam--fab-node "2024-06-07")
 
 (define-obsolete-function-alias
-  'org-node--fabricate-roam-backlinks 'org-node-roam-fake-backlinks "2024-06-07")
+  'org-node--fabricate-roam-backlinks 'org-node-roam-fab-backlinks "2024-06-07")
 
 (define-obsolete-function-alias
-  'org-node--fabricate-roam-reflinks 'org-node-roam-fake-reflinks "2024-06-07")
+  'org-node--fabricate-roam-reflinks 'org-node-roam-fab-reflinks "2024-06-07")
 
 (define-obsolete-function-alias
   'org-node-feed-file-to-roam-db 'org-node-roam-db-feed "2024-06-07")
@@ -22,11 +22,11 @@
 ;;; Method 1: Fake roam backlinks, no SQLite
 
 ;; To make M-x org-roam-buffer-toggle work without a DB, eval these:
-;; (advice-add 'org-roam-backlinks-get :override #'org-node-roam-fake-backlinks)
-;; (advice-add 'org-roam-reflinks-get :override #'org-node-roam-fake-reflinks)
+;; (advice-add 'org-roam-backlinks-get :override #'org-node-roam-fab-backlinks)
+;; (advice-add 'org-roam-reflinks-get :override #'org-node-roam-fab-reflinks)
 
-(defun org-node-roam--fake-node (node)
-  "Construct an org-roam-node object from org-node node NODE."
+(defun org-node-roam--fab-node (node)
+  "Make a knockoff org-roam-node object from org-node node NODE."
   (require 'org-roam)
   (org-roam-node-create
    :file (org-node-get-file-path node)
@@ -55,29 +55,33 @@
 ;; (seq-random-elt (hash-table-keys org-node--links-table))
 ;; (seq-random-elt (hash-table-values org-node--links-table))
 
-(defun org-node-roam-fake-backlinks (target-roam-node &rest _)
+(defun org-node-roam-fab-backlinks (target-roam-node &rest _)
   "Return org-roam-backlink objects targeting TARGET-ROAM-NODE.
 Designed as override advice for `org-roam-backlinks-get'."
   (require 'org-roam)
   (let ((target-id (org-roam-node-id target-roam-node)))
     (when target-id
+      (let ((links (gethash target-id org-node--links-table))
+            ;; TODO: this probs necessary, but verify in org-roam-buffer becsue
+            ;; i expect we see duplicates, and if not, why not?
+            ;; (links (delete-dups (gethash target-id org-node--links-table)))
+            ))
       (cl-loop
-       for link-data in (gethash target-id org-node--links-table)
-       as src-id = (plist-get link-data :src)
+       for link-data in links
+       as src-id = (plist-get link-data :origin)
        as src-node = (gethash src-id org-nodes)
        when src-node
        collect (org-roam-backlink-create
                 :target-node target-roam-node
-                :source-node (org-node-roam--fake-node src-node)
+                :source-node (org-node-roam--fab-node src-node)
                 :point (plist-get link-data :pos)
                 :properties (plist-get link-data :properties))))))
 
-
 ;; Eval to see examples of what it has to work with...
-;; (seq-random-elt (hash-table-keys org-node--reflinks-table))
-;; (seq-random-elt (hash-table-values org-node--reflinks-table))
+;; (seq-random-elt (hash-table-keys org-node--potential-reflinks))
+;; (seq-random-elt (hash-table-values org-node--potential-reflinks))
 
-(defun org-node-roam-fake-reflinks (target-roam-node &rest _)
+(defun org-node-roam-fab-reflinks (target-roam-node &rest _)
   "Return org-roam-reflink objects targeting TARGET-ROAM-NODE.
 Designed as override advice for `org-roam-reflinks-get'."
   (require 'org-roam)
@@ -85,18 +89,17 @@ Designed as override advice for `org-roam-reflinks-get'."
          (node (gethash target-id org-nodes)))
     (when node
       (cl-loop
-       for ref in (--map (replace-regexp-in-string "https:" "" it)
-                         (org-node-get-refs node))
+       for ref in (org-node-get-refs node)
        as reflinks = (cl-loop
-                      for link-data in (gethash ref org-node--reflinks-table)
-                      as src-id = (plist-get link-data :src)
+                      for link in (gethash ref org-node--potential-reflinks)
+                      as src-id = (plist-get link :origin)
                       as src-node = (gethash src-id org-nodes)
                       when src-node
                       collect (org-roam-reflink-create
-                               :ref ref
-                               :source-node (org-node-roam--fake-node src-node)
-                               :point (plist-get link-data :pos)
-                               :properties (plist-get link-data :properties)))
+                               :ref (plist-get link :dest)
+                               :source-node (org-node-roam--fab-node src-node)
+                               :point (plist-get link :pos)
+                               :properties (plist-get link :properties)))
        when reflinks append reflinks))))
 
 
@@ -226,7 +229,7 @@ Designed as override advice for `org-roam-reflinks-get'."
       (org-roam-db-query [:insert :into links
                           :values $v1]
                          (vector (plist-get backlink :pos)
-                                 (plist-get backlink :src)
+                                 (plist-get backlink :origin)
                                  target-id
                                  (plist-get backlink :type)
                                  (plist-get backlink :properties))))))
