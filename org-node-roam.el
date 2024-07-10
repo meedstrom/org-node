@@ -52,8 +52,8 @@
 
 
 ;; Eval to see examples of what it has to work with...
-;; (seq-random-elt (hash-table-keys org-node--links-table))
-;; (seq-random-elt (hash-table-values org-node--links-table))
+;; (seq-random-elt (hash-table-keys org-node--links))
+;; (seq-random-elt (hash-table-values org-node--links))
 
 (defun org-node-roam-fab-backlinks (target-roam-node &rest _)
   "Return org-roam-backlink objects targeting TARGET-ROAM-NODE.
@@ -61,10 +61,10 @@ Designed as override advice for `org-roam-backlinks-get'."
   (require 'org-roam)
   (let ((target-id (org-roam-node-id target-roam-node)))
     (when target-id
-      (let ((links (gethash target-id org-node--links-table))
+      (let ((links (gethash target-id org-node--links))
             ;; TODO: this probs necessary, but verify in org-roam-buffer becsue
             ;; i expect we see duplicates, and if not, why not?
-            ;; (links (delete-dups (gethash target-id org-node--links-table)))
+            ;; (links (delete-dups (gethash target-id org-node--links)))
             ))
       (cl-loop
        for link-data in links
@@ -78,8 +78,8 @@ Designed as override advice for `org-roam-backlinks-get'."
                 :properties (plist-get link-data :properties))))))
 
 ;; Eval to see examples of what it has to work with...
-;; (seq-random-elt (hash-table-keys org-node--potential-reflinks))
-;; (seq-random-elt (hash-table-values org-node--potential-reflinks))
+;; (seq-random-elt (hash-table-keys org-node--latent-reflinks))
+;; (seq-random-elt (hash-table-values org-node--latent-reflinks))
 
 (defun org-node-roam-fab-reflinks (target-roam-node &rest _)
   "Return org-roam-reflink objects targeting TARGET-ROAM-NODE.
@@ -91,7 +91,7 @@ Designed as override advice for `org-roam-reflinks-get'."
       (cl-loop
        for ref in (org-node-get-refs node)
        as reflinks = (cl-loop
-                      for link in (gethash ref org-node--potential-reflinks)
+                      for link in (gethash ref org-node--latent-reflinks)
                       as src-id = (plist-get link :origin)
                       as src-node = (gethash src-id org-nodes)
                       when src-node
@@ -223,7 +223,7 @@ Designed as override advice for `org-roam-reflinks-get'."
     ))
 
 (defun org-node-roam--db-add-links (target-id)
-  (let ((backlinks (gethash target-id org-node--links-table)))
+  (let ((backlinks (gethash target-id org-node--links)))
     (dolist (backlink backlinks)
       ;; See `org-roam-db-insert-link'
       (org-roam-db-query [:insert :into links

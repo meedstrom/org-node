@@ -17,7 +17,7 @@
 
 ;; Author:           Martin Edström <meedstrom91@gmail.com>
 ;; Created:          2024-04-13
-;; Version:          0.1pre
+;; Version:          0.2
 ;; Keywords:         org, hypermedia
 ;; Package-Requires: ((emacs "28.1") (compat "29.1.4.5") (dash "2.19.1"))
 ;; URL:              https://github.com/meedstrom/org-node
@@ -52,6 +52,13 @@ else the file-level node, whichever has an ID."
   (gethash (completing-read "Node: " org-node-collection
                             () () () 'org-node-hist)
            org-node-collection))
+
+(defun org-node-get-reflinks (node)
+  (cl-loop for ref in (org-node-get-refs node)
+           append (gethash ref org-node--latent-reflinks)))
+
+(defun org-node-get-backlinks (node)
+  (gethash (org-node-get-id node) org-node--links))
 
 
 ;;; Plumbing
@@ -954,19 +961,49 @@ write_file(lisp_data, file.path(dirname(tsv), \"feedback-arcs.eld\"))
       (display-buffer (current-buffer)))))
 
 (defun org-node--make-digraph-tsv-string ()
-  "From `org-node--links-table', generate a list of
+  "From `org-node--links', generate a list of
 destination-origin pairings, expressed as tab-separated values."
   (concat
    "src\tdest\n"
    (string-join
     (-uniq (cl-loop
-            for dest being the hash-keys of org-node--links-table
+            for dest being the hash-keys of org-node--links
             using (hash-values links)
             append (cl-loop
                     for link in links
                     collect (concat dest "\t" (plist-get link :origin)))))
     "\n")))
 
+;; hmmmm uhhhh a variable for this seems maybe unnecessary
+(defcustom org-node-completion-everywhere nil
+  ""
+  :group 'org-node
+  :type 'string)
+
+(defun org-node-complete-at-point ()
+  (when (and ;; org-node-completion-everywhere
+         (derived-mode-p 'org-mode)
+         (thing-at-point 'word)
+         (not (org-in-src-block-p))
+         (not (save-match-data (org-in-regexp org-link-any-re))))
+    (let ((bounds (bounds-of-thing-at-point 'word)))
+      (list (car bounds)
+            (cdr bounds)
+            (hash-table-keys org-node-collection-actually-links)
+            :exit-function
+            (lambda (text _)
+              (message "BOCA BOCA BOCA %s" text)
+              (let ((node (gethash text org-node-collection-actually-links)))
+                (when node
+                  (atomic-change-group
+                    (delete-char (- (length text)))
+                    (insert (org-link-make-string
+                             (concat "id:" (org-node-get-id node))
+                             text))))))
+            :exclusive 'no
+            ))))
+
+;;(add-hook 'completion-at-point-functions #'org-node-complete-at-point)
 
 (provide 'org-node)
 

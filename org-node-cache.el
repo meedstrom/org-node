@@ -245,10 +245,10 @@ eventually and not dropped."
   "Timestamp used to measure time it took to rebuild cache.")
 
 (defun org-node-cache--scan (files finalizer)
-  "Scan FILES for id-nodes and links.
+  "Begin async scanning FILES for id-nodes and links.
 
-Do so asynchronously, and when finished, run the FINALIZER
-function to update the tables with the new info."
+When finished, run the FINALIZER function to update current
+tables."
   (let* ((lib (find-library-name "org-node-worker"))
          (native-path (and (featurep 'native-compile)
                            (native-comp-available-p)
@@ -291,7 +291,8 @@ function to update the tables with the new info."
             (print-level nil))
         (prin1
          ;; NOTE The purpose of $sigils is just visual, to distinguish these
-         ;; "external" variables in the body of `org-node-worker--collect'.
+         ;; "external" variables in the body of
+         ;; `org-node-worker--collect-dangerously'.
          (append
           org-node-inject-variables
           `(($link-re . ,org-link-plain-re)
@@ -324,23 +325,22 @@ function to update the tables with the new info."
             (let ((standard-output (current-buffer))
                   (print-length nil))
               (prin1 files)))
-          (delete-file (org-node-worker--tmpfile "demands-0.eld"))
+          (delete-file (org-node-worker--tmpfile "results-0.eld"))
           (delete-file (org-node-worker--tmpfile "errors-0.txt"))
-          (setq org-node-worker--demands nil)
           (setq i 0)
           (when (bound-and-true-p editorconfig-mode)
             (message "Maybe disable editorconfig-mode while debugging"))
           (pop-to-buffer (get-buffer-create "*org-node debug*"))
           (erase-buffer)
-          (org-node-worker--collect)
-          (org-node-cache--handle-finished-job (not (null files)) 1))
+          (org-node-worker--collect-dangerously)
+          (org-node-cache--handle-finished-job 1 finalizer))
 
       ;; If not debugging, split the work over many Emacs processes
       (let* ((file-lists (org-node-cache--split-file-list
                           files org-node-cache--n-cores))
              (n-jobs (length file-lists)))
         (dotimes (i n-jobs)
-          (delete-file (org-node-worker--tmpfile "demands-%d.eld" i))
+          (delete-file (org-node-worker--tmpfile "results-%d.eld" i))
           (delete-file (org-node-worker--tmpfile "errors-%d.txt" i))
           ;; TODO maybe better perf if the file-lists are all inside work-variables
           (with-temp-file (org-node-worker--tmpfile "file-list-%d.eld" i)
@@ -372,7 +372,7 @@ function to update the tables with the new info."
                                            temporary-file-directory)
                           "--eval" (format "(setq i %d)" i)
                           "--load" (or native-path elc-path)
-                          "--funcall" "org-node-worker--collect"))
+                          "--funcall" "org-node-worker--collect-dangerously"))
                  :sentinel (lambda (_process _event)
                              (org-node-cache--handle-finished-job
                               n-jobs finalizer)))
@@ -381,7 +381,7 @@ function to update the tables with the new info."
 (defun org-node-cache--handle-finished-job (n-jobs finalizer)
   "Check if this was the last process to return (by counting up
 to N-JOBS), then if so, wrap-up and call FINALIZER."
-  (when (eq (cl-incf org-node-cache--done-ctr) n-jobs)
+  (when (eq n-jobs (cl-incf org-node-cache--done-ctr))
     (let* ((file-name-handler-alist nil)
            ;; (coding-system-for-read 'utf-8-unix)
            (result-sets
@@ -389,7 +389,7 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
               (cl-loop
                for i below n-jobs
                collect
-               (let ((results-file (org-node-worker--tmpfile "demands-%d.eld" i))
+               (let ((results-file (org-node-worker--tmpfile "results-%d.eld" i))
                      (err-file (org-node-worker--tmpfile "errors-%d.txt" i)))
                  (when (file-exists-p err-file)
                    (message "org-node: problems scanning some files, see %s" err-file))
@@ -397,12 +397,7 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
                      (progn
                        (erase-buffer)
                        (insert-file-contents results-file)
-                       (read (buffer-string)) ;; faster than below
-                       ;; (read (current-buffer))
-                       )
-                   ;; TODO: do not collect this as a nil thingy into the
-                   ;; cl-loop return value.
-
+                       (read (buffer-string)))
                    ;; Had 1+ errors, so unhide the stderr buffer from now on
                    (let ((buf (get-buffer " *org-node*")))
                      (when buf
@@ -413,7 +408,8 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
                               results-file org-node-cache--stderr-name)
                      nil)))))))
       ;; TODO just build the list via the cl-loop above
-      (funcall finalizer (--reduce (-zip-with #'append it acc) result-sets)))))
+      (funcall finalizer (--reduce (-zip-with #'nconc it acc)
+                                   (-non-nil result-sets))))))
 
 
 ;;; Finalizers
@@ -421,10 +417,18 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
 (defun org-node-cache--finish-full (results)
   (clrhash org-nodes)
   (clrhash org-node-collection)
-  (clrhash org-node--refs-table)
-  (clrhash org-node--potential-reflinks)
-  (clrhash org-node--links-table)
-  (org-node-cache--finish-new results)
+  (clrhash org-node--refs)
+  (clrhash org-node--latent-reflinks)
+  (clrhash org-node--links)
+  (-let (((missing-files mtimes nodes id-links reflinks) results))
+    (org-node--forget-id-locations missing-files)
+    (dolist (file missing-files)
+      (remhash file org-node-cache--mtimes))
+    (dolist (found mtimes)
+      (puthash (car found) (cdr found) org-node-cache--mtimes))
+    (org-node-cache--record-nodes nodes)
+    (org-node-cache--record-id-links id-links)
+    (org-node-cache--record-reflinks reflinks))
   (org-id-locations-save)
   (org-node-cache--print-elapsed))
 
@@ -437,21 +441,19 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
       (puthash (car found) (cdr found) org-node-cache--mtimes))
     (org-node-cache--record-nodes nodes)
     (org-node-cache--record-id-links id-links)
-    (org-node-cache--record-reflinks reflinks)))
+    (org-node-cache--record-reflinks reflinks)
+    (run-hook-with-args 'org-node-rescan-hook (mapcar #'car mtimes))))
 
-;; NOTE For perf, we do not bother to record links here.  We're re-scanning an
-;; unknown set of files that were scanned already before, so most links already
-;; are known, and each link contains both :origin ID and :dest ID, and for a
-;; given link, the set we're now re-scanning may indeed contain both nodes, so
-;; we'd have to loop thru the links table to delete links with matching :origin
-;; as well as links with matching :dest, before re-adding them.  That gets slow
-;; -- imagine a giant file holding 5000 links, and imagine
-;; `auto-save-visited-mode' repeating this up to every 5 seconds.  And it is so
-;; rarely necessary, because our insert-link advices will already record links
-;; added during normal usage!  What's left is mainly that /deleted/ links will
-;; remain in the table until removed at the next full scan.  But that is OK.
-;; In the future we could even take care of that by reusing the same strategy
-;; as `org-node-backlink--fix-changed-parts-of-buffer'.
+;; NOTE For performance, we do not bother to update the links tables on file
+;; modification.  Doing so would not be a simple puthash operation, but need
+;; looping to find all matches of :dest as well as :origin, and that gets slow
+;; when saving a big file containing 5000 links -- slow enough to annoy users
+;; of `auto-save-visited-mode', anyway.
+;;
+;; Fortunately, our insert-link advices will already record links added during
+;; normal usage!  What's left is mainly that /deleted/ links will remain in the
+;; table until removed at the next full scan.  That is OK, as I think the
+;; nicest code relies on frequent full scans anyway.
 (defun org-node-cache--finish-modified (results)
   (-let (((missing-files mtimes nodes) results))
     (org-node--forget-id-locations missing-files)
@@ -462,40 +464,41 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
       (puthash (car found) (cdr found) org-node-cache--mtimes))
     ;; In case a title was edited
     (org-node-cache--dirty-forget-completions-in (mapcar #'car mtimes))
-    (org-node-cache--record-nodes nodes)))
+    (org-node-cache--record-nodes nodes)
+    (run-hook-with-args 'org-node-rescan-hook (mapcar #'car mtimes))))
 
 
-;;; Recorders
+;;; Record
 
 (defun org-node-cache--record-id-links (links)
-  "Save LINKS to `org-node--links-table'.
+  "Save LINKS to `org-node--links'.
 LINKS plists are demonstrated in source of
 `org-node-worker--collect-links-until'."
   (dolist (link links)
     (push link
           (gethash (plist-get link :dest)
-                   org-node--links-table))))
+                   org-node--links))))
 
 (defun org-node-cache--record-reflinks (links)
-  "Save LINKS to `org-node--potential-reflinks'.
+  "Save LINKS to `org-node--latent-reflinks'.
 LINKS plists are demonstrated in source of
 `org-node-worker--collect-links-until'."
   (dolist (link links)
     (push link
           (gethash (concat (plist-get link :type) ":" (plist-get link :dest))
-                   org-node--potential-reflinks))))
+                   org-node--latent-reflinks))))
 
-(defun org-node-cache--record-nodes (nodes)
-  (mapc #'org-node-cache--record-node nodes))
+(defun org-node-cache--record-nodes (node-recipes)
+  (mapc #'org-node-cache--record-node node-recipes))
 
-;; TODO: revert to node-recipe style
-(defun org-node-cache--record-node (node)
+(defun org-node-cache--record-node (node-recipe)
   "Add a node to `org-nodes' and other tables.
+
 The input NODE-RECIPE is a list of arguments to pass to
 `make-org-node-data'."
-  (let (;;(node (apply #'org-node-data--create node-recipe))
-        (id (org-node-get-id node))
-        (path (org-node-get-file-path node)))
+  (let* ((node (apply #'org-node-data--create node-recipe))
+         (id (org-node-get-id node))
+         (path (org-node-get-file-path node)))
     ;; Share the id location with org-id & do so with a manual `puthash'
     ;; because `org-id-add-location' would run heavy logic we've already done.
     (puthash id path org-id-locations)
@@ -504,15 +507,13 @@ The input NODE-RECIPE is a list of arguments to pass to
     ;; Register the node
     (puthash id node org-nodes)
     (dolist (ref (org-node-get-refs node))
-      (puthash ref id org-node--refs-table))
+      (puthash ref id org-node--refs))
     ;; Filter & format completions
     (when (funcall org-node-filter-fn node)
-      (puthash (funcall org-node-format-fn node (org-node-get-title node))
-               node
-               org-node-collection)
-      ;; Add ROAM_ALIASES
-      (dolist (alias (org-node-get-aliases node))
-        (puthash (funcall org-node-format-fn node alias)
+      (dolist (title (cons (org-node-get-title node)
+                           (org-node-get-aliases node)))
+        (puthash title node org-node-collection-unformatted)
+        (puthash (funcall org-node-format-fn node title)
                  node
                  org-node-collection))
       ;; Let ROAM_REFS work as aliases too
@@ -535,7 +536,7 @@ FILES, and remove the corresponding completion candidates."
      and append (org-node-get-refs node) into refs
      finally do
      (dolist (ref refs)
-       (remhash ref org-node--refs-table))
+       (remhash ref org-node--refs))
      (dolist (id ids)
        (remhash id org-nodes)))))
 
@@ -606,10 +607,10 @@ misleading."
                        count (org-node-get-is-subtree node)))
           (n-backlinks (length (apply #'append
                                       (hash-table-values
-                                       org-node--links-table))))
+                                       org-node--links))))
           (n-reflinks (cl-loop
-                       for ref being the hash-keys of org-node--refs-table
-                       sum (length (gethash ref org-node--potential-reflinks)))))
+                       for ref being the hash-keys of org-node--refs
+                       sum (length (gethash ref org-node--latent-reflinks)))))
       (message "org-node saw %d files, %d subtrees, %d ID-links, %d reflinks in %.2fs"
                (- (hash-table-count org-nodes) n-subtrees)
                n-subtrees

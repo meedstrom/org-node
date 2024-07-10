@@ -7,71 +7,6 @@
   (require 'cl-macs)
   (require 'subr-x))
 
-(cl-defstruct (org-node-data (:constructor org-node-data--create)
-                             (:copier nil))
-  "An org-node data object holds information about an Org ID
-node.  By the term \"Org ID node\", we mean either a subtree with
-an ID property, or a file with a file-level ID property.  The
-information is stored in slots listed below.
-
-For each slot, there exists an accessor function
-\"org-node-get-FIELD\".
-
-For example, the field \"deadline\" has an accessor
-`org-node-get-deadline'.  So you would type
-\"(org-node-get-deadline NODE)\", where NODE is one of the
-elements of the `hash-table-values' of `org-nodes'.
-
-(Technically, there also exists a function alias to
-`org-node-get-deadline', called `org-node-data-deadline', but its
-use is discouraged.)
-
-For real-world usage of these accessors, see examples in the
-documentation of `org-node-filter-fn', the documentation of
-`org-node-format-candidate-fn', or the package README.
-
-You may be able to find the README by typing:
-
-    M-x find-library RET org-node RET
-
-or you can visit the homepage:
-
-    https://github.com/meedstrom/org-node"
-  (aliases    nil :read-only t :type List_of_strings :documentation
-              "List of ROAM_ALIASES.")
-  (deadline   nil :read-only t :type String :documentation
-              "The DEADLINE state.")
-  (file-path  nil :read-only t :type String :documentation
-              "Full file path.")
-  (file-title nil :read-only t :type String :documentation
-              "The #+title of the file where this node is. May be nil.")
-  (file-title-or-basename nil :read-only t :type String  :documentation
-                          "The title of the file where this node is, or its filename if untitled.")
-  (id         nil :read-only t :type String :documentation
-              "The ID property.")
-  (is-subtree nil :read-only t :type Boolean :documentation
-              "Valued t if it is a subtree, nil if it is a file-level node.")
-  (level      nil :read-only t :type Integer :documentation
-              "Number of stars in the heading. File-level node always 0.")
-  (olp        nil :read-only t :type List_of_strings :documentation
-              "List of ancestor headings to this node.")
-  (pos        nil :read-only t :type Integer :documentation
-              "Char position of the node. File-level node always 1.")
-  (properties nil :read-only t :type Alist :documentation
-              "Alist of properties from the :PROPERTIES: drawer.")
-  (priority nil :read-only t :type String :documentation
-            "Priority such as [#A], as a string.")
-  (refs       nil :read-only t :type List_of_strings :documentation
-              "List of ROAM_REFS.")
-  (scheduled  nil :read-only t :type String :documentation
-              "The SCHEDULED state.")
-  (tags       nil :read-only t :type List_of_strings :documentation
-              "List of tags.")
-  (title      nil :read-only t :type String :documentation
-              "The node's heading, or #+title if it is not a subtree.")
-  (todo       nil :read-only t :type String :documentation
-              "The TODO state."))
-
 ;; Note to self: file-name-concat is probably faster than expand-file-name when
 ;; we do not need to convert the filename to absolute anyway.  Basically even
 ;; better than setting file-name-handler-alist to nil.
@@ -90,7 +25,6 @@ ARGS through `format' first."
 
 (defsubst org-node-worker--elem-index (elem list)
   "Like `-elem-index', return first index of ELEM in LIST."
-  ;; (declare (pure t) (side-effect-free t))
   (when list
     (let ((list list)
           (i 0))
@@ -105,7 +39,6 @@ See `org-node-worker--pos->olp' for explanation of OLDATA and POS.
 
 Extra argument FILE-ID is the file-level id, used as a fallback
 if no ancestor heading has an ID.  It can be nil."
-  ;; (declare (pure t) (side-effect-free t))
   (let (;; Drop all the data about positions below POS
         (data-until-pos
          (nthcdr (org-node-worker--elem-index (assoc pos oldata) oldata)
@@ -139,7 +72,6 @@ As apparent in the example, OLDATA is expected in \"reverse\"
 order, such that the last heading in the file is represented in
 the first element.  An exact match for POS must also be included
 in one of the elements."
-  ;; (declare (pure t) (side-effect-free t))
   (let* (olp
          (pos-data (or (assoc pos oldata)
                        (error "Broken algo: POS %s not found in OLDATA %s"
@@ -179,10 +111,6 @@ that will match any of the TODO keywords within."
      (lambda (m) (or (match-string 2 m) (match-string 1 m)))
      s nil t)))
 
-(defmacro org-node-worker--while-progn (&rest body)
-  "Lets you indent less than a (while (progn)) form."
-  `(while (progn ,@body)))
-
 (defsubst org-node-worker--next-heading ()
   "Similar to `outline-next-heading'.
 In the special case where point is at the beginning of the buffer
@@ -208,7 +136,7 @@ and there is a heading there, just return t without moving point."
 (defsubst org-node-worker--collect-links-until (end id-here olp-with-self link-re)
   "From here to buffer position END, look for forward-links.
 Ensure these links will be used to populate tables
-`org-node--links-table' and `org-node--reflinks-table' in the
+`org-node--links' and `org-node--reflinks' in the
 main Emacs process.
 
 Argument ID-HERE is the ID of the subtree where this function is
@@ -274,22 +202,22 @@ process does not have to load org.el."
       (forward-line 1))
     res))
 
-(defun org-node-worker--collect ()
+(defun org-node-worker--collect-dangerously ()
   "Dangerous!  Assumes the current buffer is a temp buffer!
 
 Using info in the temp files prepared by `org-node-cache--scan',
-scan for ID-nodes and links in all Org files given in the file
+look for ID-nodes and links in all Org files given in the file
 list, and write results to another temp file."
-  (insert-file-contents (org-node-worker--tmpfile "work-variables.eld"))
-  (dolist (var (car (read-from-string (buffer-string))))
-    (set (car var) (cdr var)))
-  (erase-buffer)
-  ;; The variable `i' was set via the command line that launched this process
-  (insert-file-contents (org-node-worker--tmpfile "file-list-%d.eld" i))
+  (let ((file-name-handler-alist nil))
+    (insert-file-contents (org-node-worker--tmpfile "work-variables.eld"))
+    (dolist (var (read (buffer-string)))
+      (set (car var) (cdr var)))
+    (erase-buffer)
+    ;; The variable `i' was set via the command line that launched this process
+    (insert-file-contents (org-node-worker--tmpfile "file-list-%d.eld" i)))
   (setq $files (read (buffer-string)))
   (let ((case-fold-search t)
         ;; Perf
-        ;; (gc-cons-threshold $gc-cons-threshold)
         (file-name-handler-alist $file-name-handler-alist)
         ;; REVIEW: reading source for `recover-file', it sounds like the
         ;; coding system for read can affect the system for write? If so, how
@@ -304,8 +232,8 @@ list, and write results to another temp file."
         TAGS FILE-TAGS ID FILE-ID SCHED DEADLINE OLP PRIORITY LEVEL PROPS)
     (dolist (FILE $files)
       (condition-case err
-          (if (not (setq MTIME (file-attribute-modification-time
-                                (file-attributes FILE))))
+          (if (null (setq MTIME (file-attribute-modification-time
+                                 (file-attributes FILE))))
               ;; We got here because user deleted a file in a way that we
               ;; didn't notice.  If it was actually a rename done outside
               ;; Emacs, the new name will get picked up on next reset.
@@ -378,7 +306,7 @@ list, and write results to another temp file."
                         (error "Couldn't find matching :END: drawer in file %s" FILE)))
                   (org-node-worker--collect-links-until
                    END FILE-ID nil $link-re))
-                (push (org-node-data--create
+                (push (list
                        :title FILE-TITLE-OR-BASENAME ;; Uhm
                        :level 0
                        :tags FILE-TAGS
@@ -437,31 +365,28 @@ list, and write results to another temp file."
                               (org-node-worker--org-link-display-format
                                (buffer-substring HERE (pos-eol))))
                         (setq TAGS nil))
-                      ;; Now we must be careful.  Imagine this subtree is just a
-                      ;; heading, empty of content, and the very next line is another
-                      ;; heading.  Gotta go forward 1 line, see if it is a
-                      ;; planning-line, and if it is, then go forward 1 more line, and
-                      ;; if that is a :PROPERTIES: line, then we know it belongs to the
-                      ;; current subtree.  If we had just allowed the search for
-                      ;; :PROPERTIES: to cross 2 lines, we could have matched a
-                      ;; property drawer for the wrong heading.  Of course
-                      ;; `narrow-to-region' could guard us against this kind of thing,
-                      ;; but with this algorithm as solid as it is now, that'd be a
-                      ;; superfluous instruction that just increases the amount of
-                      ;; large point motions.
+                      ;; Now we must be careful.  Imagine this subtree is just
+                      ;; a heading, empty of content, and the very next line is
+                      ;; another heading.  Gotta go forward 1 line, see if it
+                      ;; is a planning-line, and if it is, then go forward 1
+                      ;; more line, and if that is a :PROPERTIES: line, then we
+                      ;; know it belongs to the current subtree.  If we had
+                      ;; just allowed the search for :PROPERTIES: to cross 2
+                      ;; lines, we could have matched a property drawer for the
+                      ;; wrong heading.
                       (forward-line 1)
                       (setq HERE (point))
                       (setq FAR (pos-eol))
                       (setq SCHED
-                            (if (re-search-forward "[[:space:]]*SCHEDULED:" FAR t)
+                            (if (re-search-forward "[[:space:]]*SCHEDULED: +" FAR t)
                                 (prog1 (buffer-substring
-                                        ;; \n just there for safety
                                         (point)
+                                        ;; \n just there for safety
                                         (+ 1 (point) (skip-chars-forward "^]>\n")))
                                   (goto-char HERE))
                               nil))
                       (setq DEADLINE
-                            (if (re-search-forward "[[:space:]]*DEADLINE:" FAR t)
+                            (if (re-search-forward "[[:space:]]*DEADLINE: +" FAR t)
                                 (prog1 (buffer-substring
                                         (point)
                                         (+ 1 (point) (skip-chars-forward "^]>\n")))
@@ -469,7 +394,7 @@ list, and write results to another temp file."
                               nil))
                       (when (or SCHED
                                 DEADLINE
-                                (re-search-forward "[[:space:]]*CLOSED:" FAR t))
+                                (re-search-forward "[[:space:]]*CLOSED: +" FAR t))
                         ;; Alright, so there was a planning-line, meaning any
                         ;; :PROPERTIES: must be on the next line.
                         (forward-line 1)
@@ -498,7 +423,7 @@ list, and write results to another temp file."
                       (when ID
                         ;; (push ID org-node-worker--result-found-ids)
                         (setq OLP (org-node-worker--pos->olp OUTLINE-DATA POS))
-                        (push (org-node-data--create
+                        (push (list
                                :title TITLE
                                :is-subtree t
                                :level LEVEL
@@ -563,11 +488,10 @@ list, and write results to another temp file."
        (prin1-to-string (list org-node-worker--result-missing-files
                               org-node-worker--result-mtimes
                               org-node-worker--result-found-nodes
-                              ;; org-node-worker--result-found-ids
                               org-node-worker--result-found-id-links
                               org-node-worker--result-found-reflinks))
        nil
-       (org-node-worker--tmpfile "demands-%d.eld" i)))))
+       (org-node-worker--tmpfile "results-%d.eld" i)))))
 
 (provide 'org-node-worker)
 

@@ -119,9 +119,9 @@ REMOVE, remove it instead."
       ;; handle-finished-job?
       (when node
         ;; Make the full string to which the :BACKLINKS: property should be set
-        (let* ((reflinks (--keep (gethash it org-node--potential-reflinks)
+        (let* ((reflinks (--keep (gethash it org-node--latent-reflinks)
                                  (org-node-get-refs node)))
-               (backlinks (gethash id org-node--links-table))
+               (backlinks (gethash id org-node--links))
                (combined
                 (thread-last
                   (append reflinks backlinks)
@@ -259,7 +259,7 @@ effectively flags all areas where text is added/changed/deleted."
                 (setq id path)
                 (setq file (org-id-find-id-file id)))
             ;; "Reflink"
-            (setq id (gethash (concat type ":" path) org-node--refs-table))
+            (setq id (gethash (concat type ":" path) org-node--refs))
             (setq file (ignore-errors
                          (org-node-get-file-path (gethash id org-nodes)))))
           (when (null file)
@@ -346,7 +346,7 @@ effectively flags all areas where text is added/changed/deleted."
         ;; TODO Placeholder to prevent deleting the just-added backlink when
         ;;      saving the "wrong" buffer first Although
         ;;      `org-node-backlink--fix-rescanned-file-buffers' is a better fix
-        ;; (push (list :src-id src-id) (gethash target-id org-node--links-table))
+        ;; (push (list :src-id src-id) (gethash target-id org-node--links))
         ))))
 
 ;; (defun org-node-backlink--fix-rescanned-file-buffers (files)
