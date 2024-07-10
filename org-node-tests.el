@@ -5,6 +5,7 @@
 ;; ...
 
 (require 'ert)
+(require 'org-node)
 
 (ert-deftest oldata-fns ()
   (let ((olp '((3730 "A subheading" 2 "33dd")
@@ -20,37 +21,6 @@
     (should-error (org-node-worker--pos->olp olp 2500))
     (should (equal (org-node-worker--pos->parent-id olp 1300 nil)
                    "d3"))))
-
-;; (describe "Various functions"
-;;           (it ""
-;;               (expect (length (org-node--split-into-n-sublists
-;;                                '(a v e e) 7))
-;;                       :to-be 7)
-;;               (expect (length (remq nil (org-node--split-into-n-sublists
-;;                                          '(a v e e) 7)))
-;;                       :to-be 1)
-;;               (expect (length
-;;                        (org-node--split-into-n-sublists
-;;                         '(a v e e q l fk k k ki i o r r r r r r r r r r g g g g g gg)
-;;                         4))
-;;                       :to-be 4)))
-
-;; (describe "Parse testfile2.org"
-;;           (if (gethash "bb02315f-f329-4566-805e-1bf17e6d892d" org-nodes)
-;;               (org-node-cache--rescan-file-a nil "testfile2.org")
-;;             (org-node-cache--scan-targeted (list "testfile2.org")))
-;;           (mapc #'accept-process-output org-node-cache--processes)
-;;           (it "Etc"
-;;               (let ((node (gethash "bb02315f-f329-4566-805e-1bf17e6d892d" org-nodes)))
-;;                 (expect (org-node-get-olp node)
-;;                         :to-equal nil)
-;;                 (expect (org-node-get-file-title node)
-;;                         :to-equal "Title")
-;;                 (expect (org-node-get-todo node)
-;;                         :to-equal "TODO"))
-;;               (let ((node (gethash "d28cf9b9-d546-46b0-8615-9880a4d2463d" org-nodes)))
-;;                 (expect (org-node-get-olp node)
-;;                         :to-equal '("1st-level" "2nd-level")))))
 
 (ert-deftest parse-testfile2.org ()
   (org-node-cache--scan-targeted (list "testfile2.org"))
@@ -104,8 +74,7 @@
       (should (equal (org-node-get-id node) "not-an-uuid1234"))
       (should (equal (org-node-get-title node) "New node"))
       (should (equal (org-node-get-file-title node) "New node"))
-      (should (equal (org-node-get-file-title-or-basename node) "New node"))
-      )
+      (should (equal (org-node-get-file-title-or-basename node) "New node")))
     (let ((org-node-make-file-level-nodes nil))
       (org-node--create "A top-level heading" "not-an-uuid5678")
       (org-node-cache-ensure t)
@@ -113,6 +82,4 @@
             (expected-filename (funcall org-node-filename-fn "A top-level heading")))
         (should (equal (org-node-get-title node) "A top-level heading"))
         (should (equal (org-node-get-file-title node) expected-filename))
-        (should (equal (org-node-get-file-title-or-basename node) expected-filename))))
-    )
-  )
+        (should (equal (org-node-get-file-title-or-basename node) expected-filename))))))

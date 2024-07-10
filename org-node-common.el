@@ -297,7 +297,7 @@ in precisely \".org\" anyway."
                   :dest id
                   :properties (list :outline (ignore-errors
                                                (org-get-outline-path t))))
-            (gethash id org-node--links-table)))))
+            (gethash id org-node--links)))))
 
 ;; NOTE Very important macro for the backlink mode because backlink insertion
 ;;      opens an Org file, and if that is slow, then every link insertion is.
@@ -433,7 +433,7 @@ first element."
            '(auto-save-visited-mode
              git-auto-commit-mode)))
 
-(defvar org-node--potential-reflinks (make-hash-table :test #'equal :size 1000)
+(defvar org-node--latent-reflinks (make-hash-table :test #'equal :size 1000)
   "Table of potential reflinks.
 
 The table keys are URIs such as web addresses, and the
@@ -442,16 +442,16 @@ ID-node where a link was found to that destination.
 
 The fact that a link is in this table does not mean there is a
 node with a ROAM_REFS matching that same link.  To find that out,
-you'd have to cross-reference with `org-node--refs-table'.")
+you'd have to cross-reference with `org-node--refs'.")
 
-(defvar org-node--links-table (make-hash-table :test #'equal :size 1000)
+(defvar org-node--links (make-hash-table :test #'equal :size 1000)
   "Table of links with a source ID and destination ID.
 
 The table keys are destination IDs, and the corresponding table
 value is a list of plists describing each ID-node where a link
 was found to that destination.")
 
-(defvar org-node--refs-table (make-hash-table :test #'equal :size 1000)
+(defvar org-node--refs (make-hash-table :test #'equal :size 1000)
   "Table of ROAM_REFS and the IDs where they can be found.")
 
 (defvar org-node--dbg nil
@@ -571,24 +571,6 @@ or you can visit the homepage:
 
 
 ;;; Obsoletions
-
-;; 2024-05-05
-;; 2024-06-07
-(defun org-node-aliases    (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-aliases,     update to org-node-get-aliases   " 78)))
-(defun org-node-deadline   (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-deadline,    update to org-node-get-deadline  " 78)))
-(defun org-node-file-path  (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-file-path,   update to org-node-get-file-path " 78)))
-(defun org-node-file-title (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-file-title,  update to org-node-get-file-title" 78)))
-(defun org-node-id         (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-id,          update to org-node-get-id        " 78)))
-(defun org-node-is-subtree (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-is-subtree,  update to org-node-get-is-subtree" 78)))
-(defun org-node-level      (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-level,       update to org-node-get-level     " 78)))
-(defun org-node-olp        (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-olp,         update to org-node-get-olp       " 78)))
-(defun org-node-pos        (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-pos,         update to org-node-get-pos       " 78)))
-(defun org-node-properties (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-properties,  update to org-node-get-properties" 78)))
-(defun org-node-refs       (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-refs,        update to org-node-get-refs      " 78)))
-(defun org-node-scheduled  (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-scheduled,   update to org-node-get-scheduled " 78)))
-(defun org-node-tags       (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-tags,        update to org-node-get-tags      " 78)))
-(defun org-node-title      (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-title,       update to org-node-get-title     " 78)))
-(defun org-node-todo       (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-todo,        update to org-node-get-todo      " 78)))
 
 (define-obsolete-variable-alias
   'org-node-slug-fn 'org-node-filename-fn "2024-06-08")
