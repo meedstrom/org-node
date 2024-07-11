@@ -826,7 +826,7 @@ to `org-node-extra-id-dirs-exclude'."
                  (org-node-files)
                  nil))
 
-(define-derived-mode org-node-lint-results-mode tabulated-list-mode
+(define-derived-mode org-node--lint-results-mode tabulated-list-mode
   "Org-Lint Results"
   nil
   (setq tabulated-list-format
@@ -862,7 +862,7 @@ to `org-node-extra-id-dirs-exclude'."
           (setq tabulated-list-entries nil)
           (let ((inhibit-read-only t))
             (erase-buffer))))
-      (org-node-lint-results-mode)
+      (org-node--lint-results-mode)
       (unwind-protect
           (dolist (file files)
             (message "Linting file... (you may quit and resume anytime) (%d/%d) %s"
@@ -891,7 +891,7 @@ to `org-node-extra-id-dirs-exclude'."
       (when (null tabulated-list-entries)
         (message "All good, no lint warnings!")))))
 
-(define-derived-mode org-node-list-feedback-arcs-mode tabulated-list-mode
+(define-derived-mode org-node--list-feedback-arcs-mode tabulated-list-mode
   "Feedback Arcs List"
   nil
   (setq tabulated-list-format
@@ -958,7 +958,7 @@ write_file(lisp_data, file.path(dirname(tsv), \"feedback-arcs.eld\"))
       (setq feedbacks (read (buffer-string)))
       (when (listp feedbacks)
         (erase-buffer)
-        (org-node-list-feedback-arcs-mode)
+        (org-node--list-feedback-arcs-mode)
         (setq tabulated-list-entries
               (cl-loop
                for (origin . dest) in feedbacks
@@ -1002,7 +1002,7 @@ destination-origin pairings, expressed as tab-separated values."
 ;;       (push buffer-file-coding-system org-node--found-systems)))
 ;;   org-node--found-systems)
 
-(define-derived-mode org-node-list-dead-links-mode tabulated-list-mode
+(define-derived-mode org-node--list-dead-links-mode tabulated-list-mode
   "Dead Links"
   nil
   (setq tabulated-list-format
@@ -1019,7 +1019,7 @@ destination-origin pairings, expressed as tab-separated values."
                                 (gethash dest org-node--backlinks-by-id)))))
     (message "%d dead links found" (length dead-links))
     (pop-to-buffer (get-buffer-create "*Dead Links*"))
-    (org-node-list-dead-links-mode)
+    (org-node--list-dead-links-mode)
     (setq tabulated-list-entries
           (cl-loop
            for (dest . link) in dead-links
@@ -1095,7 +1095,7 @@ Also turn off Org-roam's equivalent, if active."
       (with-current-buffer buf
         (remove-hook 'completion-at-point-functions
                      #'org-node-complete-at-point t)))
-    ;; Maybe reenable Org-roam's thing
+    ;; Maybe reenable Org-roam's version
     (setq org-roam-completion-everywhere
           (alist-get 'org-roam-completion-everywhere
                      org-node--roam-settings))))
@@ -1118,9 +1118,9 @@ Designed for `completion-at-point-functions', which see."
          (not (save-match-data (org-in-regexp org-link-any-re)))
          (list (car bounds)
                (cdr bounds)
+               ;; #'org-node-collection
                org-node--id-by-title
                :exclusive 'no
-               :affixation-function #'org-node--affixate-collection
                :exit-function
                (lambda (text _)
                  (when-let ((id (gethash text org-node--id-by-title)))
