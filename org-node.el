@@ -27,12 +27,19 @@
 
 ;;; Code:
 
+;; TODO Workflow to allow untitled nodes
+
+;; TODO Review whether scan-all actually happens often enough (probably not)!
+;;      - So where to make it happen?  Can't just be on spotting deletion, too
+;;        capricious.  Maybe a timer 20x the last reset's elapsed time+1, after
+;;        inserting or following a link.
+
 ;; TODO What happens when user manually moves a subtree to a different
 ;;      already-known file then saves the destination before saving the origin
 ;;      file?
 ;;      - The nodes and candidates would be correct, I think, but
 ;;        not links...
-;; TODO Workflow to allow effectively untitled nodes
+;;      - Oh, could detect a file-path change and simply do scan-all
 
 (require 'org-node-common)
 (require 'org-node-cache)
@@ -46,10 +53,17 @@
 ;;; API not used inside this package
 
 (defun org-node-at-point ()
-  "Return the ID-node point is under.
+  "Return the ID-node near point.
+
 This may refer to the current Org heading, else an ancestor
 heading, else the file-level node, whichever has an ID first."
   (gethash (org-entry-get nil "ID" t) org-node--node-by-id))
+
+(defun org-node-read ()
+  "Prompt for a known ID-node."
+  (gethash (completing-read "Node: " #'org-node-collection
+                            () () () 'org-node-hist)
+           org-node--node-by-candidate))
 
 
 ;;; Plumbing
@@ -171,10 +185,11 @@ To visit a node after creation, write:
               (goto-char (org-node-get-pos node))
               (when (org-node-get-is-subtree node)
                 (org-fold-show-context)
-                (org-fold-show-entry)))
-          (message "This node's file is missing, re-scanning all dirs...")
+                (org-fold-show-entry)
+                (recenter 0)))
+          (message "org-node: Didn't find a file, resetting cache...")
           (org-node-cache--scan-all)))
-    (error "Tried to visit node not known")))
+    (error "`org-node-goto' received a nil argument")))
 
 (defun org-node-capture-target ()
   "Can be used as target in a capture template.
@@ -211,7 +226,7 @@ type the name of a node that does not exist.  That enables this
           (setq id org-node-proposed-id))
       ;; Was called from `org-capture', which means the user has not yet typed
       ;; the title; let them type it now
-      (let ((input (completing-read "Node: " org-node--node-by-candidate
+      (let ((input (completing-read "Node: " #'org-node-collection
                                     () () () 'org-node-hist)))
         (setq node (gethash input org-node--node-by-candidate))
         (if node
@@ -244,7 +259,7 @@ type the name of a node that does not exist.  That enables this
             (error "File or buffer already exists: %s" path-to-write)
           (mkdir (file-name-directory path-to-write) t)
           (find-file path-to-write)
-          (if org-node-make-file-level-nodes
+          (if org-node-prefer-file-level-nodes
               (insert ":PROPERTIES:"
                       "\n:ID:       " id
                       "\n:END:"
@@ -294,7 +309,7 @@ which it gets some necessary variables."
                    (file-name-nondirectory path-to-write))
         (mkdir (file-name-directory path-to-write) t)
         (find-file path-to-write)
-        (if org-node-make-file-level-nodes
+        (if org-node-prefer-file-level-nodes
             (insert ":PROPERTIES:"
                     "\n:ID:       " org-node-proposed-id
                     "\n:END:"
@@ -323,7 +338,7 @@ To behave like `org-roam-node-find' when creating new nodes, set
 `org-node-creation-fn' to `org-node-new-by-roam-capture'."
   (interactive)
   (org-node-cache-ensure)
-  (let* ((input (completing-read "Node: " org-node--node-by-candidate
+  (let* ((input (completing-read "Node: " #'org-node-collection
                                  () () () 'org-node-hist))
          (node (gethash input org-node--node-by-candidate)))
     (if node
@@ -355,17 +370,13 @@ Optional argument REGION-AS-INITIAL-INPUT t means behave like
                         (setq end (point))
                         (org-link-display-format
                          (buffer-substring-no-properties beg end))))
-         (input (completing-read
-                 "Node: "
-                 org-node--node-by-candidate
-                 nil
-                 nil
-                 (if (or region-as-initial-input
-                         (when region-text
-                           (try-completion region-text org-node--id-by-title)))
-                     region-text
-                   nil)
-                 'org-node-hist))
+         (initial (if (or region-as-initial-input
+                          (when region-text
+                            (try-completion region-text org-node--id-by-title)))
+                      region-text
+                    nil))
+         (input (completing-read "Node: " #'org-node-collection
+                                 () () initial 'org-node-hist))
          (node (gethash input org-node--node-by-candidate))
          (id (if node (org-node-get-id node) (org-id-new)))
          (link-desc (or region-text
@@ -437,7 +448,7 @@ adding keywords to the things to exclude:
   (unless (derived-mode-p 'org-mode)
     (error "Only works in org-mode buffers"))
   (org-node-cache-ensure)
-  (let ((node (gethash (completing-read "Node: " org-node--node-by-candidate
+  (let ((node (gethash (completing-read "Node: " #'org-node-collection
                                         () () () 'org-node-hist)
                        org-node--node-by-candidate)))
     (let ((id (org-node-get-id node))
@@ -478,7 +489,7 @@ adding keywords to the things to exclude:
   (unless (derived-mode-p 'org-mode)
     (user-error "Only works in org-mode buffers"))
   (org-node-cache-ensure)
-  (let ((node (gethash (completing-read "Node: " org-node--node-by-candidate
+  (let ((node (gethash (completing-read "Node: " #'org-node-collection
                                         () () () 'org-node-hist)
                        org-node--node-by-candidate)))
     (let ((id (org-node-get-id node))
@@ -681,7 +692,7 @@ as more \"truthful\" than today's date.
           (find-file path-to-write)
           (org-paste-subtree)
           (save-buffer)
-          (when org-node-make-file-level-nodes
+          (when org-node-prefer-file-level-nodes
             ;; Replace the root heading and its properties with file-level
             ;; keywords &c.
             (goto-char (point-min))
@@ -1056,41 +1067,37 @@ If already visiting that node, then follow the link normally."
 
 ;;; CAPF (Completion-At-Point Function)
 
-(defun org-node-enable-capf ()
+(defvar org-node--roam-settings nil)
+(define-minor-mode org-node-capf-mode
   "Use `org-node-complete-at-point' in all Org buffers.
-Also turn off org-roam's CAPF, if present.
-
-Reverse the effect with \\[org-node-disable-capf]."
-  (interactive)
-  (add-hook 'org-mode-hook #'org-node--install-capf-in-buffer)
-  (dolist (buf (org-buffer-list))
-    (with-current-buffer buf
-      (add-hook 'completion-at-point-functions
-                #'org-node-complete-at-point nil t)
-      (when (bound-and-true-p org-roam-completion-everywhere)
-        (dolist (f org-roam-completion-functions)
-          (remove-hook 'completion-at-point-functions f nil t)))))
-  (when (bound-and-true-p org-roam-completion-everywhere)
-    (remove-hook 'org-roam-find-file-hook
-                 'org-roam--register-completion-functions-h)))
-
-(defun org-node-disable-capf ()
-  "Stop using `org-node-complete-at-point' in all Org buffers."
-  (interactive)
-  (remove-hook 'org-mode-hook #'org-node--install-capf-in-buffer)
-  (dolist (buf (org-buffer-list))
-    (with-current-buffer buf
-      (remove-hook 'completion-at-point-functions
-                   #'org-node-complete-at-point t)
-      (and (bound-and-true-p org-roam-completion-everywhere)
-           (fboundp #'org-roam-file-p)
-           (require 'org-roam)
-           (org-roam-file-p)
-           (dolist (f org-roam-completion-functions)
-             (add-hook 'completion-at-point-functions f nil t)))))
-  (when (bound-and-true-p org-roam-completion-everywhere)
-    (add-hook 'org-roam-find-file-hook
-              'org-roam--register-completion-functions-h)))
+Also turn off Org-roam's equivalent, if active."
+  :global t
+  (when (featurep 'org-roam)
+    (unless (assoc 'org-roam-completion-everywhere org-node--roam-settings)
+      (push (cons 'org-roam-completion-everywhere
+                  org-roam-completion-everywhere)
+            org-node--roam-settings)))
+  (if org-node-capf-mode
+      ;; Turn on
+      (progn
+        (setq org-roam-completion-everywhere nil)
+        (add-hook 'org-mode-hook #'org-node--install-capf-in-buffer)
+        ;; Add to already-open buffers
+        (dolist (buf (org-buffer-list))
+          (with-current-buffer buf
+            (add-hook 'completion-at-point-functions
+                      #'org-node-complete-at-point nil t))))
+    ;; Turn off
+    (remove-hook 'org-mode-hook #'org-node--install-capf-in-buffer)
+    ;; Remove from already-open buffers
+    (dolist (buf (org-buffer-list))
+      (with-current-buffer buf
+        (remove-hook 'completion-at-point-functions
+                     #'org-node-complete-at-point t)))
+    ;; Maybe reenable Org-roam's thing
+    (setq org-roam-completion-everywhere
+          (alist-get 'org-roam-completion-everywhere
+                     org-node--roam-settings))))
 
 (defun org-node--install-capf-in-buffer ()
   (and (derived-mode-p 'org-mode)
@@ -1104,7 +1111,7 @@ Reverse the effect with \\[org-node-disable-capf]."
 Designed for `completion-at-point-functions', which see."
   (let ((bounds (bounds-of-thing-at-point 'word)))
     (and bounds
-         ;; For some reason it gets added to non-org buffers like grep
+         ;; For some reason it gets added to non-org buffers like grep results
          (derived-mode-p 'org-mode)
          (not (org-in-src-block-p))
          (not (save-match-data (org-in-regexp org-link-any-re)))
@@ -1112,6 +1119,7 @@ Designed for `completion-at-point-functions', which see."
                (cdr bounds)
                org-node--id-by-title
                :exclusive 'no
+               :affixation-function #'org-node--affixate-collection
                :exit-function
                (lambda (text _)
                  (when-let ((id (gethash text org-node--id-by-title)))

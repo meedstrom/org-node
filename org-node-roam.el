@@ -5,7 +5,7 @@
 (require 'ol)
 
 (define-obsolete-function-alias
-  'org-node--convert-to-roam 'org-node-roam--make-fake "2024-07-11")
+  'org-node--convert-to-roam 'org-node-roam--make-obj "2024-07-11")
 
 (define-obsolete-function-alias
   'org-node--fabricate-roam-backlinks 'org-node-roam--make-backlinks "2024-07-11")
@@ -23,35 +23,31 @@
       (display-warning 'org-node "Deprecated function `org-node-feed-file-to-roam-db', use `org-node-roam-db-shim-mode' instead"))
     (org-node-roam-db-feed files)))
 
-(defun org-node-roam-enable-redisplay ()
-  "Make the roam buffer react when point moves in any Org buffer.
+(define-minor-mode org-node-roam-redisplay-mode
+  "Make the Roam buffer react when point moves in any Org buffer.
 
 Normally, `org-roam-db-autosync-mode' sets this up for you - this
-exists for people who turn that off.
-
-Revert with `org-node-roam-disable-redisplay'."
-  (interactive)
-  (require 'org-roam)
-  (dolist (buf (org-buffer-list))
-    (with-current-buffer buf
-      (add-hook 'post-command-hook #'org-roam-buffer--redisplay-h nil t)))
-  (add-hook 'org-mode-hook #'org-roam-buffer--setup-redisplay-h))
-
-(defun org-node-roam-disable-redisplay ()
-  "Stop the roam buffer's responsiveness."
-  (interactive)
-  (dolist (buf (org-buffer-list))
-    (with-current-buffer buf
-      (remove-hook 'post-command-hook #'org-roam-buffer--redisplay-h t)))
-  (remove-hook 'org-mode-hook #'org-roam-buffer--setup-redisplay-h))
+mode exists for people who prefer to turn that off."
+  :global t
+  (if org-node-roam-redisplay-mode
+      (progn
+        (require 'org-roam)
+        (add-hook 'org-mode-hook #'org-roam-buffer--setup-redisplay-h)
+        (dolist (buf (org-buffer-list))
+          (with-current-buffer buf
+            (add-hook 'post-command-hook #'org-roam-buffer--redisplay-h nil t))))
+    (remove-hook 'org-mode-hook #'org-roam-buffer--setup-redisplay-h)
+    (unless (bound-and-true-p org-roam-db-autosync-mode)
+      (dolist (buf (org-buffer-list))
+        (with-current-buffer buf
+          (remove-hook 'post-command-hook #'org-roam-buffer--redisplay-h t))))))
 
 ;;; Method 1: Fake roam backlinks, no SQLite
 
 (define-minor-mode org-node-roam-no-sql-mode
-  "Instruct org-roam to consult `org-roam-backlink-p' objects faked
-by org-node so that you can use \\[org-roam-buffer-toggle]
-without syncing org-roam's SQL database nor having SQLite
-installed."
+  "Instruct org-roam to use fake `org-roam-backlink-p' objects from
+org-node so that you can use \\[org-roam-buffer-toggle] without
+having SQLite installed."
   :global t
   (require 'org-roam)
   (if org-node-roam-no-sql-mode
@@ -65,7 +61,7 @@ installed."
     (advice-remove 'org-roam-backlinks-get #'org-node-roam--make-backlinks)
     (advice-remove 'org-roam-reflinks-get #'org-node-roam--make-reflinks)))
 
-(defun org-node-roam--make-fake (node)
+(defun org-node-roam--make-obj (node)
   "Make a knockoff org-roam-node object from org-node node NODE."
   (require 'org-roam)
   (org-roam-node-create
@@ -113,7 +109,7 @@ Designed as override advice for `org-roam-backlinks-get'."
        when src-node
        collect (org-roam-backlink-create
                 :target-node target-roam-node
-                :source-node (org-node-roam--make-fake src-node)
+                :source-node (org-node-roam--make-obj src-node)
                 :point (plist-get link-data :pos)
                 :properties (plist-get link-data :properties))))))
 
@@ -137,7 +133,7 @@ Designed as override advice for `org-roam-reflinks-get'."
                       when src-node
                       collect (org-roam-reflink-create
                                :ref (plist-get link :dest)
-                               :source-node (org-node-roam--make-fake src-node)
+                               :source-node (org-node-roam--make-obj src-node)
                                :point (plist-get link :pos)
                                :properties (plist-get link :properties)))
        when reflinks append reflinks))))

@@ -85,7 +85,7 @@
       (should (equal (org-node-get-title node) "New node"))
       (should (equal (org-node-get-file-title node) "New node"))
       (should (equal (org-node-get-file-title-or-basename node) "New node")))
-    (let ((org-node-make-file-level-nodes nil))
+    (let ((org-node-prefer-file-level-nodes nil))
       (org-node--create "A top-level heading" "not-an-uuid5678")
       (org-node-cache-ensure t)
       (let ((node (gethash "not-an-uuid5678" org-node--node-by-id))

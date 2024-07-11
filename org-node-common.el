@@ -38,7 +38,7 @@ Called with one argument: the list of files re-scanned."
   :group 'org-node
   :type 'boolean)
 
-(defcustom org-node-make-file-level-nodes t
+(defcustom org-node-prefer-file-level-nodes t
   "If t, write a file-level title and property drawer when
 making a new file, otherwise write a more traditional top-level
 heading.
@@ -159,27 +159,6 @@ the function is called: `org-node-proposed-title' and
           (function-item org-capture)
           function))
 
-;; DEPRECATED
-(defcustom org-node-format-candidate-fn
-  #'org-node-format-bare
-  "Function to return a string to represent a given node.
-Affects how selections are displayed during e.g. `org-node-find'.
-
-Called with two arguments: the node data and the title.
-
-The title may in fact be one of the aliases and not the canonical
-title, because the completion builder calls this again for every
-alias.
-
-The node data is an object which form you can observe in examples
-from \\[org-node-cache-peek] and specified in the type
-`org-node-get'."
-  :group 'org-node
-  :type '(radio
-          (function-item org-node-format-with-olp)
-          (function-item org-node-format-bare)
-          function))
-
 (defcustom org-node-filter-fn
   (lambda (node)
     (not (assoc "ROAM_EXCLUDE" (org-node-get-properties node))))
@@ -298,31 +277,50 @@ in precisely \".org\" or \".org_archive\" anyway."
   "Whether to alter completion candidates instead of affixating.
 
 This means that org-node will concatenate the result of
-`org-node-aot-affixation-fn' into a single string, so what the
-user types in the minibuffer can match against what would've been
-the unmatchable prefix and suffix.
+`org-node-affixation-fn' into a single string, so what the
+user types in the minibuffer can match against the prefix and
+suffix.
 
 Another consequence is it lifts the uniqueness constraint on note
 titles: you can have two headings with the same name so long as
-the prefix or suffix differ.  If you like this, you may also want
-to nullify `org-node-warn-title-collisions'."
+the prefix or suffix differ.
+
+If you set this to t, you may also want to nullify
+`org-node-warn-title-collisions'.
+
+After changing this setting, please run \\[org-node-reset]."
   :type 'boolean
   :group 'org-node)
 
-(defcustom org-node-aot-affixation-fn #'org-node-affix-with-olp
+(defcustom org-node-affixation-fn #'org-node-affix-with-olp
   "Function to give prefix and suffix to completion candidates.
 
-The results are indirectly given to :affixation-function in
-`completion-extra-properties', however this function operates one
-candidate at a time, not the whole collection.  It receives two
-arguments: node and title, and must return a list of three
-elements: completion, prefix, and suffix."
-  :type 'boolean
+The results are indirectly used by :affixation-function in
+`completion-extra-properties', however this function operates on
+one candidate at a time, not the whole collection.
+
+It receives two arguments: NODE and TITLE, and it must return a
+list of three strings: completion, prefix, and suffix.
+
+NODE is an object which form you can observe in examples from
+\\[org-node-cache-peek] and specified in the type `org-node-get'.
+
+If a node has aliases, it is passed to this function again for
+every alias, in which case TITLE is actually one of the aliases."
+  :type '(radio
+          (function-item org-node-affix-bare)
+          (function-item org-node-affix-with-olp)
+          function)
   :group 'org-node)
+
+(defun org-node-affix-bare (_node title)
+  "Return TITLE as-is.
+For `org-node-affixation-fn'."
+  (list title nil nil))
 
 (defun org-node-affix-with-olp (node title)
   "Prepend TITLE with NODE's outline path.
-For `org-node-aot-affixation-fn'."
+For `org-node-affixation-fn'."
   (list title
         (when (org-node-get-is-subtree node)
           (let ((ancestors (cons (org-node-get-file-title-or-basename node)
@@ -334,45 +332,44 @@ For `org-node-aot-affixation-fn'."
             (string-join (nreverse result))))
         nil))
 
-(defun org-node-affix-bare (_node title)
-  "Return TITLE as-is.
-For `org-node-aot-affixation-fn'."
-  (list title nil nil))
-
-(defvar org-node--affixation-by-title (make-hash-table :test #'equal)
-  "1:1 table mapping titles or aliases to affixation triplets.")
-
 (defun org-node--affixate-collection (coll)
   (cl-loop for title in coll
-           collect (gethash title org-node--affixation-by-title)))
+           collect (gethash title org-node--affixation-triplet-by-title)))
 
-(defun org-node-read ()
-  "Prompt for a known ID-node."
-  (interactive)
-  (if org-node-alter-candidates
-      (gethash (completing-read "Node: " org-node--node-by-candidate
-                                () () () 'org-node-hist)
-               org-node--node-by-candidate)
-    (let ((completion-extra-properties
-           (list :affixation-function #'org-node--affixate-collection)))
-      (gethash (gethash (completing-read "Node: " org-node--id-by-title
-                                         () () () 'org-node-hist)
-                        org-node--id-by-title)
-               org-node--node-by-id))))
+(defvar org-node--affixation-triplet-by-title (make-hash-table :test #'equal)
+  "1:1 table mapping titles or aliases to affixation triplets.")
+
+(defun org-node-collection (str pred flag)
+  "Programmed collection for `completing-read'.
+
+Pass the function as the COLLECTION argument.
+
+Uses variable `org-node--node-by-candidate' as the basis, and
+affixes each candidate using `org-node-affixation-fn'.  Actually,
+just retrieves a cached affixation.
+
+All completion candidates are guaranteed to be keys of
+`org-node--node-by-candidate', but it is possible to exit with
+user-entered input, as is normal for `completing-read'.
+
+Arguments STR, PRED and FLAG are handled behind the scenes,
+explained in the Info manual at (elisp)Programmed Completion."
+  (cond ((eq flag nil)
+         (try-completion str org-node--node-by-candidate pred))
+        ((eq flag t)
+         (all-completions str org-node--node-by-candidate pred))
+        ((eq flag 'lambda)
+         (test-completion str org-node--node-by-candidate pred))
+        ((consp flag)
+         (completion-boundaries str org-node--node-by-candidate pred (cdr flag)))
+        ((eq flag 'metadata)
+         (cons 'metadata (unless org-node-alter-candidates
+                           (list (cons 'affixation-function
+                                       #'org-node--affixate-collection)))))))
+
 
 
 ;;; Functions & variables
-
-(defun org-node--record-link-at-point (id _desc)
-  (when (derived-mode-p 'org-mode)
-    (when-let ((origin (org-entry-get nil "ID" t)))
-      (push (list :origin origin
-                  :pos (point)
-                  :type "id"
-                  :dest id
-                  :properties (list :outline (ignore-errors
-                                               (org-get-outline-path t))))
-            (gethash id org-node--backlinks-by-id)))))
 
 ;; Wishlist: that `find-file-noselect' (and maybe also `find-file') when called
 ;; from Lisp would take an optional argument that explains why the file is
@@ -630,7 +627,7 @@ elements of the `hash-table-values' of `org-node--node-by-id'.
 
 For real-world usage of these accessors, see examples in the
 documentation of `org-node-filter-fn', the documentation of
-`org-node-format-candidate-fn', or the package README.
+`org-node-affixation-fn', or the package README.
 
 You may be able to find the README by typing:
 

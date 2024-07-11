@@ -356,7 +356,7 @@ list, and write results to another temp file."
 
               ;; This initial condition supports the special case where the
               ;; very first line of a file is a heading, as would be typical of
-              ;; people who null `org-node-make-file-level-nodes'.
+              ;; people who null `org-node-prefer-file-level-nodes'.
               (when (or (looking-at-p "\\*")
                         (org-node-worker--next-heading))
                 ;; Loop over the file's subtrees

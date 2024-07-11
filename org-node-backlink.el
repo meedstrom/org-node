@@ -1,14 +1,9 @@
 ;;; org-node-backlink.el -*- lexical-binding: t; -*-
 
-;; FIXME I believe that when you remove a link, then
-;;       `org-node-cache-rescan-file' is not enough to remove the link from
-;;       the link table.  It gets corrected only on reset.
-
 (require 'org-node-common)
 (require 'org-node-cache)
 (require 'cl-macs)
 
-;;;###autoload
 (let (warned-once)
   (defun org-node-backlinks-mode (&rest args)
     (unless warned-once
@@ -23,7 +18,6 @@
     (when (derived-mode-p 'org-mode)
       (org-node-backlink-mode))))
 
-;;;###autoload
 (define-minor-mode org-node-backlink-mode
   "Keep :BACKLINKS: properties updated."
   :group 'org-node
@@ -79,11 +73,10 @@ Can be quit midway through and resumed later.  With
                                (length org-node-backlink--files-to-fix)))
              (y-or-n-p (string-fill "You understand that this may trigger your auto git-commit systems and similar because many files are about to be edited and saved?"
                                     fill-column))))
-    ;; Do 1000 at a time, because Emacs cries about opening too many file
-    ;; buffers in one loop
-    (let (;;(coding-system-for-read org-node-perf-assume-coding-system)
-          (file-name-handler-alist nil))
-      (dotimes (_ 1000)
+    (let ((file-name-handler-alist nil))
+      ;; Do 500 at a time, because Emacs cries about opening too many file
+      ;; buffers in one loop... even though we close each one as we go
+      (dotimes (_ 500)
         (when-let ((file (pop org-node-backlink--files-to-fix)))
           (message "Adding/updating :BACKLINKS:... (you may quit and resume anytime) (%d) %s"
                    (cl-incf org-node-backlink--fix-ctr) file)
@@ -114,11 +107,10 @@ REMOVE, remove it instead."
            (node (gethash id org-node--node-by-id)))
       ;; The node may not yet have been scanned by org-node, because it was
       ;; created just now, in a capture buffer which triggered a save hook
-      ;; which led us here.  There's probably an async process looking at it
-      ;; right now but we're slightly too early.  In fact, I wager this happens
-      ;; every time, so backlinks are always added using slightly outdated
-      ;; metadata.
-      ;; TODO: Maybe don't run on save hook but rather on
+      ;; which led us here.  There's probably an async process looking at the
+      ;; file right now but we're slightly too early.  In fact, I wager this
+      ;; happens every time, so backlinks are always added using slightly
+      ;; outdated metadata.  TODO: Maybe don't run on save hook but rather on
       ;; handle-finished-job?
       (when node
         ;; Make the full string to which the :BACKLINKS: property should be set
@@ -288,12 +280,8 @@ all areas where text is added/changed/deleted."
                  (or (org-get-heading t t t t)
                      (cadar (org-collect-keywords '("TITLE")))
                      (file-name-nondirectory buffer-file-name))))))
-        ;; HACK The link needs to be recorded immediately to ensure that later
-        ;; on, `org-node-backlink--fix-changed-parts-of-buffer' will not remove
-        ;; the backlink we just added.  Ditto for node at point, if it's new.
-        ;; REVIEW Transit to org-node-backlink--fix-rescanned-file-buffers?
-        (push (list :origin src-id :dest target-id :pos (point) :type "id")
-              (gethash target-id org-node--backlinks-by-id))
+        ;; Ensure that `org-node-backlink--fix-changed-parts-of-buffer' will
+        ;; not later remove the backlink we're adding
         (org-node-cache--dirty-ensure-node-known)
         (let ((org-node--imminent-recovery-msg
                "Org-node going to add a backlink to the target of the link you just inserted, but it's likely you will first get a prompt to recover an auto-save file, ready? "))
@@ -341,21 +329,6 @@ all areas where text is added/changed/deleted."
         ;;      inhibit `org-node-backlink--flag-change'
         (let ((inhibit-modification-hooks t))
           (org-entry-put nil "BACKLINKS" new-value))))))
-
-;; (defun org-node-backlink--fix-rescanned-file-buffers (files)
-;;   "Designed for `org-node-rescan-hook'.
-
-;; This replaces an older design where
-;; `org-node-backlink--fix-changed-parts-of-buffer' ran directly on
-;; before-save-hook.  That design sometimes caused backlinks to
-;; disappear when the target buffer was saved before the source
-;; buffer, because the tables were not up to date.  This instead
-;; waits until the tables knows more about the saved buffer."
-;;   (dolist (file files)
-;;     (let ((buf (find-buffer-visiting file)))
-;;       (when buf
-;;         (with-current-buffer buf
-;;           (org-node-backlink--fix-changed-parts-of-buffer))))))
 
 (provide 'org-node-backlink)
 
