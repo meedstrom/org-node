@@ -10,10 +10,12 @@ Version 0.2 in July brought many changes!  *If anything broke for you*, you can 
 #+end_src
 
 New features
-- New user option: =org-node-make-file-level-nodes=
-- New user option: =org-node-warn-title-collisions=
 - New mode: =org-node-roam-db-shim-mode=
 - New mode: =org-node-roam-no-sql-mode=
+- New user option: =org-node-make-file-level-nodes=
+- New user option: =org-node-warn-title-collisions=
+- New user option: org-node-aot-affixation-fn
+- New user option: org-node-alter-candidates
 - New command: =org-node-grep=
   - Grep across all known Org files (requires [[https://github.com/minad/consult][consult]] at the moment).  Very useful combined with [[https://github.com/oantolin/embark][embark]]-export & [[wgrep][wgrep]] to search-and-replace a given string everywhere, like to rename a tag.
 - New command: =org-node-lint-all-files=

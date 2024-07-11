@@ -159,6 +159,7 @@ the function is called: `org-node-proposed-title' and
           (function-item org-capture)
           function))
 
+;; DEPRECATED
 (defcustom org-node-format-candidate-fn
   #'org-node-format-bare
   "Function to return a string to represent a given node.
@@ -291,24 +292,76 @@ in precisely \".org\" or \".org_archive\" anyway."
   :type '(repeat string))
 
 
+;;; Completion
+
+(defcustom org-node-alter-candidates nil
+  "Whether to alter completion candidates instead of affixating.
+
+This means that org-node will concatenate the result of
+`org-node-aot-affixation-fn' into a single string, so what the
+user types in the minibuffer can match against what would've been
+the unmatchable prefix and suffix.
+
+Another consequence is it lifts the uniqueness constraint on note
+titles: you can have two headings with the same name so long as
+the prefix or suffix differ.  If you like this, you may also want
+to nullify `org-node-warn-title-collisions'."
+  :type 'boolean
+  :group 'org-node)
+
+(defcustom org-node-aot-affixation-fn #'org-node-affix-with-olp
+  "Function to give prefix and suffix to completion candidates.
+
+The results are indirectly given to :affixation-function in
+`completion-extra-properties', however this function operates one
+candidate at a time, not the whole collection.  It receives two
+arguments: node and title, and must return a list of three
+elements: completion, prefix, and suffix."
+  :type 'boolean
+  :group 'org-node)
+
+(defun org-node-affix-with-olp (node title)
+  "Prepend TITLE with NODE's outline path.
+For `org-node-aot-affixation-fn'."
+  (list title
+        (when (org-node-get-is-subtree node)
+          (let ((ancestors (cons (org-node-get-file-title-or-basename node)
+                                 (org-node-get-olp node)))
+                (result nil))
+            (dolist (anc ancestors)
+              (push (propertize anc 'face 'completions-annotations) result)
+              (push " > " result))
+            (string-join (nreverse result))))
+        nil))
+
+(defun org-node-affix-bare (_node title)
+  "Return TITLE as-is.
+For `org-node-aot-affixation-fn'."
+  (list title nil nil))
+
+(defvar org-node--affixation-by-title (make-hash-table :test #'equal)
+  "1:1 table mapping titles or aliases to affixation triplets.")
+
+(defun org-node--affixate-collection (coll)
+  (cl-loop for title in coll
+           collect (gethash title org-node--affixation-by-title)))
+
+(defun org-node-read ()
+  "Prompt for a known ID-node."
+  (interactive)
+  (if org-node-alter-candidates
+      (gethash (completing-read "Node: " org-node--node-by-candidate
+                                () () () 'org-node-hist)
+               org-node--node-by-candidate)
+    (let ((completion-extra-properties
+           (list :affixation-function #'org-node--affixate-collection)))
+      (gethash (gethash (completing-read "Node: " org-node--id-by-title
+                                         () () () 'org-node-hist)
+                        org-node--id-by-title)
+               org-node--node-by-id))))
+
+
 ;;; Functions & variables
-
-(defun org-node-format-with-olp (node title)
-  "Prepend TITLE with NODE's outline path."
-  (if (org-node-get-is-subtree node)
-      (let ((ancestors (cons (org-node-get-file-title-or-basename node)
-                             (org-node-get-olp node)))
-            (result nil))
-        (dolist (anc ancestors)
-          (push (propertize anc 'face 'completions-annotations) result)
-          (push " > " result))
-        (push title result)
-        (string-join (nreverse result)))
-    title))
-
-(defun org-node-format-bare (_node title)
-  "Return TITLE as-is."
-  title)
 
 (defun org-node--record-link-at-point (id _desc)
   (when (derived-mode-p 'org-mode)
@@ -442,8 +495,6 @@ can demonstrate the data format.  See also the type `org-node-get'.")
 
 (defvar org-node--backlinks-by-id (make-hash-table :test #'equal)
   "1:N table of ID-links.
-
-(defvar org-node--affixation-by-candidate (make-hash-table :test #'equal))
 
 The table keys are destination IDs, and the corresponding table
 value is a list of plists describing each link, including naming
