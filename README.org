@@ -11,33 +11,31 @@ Version 0.2 in July brought many changes!  *If anything broke for you*, you can 
 
 New features
 - New mode: =org-node-roam-db-shim-mode=
+  - Deprecates advice that was in [[https://github.com/meedstrom/org-node?tab=readme-ov-file#option-1b--tell-org-node-to-write-to-the-org-roam-db][Backlinks Option 1B]]
 - New mode: =org-node-roam-no-sql-mode=
+  - Deprecates advice that was in [[https://github.com/meedstrom/org-node?tab=readme-ov-file#option-1c--cut-out-the-db-altogether][Backlinks Option 1C]]
 - New mode: =org-node-roam-redisplay-mode=
 - New mode: =org-node-capf-mode=
-  - In-buffer completion at point.
 - New user option: =org-node-prefer-file-level-nodes=
 - New user option: =org-node-warn-title-collisions=
 - New user option: =org-node-affixation-fn=
+  - Deprecates old option =org-node-format-candidate-fn=
 - New user option: =org-node-alter-candidates=
 - New command: =org-node-lint-all-files=
   - Run org-lint on all known files, then report the results.  Use it to fix a broken setup; org-node [[https://github.com/meedstrom/org-node/issues/8#issuecomment-2101316447][assumes all files have correct syntax]].  In particular, malformed PROPERTIES drawers easily cause failure to scan.
 - New command: =org-node-list-dead-links=
 - New command: =org-node-list-feedback-arcs=
-  - Explore [[https://en.wikipedia.org/wiki/Feedback_arc_set][feedback arcs]] among your ID links.  Can be a nice occasional QA routine, like exploring your note pile in org-roam-ui or Delve (when you don't usually do so) and spotting better ways to connect things.
 - New command: =org-node-grep=
-  - Grep across all known Org files (requires [[https://github.com/minad/consult][consult]] at the moment).  Very useful combined with [[https://github.com/oantolin/embark][embark]]-export & [[wgrep][wgrep]] to search-and-replace a given string everywhere, like to rename a tag.
+- ... and other minor functions
 
-- New command: org-node-roam-enable-redisplay
-- New function =org-node-try-visit-ref-node= for =org-open-at-point-functions=
-  
 Removals
 - Remove user option: =org-node-perf-gc-cons-threshold=
+- Remove user option: =org-node-format-candidate-fn= (in favour of =org-node-affixate-fn=)
 - Remove variable: =org-node-cache-reset-hook=
+- Rename variable: =org-node-cache-rescan-file-hook= (in favour of =org-node-rescan-hook=, now called with 1 argument)
 
 Renames
 - Rename user option =org-node-slug-fn= to =org-node-filename-fn=
-- Rename variable =org-node-cache-rescan-file-hook= to new user option =org-node-rescan-hook=
-  - AND the hook now passes one argument, not zero
 - Rename variable =org-node-collection= to =org-node--node-by-candidate=.
 - Rename many private functions and variables
 
@@ -45,7 +43,7 @@ Changes
 - Don't automatically turn on cache-mode, just pester the user
 - Command =org-node-put-created= now respects =org-timestamp-formats= instead of just putting the date as [YYYY-MM-DD].
 - Fix: catch some nodes that were missed
-- Fix: the feature of feeding files to the roam DB was subtly broken because it'd trigger the hook before the scan completed, so it'd always be a bit outdated, now fixed.  Also, you can toggle this feature with =org-node-roam-db-shim-mode=.
+- Fix: the feature of feeding files to the Roam DB (now called =org-node-roam-db-shim-mode=) was subtly broken because it'd trigger the hook before the scan completed, so it'd always be a bit outdated, now fixed.
 - Fix: quickly update completions when a heading was edited, instead of seeing multiple stale candidates
 - Fix: Accept multiple =#+todo:= lines
 - Fix: fix =:BACKLINKS:= members sometimes disappearing
@@ -64,13 +62,13 @@ I found org-roam too slow, so I made [[https://github.com/meedstrom/quickroam][q
 
   In pursuit of being "just org-id", this package has no equivalent setting to =org-roam-directory= -- it just looks up =org-id-locations=.
 
-- *If you were not using org-roam*, maybe think of it as somewhat like [[https://github.com/alphapapa/org-recent-headings][org-recent-headings]] beefed up to the extent that you won't need other methods of browsing or linking.
+- *If you were not using org-roam*, maybe think of it as somewhat like [[https://github.com/alphapapa/org-recent-headings][org-recent-headings]] beefed-up to the extent that you won't need other methods of browsing or linking.
 
-  If you were the sort of person to prefer ID-links over file links or any other type of link, you're in the right place!  Now you can rely on IDs, and---if you want---forget about filenames and hierarchies and directory structures.  As long as you've assigned an ID to something, you can find it later.
+  If you were the sort of person to prefer ID-links over file links or any other type of link, you're in the right place!  Now you can rely on IDs, and---/if you want/---forget about filenames and subtree hierarchies and directory structures.  As long as you've assigned an ID to something, you can find it later.
 
 ** What's a "node"?
 
-My life can be divided into two periods "*before org-roam*" and "*after org-roam*".  I crossed a kind of gap once I got a good way to link between my notes.  It's odd to remember when I just relied on browsing hierarchies of subtrees -- what a strange way to do things!
+My life can be divided into two periods "*before org-roam*" and "*after org-roam*".  I crossed a kind of gap once I got a good way to link between my notes.  It's odd to remember when I just relied on browsing hierarchies of subtrees -- what an odd way to work!
 
 I used to lose track of things I had written, under some forgotten heading in a forgotten file in a forgotten directory.  The org-roam method let me *find* and *build on* my own work, instead of having repetitive [[https://en.wikipedia.org/wiki/Cryptomnesia][cryptomnesia]] and staying on square one forever.
 
@@ -103,8 +101,8 @@ A comparison of three similar systems, all permitting org-id as first-class citi
 | Avoid double-counting =:BACKLINKS:= | --       | yes                | not applicable       |
 | Grep across all files             | --       | yes                | --                   |
 | Update stale link descriptions    | --       | yes                | --                   |
-|  Warn about dead links        |          |                    |                      |
-| Warn about duplicate IDs |          |                    |                      |
+| List dead links                   | --       | yes                |                      |
+| Warn about duplicate IDs          | --       | yes                |                      |
 | Node exclusion                    | yes      | limited            | not applicable       |
 | Support Org 9.5 citations         | yes      | -- (planned)       | --                   |
 | Support org-ref                   | yes      | -- (WONTFIX)       | --                   |
@@ -129,7 +127,7 @@ Add an init snippet like this (assuming [[https://github.com/radian-software/str
 
 If you're new to these concepts, fear not.  The main things for day-to-day operation are two verbs: "find" and "insert-link".
 
-Pick some good keys and try them out.
+Pick some good keys, close the browser, and try them out.
 
 #+begin_src elisp
 (global-set-key (kbd "<f2> f") #'org-node-find)
@@ -191,7 +189,7 @@ Use this minor mode:
 (setq org-roam-db-update-on-save nil)
 #+end_src
 
-For a full reset, you're free to use the original =C-u M-x org-roam-db-sync=, or the faster =M-x org-node-roam-db-reset=, bearing in mind results aren't 100% identical.
+To full-reset the DB, you're free to use the original =C-u M-x org-roam-db-sync=, or the faster =M-x org-node-roam-db-reset=, bearing in mind results aren't 100% identical.
 
 
 **** *Option 1C*.  Cut out the DB altogether
@@ -200,12 +198,12 @@ Yes it's possible, no SQLite needed!
 
 Type =M-x org-node-roam-no-sql-mode=, then see what populates your Roam buffer henceforth.  Hopefully you see the same links as before.
 
-If you're happy with the result, and you don't need =roam:= links functionality, you can disable =org-roam-db-autosync-mode= in favour of only =M-x org-node-roam-enable-redisplay=.  As an init snippet:
+If you're happy with the result, and you don't need =roam:= links functionality, you can disable =org-roam-db-autosync-mode= in favour of the slimmer =M-x org-node-roam-redisplay-mode=.  As an init snippet:
 
 #+begin_src elisp
 (org-roam-db-autosync-mode 0)
 (org-node-roam-no-sql-mode)
-(org-node-roam-enable-redisplay)
+(org-node-roam-redisplay-mode)
 #+end_src
 
 ** Backlink solution 2: print inside the file
@@ -370,14 +368,10 @@ Rarer commands:
   - Add =BACKLINKS= property to all nodes everywhere (takes a while)
 - =org-node-backlink-regret=
   - In case you regret the =BACKLINKS= properties -- remove them all
-- =org-node-grep=
-  - (Requires [[https://github.com/minad/consult][consult]]) Grep across all known Org files.  Very useful combined with [[https://github.com/oantolin/embark][embark]]-export & [[wgrep][wgrep]] to search-and-replace a given string everywhere.  For example, if you want to rename a tag everywhere.
 - =org-node-list-feedback-arcs=
   - (Requires GNU R---see docstring) Explore [[https://en.wikipedia.org/wiki/Feedback_arc_set][feedback arcs]] among your ID links.  Can be a nice occasional QA routine, like exploring your note pile in org-roam-ui or Delve and realizing there should/shouldn't be connections here and there.
-- =org-node-enable-capf=
-  - Enable completion at point in all buffers.
-- =org-node-disable-capf=
-  - Disable completion at point in all buffers.
+- =org-node-grep=
+  - (Requires [[https://github.com/minad/consult][consult]]) Grep across all known Org files.  Very useful combined with [[https://github.com/oantolin/embark][embark]]-export & [[wgrep][wgrep]] to search-and-replace a given string everywhere.  For example, if you want to rename a tag everywhere.
 
 * Appendix
 ** Appendix I: Rosetta stone
