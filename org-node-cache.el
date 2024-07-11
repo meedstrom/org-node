@@ -540,10 +540,12 @@ The input NODE-RECIPE is a list of arguments to pass to
     (when (funcall org-node-filter-fn node)
       (dolist (title (cons (org-node-get-title node)
                            (org-node-get-aliases node)))
-        (let ((collision (gethash title org-node--id-by-title))
-              (cand (funcall org-node-format-candidate-fn node title)))
-          (puthash cand node org-node--node-by-candidate)
+        (let* ((collision (gethash title org-node--id-by-title))
+               (affx (funcall org-node-aot-affixation-fn node title))
+               (cand (concat (nth 1 affx) (nth 0 affx) (nth 2 affx))))
           (puthash title id org-node--id-by-title)
+          (puthash title affx org-node--affixation-by-title)
+          (puthash cand node org-node--node-by-candidate)
           (when (and collision org-node-warn-title-collisions)
             (unless (equal id collision)
               (message "Two nodes have same name: %s, %s (%s)"
@@ -566,12 +568,17 @@ FILES, and remove the corresponding completion candidates."
      when (member (org-node-get-file-path node) files)
      collect (org-node-get-id node) into ids
      and append (org-node-get-refs node) into refs
+     and collect (org-node-get-title node) into titles
      finally do
+     (dolist (id ids)
+       (remhash id org-node--node-by-id))
      (dolist (ref refs)
        (remhash ref org-node--id-by-ref))
-     (dolist (id ids)
-       (remhash id org-node--node-by-id)))))
+     (dolist (title titles)
+       (remhash title org-node--id-by-title)))))
 
+;; NOTE Interestingly, no need to do this for the equivalent
+;;      tables used when `org-node-alter-candidates' nil.
 (defun org-node-cache--dirty-forget-completions-in (files)
   "Remove the completion candidates for all nodes in FILES."
   (when files

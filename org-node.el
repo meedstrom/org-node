@@ -52,18 +52,11 @@ This may refer to the current Org heading, else an ancestor
 heading, else the file-level node, whichever has an ID first."
   (gethash (org-entry-get nil "ID" t) org-node--node-by-id))
 
-(defun org-node-read ()
-  "Prompt for a known ID-node."
-  (gethash (completing-read "Node: " org-node--node-by-candidate
-                            () () () 'org-node-hist)
-           org-node--node-by-candidate))
-
 
 ;;; Plumbing
 
 (defvar org-node-hist nil
   "Minibuffer history.")
-
 (put 'org-node-hist 'history-length 1000)
 
 (defun org-node-guess-or-ask-dir (prompt)
@@ -1090,23 +1083,30 @@ Reverse the effect with \\[org-node-disable-capf]."
     (with-current-buffer buf
       (remove-hook 'completion-at-point-functions
                    #'org-node-complete-at-point t)
-      (when (bound-and-true-p org-roam-completion-everywhere)
-        (require 'org-roam)
-        (when (org-roam-file-p)
-          (dolist (f org-roam-completion-functions)
-            (add-hook 'completion-at-point-functions f nil t))))))
+      (and (bound-and-true-p org-roam-completion-everywhere)
+           (fboundp #'org-roam-file-p)
+           (require 'org-roam)
+           (org-roam-file-p)
+           (dolist (f org-roam-completion-functions)
+             (add-hook 'completion-at-point-functions f nil t)))))
   (when (bound-and-true-p org-roam-completion-everywhere)
     (add-hook 'org-roam-find-file-hook
               'org-roam--register-completion-functions-h)))
 
 (defun org-node--install-capf-in-buffer ()
-  (add-hook 'completion-at-point-functions #'org-node-complete-at-point nil t))
+  (and (derived-mode-p 'org-mode)
+       buffer-file-name
+       (equal "org" (file-name-extension buffer-file-name))
+       (add-hook 'completion-at-point-functions
+                 #'org-node-complete-at-point nil t)))
 
 (defun org-node-complete-at-point ()
   "Complete word at point to any known node title, and linkify.
 Designed for `completion-at-point-functions', which see."
   (let ((bounds (bounds-of-thing-at-point 'word)))
     (and bounds
+         ;; For some reason it gets added to non-org buffers like grep
+         (derived-mode-p 'org-mode)
          (not (org-in-src-block-p))
          (not (save-match-data (org-in-regexp org-link-any-re)))
          (list (car bounds)

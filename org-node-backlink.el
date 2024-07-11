@@ -117,13 +117,16 @@ REMOVE, remove it instead."
       ;; which led us here.  There's probably an async process looking at it
       ;; right now but we're slightly too early.  In fact, I wager this happens
       ;; every time, so backlinks are always added using slightly outdated
-      ;; metadata. TODO: Maybe don't run on save hook but rather on
+      ;; metadata.
+      ;; TODO: Maybe don't run on save hook but rather on
       ;; handle-finished-job?
       (when node
         ;; Make the full string to which the :BACKLINKS: property should be set
         (let* ((reflinks (org-node-get-reflinks node))
                (backlinks (gethash id org-node--backlinks-by-id))
-               ;; (cites (--keep (gethash it org-node--cites-by-citekey)
+               ;; TODO record-node should process ROAM_REFS in a way that's
+               ;;      aware of citations
+               ;; (citations (--keep (gethash it org-node--cites-by-citekey)
                ;;                (org-node-get-refs node)))
                (combined
                 (thread-last
@@ -212,8 +215,8 @@ subtree.  For a huge file, this is much faster than using
 (defun org-node-backlink--flag-change (beg end _)
   "Add text property `org-node-flag' to region between BEG and END.
 
-Designed to run on `after-change-functions', in which case this
-effectively flags all areas where text is added/changed/deleted."
+Designed for `after-change-functions', so this effectively flags
+all areas where text is added/changed/deleted."
   (when (derived-mode-p 'org-mode)
     (with-silent-modifications
       (put-text-property beg end 'org-node-flag t))))
@@ -285,10 +288,12 @@ effectively flags all areas where text is added/changed/deleted."
                  (or (org-get-heading t t t t)
                      (cadar (org-collect-keywords '("TITLE")))
                      (file-name-nondirectory buffer-file-name))))))
-        ;; The link needs to be recorded immediately to ensure that later on,
-        ;; `org-node-backlink--fix-changed-parts-of-buffer' will not remove the
-        ;; backlink we just added.  Ditto for node at point, if it hasn't been
-        ;; scanned yet.
+        ;; HACK The link needs to be recorded immediately to ensure that later
+        ;; on, `org-node-backlink--fix-changed-parts-of-buffer' will not remove
+        ;; the backlink we just added.  Ditto for node at point, if it's new.
+        ;; REVIEW Transit to org-node-backlink--fix-rescanned-file-buffers?
+        (push (list :origin src-id :dest target-id :pos (point) :type "id")
+              (gethash target-id org-node--backlinks-by-id))
         (org-node-cache--dirty-ensure-node-known)
         (let ((org-node--imminent-recovery-msg
                "Org-node going to add a backlink to the target of the link you just inserted, but it's likely you will first get a prompt to recover an auto-save file, ready? "))
@@ -302,18 +307,19 @@ effectively flags all areas where text is added/changed/deleted."
             nil t))
       (push target-id org-node-backlink--fails)
     (when (get-text-property (point) 'read-only)
-      ;; If for some reason the search landed us in a transclude region or...
-      ;; Note that `org-entry-put' inhibits read-only, so it wouldn't have
-      ;; signaled any error.
+      ;; If for some reason the search landed us in a transclude region or
+      ;; other read-only area...  Note that `org-entry-put' inhibits read-only,
+      ;; so it wouldn't signal any error.
       (error "org-node: Property drawer seems to be read-only at %d in %s"
              (point) (buffer-name)))
     (let ((current-backlinks-value (org-entry-get nil "BACKLINKS"))
           (src-link (org-link-make-string (concat "id:" src-id) src-title))
           new-value)
       (if current-backlinks-value
-          ;; Build a temp list to check we don't add the same link twice.  There
-          ;; is an Org builtin `org-entry-add-to-multivalued-property', but we
-          ;; cannot use it since the link descriptions may contain spaces.
+          ;; Build a temp list to check we don't add the same link twice.
+          ;; There is an Org builtin `org-entry-add-to-multivalued-property',
+          ;; but we cannot use it since the link descriptions may contain
+          ;; spaces.
           (let ((links (split-string (replace-regexp-in-string
                                       "]][[:space:]]+\\[\\["
                                       "]]\f[["
@@ -334,13 +340,7 @@ effectively flags all areas where text is added/changed/deleted."
         ;; TODO don't inhibit all modification hooks, just
         ;;      inhibit `org-node-backlink--flag-change'
         (let ((inhibit-modification-hooks t))
-          (org-entry-put nil "BACKLINKS" new-value))
-        ;; (org-node-cache--scan-targeted (list src-file))
-        ;; TODO Placeholder to prevent deleting the just-added backlink when
-        ;;      saving the "wrong" buffer first Although
-        ;;      `org-node-backlink--fix-rescanned-file-buffers' is a better fix
-        ;; (push (list :src-id src-id) (gethash target-id org-node--backlinks-by-id))
-        ))))
+          (org-entry-put nil "BACKLINKS" new-value))))))
 
 ;; (defun org-node-backlink--fix-rescanned-file-buffers (files)
 ;;   "Designed for `org-node-rescan-hook'.
