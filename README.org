@@ -12,19 +12,21 @@ Version 0.2 in July brought many changes!  *If anything broke for you*, you can 
 New features
 - New mode: =org-node-roam-db-shim-mode=
 - New mode: =org-node-roam-no-sql-mode=
-- New user option: =org-node-make-file-level-nodes=
+- New mode: =org-node-roam-redisplay-mode=
+- New mode: =org-node-capf-mode=
+  - In-buffer completion at point.
+- New user option: =org-node-prefer-file-level-nodes=
 - New user option: =org-node-warn-title-collisions=
-- New user option: org-node-aot-affixation-fn
-- New user option: org-node-alter-candidates
-- New command: =org-node-grep=
-  - Grep across all known Org files (requires [[https://github.com/minad/consult][consult]] at the moment).  Very useful combined with [[https://github.com/oantolin/embark][embark]]-export & [[wgrep][wgrep]] to search-and-replace a given string everywhere, like to rename a tag.
+- New user option: =org-node-affixation-fn=
+- New user option: =org-node-alter-candidates=
 - New command: =org-node-lint-all-files=
   - Run org-lint on all known files, then report the results.  Use it to fix a broken setup; org-node [[https://github.com/meedstrom/org-node/issues/8#issuecomment-2101316447][assumes all files have correct syntax]].  In particular, malformed PROPERTIES drawers easily cause failure to scan.
+- New command: =org-node-list-dead-links=
 - New command: =org-node-list-feedback-arcs=
   - Explore [[https://en.wikipedia.org/wiki/Feedback_arc_set][feedback arcs]] among your ID links.  Can be a nice occasional QA routine, like exploring your note pile in org-roam-ui or Delve (when you don't usually do so) and spotting better ways to connect things.
-- New command: =org-node-list-dead-links=
-- New command: =org-node-enable-capf=
-  - Like org-roam's =org-roam-completion-everywhere=.
+- New command: =org-node-grep=
+  - Grep across all known Org files (requires [[https://github.com/minad/consult][consult]] at the moment).  Very useful combined with [[https://github.com/oantolin/embark][embark]]-export & [[wgrep][wgrep]] to search-and-replace a given string everywhere, like to rename a tag.
+
 - New command: org-node-roam-enable-redisplay
 - New function =org-node-try-visit-ref-node= for =org-open-at-point-functions=
   
@@ -300,25 +302,19 @@ Would it be nice if, clicking on it, you're automatically sent to that node inst
 (add-hook 'org-open-at-point-functions #'org-node-try-visit-ref-node)
 #+end_src
 
-*** Rich completions
-# TODO make an :affixation-function variant of this the default
-# also annotate with ID
-
-How to see the headings' full outline paths while you search for nodes:
-
-#+begin_src elisp
-(setopt org-node-format-candidate-fn #'org-node-format-with-olp)
-#+end_src
-
-(When customizing this function, test the result by doing a =M-x org-node-reset=.)
-
 *** Limitation: unique titles
-
+RSS
 If two ID-nodes exist with the same title, one of them will disappear from minibuffer completions.
 
-That's just the nature of completion, and much can be said for embracing an uniqueness constraint anyway, but there's a workaround: use rich completions (see above).  It adds text to each candidate, resolving practically all conflicts.
+That's just the nature of completion, and much can be said for embracing an uniqueness constraint anyway.  Org-node will print messages telling you about title collisions (controlled by the option =org-node-warn-title-collisions=).
 
-But note!  The trick won't help with the in-buffer completion-at-point.  So in the future, I may add distinguishers like "(2)", "(3)", "(4)"... to each naming conflict.
+Anyway, there's a workaround.  Assuming you leave =org-node-affixation-fn= at its default setting, set =org-node-alter-candidates= to t.
+
+Because this merges the outline path with the matchable part of each candidate (so you do not match only on title), it resolves practically all conflicts.  [[https://fosstodon.org/@nickanderson/112249581810196258][Some people]] depend on that workflow.
+
+Final note: this workaround won't help the in-buffer completions provided by =org-node-capf-mode=, but hopefully you won't need it often.
+
+# Maybe I'll add distinguishers like "1" "2" "3" to each naming conflict?
 
 *** Limitation: excluding notes
 The option =org-node-filter-fn= works well for excluding TODO items that happen to have an ID, and excluding org-drill items and that sort of thing, but beyond that, it has limited utility because unlike org-roam, *child ID nodes of an excluded node are not excluded!*
@@ -420,21 +416,21 @@ API comparison between org-roam and org-node.
 
 I sometimes call org-node a "bizarro org-roam".  Why?
 
-- Org-node treats =ROAM_REFS= more like aliases, and it treats the associated concept "reflinks" like backlinks.
-  - I suspect it's easier to get started with refs if you don't /call/ them refs.  There must be many people today who remain unsure what a "roam ref" is, because they have a backlog of 500 other Emacs/Org concepts to learn.  And it's not actually a concept that needs a name.
+1. Org-node treats =ROAM_REFS= more like aliases, and it treats the associated concept "reflinks" like backlinks.
+   - I suspect it's easier to get started with refs if you don't /call/ them refs.  There must be many people today who remain unsure what a "roam ref" is, because they have a backlog of 500 other Emacs/Org concepts to learn.  And it's not actually a concept that needs a name.
 
-    The distinction between a reflink and a backlink comes from technical implementation, but an user shouldn't have to know about it.
+     The distinction between a reflink and a backlink comes from technical implementation, but an user shouldn't have to know about it.
 
-    If I cared not for compatibility, I might have called my version of the =ROAM_REFS= property =EXTRA_IDS=.  I think that says a lot more about how it really works.  When you see someone putting a web URL in an =EXTRA_IDS= property, you can sorta intuit what's going on.
+     If I cared not for compatibility, I might have called my version of the =ROAM_REFS= property =EXTRA_IDS=.  I think that says a lot more about how it really works.  When you see someone putting a web URL in an =EXTRA_IDS= property, you can sorta intuit what's going on.
 
-    I even considered merging it with the =ID= property(!), but there is one way in which a =ROAM_REFS= is not equivalent to an =ID=:  sometimes you want to search for refs (org-roam provides the command =org-roam-ref-find=), but you never want to search for IDs, since they're usually nonsensical UUIDs.
+     I even considered merging it with the =ID= property(!), but there is one way in which a =ROAM_REFS= is not equivalent to an =ID=:  sometimes you want to search for refs (org-roam provides the command =org-roam-ref-find=), but you never want to search for IDs, since they're usually nonsensical UUIDs.
 
-    But, /again/, the user doesn't need two separate commands or mental buckets: =org-node-find= does both, as if the =ROAM_REFS= was really the =ROAM_ALIASES= field.  Though a small detail differs there: the user option =org-node-format-candidate-fn= is not applied, whereas it is applied to real aliases.
+     But, /again/, the user doesn't need two separate commands or mental buckets: =org-node-find= does both, as if the =ROAM_REFS= was really the =ROAM_ALIASES= field.  Though a small detail differs there: the user option =org-node-affixate-fn= is not applied, whereas it is applied to real aliases.
 
-- The command =org-node-extract-subtree= places you in the newly created buffer so you can check the result, the opposite of =org-roam-extract-subtree= which actually /buries/ the buffer so it's difficult to check.
+2. The command =org-node-extract-subtree= places you in the newly created buffer so you can check the result, the opposite of =org-roam-extract-subtree= which actually /buries/ the buffer so it's difficult to check.
 
-- =org-roam-id-at-point=...
+3. Org-roam is the most general toolkit.  Take a function like =org-roam-id-at-point=.  Why does it exist, when you could use =(org-entry-get nil "ID" t)=?  Well, the org-roam version ignores those ancestor headings that have an ID but have been marked not to count as "Roam nodes", so it travels further up the tree until it finds one that is indeed "a Roam node".
 
-- =org-roam-node-display-template=...
+   - This brings good to some users.  Complexity is not the enemy.  It's just a bit of a YAML vs TOML situation.  Or lsp-mode vs eglot.  I prefer to try to be "closer to the metal", use vanilla =org-capture= instead of =org-roam-capture=, look up vanilla =org-id-locations= instead of =org-roam-directory= etc.  Less wrappers.
 
-- Code style
+4. Take the variable =org-roam-node-display-template=.  At least, others may consider this a pro, but for my tastes no.  I try to let people customize with little lambdas and provide examples of how they'd get some result or other.  This instead has the dream UI where you can just set the variable to a string "${olp} ${tags} ${title}" or some such and be done with it.  Problem is it's a new mini-DSL (domain-specific language), and when you learn it you miss out on an elisp lesson.  Convenient for beginners but also /keeps/ them beginners.
