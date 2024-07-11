@@ -3,6 +3,8 @@
 ;; TODO try not writing 6 file lists, just one and access correct list with
 ;;      cdr assq i ...
 
+;; (setq org-node--debug t)
+
 (eval-when-compile
   (require 'cl-macs)
   (require 'subr-x))
@@ -10,7 +12,7 @@
 ;; Note to self: file-name-concat is probably faster than expand-file-name when
 ;; we do not need to convert the filename to absolute anyway.  Basically even
 ;; better than setting file-name-handler-alist to nil.
-(defsubst org-node-worker--tmpfile (&optional basename &rest args)
+(defun org-node-worker--tmpfile (&optional basename &rest args)
   "Return a path that puts BASENAME in a temporary directory.
 
 On most systems, the resulting string will be
@@ -22,6 +24,16 @@ ARGS through `format' first."
                     (if basename
                         (apply #'format basename args)
                       "")))
+
+(defun org-node-worker--make-todo-regexp (keywords-string)
+  "Make a regexp based on KEYWORDS-STRING,
+that will match any of the TODO keywords within."
+  (thread-last keywords-string
+               (replace-regexp-in-string "(.*?)" "")
+               (string-replace "|" "")
+               (string-trim)
+               (split-string)
+               (regexp-opt)))
 
 (defsubst org-node-worker--elem-index (elem list)
   "Like `-elem-index', return first index of ELEM in LIST."
@@ -39,7 +51,7 @@ See `org-node-worker--pos->olp' for explanation of OLDATA and POS.
 
 Extra argument FILE-ID is the file-level id, used as a fallback
 if no ancestor heading has an ID.  It can be nil."
-  (let (;; Drop all the data about positions below POS
+  (let (;; Drop all the data about positions below HEADING-POS
         (data-until-pos
          (nthcdr (org-node-worker--elem-index (assoc pos oldata) oldata)
                  oldata)))
@@ -55,7 +67,7 @@ if no ancestor heading has an ID.  It can be nil."
                if (= 1 previous-level) return file-id))))
 
 (defsubst org-node-worker--pos->olp (oldata pos)
-  "Given buffer position POS, return the Org outline path.
+  "Given buffer position HEADING-POS, return the Org outline path.
 Result should look like a result from `org-get-outline-path'.
 
 Argument OLDATA must be of a form looking like
@@ -70,13 +82,13 @@ asterisks in the heading at that location.
 
 As apparent in the example, OLDATA is expected in \"reverse\"
 order, such that the last heading in the file is represented in
-the first element.  An exact match for POS must also be included
+the first element.  An exact match for HEADING-POS must also be included
 in one of the elements."
   (let* (olp
          (pos-data (or (assoc pos oldata)
-                       (error "Broken algo: POS %s not found in OLDATA %s"
+                       (error "Broken algo: HEADING-POS %s not found in OLDATA %s"
                               pos oldata)))
-         ;; Drop all the data about positions below POS (using `nthcdr' because
+         ;; Drop all the data about positions below HEADING-POS (using `nthcdr' because
          ;; oldata is in reverse order)
          (data-until-pos (nthcdr (org-node-worker--elem-index pos-data oldata)
                                  oldata)))
@@ -91,16 +103,6 @@ in one of the elements."
                ;; Stop
                return nil))
     olp))
-
-(defsubst org-node-worker--make-todo-regexp (keywords-string)
-  "Make a regexp based on KEYWORDS-STRING,
-that will match any of the TODO keywords within."
-  (thread-last keywords-string
-               (replace-regexp-in-string "(.*?)" "")
-               (string-replace "|" "")
-               (string-trim)
-               (split-string)
-               (regexp-opt)))
 
 (defsubst org-node-worker--org-link-display-format (s)
   "Copy-pasted from `org-link-display-format'."
@@ -123,20 +125,35 @@ and there is a heading there, just return t without moving point."
   (if (re-search-forward "^\\*+ " nil 'move)
       (goto-char (pos-bol))))
 
-(defvar org-node-worker--results nil
-  "List of results to pass back to the main Emacs.")
-
-(defvar org-node-worker--result-missing-files nil)
-(defvar org-node-worker--result-found-nodes nil)
-(defvar org-node-worker--result-mtimes nil)
-;; (defvar org-node-worker--result-found-ids nil)
-(defvar org-node-worker--result-found-id-links nil)
-(defvar org-node-worker--result-found-reflinks nil)
+(defsubst org-node-worker--collect-citations-until (end id-here olp-with-self)
+  "From here to buffer position END, look for citation @keys."
+  ;; NOTE Should ideally search for `org-element-citation-prefix-re', but
+  ;; hoping this is good enough.
+  (while (search-forward "[cite" end t)
+    (let ((closing-bracket (save-excursion (search-forward "]" end t))))
+      (when closing-bracket
+        (while (re-search-forward
+                ;; Copypasta from `org-element-citation-key-re'
+                "@\\([!#-+./:<>-@^-`{-~[:word:]-]+\\)"
+                closing-bracket t)
+          (if (save-excursion
+                (goto-char (pos-bol))
+                (or (looking-at-p "[[:space:]]*# ")
+                    (looking-at-p "[[:space:]]*#\\+")))
+              ;; On a # comment or #+keyword, skip citation
+              ;; (NOTE: don't skip whole line as in the other fn)
+              (goto-char closing-bracket)
+            (push (list :origin id-here
+                        :pos (point)
+                        :key (match-string 0)
+                        ;; Because org-roam asks for it
+                        :properties (list :outline olp-with-self))
+                  org-node-worker--result-found-citations)))))))
 
 (defsubst org-node-worker--collect-links-until (end id-here olp-with-self link-re)
   "From here to buffer position END, look for forward-links.
 Ensure these links will be used to populate tables
-`org-node--links' and `org-node--reflinks' in the
+`org-node--backlinks-by-id' and `org-node--reflinks' in the
 main Emacs process.
 
 Argument ID-HERE is the ID of the subtree where this function is
@@ -202,6 +219,16 @@ process does not have to load org.el."
       (forward-line 1))
     res))
 
+
+;;; Main
+
+(defvar org-node-worker--result-missing-files nil)
+(defvar org-node-worker--result-found-nodes nil)
+(defvar org-node-worker--result-mtimes nil)
+(defvar org-node-worker--result-found-id-links nil)
+(defvar org-node-worker--result-found-reflinks nil)
+(defvar org-node-worker--result-found-citations nil)
+
 (defun org-node-worker--collect-dangerously ()
   "Dangerous!  Assumes the current buffer is a temp buffer!
 
@@ -226,7 +253,7 @@ list, and write results to another temp file."
         ;; Assigned on every iteration, so may as well let-bind once, hopefully
         ;; producing less garbage.  Not sure how elisp works... but profiling
         ;; shows a speedup.
-        POS HERE FAR OUTLINE-DATA MTIME
+        HEADING-POS HERE FAR END OUTLINE-DATA MTIME OLP-WITH-SELF ID-HERE
         TITLE FILE-TITLE FILE-TITLE-OR-BASENAME
         TODO-STATE TODO-RE FILE-TODO-SETTINGS
         TAGS FILE-TAGS ID FILE-ID SCHED DEADLINE OLP PRIORITY LEVEL PROPS)
@@ -243,7 +270,7 @@ list, and write results to another temp file."
             ;; NOTE: Here I used `insert-file-contents-literally' in the past,
             ;; converting each captured substring afterwards with
             ;; `decode-coding-string', but it still made us record wrong values
-            ;; for POS when there was any Unicode in the file.  Instead,
+            ;; for HEADING-POS when there was any Unicode in the file.  Instead,
             ;; setting `$assume-coding-system' and `$file-name-handler-alist'
             ;; regains much of the performance that it had.
             (insert-file-contents FILE)
@@ -295,17 +322,20 @@ list, and write results to another temp file."
               (setq FILE-TITLE-OR-BASENAME
                     (or FILE-TITLE (file-name-nondirectory FILE)))
               (when (setq FILE-ID (cdr (assoc "ID" PROPS)))
-                ;; (push FILE-ID org-node-worker--result-found-ids)
                 ;; Collect links
-                (let ((END (save-excursion
-                             (when (org-node-worker--next-heading)
-                               (1- (point))))))
-                  ;; Don't count org-super-links backlinks as forward links
-                  (when (re-search-forward $backlink-drawer-re END t)
-                    (or (search-forward ":end:" END t)
-                        (error "Couldn't find matching :END: drawer in file %s" FILE)))
-                  (org-node-worker--collect-links-until
-                   END FILE-ID nil $link-re))
+                (setq END (save-excursion
+                            (when (org-node-worker--next-heading)
+                              (1- (point)))))
+                ;; Don't count org-super-links backlinks as forward links
+                (when (re-search-forward $backlink-drawer-re END t)
+                  (or (search-forward ":end:" END t)
+                      (error "Couldn't find matching :END: drawer in file %s" FILE)))
+                (setq HERE (point))
+                (org-node-worker--collect-links-until
+                 END FILE-ID nil $link-re)
+                (goto-char HERE)
+                (org-node-worker--collect-citations-until
+                 END ID-HERE OLP-WITH-SELF)
                 (push (list
                        :title FILE-TITLE-OR-BASENAME ;; Uhm
                        :level 0
@@ -324,14 +354,15 @@ list, and write results to another temp file."
                         (or (cdr (assoc "ROAM_REFS" PROPS)) "")))
                       org-node-worker--result-found-nodes))
 
-              ;; This initial condition supports the special case where
-              ;; the very first line of a file is a heading
+              ;; This initial condition supports the special case where the
+              ;; very first line of a file is a heading, as would be typical of
+              ;; people who null `org-node-make-file-level-nodes'.
               (when (or (looking-at-p "\\*")
                         (org-node-worker--next-heading))
                 ;; Loop over the file's subtrees
                 (while
                     (progn
-                      (setq POS (point))
+                      (setq HEADING-POS (point))
                       (setq LEVEL (skip-chars-forward "*"))
                       (skip-chars-forward " ")
                       (setq HERE (point))
@@ -392,13 +423,17 @@ list, and write results to another temp file."
                                         (+ 1 (point) (skip-chars-forward "^]>\n")))
                                   (goto-char HERE))
                               nil))
-                      (when (or SCHED
-                                DEADLINE
-                                (re-search-forward "[[:space:]]*CLOSED: +" FAR t))
-                        ;; Alright, so there was a planning-line, meaning any
-                        ;; :PROPERTIES: must be on the next line.
-                        (forward-line 1)
-                        (setq FAR (pos-eol)))
+                      (if (or SCHED
+                              DEADLINE
+                              (re-search-forward "[[:space:]]*CLOSED: +" FAR t))
+                          ;; Alright, so there was a planning-line, meaning any
+                          ;; :PROPERTIES: must be on the next line.
+                          (progn
+                            (forward-line 1)
+                            (setq FAR (pos-eol)))
+                        ;; No planning-line, who knows what it is (a new
+                        ;; heading?), return to safety
+                        (goto-char (1+ HEADING-POS)))
                       (setq PROPS
                             (if (re-search-forward "^[[:space:]]*:properties:" FAR t)
                                 (progn
@@ -419,16 +454,16 @@ list, and write results to another temp file."
                                    FILE))
                               nil))
                       (setq ID (cdr (assoc "ID" PROPS)))
-                      (push (list POS TITLE LEVEL ID) OUTLINE-DATA) ;; nil ID allowed
+                      ;; nil ID allowed
+                      (push (list HEADING-POS TITLE LEVEL ID) OUTLINE-DATA)
                       (when ID
-                        ;; (push ID org-node-worker--result-found-ids)
-                        (setq OLP (org-node-worker--pos->olp OUTLINE-DATA POS))
+                        (setq OLP (org-node-worker--pos->olp OUTLINE-DATA HEADING-POS))
                         (push (list
                                :title TITLE
                                :is-subtree t
                                :level LEVEL
                                :id ID
-                               :pos POS
+                               :pos HEADING-POS
                                :tags TAGS
                                :todo TODO-STATE
                                :file-path FILE
@@ -447,28 +482,33 @@ list, and write results to another temp file."
                                 (or (cdr (assoc "ROAM_REFS" PROPS)) "")))
                               org-node-worker--result-found-nodes))
                       ;; Now collect links while we're here!
-                      ;; REVIEW: Oddly, the number of ID-links drops somewhat
-                      ;; when I do a save-restriction and narrow to a subtree
-                      ;; at a time. Why might that be?
-                      (let ((ID-HERE (or ID (org-node-worker--pos->parent-id
-                                             OUTLINE-DATA POS FILE-ID))))
-                        (when ID-HERE
-                          (let ((END (save-excursion
-                                       (when (org-node-worker--next-heading)
-                                         (1- (point)))))
-                                (OLP-WITH-SELF (append OLP (list TITLE))))
-                            ;; Don't count org-super-links backlinks
-                            (when (re-search-forward $backlink-drawer-re END t)
-                              (or (search-forward ":end:" END t)
-                                  (error "Couldn't find matching :END: drawer in file %s at position %d"
-                                         FILE (point))))
-                            (org-node-worker--collect-links-until
-                             END ID-HERE OLP-WITH-SELF $link-re)
-                            ;; Gotcha... also collect links inside the heading, not
-                            ;; just the body text
-                            (goto-char POS)
-                            (org-node-worker--collect-links-until
-                             (pos-eol) ID-HERE OLP-WITH-SELF $link-re))))
+                      (setq ID-HERE (or ID (org-node-worker--pos->parent-id
+                                            OUTLINE-DATA HEADING-POS FILE-ID)))
+                      (when ID-HERE
+                        (setq END (save-excursion
+                                    (when (org-node-worker--next-heading)
+                                      (1- (point)))))
+                        (setq OLP-WITH-SELF (append OLP (list TITLE)))
+                        ;; Don't count org-super-links backlinks
+                        (when (re-search-forward $backlink-drawer-re END t)
+                          (or (search-forward ":end:" END t)
+                              (error "Couldn't find matching :END: drawer in file %s at position %d"
+                                     FILE (point))))
+                        (setq HERE (point))
+                        ;; Gotcha... collect links inside the heading, not
+                        ;; just the body text
+                        (goto-char HEADING-POS)
+                        (org-node-worker--collect-links-until
+                         (pos-eol) ID-HERE OLP-WITH-SELF $link-re)
+                        (goto-char HEADING-POS)
+                        (org-node-worker--collect-citations-until
+                         (pos-eol) ID-HERE OLP-WITH-SELF)
+                        (goto-char HERE)
+                        (org-node-worker--collect-links-until
+                         END ID-HERE OLP-WITH-SELF $link-re)
+                        (goto-char HERE)
+                        (org-node-worker--collect-citations-until
+                         END ID-HERE OLP-WITH-SELF))
                       (org-node-worker--next-heading))))))
 
         (( t error )
@@ -489,7 +529,8 @@ list, and write results to another temp file."
                               org-node-worker--result-mtimes
                               org-node-worker--result-found-nodes
                               org-node-worker--result-found-id-links
-                              org-node-worker--result-found-reflinks))
+                              org-node-worker--result-found-reflinks
+                              org-node-worker--result-found-citations))
        nil
        (org-node-worker--tmpfile "results-%d.eld" i)))))
 

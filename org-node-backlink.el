@@ -60,9 +60,9 @@
   (interactive)
   (org-node-backlink-fix-all 'remove))
 
-(defun org-node-backlink-fix-all (&optional remove)
+(defun org-node-backlink-fix-all (&optional remove?)
   "Add :BACKLINKS: property to all nodes known to `org-id-locations'.
-Optional argument REMOVE t means remove them instead, the same
+Optional argument REMOVE? t means remove them instead, the same
 as the user command \\[org-node-backlink-regret].
 
 Can be quit midway through and resumed later.  With
@@ -81,35 +81,37 @@ Can be quit midway through and resumed later.  With
                                     fill-column))))
     ;; Do 1000 at a time, because Emacs cries about opening too many file
     ;; buffers in one loop
-    (dotimes (_ 1000)
-      (when-let ((file (pop org-node-backlink--files-to-fix)))
-        (message "Adding/updating :BACKLINKS:... (you may quit and resume anytime) (%d) %s"
-                 (cl-incf org-node-backlink--fix-ctr) file)
-        (org-node--with-quick-file-buffer file
-          (org-node-backlink--fix-whole-buffer remove))))
+    (let (;;(coding-system-for-read org-node-perf-assume-coding-system)
+          (file-name-handler-alist nil))
+      (dotimes (_ 1000)
+        (when-let ((file (pop org-node-backlink--files-to-fix)))
+          (message "Adding/updating :BACKLINKS:... (you may quit and resume anytime) (%d) %s"
+                   (cl-incf org-node-backlink--fix-ctr) file)
+          (org-node--with-quick-file-buffer file
+            (org-node-backlink--fix-whole-buffer remove?)))))
     (if org-node-backlink--files-to-fix
         ;; Keep going
-        (run-with-timer 1 nil #'org-node-backlink-fix-all remove)
+        (run-with-timer 1 nil #'org-node-backlink-fix-all remove?)
       ;; Reset
       (setq org-node-backlink--fix-ctr 0))))
 
-(defun org-node-backlink--fix-whole-buffer (&optional remove)
+(defun org-node-backlink--fix-whole-buffer (&optional remove?)
   (save-excursion
     (goto-char (point-min))
     (let ((case-fold-search t))
       (while (re-search-forward "^[[:space:]]*:id: " nil t)
-        (org-node-backlink--fix-subtree-here remove)))))
+        (org-node-backlink--fix-subtree-here remove?)))))
 
-(defun org-node-backlink--fix-subtree-here (&optional remove)
+(defun org-node-backlink--fix-subtree-here (&optional remove?)
   "Assume point is at an :ID: line, after the \":ID:\" substring,
 then update the :BACKLINKS: property in this entry.  With arg
 REMOVE, remove it instead."
-  (if remove
+  (if remove?
       (org-entry-delete nil "BACKLINKS")
     (skip-chars-forward "[:space:]")
     (let* ((id (buffer-substring-no-properties
                 (point) (+ (point) (skip-chars-forward "^ \n"))))
-           (node (gethash id org-nodes)))
+           (node (gethash id org-node--node-by-id)))
       ;; The node may not yet have been scanned by org-node, because it was
       ;; created just now, in a capture buffer which triggered a save hook
       ;; which led us here.  There's probably an async process looking at it
@@ -119,9 +121,10 @@ REMOVE, remove it instead."
       ;; handle-finished-job?
       (when node
         ;; Make the full string to which the :BACKLINKS: property should be set
-        (let* ((reflinks (--keep (gethash it org-node--latent-reflinks)
-                                 (org-node-get-refs node)))
-               (backlinks (gethash id org-node--links))
+        (let* ((reflinks (org-node-get-reflinks node))
+               (backlinks (gethash id org-node--backlinks-by-id))
+               ;; (cites (--keep (gethash it org-node--cites-by-citekey)
+               ;;                (org-node-get-refs node)))
                (combined
                 (thread-last
                   (append reflinks backlinks)
@@ -134,7 +137,7 @@ REMOVE, remove it instead."
                   (--map (org-link-make-string
                           (concat "id:" it)
                           (org-node-get-title
-                           (or (gethash it org-nodes)
+                           (or (gethash it org-node--node-by-id)
                                (error "ID in backlink tables not known to main org-nodes table: %s"
                                       it)))))))
                (links-string (string-join combined "  ")))
@@ -253,15 +256,19 @@ effectively flags all areas where text is added/changed/deleted."
             (type (org-element-property :type elm))
             id file)
         (when (and path type)
+          ;; REVIEW Here is actually interesting space to consider merging
+          ;; some code for backlinks and reflinks by just considering ids
+          ;; themselves as a kind of ref...
           (if (equal "id" type)
               ;; Classic backlink
               (progn
                 (setq id path)
                 (setq file (org-id-find-id-file id)))
             ;; "Reflink"
-            (setq id (gethash (concat type ":" path) org-node--refs))
+            (setq id (gethash (concat type ":" path) org-node--id-by-ref))
             (setq file (ignore-errors
-                         (org-node-get-file-path (gethash id org-nodes)))))
+                         (org-node-get-file-path
+                          (gethash id org-node--node-by-id)))))
           (when (null file)
             (push id org-node-backlink--fails))
           (when (and id file)
@@ -283,24 +290,10 @@ effectively flags all areas where text is added/changed/deleted."
         ;; backlink we just added.  Ditto for node at point, if it hasn't been
         ;; scanned yet.
         (org-node-cache--dirty-ensure-node-known)
-        (advice-add 'after-find-file :before
-                    #'org-node-backlink--explain-imminent-recovery)
-        (org-node--with-quick-file-buffer target-file
-          (when org-node-backlink--proceed
+        (let ((org-node--imminent-recovery-msg
+               "Org-node going to add a backlink to the target of the link you just inserted, but it's likely you will first get a prompt to recover an auto-save file, ready? "))
+          (org-node--with-quick-file-buffer target-file
             (org-node-backlink--add-at target-id src-title src-id)))))))
-
-(defvar org-node-backlink--proceed t)
-
-(defun org-node-backlink--explain-imminent-recovery (&optional _ _ _ after-revert _)
-  (unwind-protect
-      (unless after-revert
-        (when (and (not (and buffer-file-name auto-save-visited-file-name))
-                   (file-newer-than-file-p (or buffer-auto-save-file-name
-                                               (make-auto-save-file-name))
-                                           buffer-file-name))
-          (setq org-node-backlink--proceed
-                (y-or-n-p "Org-node going to add a backlink to the target of the link you just inserted, but it's likely you will first get a prompt to recover an auto-save file, ready? "))))
-    (advice-remove 'after-find-file #'org-node-backlink--explain-imminent-recovery)))
 
 (defun org-node-backlink--add-at (target-id src-title src-id)
   (goto-char (point-min))
@@ -346,7 +339,7 @@ effectively flags all areas where text is added/changed/deleted."
         ;; TODO Placeholder to prevent deleting the just-added backlink when
         ;;      saving the "wrong" buffer first Although
         ;;      `org-node-backlink--fix-rescanned-file-buffers' is a better fix
-        ;; (push (list :src-id src-id) (gethash target-id org-node--links))
+        ;; (push (list :src-id src-id) (gethash target-id org-node--backlinks-by-id))
         ))))
 
 ;; (defun org-node-backlink--fix-rescanned-file-buffers (files)

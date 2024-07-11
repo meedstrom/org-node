@@ -26,6 +26,7 @@ delete too many backlinks on cleanup."
         (add-hook 'org-node-creation-hook #'org-node-cache--dirty-ensure-node-known)
         (add-hook 'org-node-insert-link-hook #'org-node--record-link-at-point)
         (add-hook 'org-roam-post-node-insert-hook #'org-node--record-link-at-point)
+        (add-hook 'completion-at-point-functions #'org-node-complete-at-point)
         (advice-add 'org-insert-link :after #'org-node--record-link-at-point)
         (advice-add 'rename-file :after #'org-node-cache--handle-save)
         (advice-add 'delete-file :after #'org-node-cache--handle-save)
@@ -33,17 +34,18 @@ delete too many backlinks on cleanup."
         (setq org-node-cache--timer
               (run-with-idle-timer 60 t #'org-node-cache--scan-new-or-modified))
         (when (boundp 'org-node-cache-reset-hook)
-          (display-warning 'org-node "Deprecated 2024-06-09: org-node-cache-reset-hook removed, update your initfiles")))
+          (display-warning 'org-node "Deprecated 2024-07-11: org-node-cache-reset-hook removed, update your initfiles")))
     (remove-hook 'after-save-hook #'org-node-cache--handle-save)
     (remove-hook 'org-node-creation-hook #'org-node-cache--dirty-ensure-node-known)
     (remove-hook 'org-node-insert-link-hook #'org-node--record-link-at-point)
     (remove-hook 'org-roam-post-node-insert-hook #'org-node--record-link-at-point)
+    (remove-hook 'completion-at-point-functions #'org-node-complete-at-point)
     (advice-remove 'org-insert-link #'org-node--record-link-at-point)
     (advice-remove 'rename-file #'org-node-cache--handle-save)
     (advice-remove 'delete-file #'org-node-cache--handle-save)))
 
 (defun org-node-cache-ensure (&optional synchronous force)
-  "Ensure that `org-nodes' and other tables are ready for use.
+  "Ensure that `org-node--node-by-id' and other tables are ready for use.
 Specifically, do the following:
 
 - Initialize `org-id-locations' if it is not already.
@@ -55,12 +57,12 @@ needed or already ongoing, block Emacs until it is done.
 
 When SYNCHRONOUS is nil, return immediately and let the caching
 proceed in the background.  As that may take a few seconds, that
-would mean that the `org-nodes' table is probably still outdated
+would mean that the `org-node--node-by-id' table is probably still outdated
 by the time you query it, but that is acceptable in many
 situations such as in an user command since the table is mostly
 correct - and fully correct by the time of the next invocation.
 
-If the `org-nodes' table is currently empty, behave as if
+If the `org-node--node-by-id' table is currently empty, behave as if
 SYNCHRONOUS t, unless SYNCHRONOUS is the symbol `must-async'.
 
 Usually when both arguments are nil, this function no-ops, so it
@@ -68,7 +70,7 @@ is cheap to put at the start of any user command.  It can only
 really interfere with user experience if SYNCHRONOUS t and it
 takes your computer long to finish \\[org-node-reset]."
   (org-node-cache--init-ids)
-  (when (hash-table-empty-p org-nodes)
+  (when (hash-table-empty-p org-node--node-by-id)
     (setq synchronous (if (eq synchronous 'must-async) nil t))
     (setq force t))
   (when force
@@ -79,7 +81,13 @@ takes your computer long to finish \\[org-node-reset]."
     (if org-node-cache-mode
         (message "org-node caching...")
       (message "org-node caching... (Hint: Turn on org-node-cache-mode)"))
-    (mapc #'accept-process-output org-node-cache--processes)))
+    (mapc #'accept-process-output org-node-cache--processes)
+    ;; Just in case... see docstring of `org-node--create'.
+    ;; Not super happy about this edge case
+    (while (member org-node-cache--retry-timer timer-list)
+      (cancel-timer org-node-cache--retry-timer)
+      (funcall (timer--function org-node-cache--retry-timer))
+      (mapc #'accept-process-output org-node-cache--processes))))
 
 (defun org-node-cache--init-ids ()
   (require 'org-id)
@@ -95,9 +103,6 @@ takes your computer long to finish \\[org-node-reset]."
     (when (hash-table-empty-p org-id-locations)
       (org-node--die "org-id-locations empty, try `org-id-update-id-locations' or `org-roam-update-org-id-locations'"))))
 
-(defvar org-node-cache--mtimes (make-hash-table :test #'equal)
-  "Table of files and modification times.")
-
 (defvar org-node-cache--timer (timer-create)
   "Timer for intermittently checking `org-node-extra-id-dirs'
 for new, changed or deleted files.
@@ -109,6 +114,7 @@ rm on the command line instead of using \\[delete-file].")
 ;; 200 ms
 (defun org-node-cache--scan-new-or-modified ()
   "If `org-node-files' finds any new files, arrange to scan them.
+If a file is gone, reset the cache.
 
 It does not hurt to call this often, like at the end of most
 org-node related commands, but it should not be called where the
@@ -120,25 +126,27 @@ This function will detect files that were created or modified
 outside this Emacs instance, so it is a good choice for
 reliability, but when you know a specific file to check, use
 `org-node-cache--scan-targeted' instead, since it is faster by
-not checking all files' mtime."
-  (let ((known-earlier (hash-table-keys org-node-cache--mtimes))
+not needing to compare all file-modification times."
+  (let ((known-earlier (hash-table-keys org-node--mtime-by-file))
         (found-now (org-node-files)))
     (let ((deleted (-difference known-earlier found-now))
           (new-or-modified
-           (cl-loop for file in found-now
-                    as saved-mtime = (gethash file org-node-cache--mtimes)
-                    as mtime = (file-attribute-modification-time
-                                (file-attributes file))
-                    when (or (not saved-mtime)
-                             (not (time-equal-p saved-mtime mtime)))
-                    do (puthash file mtime org-node-cache--mtimes)
-                    and collect file)))
-      (unless (null known-earlier) ;; First time populating the table
+           (cl-loop
+            for file in found-now
+            as saved-mtime = (gethash file org-node--mtime-by-file)
+            as mtime = (file-attribute-modification-time
+                        (file-attributes file))
+            when (or (not saved-mtime)
+                     (not (time-equal-p saved-mtime mtime)))
+            do (puthash file mtime org-node--mtime-by-file)
+            and collect file)))
+      (if (null known-earlier)
+          (org-node-cache--scan-all)
         (if deleted
             (progn
               (org-node--forget-id-locations deleted)
               (dolist (file deleted)
-                (remhash file org-node-cache--mtimes))
+                (remhash file org-node--mtime-by-file))
               (org-node-cache--scan-all))
           (when new-or-modified
             (org-node-cache--scan-targeted new-or-modified)))))))
@@ -162,10 +170,10 @@ advice on `rename-file' or `delete-file'."
       (org-node-cache--scan-targeted (list file)))))
 
 (defun org-node-cache-peek ()
-  "Print some random members of `org-nodes'.
-For reference, see type `org-node-data'."
+  "Print some random members of `org-node--node-by-id'.
+For reference, see type `org-node-get'."
   (interactive)
-  (let ((id-nodes (hash-table-values org-nodes))
+  (let ((id-nodes (hash-table-values org-node--node-by-id))
         (print-length nil))
     (dotimes (_ 3)
       (print '----------------------------)
@@ -202,7 +210,7 @@ eventually and not dropped."
               ;; Timeout subprocess stuck in some infinite loop (eats battery)
               (progn
                 (setq wait-start nil)
-                (message "org-node of processes worked longer than 30 sec, killed")
+                (message "org-node: some processes worked longer than 30 sec, killed")
                 (while-let ((old-process (pop org-node-cache--processes)))
                   (delete-process old-process)))
             ;; Retry soon
@@ -219,7 +227,7 @@ eventually and not dropped."
         ;; Targeted scan of specific files
         (let (new modified)
           (cl-loop for file in file-queue
-                   if (gethash file org-node-cache--mtimes)
+                   if (gethash file org-node--mtime-by-file)
                    do (push file modified)
                    else do (push file new))
           (cond (new
@@ -244,37 +252,52 @@ eventually and not dropped."
 (defvar org-node-cache--start-time nil
   "Timestamp used to measure time it took to rebuild cache.")
 
+(defvar org-node-cache-max-jobs nil
+  "Number of subprocesses to run.
+If left at nil, will be set at runtime to the result of
+`org-node-cache--count-logical-cores'.")
+
+(defun org-node-cache--init-lib ()
+  "Do first-time setup, maybe re-do if world has changed.
+
+Return file path to either .eln or the .elc variant of compiled
+org-node-worker library."
+  (unless org-node-cache-max-jobs
+    (setq org-node-cache-max-jobs (org-node-cache--count-logical-cores)))
+  ;; Compile the user-provided lambdas. Would use native-comp here. but
+  ;; it wrecks customize, and any elegant workaround grows to ~30 LoC.
+  (unless (compiled-function-p org-node-filter-fn)
+    (setq org-node-filter-fn (byte-compile org-node-filter-fn)))
+  (unless (compiled-function-p org-node-format-candidate-fn)
+    (setq org-node-format-candidate-fn (byte-compile org-node-format-candidate-fn)))
+  ;; Compile org-node-worker.el, in case the user's package manager
+  ;; didn't do so already, or local changes have been made.
+  (let* ((file-name-handler-alist nil)
+         (lib (find-library-name "org-node-worker"))
+         (native-path (and (featurep 'native-compile)
+                           (native-comp-available-p)
+                           (require 'comp)
+                           (comp-el-to-eln-filename lib)))
+         (elc-path (org-node-worker--tmpfile "worker.elc")))
+    (mkdir (org-node-worker--tmpfile) t)
+    (if native-path
+        (unless (file-newer-than-file-p native-path lib)
+          (native-compile lib))
+      ;; No native-comp facility, so make an .elc
+      (unless (file-newer-than-file-p elc-path lib)
+        ;; Ensure the .elc won't clutter some source directory
+        (let ((byte-compile-dest-file-function `(lambda (&rest _) ,elc-path)))
+          (byte-compile-file lib))))
+    (or native-path elc-path)))
+
 (defun org-node-cache--scan (files finalizer)
   "Begin async scanning FILES for id-nodes and links.
 
 When finished, run the FINALIZER function to update current
 tables."
-  (let* ((lib (find-library-name "org-node-worker"))
-         (native-path (and (featurep 'native-compile)
-                           (native-comp-available-p)
-                           (require 'comp)
-                           (comp-el-to-eln-filename lib)))
-         (file-name-handler-alist nil)
-         (elc-path (org-node-worker--tmpfile "worker.elc")))
-    (mkdir (org-node-worker--tmpfile) t)
-    ;; Compile org-node-worker.el, in case the user's package manager
-    ;; didn't do so already, or local changes have been made.
-    (if native-path
-        (unless (file-newer-than-file-p native-path lib)
-          (native-compile lib))
-      ;; No native-comp facility, make an .elc
-      (unless (file-newer-than-file-p elc-path lib)
-        ;; Ensure the .elc won't clutter some source directory
-        (let ((byte-compile-dest-file-function `(lambda (&rest _) ,elc-path)))
-          (byte-compile-file lib))))
-    ;; Compile the user-provided lambdas. Would use native-comp here. but
-    ;; it wrecks customize, and any elegant workaround grows to ~30 LoC.
-    (unless (compiled-function-p org-node-filter-fn)
-      (setq org-node-filter-fn (byte-compile org-node-filter-fn)))
-    (unless (compiled-function-p org-node-format-fn)
-      (setq org-node-format-fn (byte-compile org-node-format-fn)))
-
-    ;; Prep for new scan
+  (let ((compiled-lib (org-node-cache--init-lib))
+        (file-name-handler-alist nil))
+    ;; Prep for scan
     (garbage-collect)
     (setq org-node-cache--start-time (current-time))
     (setq org-node-cache--done-ctr 0)
@@ -317,16 +340,16 @@ tables."
                             "backlinks")
                         ":")))))))
 
-    (if org-node--dbg
+    (if org-node--debug
         ;; Special case for debugging; run single-threaded so we can step
         ;; through the org-node-worker.el functions with edebug
         (progn
+          (delete-file (org-node-worker--tmpfile "results-0.eld"))
+          (delete-file (org-node-worker--tmpfile "errors-0.txt"))
           (with-temp-file (org-node-worker--tmpfile "file-list-0.eld")
             (let ((standard-output (current-buffer))
                   (print-length nil))
               (prin1 files)))
-          (delete-file (org-node-worker--tmpfile "results-0.eld"))
-          (delete-file (org-node-worker--tmpfile "errors-0.txt"))
           (setq i 0)
           (when (bound-and-true-p editorconfig-mode)
             (message "Maybe disable editorconfig-mode while debugging"))
@@ -335,9 +358,9 @@ tables."
           (org-node-worker--collect-dangerously)
           (org-node-cache--handle-finished-job 1 finalizer))
 
-      ;; If not debugging, split the work over many Emacs processes
-      (let* ((file-lists (org-node-cache--split-file-list
-                          files org-node-cache--n-cores))
+      ;; If not debugging, split the work over many child processes
+      (let* ((file-lists
+              (org-node--split-into-n-sublists files org-node-cache-max-jobs))
              (n-jobs (length file-lists)))
         (dotimes (i n-jobs)
           (delete-file (org-node-worker--tmpfile "results-%d.eld" i))
@@ -353,14 +376,16 @@ tables."
                  :noquery t
                  :stderr (get-buffer-create org-node-cache--stderr-name)
                  :command
-                 ;; REVIEW does taskset ever make a diff?
+                 ;; REVIEW does taskset ever make a diff?  If not, remove it.
+                 ;; It assumes `org-node-cache-max-jobs' is no more than the
+                 ;; number of actual cores.
                  (append (when (executable-find "taskset")
                            (list "taskset" "-c" (number-to-string i)))
                          (list
                           (file-truename
-                           ;; Ensure the children use the same binary
-                           ;; executable used by this Emacs, so the
-                           ;; compiled bytecode is correct
+                           ;; Ensure the children run the same binary
+                           ;; executable as used by this Emacs, so the
+                           ;; compiled lib is correct for it
                            (expand-file-name invocation-name
                                              invocation-directory))
                           "--quick"
@@ -371,7 +396,7 @@ tables."
                           "--eval" (format "(setq temporary-file-directory \"%s\")"
                                            temporary-file-directory)
                           "--eval" (format "(setq i %d)" i)
-                          "--load" (or native-path elc-path)
+                          "--load" compiled-lib
                           "--funcall" "org-node-worker--collect-dangerously"))
                  :sentinel (lambda (_process _event)
                              (org-node-cache--handle-finished-job
@@ -415,20 +440,22 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
 ;;; Finalizers
 
 (defun org-node-cache--finish-full (results)
-  (clrhash org-nodes)
-  (clrhash org-node-collection)
-  (clrhash org-node--refs)
-  (clrhash org-node--latent-reflinks)
-  (clrhash org-node--links)
-  (-let (((missing-files mtimes nodes id-links reflinks) results))
+  (clrhash org-node--node-by-id)
+  (clrhash org-node--node-by-candidate)
+  (clrhash org-node--id-by-ref)
+  (clrhash org-node--id-by-title)
+  (clrhash org-node--reflinks-by-ref)
+  (clrhash org-node--backlinks-by-id)
+  (-let (((missing-files mtimes nodes id-links reflinks cites) results))
     (org-node--forget-id-locations missing-files)
     (dolist (file missing-files)
-      (remhash file org-node-cache--mtimes))
+      (remhash file org-node--mtime-by-file))
     (dolist (found mtimes)
-      (puthash (car found) (cdr found) org-node-cache--mtimes))
+      (puthash (car found) (cdr found) org-node--mtime-by-file))
     (org-node-cache--record-nodes nodes)
     (org-node-cache--record-id-links id-links)
-    (org-node-cache--record-reflinks reflinks))
+    (org-node-cache--record-reflinks reflinks)
+    (org-node-cache--record-cites cites))
   (org-id-locations-save)
   (org-node-cache--print-elapsed))
 
@@ -436,9 +463,9 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
   (-let (((missing-files mtimes nodes id-links reflinks) results))
     (org-node--forget-id-locations missing-files)
     (dolist (file missing-files)
-      (remhash file org-node-cache--mtimes))
+      (remhash file org-node--mtime-by-file))
     (dolist (found mtimes)
-      (puthash (car found) (cdr found) org-node-cache--mtimes))
+      (puthash (car found) (cdr found) org-node--mtime-by-file))
     (org-node-cache--record-nodes nodes)
     (org-node-cache--record-id-links id-links)
     (org-node-cache--record-reflinks reflinks)
@@ -448,7 +475,7 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
 ;; modification.  Doing so would not be a simple puthash operation, but need
 ;; looping to find all matches of :dest as well as :origin, and that gets slow
 ;; when saving a big file containing 5000 links -- slow enough to annoy users
-;; of `auto-save-visited-mode', anyway.
+;; of `auto-save-visited-mode', at minimum.
 ;;
 ;; Fortunately, our insert-link advices will already record links added during
 ;; normal usage!  What's left is mainly that /deleted/ links will remain in the
@@ -459,9 +486,9 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
     (org-node--forget-id-locations missing-files)
     (org-node-cache--dirty-forget-files missing-files)
     (dolist (file missing-files)
-      (remhash file org-node-cache--mtimes))
+      (remhash file org-node--mtime-by-file))
     (dolist (found mtimes)
-      (puthash (car found) (cdr found) org-node-cache--mtimes))
+      (puthash (car found) (cdr found) org-node--mtime-by-file))
     ;; In case a title was edited
     (org-node-cache--dirty-forget-completions-in (mapcar #'car mtimes))
     (org-node-cache--record-nodes nodes)
@@ -471,32 +498,34 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
 ;;; Record
 
 (defun org-node-cache--record-id-links (links)
-  "Save LINKS to `org-node--links'.
+  "Save LINKS to table `org-node--backlinks-by-id'.
 LINKS plists are demonstrated in source of
 `org-node-worker--collect-links-until'."
   (dolist (link links)
-    (push link
-          (gethash (plist-get link :dest)
-                   org-node--links))))
+    (push link (gethash (plist-get link :dest) org-node--backlinks-by-id))))
 
 (defun org-node-cache--record-reflinks (links)
-  "Save LINKS to `org-node--latent-reflinks'.
+  "Save LINKS to table `org-node--reflinks-by-ref'.
 LINKS plists are demonstrated in source of
 `org-node-worker--collect-links-until'."
   (dolist (link links)
     (push link
           (gethash (concat (plist-get link :type) ":" (plist-get link :dest))
-                   org-node--latent-reflinks))))
+                   org-node--reflinks-by-ref))))
+
+(defun org-node-cache--record-cites (cites)
+  (dolist (cite cites)
+    (push cite (gethash (plist-get cite :key) org-node--cites-by-citekey))))
 
 (defun org-node-cache--record-nodes (node-recipes)
   (mapc #'org-node-cache--record-node node-recipes))
 
 (defun org-node-cache--record-node (node-recipe)
-  "Add a node to `org-nodes' and other tables.
+  "Add a node to `org-node--node-by-id' and other tables.
 
 The input NODE-RECIPE is a list of arguments to pass to
-`make-org-node-data'."
-  (let* ((node (apply #'org-node-data--create node-recipe))
+`org-node--make-obj'."
+  (let* ((node (apply #'org-node--make-obj node-recipe))
          (id (org-node-get-id node))
          (path (org-node-get-file-path node)))
     ;; Share the id location with org-id & do so with a manual `puthash'
@@ -505,20 +534,23 @@ The input NODE-RECIPE is a list of arguments to pass to
     (unless (member path org-id-files)
       (push path org-id-files))
     ;; Register the node
-    (puthash id node org-nodes)
+    (puthash id node org-node--node-by-id)
     (dolist (ref (org-node-get-refs node))
-      (puthash ref id org-node--refs))
-    ;; Filter & format completions
+      (puthash ref id org-node--id-by-ref))
     (when (funcall org-node-filter-fn node)
       (dolist (title (cons (org-node-get-title node)
                            (org-node-get-aliases node)))
-        (puthash title node org-node-collection-unformatted)
-        (puthash (funcall org-node-format-fn node title)
-                 node
-                 org-node-collection))
-      ;; Let ROAM_REFS work as aliases too
+        (let ((collision (gethash title org-node--id-by-title))
+              (cand (funcall org-node-format-candidate-fn node title)))
+          (puthash cand node org-node--node-by-candidate)
+          (puthash title id org-node--id-by-title)
+          (when (and collision org-node-warn-title-collisions)
+            (unless (equal id collision)
+              (message "Two nodes have same name: %s, %s (%s)"
+                       id collision title)))))
+      ;; (yolo) Let ROAM_REFS work as aliases too
       (dolist (ref (org-node-get-refs node))
-        (puthash ref node org-node-collection)))))
+        (puthash ref node org-node--node-by-candidate)))))
 
 
 ;;; "Dirty" functions
@@ -530,24 +562,24 @@ FILES, and remove the corresponding completion candidates."
   (when files
     (org-node-cache--dirty-forget-completions-in files)
     (cl-loop
-     for node being the hash-values of org-nodes
+     for node being the hash-values of org-node--node-by-id
      when (member (org-node-get-file-path node) files)
      collect (org-node-get-id node) into ids
      and append (org-node-get-refs node) into refs
      finally do
      (dolist (ref refs)
-       (remhash ref org-node--refs))
+       (remhash ref org-node--id-by-ref))
      (dolist (id ids)
-       (remhash id org-nodes)))))
+       (remhash id org-node--node-by-id)))))
 
 (defun org-node-cache--dirty-forget-completions-in (files)
   "Remove the completion candidates for all nodes in FILES."
   (when files
     (cl-loop
-     for formatted-title being the hash-keys of org-node-collection
+     for candidate being the hash-keys of org-node--node-by-candidate
      using (hash-values node)
      when (member (org-node-get-file-path node) files)
-     do (remhash formatted-title org-node-collection))))
+     do (remhash candidate org-node--node-by-candidate))))
 
 (defun org-node-cache--dirty-ensure-node-known ()
   "Quick and dirty, works in unsaved buffers.
@@ -555,10 +587,10 @@ FILES, and remove the corresponding completion candidates."
 Not meant to be perfect, but good enough to ensure that the node
 at point will show up among completion candidates and that
 `org-node-backlink-mode' won't autoclean backlinks to here on
-account of it \"not existing\"."
+account of it \"not existing yet\"."
   (let ((id (org-entry-get nil "ID" t))
         (case-fold-search t))
-    (unless (gethash id org-nodes)
+    (unless (gethash id org-node--node-by-id)
       (save-excursion
         (without-restriction
           (goto-char (point-min))
@@ -568,7 +600,7 @@ account of it \"not existing\"."
                 (fpath (abbreviate-file-name (file-truename buffer-file-name)))
                 (ftitle (cadar (org-collect-keywords '("TITLE")))))
             (org-node-cache--record-node
-             (org-node-data--create
+             (list
               :title (or heading ftitle)
               :id id
               :is-subtree (if heading t)
@@ -594,79 +626,29 @@ account of it \"not existing\"."
 
 (defun org-node-cache--print-elapsed ()
   "Print time elapsed since `org-node-cache--start-time'.
-Also report statistics about the content of `org-nodes'.
+Also report statistics about the content of `org-node--node-by-id'.
 
-Currently, the printed message implies that all of `org-nodes'
+Currently, the printed message implies that all of `org-node--node-by-id'
 was collected within the time elapsed, so you should not run this
 function after only a partial scan, as the message would be
 misleading."
   (if (not org-node-cache-mode)
       (message "Scan complete (Hint: Turn on org-node-cache-mode)")
     (let ((n-subtrees (cl-loop
-                       for node being the hash-values of org-nodes
+                       for node being the hash-values of org-node--node-by-id
                        count (org-node-get-is-subtree node)))
           (n-backlinks (length (apply #'append
                                       (hash-table-values
-                                       org-node--links))))
+                                       org-node--backlinks-by-id))))
           (n-reflinks (cl-loop
-                       for ref being the hash-keys of org-node--refs
-                       sum (length (gethash ref org-node--latent-reflinks)))))
+                       for ref being the hash-keys of org-node--id-by-ref
+                       sum (length (gethash ref org-node--reflinks-by-ref)))))
       (message "org-node saw %d files, %d subtrees, %d ID-links, %d reflinks in %.2fs"
                (- (hash-table-count org-nodes) n-subtrees)
                n-subtrees
                n-backlinks
                n-reflinks
                (float-time (time-since org-node-cache--start-time))))))
-
-(defun org-node-cache--split-file-list (files n)
-  "Split FILES into a list of N lists of files.
-
-Take their file-sizes into account, so that a third of those N
-lists are short lists of big files, while the other two-thirds
-are long lists of small files.  The single biggest file will tend
-to be isolated into a list of one member.
-
-Since each sublist is meant to be given to one child process,
-this balancing reduces the risk that one process takes noticably
-longer due to being saddled with a mega-file in addition to the
-average workload."
-  (let ((max-reserved-cores (/ n 3))
-        (biggest 0)
-        big-files small-files lists-of-big-files lists-of-small-files)
-    (setq n (- n max-reserved-cores))
-    (if (= 0 max-reserved-cores)
-        (setq small-files files)
-      ;; Construct a little list BIG-FILES which will definitely have the
-      ;; biggest files as members on top, and some stragglers at the bottom
-      (dolist (file files)
-        (let ((size (file-attribute-size (file-attributes file))))
-          (if size
-              (if (> biggest size)
-                  (push file small-files)
-                (setq biggest size)
-                (push (cons size file) big-files))
-            ;; Couldn't access the file attributes, so the file was probably
-            ;; deleted before we got here
-            (org-node--forget-id-locations (list file)))))
-      ;; Reserve some cores for scanning the biggest files
-      (while (and big-files (> max-reserved-cores (length lists-of-big-files)))
-        (let (sublist)
-          (while (and big-files
-                      (>= biggest
-                          (apply #'+ (caar big-files) (mapcar #'car sublist))))
-            (push (pop big-files) sublist))
-          (push (mapcar #'cdr sublist) lists-of-big-files))))
-    ;; Make lists of the rest
-    (let ((len (/ (length small-files) n)))
-      (dotimes (i n)
-        (let ((sublist (if (= i (- n 1))
-                           ;; Let the last iteration just take what's left
-                           small-files
-                         (prog1 (take len small-files)
-                           (setq small-files (-drop len small-files))))))
-          (when sublist (push sublist lists-of-small-files))))
-      (append lists-of-big-files
-              lists-of-small-files))))
 
 (defun org-node-cache--count-logical-cores ()
   "Return sum of available processor cores, minus 1."
@@ -684,8 +666,6 @@ average workload."
                    (with-temp-buffer
                      (call-process "echo" nil t nil "%NUMBER_OF_PROCESSORS%")
                      (buffer-string)))))))))
-
-(defvar org-node-cache--n-cores (org-node-cache--count-logical-cores))
 
 (provide 'org-node-cache)
 

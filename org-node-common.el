@@ -1,8 +1,7 @@
 ;;; org-node-common.el -*- lexical-binding: t; -*-
 
 ;; TODO The perf-* user options now seem to have almost no effect, there must
-;;      be significant overhead from just running the child processes -
-;;      eliminate it
+;;      be significant overhead on the child processes - eliminate it
 
 (require 'compat)
 (require 'cl-lib)
@@ -34,6 +33,11 @@ Called with one argument: the list of files re-scanned."
   :group 'org-node
   :type 'boolean)
 
+(defcustom org-node-warn-title-collisions t
+  ""
+  :group 'org-node
+  :type 'boolean)
+
 (defcustom org-node-make-file-level-nodes t
   "If t, write a file-level title and property drawer when
 making a new file, otherwise write a more traditional top-level
@@ -44,8 +48,8 @@ This affects the behavior of `org-node-new-file',
 
 If you change your mind about this setting, the Org-roam commands
 `org-roam-promote-entire-buffer' and
-`org-roam-demote-entire-buffer' can help you transition the files
-you have made along the way."
+`org-roam-demote-entire-buffer' can help you detransition the
+files you have made along the way."
   :group 'org-node
   :type 'boolean)
 
@@ -71,8 +75,8 @@ Picking a specific coding system can speed up `org-node-reset',
 sometimes significantly.  Set nil to let Emacs figure it out anew
 on every file.
 
-Modern GNU/Linux and BSD systems almost always encode new files
-as `utf-8-unix'.  On Mac it would be `utf-8-mac'.
+Modern GNU/Linux, BSD and Mac systems almost always encode new
+files as `utf-8-unix'.
 
 On Windows this probably should be nil.  Same if you access your
 files from multiple platforms.
@@ -119,11 +123,14 @@ setting."
 (defcustom org-node-filename-fn #'org-node-slugify-as-url
   "Function taking a #+TITLE and returning a filename.
 
+This is used when you type a new node title, and a file is
+created for you.
+
 Built-in choices:
-- `org-node-slugify-as-url'
+- `org-node-slugify-for-web'
 - `org-node-slugify-like-roam'"
   :group 'org-node
-  :type '(choice
+  :type '(radio
           (function-item org-node-slugify-like-roam)
           (function-item org-node-slugify-as-url)
           function))
@@ -139,18 +146,69 @@ Built-in choices:
 
 If you choose `org-capture' here, configure
 `org-capture-templates' such that some capture templates use
-`org-node-capture-target' as their target, else it is pointless.
+`org-node-capture-target' as their target.
 
 If you wish to write a custom function instead of any of the
-above three choies, know that two variables are set at the time
+above three choices, know that two variables are set at the time
 the function is called: `org-node-proposed-title' and
-`org-node-proposed-id', which you are expected to respect."
+`org-node-proposed-id', which you are expected to use."
   :group 'org-node
-  :type '(choice
+  :type '(radio
           (function-item org-node-new-file)
           (function-item org-node-new-by-roam-capture)
           (function-item org-capture)
           function))
+
+(defcustom org-node-format-candidate-fn
+  #'org-node-format-bare
+  "Function to return a string to represent a given node.
+Affects how selections are displayed during e.g. `org-node-find'.
+
+Called with two arguments: the node data and the title.
+
+The title may in fact be one of the aliases and not the canonical
+title, because the completion builder calls this again for every
+alias.
+
+The node data is an object which form you can observe in examples
+from \\[org-node-cache-peek] and specified in the type
+`org-node-get'."
+  :group 'org-node
+  :type '(radio
+          (function-item org-node-format-with-olp)
+          (function-item org-node-format-bare)
+          function))
+
+(defcustom org-node-filter-fn
+  (lambda (node)
+    (not (assoc "ROAM_EXCLUDE" (org-node-get-properties node))))
+  "Predicate returning t to include a node, or nil to exclude it.
+
+The filtering only has an impact on `org-node--node-by-candidate', which
+forms the basis for completions in the minibuffer, and
+`org-node--id-by-title', used by the in-buffer
+`org-node-complete-at-point'.  In other words, passing nil means
+the user cannot autocomplete to the node, but Lisp code can still
+find it in `org-node--node-by-id'.
+
+This function is applied once for every org-id node found, and
+receives the node data as a single argument: an object which form
+you can observe in examples from \\[org-node-cache-peek] and
+specified in the type `org-node-get' (search with C-h o).
+
+See the following example for a way to filter out nodes with a
+ROAM_EXCLUDE property, or that have any kind of TODO state, or
+are tagged :drill:, or where the full file path contains the word
+\"archive\".
+
+(setq org-node-filter-fn
+      (lambda (node)
+        (and (not (assoc \"ROAM_EXCLUDE\" (org-node-get-properties node)))
+             (not (org-node-get-todo node))
+             (not (string-search \"archive\" (org-node-get-file-path node)))
+             (not (member \"drill\" (org-node-get-tags node))))))"
+  :group 'org-node
+  :type 'function)
 
 (defcustom org-node-insert-link-hook '()
   "Hook run after inserting a link to an Org-ID node.
@@ -176,63 +234,6 @@ especially since the default `org-node-filename-fn' does not put
 a timestamp in the filename."
   :group 'org-node
   :type 'hook)
-
-(defcustom org-node-format-fn
-  (lambda (_node title)
-    title)
-  "Function to return a string to represent a given node.
-Affects how selections are displayed during e.g. `org-node-find'.
-
-Called with two arguments: the node data and the title.
-
-The title may in fact be one of the aliases and not the canonical
-title, because the function runs again for every alias.
-
-The node data is an object which form you can observe in examples
-from \\[org-node-cache-peek] and specified in the type
-`org-node-data' (use C-h o to search for it).
-
-The following example will make the completions display the
-ancestors (outline path) to each node:
-
-(setq org-node-format-fn
-      (lambda (node title)
-        (if-let ((olp (org-node-get-olp node)))
-            (concat (string-join olp \" > \") \" > \" title)
-          title)))"
-  :group 'org-node
-  :type 'function)
-
-(defvaralias 'org-node-format-candidate-fn 'org-node-format-fn)
-
-(defcustom org-node-filter-fn
-  (lambda (node)
-    (not (assoc "ROAM_EXCLUDE" (org-node-get-properties node))))
-  "Predicate returning t to include a node, or nil to exclude it.
-
-This function is applied once for every org-id node found, and
-receives the node data as a single argument: an object which form
-you can observe in examples from \\[org-node-cache-peek] and
-specified in the type `org-node-data' (search with C-h o).
-
-This function is called after fully building the `org-nodes'
-table, so you can even query it for other nodes.  The filtering
-only has an impact on `org-node-collection', which forms the
-basis for completions in the minibuffer.
-
-See the following example for a way to filter out nodes with a
-ROAM_EXCLUDE property, or that have any kind of TODO state, or
-are tagged :drill:, or where the full file path contains the word
-\"archive\".
-
-(setq org-node-filter-fn
-      (lambda (node)
-        (and (not (assoc \"ROAM_EXCLUDE\" (org-node-get-properties node)))
-             (not (org-node-get-todo node))
-             (not (string-search \"archive\" (org-node-get-file-path node)))
-             (not (member \"drill\" (org-node-get-tags node))))))"
-  :group 'org-node
-  :type 'function)
 
 (defcustom org-node-extra-id-dirs (list)
   "Directories in which to search Org files for IDs.
@@ -280,13 +281,34 @@ causing org-id to complain about \"duplicate IDs\".
 For all other \"excludey\" purposes, you probably want to
 configure `org-node-filter-fn' instead.
 
+If you have accidentally added a directory of backup files, try
+\\[org-node-forget-dir].
+
 It is not necessary to exclude backups or autosaves that end in ~
 or # or .bak since `org-node-files' only considers files that end
-in precisely \".org\" anyway."
+in precisely \".org\" or \".org_archive\" anyway."
   :group 'org-node
   :type '(repeat string))
 
 
+;;; Functions & variables
+
+(defun org-node-format-with-olp (node title)
+  "Prepend TITLE with NODE's outline path."
+  (if (org-node-get-is-subtree node)
+      (let ((ancestors (cons (org-node-get-file-title-or-basename node)
+                             (org-node-get-olp node)))
+            (result nil))
+        (dolist (anc ancestors)
+          (push (propertize anc 'face 'completions-annotations) result)
+          (push " > " result))
+        (push title result)
+        (string-join (nreverse result)))
+    title))
+
+(defun org-node-format-bare (_node title)
+  "Return TITLE as-is."
+  title)
 
 (defun org-node--record-link-at-point (id _desc)
   (when (derived-mode-p 'org-mode)
@@ -297,20 +319,30 @@ in precisely \".org\" anyway."
                   :dest id
                   :properties (list :outline (ignore-errors
                                                (org-get-outline-path t))))
-            (gethash id org-node--links)))))
+            (gethash id org-node--backlinks-by-id)))))
 
-;; NOTE Very important macro for the backlink mode because backlink insertion
-;;      opens an Org file, and if that is slow, then every link insertion is.
+;; Wishlist: that `find-file-noselect' (and maybe also `find-file') when called
+;; from Lisp would take an optional argument that explains why the file is
+;; about to be opened, changing the autosave recovery prompt.  In lieu of that,
+;; hack up a gatekeeper prompt.
+(defvar org-node--imminent-recovery-msg
+  "Org-node about to look inside or edit a file, but it's likely you will first get a prompt to recover an auto-save file, ready? "
+  "For use by `org-node--with-quick-file-buffer'.")
+
+;; NOTE Very important macro for the backlink mode, because backlink insertion
+;;      opens an Org file, and if doing that is laggy, then every link
+;;      insertion is laggy.
 (defmacro org-node--with-quick-file-buffer (file &rest body)
   "Pseudo-backport of Emacs 29 `org-with-file-buffer'.
-Also integrates `org-with-wide-buffer' behavior, some
-magic around saving, and tries to open FILE quickly.
+Also integrates `org-with-wide-buffer' behavior, some magic
+around saving, and tries to open FILE quickly i.e. with
+minimal hooks.
 
 In short, if a buffer was visiting FILE, go to that existing
-buffer, else visit FILE in a new buffer, in which case ignore
-`org-mode-hook' and the usual Org startup checks.  With that as
-the current buffer, temporarly `widen' it, execute BODY, then
-restore point.  Finally:
+buffer, else visit FILE in a new buffer, in which case ignore the
+usual Org startup checks.  With that as the current buffer,
+temporarly `widen' it, execute BODY, then restore point.
+Finally:
 
 - If a new buffer had to be opened: save and kill it.  Mandatory
   because buffers opened in the quick way look \"wrong\" as many
@@ -318,33 +350,41 @@ restore point.  Finally:
 - If a buffer had been open: leave it open and leave it unsaved."
   (declare (indent 1) (debug t))
   `(let ((find-file-hook nil)
-         (org-element-use-cache nil) ;; generally safer
+         (org-element-use-cache nil) ;; generally prevents bugs
          (after-save-hook nil)
-         (kill-buffer-hook nil) ;; prevent save-place-mode
+         (kill-buffer-hook nil) ;; inhibit save-place etc
          (before-save-hook nil)
          (org-agenda-files nil)
          (org-inhibit-startup t))
      (let ((was-open (find-buffer-visiting ,file)))
-       (with-current-buffer (or was-open
-                                (delay-mode-hooks
-                                  (find-file-noselect ,file)))
-         (save-excursion
-           (without-restriction
-             ,@body))
-         (unless was-open
-           (when (buffer-modified-p)
-             (let ((save-silently t)
-                   (inhibit-message t))
-               (save-buffer)))
-           (kill-buffer))))))
+       (when (or was-open
+                 (if (file-newer-than-file-p (let ((buffer-file-name ,file))
+                                               (make-auto-save-file-name))
+                                             ,file)
+                     (y-or-n-p org-node--imminent-recovery-msg)
+                   t))
+         (with-current-buffer (or was-open
+                                  (delay-mode-hooks
+                                    (find-file-noselect ,file)))
+           (save-excursion
+             (without-restriction
+               ,@body))
+           (unless was-open
+             (when (buffer-modified-p)
+               (let ((save-silently t)
+                     (inhibit-message t))
+                 (save-buffer)))
+             (kill-buffer)))))))
 
-;; TODO: save 50ms by recording only unabbreviated file names in mem and the
-;; ..mtime-table, and only abbreviating once inside the ..scan fn
+;; REVIEW Maybe save 50ms (of total 200ms) by recording only
+;; unabbreviated file names in mem and the mtimes table, and deferring
+;; abbreviation until the ..scan fn.  FWIW, most of the other 150ms is
+;; `directory-files-recursively', hard to improve.
 (let (mem)
   (defun org-node-files (&optional memoized)
     "List files in `org-id-locations' or `org-node-extra-id-dirs'.
 
-With argument MEMOIZED t, reuse a result from the last time
+With argument MEMOIZED t, reuse the list from the last time
 something called this function, returning instantly."
     (if (and memoized mem)
         mem
@@ -365,14 +405,85 @@ something called this function, returning instantly."
                         ;; Abbreviating because org-id does too
                         collect (abbreviate-file-name file)))))))))
 
-(defvar org-nodes (make-hash-table :test #'equal :size 1000)
-  "Table associating ids with file/subtree data.
-To peek on the contents, try \\[org-node-cache-peek] a few times, which
-can demonstrate the data format.  See also the type `org-node-data'.")
+(defun org-node--split-into-n-sublists (big-list n)
+  "Split BIG-LIST into a list of N sublists.
 
-(defvar org-node-collection (make-hash-table :test #'equal :size 1000)
-  "Filtered `org-nodes', keyed not on ids but formatted titles.
-This allows use with `completing-read'.")
+In the special case where BIG-LIST contains fewer than N
+elements, the return value is just like BIG-LIST except that each
+element is wrapped in its own list."
+  (let ((sublist-length (max 1 (/ (length big-list) n)))
+        result)
+    (dotimes (i n)
+      (if (= i (1- n))
+          ;; Let the last iteration just take what's left
+          (push big-list result)
+        (push (take sublist-length big-list) result)
+        (setq big-list (nthcdr sublist-length big-list))))
+    (delq nil result)))
+
+(defvar org-node--node-by-id (make-hash-table :test #'equal)
+  "1:1 table mapping ids to nodes.
+To peek on the contents, try \\[org-node-cache-peek] a few times, which
+can demonstrate the data format.  See also the type `org-node-get'.")
+
+(defvaralias 'org-nodes 'org-node--node-by-id)
+
+(defvar org-node--node-by-candidate (make-hash-table :test #'equal)
+  "1:1 table mapping completion candidates to nodes.")
+
+(defvar org-node--mtime-by-file (make-hash-table :test #'equal)
+  "1:1 table mapping files to modification times.")
+
+(defvar org-node--id-by-title (make-hash-table :test #'equal)
+  "1:1 table mapping raw titles (and ROAM_ALIASES) to IDs.")
+
+(defvar org-node--id-by-ref (make-hash-table :test #'equal)
+  "1:1 table mapping ROAM_REFS members to the adjacent ID.")
+
+(defvar org-node--backlinks-by-id (make-hash-table :test #'equal)
+  "1:N table of ID-links.
+
+(defvar org-node--affixation-by-candidate (make-hash-table :test #'equal))
+
+The table keys are destination IDs, and the corresponding table
+value is a list of plists describing each link, including naming
+the ID-node where the link originated.")
+
+;; REVIEW May have to look over the naming... "ref" has come to mean any link
+;; matching `org-link-plain-re' that isn't of type "id", end of story.  Under
+;; that definition, a citation @key is not a ref, which is surprising.
+(defvar org-node--reflinks-by-ref (make-hash-table :test #'equal)
+  "1:N table mapping refs to latent reflinks.
+
+The table keys are \"refs\" i.e. plain URI strings such as web
+addresses or \"file:\" links, and the table values are lists
+holding a plist for each place where that URI was found.
+
+To see how these plists look, see source of
+`org-node-worker--collect-links-until'.
+
+In truth, passing this table to `hash-table-keys' will get you a
+grand list of all (non-ID) links found in any node anywhere,
+whether or not a node exists with a corresponding ROAM_REFS
+property.
+
+To know whether one of these \"latent\" reflinks has a node
+actually referencing it, check for the the same ref in
+`org-node--id-by-ref'.  Or use the convenience wrapper
+`org-node-get-reflinks' if suitable.")
+
+(defvar org-node--cites-by-citekey (make-hash-table :test #'equal)
+  "1:N table mapping @citekeys to latent citations.
+For explanation of \"latent\", see `org-node--reflinks-by-ref'.")
+
+(defun org-node-get-reflinks (node)
+  "Get list of reflinks pointing to NODE."
+  (cl-loop for ref in (org-node-get-refs node)
+           append (gethash ref org-node--reflinks-by-ref)))
+
+(defun org-node-get-backlinks (node)
+  "Get list of ID-links pointing to NODE."
+  (gethash (org-node-get-id node) org-node--backlinks-by-id))
 
 (defun org-node--forget-id-locations (files)
   "Remove references to FILES in `org-id-locations'.
@@ -389,7 +500,7 @@ calling `org-id-locations-save', which this function does not do."
   "Like `error' but make sure the user sees it.
 Useful because not everyone has `debug-on-error' t, and then
 errors are very easy to miss."
-  (let ((err-string (apply #'format format-string args)))
+  (let ((err-string (apply #'format-message format-string args)))
     (display-warning 'org-node err-string :error)
     (error "%s" err-string)))
 
@@ -398,14 +509,17 @@ errors are very easy to miss."
 (defun org-node--root-dirs (file-list)
   "Given FILE-LIST, infer the most base root directories.
 
-In many cases, if FILE-LIST is the `hash-table-values' of
-`org-id-locations', this function will spit out a list of one
-item because many people keep their Org files in one root
+If FILE-LIST is the `hash-table-values' of `org-id-locations',
+this function will in many cases spit out a list of one item
+because many people keep their Org files in one root
 directory (with various subdirectories).
 
 If it finds more than one root, it sorts by count of files they
 contain, so that the most populous root directory will be the
-first element."
+first element.
+
+FILE-LIST must be a list of full paths.  This function does not
+consult the filesystem, just compares substrings to each other."
   (let* ((files (-uniq file-list))
          (directories (-uniq (mapcar #'file-name-directory files))))
     ;; Example: if there is /home/roam/courses/Math1A/, but ancestor dir
@@ -433,61 +547,35 @@ first element."
            '(auto-save-visited-mode
              git-auto-commit-mode)))
 
-(defvar org-node--latent-reflinks (make-hash-table :test #'equal :size 1000)
-  "Table of potential reflinks.
-
-The table keys are URIs such as web addresses, and the
-corresponding table value is a list of plists describing each
-ID-node where a link was found to that destination.
-
-The fact that a link is in this table does not mean there is a
-node with a ROAM_REFS matching that same link.  To find that out,
-you'd have to cross-reference with `org-node--refs'.")
-
-(defvar org-node--links (make-hash-table :test #'equal :size 1000)
-  "Table of links with a source ID and destination ID.
-
-The table keys are destination IDs, and the corresponding table
-value is a list of plists describing each ID-node where a link
-was found to that destination.")
-
-(defvar org-node--refs (make-hash-table :test #'equal :size 1000)
-  "Table of ROAM_REFS and the IDs where they can be found.")
-
-(defvar org-node--dbg nil
+(defvar org-node--debug nil
   "Whether to run in a way suitable for debugging.")
+
+(defun org-node--debug-scan-this-file ()
+  (interactive)
+  (when (derived-mode-p 'org-mode)
+    (org-node-cache--scan-targeted (list buffer-file-name))))
+
+(defun org-node--debug-toggle ()
+  (interactive)
+  (setq org-node--debug (not org-node--debug)))
 
 
 ;;; Data structure
 
-;; While I developed the package for my own use, I didn't need a struct.
-;; Plists did fine, but now that it has users... the problem with `plist-get'
-;; is I can never rename any of the data fields.
-;;
-;; If you use `plist-get' to fetch a key that doesn't exist, it just quietly
-;; returns nil, no error, no warning.  (Bad for an API!)  Let's say I want to
-;; deprecate or rename a plist field such as :roam-exclude, then I must hope
-;; everyone reads the news.  By contrast if the getter is a function
-;; `org-node-get-roam-exclude', I can override it so it emits a warning.
-
-(cl-defstruct (org-node-data (:constructor org-node-data--create)
-                             (:copier nil))
-  "An org-node data object holds information about an Org ID
-node.  By the term \"Org ID node\", we mean either a subtree with
+(cl-defstruct (org-node-get (:constructor org-node--make-obj)
+                            (:copier nil))
+  "An org-node object holds information about an Org ID node.
+By the term \"Org ID node\", we mean either a subtree with
 an ID property, or a file with a file-level ID property.  The
 information is stored in slots listed below.
 
-For each slot, there exists an accessor function
+For each slot, there exists a getter function
 \"org-node-get-FIELD\".
 
-For example, the field \"deadline\" has an accessor
+For example, the field \"deadline\" has a getter
 `org-node-get-deadline'.  So you would type
 \"(org-node-get-deadline NODE)\", where NODE is one of the
-elements of the `hash-table-values' of `org-nodes'.
-
-(Technically, there also exists a function alias to
-`org-node-get-deadline', called `org-node-data-deadline', but its
-use is discouraged.)
+elements of the `hash-table-values' of `org-node--node-by-id'.
 
 For real-world usage of these accessors, see examples in the
 documentation of `org-node-filter-fn', the documentation of
@@ -500,90 +588,76 @@ You may be able to find the README by typing:
 or you can visit the homepage:
 
     https://github.com/meedstrom/org-node"
-  (aliases    nil :read-only t :type List_of_strings :documentation
-              "List of ROAM_ALIASES.")
-  (deadline   nil :read-only t :type String :documentation
-              "The DEADLINE state.")
-  (file-path  nil :read-only t :type String :documentation
-              "Full file path.")
-  (file-title nil :read-only t :type String :documentation
-              "The #+title of the file where this node is. May be nil.")
-  (file-title-or-basename nil :read-only t :type String  :documentation
-                          "The title of the file where this node is, or its filename if untitled.")
-  (id         nil :read-only t :type String :documentation
-              "The ID property.")
-  (is-subtree nil :read-only t :type Boolean :documentation
-              "Valued t if it is a subtree, nil if it is a file-level node.")
-  (level      nil :read-only t :type Integer :documentation
-              "Number of stars in the heading. File-level node always 0.")
-  (olp        nil :read-only t :type List_of_strings :documentation
-              "List of ancestor headings to this node.")
-  (pos        nil :read-only t :type Integer :documentation
-              "Char position of the node. File-level node always 1.")
-  (properties nil :read-only t :type Alist :documentation
-              "Alist of properties from the :PROPERTIES: drawer.")
-  (priority nil :read-only t :type String :documentation
-            "Priority such as [#A], as a string.")
-  (refs       nil :read-only t :type List_of_strings :documentation
-              "List of ROAM_REFS.")
-  (scheduled  nil :read-only t :type String :documentation
-              "The SCHEDULED state.")
-  (tags       nil :read-only t :type List_of_strings :documentation
-              "List of tags.")
-  (title      nil :read-only t :type String :documentation
-              "The node's heading, or #+title if it is not a subtree.")
-  (todo       nil :read-only t :type String :documentation
-              "The TODO state."))
-
-;; Make getters called "org-node-get-..." instead of "org-node-data-...".
-;;
-;; It's one letter shorter, and a verb.  Function names read better as verbs,
-;; and while it may not be necessary for a struct accessor, then consider an
-;; accessor like "org-node-data-title": what does this mean?  The title of the
-;; data, or the title of the node?
-;;
-;; Of course it could've been just "org-node-title", which is free of the above
-;; confusion, but has its own issues.  First (1) the package itself is also
-;; called "org-node", so this pollutes the namespace.  When you search for
-;; functions and variables, you're unsure what's related to the struct and
-;; what's not.
-;;
-;; Additionally (2), it's good to distinguish the concept of an ID node
-;; (meaning an Org file, or a heading in an Org file) from the concept of a
-;; metadata object holding info about that ID node.
-(defalias 'org-node-get-aliases    #'org-node-data-aliases)
-(defalias 'org-node-get-deadline   #'org-node-data-deadline)
-(defalias 'org-node-get-file-path  #'org-node-data-file-path)
-(defalias 'org-node-get-file-title #'org-node-data-file-title)
-(defalias 'org-node-get-file-title-or-basename #'org-node-data-file-title-or-basename)
-(defalias 'org-node-get-id         #'org-node-data-id)
-(defalias 'org-node-get-is-subtree #'org-node-data-is-subtree)
-(defalias 'org-node-get-level      #'org-node-data-level)
-(defalias 'org-node-get-olp        #'org-node-data-olp)
-(defalias 'org-node-get-pos        #'org-node-data-pos)
-(defalias 'org-node-get-properties #'org-node-data-properties)
-(defalias 'org-node-get-refs       #'org-node-data-refs)
-(defalias 'org-node-get-scheduled  #'org-node-data-scheduled)
-(defalias 'org-node-get-tags       #'org-node-data-tags)
-(defalias 'org-node-get-title      #'org-node-data-title)
-(defalias 'org-node-get-todo       #'org-node-data-todo)
-
+  (aliases    nil :read-only t :type list :documentation
+              "Returns list of ROAM_ALIASES registered on the node.")
+  (deadline   nil :read-only t :type string :documentation
+              "Returns node's DEADLINE state.")
+  (file-path  nil :read-only t :type string :documentation
+              "Returns node's full file path.")
+  (file-title nil :read-only t :type string :documentation
+              "Returns the #+title of the file where this node is. May be nil.")
+  (file-title-or-basename nil :read-only t :type string  :documentation
+                          "Returns the title of the file where this node is, or its filename if untitled.")
+  (id         nil :read-only t :type string :documentation
+              "Returns node's ID property.")
+  (is-subtree nil :read-only t :type boolean :documentation
+              "Returns t if node is a subtree, nil if it is file-level.")
+  (level      nil :read-only t :type integer :documentation
+              "Returns number of stars in the node heading. File-level node always 0.")
+  (olp        nil :read-only t :type list :documentation
+              "Returns list of ancestor headings to this node.")
+  (pos        nil :read-only t :type integer :documentation
+              "Returns char position of the node. File-level node always 1.")
+  (properties nil :read-only t :type alist :documentation
+              "Returns alist of properties from the :PROPERTIES: drawer.")
+  (priority   nil :read-only t :type string :documentation
+              "Returns priority such as [#A], as a string.")
+  (refs       nil :read-only t :type list :documentation
+              "Returns list of ROAM_REFS registered on the node.")
+  (scheduled  nil :read-only t :type string :documentation
+              "Returns node's SCHEDULED state.")
+  (tags       nil :read-only t :type list :documentation
+              "Returns list of tags local to the node.")
+  (title      nil :read-only t :type string :documentation
+              "Returns the node's heading, or #+title if it is not a subtree.")
+  (todo       nil :read-only t :type string :documentation
+              "Returns node's TODO state."))
 
 
 ;;; Obsoletions
 
-(define-obsolete-variable-alias
-  'org-node-slug-fn 'org-node-filename-fn "2024-06-08")
+;; 2024-07-11
+(defun org-node-aliases    (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-aliases,     update to org-node-get-aliases   " 78)))
+(defun org-node-deadline   (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-deadline,    update to org-node-get-deadline  " 78)))
+(defun org-node-file-path  (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-file-path,   update to org-node-get-file-path " 78)))
+(defun org-node-file-title (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-file-title,  update to org-node-get-file-title" 78)))
+(defun org-node-is-subtree (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-is-subtree,  update to org-node-get-is-subtree" 78)))
+(defun org-node-id         (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-id,          update to org-node-get-id        " 78)))
+(defun org-node-level      (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-level,       update to org-node-get-level     " 78)))
+(defun org-node-olp        (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-olp,         update to org-node-get-olp       " 78)))
+(defun org-node-pos        (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-pos,         update to org-node-get-pos       " 78)))
+(defun org-node-properties (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-properties,  update to org-node-get-properties" 78)))
+(defun org-node-refs       (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-refs,        update to org-node-get-refs      " 78)))
+(defun org-node-scheduled  (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-scheduled,   update to org-node-get-scheduled " 78)))
+(defun org-node-tags       (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-tags,        update to org-node-get-tags      " 78)))
+(defun org-node-title      (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-title,       update to org-node-get-title     " 78)))
+(defun org-node-todo       (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-todo,        update to org-node-get-todo      " 78)))
 
 (define-obsolete-variable-alias
-  'org-node-cache-rescan-file-hook 'org-node-rescan-hook "2024-06-07")
+  'org-node-collection 'org-node--node-by-candidate "2024-07-11")
 
-;; 2024-06-07
+(define-obsolete-variable-alias
+  'org-node-slug-fn 'org-node-filename-fn "2024-07-11")
+
+(define-obsolete-variable-alias
+  'org-node-cache-rescan-file-hook 'org-node-rescan-hook "2024-07-11")
+
+;; 2024-07-11
 (add-hook 'org-node-rescan-hook #'org-node--deprecate-rescan-hook-old-usage)
 (defun org-node--deprecate-rescan-hook-old-usage (&optional files)
   "Emit a warning for deprecated usage."
   (when (null files)
-    (display-warning 'org-node (string-fill "\nBreaking change: The hook `org-node-cache-rescan-file-hook' is no longer called with any specific buffer current, and instead passes the list of files scanned (one argument, not zero), and is renamed to `org-node-rescan-hook'" 78))))
+    (display-warning 'org-node (string-fill "\nBreaking change: The hook `org-node-cache-rescan-file-hook' is renamed to `org-node-rescan-hook', and is no longer called with any specific buffer current, and instead passes the list of files scanned (one argument, not zero)" 78))))
 
 (provide 'org-node-common)
 

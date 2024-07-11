@@ -27,43 +27,43 @@
 
 ;;; Code:
 
-;; TODO What happens when user manually moves a subtree to a different file
-;;      then saves the destination before saving the origin file?
-;;      - The nodes table would be correct, but maybe not completion collection
-;; TODO Annotations for completion? Completion categories? https://github.com/alphapapa/org-ql/issues/299
+;; TODO What happens when user manually moves a subtree to a different
+;;      already-known file then saves the destination before saving the origin
+;;      file?
+;;      - The nodes and candidates would be correct, I think, but
+;;        not links...
+;; TODO Workflow to allow effectively untitled nodes
 
 (require 'org-node-common)
 (require 'org-node-cache)
 (require 'org-node-backlink)
 (require 'org-node-roam)
 
+(define-obsolete-variable-alias
+  'org-node-slugify-as-url 'org-node-slugify-for-web "2024-07-11")
+
 
 ;;; API not used inside this package
 
 (defun org-node-at-point ()
-  "Return the ID-node at point.
-This may refer to the current heading, else an ancestor heading,
-else the file-level node, whichever has an ID."
-  (gethash (org-entry-get nil "ID" t) org-nodes))
+  "Return the ID-node point is under.
+This may refer to the current Org heading, else an ancestor
+heading, else the file-level node, whichever has an ID first."
+  (gethash (org-entry-get nil "ID" t) org-node--node-by-id))
 
 (defun org-node-read ()
-  "Prompt for a known node."
-  (gethash (completing-read "Node: " org-node-collection
+  "Prompt for a known ID-node."
+  (gethash (completing-read "Node: " org-node--node-by-candidate
                             () () () 'org-node-hist)
-           org-node-collection))
-
-(defun org-node-get-reflinks (node)
-  (cl-loop for ref in (org-node-get-refs node)
-           append (gethash ref org-node--latent-reflinks)))
-
-(defun org-node-get-backlinks (node)
-  (gethash (org-node-get-id node) org-node--links))
+           org-node--node-by-candidate))
 
 
 ;;; Plumbing
 
 (defvar org-node-hist nil
   "Minibuffer history.")
+
+(put 'org-node-hist 'history-length 1000)
 
 (defun org-node-guess-or-ask-dir (prompt)
   "Maybe prompt for a directory, and if so, show string PROMPT.
@@ -89,7 +89,7 @@ Behavior depends on the user option `org-node-ask-directory'."
           (org-roam-node-slug (org-roam-node-create :title title))
           ".org"))
 
-(defun org-node-slugify-as-url (title)
+(defun org-node-slugify-for-web (title)
   "From TITLE, make a filename that looks nice as URL component.
 
 A title like \"Löb's Theorem\" becomes \"lobs-theorem.org\".
@@ -149,12 +149,11 @@ Applying the above to \"Löb's Theorem\" results in something like
 When writing custom code, you should not assume anything about
 which buffer will be current afterwards, since it depends on
 `org-node-creation-fn' and whether TITLE or ID already existed.
-
 To visit a node after creation, write:
 
     (org-node--create TITLE ID)
     (org-node-cache-ensure t)
-    (let ((node (gethash ID org-nodes)))
+    (let ((node (gethash ID org-node--node-by-id)))
       (if node (org-node--goto node)))"
   (setq org-node-proposed-title title)
   (setq org-node-proposed-id id)
@@ -178,7 +177,8 @@ To visit a node after creation, write:
               (widen)
               (goto-char (org-node-get-pos node))
               (when (org-node-get-is-subtree node)
-                (org-fold-show-context)))
+                (org-fold-show-context)
+                (org-fold-show-entry)))
           (message "This node's file is missing, re-scanning all dirs...")
           (org-node-cache--scan-all)))
     (error "Tried to visit node not known")))
@@ -218,9 +218,9 @@ type the name of a node that does not exist.  That enables this
           (setq id org-node-proposed-id))
       ;; Was called from `org-capture', which means the user has not yet typed
       ;; the title; let them type it now
-      (let ((input (completing-read "Node: " org-node-collection
+      (let ((input (completing-read "Node: " org-node--node-by-candidate
                                     () () () 'org-node-hist)))
-        (setq node (gethash input org-node-collection))
+        (setq node (gethash input org-node--node-by-candidate))
         (if node
             (progn
               (setq title (org-node-get-title node))
@@ -330,9 +330,9 @@ To behave like `org-roam-node-find' when creating new nodes, set
 `org-node-creation-fn' to `org-node-new-by-roam-capture'."
   (interactive)
   (org-node-cache-ensure)
-  (let* ((input (completing-read "Node: " org-node-collection
+  (let* ((input (completing-read "Node: " org-node--node-by-candidate
                                  () () () 'org-node-hist))
-         (node (gethash input org-node-collection)))
+         (node (gethash input org-node--node-by-candidate)))
     (if node
         (org-node--goto node)
       (org-node--create input (org-id-new)))))
@@ -362,13 +362,18 @@ Optional argument REGION-AS-INITIAL-INPUT t means behave like
                         (setq end (point))
                         (org-link-display-format
                          (buffer-substring-no-properties beg end))))
-         (input (completing-read "Node: "
-                                 org-node-collection
-                                 nil
-                                 nil
-                                 (if region-as-initial-input region-text nil)
-                                 'org-node-hist))
-         (node (gethash input org-node-collection))
+         (input (completing-read
+                 "Node: "
+                 org-node--node-by-candidate
+                 nil
+                 nil
+                 (if (or region-as-initial-input
+                         (when region-text
+                           (try-completion region-text org-node--id-by-title)))
+                     region-text
+                   nil)
+                 'org-node-hist))
+         (node (gethash input org-node--node-by-candidate))
          (id (if node (org-node-get-id node) (org-id-new)))
          (link-desc (or region-text
                         (and node
@@ -390,15 +395,23 @@ Optional argument REGION-AS-INITIAL-INPUT t means behave like
 (defun org-node-insert-link* ()
   "Insert a link to one of your ID nodes.
 
-Unlike `org-node-insert-link', emulate org-roam and paste any
-selected region text into the minibuffer first.
+Unlike `org-node-insert-link', emulate `org-roam-node-insert' by
+pasting selected region text into the minibuffer.
 
-To behave like org-roam when creating new nodes, set
-`org-node-creation-fn' to `org-node-new-by-roam-capture'.
+That behavivor can be convenient if you tend to want to use the
+selected text as a new node title rather than just linkify it to
+an existing node, for example.  On the other hand if you always
+find yourself erasing the minibuffer, you'll prefer
+`org-node-insert-link'.
 
-If you still find the behavior different, perhaps you had
-something in `org-roam-post-node-insert-hook'.  Configure
-`org-node-insert-link-hook' the same way."
+On the topic of Org-roam emulation, bonus tips:
+
+- To behave like org-roam on node creation, set
+  `org-node-creation-fn' to `org-node-new-by-roam-capture'.
+
+- If you still find the behavior different, perhaps you had
+  something in `org-roam-post-node-insert-hook'.  Configure
+  `org-node-insert-link-hook' the same way."
   (interactive nil org-mode)
   (org-node-insert-link t))
 
@@ -407,11 +420,11 @@ something in `org-roam-post-node-insert-hook'.  Configure
   "Visit a random node."
   (interactive)
   (org-node-cache-ensure)
-  (org-node--goto (nth (random (hash-table-count org-node-collection))
-                       (hash-table-values org-node-collection))))
+  (org-node--goto (nth (random (hash-table-count org-node--node-by-candidate))
+                       (hash-table-values org-node--node-by-candidate))))
 
 (define-obsolete-function-alias
-  #'org-node-random #'org-node-visit-random "2024-07-07")
+  'org-node-random 'org-node-visit-random "2024-07-11")
 
 ;;;###autoload
 (defun org-node-insert-transclusion-as-subtree ()
@@ -431,9 +444,9 @@ adding keywords to the things to exclude:
   (unless (derived-mode-p 'org-mode)
     (error "Only works in org-mode buffers"))
   (org-node-cache-ensure)
-  (let ((node (gethash (completing-read "Node: " org-node-collection
+  (let ((node (gethash (completing-read "Node: " org-node--node-by-candidate
                                         () () () 'org-node-hist)
-                       org-node-collection)))
+                       org-node--node-by-candidate)))
     (let ((id (org-node-get-id node))
           (title (org-node-get-title node))
           (level (or (org-current-level) 0))
@@ -472,9 +485,9 @@ adding keywords to the things to exclude:
   (unless (derived-mode-p 'org-mode)
     (user-error "Only works in org-mode buffers"))
   (org-node-cache-ensure)
-  (let ((node (gethash (completing-read "Node: " org-node-collection
+  (let ((node (gethash (completing-read "Node: " org-node--node-by-candidate
                                         () () () 'org-node-hist)
-                       org-node-collection)))
+                       org-node--node-by-candidate)))
     (let ((id (org-node-get-id node))
           (title (org-node-get-title node))
           (level (or (org-current-level) 0)))
@@ -566,7 +579,7 @@ so it matches the destination's current title."
                              (substring (cadr parts) 0 -2)))
                      (id (when (string-prefix-p "id:" target)
                            (substring target 3)))
-                     (node (gethash id org-nodes))
+                     (node (gethash id org-node--node-by-id))
                      (true-title (when node
                                    (org-node-get-title node)))
                      (answered-yes nil))
@@ -832,7 +845,9 @@ to `org-node-extra-id-dirs-exclude'."
          (files (-difference (org-node-files) org-node--linted))
          (ctr (length org-node--linted))
          (ctrmax (+ (length files) (length org-node--linted)))
-         (entries nil))
+         (entries nil)
+         (coding-system-for-read org-node-perf-assume-coding-system)
+         (file-name-handler-alist nil))
     (with-current-buffer report-buffer
       (when (null files)
         ;; Reset
@@ -946,63 +961,164 @@ write_file(lisp_data, file.path(dirname(tsv), \"feedback-arcs.eld\"))
                (list
                 (cons origin dest)
                 (vector
-                 (list (org-node-get-title (gethash origin org-nodes))
+                 (list (org-node-get-title (gethash origin org-node--node-by-id))
                        'face 'link
                        'action `(lambda (_button)
-                                  (org-node--goto ,(gethash origin org-nodes)))
+                                  (org-node--goto ,(gethash origin org-node--node-by-id)))
                        'follow-link t)
-                 (list (org-node-get-title (gethash dest org-nodes))
+                 (list (org-node-get-title (gethash dest org-node--node-by-id))
                        'face 'link
                        'action `(lambda (_button)
-                                  (org-node--goto ,(gethash dest org-nodes)))
+                                  (org-node--goto ,(gethash dest org-node--node-by-id)))
                        'follow-link t)))))
         (tabulated-list-print))
       (display-buffer (current-buffer)))))
 
 (defun org-node--make-digraph-tsv-string ()
-  "From `org-node--links', generate a list of
+  "From `org-node--backlinks-by-id', generate a list of
 destination-origin pairings, expressed as tab-separated values."
   (concat
    "src\tdest\n"
    (string-join
     (-uniq (cl-loop
-            for dest being the hash-keys of org-node--links
+            for dest being the hash-keys of org-node--backlinks-by-id
             using (hash-values links)
             append (cl-loop
                     for link in links
                     collect (concat dest "\t" (plist-get link :origin)))))
     "\n")))
 
-;; hmmmm uhhhh a variable for this seems maybe unnecessary
-(defcustom org-node-completion-everywhere nil
-  ""
-  :group 'org-node
-  :type 'string)
+;; TODO command to list the coding systems of all files
+;;      to help with `org-node-perf-assume-coding-system'
+;; (defvar org-node--found-systems nil)
+;; (defun org-node-list-file-coding-systems ()
+;;   (dolist (file (take 20 (org-node-files)))
+;;     (org-node--with-quick-file-buffer file
+;;       (push buffer-file-coding-system org-node--found-systems)))
+;;   org-node--found-systems)
+
+(define-derived-mode org-node-list-dead-links-mode tabulated-list-mode
+  "Dead Links"
+  nil
+  (setq tabulated-list-format
+        [("Location" 40 t)
+         ("Unknown ID reference" 40 t)])
+  (tabulated-list-init-header))
+
+(defun org-node-list-dead-links ()
+  (interactive)
+  (let ((dead-links
+         (cl-loop for dest being the hash-keys of org-node--backlinks-by-id
+                  unless (gethash dest org-node--node-by-id)
+                  append (--map (cons dest it)
+                                (gethash dest org-node--backlinks-by-id)))))
+    (message "%d dead links found" (length dead-links))
+    (pop-to-buffer (get-buffer-create "*Dead Links*"))
+    (org-node-list-dead-links-mode)
+    (setq tabulated-list-entries
+          (cl-loop
+           for (dest . link) in dead-links
+           as origin-node = (gethash (plist-get link :origin)
+                                     org-node--node-by-id)
+           if (not (equal dest (plist-get link :dest)))
+           do (error "IDs not equal: %s, %s" dest (plist-get link :dest))
+           else if (not origin-node)
+           do (error "Node not found for ID: %s" (plist-get link :origin))
+           else
+           collect (list link
+                         (vector
+                          (list (org-node-get-title origin-node)
+                                'face 'link
+                                'action `(lambda (_button)
+                                           (org-node--goto ,origin-node)
+                                           (goto-char ,(plist-get link :pos)))
+                                'follow-link t)
+                          dest))))
+    (tabulated-list-print)))
+
+
+;;; Misc
+
+(defun org-node-try-visit-ref-node ()
+  "Designed for `org-open-at-point-functions'.
+
+For the link at point, if there exists an org-ID node that has
+the link in its ROAM_REFS property, visit that node rather than
+following the link normally.
+
+If already visiting that node, then follow the link normally."
+  (let* ((url (thing-at-point 'url))
+         (found (cl-loop for node being the hash-values of org-nodes
+                         when (member url (org-node-get-refs node))
+                         return node)))
+    (if (and found
+             ;; check that point is not already in the ref node (if so, better
+             ;; to fallback to default `org-open-at-point' logic)
+             (not (and (derived-mode-p 'org-mode)
+                       (equal (org-entry-get nil "ID" t)
+                              (org-node-get-id found)))))
+        (always (org-node--goto found))
+      nil)))
+
+
+;;; CAPF (Completion-At-Point Function)
+
+(defun org-node-enable-capf ()
+  "Use `org-node-complete-at-point' in all Org buffers.
+Also turn off org-roam's CAPF, if present.
+
+Reverse the effect with \\[org-node-disable-capf]."
+  (interactive)
+  (add-hook 'org-mode-hook #'org-node--install-capf-in-buffer)
+  (dolist (buf (org-buffer-list))
+    (with-current-buffer buf
+      (add-hook 'completion-at-point-functions
+                #'org-node-complete-at-point nil t)
+      (when (bound-and-true-p org-roam-completion-everywhere)
+        (dolist (f org-roam-completion-functions)
+          (remove-hook 'completion-at-point-functions f nil t)))))
+  (when (bound-and-true-p org-roam-completion-everywhere)
+    (remove-hook 'org-roam-find-file-hook
+                 'org-roam--register-completion-functions-h)))
+
+(defun org-node-disable-capf ()
+  "Stop using `org-node-complete-at-point' in all Org buffers."
+  (interactive)
+  (remove-hook 'org-mode-hook #'org-node--install-capf-in-buffer)
+  (dolist (buf (org-buffer-list))
+    (with-current-buffer buf
+      (remove-hook 'completion-at-point-functions
+                   #'org-node-complete-at-point t)
+      (when (bound-and-true-p org-roam-completion-everywhere)
+        (require 'org-roam)
+        (when (org-roam-file-p)
+          (dolist (f org-roam-completion-functions)
+            (add-hook 'completion-at-point-functions f nil t))))))
+  (when (bound-and-true-p org-roam-completion-everywhere)
+    (add-hook 'org-roam-find-file-hook
+              'org-roam--register-completion-functions-h)))
+
+(defun org-node--install-capf-in-buffer ()
+  (add-hook 'completion-at-point-functions #'org-node-complete-at-point nil t))
 
 (defun org-node-complete-at-point ()
-  (when (and ;; org-node-completion-everywhere
-         (derived-mode-p 'org-mode)
-         (thing-at-point 'word)
+  "Complete word at point to any known node title, and linkify.
+Designed for `completion-at-point-functions', which see."
+  (let ((bounds (bounds-of-thing-at-point 'word)))
+    (and bounds
          (not (org-in-src-block-p))
-         (not (save-match-data (org-in-regexp org-link-any-re))))
-    (let ((bounds (bounds-of-thing-at-point 'word)))
-      (list (car bounds)
-            (cdr bounds)
-            (hash-table-keys org-node-collection-actually-links)
-            :exit-function
-            (lambda (text _)
-              (message "BOCA BOCA BOCA %s" text)
-              (let ((node (gethash text org-node-collection-actually-links)))
-                (when node
-                  (atomic-change-group
-                    (delete-char (- (length text)))
-                    (insert (org-link-make-string
-                             (concat "id:" (org-node-get-id node))
-                             text))))))
-            :exclusive 'no
-            ))))
-
-;;(add-hook 'completion-at-point-functions #'org-node-complete-at-point)
+         (not (save-match-data (org-in-regexp org-link-any-re)))
+         (list (car bounds)
+               (cdr bounds)
+               org-node--id-by-title
+               :exclusive 'no
+               :exit-function
+               (lambda (text _)
+                 (when-let ((id (gethash text org-node--id-by-title)))
+                   (atomic-change-group
+                     (delete-char (- (length text)))
+                     (insert (org-link-make-string
+                              (concat "id:" id) text)))))))))
 
 (provide 'org-node)
 

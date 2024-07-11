@@ -5,27 +5,67 @@
 (require 'ol)
 
 (define-obsolete-function-alias
-  'org-node--convert-to-roam 'org-node-roam--fab-node "2024-06-07")
+  'org-node--convert-to-roam 'org-node-roam--make-fake "2024-07-11")
 
 (define-obsolete-function-alias
-  'org-node--fabricate-roam-backlinks 'org-node-roam-fab-backlinks "2024-06-07")
+  'org-node--fabricate-roam-backlinks 'org-node-roam--make-backlinks "2024-07-11")
 
 (define-obsolete-function-alias
-  'org-node--fabricate-roam-reflinks 'org-node-roam-fab-reflinks "2024-06-07")
+  'org-node--fabricate-roam-reflinks 'org-node-roam--make-reflinks "2024-07-11")
 
 (define-obsolete-function-alias
-  'org-node-feed-file-to-roam-db 'org-node-roam-db-feed "2024-06-07")
+  'org-node-feed-roam-db 'org-node-roam-db-reset "2024-07-11")
 
-(define-obsolete-function-alias
-  'org-node-feed-roam-db 'org-node-roam-db-reset "2024-06-07")
+(let (warned-once)
+  (defun org-node-feed-file-to-roam-db (&optional files)
+    (unless warned-once
+      (setq warned-once t)
+      (display-warning 'org-node "Deprecated function `org-node-feed-file-to-roam-db', use `org-node-roam-db-shim-mode' instead"))
+    (org-node-roam-db-feed files)))
+
+(defun org-node-roam-enable-redisplay ()
+  "Make the roam buffer react when point moves in any Org buffer.
+
+Normally, `org-roam-db-autosync-mode' sets this up for you - this
+exists for people who turn that off.
+
+Revert with `org-node-roam-disable-redisplay'."
+  (interactive)
+  (require 'org-roam)
+  (dolist (buf (org-buffer-list))
+    (with-current-buffer buf
+      (add-hook 'post-command-hook #'org-roam-buffer--redisplay-h nil t)))
+  (add-hook 'org-mode-hook #'org-roam-buffer--setup-redisplay-h))
+
+(defun org-node-roam-disable-redisplay ()
+  "Stop the roam buffer's responsiveness."
+  (interactive)
+  (dolist (buf (org-buffer-list))
+    (with-current-buffer buf
+      (remove-hook 'post-command-hook #'org-roam-buffer--redisplay-h t)))
+  (remove-hook 'org-mode-hook #'org-roam-buffer--setup-redisplay-h))
 
 ;;; Method 1: Fake roam backlinks, no SQLite
 
-;; To make M-x org-roam-buffer-toggle work without a DB, eval these:
-;; (advice-add 'org-roam-backlinks-get :override #'org-node-roam-fab-backlinks)
-;; (advice-add 'org-roam-reflinks-get :override #'org-node-roam-fab-reflinks)
+(define-minor-mode org-node-roam-no-sql-mode
+  "Instruct org-roam to consult `org-roam-backlink-p' objects faked
+by org-node so that you can use \\[org-roam-buffer-toggle]
+without syncing org-roam's SQL database nor having SQLite
+installed."
+  :global t
+  (require 'org-roam)
+  (if org-node-roam-no-sql-mode
+      (progn
+        (unless org-node-cache-mode
+          (message "`org-node-roam-no-sql-mode' will do nothing without `org-node-cache-mode'"))
+        (advice-add 'org-roam-backlinks-get :override
+                    #'org-node-roam--make-backlinks)
+        (advice-add 'org-roam-reflinks-get :override
+                    #'org-node-roam--make-reflinks))
+    (advice-remove 'org-roam-backlinks-get #'org-node-roam--make-backlinks)
+    (advice-remove 'org-roam-reflinks-get #'org-node-roam--make-reflinks)))
 
-(defun org-node-roam--fab-node (node)
+(defun org-node-roam--make-fake (node)
   "Make a knockoff org-roam-node object from org-node node NODE."
   (require 'org-roam)
   (org-roam-node-create
@@ -52,58 +92,98 @@
 
 
 ;; Eval to see examples of what it has to work with...
-;; (seq-random-elt (hash-table-keys org-node--links))
-;; (seq-random-elt (hash-table-values org-node--links))
+;; (seq-random-elt (hash-table-keys org-node--backlinks-by-id))
+;; (seq-random-elt (hash-table-values org-node--backlinks-by-id))
 
-(defun org-node-roam-fab-backlinks (target-roam-node &rest _)
+(defun org-node-roam--make-backlinks (target-roam-node &rest _)
   "Return org-roam-backlink objects targeting TARGET-ROAM-NODE.
 Designed as override advice for `org-roam-backlinks-get'."
   (require 'org-roam)
   (let ((target-id (org-roam-node-id target-roam-node)))
     (when target-id
-      (let ((links (gethash target-id org-node--links))
+      (let ((links (gethash target-id org-node--backlinks-by-id))
             ;; TODO: this probs necessary, but verify in org-roam-buffer becsue
             ;; i expect we see duplicates, and if not, why not?
-            ;; (links (delete-dups (gethash target-id org-node--links)))
+            ;; (links (delete-dups (gethash target-id org-node--backlinks-by-id)))
             ))
       (cl-loop
        for link-data in links
        as src-id = (plist-get link-data :origin)
-       as src-node = (gethash src-id org-nodes)
+       as src-node = (gethash src-id org-node--node-by-id)
        when src-node
        collect (org-roam-backlink-create
                 :target-node target-roam-node
-                :source-node (org-node-roam--fab-node src-node)
+                :source-node (org-node-roam--make-fake src-node)
                 :point (plist-get link-data :pos)
                 :properties (plist-get link-data :properties))))))
 
 ;; Eval to see examples of what it has to work with...
-;; (seq-random-elt (hash-table-keys org-node--latent-reflinks))
-;; (seq-random-elt (hash-table-values org-node--latent-reflinks))
+;; (seq-random-elt (hash-table-keys org-node--reflinks-by-ref))
+;; (seq-random-elt (hash-table-values org-node--reflinks-by-ref))
 
-(defun org-node-roam-fab-reflinks (target-roam-node &rest _)
+(defun org-node-roam--make-reflinks (target-roam-node &rest _)
   "Return org-roam-reflink objects targeting TARGET-ROAM-NODE.
 Designed as override advice for `org-roam-reflinks-get'."
   (require 'org-roam)
   (let* ((target-id (org-roam-node-id target-roam-node))
-         (node (gethash target-id org-nodes)))
+         (node (gethash target-id org-node--node-by-id)))
     (when node
       (cl-loop
        for ref in (org-node-get-refs node)
        as reflinks = (cl-loop
-                      for link in (gethash ref org-node--latent-reflinks)
+                      for link in (gethash ref org-node--reflinks-by-ref)
                       as src-id = (plist-get link :origin)
-                      as src-node = (gethash src-id org-nodes)
+                      as src-node = (gethash src-id org-node--node-by-id)
                       when src-node
                       collect (org-roam-reflink-create
                                :ref (plist-get link :dest)
-                               :source-node (org-node-roam--fab-node src-node)
+                               :source-node (org-node-roam--make-fake src-node)
                                :point (plist-get link :pos)
                                :properties (plist-get link :properties)))
        when reflinks append reflinks))))
 
 
 ;;; Method 2: feed the DB
+
+(define-minor-mode org-node-roam-db-shim-mode
+  ""
+  :global t
+  (require 'org-roam)
+  (remove-hook 'org-node-rescan-hook 'org-node-feed-file-to-roam-db) ;; deprec
+  (if org-node-roam-db-shim-mode
+      (progn
+        (unless org-node-cache-mode
+          (message "`org-node-roam-db-shim-mode' will do nothing without `org-node-cache-mode'"))
+        (add-hook 'org-node-rescan-hook #'org-node-roam-db-feed))
+    (remove-hook 'org-node-rescan-hook #'org-node-roam-db-feed)))
+
+(defun org-node-roam-db-feed (files)
+  (require 'org-roam)
+  (require 'emacsql)
+  (emacsql-with-transaction (org-roam-db)
+    (cl-loop for node being the hash-values of org-nodes
+             when (member (org-node-get-file-path node) files)
+             do
+             (org-node-roam--db-add-node node)
+             (org-node-roam--db-add-links (org-node-get-id node)))))
+
+(defun org-node-roam-db-reset ()
+  (interactive)
+  (require 'org-roam)
+  (require 'emacsql)
+  (org-roam-db)
+  (org-roam-db-clear-all)
+  (org-roam-db--close)
+  (delete-file org-roam-db-location)
+  (emacsql-with-transaction (org-roam-db)
+    (cl-loop with ctr = 0
+             with max = (hash-table-count org-nodes)
+             for node being the hash-values of org-nodes
+             do (when (= 0 (% (cl-incf ctr) 10))
+                  (message "Inserting into %s... %d/%d"
+                           org-roam-db-location ctr max))
+             (org-node-roam--db-add-node node)
+             (org-node-roam--db-add-links (org-node-get-id node)))))
 
 (defun org-node-roam--ref->list (ref node-id)
   "Code adapted from `org-roam-db-insert-refs'"
@@ -213,8 +293,8 @@ Designed as override advice for `org-roam-reflinks-get'."
          (vector id file-path level pos todo priority
                  scheduled deadline title properties olp))))
     ;; See `org-roam-db-insert-refs'
-    (dolist (ref-link roam-refs)
-      (dolist (individual-ref (org-node-roam--ref->list ref-link id))
+    (dolist (ref-chunk roam-refs)
+      (dolist (individual-ref (org-node-roam--ref->list ref-chunk id))
         (org-roam-db-query [:insert :into refs
                             :values $v1]
                            individual-ref)))
@@ -223,43 +303,18 @@ Designed as override advice for `org-roam-reflinks-get'."
     ))
 
 (defun org-node-roam--db-add-links (target-id)
-  (let ((backlinks (gethash target-id org-node--links)))
-    (dolist (backlink backlinks)
-      ;; See `org-roam-db-insert-link'
-      (org-roam-db-query [:insert :into links
-                          :values $v1]
-                         (vector (plist-get backlink :pos)
-                                 (plist-get backlink :origin)
-                                 target-id
-                                 (plist-get backlink :type)
-                                 (plist-get backlink :properties))))))
-
-(defun org-node-roam-db-reset ()
-  (interactive)
-  (require 'org-roam)
-  (require 'emacsql)
-  (org-roam-db-clear-all)
-  (org-roam-db--close)
-  (delete-file org-roam-db-location)
-  (emacsql-with-transaction (org-roam-db)
-    (cl-loop with ctr = 0
-             with max = (hash-table-count org-nodes)
-             for node being the hash-values of org-nodes
-             do (when (= 0 (% (cl-incf ctr) 10))
-                  (message "Inserting into %s... %d/%d"
-                           org-roam-db-location ctr max))
-             (org-node-roam--db-add-node node)
-             (org-node-roam--db-add-links (org-node-get-id node)))))
-
-(defun org-node-roam-db-feed (&optional files)
-  (require 'org-roam)
-  (require 'emacsql)
-  (emacsql-with-transaction (org-roam-db)
-    (cl-loop for node being the hash-values of org-nodes
-             when (member (org-node-get-file-path node) files)
-             do
-             (org-node-roam--db-add-node node)
-             (org-node-roam--db-add-links (org-node-get-id node)))))
+  "Add ID-links and reflinks pointing to TARGET-ID."
+  ;; See `org-roam-db-insert-link'
+  (dolist (link (append (gethash target-id org-node--backlinks-by-id)
+                        (org-node-get-reflinks
+                         (gethash target-id org-node--node-by-id))))
+    (org-roam-db-query [:insert :into links
+                        :values $v1]
+                       (vector (plist-get link :pos)
+                               (plist-get link :origin)
+                               target-id
+                               (plist-get link :type)
+                               (plist-get link :properties)))))
 
 (provide 'org-node-roam)
 
