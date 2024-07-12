@@ -10,19 +10,19 @@ Version 0.2 in July brought many changes!  *If anything broke for you*, you can 
 #+end_src
 
 New features
+- New mode: =org-node-complete-at-point-mode=
+- New mode: =org-node-roam-redisplay-mode=
 - New mode: =org-node-roam-db-shim-mode=
   - Deprecates advice that was in [[https://github.com/meedstrom/org-node?tab=readme-ov-file#option-1b--tell-org-node-to-write-to-the-org-roam-db][Backlinks Option 1B]]
 - New mode: =org-node-roam-no-sql-mode=
   - Deprecates advice that was in [[https://github.com/meedstrom/org-node?tab=readme-ov-file#option-1c--cut-out-the-db-altogether][Backlinks Option 1C]]
-- New mode: =org-node-roam-redisplay-mode=
-- New mode: =org-node-complete-at-point-mode=
 - New user option: =org-node-prefer-file-level-nodes=
 - New user option: =org-node-warn-title-collisions=
 - New user option: =org-node-affixation-fn=
   - Deprecates old option =org-node-format-candidate-fn=
 - New user option: =org-node-alter-candidates=
 - New command: =org-node-lint-all-files=
-  - Run org-lint on all known files, then report the results.  Use it to fix a broken setup; org-node [[https://github.com/meedstrom/org-node/issues/8#issuecomment-2101316447][assumes all files have correct syntax]].  In particular, malformed PROPERTIES drawers easily cause failure to scan.
+  - Run org-lint on all known files, then report the results.  Use it to fix a broken setup; org-node [[https://github.com/meedstrom/org-node/issues/8#issuecomment-2101316447][assumes all files contain valid Org syntax]].  In particular, malformed PROPERTIES drawers easily break the scan.
 - New command: =org-node-list-dead-links=
 - New command: =org-node-list-feedback-arcs=
 - New command: =org-node-grep=
@@ -30,21 +30,22 @@ New features
 
 Removals
 - Remove user option: =org-node-perf-gc-cons-threshold=
-- Remove user option: =org-node-format-candidate-fn= (in favour of =org-node-affixate-fn=)
+- Remove user option: =org-node-format-candidate-fn= (in favour of =org-node-affixation-fn=)
 - Remove variable: =org-node-cache-reset-hook=
 - Remove variable: =org-node-cache-rescan-file-hook= (in favour of =org-node-rescan-hook=, now called with 1 argument)
 
 Renames
 - Rename command =org-node-random= to =org-node-visit-random=
 - Rename user option =org-node-slug-fn= to =org-node-filename-fn=
-  - Rename function =org-node-slugify-as-url= to =org-node-slugify-for-web=
+- Rename function =org-node-slugify-as-url= to =org-node-slugify-for-web=
 - Rename variable =org-node-collection= to =org-node--node-by-candidate=
 - Rename many private functions and variables
 
 Changes
-- Completions are now "rich" by default -- to revert this, set =(setq org-node-affixate-fn #'org-node-affix-bare)=
+- Completions are now "rich" by default -- to revert this, set =(setq org-node-affixation-fn #'org-node-affix-bare)=
 - Don't automatically turn on cache-mode, just pester the user
 - Command =org-node-put-created= now respects =org-timestamp-formats= instead of just putting the date as [YYYY-MM-DD].
+- Visiting a node will now reveal the surrounding Org context and do =(recenter 0)=.  If you prefer another behavior, redefine =org-node--goto=.
 - Fix: catch some nodes that were missed
 - Fix: the feature of feeding files to the Roam DB (now called =org-node-roam-db-shim-mode=) was subtly broken because it'd trigger the hook before the scan completed, so it'd always be a bit outdated, now fixed.
 - Fix: quickly update completions when a heading was edited, instead of seeing multiple stale candidates
@@ -269,14 +270,14 @@ With that done, the commands =org-node-find= & =org-node-insert-link= can outsou
 
 *** Managing org-id-locations
 
-I find unsatisfactory the config options in org-id (Why? See [[http://edstrom.dev/wjwrl/taking-ownership-of-org-id][Taking ownership of org-id]]), so org-node gives you a new way to feed data to org-id, making sure we won't run into "ID not found" situations.
+I find unsatisfactory the config options in org-id (Why? See [[http://edstrom.dev/wjwrl/taking-ownership-of-org-id][Taking ownership of org-id]]), so org-node gives you an extra way to feed data to org-id, making sure we won't run into "ID not found" situations.
 
 Example setting:
 
 #+begin_src elisp
-(setq org-node-extra-id-dirs '("/home/kept/notes/"
-                               "/home/kept/project1/"
-                               "/home/kept/project2/")
+(setq org-node-extra-id-dirs '("/home/kept/org/"
+                               "/home/me/Dropbox/project2/"
+                               "/mnt/stuff/"))
 #+end_src
 
 
@@ -285,11 +286,11 @@ Example setting:
 # (org-node-complete-at-point-mode)
 # #+end_src
 
-*** Instruct org-open-at-point to visit ref-node if one exists
+*** Instruct org-open-at-point to visit ref
 
-Say you there's a link to a web URL, and you've forgot you have a node listing that exact URL in its =ROAM_REFS= property.
+Say there's a link to a web URL, and you've forgot you also have a node listing that exact URL in its =ROAM_REFS= property.
 
-Would it be nice if, clicking on it, you're automatically sent to that node instead of going on the web?  Here you go:
+Wouldn't it be nice if, clicking on that link, you're automatically sent to that node instead of going on the web?  Here you go:
 
 #+begin_src elisp
 (add-hook 'org-open-at-point-functions #'org-node-try-visit-ref-node)
