@@ -38,6 +38,7 @@ Renames
 - Rename command =org-node-random= to =org-node-visit-random=
 - Rename user option =org-node-slug-fn= to =org-node-filename-fn=
 - Rename function =org-node-slugify-as-url= to =org-node-slugify-for-web=
+- Rename function =org-node-new-by-roam-capture= to =org-node-new-via-roam-capture=
 - Rename variable =org-node-collection= to =org-node--node-by-candidate=
 - Rename many private functions and variables
 
@@ -129,7 +130,7 @@ Add an init snippet like this (assuming [[https://github.com/radian-software/str
 
 ** Quick start
 
-If you're new to these concepts, fear not.  The main things for day-to-day operation are two verbs: "find" and "link".
+If you're new to these concepts, fear not.  The main things for day-to-day operation are two verbs: "find" and "insert link".
 
 Pick some good keys and try them out.
 
@@ -140,18 +141,18 @@ Pick some good keys and try them out.
 
 To browse config options, type =M-x customize-group RET org-node RET=.
 
-Final tip for the newbie: there's no separate command for creating a new node!  Reuse one of the commands above, and type the name of a node that doesn't exist.  Try it and see what happens!
+Final tip for the newbie: there's no separate command for creating a new node!  Reuse one of the commands above... and type the name of a node that doesn't exist.  Try it and see what happens!
 
 ** Use Org-roam at the same time?
 
 These settings help you feel at home using both packages side-by-side:
 
 #+begin_src elisp
-(setq org-node-creation-fn #'org-node-new-by-roam-capture)
+(setq org-node-creation-fn #'org-node-new-via-roam-capture)
 (setq org-node-filename-fn #'org-node-slugify-like-roam)
 #+end_src
 
-If you've been struggling with slow saving of big files in the past, consider these org-roam settings:
+If you've struggled in the past with big files taking a long time to save, consider these org-roam settings:
 
 #+begin_src elisp
 (setq org-roam-db-update-on-save nil) ;; don't update DB on save, not needed
@@ -253,7 +254,7 @@ Example capture templates follow. The secret sauce is =(function org-node-captur
          :immediate-finish t)))
 #+end_src
 
-With that done, the commands =org-node-find= & =org-node-insert-link= can outsource to org-capture when creating new nodes:
+With that done, the commands =org-node-find= & =org-node-insert-link= can also outsource to org-capture when creating new nodes:
 
 #+begin_src elisp
 (setq org-node-creation-fn #'org-capture)
@@ -320,9 +321,9 @@ While the point of IDs is to avoid depending on exact filenames, it's often prag
 *** Limitation: TRAMP
 Working over TRAMP is untested, but I suspect it won't work.  Org-node tries to be very fast, often nulling =file-name-handler-alist=, which TRAMP needs.
 
-If you need TRAMP, use org-roam, which is made to /not/ re-access files or directories so often anyway, in favor of trusting its own DB.
+If you need TRAMP, use org-roam, which is made to /not/ re-access files or directories so often anyway (which would be slow over a network connection), in favor of trusting its own DB.
 
-(Actually, that design caused me no end of problems with out-of-sync DB.  So I'm happy org-node checks the disk files more often.)
+That design caused me no end of problems with out-of-sync DB, so it's a feature that org-node checks the disk files more often, but then it needs to be fast, and here we are.
 
 *** Toolbox
 

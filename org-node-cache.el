@@ -67,8 +67,13 @@ Usually when both arguments are nil, this function no-ops, so it
 is cheap to put at the start of any user command.  It can only
 really interfere with user experience if SYNCHRONOUS t and it
 takes your computer long to finish \\[org-node-reset]."
+  (unless (eq synchronous 'must-async)
+    ;; HACK The warn-function becomes a no-op after the first run, so gotta run
+    ;; it as late as possible in case of late variable settings.  By running it
+    ;; here, we've waited until the user runs a command.
+    (org-node--warn-obsolete-variables))
   (org-node-cache--init-ids)
-  (when (hash-table-empty-p org-node--node-by-id)
+  (when (hash-table-empty-p org-nodes)
     (setq synchronous (if (eq synchronous 'must-async) nil t))
     (setq force t))
   (when force
@@ -185,7 +190,7 @@ For reference, see type `org-node-get'."
   (org-node-cache--try-launch-scan t))
 
 (defun org-node-cache--scan-targeted (files)
-  (org-node-cache--try-launch-scan files))
+  (org-node-cache--try-launch-scan (ensure-list files)))
 
 (defvar org-node-cache--retry-timer (timer-create))
 ;; (defvar org-node-cache--file-queue nil)
@@ -437,24 +442,27 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
 ;;; Finalizers
 
 (defun org-node-cache--finish-full (results)
-  (clrhash org-node--node-by-id)
-  (clrhash org-node--node-by-candidate)
-  (clrhash org-node--id-by-ref)
-  (clrhash org-node--id-by-title)
-  (clrhash org-node--reflinks-by-ref)
-  (clrhash org-node--backlinks-by-id)
-  (-let (((missing-files mtimes nodes id-links reflinks cites) results))
-    (org-node--forget-id-locations missing-files)
-    (dolist (file missing-files)
-      (remhash file org-node--mtime-by-file))
-    (dolist (found mtimes)
-      (puthash (car found) (cdr found) org-node--mtime-by-file))
-    (org-node-cache--record-nodes nodes)
-    (org-node-cache--record-id-links id-links)
-    (org-node-cache--record-reflinks reflinks)
-    (org-node-cache--record-cites cites))
-  (org-id-locations-save)
-  (org-node-cache--print-elapsed))
+  (let ((first-time (hash-table-empty-p org-node--node-by-id)))
+    (clrhash org-node--node-by-id)
+    (clrhash org-node--node-by-candidate)
+    (clrhash org-node--id-by-ref)
+    (clrhash org-node--id-by-title)
+    (clrhash org-node--reflinks-by-ref)
+    (clrhash org-node--backlinks-by-id)
+    (-let (((missing-files mtimes nodes id-links reflinks cites) results))
+      (org-node--forget-id-locations missing-files)
+      (dolist (file missing-files)
+        (remhash file org-node--mtime-by-file))
+      (dolist (found mtimes)
+        (puthash (car found) (cdr found) org-node--mtime-by-file))
+      (org-node-cache--record-nodes nodes)
+      (org-node-cache--record-id-links id-links)
+      (org-node-cache--record-reflinks reflinks)
+      (org-node-cache--record-cites cites))
+    ;; Unnecessary noise at emacs init
+    (unless first-time
+      (org-id-locations-save)
+      (org-node-cache--print-elapsed))))
 
 (defun org-node-cache--finish-new (results)
   (-let (((missing-files mtimes nodes id-links reflinks) results))
@@ -657,6 +665,20 @@ also necessary is `org-node-cache--dirty-ensure-link-known'."
 
 ;;; Etc
 
+;; Experimental.  Resetting on an idle timer this long is kind of a smell, because we should find
+
+;; (add-hook 'org-node-insert-link-hook #'org-node--schedule-idle-reset)
+;; (add-hook 'org-open-link-functions #'org-node--schedule-idle-reset)
+(defun org-node--schedule-idle-reset (&rest _)
+  (cancel-timer org-node-cache--idle-timer)
+  (setq org-node-cache--idle-timer
+        (run-with-idle-timer
+         (* 30 (1+ org-node-cache--elapsed)) nil #'org-node-cache--scan-all))
+  nil)
+
+(defvar org-node-cache--elapsed 1
+  "Time elapsed by the last cache reset.")
+
 (defun org-node-cache--print-elapsed ()
   "Print time elapsed since `org-node-cache--start-time'.
 Also report statistics about the nodes and links found.
@@ -681,7 +703,8 @@ be misleading."
                n-subtrees
                n-backlinks
                n-reflinks
-               (float-time (time-since org-node-cache--start-time))))))
+               (setq org-node-cache--elapsed
+                     (float-time (time-since org-node-cache--start-time)))))))
 
 (defun org-node-cache--count-logical-cores ()
   "Return sum of available processor cores, minus 1."
