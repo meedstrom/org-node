@@ -10,17 +10,17 @@ Version 0.2 in July brought many changes!  *If anything broke for you*, you can 
 #+end_src
 
 New features
-- New mode: =org-node-complete-at-point-mode=
-- New mode: =org-node-roam-redisplay-mode=
 - New mode: =org-node-roam-db-shim-mode=
   - Deprecates advice that was in [[https://github.com/meedstrom/org-node?tab=readme-ov-file#option-1b--tell-org-node-to-write-to-the-org-roam-db][Backlinks Option 1B]]
 - New mode: =org-node-roam-no-sql-mode=
   - Deprecates advice that was in [[https://github.com/meedstrom/org-node?tab=readme-ov-file#option-1c--cut-out-the-db-altogether][Backlinks Option 1C]]
+- New mode: =org-node-roam-redisplay-mode=
+- New mode: =org-node-complete-at-point-mode=
 - New user option: =org-node-prefer-file-level-nodes=
 - New user option: =org-node-warn-title-collisions=
+- New user option: =org-node-alter-candidates=
 - New user option: =org-node-affixation-fn=
   - Deprecates old option =org-node-format-candidate-fn=
-- New user option: =org-node-alter-candidates=
 - New command: =org-node-lint-all-files=
   - Run org-lint on all known files, then report the results.  Use it to fix a broken setup; org-node [[https://github.com/meedstrom/org-node/issues/8#issuecomment-2101316447][assumes all files contain valid Org syntax]].  In particular, malformed PROPERTIES drawers easily break the scan.
 - New command: =org-node-list-dead-links=
@@ -42,14 +42,14 @@ Renames
 - Rename many private functions and variables
 
 Changes
-- Completions are now "rich" by default -- to revert this, set =(setq org-node-affixation-fn #'org-node-affix-bare)=
+- Minibuffer completions are now "rich" by default.  To revert to vanilla, set =(setq org-node-affixation-fn #'org-node-affix-bare)=.
 - Don't automatically turn on cache-mode, just pester the user
 - Command =org-node-put-created= now respects =org-timestamp-formats= instead of just putting the date as [YYYY-MM-DD].
 - Visiting a node will now reveal the surrounding Org context and do =(recenter 0)=.  If you prefer another behavior, redefine =org-node--goto=.
-- Fix: catch some nodes that were missed
+- Fix: catch some nodes that did not get scanned
 - Fix: the feature of feeding files to the Roam DB (now called =org-node-roam-db-shim-mode=) was subtly broken because it'd trigger the hook before the scan completed, so it'd always be a bit outdated, now fixed.
 - Fix: quickly update completions when a heading was edited, instead of seeing multiple stale candidates
-- Fix: Accept multiple =#+todo:= lines
+- Fix: accept multiple =#+todo:= lines
 - Fix: fix =:BACKLINKS:= members sometimes disappearing
 - Fix: fix =org-node-insert-transclusion-as-subtree= inserting asterisks after the link
 - Fix: fix some backlink-mode errors
@@ -105,8 +105,8 @@ A comparison of three similar systems, all permitting org-id as first-class citi
 | Avoid double-counting =:BACKLINKS:= | --       | yes                | not applicable       |
 | Grep across all files             | --       | yes                | --                   |
 | Update stale link descriptions    | --       | yes                | --                   |
-| List dead links                   | --       | yes                |                      |
-| Warn about duplicate IDs          | --       | yes                |                      |
+| List dead links                   | --       | yes                | --                   |
+| Warn about duplicate IDs          | --       | yes                | --                   |
 | Node exclusion                    | yes      | limited            | not applicable       |
 | Support Org 9.5 citations         | yes      | -- (planned)       | --                   |
 | Support org-ref                   | yes      | -- (WONTFIX)       | --                   |
@@ -129,20 +129,13 @@ Add an init snippet like this (assuming [[https://github.com/radian-software/str
 
 ** Quick start
 
-If you're new to these concepts, fear not.  The main things for day-to-day operation are two verbs: "find" and "insert-link".
+If you're new to these concepts, fear not.  The main things for day-to-day operation are two verbs: "find" and "link".
 
-Pick some good keys, close the browser, and try them out.
-
-#+begin_src elisp
-(global-set-key (kbd "<f2> f") #'org-node-find)
-(global-set-key (kbd "<f2> i") #'org-node-insert-link)
-#+end_src
-
-(If you don't like F2, maybe M-s?)
+Pick some good keys and try them out.
 
 #+begin_src elisp
-(global-set-key (kbd "M-s f") #'org-node-find)
-(global-set-key (kbd "M-s i") #'org-node-insert-link)
+(keymap-set global-map "M-s f" #'org-node-find)
+(keymap-set org-mode-map "M-s i" #'org-node-insert-link)
 #+end_src
 
 To browse config options, type =M-x customize-group RET org-node RET=.
@@ -197,9 +190,7 @@ To full-reset the DB, either of these should work
 
 **** *Option 1C*.  Cut out the DB altogether
 
-Yes it's possible, no SQLite needed!
-
-Type =M-x org-node-roam-no-sql-mode=, then see what populates your Roam buffer henceforth.  Hopefully you see the same links as before.
+No need to compile SQLite!  Type =M-x org-node-roam-no-sql-mode=, then see what populates your Roam buffer henceforth.  Hopefully you see the same links as before.
 
 If you're happy with the result, and you don't need =roam:= links functionality, you can disable =org-roam-db-autosync-mode= in favour of the slimmer =M-x org-node-roam-redisplay-mode=.  As an init snippet:
 
@@ -255,8 +246,8 @@ Example capture templates follow. The secret sauce is =(function org-node-captur
          :jump-to-captured t
          :immediate-finish t)
 
-        ;; Sometimes useful with `org-node-insert-link' to make a stub you'll
-        ;; fill in later
+        ;; Sometimes a handy choice after `org-node-insert-link' to
+        ;; make a stub you'll fill in later
         ("ni" "Instantly create stub ID node without visiting"
          plain (function org-node-capture-target) nil
          :immediate-finish t)))
@@ -343,9 +334,9 @@ Basic commands:
 - =org-node-insert-transclusion-as-subtree=
 - =org-node-visit-random=
 - =org-node-extract-subtree=
-  - A bizarro counterpart to =org-roam-extract-subtree=.  Export a subtree at point into a file-level node, leave a link where it was, and show the new file as the current buffer.
+  - A bizarro counterpart to =org-roam-extract-subtree=.  Export the subtree at point into a file-level node, *leave a link where the subtree was,* and show the new file as current buffer.
 - =org-node-nodeify-entry=
-  - (Trivial) Give an ID to the subtree at point (and run org-node-creation-hook)
+  - (Trivial) Give an ID to the subtree at point, and run the hook =org-node-creation-hook=
 - =org-node-insert-heading=
   - (Trivial) Like =org-insert-heading= + =org-node-nodeify-entry=
 
