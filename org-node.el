@@ -49,9 +49,6 @@
 (require 'org-node-backlink)
 (require 'org-node-roam)
 
-(define-obsolete-variable-alias
-  'org-node-slugify-as-url 'org-node-slugify-for-web "2024-07-11")
-
 
 ;;; API not used inside this package
 
@@ -280,13 +277,13 @@ type the name of a node that does not exist.  That enables this
             (save-buffer)
             (org-node-cache--scan-targeted (list path-to-write))))))))
 
-(defun org-node-new-by-roam-capture ()
+(defun org-node-new-via-roam-capture ()
   "Call `org-roam-capture-' with predetermined arguments.
 Meant to be called indirectly as `org-node-creation-fn', at which
 time some necessary variables are set."
   (if (or (null org-node-proposed-title)
           (null org-node-proposed-id))
-      (message "`org-node-new-by-roam-capture' is meant to be called indirectly via `org-node--create'")
+      (message "`org-node-new-via-roam-capture' is meant to be called indirectly via `org-node--create'")
     (unless (fboundp #'org-roam-capture-)
       (org-node--die "Didn't create node! Either install org-roam or %s"
                      "configure `org-node-creation-fn'"))
@@ -340,7 +337,7 @@ which it gets some necessary variables."
   "Select and visit one of your ID nodes.
 
 To behave like `org-roam-node-find' when creating new nodes, set
-`org-node-creation-fn' to `org-node-new-by-roam-capture'."
+`org-node-creation-fn' to `org-node-new-via-roam-capture'."
   (interactive)
   (org-node-cache-ensure)
   (let* ((input (completing-read "Node: " #'org-node-collection
@@ -417,7 +414,7 @@ find yourself erasing the minibuffer, you'll prefer
 On the topic of Org-roam emulation, bonus tips:
 
 - To behave like org-roam on node creation, set
-  `org-node-creation-fn' to `org-node-new-by-roam-capture'.
+  `org-node-creation-fn' to `org-node-new-via-roam-capture'.
 
 - If you still find the behavior different, perhaps you had
   something in `org-roam-post-node-insert-hook'.  Configure
@@ -432,9 +429,6 @@ On the topic of Org-roam emulation, bonus tips:
   (org-node-cache-ensure)
   (org-node--goto (nth (random (hash-table-count org-node--node-by-candidate))
                        (hash-table-values org-node--node-by-candidate))))
-
-(define-obsolete-function-alias
-  'org-node-random 'org-node-visit-random "2024-07-11")
 
 ;;;###autoload
 (defun org-node-insert-transclusion-as-subtree ()
@@ -575,7 +569,7 @@ so it matches the destination's current title."
                       :inherit 'org-link
                       :inverse-video (not (face-inverse-video-p 'org-link)))
   (org-node-cache-ensure)
-  (when (org-node--consent-to-problematic-modes-for-mass-edit)
+  (when (org-node--consent-to-bothersome-modes-for-mass-edit)
     (dolist (file (or files (org-node-files)))
       (with-current-buffer (find-file-noselect file)
         (save-excursion

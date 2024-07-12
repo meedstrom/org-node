@@ -141,7 +141,7 @@ create a node that does not yet exist.
 
 Built-in choices:
 - `org-node-new-file'
-- `org-node-new-by-roam-capture'
+- `org-node-new-via-roam-capture'
 - `org-capture'
 
 If you choose `org-capture' here, configure
@@ -155,7 +155,7 @@ the function is called: `org-node-proposed-title' and
   :group 'org-node
   :type '(radio
           (function-item org-node-new-file)
-          (function-item org-node-new-by-roam-capture)
+          (function-item org-node-new-via-roam-capture)
           (function-item org-capture)
           function))
 
@@ -206,7 +206,7 @@ Applied only by `org-node-new-file', `org-node-capture-target',
 `org-node-insert-heading', `org-node-nodeify-entry' and
 `org-node-extract-subtree'.
 
-NOT applied by `org-node-new-by-roam-capture' -- see org-roam's
+NOT applied by `org-node-new-via-roam-capture' -- see org-roam's
 `org-roam-capture-new-node-hook' instead.
 
 A good member to put in this hook is `org-node-put-created',
@@ -418,22 +418,22 @@ Finally:
                  (save-buffer)))
              (kill-buffer)))))))
 
-;; REVIEW Maybe save 50ms (of total 200ms) by recording only
-;; unabbreviated file names in mem and the mtimes table, and deferring
-;; abbreviation until the ..scan fn.  FWIW, most of the other 150ms is
-;; `directory-files-recursively', hard to improve.
+;; Profiling
+;; (progn (garbage-collect) (car (benchmark-run-compiled 10 (org-node-files))))
+;; (progn (garbage-collect) (benchmark-run-compiled 10 (org-node-guess-or-ask-dir "")))
+;; (time (org-node-files))
 (let (mem)
   (defun org-node-files (&optional memoized)
     "List files in `org-id-locations' or `org-node-extra-id-dirs'.
 
-With argument MEMOIZED t, reuse the list from the last time
-something called this function, returning instantly."
+With argument MEMOIZED t, return the same list as the last time
+something called this function, skipping work."
     (if (and memoized mem)
         mem
       (setq mem
             (-union
              (hash-table-values org-id-locations)
-             (let ((file-name-handler-alist nil))
+             (let ((file-name-handler-alist nil)) ;; cuts 200 ms to 70 ms
                (cl-loop
                 for dir in org-node-extra-id-dirs
                 append (cl-loop
@@ -495,19 +495,17 @@ the ID-node where the link originated.")
 (defvar org-node--reflinks-by-ref (make-hash-table :test #'equal)
   "1:N table mapping refs to latent reflinks.
 
-The table keys are \"refs\" i.e. plain URI strings such as web
-addresses or \"file:\" links, and the table values are lists
-holding a plist for each place where that URI was found.
-
-To see how these plists look, see source of
+Refs are plain URI strings such as web addresses, and the list of
+reflinks is a list holding a plist for every place where that URI
+was found.  For details of these plists, see source of
 `org-node-worker--collect-links-until'.
 
-In truth, passing this table to `hash-table-keys' will get you a
-grand list of all (non-ID) links found in any node anywhere,
-whether or not a node exists with a corresponding ROAM_REFS
-property.
+In truth, this table contains many more rows than the number of
+ROAM_REFS you probably have.  (Just pass it to `hash-table-keys'
+and see.)  That's because the scanner does not know which links
+have a corresponding ref-node, so it grabs every link.
 
-To know whether one of these \"latent\" reflinks has a node
+To see whether one of these \"latent\" reflinks has a node
 actually referencing it, check for the the same ref in
 `org-node--id-by-ref'.  Or use the convenience wrapper
 `org-node-get-reflinks' if suitable.")
@@ -515,15 +513,6 @@ actually referencing it, check for the the same ref in
 (defvar org-node--cites-by-citekey (make-hash-table :test #'equal)
   "1:N table mapping @citekeys to latent citations.
 For explanation of \"latent\", see `org-node--reflinks-by-ref'.")
-
-(defun org-node-get-reflinks (node)
-  "Get list of reflinks pointing to NODE."
-  (cl-loop for ref in (org-node-get-refs node)
-           append (gethash ref org-node--reflinks-by-ref)))
-
-(defun org-node-get-backlinks (node)
-  "Get list of ID-links pointing to NODE."
-  (gethash (org-node-get-id node) org-node--backlinks-by-id))
 
 (defun org-node--forget-id-locations (files)
   "Remove references to FILES in `org-id-locations'.
@@ -544,8 +533,6 @@ errors are very easy to miss."
     (display-warning 'org-node err-string :error)
     (error "%s" err-string)))
 
-;; Test by evalling:
-;; (org-node--root-dirs (hash-table-values org-id-locations))
 (defun org-node--root-dirs (file-list)
   "Given FILE-LIST, infer the most base root directories.
 
@@ -578,8 +565,7 @@ consult the filesystem, just compares substrings to each other."
        do (cl-incf (cdr (assoc the-root dir-counters)))
        finally return (mapcar #'car (cl-sort dir-counters #'> :key #'cdr))))))
 
-;; REVIEW deprecate?
-(defun org-node--consent-to-problematic-modes-for-mass-edit ()
+(defun org-node--consent-to-bothersome-modes-for-mass-edit ()
   (--all-p (if (and (boundp it) (symbol-value it))
                (y-or-n-p
                 (format "%S is active - proceed anyway?" it))
@@ -590,17 +576,8 @@ consult the filesystem, just compares substrings to each other."
 (defvar org-node--debug nil
   "Whether to run in a way suitable for debugging.")
 
-(defun org-node--debug-scan-this-file ()
-  (interactive)
-  (when (derived-mode-p 'org-mode)
-    (org-node-cache--scan-targeted (list buffer-file-name))))
-
-(defun org-node--debug-toggle ()
-  (interactive)
-  (setq org-node--debug (not org-node--debug)))
-
 
-;;; Data structure
+;;; Node info struct
 
 (cl-defstruct (org-node-get (:constructor org-node--make-obj)
                             (:copier nil))
@@ -617,9 +594,8 @@ For example, the field \"deadline\" has a getter
 \"(org-node-get-deadline NODE)\", where NODE is one of the
 elements of the `hash-table-values' of `org-node--node-by-id'.
 
-For real-world usage of these accessors, see examples in the
-documentation of `org-node-filter-fn', the documentation of
-`org-node-affixation-fn', or the package README.
+For real-world usage of these getters, see examples in the
+documentation of `org-node-filter-fn' or the package README.
 
 You may be able to find the README by typing:
 
@@ -663,41 +639,51 @@ or you can visit the homepage:
   (todo       nil :read-only t :type string :documentation
               "Returns node's TODO state."))
 
+(defun org-node-get-reflinks (node)
+  "Get list of reflinks pointing to NODE."
+  (cl-loop for ref in (org-node-get-refs node)
+           append (gethash ref org-node--reflinks-by-ref)))
+
+(defun org-node-get-backlinks (node)
+  "Get list of ID-links pointing to NODE."
+  (gethash (org-node-get-id node) org-node--backlinks-by-id))
+
 
 ;;; Obsoletions
-
-;; 2024-07-11
-(defun org-node-aliases    (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-aliases,     update to org-node-get-aliases   " 78)))
-(defun org-node-deadline   (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-deadline,    update to org-node-get-deadline  " 78)))
-(defun org-node-file-path  (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-file-path,   update to org-node-get-file-path " 78)))
-(defun org-node-file-title (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-file-title,  update to org-node-get-file-title" 78)))
-(defun org-node-is-subtree (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-is-subtree,  update to org-node-get-is-subtree" 78)))
-(defun org-node-id         (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-id,          update to org-node-get-id        " 78)))
-(defun org-node-level      (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-level,       update to org-node-get-level     " 78)))
-(defun org-node-olp        (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-olp,         update to org-node-get-olp       " 78)))
-(defun org-node-pos        (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-pos,         update to org-node-get-pos       " 78)))
-(defun org-node-properties (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-properties,  update to org-node-get-properties" 78)))
-(defun org-node-refs       (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-refs,        update to org-node-get-refs      " 78)))
-(defun org-node-scheduled  (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-scheduled,   update to org-node-get-scheduled " 78)))
-(defun org-node-tags       (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-tags,        update to org-node-get-tags      " 78)))
-(defun org-node-title      (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-title,       update to org-node-get-title     " 78)))
-(defun org-node-todo       (node) (org-node--die "%s" (string-fill "\nYour config uses deprecated accessor org-node-todo,        update to org-node-get-todo      " 78)))
 
 (define-obsolete-variable-alias
   'org-node-collection 'org-node--node-by-candidate "2024-07-11")
 
-(define-obsolete-variable-alias
-  'org-node-slug-fn 'org-node-filename-fn "2024-07-11")
+(let ((aliases '(org-node-slug-fn org-node-filename-fn
+                 org-node-cache-rescan-file-hook org-node-rescan-hook)))
+  (defun org-node--warn-obsolete-variables ()
+    "To be called when turning a mode on."
+    (while aliases
+      (let ((old (pop aliases))
+            (new (pop aliases)))
+        (when (and (boundp old) (symbol-value old))
+          (lwarn 'org-node :warning "Your config uses old variable: %S, new name: %S"
+                 old new)
+          (set new (symbol-value old)))))))
 
-(define-obsolete-variable-alias
-  'org-node-cache-rescan-file-hook 'org-node-rescan-hook "2024-07-11")
+(defmacro org-node--defobsolete (old new)
+  "Define OLD as a function that runs NEW."
+  `(let (warned-once)
+     (defun ,old (&rest args)
+       (declare (obsolete ',new "July 2024"))
+       (unless warned-once
+         (setq warned-once t)
+         (lwarn 'org-node :warning "Your config uses old function name: %S, new name %S"
+                ',old ',new))
+       (apply ',new args))))
 
-;; 2024-07-11
-(add-hook 'org-node-rescan-hook #'org-node--deprecate-rescan-hook-old-usage)
-(defun org-node--deprecate-rescan-hook-old-usage (&optional files)
-  "Emit a warning for deprecated usage."
-  (when (null files)
-    (display-warning 'org-node (string-fill "\nBreaking change: The hook `org-node-cache-rescan-file-hook' is renamed to `org-node-rescan-hook', and is no longer called with any specific buffer current, and instead passes the list of files scanned (one argument, not zero)" 78))))
+(org-node--defobsolete org-node-slugify-as-url org-node-slugify-for-web)
+(org-node--defobsolete org-node-random org-node-visit-random)
+(org-node--defobsolete org-node-new-by-roam-capture org-node-new-via-roam-capture)
+(org-node--defobsolete org-node-feed-roam-db org-node-roam-db-reset)
+(org-node--defobsolete org-node--convert-to-roam org-node-roam--make-obj)
+(org-node--defobsolete org-node--fabricate-roam-backlinks org-node-roam--make-backlinks )
+(org-node--defobsolete org-node--fabricate-roam-reflinks org-node-roam--make-reflinks )
 
 (provide 'org-node-common)
 

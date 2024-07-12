@@ -4,18 +4,6 @@
 (require 'url-parse)
 (require 'ol)
 
-(define-obsolete-function-alias
-  'org-node--convert-to-roam 'org-node-roam--make-obj "2024-07-11")
-
-(define-obsolete-function-alias
-  'org-node--fabricate-roam-backlinks 'org-node-roam--make-backlinks "2024-07-11")
-
-(define-obsolete-function-alias
-  'org-node--fabricate-roam-reflinks 'org-node-roam--make-reflinks "2024-07-11")
-
-(define-obsolete-function-alias
-  'org-node-feed-roam-db 'org-node-roam-db-reset "2024-07-11")
-
 (let (warned-once)
   (defun org-node-feed-file-to-roam-db (&optional files)
     (unless warned-once
