@@ -101,17 +101,17 @@ Designed as override advice for `org-roam-backlinks-get'."
             ;; TODO: this probs necessary, but verify in org-roam-buffer becsue
             ;; i expect we see duplicates, and if not, why not?
             ;; (links (delete-dups (gethash target-id org-node--backlinks-by-id)))
-            ))
-      (cl-loop
-       for link-data in links
-       as src-id = (plist-get link-data :origin)
-       as src-node = (gethash src-id org-node--node-by-id)
-       when src-node
-       collect (org-roam-backlink-create
-                :target-node target-roam-node
-                :source-node (org-node-roam--make-obj src-node)
-                :point (plist-get link-data :pos)
-                :properties (plist-get link-data :properties))))))
+            )
+        (cl-loop
+         for link-data in links
+         as src-id = (plist-get link-data :origin)
+         as src-node = (gethash src-id org-node--node-by-id)
+         when src-node
+         collect (org-roam-backlink-create
+                  :target-node target-roam-node
+                  :source-node (org-node-roam--make-obj src-node)
+                  :point (plist-get link-data :pos)
+                  :properties (plist-get link-data :properties)))))))
 
 ;; Eval to see examples of what it has to work with...
 ;; (seq-random-elt (hash-table-keys org-node--reflinks-by-ref))

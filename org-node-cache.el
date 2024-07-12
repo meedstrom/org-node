@@ -81,7 +81,8 @@ takes your computer long to finish \\[org-node-reset]."
       (message "org-node caching... (Hint: Turn on org-node-cache-mode)"))
     (mapc #'accept-process-output org-node-cache--processes)
     ;; Just in case... see docstring of `org-node--create'.
-    ;; Not super happy about this edge case
+    ;; Not super happy about this edge-case, it's a wart of the current design
+    ;; of `org-node-cache--try-launch-scan'.
     (while (member org-node-cache--retry-timer timer-list)
       (cancel-timer org-node-cache--retry-timer)
       (funcall (timer--function org-node-cache--retry-timer))
@@ -255,21 +256,9 @@ eventually and not dropped."
 If left at nil, will be set at runtime to the result of
 `org-node-cache--count-logical-cores'.")
 
-(defun org-node-cache--init-library ()
-  "Do first-time setup, maybe re-do if world has changed.
-
-Return file path to either .eln or the .elc variant of compiled
-org-node-worker library, preferring .eln."
-  (unless org-node-cache--max-jobs
-    (setq org-node-cache--max-jobs (org-node-cache--count-logical-cores)))
-  ;; Compile user-provided lambdas.  Would use native-comp here. but
-  ;; it wrecks Customize, and any elegant workaround grows to ~30 LoC.
-  (unless (compiled-function-p org-node-filter-fn)
-    (setq org-node-filter-fn (byte-compile org-node-filter-fn)))
-  (unless (compiled-function-p org-node-affixation-fn)
-    (setq org-node-affixation-fn (byte-compile org-node-affixation-fn)))
-  ;; Compile org-node-worker.el, in case the user's package manager
-  ;; didn't do so already, or local changes have been made.
+(defun org-node-cache--ensure-compiled-lib ()
+  "Compile org-node-worker.el, in case the user's package manager
+didn't do so already, or local changes have been made."
   (let* ((file-name-handler-alist nil)
          (lib (find-library-name "org-node-worker"))
          (native-path (and (featurep 'native-compile)
@@ -277,7 +266,6 @@ org-node-worker library, preferring .eln."
                            (require 'comp)
                            (comp-el-to-eln-filename lib)))
          (elc-path (org-node-worker--tmpfile "worker.elc")))
-    (mkdir (org-node-worker--tmpfile) t)
     (if native-path
         (unless (file-newer-than-file-p native-path lib)
           (native-compile lib))
@@ -288,14 +276,24 @@ org-node-worker library, preferring .eln."
           (byte-compile-file lib))))
     (or native-path elc-path)))
 
+(defmacro org-node-cache--ensure-compiled-fn (var)
+  "Ensure that the value of variable VAR is a compiled function."
+  `(or (compiled-function-p (if (symbolp ,var) (symbol-function ,var) ,var))
+       ;; Would use native-comp here, but it wrecks Customize
+       (setq ,var (byte-compile ,var))))
+
 (defun org-node-cache--scan (files finalizer)
   "Begin async scanning FILES for id-nodes and links.
 
 When finished, run the FINALIZER function to update current
 tables."
-  (let ((compiled-lib (org-node-cache--init-library))
+  (mkdir (org-node-worker--tmpfile) t)
+  (unless org-node-cache--max-jobs
+    (setq org-node-cache--max-jobs (org-node-cache--count-logical-cores)))
+  (org-node-cache--ensure-compiled-fn org-node-filter-fn)
+  (org-node-cache--ensure-compiled-fn org-node-affixation-fn)
+  (let ((compiled-lib (org-node-cache--ensure-compiled-lib))
         (file-name-handler-alist nil))
-    ;; Prep for scan
     (garbage-collect)
     (setq org-node-cache--start-time (current-time))
     (setq org-node-cache--done-ctr 0)
@@ -312,8 +310,8 @@ tables."
             (print-level nil))
         (prin1
          ;; NOTE The purpose of $sigils is just visual, to distinguish these
-         ;; "external" variables in the body of
-         ;; `org-node-worker--collect-dangerously'.
+         ;;      "external" variables in the body of
+         ;;      `org-node-worker--collect-dangerously'.
          (append
           org-node-inject-variables
           `(($link-re . ,org-link-plain-re)

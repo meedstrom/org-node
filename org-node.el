@@ -29,6 +29,9 @@
 
 ;; TODO Workflow to allow untitled nodes
 
+;; TODO Uniquify conflicting completions with basename+pos and remove after
+;;      with :exit-function maybe.  With this, could deprecate alter-candidates
+
 ;; TODO Review whether scan-all actually happens often enough (probably not)!
 ;;      - So where to make it happen?  Can't just be on spotting deletion, too
 ;;        capricious.  Maybe a timer 20x the last reset's elapsed time+1, after
@@ -616,7 +619,6 @@ so it matches the destination's current title."
                     (sleep-for .11))
                   (goto-char end))))))))))
 
-;; TODO: check what happens if Org invisible regions interfere
 ;;;###autoload
 (defun org-node-extract-subtree ()
   "Extract subtree at point into a file of its own.
@@ -704,7 +706,8 @@ as more \"truthful\" than today's date.
             (org-map-region #'org-promote (point-min) (point-max))
             (insert
              ":PROPERTIES:\n"
-             (string-join (--map (concat ":" (car it) ": " (cdr it)) properties)
+             (string-join (--map (concat ":" (car it) ": " (cdr it))
+                                 properties)
                           "\n")
              "\n:END:"
              (if explicit-category
@@ -719,7 +722,6 @@ as more \"truthful\" than today's date.
           (save-buffer)
           (org-node-cache--scan-targeted (list path-to-write source-path)))))))
 
-;; some yolo code
 ;;;###autoload
 (defun org-node-rename-asset-and-rewrite-links ()
   "Prompt for an asset such as an image file to be renamed, then
@@ -749,6 +751,7 @@ to replacing all the links, finally rename the asset file itself."
       (unless (file-writable-p new)
         (error "New path wouldn't be writable"))
       (rgrep (regexp-quote filename) "*.org")
+      ;; HACK Doesn't work right away, so wait a sec, then it works
       (run-with-timer
        1 nil
        (lambda ()
@@ -828,7 +831,7 @@ to `org-node-extra-id-dirs-exclude'."
                  (org-node-files)
                  nil))
 
-(define-derived-mode org-node--lint-results-mode tabulated-list-mode
+(define-derived-mode org-node--tabulate-lint-results-mode tabulated-list-mode
   "Org-Lint Results"
   nil
   (setq tabulated-list-format
@@ -864,7 +867,7 @@ to `org-node-extra-id-dirs-exclude'."
           (setq tabulated-list-entries nil)
           (let ((inhibit-read-only t))
             (erase-buffer))))
-      (org-node--lint-results-mode)
+      (org-node--tabulate-lint-results-mode)
       (unwind-protect
           (dolist (file files)
             (message "Linting file... (you may quit and resume anytime) (%d/%d) %s"
@@ -893,7 +896,7 @@ to `org-node-extra-id-dirs-exclude'."
       (when (null tabulated-list-entries)
         (message "All good, no lint warnings!")))))
 
-(define-derived-mode org-node--list-feedback-arcs-mode tabulated-list-mode
+(define-derived-mode org-node--tabulate-feedback-arcs-mode tabulated-list-mode
   "Feedback Arcs List"
   nil
   (setq tabulated-list-format
@@ -960,7 +963,7 @@ write_file(lisp_data, file.path(dirname(tsv), \"feedback-arcs.eld\"))
       (setq feedbacks (read (buffer-string)))
       (when (listp feedbacks)
         (erase-buffer)
-        (org-node--list-feedback-arcs-mode)
+        (org-node--tabulate-feedback-arcs-mode)
         (setq tabulated-list-entries
               (cl-loop
                for (origin . dest) in feedbacks
@@ -983,7 +986,7 @@ write_file(lisp_data, file.path(dirname(tsv), \"feedback-arcs.eld\"))
 
 (defun org-node--make-digraph-tsv-string ()
   "From `org-node--backlinks-by-id', generate a list of
-destination-origin pairings, expressed as tab-separated values."
+destination-origin pairs, expressed as tab-separated values."
   (concat
    "src\tdest\n"
    (string-join
@@ -1004,7 +1007,7 @@ destination-origin pairings, expressed as tab-separated values."
 ;;       (push buffer-file-coding-system org-node--found-systems)))
 ;;   org-node--found-systems)
 
-(define-derived-mode org-node--list-dead-links-mode tabulated-list-mode
+(define-derived-mode org-node--tabulate-dead-links-mode tabulated-list-mode
   "Dead Links"
   nil
   (setq tabulated-list-format
@@ -1021,7 +1024,7 @@ destination-origin pairings, expressed as tab-separated values."
                                 (gethash dest org-node--backlinks-by-id)))))
     (message "%d dead links found" (length dead-links))
     (pop-to-buffer (get-buffer-create "*Dead Links*"))
-    (org-node--list-dead-links-mode)
+    (org-node--tabulate-dead-links-mode)
     (setq tabulated-list-entries
           (cl-loop
            for (dest . link) in dead-links

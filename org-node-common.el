@@ -292,18 +292,23 @@ After changing this setting, please run \\[org-node-reset]."
 (defcustom org-node-affixation-fn #'org-node-affix-with-olp
   "Function to give prefix and suffix to completion candidates.
 
-The results are indirectly used by :affixation-function in
+The results will be indirectly used by the affixation function
+associated with `org-node-collection', i.e. to style the
+appearance of completions during \\[org-node-find] et al.
+
+To read more about affixations, see docstring
 `completion-extra-properties', however this function operates on
 one candidate at a time, not the whole collection.
 
 It receives two arguments: NODE and TITLE, and it must return a
-list of three strings: completion, prefix, and suffix.
+list of three strings: completion, prefix and suffix.
 
 NODE is an object which form you can observe in examples from
-\\[org-node-cache-peek] and specified in the type `org-node-get'.
+\\[org-node-cache-peek] and specified in type `org-node-get'.
 
 If a node has aliases, it is passed to this function again for
-every alias, in which case TITLE is actually one of the aliases."
+every alias, in which case TITLE argument is actually one of the
+aliases."
   :type '(radio
           (function-item org-node-affix-bare)
           (function-item org-node-affix-with-olp)
@@ -311,13 +316,13 @@ every alias, in which case TITLE is actually one of the aliases."
   :group 'org-node)
 
 (defun org-node-affix-bare (_node title)
-  "Return TITLE as-is.
-For `org-node-affixation-fn'."
+  "Use TITLE as-is.
+For use as `org-node-affixation-fn'."
   (list title nil nil))
 
 (defun org-node-affix-with-olp (node title)
   "Prepend TITLE with NODE's outline path.
-For `org-node-affixation-fn'."
+For use as `org-node-affixation-fn'."
   (list title
         (when (org-node-get-is-subtree node)
           (let ((ancestors (cons (org-node-get-file-title-or-basename node)
@@ -329,27 +334,26 @@ For `org-node-affixation-fn'."
             (string-join (nreverse result))))
         nil))
 
-(defun org-node--affixate-collection (coll)
-  "From cache, return precomputed affixations for all of COLL."
-  (cl-loop for title in coll
-           collect (gethash title org-node--affixation-triplet-by-title)))
-
 (defvar org-node--affixation-triplet-by-title (make-hash-table :test #'equal)
   "1:1 table mapping titles or aliases to affixation triplets.")
+
+(defun org-node--affixate-collection (coll)
+  "Take COLL and return precomputed affixations for each member."
+  (cl-loop for title in coll
+           collect (gethash title org-node--affixation-triplet-by-title)))
 
 (defun org-node-collection (str pred action)
   "Programmed COLLECTION for `completing-read'.
 
 Uses variable `org-node--node-by-candidate' as the basis, and
-affixes each candidate using `org-node-affixation-fn'.  Actually,
-just retrieves a cached affixation.
+affixes each candidate using `org-node-affixation-fn'.
 
-All completion candidates are guaranteed to be keys of
-`org-node--node-by-candidate', but it is possible to exit with
-user-entered input, as is normal for `completing-read'.
+All completions are keys of `org-node--node-by-candidate', but
+remember that it is possible for `completing-read' to exit with
+user-entered input that didn't match anything.
 
 Arguments STR, PRED and ACTION are handled behind the scenes,
-explained in the Info manual at (elisp)Programmed Completion."
+read more in the manual at (elisp)Programmed Completion."
   (if (eq action 'metadata)
       (cons 'metadata (unless org-node-alter-candidates
                         (list (cons 'affixation-function
