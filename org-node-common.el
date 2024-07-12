@@ -34,7 +34,7 @@ Called with one argument: the list of files re-scanned."
   :type 'boolean)
 
 (defcustom org-node-warn-title-collisions t
-  ""
+  "Whether to print messages on finding duplicate node titles."
   :group 'org-node
   :type 'boolean)
 
@@ -48,7 +48,7 @@ This affects the behavior of `org-node-new-file',
 
 If you change your mind about this setting, the Org-roam commands
 `org-roam-promote-entire-buffer' and
-`org-roam-demote-entire-buffer' can help you detransition the
+`org-roam-demote-entire-buffer' can help you transition the
 files you have made along the way."
   :group 'org-node
   :type 'boolean)
@@ -120,7 +120,7 @@ setting."
   :group 'org-node
   :type '(choice integer (const nil)))
 
-(defcustom org-node-filename-fn #'org-node-slugify-as-url
+(defcustom org-node-filename-fn #'org-node-slugify-for-web
   "Function taking a #+TITLE and returning a filename.
 
 This is used when you type a new node title, and a file is
@@ -283,10 +283,7 @@ suffix.
 
 Another consequence is it lifts the uniqueness constraint on note
 titles: you can have two headings with the same name so long as
-the prefix or suffix differ.
-
-If you set this to t, you may also want to nullify
-`org-node-warn-title-collisions'.
+they don't also have the same prefix or suffix.
 
 After changing this setting, please run \\[org-node-reset]."
   :type 'boolean
@@ -333,6 +330,7 @@ For `org-node-affixation-fn'."
         nil))
 
 (defun org-node--affixate-collection (coll)
+  "From cache, return precomputed affixations for all of COLL."
   (cl-loop for title in coll
            collect (gethash title org-node--affixation-triplet-by-title)))
 
