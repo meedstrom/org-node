@@ -558,6 +558,9 @@ file located there."
                    (file-name-nondirectory path)
                    (file-name-nondirectory new-path)))))))
 
+(defface org-node--rewrite-face nil
+  "Face for use in `org-node-rewrite-links-ask'.")
+
 ;;;###autoload
 (defun org-node-rewrite-links-ask (&optional files)
   "Search all files for ID-links where the link description has
@@ -568,10 +571,9 @@ so it matches the destination's current title."
   (interactive)
   (require 'ol)
   (require 'org-faces)
-  (defface rewrite-face
-    '((t :inverse-video (not (face-inverse-video-p 'org-link))
-       :inherit 'org-link))
-    "Face for use in `org-node-rewrite-links-ask'.")
+  (set-face-attribute 'org-node--rewrite-face ()
+                      :inherit 'org-link
+                      :inverse-video (not (face-inverse-video-p 'org-link)))
   (org-node-cache-ensure)
   (when (org-node--consent-to-problematic-modes-for-mass-edit)
     (dolist (file (or files (org-node-files)))
@@ -598,9 +600,10 @@ so it matches the destination's current title."
                            (not (member-ignore-case
                                  desc (org-node-get-aliases node))))
                   (switch-to-buffer (current-buffer))
+                  (goto-char end)
                   (org-reveal)
                   (recenter)
-                  (highlight-regexp exact-link 'rewrite-face)
+                  (highlight-regexp exact-link 'org-node--rewrite-face)
                   (unwind-protect
                       (setq answered-yes
                             (y-or-n-p
