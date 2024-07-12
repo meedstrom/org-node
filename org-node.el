@@ -131,7 +131,7 @@ Applying the above to \"Löb's Theorem\" results in something like
                 (replace-regexp-in-string "^-" "")
                 (replace-regexp-in-string "-$" ""))
    ".org"))
-(defalias 'org-node-slugify-as-url org-node-slugify-for-web)
+(defalias 'org-node-slugify-as-url 'org-node-slugify-for-web)
 
 ;; Some useful test cases if you want to hack on the above function!
 
