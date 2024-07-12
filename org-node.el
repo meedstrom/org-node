@@ -135,15 +135,15 @@ Applying the above to \"Löb's Theorem\" results in something like
 
 ;; Some useful test cases if you want to hack on the above function!
 
-;; (org-node-slugify-as-url "A/B testing")
-;; (org-node-slugify-as-url "\"But there's still a chance, right?\"")
-;; (org-node-slugify-as-url "Löb's Theorem")
-;; (org-node-slugify-as-url "How to convince me that 2 + 2 = 3")
-;; (org-node-slugify-as-url "E. T. Jaynes")
-;; (org-node-slugify-as-url "Amnesic recentf, org-id-locations? Solution: Run kill-emacs-hook periodically.")
-;; (org-node-slugify-as-url "Slimline/\"pizza box\" computer chassis")
-;; (org-node-slugify-as-url "#emacs")
-;; (org-node-slugify-as-url "칹え🐛")
+;; (org-node-slugify-for-web "A/B testing")
+;; (org-node-slugify-for-web "\"But there's still a chance, right?\"")
+;; (org-node-slugify-for-web "Löb's Theorem")
+;; (org-node-slugify-for-web "How to convince me that 2 + 2 = 3")
+;; (org-node-slugify-for-web "E. T. Jaynes")
+;; (org-node-slugify-for-web "Amnesic recentf, org-id-locations? Solution: Run kill-emacs-hook periodically.")
+;; (org-node-slugify-for-web "Slimline/\"pizza box\" computer chassis")
+;; (org-node-slugify-for-web "#emacs")
+;; (org-node-slugify-for-web "칹え🐛")
 
 (defvar org-node-proposed-title nil
   "For use by `org-node-creation-fn'.")
@@ -154,10 +154,11 @@ Applying the above to \"Löb's Theorem\" results in something like
 (defun org-node--create (title id)
   "Call `org-node-creation-fn' with necessary variables set.
 
-When writing custom code, you should not assume anything about
+When calling from Lisp, you should not assume anything about
 which buffer will be current afterwards, since it depends on
 `org-node-creation-fn' and whether TITLE or ID already existed.
-To visit a node after creation, write:
+To visit a node after creating it, either let-bind
+`org-node-creation-fn' so you know what you get, or write:
 
     (org-node--create TITLE ID)
     (org-node-cache-ensure t)
@@ -371,25 +372,26 @@ Optional argument REGION-AS-INITIAL-INPUT t means behave like
                         (setq end (point))
                         (org-link-display-format
                          (buffer-substring-no-properties beg end))))
-         (initial (if (or region-as-initial-input
-                          (when region-text
-                            (try-completion region-text org-node--id-by-title)))
-                      region-text
-                    nil))
+         (init (if (or region-as-initial-input
+                       (when region-text
+                         (try-completion region-text org-node--id-by-title)))
+                   region-text
+                 nil))
          (input (completing-read "Node: " #'org-node-collection
-                                 () () initial 'org-node-hist))
+                                 () () init 'org-node-hist))
          (node (gethash input org-node--node-by-candidate))
          (id (if node (org-node-get-id node) (org-id-new)))
          (link-desc (or region-text
-                        (and node
-                             (let ((aliases (org-node-get-aliases node)))
-                               (--first (string-search it input) aliases)))
-                        (and node
-                             (org-node-get-title node))
+                        ;; HACK input is already what the user selected, but
+                        ;; when `org-node-alter-candidates' = t, we dont want
+                        ;; to use the whole completion candidate
+                        (and node (--find (string-search it input)
+                                          (org-node-get-aliases node)))
+                        (and node (org-node-get-title node))
                         input)))
     (atomic-change-group
-      (if region-text
-          (delete-region beg end))
+      (when region-text
+        (delete-region beg end))
       (insert (org-link-make-string (concat "id:" id) link-desc))
       (run-hook-with-args 'org-node-insert-link-hook id link-desc))
     ;; TODO: Delete the link if a node was not created
