@@ -132,6 +132,7 @@ Applying the above to \"Löb's Theorem\" results in something like
                 (replace-regexp-in-string "^-" "")
                 (replace-regexp-in-string "-$" ""))
    ".org"))
+(defalias 'org-node-slugify-as-url org-node-slugify-for-web)
 
 ;; Some useful test cases if you want to hack on the above function!
 
@@ -717,7 +718,7 @@ as more \"truthful\" than today's date.
           (save-buffer)
           (org-node-cache--scan-targeted (list path-to-write source-path)))))))
 
-;; Rough code, hope it works for everyone
+;; some yolo code
 ;;;###autoload
 (defun org-node-rename-asset-and-rewrite-links ()
   "Prompt for an asset such as an image file to be renamed, then
@@ -1069,7 +1070,7 @@ If already visiting that node, then follow the link normally."
 ;;; CAPF (Completion-At-Point Function)
 
 (defvar org-node--roam-settings nil)
-(define-minor-mode org-node-capf-mode
+(define-minor-mode org-node-complete-at-point-mode
   "Use `org-node-complete-at-point' in all Org buffers.
 Also turn off Org-roam's equivalent, if active."
   :global t
@@ -1078,7 +1079,7 @@ Also turn off Org-roam's equivalent, if active."
       (push (cons 'org-roam-completion-everywhere
                   org-roam-completion-everywhere)
             org-node--roam-settings)))
-  (if org-node-capf-mode
+  (if org-node-complete-at-point-mode
       ;; Turn on
       (progn
         (setq org-roam-completion-everywhere nil)
@@ -1118,7 +1119,6 @@ Designed for `completion-at-point-functions', which see."
          (not (save-match-data (org-in-regexp org-link-any-re)))
          (list (car bounds)
                (cdr bounds)
-               ;; #'org-node-collection
                org-node--id-by-title
                :exclusive 'no
                :exit-function

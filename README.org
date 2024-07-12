@@ -15,7 +15,7 @@ New features
 - New mode: =org-node-roam-no-sql-mode=
   - Deprecates advice that was in [[https://github.com/meedstrom/org-node?tab=readme-ov-file#option-1c--cut-out-the-db-altogether][Backlinks Option 1C]]
 - New mode: =org-node-roam-redisplay-mode=
-- New mode: =org-node-capf-mode=
+- New mode: =org-node-complete-at-point-mode=
 - New user option: =org-node-prefer-file-level-nodes=
 - New user option: =org-node-warn-title-collisions=
 - New user option: =org-node-affixation-fn=
@@ -32,11 +32,13 @@ Removals
 - Remove user option: =org-node-perf-gc-cons-threshold=
 - Remove user option: =org-node-format-candidate-fn= (in favour of =org-node-affixate-fn=)
 - Remove variable: =org-node-cache-reset-hook=
-- Rename variable: =org-node-cache-rescan-file-hook= (in favour of =org-node-rescan-hook=, now called with 1 argument)
+- Remove variable: =org-node-cache-rescan-file-hook= (in favour of =org-node-rescan-hook=, now called with 1 argument)
 
 Renames
+- Rename command =org-node-random= to =org-node-visit-random=
 - Rename user option =org-node-slug-fn= to =org-node-filename-fn=
-- Rename variable =org-node-collection= to =org-node--node-by-candidate=.
+  - Rename function =org-node-slugify-as-url= to =org-node-slugify-for-web=
+- Rename variable =org-node-collection= to =org-node--node-by-candidate=
 - Rename many private functions and variables
 
 Changes
@@ -187,7 +189,9 @@ Use this minor mode:
 (setq org-roam-db-update-on-save nil)
 #+end_src
 
-To full-reset the DB, you're free to use the original =C-u M-x org-roam-db-sync=, or the faster =M-x org-node-roam-db-reset=, bearing in mind results aren't 100% identical.
+To full-reset the DB, either of these should work
+- =C-u M-x org-roam-db-sync=
+- =M-x org-node-roam-db-reset=, bearing in mind results aren't 100% identical.
 
 
 **** *Option 1C*.  Cut out the DB altogether
@@ -236,7 +240,7 @@ It can make sense for people who understand the magic of capture templates.  I d
 
 Can we reproduce the functionality on top of vanilla org-capture?  That'd be less scary.  The answer is yes!
 
-Some example capture templates follow. The secret sauce is =(function org-node-capture-target)=.
+Example capture templates follow. The secret sauce is =(function org-node-capture-target)=.
 
 #+begin_src elisp
 (setq org-capture-templates
@@ -257,7 +261,7 @@ Some example capture templates follow. The secret sauce is =(function org-node-c
          :immediate-finish t)))
 #+end_src
 
-And if you want the commands =org-node-find= & =org-node-insert-link= to likewise outsource to org-capture when creating new nodes:
+With that done, the commands =org-node-find= & =org-node-insert-link= can outsource to org-capture when creating new nodes:
 
 #+begin_src elisp
 (setq org-node-creation-fn #'org-capture)
@@ -275,6 +279,12 @@ Example setting:
                                "/home/kept/project2/")
 #+end_src
 
+
+# *** Completion-at-point
+# #+begin_src elisp
+# (org-node-complete-at-point-mode)
+# #+end_src
+
 *** Instruct org-open-at-point to visit ref-node if one exists
 
 Say you there's a link to a web URL, and you've forgot you have a node listing that exact URL in its =ROAM_REFS= property.
@@ -287,15 +297,15 @@ Would it be nice if, clicking on it, you're automatically sent to that node inst
 
 *** Limitation: unique titles
 
-If two ID-nodes exist with the same title, one of them will disappear from minibuffer completions.
+If two ID-nodes exist with the same title, one of them disappears from minibuffer completions.
 
-That's just the nature of completion.  Other packages such as Org-roam have the same limitation.  Much can be said for embracing the uniqueness constraint, and Org-node will print messages telling you about title collisions (controlled by the option =org-node-warn-title-collisions=).
+That's just the nature of completion.  Other packages such as Org-roam have the same limitation.  Much can be said for embracing the uniqueness constraint, and org-node will print messages telling you about title collisions.
 
-Anyway, there's a workaround.  Assuming you leave =org-node-affixation-fn= at its default setting, set =org-node-alter-candidates= to t.
+Anyway, there's a workaround.  Assuming you leave =org-node-affixation-fn= at its default setting, just set =org-node-alter-candidates= to t.
 
-Because this merges the outline path with the matchable part of each candidate (so you do not match only on title), it resolves practically all conflicts.  [[https://fosstodon.org/@nickanderson/112249581810196258][Some people]] depend on that workflow.
+This merges the Org outline path with the matchable part of each candidate (so you do not match only on title), so it resolves most conflicts.  [[https://fosstodon.org/@nickanderson/112249581810196258][Some people]] depend on that workflow.
 
-NB: this workaround won't help the in-buffer completions provided by =org-node-capf-mode=, but hopefully you won't need it often.
+NB: this workaround won't help the in-buffer completions provided by =org-node-complete-at-point-mode=, but hopefully you won't need it often.
 
 # Maybe I'll add distinguishers like "1" "2" "3" to each naming conflict?
 
@@ -320,7 +330,7 @@ Working over TRAMP is untested, but I suspect it won't work.  Org-node tries to 
 
 If you need TRAMP, use org-roam, which is made to /not/ re-access files or directories so often anyway, in favor of trusting its own DB.
 
-(Actually, that design caused me no end of problems.  I got an out-of-sync DB all the time, it's the challenge of cache invalidation. I think it's saner to check the disk files more often!)
+(Actually, that design caused me no end of problems with out-of-sync DB.  So I'm happy org-node checks the disk files more often.)
 
 *** Toolbox
 
@@ -331,8 +341,6 @@ Basic commands:
 - =org-node-insert-transclusion=
 - =org-node-insert-transclusion-as-subtree=
 - =org-node-visit-random=
-- =org-node-rename-file-by-title=
-  - Auto-rename the file based on the current =#+title=
 - =org-node-extract-subtree=
   - A bizarro counterpart to =org-roam-extract-subtree=.  Export a subtree at point into a file-level node, leave a link where it was, and show the new file as the current buffer.
 - =org-node-nodeify-entry=
@@ -342,23 +350,23 @@ Basic commands:
 
 Rarer commands:
 
-- =org-node-rewrite-links-ask=
-  - Look for link descriptions that got out of sync with the current node title, then prompt at each link to update it
-- =org-node-rename-asset-and-rewrite-links=
-  - Interactively rename an asset such as an image file and try to update all Org links to them.  Requires [[https://github.com/mhayashi1120/Emacs-wgrep][wgrep]].
-    - NOTE: For now, it only looks for links inside the root directory that it prompts you for, and sub and sub-subdirectories and so on -- but won't find a link in a completely different place.  Like if you have Org files under /media linking to assets in /home, those links won't be updated.
-- =org-node-backlink-fix-all=
-  - Add =BACKLINKS= property to all nodes everywhere (takes a while)
-- =org-node-backlink-regret=
-  - In case you regret the =BACKLINKS= properties -- remove them all
 - =org-node-lint-all-files=
   - An utility to help fix a broken setup: it runs org-lint on all known files and generates a report of syntax problems.  Org-node [[https://github.com/meedstrom/org-node/issues/8#issuecomment-2101316447][assumes all files have valid syntax]], in particular around PROPERTIES drawers.
+- =org-node-list-dead-links=
+  - List links where the destination ID could not be found
+- =org-node-rewrite-links-ask=
+  - Look for link descriptions that got out of sync with the current node title, then prompt at each link to update it
+- =org-node-rename-file-by-title=
+  - Auto-rename the file based on the current =#+title= and =org-node-filename-fn=
+- =org-node-backlink-fix-all=
+  - Update =BACKLINKS= property in all nodes (takes a while)
 - =org-node-grep=
   - (Requires [[https://github.com/minad/consult][consult]]) Grep across all known Org files.  Very useful combined with [[https://github.com/oantolin/embark][embark]]-export & [[wgrep][wgrep]], to search-and-replace a given string everywhere in every directory, for example to rename a tag everywhere.
 - =org-node-list-feedback-arcs=
   - (Requires GNU R) Explore [[https://en.wikipedia.org/wiki/Feedback_arc_set][feedback arcs]] in your ID link network.  Can be a nice [[https://edstrom.dev/zvjjm/slipbox-workflow#ttqyc][occasional QA routine]].
-- =org-node-list-dead-links=
-  - List links where the destination ID could not be found
+- =org-node-rename-asset-and-rewrite-links=
+  - Interactively rename an asset such as an image file and try to update all Org links to them.  Requires [[https://github.com/mhayashi1120/Emacs-wgrep][wgrep]].
+    - NOTE: For now, it only looks for links inside the root directory that it prompts you for, and sub and sub-subdirectories and so on -- but won't find a link in a completely different place.  Like if you have Org files under /media linking to assets in /home, those links won't be updated.
 
 * Appendix
 ** Appendix I: Rosetta stone

@@ -132,7 +132,7 @@ Built-in choices:
   :group 'org-node
   :type '(radio
           (function-item org-node-slugify-like-roam)
-          (function-item org-node-slugify-as-url)
+          (function-item org-node-slugify-for-web)
           function))
 
 (defcustom org-node-creation-fn #'org-node-new-file
@@ -339,10 +339,8 @@ For `org-node-affixation-fn'."
 (defvar org-node--affixation-triplet-by-title (make-hash-table :test #'equal)
   "1:1 table mapping titles or aliases to affixation triplets.")
 
-(defun org-node-collection (str pred flag)
-  "Programmed collection for `completing-read'.
-
-Pass the function as the COLLECTION argument.
+(defun org-node-collection (str pred action)
+  "Programmed COLLECTION for `completing-read'.
 
 Uses variable `org-node--node-by-candidate' as the basis, and
 affixes each candidate using `org-node-affixation-fn'.  Actually,
@@ -352,21 +350,13 @@ All completion candidates are guaranteed to be keys of
 `org-node--node-by-candidate', but it is possible to exit with
 user-entered input, as is normal for `completing-read'.
 
-Arguments STR, PRED and FLAG are handled behind the scenes,
+Arguments STR, PRED and ACTION are handled behind the scenes,
 explained in the Info manual at (elisp)Programmed Completion."
-  (cond ((eq flag nil)
-         (try-completion str org-node--node-by-candidate pred))
-        ((eq flag t)
-         (all-completions str org-node--node-by-candidate pred))
-        ((eq flag 'lambda)
-         (test-completion str org-node--node-by-candidate pred))
-        ((consp flag)
-         (completion-boundaries str org-node--node-by-candidate pred (cdr flag)))
-        ((eq flag 'metadata)
-         (cons 'metadata (unless org-node-alter-candidates
-                           (list (cons 'affixation-function
-                                       #'org-node--affixate-collection)))))))
-
+  (if (eq action 'metadata)
+      (cons 'metadata (unless org-node-alter-candidates
+                        (list (cons 'affixation-function
+                                    #'org-node--affixate-collection))))
+    (complete-with-action action org-node--node-by-candidate str pred)))
 
 
 ;;; Functions & variables
