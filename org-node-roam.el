@@ -1,7 +1,6 @@
 ;;; org-node-roam.el --- Rudimentary Org-roam replica -*- lexical-binding: t; -*-
 
-(require 'org-node-common)
-(require 'url-parse)
+(require 'org-node)
 (require 'ol)
 
 (let (warned-once)
@@ -11,6 +10,7 @@
       (display-warning 'org-node "Deprecated function `org-node-feed-file-to-roam-db', use `org-node-roam-db-shim-mode' instead"))
     (org-node-roam-db-feed files)))
 
+;;;###autoload
 (define-minor-mode org-node-roam-redisplay-mode
   "Make the Roam buffer react when point moves in any Org buffer.
 
@@ -32,6 +32,7 @@ mode exists for people who prefer to turn that off."
 
 ;;; Method 1: Fake roam backlinks, no SQLite
 
+;;;###autoload
 (define-minor-mode org-node-roam-no-sql-mode
   "Instruct org-roam to use fake `org-roam-backlink-p' objects from
 org-node so that you can use \\[org-roam-buffer-toggle] without
@@ -129,6 +130,7 @@ Designed as override advice for `org-roam-reflinks-get'."
 
 ;;; Method 2: feed the DB
 
+;;;###autoload
 (define-minor-mode org-node-roam-db-shim-mode
   ""
   :global t
