@@ -459,9 +459,6 @@ can demonstrate the data format.  See also the type `org-node-get'.")
 (defvar org-node--node-by-candidate (make-hash-table :test #'equal)
   "1:1 table mapping completion candidates to nodes.")
 
-(defvar org-node--mtime-by-file (make-hash-table :test #'equal)
-  "1:1 table mapping files to modification times.")
-
 (defvar org-node--id-by-title (make-hash-table :test #'equal)
   "1:1 table mapping raw titles (and ROAM_ALIASES) to IDs.")
 
@@ -648,7 +645,7 @@ delete too many backlinks on cleanup."
         (advice-add 'delete-file :after #'org-node--handle-save)
         (org-node-cache-ensure 'must-async t)
         (setq org-node--idle-timer
-              (run-with-idle-timer 60 t #'org-node--reset-if-disk-changed))
+              (run-with-idle-timer 60 t #'org-node--schedule-idle-reset))
         (when (boundp 'org-node-cache-reset-hook)
           (display-warning 'org-node "Deprecated 2024-07-11: org-node-cache-reset-hook removed, update your initfiles")))
     (remove-hook 'after-save-hook #'org-node--handle-save)
@@ -739,30 +736,6 @@ advice on `rename-file' or `delete-file'."
                    '(".org" ".org_archive" ".org.gpg"))
       (org-node--scan-targeted (list file)))))
 
-(defun org-node--reset-if-disk-changed ()
-  "If `org-node-files' finds altered disk files, reset cache.
-
-This function will detect files that were created or modified
-outside this Emacs instance, so it is a good choice for
-reliability, but when you know a specific file to check, use
-`org-node--scan-targeted' instead, since it is faster by
-not needing to compare all file-modification times."
-  (let ((known-earlier (hash-table-keys org-node--mtime-by-file))
-        (found-now (org-node-files)))
-    (let ((deleted (-difference known-earlier found-now))
-          (new-or-modified
-           (cl-loop
-            for file in found-now
-            as saved-mtime = (gethash file org-node--mtime-by-file)
-            as mtime = (file-attribute-modification-time
-                        (file-attributes file))
-            when (or (not saved-mtime)
-                     (not (time-equal-p saved-mtime mtime)))
-            do (puthash file mtime org-node--mtime-by-file)
-            and collect file)))
-      (if (or deleted new-or-modified)
-          (org-node--scan-all)))))
-
 ;; Experimental
 ;; (add-hook 'org-node-insert-link-hook #'org-node--schedule-idle-reset)
 ;; (add-hook 'org-open-link-functions #'org-node--schedule-idle-reset)
@@ -770,7 +743,7 @@ not needing to compare all file-modification times."
   (cancel-timer org-node--idle-timer)
   (setq org-node--idle-timer
         (run-with-idle-timer
-         (* 30 (1+ org-node--elapsed)) nil #'org-node--reset-if-disk-changed))
+         (* 30 (1+ org-node--elapsed)) nil #'org-node--schedule-idle-reset))
   nil)
 
 (defvar org-node--idle-timer (timer-create)
@@ -825,12 +798,7 @@ eventually and not dropped."
             (org-node--scan (org-node-files)
                             #'org-node--finish-full))
         ;; Targeted scan of specific files
-        (let (modified)
-          (cl-loop for file in file-queue
-                   if (gethash file org-node--mtime-by-file)
-                   do (push file modified))
-          (setq file-queue nil)
-          (org-node--scan modified #'org-node--finish-modified)))
+        (org-node--scan file-queue #'org-node--finish-modified))
       (when file-queue
         (cancel-timer org-node--retry-timer)
         (setq org-node--retry-timer
@@ -1026,12 +994,8 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
     (clrhash org-node--id-by-title)
     (clrhash org-node--reflinks-by-ref)
     (clrhash org-node--backlinks-by-id)
-    (-let (((missing-files mtimes nodes id-links reflinks cites) results))
+    (-let (((missing-files _ nodes id-links reflinks cites) results))
       (org-node--forget-id-locations missing-files)
-      (dolist (file missing-files)
-        (remhash file org-node--mtime-by-file))
-      (dolist (found mtimes)
-        (puthash (car found) (cdr found) org-node--mtime-by-file))
       (dolist (node nodes)
         (org-node--record-node node))
       (org-node--record-id-links id-links)
@@ -1043,28 +1007,24 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
       (org-node--print-elapsed))))
 
 ;; NOTE For performance, we do not bother to update the links tables on file
-;; modification.  Doing so would not be a simple puthash operation, but need
+;; modification.  Doing so would not be simple puthash operations, but need
 ;; looping to find all matches of :dest as well as :origin, and that gets slow
 ;; when saving a big file containing 5000 links -- slow enough to annoy users
 ;; of `auto-save-visited-mode', at minimum.
 ;;
-;; Fortunately, our insert-link advices will already record links added during
-;; normal usage!  What's left is mainly that /deleted/ links will remain in the
-;; table until removed at the next full scan.  That is OK, as I think the
-;; nicest code relies on frequent full scans anyway.
+;; Fortunately it isn't needed, our insert-link advices will already record
+;; links added during normal usage!  What's left undone til next full scan:
+;; 1. deleted links remain in the table
+;; 2. the :pos value can be off which could affect org-roam-buffer
 (defun org-node--finish-modified (results)
-  (-let (((missing-files mtimes nodes) results))
+  (-let (((missing-files found-files nodes) results))
     (org-node--forget-id-locations missing-files)
     (org-node--dirty-forget-files missing-files)
-    (dolist (file missing-files)
-      (remhash file org-node--mtime-by-file))
-    (dolist (found mtimes)
-      (puthash (car found) (cdr found) org-node--mtime-by-file))
     ;; In case a title was edited
-    (org-node--dirty-forget-completions-in (mapcar #'car mtimes))
+    (org-node--dirty-forget-completions-in found-files)
     (dolist (node nodes)
       (org-node--record-node node))
-    (run-hook-with-args 'org-node-rescan-hook (mapcar #'car mtimes))))
+    (run-hook-with-args 'org-node-rescan-hook found-files)))
 
 
 ;;; "Record" functions
@@ -1236,8 +1196,7 @@ calling `org-id-locations-save', which this function does not do."
   (when files
     ;; (setq org-id-files (-difference org-id-files files)) ;; Redundant
     (let ((alist (org-id-hash-to-alist org-id-locations)))
-      (cl-loop for file in files
-               do (assoc-delete-all file alist))
+      (cl-loop for file in files do (assoc-delete-all file alist))
       (setq org-id-locations (org-id-alist-to-hash alist)))))
 
 (defun org-node--split-into-n-sublists (big-list n)
@@ -1548,8 +1507,8 @@ which it gets some necessary variables."
         (unwind-protect
             (run-hooks 'org-node-creation-hook)
           (save-buffer)
-          (org-id-add-location org-node-proposed-id path-to-write) ;; Redundant
-          (org-node--scan-targeted (list path-to-write)))))))
+          ;; REVIEW Redundant?
+          (org-id-add-location org-node-proposed-id path-to-write))))))
 
 (defun org-node-new-via-roam-capture ()
   "Call `org-roam-capture-' with predetermined arguments.
@@ -1564,9 +1523,7 @@ time some necessary variables are set."
     (require 'org-roam)
     (org-roam-capture- :node (org-roam-node-create
                               :title org-node-proposed-title
-                              :id    org-node-proposed-id))
-    ;; REVIEW: redundant given save-hooks?
-    (org-node--reset-if-disk-changed)))
+                              :id    org-node-proposed-id))))
 
 ;; TODO write a template to capture into an org-journal file
 ;; (defun org-node-capture-target-day ()

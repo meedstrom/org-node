@@ -219,7 +219,7 @@ process does not have to load org.el."
 
 (defvar org-node-worker--result-missing-files nil)
 (defvar org-node-worker--result-found-nodes nil)
-(defvar org-node-worker--result-mtimes nil)
+(defvar org-node-worker--result-found-files nil)
 (defvar org-node-worker--result-found-id-links nil)
 (defvar org-node-worker--result-found-reflinks nil)
 (defvar org-node-worker--result-found-citations nil)
@@ -254,13 +254,12 @@ list, and write results to another temp file."
         TAGS FILE-TAGS ID FILE-ID SCHED DEADLINE OLP PRIORITY LEVEL PROPS)
     (dolist (FILE $files)
       (condition-case err
-          (if (null (setq MTIME (file-attribute-modification-time
-                                 (file-attributes FILE))))
+          (if (not (file-exists-p FILE))
               ;; We got here because user deleted a file in a way that we
               ;; didn't notice.  If it was actually a rename done outside
               ;; Emacs, the new name will get picked up on next reset.
               (push FILE org-node-worker--result-missing-files)
-            (push (cons FILE MTIME) org-node-worker--result-mtimes)
+            (push FILE org-node-worker--result-found-files)
             (erase-buffer)
             ;; NOTE: Here I used `insert-file-contents-literally' in the past,
             ;; converting each captured substring afterwards with
@@ -521,7 +520,7 @@ list, and write results to another temp file."
           (print-level nil))
       (write-region
        (prin1-to-string (list org-node-worker--result-missing-files
-                              org-node-worker--result-mtimes
+                              org-node-worker--result-found-files
                               org-node-worker--result-found-nodes
                               org-node-worker--result-found-id-links
                               org-node-worker--result-found-reflinks
