@@ -3,12 +3,16 @@
 (require 'org-node)
 (require 'ol)
 
-(let (warned-once)
-  (defun org-node-feed-file-to-roam-db (&optional files)
-    (unless warned-once
-      (setq warned-once t)
-      (display-warning 'org-node "Deprecated function `org-node-feed-file-to-roam-db', use `org-node-roam-db-shim-mode' instead"))
-    (org-node-roam-db-feed files)))
+;;;###autoload
+(defun org-node-feed-file-to-roam-db (&optional files)
+  (declare (obsolete 'org-node-roam-db-feed "2024-07-11"))
+  (unless warned-once
+    (setq warned-once t)
+    (display-warning 'org-node "Deprecated function `org-node-feed-file-to-roam-db', use `org-node-roam-db-shim-mode' instead"))
+  (org-node-roam-db-feed files))
+
+(org-node--defobsolete org-node--fabricate-roam-backlinks org-node-roam--make-backlinks)
+(org-node--defobsolete org-node--fabricate-roam-reflinks org-node-roam--make-reflinks)
 
 ;;;###autoload
 (define-minor-mode org-node-roam-redisplay-mode
