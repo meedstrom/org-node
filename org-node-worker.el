@@ -1,10 +1,5 @@
 ;;; org-node-worker.el --- Gotta go fast -*- lexical-binding: t; -*-
 
-;; TODO try not writing 6 file lists, just one and access correct list with
-;;      cdr assq i ...
-
-;; (setq org-node--debug t)
-
 (eval-when-compile
   (require 'cl-macs)
   (require 'subr-x))
@@ -35,7 +30,7 @@ that will match any of the TODO keywords within."
                (split-string)
                (regexp-opt)))
 
-(defsubst org-node-worker--elem-index (elem list)
+(defun org-node-worker--elem-index (elem list)
   "Like `-elem-index', return first index of ELEM in LIST."
   (when list
     (let ((list list)
@@ -45,7 +40,7 @@ that will match any of the TODO keywords within."
               list (cdr list)))
       i)))
 
-(defsubst org-node-worker--pos->parent-id (oldata pos file-id)
+(defun org-node-worker--pos->parent-id (oldata pos file-id)
   "Return ID of the closest ancestor heading that has an ID.
 See `org-node-worker--pos->olp' for explanation of OLDATA and POS.
 
@@ -66,7 +61,7 @@ if no ancestor heading has an ID.  It can be nil."
                ;; Even the top-level heading had no id
                if (= 1 previous-level) return file-id))))
 
-(defsubst org-node-worker--pos->olp (oldata pos)
+(defun org-node-worker--pos->olp (oldata pos)
   "Given buffer position HEADING-POS, return the Org outline path.
 Result should look like a result from `org-get-outline-path'.
 
@@ -104,7 +99,7 @@ in one of the elements."
                return nil))
     olp))
 
-(defsubst org-node-worker--org-link-display-format (s)
+(defun org-node-worker--org-link-display-format (s)
   "Copy-pasted from `org-link-display-format'."
   (save-match-data
     (replace-regexp-in-string
@@ -113,7 +108,7 @@ in one of the elements."
      (lambda (m) (or (match-string 2 m) (match-string 1 m)))
      s nil t)))
 
-(defsubst org-node-worker--next-heading ()
+(defun org-node-worker--next-heading ()
   "Similar to `outline-next-heading'.
 In the special case where point is at the beginning of the buffer
 and there is a heading there, just return t without moving point."
@@ -125,7 +120,7 @@ and there is a heading there, just return t without moving point."
   (if (re-search-forward "^\\*+ " nil 'move)
       (goto-char (pos-bol))))
 
-(defsubst org-node-worker--collect-citations-until (end id-here olp-with-self)
+(defun org-node-worker--collect-citations-until (end id-here olp-with-self)
   "From here to buffer position END, look for citation @keys."
   ;; NOTE Should ideally search for `org-element-citation-prefix-re', but
   ;; hoping this is good enough.
@@ -150,7 +145,7 @@ and there is a heading there, just return t without moving point."
                         :properties (list :outline olp-with-self))
                   org-node-worker--result-found-citations)))))))
 
-(defsubst org-node-worker--collect-links-until (end id-here olp-with-self link-re)
+(defun org-node-worker--collect-links-until (end id-here olp-with-self link-re)
   "From here to buffer position END, look for forward-links.
 Ensure these links will be used to populate tables
 `org-node--backlinks-by-id' and `org-node--reflinks' in the
@@ -195,7 +190,7 @@ process does not have to load org.el."
                   org-node-worker--result-found-id-links
                 org-node-worker--result-found-reflinks))))))
 
-(defsubst org-node-worker--collect-properties (beg end file)
+(defun org-node-worker--collect-properties (beg end file)
   "Assuming BEG and END delimit the region in between
 :PROPERTIES:...:END:, collect the properties into an alist."
   (let (res)
