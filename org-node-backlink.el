@@ -1,7 +1,6 @@
 ;;; org-node-backlink.el -*- lexical-binding: t; -*-
 
-(require 'org-node-common)
-(require 'org-node-cache)
+(require 'org-node)
 (require 'cl-macs)
 
 (let (warned-once)
@@ -12,12 +11,14 @@
                       "Your config may have misspelled `org-node-backlink-mode' as `org-node-backlinks-mode'"))
     (apply #'org-node-backlink-mode args)))
 
+;;;###autoload
 (define-globalized-minor-mode org-node-backlink-global-mode
   org-node-backlink-mode
   (lambda ()
     (when (derived-mode-p 'org-mode)
       (org-node-backlink-mode))))
 
+;;;###autoload
 (define-minor-mode org-node-backlink-mode
   "Keep :BACKLINKS: properties updated."
   :group 'org-node
@@ -49,11 +50,13 @@
 (defvar org-node-backlink--fix-ctr 0)
 (defvar org-node-backlink--files-to-fix nil)
 
+;;;###autoload
 (defun org-node-backlink-regret ()
   "Visit all `org-id-locations' and remove :BACKLINKS: property."
   (interactive)
   (org-node-backlink-fix-all 'remove))
 
+;;;###autoload
 (defun org-node-backlink-fix-all (&optional remove?)
   "Add :BACKLINKS: property to all nodes known to `org-id-locations'.
 Optional argument REMOVE? t means remove them instead, the same
@@ -282,7 +285,7 @@ all areas where text is added/changed/deleted."
                      (file-name-nondirectory buffer-file-name))))))
         ;; Ensure that `org-node-backlink--fix-changed-parts-of-buffer' will
         ;; not later remove the backlink we're adding
-        (org-node-cache--dirty-ensure-node-known)
+        (org-node--dirty-ensure-node-known)
         (let ((org-node--imminent-recovery-msg
                "Org-node going to add a backlink to the target of the link you just inserted, but it's likely you will first get a prompt to recover an auto-save file, ready? "))
           (org-node--with-quick-file-buffer target-file
