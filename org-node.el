@@ -792,6 +792,7 @@ rm on the command line instead of using \\[delete-file].")
   (org-node--try-launch-scan (ensure-list files)))
 
 (defvar org-node--retry-timer (timer-create))
+(defvar org-node--known-files nil)
 
 ;; On the one hand, elegant, but somehow it's long for such a simple concept
 (let (file-queue wait-start full-scan-requested)
@@ -801,7 +802,7 @@ multiple files are being renamed) will be handled
 eventually and not dropped."
     (if (eq t files)
         (setq full-scan-requested t)
-      (setq file-queue (-union (mapcar #'abbreviate-file-name files) file-queue)))
+      (setq file-queue (-union (-map #'abbreviate-file-name files) file-queue)))
     (if (-any-p #'process-live-p org-node--processes)
         (progn
           (unless wait-start
@@ -825,19 +826,12 @@ eventually and not dropped."
             (org-node--scan (org-node-files)
                             #'org-node--finish-full))
         ;; Targeted scan of specific files
-        (let (new modified)
+        (let (modified)
           (cl-loop for file in file-queue
                    if (gethash file org-node--mtime-by-file)
-                   do (push file modified)
-                   else do (push file new))
-          (cond (new
-                 (setq file-queue modified)
-                 (org-node--scan new
-                                 #'org-node--finish-new))
-                (modified
-                 (setq file-queue nil)
-                 (org-node--scan modified
-                                 #'org-node--finish-modified)))))
+                   do (push file modified))
+          (setq file-queue nil)
+          (org-node--scan modified #'org-node--finish-modified)))
       (when file-queue
         (cancel-timer org-node--retry-timer)
         (setq org-node--retry-timer
@@ -1048,20 +1042,6 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
     (unless first-time
       (org-id-locations-save)
       (org-node--print-elapsed))))
-
-;; TODO deprecate
-(defun org-node--finish-new (results)
-  (-let (((missing-files mtimes nodes id-links reflinks) results))
-    (org-node--forget-id-locations missing-files)
-    (dolist (file missing-files)
-      (remhash file org-node--mtime-by-file))
-    (dolist (found mtimes)
-      (puthash (car found) (cdr found) org-node--mtime-by-file))
-    (dolist (node nodes)
-      (org-node--record-node node))
-    (org-node--record-id-links id-links)
-    (org-node--record-reflinks reflinks)
-    (run-hook-with-args 'org-node-rescan-hook (mapcar #'car mtimes))))
 
 ;; NOTE For performance, we do not bother to update the links tables on file
 ;; modification.  Doing so would not be a simple puthash operation, but need
