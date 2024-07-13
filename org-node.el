@@ -63,25 +63,22 @@
                  old new)
           (set new (symbol-value old)))))))
 
-(defmacro org-node--defobsolete (old new)
+(defmacro org-node--defobsolete (old new &optional interactive)
   "Define OLD as a function that runs NEW."
   `(let (warned-once)
      (defun ,old (&rest args)
+       ,@(if interactive '((interactive)))
        (declare (obsolete ',new "July 2024"))
        (unless warned-once
          (setq warned-once t)
-         (lwarn 'org-node :warning "Your config uses old function name: %S, new name %S"
+         (lwarn 'org-node :warning "You or your config used old function name: %S, new name %S"
                 ',old ',new))
        (apply ',new args))))
 
-(org-node--defobsolete org-nodeify-entry org-node-nodeify-entry)
+(org-node--defobsolete org-nodeify-entry org-node-nodeify-entry t)
+(org-node--defobsolete org-node-random org-node-visit-random t)
 (org-node--defobsolete org-node-slugify-as-url org-node-slugify-for-web)
-(org-node--defobsolete org-node-random org-node-visit-random)
 (org-node--defobsolete org-node-new-by-roam-capture org-node-new-via-roam-capture)
-(org-node--defobsolete org-node-feed-roam-db org-node-roam-db-reset)
-(org-node--defobsolete org-node--convert-to-roam org-node-roam--make-obj)
-(org-node--defobsolete org-node--fabricate-roam-backlinks org-node-roam--make-backlinks )
-(org-node--defobsolete org-node--fabricate-roam-reflinks org-node-roam--make-reflinks )
 
 
 ;;; Options
