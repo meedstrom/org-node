@@ -630,13 +630,12 @@ file is gone.
 Either operate on ARG2 if it seems to be a file name, else ARG1,
 else the current buffer file.  Meant for `after-save-hook' or as
 advice on `rename-file' or `delete-file'."
-  (let ((file (cond
-               ((and (stringp arg2) (file-exists-p arg2)) ;; rename-file
-                arg2)
-               ((stringp arg1) ;; delete-file
-                arg1)
-               ((stringp buffer-file-name) ;; after-save-hook
-                buffer-file-name))))
+  (let ((file (cond ((and (stringp arg2) (file-exists-p arg2)) ;; rename-file
+                     arg2)
+                    ((stringp arg1) ;; delete-file
+                     arg1)
+                    ((stringp buffer-file-name) ;; after-save-hook
+                     buffer-file-name))))
     (when (--any-p (string-suffix-p it file)
                    '(".org" ".org_archive" ".org.gpg"))
       (org-node--scan-targeted (list file)))))
@@ -648,7 +647,7 @@ advice on `rename-file' or `delete-file'."
   (cancel-timer org-node--idle-timer)
   (setq org-node--idle-timer
         (run-with-idle-timer
-         (* 30 (1+ org-node--elapsed)) nil #'org-node--schedule-idle-reset))
+         (* 30 (1+ org-node--time-elapsed)) nil #'org-node--schedule-idle-reset))
   nil)
 
 (defvar org-node--idle-timer (timer-create)
@@ -671,7 +670,7 @@ rm on the command line instead of using \\[delete-file].")
 (defvar org-node--retry-timer (timer-create))
 (defvar org-node--known-files nil)
 
-;; On the one hand, elegant, but somehow it's long for such a simple concept
+;; TODO Shorten
 (let (file-queue wait-start full-scan-requested)
   (defun org-node--try-launch-scan (&optional files)
     "Ensure that multiple calls occurring in a short time (like when
@@ -700,9 +699,10 @@ eventually and not dropped."
       (if full-scan-requested
           (progn
             (setq full-scan-requested nil)
-            (org-node--scan (org-node-files) #'org-node--finish-full))
+            (org-node--scan (org-node-files) #'org-node--finalize-full))
         ;; Targeted scan of specific files
-        (org-node--scan file-queue #'org-node--finish-modified))
+        (org-node--scan file-queue #'org-node--finalize-modified)
+        (setq file-queue nil))
       (when file-queue
         (cancel-timer org-node--retry-timer)
         (setq org-node--retry-timer
@@ -714,7 +714,7 @@ eventually and not dropped."
   "Count of finished subprocesses.")
 (defvar org-node--stderr-name " *org-node*"
   "Name of buffer for the subprocesses stderr.")
-(defvar org-node--start-time nil
+(defvar org-node--time-at-init-scan nil
   "Timestamp used to measure time it took to rebuild cache.")
 
 (defvar org-node--max-jobs nil
@@ -767,12 +767,6 @@ didn't do so already, or local changes have been made."
        ;; Would use native-comp here, but it wrecks Customize
        (setq ,var (byte-compile ,var))))
 
-;; ;; Need to merge the regexps, so we dont pick up same link twice,
-;; ;; bracketed and unbracketed form.
-;; (defun org-node--make-merged-link-re ()
-;;   (require 'ol)
-;;   (concat org-link-bracket-re "\\|" org-link-plain-re))
-
 (defun org-node--scan (files finalizer)
   "Begin async scanning FILES for id-nodes and links.
 
@@ -784,8 +778,8 @@ tables."
   (org-node--ensure-compiled-fn org-node-affixation-fn)
   (let ((compiled-lib (org-node--ensure-compiled-lib))
         (file-name-handler-alist nil))
-    (garbage-collect)
-    (setq org-node--start-time (current-time))
+    (when org-node--debug (garbage-collect))
+    (setq org-node--time-at-init-scan (current-time))
     (setq org-node--done-ctr 0)
     (when (-any-p #'process-live-p org-node--processes)
       ;; We should never end up here, but just in case
@@ -879,13 +873,17 @@ tables."
                              (org-node--handle-finished-job n-jobs finalizer)))
                 org-node--processes))))))
 
+(defvar org-node--time-at-start-finalize nil)
+
 (defun org-node--handle-finished-job (n-jobs finalizer)
   "Check if this was the last process to return (by counting up
 to N-JOBS), then if so, wrap-up and call FINALIZER."
   (when (eq n-jobs (cl-incf org-node--done-ctr))
-    (let* ((file-name-handler-alist nil)
-           ;; (coding-system-for-read 'utf-8-unix)
-           result-sets)
+    (when org-node--debug (garbage-collect))
+    (setq org-node--time-at-start-finalize (current-time))
+    (let ((file-name-handler-alist nil)
+          ;; (coding-system-for-read 'utf-8-unix)
+          result-sets)
       (with-temp-buffer
         (dotimes (i n-jobs)
           (let ((results-file (org-node-worker--tmpfile "results-%d.eld" i))
@@ -904,12 +902,13 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
               (erase-buffer)
               (insert-file-contents results-file)
               (push (read (buffer-string)) result-sets)))))
+      (setq org-node--time-at-last-child-done (-last-item (car result-sets)))
       (funcall finalizer (--reduce (-zip-with #'nconc it acc) result-sets)))))
 
 
 ;;;; Scan finalizers
 
-(defun org-node--finish-full (results)
+(defun org-node--finalize-full (results)
   (let ((first-time (hash-table-empty-p org-node--node-by-id)))
     (clrhash org-node--node-by-id)
     (clrhash org-node--node-by-candidate)
@@ -918,7 +917,7 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
     (clrhash org-node--reflinks-by-ref)
     (clrhash org-node--backlinks-by-id)
     (clrhash org-node--cites-by-citekey)
-    (-let (((missing-files _ nodes id-links reflinks cites) results))
+    (-let (((missing-files _found-files nodes id-links reflinks cites) results))
       (org-node--forget-id-locations missing-files)
       (dolist (node nodes)
         (org-node--record-node node))
@@ -940,7 +939,7 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
 ;; links added during normal usage!  What's left undone til next full scan:
 ;; 1. deleted links remain in the table --> undead backlinks
 ;; 2. the :pos value can be off which could affect org-roam-buffer
-(defun org-node--finish-modified (results)
+(defun org-node--finalize-modified (results)
   (-let (((missing-files found-files nodes) results))
     (org-node--forget-id-locations missing-files)
     (org-node--dirty-forget-files missing-files)
@@ -1001,7 +1000,7 @@ The input NODE-RECIPE is a list of arguments to pass to
               (puthash (concat (nth 1 affx) (nth 0 affx) (nth 2 affx))
                        node
                        org-node--node-by-candidate)
-            ;; Raw title as candidate (to be affixated in realtime)
+            ;; Raw title as candidate (to be affixated by `org-node-collection')
             (puthash title node org-node--node-by-candidate)
             (puthash title affx org-node--affixation-triplet-by-title))
           (puthash title id org-node--id-by-title)
@@ -1009,10 +1008,10 @@ The input NODE-RECIPE is a list of arguments to pass to
             (unless (equal id collision)
               (message "Two nodes have same name: %s, %s (%s)"
                        id collision title)))))
-      ;; (yolo) Let ROAM_REFS work as aliases too
+      ;; Let ROAM_REFS work as aliases too
+      ;; (But don't apply the affixation fn)
       (dolist (ref (org-node-get-refs node))
         (puthash ref node org-node--node-by-candidate)
-        ;; Though we won't affixate refs, color them anyway
         (puthash ref
                  (list (propertize ref 'face 'org-cite) nil nil)
                  org-node--affixation-triplet-by-title)))))
@@ -1117,27 +1116,13 @@ also necessary is `org-node--dirty-ensure-link-known'."
 (defvar org-node--debug nil
   "Whether to run in a way suitable for debugging.")
 
-(defun org-node--split-into-n-sublists (big-list n)
-  "Split BIG-LIST into a list of N sublists.
-
-In the special case where BIG-LIST contains fewer than N
-elements, the return value is just like BIG-LIST except that each
-element is wrapped in its own list."
-  (let ((sublist-length (max 1 (/ (length big-list) n)))
-        result)
-    (dotimes (i n)
-      (if (= i (1- n))
-          ;; Let the last iteration just take what's left
-          (push big-list result)
-        (push (take sublist-length big-list) result)
-        (setq big-list (nthcdr sublist-length big-list))))
-    (delq nil result)))
-
-(defvar org-node--elapsed 1
+(defvar org-node--time-elapsed 1
   "Time elapsed by the last cache reset.")
 
+(defvar org-node--time-at-last-child-done nil)
+
 (defun org-node--print-elapsed ()
-  "Print time elapsed since `org-node--start-time'.
+  "Print time elapsed since `org-node--time-at-init-scan'.
 Also report statistics about the nodes and links found.
 
 Currently, the printed message implies that all of org-node's
@@ -1160,8 +1145,30 @@ be misleading."
                n-subtrees
                n-backlinks
                n-reflinks
-               (setq org-node--elapsed
-                     (float-time (time-since org-node--start-time)))))))
+               ;; For reproducible profiling
+               (setq org-node--time-elapsed
+                     (+ (float-time
+                         (time-subtract (current-time)
+                                        org-node--time-at-start-finalize))
+                        (float-time
+                         (time-subtract org-node--time-at-last-child-done
+                                        org-node--time-at-init-scan))))))))
+
+(defun org-node--split-into-n-sublists (big-list n)
+  "Split BIG-LIST into a list of N sublists.
+
+In the special case where BIG-LIST contains fewer than N
+elements, the return value is just like BIG-LIST except that each
+element is wrapped in its own list."
+  (let ((sublist-length (max 1 (/ (length big-list) n)))
+        result)
+    (dotimes (i n)
+      (if (= i (1- n))
+          ;; Let the last iteration just take what's left
+          (push big-list result)
+        (push (take sublist-length big-list) result)
+        (setq big-list (nthcdr sublist-length big-list))))
+    (delq nil result)))
 
 ;; I wish that `find-file-noselect' when called from Lisp would take an
 ;; optional argument that explains why the file is about to be opened, amending

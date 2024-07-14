@@ -551,7 +551,8 @@ list, and write results to another temp file."
                               result-found-nodes
                               org-node-worker--result-found-id-links
                               org-node-worker--result-found-reflinks
-                              org-node-worker--result-found-citations))
+                              org-node-worker--result-found-citations
+                              (current-time)))
        nil
        (org-node-worker--tmpfile "results-%d.eld" i)))))
 
