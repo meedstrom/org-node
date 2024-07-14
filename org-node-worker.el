@@ -4,21 +4,16 @@
   (require 'cl-macs)
   (require 'subr-x))
 
-;; Note to self: file-name-concat is probably faster than expand-file-name when
-;; we do not need to convert the filename to absolute anyway.  Basically even
-;; better than setting file-name-handler-alist to nil.
 (defun org-node-worker--tmpfile (&optional basename &rest args)
   "Return a path that puts BASENAME in a temporary directory.
+Also as a nicety, `format' BASENAME with ARGS.
 
 On most systems, the resulting string will be
-/tmp/org-node/BASENAME, but it depends on the output of
-`temporary-file-directory'.  Also as a nicety, pass BASENAME and
-ARGS through `format' first."
-  (file-name-concat (temporary-file-directory)
+/tmp/org-node/BASENAME, but it depends on
+`temporary-file-directory'."
+  (file-name-concat temporary-file-directory
                     "org-node"
-                    (if basename
-                        (apply #'format basename args)
-                      "")))
+                    (if basename (apply #'format basename args) "")))
 
 (defun org-node-worker--make-todo-regexp (keywords-string)
   "Make a regexp based on KEYWORDS-STRING,
@@ -40,7 +35,9 @@ that will match any of the TODO keywords within."
           (setq beg (match-beginning 0))
           (setq end (search-forward "]"))
           (goto-char beg)
-          (while (re-search-forward "@\\([!#-+./:<>-@^-`{-~[:word:]-]+\\)" end t)
+          ;; The regexp is `org-element-citation-key-re'
+          (while (re-search-forward "@\\([!#-+./:<>-@^-`{-~[:word:]-]+\\)"
+                                    end t)
             (push (match-string 0) refs))
           (delete-region beg end))
         (goto-char 1)
@@ -106,8 +103,8 @@ in one of the elements."
          (pos-data (or (assoc pos oldata)
                        (error "Broken algo: HEADING-POS %s not found in OLDATA %s"
                               pos oldata)))
-         ;; Drop all the data about positions below HEADING-POS (using `nthcdr' because
-         ;; oldata is in reverse order)
+         ;; Drop all the data about positions below HEADING-POS (using `nthcdr'
+         ;; because oldata is in reverse order)
          (data-until-pos (nthcdr (org-node-worker--elem-index pos-data oldata)
                                  oldata)))
     (let ((previous-level (caddr (car data-until-pos))))
@@ -126,47 +123,18 @@ in one of the elements."
   "Copy-pasted from `org-link-display-format'."
   (save-match-data
     (replace-regexp-in-string
-     ;; Pasted from `org-link-bracket-re'
+     ;; The regexp is `org-link-bracket-re'
      "\\[\\[\\(\\(?:[^][\\]\\|\\\\\\(?:\\\\\\\\\\)*[][]\\|\\\\+[^][]\\)+\\)]\\(?:\\[\\([^z-a]+?\\)]\\)?]"
      (lambda (m) (or (match-string 2 m) (match-string 1 m)))
      s nil t)))
 
 (defun org-node-worker--next-heading ()
-  "Similar to `outline-next-heading'.
-In the special case where point is at the beginning of the buffer
-and there is a heading there, just return t without moving point."
-  ;; if (and (bobp) (looking-at-p "^\\*+ "))
-  ;; t
+  "Similar to `outline-next-heading'."
   (if (and (bolp) (not (eobp)))
       ;; Prevent matching the same line forever
       (forward-char))
   (if (re-search-forward "^\\*+ " nil 'move)
       (goto-char (pos-bol))))
-
-(defun org-node-worker--collect-citations-until (end id-here olp-with-self)
-  "From here to buffer position END, look for citation @keys."
-  ;; NOTE Should ideally search for `org-element-citation-prefix-re', but
-  ;; hoping this is good enough.
-  (while (search-forward "[cite" end t)
-    (let ((closing-bracket (save-excursion (search-forward "]" end t))))
-      (when closing-bracket
-        (while (re-search-forward
-                ;; Copypasta from `org-element-citation-key-re'
-                "@\\([!#-+./:<>-@^-`{-~[:word:]-]+\\)"
-                closing-bracket t)
-          (if (save-excursion
-                (goto-char (pos-bol))
-                (or (looking-at-p "[[:space:]]*# ")
-                    (looking-at-p "[[:space:]]*#\\+")))
-              ;; On a # comment or #+keyword, skip citation
-              ;; (NOTE: don't skip whole line as in the other fn)
-              (goto-char closing-bracket)
-            (push (list :origin id-here
-                        :pos (point)
-                        :key (match-string 0)
-                        ;; Because org-roam asks for it
-                        :properties (list :outline olp-with-self))
-                  org-node-worker--result-found-citations)))))))
 
 (defun org-node-worker--collect-links-until (end id-here olp-with-self link-re)
   "From here to buffer position END, look for forward-links.
@@ -188,30 +156,54 @@ that org-roam expects to have.
 Argument LINK-RE is expected to be the value of
 `org-link-plain-re', passed in this way only so that the child
 process does not have to load org.el."
-  (while (re-search-forward
-          ;; NOTE: There was a hair-pulling bug here because I pasted the
-          ;; evalled value of `org-link-plain-re', but whitespace cleaners
-          ;; subtly changed it upon save!  So now we just pass in the variable.
-          ;; And a lesson: set your editor to always highlight trailing spaces,
-          ;; at least in the regions you have modified (PR ws-butler?)
-          link-re end t)
-    (let ((link-type (match-string 1))
-          (path (match-string 2)))
-      (if (save-excursion
-            (goto-char (pos-bol))
-            (or (looking-at-p "[[:space:]]*# ")
-                (looking-at-p "[[:space:]]*#\\+")))
-          ;; On a # comment or #+keyword, skip whole line
-          (goto-char (pos-eol))
-        (push (list :origin id-here
-                    :pos (point)
-                    :type link-type
-                    :dest path
-                    ;; Because org-roam asks for it
-                    :properties (list :outline olp-with-self))
-              (if (equal "id" link-type)
-                  org-node-worker--result-found-id-links
-                org-node-worker--result-found-reflinks))))))
+  (let ((beg (point)))
+    (while (re-search-forward
+            ;; NOTE: There was a hair-pulling bug here because I pasted the
+            ;; evalled value of `org-link-plain-re', but whitespace cleaners
+            ;; subtly changed it upon save!  So now we just pass in the variable.
+            ;; And a lesson: set your editor to always highlight trailing spaces,
+            ;; at least in the regions you have modified (PR ws-butler?)
+            link-re end t)
+      (let ((link-type (match-string 1))
+            (path (match-string 2)))
+        (if (save-excursion
+              (goto-char (pos-bol))
+              (or (looking-at-p "[[:space:]]*# ")
+                  (looking-at-p "[[:space:]]*#\\+")))
+            ;; On a # comment or #+keyword, skip whole line
+            (goto-char (pos-eol))
+          (push (list :origin id-here
+                      :pos (point)
+                      :type link-type
+                      :dest path
+                      ;; Because org-roam asks for it
+                      :properties (list :outline olp-with-self))
+                (if (equal "id" link-type)
+                    org-node-worker--result-found-id-links
+                  org-node-worker--result-found-reflinks)))))
+    ;; Start over and look for @citekeys
+    (goto-char beg)
+    ;; NOTE Should ideally search for `org-element-citation-prefix-re', but
+    ;; hoping this is good enough.
+    (while (search-forward "[cite" end t)
+      (let ((closing-bracket (save-excursion (search-forward "]" end t))))
+        (when closing-bracket
+          ;; The regexp is `org-element-citation-key-re'
+          (while (re-search-forward "@\\([!#-+./:<>-@^-`{-~[:word:]-]+\\)"
+                                    closing-bracket t)
+            (if (save-excursion
+                  (goto-char (pos-bol))
+                  (or (looking-at-p "[[:space:]]*# ")
+                      (looking-at-p "[[:space:]]*#\\+")))
+                ;; On a # comment or #+keyword, skip citation
+                ;; (NOTE: don't skip whole line as in the other fn)
+                (goto-char closing-bracket)
+              (push (list :origin id-here
+                          :pos (point)
+                          :key (match-string 0)
+                          ;; Because org-roam asks for it
+                          :properties (list :outline olp-with-self))
+                    org-node-worker--result-found-citations))))))))
 
 (defun org-node-worker--collect-properties (beg end file)
   "Assuming BEG and END delimit the region in between
@@ -240,7 +232,7 @@ process does not have to load org.el."
 
 ;;; Main
 
-;; TODO move these 3 into let-binding
+;; TODO move these 3 into let-binding, dont need global variables
 (defvar org-node-worker--result-missing-files nil)
 (defvar org-node-worker--result-found-files nil)
 (defvar org-node-worker--result-found-nodes nil)
@@ -249,6 +241,7 @@ process does not have to load org.el."
 (defvar org-node-worker--result-found-reflinks nil)
 (defvar org-node-worker--result-found-citations nil)
 
+;; TODO use `narrow-to-region' per subtree for more confidence refactoring
 (defun org-node-worker--collect-dangerously ()
   "Dangerous!  Assumes the current buffer is a temp buffer!
 
@@ -290,8 +283,8 @@ list, and write results to another temp file."
             ;; converting each captured substring afterwards with
             ;; `decode-coding-string', but it still made us record wrong values
             ;; for HEADING-POS when there was any Unicode in the file.
-            ;; Instead, setting `$assume-coding-system' and
-            ;; `$file-name-handler-alist' recoups much of the performance.
+            ;; Instead, overriding `coding-system-for-read' and
+            ;; `file-name-handler-alist' recoups much of the performance.
             (insert-file-contents FILE)
             ;; Verify there is at least one ID-node, otherwise skip file
             (when (re-search-forward "^[[:space:]]*:id: " nil t)
@@ -300,6 +293,8 @@ list, and write results to another temp file."
               ;; Rough equivalent of `org-end-of-meta-data' for the file
               ;; level, can jump somewhat too far but that's ok
               (if (re-search-forward "^ *?[^#:]" nil t)
+                  ;; NOTE If first char in file is an Org heading star, this
+                  ;;      just means FAR=1 with all that it implies
                   (setq FAR (1- (point)))
                 (setq FAR (point-max)))
               (goto-char 1)
@@ -324,13 +319,13 @@ list, and write results to another temp file."
                           (goto-char 1))
                       nil))
               (setq TODO-RE
-                    (if (re-search-forward $file-option-todo-re FAR t)
+                    (if (re-search-forward $file-todo-option-re FAR t)
                         (progn
                           (setq FILE-TODO-SETTINGS nil)
                           ;; Because you can have multiple #+todo: lines...
                           (while (progn
                                    (push (buffer-substring (point) (pos-eol)) FILE-TODO-SETTINGS)
-                                   (re-search-forward $file-option-todo-re FAR t)))
+                                   (re-search-forward $file-todo-option-re FAR t)))
                           (goto-char 1)
                           (org-node-worker--make-todo-regexp
                            (string-join FILE-TODO-SETTINGS " ")))
@@ -341,20 +336,24 @@ list, and write results to another temp file."
               (setq FILE-TITLE-OR-BASENAME
                     (or FILE-TITLE (file-name-nondirectory FILE)))
               (when (setq FILE-ID (cdr (assoc "ID" PROPS)))
-                ;; Collect links
+                ;; Collect links & citations before first heading
                 (setq END (save-excursion
                             (when (org-node-worker--next-heading)
                               (1- (point)))))
+                (setq HERE (point))
                 ;; Don't count org-super-links backlinks as forward links
                 (when (re-search-forward $backlink-drawer-re END t)
-                  (or (search-forward ":end:" END t)
-                      (error "Couldn't find matching :END: drawer in file %s" FILE)))
-                (setq HERE (point))
+                  (let ((DRAWER-BEG (point)))
+                    (unless (search-forward ":end:" END t)
+                      (error "Couldn't find matching :END: drawer in file %s"
+                             FILE))
+                    (setq FAR (point))
+                    (org-node-worker--collect-links-until
+                     END FILE-ID nil $link-re)
+                    (setq END DRAWER-BEG)))
+                (goto-char HERE)
                 (org-node-worker--collect-links-until
                  END FILE-ID nil $link-re)
-                (goto-char HERE)
-                (org-node-worker--collect-citations-until
-                 END ID-HERE OLP-WITH-SELF)
                 (push (list
                        :title FILE-TITLE-OR-BASENAME ;; Uhm
                        :level 0
@@ -517,15 +516,9 @@ list, and write results to another temp file."
                         (goto-char HEADING-POS)
                         (org-node-worker--collect-links-until
                          (pos-eol) ID-HERE OLP-WITH-SELF $link-re)
-                        (goto-char HEADING-POS)
-                        (org-node-worker--collect-citations-until
-                         (pos-eol) ID-HERE OLP-WITH-SELF)
                         (goto-char HERE)
                         (org-node-worker--collect-links-until
-                         END ID-HERE OLP-WITH-SELF $link-re)
-                        (goto-char HERE)
-                        (org-node-worker--collect-citations-until
-                         END ID-HERE OLP-WITH-SELF))
+                         END ID-HERE OLP-WITH-SELF $link-re))
                       (org-node-worker--next-heading))))))
 
         (( t error )
