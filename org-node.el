@@ -59,7 +59,7 @@
       (let ((old (pop aliases))
             (new (pop aliases)))
         (when (and (boundp old) (symbol-value old))
-          (lwarn 'org-node :warning "Your config uses old variable: %S, new name: %S"
+          (lwarn 'org-node :warning "Your config uses old variable: %S,  new name: %S"
                  old new)
           (set new (symbol-value old)))))))
 
@@ -71,7 +71,7 @@
        (declare (obsolete ',new "July 2024"))
        (unless warned-once
          (setq warned-once t)
-         (lwarn 'org-node :warning "You or your config used old function name: %S, new name %S"
+         (lwarn 'org-node :warning "You or your config used old function name: %S,  new name: %S"
                 ',old ',new))
        (apply ',new args))))
 
@@ -945,40 +945,32 @@ tables."
                              (org-node--handle-finished-job n-jobs finalizer)))
                 org-node--processes))))))
 
-;; TODO Rewrite prettier
 (defun org-node--handle-finished-job (n-jobs finalizer)
   "Check if this was the last process to return (by counting up
 to N-JOBS), then if so, wrap-up and call FINALIZER."
   (when (eq n-jobs (cl-incf org-node--done-ctr))
     (let* ((file-name-handler-alist nil)
            ;; (coding-system-for-read 'utf-8-unix)
-           (result-sets
-            (with-temp-buffer
-              (cl-loop
-               for i below n-jobs
-               collect
-               (let ((results-file (org-node-worker--tmpfile "results-%d.eld" i))
-                     (err-file (org-node-worker--tmpfile "errors-%d.txt" i)))
-                 (when (file-exists-p err-file)
-                   (message "org-node: problems scanning some files, see %s"
-                            err-file))
-                 (if (file-exists-p results-file)
-                     (progn
-                       (erase-buffer)
-                       (insert-file-contents results-file)
-                       (read (buffer-string)))
-                   ;; Had 1+ errors, so unhide the stderr buffer from now on
-                   (let ((buf (get-buffer " *org-node*")))
-                     (when buf
-                       (setq org-node--stderr-name "*org-node errors*")
-                       (with-current-buffer buf
-                         (rename-buffer org-node--stderr-name)))
-                     (message "An org-node worker failed to scan files, not producing %s.  See buffer %s"
-                              results-file org-node--stderr-name)
-                     nil)))))))
-      ;; TODO just build the list via the cl-loop above
-      (funcall finalizer (--reduce (-zip-with #'nconc it acc)
-                                   (-non-nil result-sets))))))
+           result-sets)
+      (with-temp-buffer
+        (dotimes (i n-jobs)
+          (let ((results-file (org-node-worker--tmpfile "results-%d.eld" i))
+                (err-file (org-node-worker--tmpfile "errors-%d.txt" i)))
+            (when (file-exists-p err-file)
+              (message "org-node: problems scanning some files, see %s" err-file))
+            (if (not (file-exists-p results-file))
+                (let ((buf (get-buffer " *org-node*")))
+                  (when buf
+                    ;; Had 1+ errors, so unhide stderr buffer from now on
+                    (setq org-node--stderr-name "*org-node errors*")
+                    (with-current-buffer buf
+                      (rename-buffer org-node--stderr-name)))
+                  (message "An org-node worker failed to scan files, not producing %s.  See buffer %s"
+                           results-file org-node--stderr-name))
+              (erase-buffer)
+              (insert-file-contents results-file)
+              (push (read (buffer-string)) result-sets)))))
+      (funcall finalizer (--reduce (-zip-with #'nconc it acc) result-sets)))))
 
 
 ;;; Finalizers
@@ -2099,7 +2091,7 @@ to `org-node-extra-id-dirs-exclude'."
   (unless (fboundp #'consult--grep)
     (user-error "This command requires the consult package"))
   (require 'consult)
-  (org-node-cache-ensure)
+  (org-node--init-ids)
   (consult--grep "Grep across all files known to org-node"
                  #'consult--grep-make-builder
                  (org-node-files)
@@ -2112,19 +2104,19 @@ to `org-node-extra-id-dirs-exclude'."
 (defun org-node-lint-all-files ()
   "Run `org-lint' on all known Org files, and report results."
   (interactive)
-  (org-node-cache-ensure t)
+  (org-node--init-ids)
   (let* ((warnings nil)
          (report-buffer (get-buffer-create "*org-node lint report*"))
-         ;; (files (-uniq (hash-table-values org-id-locations)))
          (files (-difference (org-node-files) org-node--linted))
          (ctr (length org-node--linted))
          (ctrmax (+ (length files) (length org-node--linted)))
          (entries nil)
-         (coding-system-for-read org-node-perf-assume-coding-system)
+         (coding-system-for-read (or org-node-perf-assume-coding-system
+                                     coding-system-for-read))
          (file-name-handler-alist nil))
     (with-current-buffer report-buffer
       (when (null files)
-        ;; Reset
+        ;; Start over
         (when (y-or-n-p "Wipe the previous lint results? ")
           (setq files (org-node-files))
           (setq org-node--linted nil)
