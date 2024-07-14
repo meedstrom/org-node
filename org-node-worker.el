@@ -30,27 +30,28 @@ that will match any of the TODO keywords within."
                (split-string)
                (regexp-opt)))
 
-;; TODO If there's a quoted member in ROAM_REFS
-;;      "https://gnu.org/A Link With Spaces/index.htm"
-;; it will be correctly saved as one string by `split-string-and-unquote',
-;; sans quotes.  But maybe in our tables we should wrap it in brackets so it's
-;;      [[https://gnu.org/A Link With Spaces/index.htm]]
-;; so that `org-node-roam--convert-ref' will parse it correctly (this would
-;; lead to the org-roam db being even more correct than org-roam itself, as it
-;; will bug in that case)
 (defun org-node-worker--split-refs-field (str)
-  (with-temp-buffer
-    (insert str)
-    (goto-char 1)
-    (let (refs beg end)
-      (while (search-forward "[cite:" nil t)
-        (setq beg (match-beginning 0))
-        (setq end (search-forward "]"))
-        (goto-char beg)
-        (while (re-search-forward "@\\([!#-+./:<>-@^-`{-~[:word:]-]+\\)" end t)
-          (push (match-string 0) refs))
-        (delete-region beg end))
-      (append refs (split-string-and-unquote (buffer-string))))))
+  (when str
+    (with-temp-buffer
+      (insert str)
+      (goto-char 1)
+      (let (refs beg end)
+        (while (search-forward "[cite:" nil t)
+          (setq beg (match-beginning 0))
+          (setq end (search-forward "]"))
+          (goto-char beg)
+          (while (re-search-forward "@\\([!#-+./:<>-@^-`{-~[:word:]-]+\\)" end t)
+            (push (match-string 0) refs))
+          (delete-region beg end))
+        (goto-char 1)
+        (while (search-forward "[[" nil t)
+          (setq beg (match-beginning 0))
+          (setq end (search-forward "]]"))
+          (goto-char beg)
+          (push (buffer-substring (+ 2 beg) (1- (search-forward "]")))
+                refs)
+          (delete-region beg end))
+        (append refs (split-string-and-unquote (buffer-string)))))))
 
 (defun org-node-worker--elem-index (elem list)
   "Like `-elem-index', return first index of ELEM in LIST."
@@ -239,9 +240,11 @@ process does not have to load org.el."
 
 ;;; Main
 
+;; TODO move these 3 into let-binding
 (defvar org-node-worker--result-missing-files nil)
-(defvar org-node-worker--result-found-nodes nil)
 (defvar org-node-worker--result-found-files nil)
+(defvar org-node-worker--result-found-nodes nil)
+
 (defvar org-node-worker--result-found-id-links nil)
 (defvar org-node-worker--result-found-reflinks nil)
 (defvar org-node-worker--result-found-citations nil)
@@ -371,7 +374,7 @@ list, and write results to another temp file."
 
               ;; This initial condition supports the special case where the
               ;; very first line of a file is a heading, as would be typical of
-              ;; people who null `org-node-prefer-file-level-nodes'.
+              ;; people who nix `org-node-prefer-file-level-nodes'.
               (when (or (looking-at-p "\\*")
                         (org-node-worker--next-heading))
                 ;; Loop over the file's subtrees
