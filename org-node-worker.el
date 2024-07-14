@@ -30,6 +30,28 @@ that will match any of the TODO keywords within."
                (split-string)
                (regexp-opt)))
 
+;; TODO If there's a quoted member in ROAM_REFS
+;;      "https://gnu.org/A Link With Spaces/index.htm"
+;; it will be correctly saved as one string by `split-string-and-unquote',
+;; sans quotes.  But maybe in our tables we should wrap it in brackets so it's
+;;      [[https://gnu.org/A Link With Spaces/index.htm]]
+;; so that `org-node-roam--convert-ref' will parse it correctly (this would
+;; lead to the org-roam db being even more correct than org-roam itself, as it
+;; will bug in that case)
+(defun org-node-worker--split-refs-field (str)
+  (with-temp-buffer
+    (insert str)
+    (goto-char 1)
+    (let (refs beg end)
+      (while (search-forward "[cite:" nil t)
+        (setq beg (match-beginning 0))
+        (setq end (search-forward "]"))
+        (goto-char beg)
+        (while (re-search-forward "@\\([!#-+./:<>-@^-`{-~[:word:]-]+\\)" end t)
+          (push (match-string 0) refs))
+        (delete-region beg end))
+      (append refs (split-string-and-unquote (buffer-string))))))
+
 (defun org-node-worker--elem-index (elem list)
   "Like `-elem-index', return first index of ELEM in LIST."
   (when list
@@ -248,7 +270,7 @@ list, and write results to another temp file."
         ;; Assigned on every iteration, so may as well let-bind once, hopefully
         ;; producing less garbage.  Not sure how elisp works... but profiling
         ;; shows a speedup.
-        HEADING-POS HERE FAR END OUTLINE-DATA MTIME OLP-WITH-SELF ID-HERE
+        HEADING-POS HERE FAR END OUTLINE-DATA OLP-WITH-SELF ID-HERE
         TITLE FILE-TITLE FILE-TITLE-OR-BASENAME
         TODO-STATE TODO-RE FILE-TODO-SETTINGS
         TAGS FILE-TAGS ID FILE-ID SCHED DEADLINE OLP PRIORITY LEVEL PROPS)
@@ -264,9 +286,9 @@ list, and write results to another temp file."
             ;; NOTE: Here I used `insert-file-contents-literally' in the past,
             ;; converting each captured substring afterwards with
             ;; `decode-coding-string', but it still made us record wrong values
-            ;; for HEADING-POS when there was any Unicode in the file.  Instead,
-            ;; setting `$assume-coding-system' and `$file-name-handler-alist'
-            ;; regains much of the performance that it had.
+            ;; for HEADING-POS when there was any Unicode in the file.
+            ;; Instead, setting `$assume-coding-system' and
+            ;; `$file-name-handler-alist' recoups much of the performance.
             (insert-file-contents FILE)
             ;; Verify there is at least one ID-node, otherwise skip file
             (when (re-search-forward "^[[:space:]]*:id: " nil t)
@@ -343,9 +365,8 @@ list, and write results to another temp file."
                        :aliases
                        (split-string-and-unquote
                         (or (cdr (assoc "ROAM_ALIASES" PROPS)) ""))
-                       :refs
-                       (split-string-and-unquote
-                        (or (cdr (assoc "ROAM_REFS" PROPS)) "")))
+                       :refs (org-node-worker--split-refs-field
+                              (cdr (assoc "ROAM_REFS" PROPS))))
                       org-node-worker--result-found-nodes))
 
               ;; This initial condition supports the special case where the
@@ -471,9 +492,8 @@ list, and write results to another temp file."
                                :aliases
                                (split-string-and-unquote
                                 (or (cdr (assoc "ROAM_ALIASES" PROPS)) ""))
-                               :refs
-                               (split-string-and-unquote
-                                (or (cdr (assoc "ROAM_REFS" PROPS)) "")))
+                               :refs (org-node-worker--split-refs-field
+                                      (cdr (assoc "ROAM_REFS" PROPS))))
                               org-node-worker--result-found-nodes))
                       ;; Now collect links while we're here!
                       (setq ID-HERE (or ID (org-node-worker--pos->parent-id
