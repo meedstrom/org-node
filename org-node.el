@@ -31,7 +31,8 @@
 
 ;; TODO The perf-* user options have almost no effect anymore, there
 ;;      must be significant overhead on the child processes... nix it
-;; TODO Workflow to allow untitled nodes
+;; TODO A workflow to allow pseudo-untitled (numeric-titled) nodes
+;;      - Need a bunch of commands, like jump to node from fulltext search
 
 (require 'compat)
 (require 'cl-lib)
