@@ -205,7 +205,7 @@ If you're happy with the result, and you don't need =roam:= links functionality,
 #+end_src
 
 ** Backlink solution 2: print inside the file
-I rarely have the screen space to display a backlink buffer.  So this is better. 😏
+I rarely have the screen space to display a backlink buffer.  So this is better. 😉
 
 **** *Option 2A*.  Let org-node add a =:BACKLINKS:= property to all nodes
 
