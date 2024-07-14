@@ -1,3 +1,4 @@
+#+startup: content
 * org-node
 ** News [2024-07-11]
 Version 0.2 in July brought many changes!  *If anything broke for you*, you can rollback to the 0.1pre branch:
@@ -291,20 +292,6 @@ Wouldn't it be nice if, clicking on that link, you're automatically sent to that
 (add-hook 'org-open-at-point-functions #'org-node-try-visit-ref-node)
 #+end_src
 
-*** Limitation: unique titles
-
-If two ID-nodes exist with the same title, one of them disappears from minibuffer completions.
-
-That's just the nature of completion.  Other packages such as Org-roam have the same limitation.  Much can be said for embracing the uniqueness constraint, and org-node will print messages telling you about title collisions.
-
-Anyway, there's a workaround.  Assuming you leave =org-node-affixation-fn= at its default setting, just set =org-node-alter-candidates= to t.
-
-This merges the Org outline path with the matchable part of each candidate (so you do not match only on title), so it resolves most conflicts.  [[https://fosstodon.org/@nickanderson/112249581810196258][Some people]] depend on that workflow.
-
-NB: this workaround won't help the in-buffer completions provided by =org-node-complete-at-point-mode=, but hopefully you won't need it often.
-
-# Maybe I'll add distinguishers like "1" "2" "3" to each naming conflict?
-
 *** Limitation: excluding notes
 The option =org-node-filter-fn= works well for excluding TODO items that happen to have an ID, and excluding org-drill items and that sort of thing, but beyond that, it has limited utility because unlike org-roam, *child ID nodes of an excluded node are not excluded!*
 
@@ -321,6 +308,20 @@ While the point of IDs is to avoid depending on exact filenames, it's often prag
                  (string-search "archive" (org-node-get-file-path node))))))
 #+end_src
 
+*** Limitation: unique titles
+
+If two ID-nodes exist with the same title, one of them disappears from minibuffer completions.
+
+That's just the nature of completion.  Other packages such as Org-roam have the same limitation.  Much can be said for embracing the uniqueness constraint, and org-node will print messages telling you about title collisions.
+
+Anyway, there's a workaround.  Assuming you leave =org-node-affixation-fn= at its default setting, just set =org-node-alter-candidates= to t.
+
+This lets you match against the node outline path and not only the title, which resolves most conflicts given that the most likely source of conflict is subheadings in disparate files, named the same.  [[https://fosstodon.org/@nickanderson/112249581810196258][Some people]] depend on that workflow.
+
+NB: this workaround won't help the in-buffer completions provided by =org-node-complete-at-point-mode=, but with some luck you'll never notice.
+
+# Maybe I'll add distinguishers like "1" "2" "3" to each naming conflict?
+
 *** Limitation: TRAMP
 Working over TRAMP is untested, but I suspect it won't work.  Org-node tries to be very fast, often nulling =file-name-handler-alist=, which TRAMP needs.
 
@@ -331,17 +332,7 @@ That design caused me no end of problems with out-of-sync DB, so it's a feature 
 *** Limitation: undead backlinks
 You may notice backlinks staying after you erased the forward link.  For performance reasons, org-node waits for idle before cleaning up.
 
-Also due to this mechanism, org-roam-buffer's contextual display may shift to show irrelevant text as a file is edited; this too is corrected on idle.
-
-*** Limitation: links with spaces in =ROAM_REFS=
-
-Currently to seek reflinks, org-node just uses =org-link-plain-re=, which is not space-aware.  So =ROAM_REFS= like:
-
-: :ROAM_REFS: [[https://romankogan.net/adhd/#False Dependency Chain]]
-
-will not get reflinks.  I'll see about transiting to =org-link-any-re=, it just seems like a perf hit for a tiny use case.
-
-# Oh... with any-re, you can make a datestamp a ref!  Maybe people do use that.
+The same mechanism is responsible for the org-roam-buffer's display of link contexts shifting to display irrelevant text as the underlying file is edited; this too is corrected on idle.
 
 *** Toolbox
 

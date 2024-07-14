@@ -17,7 +17,7 @@
 
 ;; Author:           Martin Edström <meedstrom91@gmail.com>
 ;; Created:          2024-04-13
-;; Version:          0.3pre
+;; Version:          0.3
 ;; Keywords:         org, hypermedia
 ;; Package-Requires: ((emacs "28.1") (compat "29.1.4.5") (dash "2.19.1"))
 ;; URL:              https://github.com/meedstrom/org-node
@@ -32,7 +32,8 @@
 
 ;; TODO The perf-* user options have almost no effect anymore, there
 ;;      must be significant overhead on the child processes... nix it
-;; TODO Workflow to allow untitled nodes
+;; TODO A workflow to allow pseudo-untitled (numeric-titled) nodes
+;;      - Need a bunch of commands, like jump to node from fulltext search
 
 (require 'compat)
 (require 'cl-lib)
