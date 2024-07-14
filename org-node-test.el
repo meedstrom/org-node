@@ -1,6 +1,7 @@
-;;; -*- lexical-binding: t; -*-
+;;; org-node-test.el -*- lexical-binding: t; -*-
 
 (require 'ert)
+(require 'dash)
 (require 'org-node)
 (require 'org-node-roam)
 (require 'org-node-worker)
@@ -101,3 +102,7 @@
         (should (equal (org-node-get-title node) "A top-level heading"))
         (should (equal (org-node-get-file-title node) expected-filename))
         (should (equal (org-node-get-file-title-or-basename node) expected-filename))))))
+
+(provide 'org-node-test)
+
+;;; org-node-test.el ends here

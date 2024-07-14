@@ -18,7 +18,7 @@
 ;; Author:           Martin Edström <meedstrom91@gmail.com>
 ;; Created:          2024-04-13
 ;; Keywords:         org, hypermedia
-;; Package-Requires: ((emacs "28.1") (compat "30") (dash "2.19.1"))
+;; Package-Requires: ((emacs "28.1") (compat "29.1.4.5") (dash "2.19.1"))
 ;; URL:              https://github.com/meedstrom/org-node
 
 ;; This file is not part of GNU Emacs.
@@ -27,15 +27,11 @@
 
 ;;; Code:
 
-;; TODO The perf-* user options now seem to have almost no effect, there must
-;;      be significant overhead on the child processes - eliminate it
+;; NOTE Big file? Use `consult-outline'!
 
+;; TODO The perf-* user options have almost no effect anymore, there
+;;      must be significant overhead on the child processes... nix it
 ;; TODO Workflow to allow untitled nodes
-
-;; TODO Review whether scan-all actually happens often enough (probably not)!
-;;      - So where to make it happen?  Can't just be on spotting deletion, too
-;;        capricious.  Maybe a timer 20x the last reset's elapsed time+1, after
-;;        inserting or following a link.
 
 (require 'compat)
 (require 'cl-lib)
@@ -46,7 +42,7 @@
 (require 'org-node-worker)
 
 
-;;; Obsoletions
+;;;; Obsoletions
 
 (define-obsolete-variable-alias
   'org-node-collection 'org-node--node-by-candidate "2024-07-11")
@@ -64,7 +60,9 @@
           (set new (symbol-value old)))))))
 
 (defmacro org-node--defobsolete (old new &optional interactive)
-  "Define OLD as a function that runs NEW."
+  "Define OLD as a function that runs NEW.
+If INTERACTIVE, define it as an interactive function (but not
+autoloaded)."
   `(let (warned-once)
      (defun ,old (&rest args)
        ,@(if interactive '((interactive)))
@@ -81,7 +79,7 @@
 (org-node--defobsolete org-node-new-by-roam-capture org-node-new-via-roam-capture)
 
 
-;;; Options
+;;;; Options
 
 (defgroup org-node nil
   "Support a zettelkasten of org-id files and subtrees."
@@ -102,7 +100,7 @@ Called with one argument: the list of files re-scanned."
   :type 'boolean)
 
 (defcustom org-node-prefer-file-level-nodes t
-  "If t, write a file-level title and property drawer when
+  "If t, write a title and file-level property drawer when
 making a new file, otherwise write a more traditional top-level
 heading.
 
@@ -283,70 +281,7 @@ in precisely \".org\" or \".org_archive\" anyway."
   :type '(repeat string))
 
 
-;;; The metadata struct
-
-(cl-defstruct (org-node-get (:constructor org-node--make-obj)
-                            (:copier nil))
-  "An org-node object holds information about an Org ID node.
-By the term \"Org ID node\", we mean either a subtree with
-an ID property, or a file with a file-level ID property.  The
-information is stored in slots listed below.
-
-For each slot, there exists a getter function
-\"org-node-get-FIELD\".
-
-For example, the field \"deadline\" has a getter
-`org-node-get-deadline'.  So you would type
-\"(org-node-get-deadline NODE)\", where NODE is one of the
-elements of the `hash-table-values' of `org-node--node-by-id'.
-
-For real-world usage of these getters, see examples in the
-documentation of `org-node-filter-fn' or the package README.
-
-You may be able to find the README by typing:
-
-    M-x find-library RET org-node RET
-
-or you can visit the homepage:
-
-    https://github.com/meedstrom/org-node"
-  (aliases    nil :read-only t :type list :documentation
-              "Returns list of ROAM_ALIASES registered on the node.")
-  (deadline   nil :read-only t :type string :documentation
-              "Returns node's DEADLINE state.")
-  (file-path  nil :read-only t :type string :documentation
-              "Returns node's full file path.")
-  (file-title nil :read-only t :type string :documentation
-              "Returns the #+title of the file where this node is. May be nil.")
-  (file-title-or-basename nil :read-only t :type string  :documentation
-                          "Returns the title of the file where this node is, or its filename if untitled.")
-  (id         nil :read-only t :type string :documentation
-              "Returns node's ID property.")
-  (is-subtree nil :read-only t :type boolean :documentation
-              "Returns t if node is a subtree, nil if it is file-level.")
-  (level      nil :read-only t :type integer :documentation
-              "Returns number of stars in the node heading. File-level node always 0.")
-  (olp        nil :read-only t :type list :documentation
-              "Returns list of ancestor headings to this node.")
-  (pos        nil :read-only t :type integer :documentation
-              "Returns char position of the node. File-level node always 1.")
-  (properties nil :read-only t :type alist :documentation
-              "Returns alist of properties from the :PROPERTIES: drawer.")
-  (priority   nil :read-only t :type string :documentation
-              "Returns priority such as [#A], as a string.")
-  (refs       nil :read-only t :type list :documentation
-              "Returns list of ROAM_REFS registered on the node.")
-  (scheduled  nil :read-only t :type string :documentation
-              "Returns node's SCHEDULED state.")
-  (tags       nil :read-only t :type list :documentation
-              "Returns list of tags local to the node.")
-  (title      nil :read-only t :type string :documentation
-              "Returns the node's heading, or #+title if it is not a subtree.")
-  (todo       nil :read-only t :type string :documentation
-              "Returns node's TODO state."))
-
-
-;;; Pretty completion
+;;;; Pretty completion
 
 (defcustom org-node-alter-candidates nil
   "Whether to alter completion candidates instead of affixating.
@@ -444,7 +379,70 @@ read more in the manual at (elisp)Programmed Completion."
 (put 'org-node-hist 'history-length 1000)
 
 
-;;; Tables
+;;;; The metadata struct
+
+(cl-defstruct (org-node-get (:constructor org-node--make-obj)
+                            (:copier nil))
+  "An org-node object holds information about an Org ID node.
+By the term \"Org ID node\", we mean either a subtree with
+an ID property, or a file with a file-level ID property.  The
+information is stored in slots listed below.
+
+For each slot, there exists a getter function
+\"org-node-get-FIELD\".
+
+For example, the field \"deadline\" has a getter
+`org-node-get-deadline'.  So you would type
+\"(org-node-get-deadline NODE)\", where NODE is one of the
+elements of the `hash-table-values' of `org-node--node-by-id'.
+
+For real-world usage of these getters, see examples in the
+documentation of `org-node-filter-fn' or the package README.
+
+You may be able to find the README by typing:
+
+    M-x find-library RET org-node RET
+
+or you can visit the homepage:
+
+    https://github.com/meedstrom/org-node"
+  (aliases    nil :read-only t :type list :documentation
+              "Returns list of ROAM_ALIASES registered on the node.")
+  (deadline   nil :read-only t :type string :documentation
+              "Returns node's DEADLINE state.")
+  (file-path  nil :read-only t :type string :documentation
+              "Returns node's full file path.")
+  (file-title nil :read-only t :type string :documentation
+              "Returns the #+title of the file where this node is. May be nil.")
+  (file-title-or-basename nil :read-only t :type string  :documentation
+                          "Returns the title of the file where this node is, or its filename if untitled.")
+  (id         nil :read-only t :type string :documentation
+              "Returns node's ID property.")
+  (is-subtree nil :read-only t :type boolean :documentation
+              "Returns t if node is a subtree, nil if it is file-level.")
+  (level      nil :read-only t :type integer :documentation
+              "Returns number of stars in the node heading. File-level node always 0.")
+  (olp        nil :read-only t :type list :documentation
+              "Returns list of ancestor headings to this node.")
+  (pos        nil :read-only t :type integer :documentation
+              "Returns char position of the node. File-level node always 1.")
+  (properties nil :read-only t :type alist :documentation
+              "Returns alist of properties from the :PROPERTIES: drawer.")
+  (priority   nil :read-only t :type string :documentation
+              "Returns priority such as [#A], as a string.")
+  (refs       nil :read-only t :type list :documentation
+              "Returns list of ROAM_REFS registered on the node.")
+  (scheduled  nil :read-only t :type string :documentation
+              "Returns node's SCHEDULED state.")
+  (tags       nil :read-only t :type list :documentation
+              "Returns list of tags local to the node.")
+  (title      nil :read-only t :type string :documentation
+              "Returns the node's heading, or #+title if it is not a subtree.")
+  (todo       nil :read-only t :type string :documentation
+              "Returns node's TODO state."))
+
+
+;;;; Tables
 
 (defvar org-node--node-by-id (make-hash-table :test #'equal)
   "1:1 table mapping ids to nodes.
@@ -472,6 +470,11 @@ the ID-node where the link originated.")
 ;; REVIEW May have to look over the naming... "ref" has come to mean any link
 ;; matching `org-link-plain-re' that isn't of type "id", end of story.  Under
 ;; that definition, a citation @key is not a ref, which is surprising.
+;;
+;; 2024-07-14 I'm thinking just as there's "id-links" and "backlinks", there
+;; should be "reflinks" and "ref-backlinks".
+;; Then this would be called... "ref-backlinks-by-reflink"... no...
+;; Can I not just merge all three tables?
 (defvar org-node--reflinks-by-ref (make-hash-table :test #'equal)
   "1:N table mapping refs to latent reflinks.
 
@@ -481,9 +484,12 @@ was found.  For details of these plists, see source of
 `org-node-worker--collect-links-until'.
 
 In truth, this table contains many more rows than the number of
-ROAM_REFS you probably have.  (Just pass it to `hash-table-keys'
-and see.)  That's because the scanner does not know which links
-have a corresponding ref-node, so it grabs every link.
+ROAM_REFS you probably have.  Just eval this and see:
+
+    (string-join (hash-table-keys org-node--reflinks-by-ref) [32])
+
+That's because the scanner does not know ahead of time which
+links have a corresponding ref-node.
 
 To see whether one of these \"latent\" reflinks has a node
 actually referencing it, check for the the same ref in
@@ -491,8 +497,7 @@ actually referencing it, check for the the same ref in
 `org-node-get-reflinks' if suitable.")
 
 (defvar org-node--cites-by-citekey (make-hash-table :test #'equal)
-  "1:N table mapping @citekeys to latent citations.
-For explanation of \"latent\", see `org-node--reflinks-by-ref'.")
+  "1:N table mapping @citekeys to latent citations.")
 
 (defun org-node-get-reflinks (node)
   "Get list of reflinks pointing to NODE."
@@ -503,122 +508,25 @@ For explanation of \"latent\", see `org-node--reflinks-by-ref'.")
   "Get list of ID-links pointing to NODE."
   (gethash (org-node-get-id node) org-node--backlinks-by-id))
 
-(defun org-node-peek ()
+(defun org-node-get-citations (node)
+  "Get list of citations pointing to NODE.
+A citation is anywhere that a @citekey occurred."
+  (cl-loop for ref in (org-node-get-refs node)
+           append (gethash ref org-node--cites-by-citekey)))
+
+(defun org-node-peek (&optional ht)
   "Print some random rows of table `org-nodes'.
-For reference, see type `org-node-get'."
+For reference, see type `org-node-get'.
+When called from Lisp, peek on any hash table HT."
   (interactive)
-  (let ((id-nodes (hash-table-values org-node--node-by-id))
+  (let ((rows (hash-table-values (or ht org-nodes)))
         (print-length nil))
     (dotimes (_ 3)
       (print '----------------------------)
-      (cl-prin1 (nth (random (length id-nodes)) id-nodes)))))
+      (cl-prin1 (nth (random (length rows)) rows)))))
 
 
-;;; Functions & variables
-
-;; I wish that `find-file-noselect' when called from Lisp would take an
-;; optional argument that explains why the file is about to be opened, amending
-;; the autosave recovery prompt.  Hack up something like that.
-(defvar org-node--imminent-recovery-msg
-  "Org-node about to look inside or edit a file, but it's likely you will first get a prompt to recover an auto-save file, ready? "
-  "For use by `org-node--with-quick-file-buffer'.")
-
-;; NOTE Very important macro for the backlink mode, because backlink insertion
-;;      opens an Org file, and if doing that is laggy, then every link
-;;      insertion is laggy.
-(defmacro org-node--with-quick-file-buffer (file &rest body)
-  "Pseudo-backport of Emacs 29 `org-with-file-buffer'.
-Also integrates `org-with-wide-buffer' behavior, some magic
-around saving, and tries to open FILE quickly i.e. with
-minimal hooks.
-
-In short, if a buffer was visiting FILE, go to that buffer, else
-visit FILE in a new buffer, in which case ignore the usual Org
-startup checks.  Temporarily `widen' the buffer, execute BODY,
-then restore point.  Finally:
-
-- If a new buffer had to be opened: save and kill it.  Mandatory
-  because buffers opened in the quick way look \"wrong\" as many
-  hooks did not run, e.g. no indent-mode, no visual wrap etc.
-- If a buffer had been open: leave it open and leave it unsaved."
-  (declare (indent 1) (debug t))
-  `(let ((find-file-hook nil)
-         (after-save-hook nil)
-         (before-save-hook nil)
-         (org-element-use-cache nil) ;; generally prevents bugs
-         (org-inhibit-startup t) ;; ignore #+STARTUP: stuff
-         (org-agenda-files nil)
-         (kill-buffer-hook nil) ;; inhibit save-place etc
-         (kill-buffer-query-functions nil)
-         (buffer-list-update-hook nil))
-     (let ((was-open (find-buffer-visiting ,file)))
-       (when (or was-open
-                 (if (file-newer-than-file-p (let ((buffer-file-name ,file))
-                                               (make-auto-save-file-name))
-                                             ,file)
-                     (y-or-n-p org-node--imminent-recovery-msg)
-                   t))
-         (with-current-buffer (or was-open
-                                  (delay-mode-hooks
-                                    (find-file-noselect ,file)))
-           (save-excursion
-             (without-restriction
-               ,@body))
-           (unless was-open
-             (when (buffer-modified-p)
-               (let ((save-silently t)
-                     (inhibit-message t))
-                 (save-buffer)))
-             (kill-buffer)))))))
-
-;; Profiling
-;; (progn (garbage-collect) (car (benchmark-run-compiled 10 (org-node-files))))
-(let (mem)
-  (defun org-node-files (&optional memoized)
-    "List files in `org-id-locations' or `org-node-extra-id-dirs'.
-
-With argument MEMOIZED t, return the same list as the last time
-something called this function, skipping work."
-    (if (and memoized mem)
-        mem
-      (setq mem
-            (-union
-             (hash-table-values org-id-locations)
-             (let ((file-name-handler-alist nil)) ;; cuts 200 ms to 70 ms
-               (cl-loop
-                for dir in org-node-extra-id-dirs
-                append (cl-loop
-                        for file in (directory-files-recursively
-                                     dir (rx (or ".org" ".org_archive") eos)
-                                     nil t)
-                        unless (cl-loop
-                                for exclude in org-node-extra-id-dirs-exclude
-                                when (string-search exclude file)
-                                return t)
-                        ;; Abbreviating because org-id does too
-                        collect (abbreviate-file-name file)))))))))
-
-(defun org-node--die (format-string &rest args)
-  "Like `error' but make sure the user sees it.
-Useful because not everyone has `debug-on-error' t, and then
-errors are very easy to miss."
-  (let ((err-string (apply #'format-message format-string args)))
-    (display-warning 'org-node err-string :error)
-    (error "%s" err-string)))
-
-(defun org-node--consent-to-bothersome-modes-for-mass-edit ()
-  (--all-p (if (and (boundp it) (symbol-value it))
-               (y-or-n-p
-                (format "%S is active - proceed anyway?" it))
-             t)
-           '(auto-save-visited-mode
-             git-auto-commit-mode)))
-
-(defvar org-node--debug nil
-  "Whether to run in a way suitable for debugging.")
-
-
-;;; The mode
+;;;; The mode
 
 ;;;###autoload
 (define-minor-mode org-node-cache-mode
@@ -752,7 +660,7 @@ other than the current instance of Emacs, such as an user typing
 rm on the command line instead of using \\[delete-file].")
 
 
-;;; Scanning
+;;;; Scanning
 
 (defun org-node--scan-all ()
   (org-node--try-launch-scan t))
@@ -792,8 +700,7 @@ eventually and not dropped."
       (if full-scan-requested
           (progn
             (setq full-scan-requested nil)
-            (org-node--scan (org-node-files)
-                            #'org-node--finish-full))
+            (org-node--scan (org-node-files) #'org-node--finish-full))
         ;; Targeted scan of specific files
         (org-node--scan file-queue #'org-node--finish-modified))
       (when file-queue
@@ -814,6 +721,24 @@ eventually and not dropped."
   "Number of subprocesses to run.
 If left at nil, will be set at runtime to the result of
 `org-node--count-logical-cores'.")
+
+(defun org-node--count-logical-cores ()
+  "Return sum of available processor cores, minus 1."
+  (max (1- (string-to-number
+            (pcase system-type
+              ((or 'gnu 'gnu/linux 'gnu/kfreebsd 'berkeley-unix)
+               (if (executable-find "nproc")
+                   (shell-command-to-string "nproc --all")
+                 (shell-command-to-string "lscpu -p | egrep -v '^#' | wc -l")))
+              ((or 'darwin)
+               (shell-command-to-string "sysctl -n hw.logicalcpu_max"))
+              ;; No idea if this works
+              ((or 'cygwin 'windows-nt 'ms-dos)
+               (ignore-errors
+                 (with-temp-buffer
+                   (call-process "echo" nil t nil "%NUMBER_OF_PROCESSORS%")
+                   (buffer-string)))))))
+       1))
 
 (defun org-node--ensure-compiled-lib ()
   "Compile org-node-worker.el, in case the user's package manager
@@ -841,6 +766,12 @@ didn't do so already, or local changes have been made."
   `(or (compiled-function-p (if (symbolp ,var) (symbol-function ,var) ,var))
        ;; Would use native-comp here, but it wrecks Customize
        (setq ,var (byte-compile ,var))))
+
+;; ;; Need to merge the regexps, so we dont pick up same link twice,
+;; ;; bracketed and unbracketed form.
+;; (defun org-node--make-merged-link-re ()
+;;   (require 'ol)
+;;   (concat org-link-bracket-re "\\|" org-link-plain-re))
 
 (defun org-node--scan (files finalizer)
   "Begin async scanning FILES for id-nodes and links.
@@ -873,10 +804,12 @@ tables."
          ;;      `org-node-worker--collect-dangerously'.
          (append
           org-node-inject-variables
-          `(($link-re . ,org-link-plain-re)
+          `(($plain-re . ,org-link-plain-re)
+            ($merged-re . ,(concat org-link-bracket-re "\\|" org-link-plain-re))
             ($assume-coding-system . ,org-node-perf-assume-coding-system)
-            ($file-option-todo-re
-             . ,(rx bol (or "#+todo: " "#+seq_todo: " "#+typ_todo: ")))
+            ($file-todo-option-re
+             . ,(rx bol (* space)
+                    (or "#+todo: " "#+seq_todo: " "#+typ_todo: ")))
             ($file-name-handler-alist
              . ,(--keep (rassoc it org-node-perf-keep-file-name-handlers)
                         file-name-handler-alist))
@@ -884,7 +817,8 @@ tables."
              . ,(if (stringp (car org-todo-keywords))
                     (org-node--die "Quit because `org-todo-keywords' is configured with obsolete syntax, please fix")
                   (org-node-worker--make-todo-regexp
-                   (string-join (-mapcat #'cdr (default-value 'org-todo-keywords))
+                   (string-join (-mapcat #'cdr
+                                         (default-value 'org-todo-keywords))
                                 " "))))
             ($backlink-drawer-re
              . ,(concat "^[[:space:]]*:"
@@ -973,7 +907,7 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
       (funcall finalizer (--reduce (-zip-with #'nconc it acc) result-sets)))))
 
 
-;;; Finalizers
+;;;; Scan finalizers
 
 (defun org-node--finish-full (results)
   (let ((first-time (hash-table-empty-p org-node--node-by-id)))
@@ -983,6 +917,7 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
     (clrhash org-node--id-by-title)
     (clrhash org-node--reflinks-by-ref)
     (clrhash org-node--backlinks-by-id)
+    (clrhash org-node--cites-by-citekey)
     (-let (((missing-files _ nodes id-links reflinks cites) results))
       (org-node--forget-id-locations missing-files)
       (dolist (node nodes)
@@ -1003,7 +938,7 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
 ;;
 ;; Fortunately it isn't needed, our insert-link advices will already record
 ;; links added during normal usage!  What's left undone til next full scan:
-;; 1. deleted links remain in the table
+;; 1. deleted links remain in the table --> undead backlinks
 ;; 2. the :pos value can be off which could affect org-roam-buffer
 (defun org-node--finish-modified (results)
   (-let (((missing-files found-files nodes) results))
@@ -1016,7 +951,7 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
     (run-hook-with-args 'org-node-rescan-hook found-files)))
 
 
-;;; "Record" functions
+;;;; "Record" functions
 
 (defun org-node--record-id-links (links)
   "Save LINKS to table `org-node--backlinks-by-id'.
@@ -1030,9 +965,10 @@ LINKS plists are demonstrated in source of
 LINKS plists are demonstrated in source of
 `org-node-worker--collect-links-until'."
   (dolist (link links)
-    (push link
-          (gethash (concat (plist-get link :type) ":" (plist-get link :dest))
-                   org-node--reflinks-by-ref))))
+    (push link (gethash
+                ;; TODO stop concatting, use only dest, if that works cleanly
+                (concat (plist-get link :type) ":" (plist-get link :dest))
+                org-node--reflinks-by-ref))))
 
 (defun org-node--record-cites (cites)
   (dolist (cite cites)
@@ -1076,13 +1012,13 @@ The input NODE-RECIPE is a list of arguments to pass to
       ;; (yolo) Let ROAM_REFS work as aliases too
       (dolist (ref (org-node-get-refs node))
         (puthash ref node org-node--node-by-candidate)
-        ;; Do not affixate them, but color them anyway
+        ;; Though we won't affixate refs, color them anyway
         (puthash ref
                  (list (propertize ref 'face 'org-cite) nil nil)
                  org-node--affixation-triplet-by-title)))))
 
 
-;;; "Dirty" functions
+;;;; "Dirty" functions
 ;; Help keep the cache reasonably in sync without having to do a full reset
 
 (defun org-node--dirty-forget-files (files)
@@ -1163,8 +1099,8 @@ also necessary is `org-node--dirty-ensure-link-known'."
               :file-title-or-basename (or ftitle (file-name-nondirectory fpath))
               :aliases (split-string-and-unquote
                         (or (cdr (assoc "ROAM_ALIASES" props)) ""))
-              :refs (split-string-and-unquote
-                     (or (cdr (assoc "ROAM_REFS" props)) ""))
+              :refs (org-node-worker--split-refs-field
+                     (cdr (assoc "ROAM_REFS" props)))
               :pos (if heading (org-entry-beginning-position) 1)
               :level (or (org-current-level) 0)
               :olp (org-get-outline-path)
@@ -1176,17 +1112,10 @@ also necessary is `org-node--dirty-ensure-link-known'."
               :scheduled (cdr (assoc "SCHEDULED" props))))))))))
 
 
-;;; Etc
+;;;; Etc
 
-(defun org-node--forget-id-locations (files)
-  "Remove references to FILES in `org-id-locations'.
-You might consider \"committing\" the effect afterwards by
-calling `org-id-locations-save', which this function does not do."
-  (when files
-    ;; (setq org-id-files (-difference org-id-files files)) ;; Redundant
-    (let ((alist (org-id-hash-to-alist org-id-locations)))
-      (cl-loop for file in files do (assoc-delete-all file alist))
-      (setq org-id-locations (org-id-alist-to-hash alist)))))
+(defvar org-node--debug nil
+  "Whether to run in a way suitable for debugging.")
 
 (defun org-node--split-into-n-sublists (big-list n)
   "Split BIG-LIST into a list of N sublists.
@@ -1234,26 +1163,116 @@ be misleading."
                (setq org-node--elapsed
                      (float-time (time-since org-node--start-time)))))))
 
-(defun org-node--count-logical-cores ()
-  "Return sum of available processor cores, minus 1."
-  (max (1- (string-to-number
-            (pcase system-type
-              ((or 'gnu 'gnu/linux 'gnu/kfreebsd 'berkeley-unix)
-               (if (executable-find "nproc")
-                   (shell-command-to-string "nproc --all")
-                 (shell-command-to-string "lscpu -p | egrep -v '^#' | wc -l")))
-              ((or 'darwin)
-               (shell-command-to-string "sysctl -n hw.logicalcpu_max"))
-              ;; No idea if this works
-              ((or 'cygwin 'windows-nt 'ms-dos)
-               (ignore-errors
-                 (with-temp-buffer
-                   (call-process "echo" nil t nil "%NUMBER_OF_PROCESSORS%")
-                   (buffer-string)))))))
-       1))
+;; I wish that `find-file-noselect' when called from Lisp would take an
+;; optional argument that explains why the file is about to be opened, amending
+;; the autosave recovery prompt.  Hack up something like that.
+(defvar org-node--imminent-recovery-msg
+  "Org-node about to look inside or edit a file, but it's likely you will first get a prompt to recover an auto-save file, ready? "
+  "For use by `org-node--with-quick-file-buffer'.")
+
+;; NOTE Very important macro for the backlink mode, because backlink insertion
+;;      opens an Org file, and if doing that is laggy, then every link
+;;      insertion is laggy.
+(defmacro org-node--with-quick-file-buffer (file &rest body)
+  "Pseudo-backport of Emacs 29 `org-with-file-buffer'.
+Also integrates `org-with-wide-buffer' behavior, some magic
+around saving, and tries to open FILE quickly i.e. with
+minimal hooks.
+
+In short, if a buffer was visiting FILE, go to that buffer, else
+visit FILE in a new buffer, in which case ignore the usual Org
+startup checks.  Temporarily `widen' the buffer, execute BODY,
+then restore point.  Finally:
+
+- If a new buffer had to be opened: save and kill it.  Mandatory
+  because buffers opened in the quick way look \"wrong\" as many
+  hooks did not run, e.g. no indent-mode, no visual wrap etc.
+- If a buffer had been open: leave it open and leave it unsaved."
+  (declare (indent 1) (debug t))
+  `(let ((find-file-hook nil)
+         (after-save-hook nil)
+         (before-save-hook nil)
+         (org-element-use-cache nil) ;; generally prevent bugs
+         (org-inhibit-startup t) ;; don't use org startup options
+         (org-agenda-files nil)
+         (kill-buffer-hook nil) ;; inhibit save-place etc
+         (kill-buffer-query-functions nil)
+         (buffer-list-update-hook nil))
+     (let ((was-open (find-buffer-visiting ,file)))
+       (when (or was-open
+                 (if (file-newer-than-file-p (let ((buffer-file-name ,file))
+                                               (make-auto-save-file-name))
+                                             ,file)
+                     (y-or-n-p org-node--imminent-recovery-msg)
+                   t))
+         (with-current-buffer (or was-open
+                                  (delay-mode-hooks
+                                    (find-file-noselect ,file)))
+           (save-excursion
+             (without-restriction
+               ,@body))
+           (unless was-open
+             (when (buffer-modified-p)
+               (let ((save-silently t)
+                     (inhibit-message t))
+                 (save-buffer)))
+             (kill-buffer)))))))
+
+(defun org-node--die (format-string &rest args)
+  "Like `error' but make sure the user sees it.
+Useful because not everyone has `debug-on-error' t, and then
+errors are very easy to miss."
+  (let ((err-string (apply #'format-message format-string args)))
+    (display-warning 'org-node err-string :error)
+    (error "%s" err-string)))
+
+(defun org-node--consent-to-bothersome-modes-for-mass-edit ()
+  (--all-p (if (and (boundp it) (symbol-value it))
+               (y-or-n-p
+                (format "%S is active - proceed anyway?" it))
+             t)
+           '(auto-save-visited-mode
+             git-auto-commit-mode)))
+
+;; Profiling
+;; (progn (garbage-collect) (car (benchmark-run-compiled 10 (org-node-files))))
+(let (mem)
+  (defun org-node-files (&optional memoized)
+    "List files in `org-id-locations' or `org-node-extra-id-dirs'.
+
+With argument MEMOIZED t, return the same list as the last time
+something called this function, skipping work."
+    (if (and memoized mem)
+        mem
+      (setq mem
+            (-union
+             (hash-table-values org-id-locations)
+             (let ((file-name-handler-alist nil)) ;; cuts 200 ms to 70 ms
+               (cl-loop
+                for dir in org-node-extra-id-dirs
+                append (cl-loop
+                        for file in (directory-files-recursively
+                                     dir (rx (or ".org" ".org_archive") eos)
+                                     nil t)
+                        unless (cl-loop
+                                for exclude in org-node-extra-id-dirs-exclude
+                                when (string-search exclude file)
+                                return t)
+                        ;; Abbreviating because org-id does too
+                        collect (abbreviate-file-name file)))))))))
+
+(defun org-node--forget-id-locations (files)
+  "Remove references to FILES in `org-id-locations'.
+You might consider \"committing\" the effect afterwards by
+calling `org-id-locations-save', which this function does not do."
+  (when files
+    ;; (setq org-id-files (-difference org-id-files files)) ;; Redundant
+    (let ((alist (org-id-hash-to-alist org-id-locations)))
+      (cl-loop for file in files do (assoc-delete-all file alist))
+      (setq org-id-locations (org-id-alist-to-hash alist)))))
 
 
-;;; Filename
+;;;; Filename function
 
 (defun org-node--root-dirs (file-list)
   "Infer root directories of FILE-LIST.
@@ -1320,7 +1339,7 @@ Behavior depends on the user option `org-node-ask-directory'."
 
 (defcustom org-node-filename-fn #'org-node-slugify-for-web
   "Function taking a node title and returning a filename.
-Receives one argument, the value of #+TITLE from an Org file.
+Receives one argument: the value of an Org #+TITLE keyword.
 
 Built-in choices:
 - `org-node-slugify-for-web'
@@ -1390,7 +1409,7 @@ Applying the above to \"Löb's Theorem\" results in something like
           ".org"))
 
 
-;;; Creator
+;;;; How to create new nodes
 
 (defvar org-node-proposed-title nil
   "For use by `org-node-creation-fn'.")
@@ -1603,7 +1622,7 @@ type the name of a node that does not exist.  That enables this
             (org-node--scan-targeted (list path-to-write))))))))
 
 
-;;; Commands
+;;;; Commands
 
 ;;;###autoload
 (defun org-node-find ()
@@ -1694,7 +1713,7 @@ find yourself erasing the minibuffer, you'll prefer
 
 On the topic of Org-roam emulation, bonus tips:
 
-- To behave like org-roam on node creation, set
+- To behave like Org-roam on node creation, set
   `org-node-creation-fn' to `org-node-new-via-roam-capture'.
 
 - If you still find the behavior different, perhaps you had
@@ -1765,8 +1784,8 @@ adding keywords to the things to exclude:
       ;; `org-transclusion-exclude-elements' from having an effect, and the
       ;; subtree's property drawer shows up!
       ;; TODO: Patch `org-transclusion-content-range-of-lines' to respect
-      ;; `org-transclusion-exclude-elements', or make a different argument like
-      ;; ":no-initial-heading"
+      ;; `org-transclusion-exclude-elements', or (better) don't use :lines but
+      ;; make a different argument like ":no-initial-heading"
       ;;
       ;; For now, just let it nest an extra heading. Looks odd, but doesn't
       ;; break things.
@@ -1823,7 +1842,7 @@ as more \"truthful\" than today's date.
              (boundary (save-excursion
                          (org-end-of-meta-data t)
                          (point)))
-             ;; Why is category autocreated by `org-entry-properties'...  It's
+             ;; Why is CATEGORY autocreated by `org-entry-properties'...  It's
              ;; an invisible property that's always present and usually not
              ;; interesting, unless user has entered some explicit value
              (explicit-category (save-excursion
@@ -2101,21 +2120,18 @@ to `org-node-extra-id-dirs-exclude'."
   "List of files linted so far.")
 
 ;;;###autoload
-(defun org-node-lint-all-files ()
+(defun org-node-lint-all-files (&optional C-u)
   "Run `org-lint' on all known Org files, and report results."
-  (interactive)
+  (interactive "P")
   (org-node--init-ids)
   (let* ((warnings nil)
          (report-buffer (get-buffer-create "*org-node lint report*"))
          (files (-difference (org-node-files) org-node--linted))
          (ctr (length org-node--linted))
          (ctrmax (+ (length files) (length org-node--linted)))
-         (entries nil)
-         (coding-system-for-read (or org-node-perf-assume-coding-system
-                                     coding-system-for-read))
-         (file-name-handler-alist nil))
+         (entries nil))
     (with-current-buffer report-buffer
-      (when (null files)
+      (when (or (null files) C-u)
         ;; Start over
         (when (y-or-n-p "Wipe the previous lint results? ")
           (setq files (org-node-files))
@@ -2177,10 +2193,7 @@ network to quality-control it.  Rationale:
   (unless (executable-find "Rscript")
     (user-error
      "This command requires GNU R, with R packages tidyverse and igraph"))
-  (let ((r-script (org-node-worker--tmpfile "analyze_feedback_arcs.R"))
-        (digraph-tsv (org-node-worker--tmpfile "id_node_digraph.tsv")))
-    (write-region
-     "library(stringr)
+  (let ((r-code "library(stringr)
 library(readr)
 library(igraph)
 
@@ -2195,16 +2208,16 @@ lisp_data <- str_c(\"(\\\"\", as_ids(fas1), \"\\\")\") |>
     str_c(\"(\", x, \")\")
   })()
 
-write_file(lisp_data, file.path(dirname(tsv), \"feedback-arcs.eld\"))
-" nil r-script)
-    (write-region (org-node--make-digraph-tsv-string)
-                  nil
-                  digraph-tsv)
+write_file(lisp_data, file.path(dirname(tsv), \"feedback-arcs.eld\"))")
+        (script-file (org-node-worker--tmpfile "analyze_feedback_arcs.R"))
+        (digraph-tsv (org-node-worker--tmpfile "id_node_digraph.tsv")))
+    (write-region r-code nil script-file)
+    (write-region (org-node--make-digraph-tsv-string) nil digraph-tsv)
     (with-current-buffer (get-buffer-create "*feedback arcs*")
       (fundamental-mode)
       (setq-local buffer-read-only nil)
       (erase-buffer)
-      (unless (= 0 (call-process "Rscript" nil t nil r-script digraph-tsv))
+      (unless (= 0 (call-process "Rscript" nil t nil script-file digraph-tsv))
         (error "%s" (buffer-string)))
       (erase-buffer)
       (insert-file-contents (org-node-worker--tmpfile "feedback-arcs.eld"))
@@ -2296,8 +2309,28 @@ destination-origin pairs, expressed as Tab-Separated Values."
                           dest))))
     (tabulated-list-print)))
 
+;; TODO
+;; (defun org-node-find-plain-link ()
+;;   (interactive)
+;;   (let* ((every-link (cl-loop
+;;                       for list being the hash-values of org-node--reflinks-by-ref
+;;                       append list))
+;;          (disambiguated
+;;           (cl-loop for link in every-link
+;;                    collect (plist-get link :pos)
+;;                    )
+;;           )
+;;          (link-data (gethash (completing-read "Find where link is: "
+;;                                               org-node--reflinks-by-ref)
+;;                              org-node--reflinks-by-ref))
+;;          (origin-id (plist-get link-data :origin))
+;;          (node (gethash origin-id org-node--node-by-id)))
+;;     (if node
+;;         (org-node--goto node)
+;;       (message "Not sure where is ID %s" link-data))))
+
 
-;;; CAPF (Completion-At-Point Function)
+;;;; CAPF (Completion-At-Point Function)
 
 (defvar org-node--roam-settings nil)
 (define-minor-mode org-node-complete-at-point-mode
@@ -2360,7 +2393,7 @@ Designed for `completion-at-point-functions', which see."
                               (concat "id:" id) text)))))))))
 
 
-;;; Misc
+;;;; Misc
 
 (defun org-node-convert-link-to-super (&rest _)
   "Drop input and call `org-super-links-convert-link-to-super'."
@@ -2389,7 +2422,7 @@ If already visiting that node, then follow the link normally."
       nil)))
 
 
-;;; API not used inside this package
+;;;; API not used inside this package
 
 (defun org-node-at-point ()
   "Return the ID-node near point.

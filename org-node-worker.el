@@ -136,7 +136,8 @@ in one of the elements."
   (if (re-search-forward "^\\*+ " nil 'move)
       (goto-char (pos-bol))))
 
-(defun org-node-worker--collect-links-until (end id-here olp-with-self link-re)
+(defun org-node-worker--collect-links-until
+    (end id-here olp-with-self plain-re merged-re)
   "From here to buffer position END, look for forward-links.
 Ensure these links will be used to populate tables
 `org-node--backlinks-by-id' and `org-node--reflinks' in the
@@ -153,34 +154,61 @@ Argument OLP-WITH-SELF is the outline path to the current
 subtree, with its own heading tacked onto the end.  This is data
 that org-roam expects to have.
 
-Argument LINK-RE is expected to be the value of
+Argument PLAIN-RE is expected to be the value of
 `org-link-plain-re', passed in this way only so that the child
 process does not have to load org.el."
-  (let ((beg (point)))
-    (while (re-search-forward
-            ;; NOTE: There was a hair-pulling bug here because I pasted the
-            ;; evalled value of `org-link-plain-re', but whitespace cleaners
-            ;; subtly changed it upon save!  So now we just pass in the variable.
-            ;; And a lesson: set your editor to always highlight trailing spaces,
-            ;; at least in the regions you have modified (PR ws-butler?)
-            link-re end t)
-      (let ((link-type (match-string 1))
-            (path (match-string 2)))
-        (if (save-excursion
-              (goto-char (pos-bol))
-              (or (looking-at-p "[[:space:]]*# ")
-                  (looking-at-p "[[:space:]]*#\\+")))
-            ;; On a # comment or #+keyword, skip whole line
-            (goto-char (pos-eol))
-          (push (list :origin id-here
-                      :pos (point)
-                      :type link-type
-                      :dest path
-                      ;; Because org-roam asks for it
-                      :properties (list :outline olp-with-self))
-                (if (equal "id" link-type)
-                    org-node-worker--result-found-id-links
-                  org-node-worker--result-found-reflinks)))))
+  (let ((beg (point))
+        link-type path)
+    (while (re-search-forward merged-re end t)
+      (if (match-string 1)
+          ;; Link is the bracketed kind
+          (let ((whole (match-string 0)))
+            (setq link-type ""
+                  path (match-string 1))
+            ;; Is there an URI-like link inside?
+            ;; This is the magic place that allows links to have spaces.
+            (when (string-match plain-re whole)
+              (setq link-type (match-string 1 whole)
+                    path (string-trim-left path ".*?:"))))
+        ;; Link is the unbracketed kind
+        (setq link-type (match-string 3)
+              path (match-string 4)))
+      (if (save-excursion
+            (goto-char (pos-bol))
+            (or (looking-at-p "[[:space:]]*# ")
+                (looking-at-p "[[:space:]]*#\\+")))
+          ;; On a # comment or #+keyword, skip whole line
+          (goto-char (pos-eol))
+        (and link-type path
+             (push (list :origin id-here
+                         :pos (point)
+                         :type link-type
+                         :dest path
+                         ;; Because org-roam asks for it
+                         :properties (list :outline olp-with-self))
+                   (if (equal "id" link-type)
+                       org-node-worker--result-found-id-links
+                     org-node-worker--result-found-reflinks)))))
+    ;; (goto-char beg)
+    ;; (while (re-search-forward plain-re end t)
+    ;;   (setq link-type (match-string 1)
+    ;;         path (match-string 2))
+    ;;   (if (save-excursion
+    ;;         (goto-char (pos-bol))
+    ;;         (or (looking-at-p "[[:space:]]*# ")
+    ;;             (looking-at-p "[[:space:]]*#\\+")))
+    ;;       ;; On a # comment or #+keyword, skip whole line
+    ;;       (goto-char (pos-eol))
+    ;;     (push (list :origin id-here
+    ;;                 :pos (point)
+    ;;                 :type link-type
+    ;;                 :dest path
+    ;;                 ;; Because org-roam asks for it
+    ;;                 :properties (list :outline olp-with-self))
+    ;;           (if (equal "id" link-type)
+    ;;               org-node-worker--result-found-id-links
+    ;;             org-node-worker--result-found-reflinks))))
+
     ;; Start over and look for @citekeys
     (goto-char beg)
     ;; NOTE Should ideally search for `org-element-citation-prefix-re', but
@@ -203,7 +231,8 @@ process does not have to load org.el."
                           :key (match-string 0)
                           ;; Because org-roam asks for it
                           :properties (list :outline olp-with-self))
-                    org-node-worker--result-found-citations))))))))
+                    org-node-worker--result-found-citations))))))
+    ))
 
 (defun org-node-worker--collect-properties (beg end file)
   "Assuming BEG and END delimit the region in between
@@ -232,16 +261,12 @@ process does not have to load org.el."
 
 ;;; Main
 
-;; TODO move these 3 into let-binding, dont need global variables
-(defvar org-node-worker--result-missing-files nil)
-(defvar org-node-worker--result-found-files nil)
-(defvar org-node-worker--result-found-nodes nil)
-
 (defvar org-node-worker--result-found-id-links nil)
 (defvar org-node-worker--result-found-reflinks nil)
 (defvar org-node-worker--result-found-citations nil)
 
-;; TODO use `narrow-to-region' per subtree for more confidence refactoring
+;; TODO Use `narrow-to-region' per subtree for more confident refactoring
+
 (defun org-node-worker--collect-dangerously ()
   "Dangerous!  Assumes the current buffer is a temp buffer!
 
@@ -257,6 +282,9 @@ list, and write results to another temp file."
     (insert-file-contents (org-node-worker--tmpfile "file-list-%d.eld" i)))
   (setq $files (read (buffer-string)))
   (let ((case-fold-search t)
+        result-missing-files
+        result-found-nodes
+        result-found-files
         ;; Perf
         (file-name-handler-alist $file-name-handler-alist)
         ;; REVIEW: reading source for `recover-file', it sounds like the
@@ -276,8 +304,8 @@ list, and write results to another temp file."
               ;; We got here because user deleted a file in a way that we
               ;; didn't notice.  If it was actually a rename done outside
               ;; Emacs, the new name will get picked up on next reset.
-              (push FILE org-node-worker--result-missing-files)
-            (push FILE org-node-worker--result-found-files)
+              (push FILE result-missing-files)
+            (push FILE result-found-files)
             (erase-buffer)
             ;; NOTE: Here I used `insert-file-contents-literally' in the past,
             ;; converting each captured substring afterwards with
@@ -349,11 +377,11 @@ list, and write results to another temp file."
                              FILE))
                     (setq FAR (point))
                     (org-node-worker--collect-links-until
-                     END FILE-ID nil $link-re)
+                     END FILE-ID nil $plain-re $merged-re)
                     (setq END DRAWER-BEG)))
                 (goto-char HERE)
                 (org-node-worker--collect-links-until
-                 END FILE-ID nil $link-re)
+                 END FILE-ID nil $plain-re $merged-re)
                 (push (list
                        :title FILE-TITLE-OR-BASENAME ;; Uhm
                        :level 0
@@ -369,7 +397,7 @@ list, and write results to another temp file."
                         (or (cdr (assoc "ROAM_ALIASES" PROPS)) ""))
                        :refs (org-node-worker--split-refs-field
                               (cdr (assoc "ROAM_REFS" PROPS))))
-                      org-node-worker--result-found-nodes))
+                      result-found-nodes))
 
               ;; This initial condition supports the special case where the
               ;; very first line of a file is a heading, as would be typical of
@@ -496,7 +524,7 @@ list, and write results to another temp file."
                                 (or (cdr (assoc "ROAM_ALIASES" PROPS)) ""))
                                :refs (org-node-worker--split-refs-field
                                       (cdr (assoc "ROAM_REFS" PROPS))))
-                              org-node-worker--result-found-nodes))
+                              result-found-nodes))
                       ;; Now collect links while we're here!
                       (setq ID-HERE (or ID (org-node-worker--pos->parent-id
                                             OUTLINE-DATA HEADING-POS FILE-ID)))
@@ -515,10 +543,10 @@ list, and write results to another temp file."
                         ;; just the body text
                         (goto-char HEADING-POS)
                         (org-node-worker--collect-links-until
-                         (pos-eol) ID-HERE OLP-WITH-SELF $link-re)
+                         (pos-eol) ID-HERE OLP-WITH-SELF $plain-re $merged-re)
                         (goto-char HERE)
                         (org-node-worker--collect-links-until
-                         END ID-HERE OLP-WITH-SELF $link-re))
+                         END ID-HERE OLP-WITH-SELF $plain-re $merged-re))
                       (org-node-worker--next-heading))))))
 
         (( t error )
@@ -535,9 +563,9 @@ list, and write results to another temp file."
     (let ((print-length nil)
           (print-level nil))
       (write-region
-       (prin1-to-string (list org-node-worker--result-missing-files
-                              org-node-worker--result-found-files
-                              org-node-worker--result-found-nodes
+       (prin1-to-string (list result-missing-files
+                              result-found-files
+                              result-found-nodes
                               org-node-worker--result-found-id-links
                               org-node-worker--result-found-reflinks
                               org-node-worker--result-found-citations))

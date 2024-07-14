@@ -99,25 +99,27 @@ A comparison of three similar systems, all permitting org-id as first-class citi
 | Node aliases                      | yes      | yes                | --                   |
 | Rich backlinks buffer             | yes      | yes (org-roam's)   | --                   |
 | Reflinks                          | yes      | yes (as backlinks) | --                   |
-| Ref search                        | yes      | yes (as aliases)   | --                   |
+| Ref search                        | yes      | yes (as aliases)   | not applicable       |
+| Org 9.5 @citekeys as refs         | yes      | yes                | not applicable       |
 | Can have rich search completion   | yes      | yes                | not applicable       |
 | Can work thru org-roam-capture    | yes      | yes                | --                   |
 | Can work thru org-capture         | --       | yes                | --                   |
 | Can show backlinks in same window | --       | yes                | yes                  |
 | Avoid double-counting =:BACKLINKS:= | --       | yes                | not applicable       |
 | Grep across all files             | --       | yes                | --                   |
-| Update stale link descriptions    | --       | yes                | --                   |
+| Command to fix link descriptions  | --       | yes                | --                   |
 | List dead links                   | --       | yes                | --                   |
-| Warn about duplicate IDs          | --       | yes                | --                   |
+| Warn about duplicate titles       | --       | yes                | --                   |
 | Node exclusion                    | yes      | limited            | not applicable       |
-| Support Org 9.5 citations         | yes      | -- (planned)       | --                   |
-| Support org-ref                   | yes      | -- (WONTFIX)       | --                   |
-| Support =roam:= links               | yes      | -- (WONTFIX)       | --                   |
+| Principled "related"-section      | --       | --                 | yes                  |
+| Customize how backlinks shown     | yes      | --                 | yes                  |
+| Support org-ref                   | yes      | --                 | not applicable       |
+| Support =roam:= links               | yes      | -- (WONTFIX)       | not applicable       |
 | Can have separate note piles      | yes      | -- (WONTFIX)       | not applicable       |
 |-----------------------------------+----------+--------------------+----------------------|
 | Some query-able cache             | EmacSQL  | hash tables        | --                   |
 | Async caching                     | --       | yes                | not applicable       |
-| Time to re-cache my 3000 nodes    | 2m 48s   | 0m 02s             | not applicable       |
+| *Time to re-cache my 3000 nodes*    | 2m 48s   | 0m 02s             | not applicable       |
 
 * Setup
 
@@ -325,6 +327,21 @@ Working over TRAMP is untested, but I suspect it won't work.  Org-node tries to 
 If you need TRAMP, use org-roam, which is made to /not/ re-access files or directories so often anyway (which would be slow over a network connection), in favor of trusting its own DB.
 
 That design caused me no end of problems with out-of-sync DB, so it's a feature that org-node checks the disk files more often, but then it needs to be fast, and here we are.
+
+*** Limitation: undead backlinks
+You may notice backlinks staying after you erased the forward link.  For performance reasons, org-node waits for idle before cleaning up.
+
+Also due to this mechanism, org-roam-buffer's contextual display may shift to show irrelevant text as a file is edited; this too is corrected on idle.
+
+*** Limitation: links with spaces in =ROAM_REFS=
+
+Currently to seek reflinks, org-node just uses =org-link-plain-re=, which is not space-aware.  So =ROAM_REFS= like:
+
+: :ROAM_REFS: [[https://romankogan.net/adhd/#False Dependency Chain]]
+
+will not get reflinks.  I'll see about transiting to =org-link-any-re=, it just seems like a perf hit for a tiny use case.
+
+# Oh... with any-re, you can make a datestamp a ref!  Maybe people do use that.
 
 *** Toolbox
 
