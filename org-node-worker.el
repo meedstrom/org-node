@@ -245,8 +245,6 @@ process does not have to load org.el."
 (defvar org-node-worker--result-found-reflinks nil)
 (defvar org-node-worker--result-found-citations nil)
 
-;; TODO Use `narrow-to-region' per subtree for more confident refactoring
-
 (defun org-node-worker--collect-dangerously ()
   "Dangerous!  Assumes the current buffer is a temp buffer!
 
@@ -267,13 +265,10 @@ list, and write results to another temp file."
         result-found-files
         ;; Perf
         (file-name-handler-alist $file-name-handler-alist)
-        ;; REVIEW: reading the source for `recover-file', it sounds like the
-        ;; coding system for read can affect the system for write? If so, how
-        ;; to pick a sane system for write?
         (coding-system-for-read $assume-coding-system)
-        ;; Assigned on every iteration, so may as well let-bind once, hopefully
-        ;; producing less garbage.  Not sure how elisp works... but profiling
-        ;; shows a speedup.
+        (coding-system-for-write $assume-coding-system) ;; same as mother emacs
+        ;; Assigned on every iteration, so let-bind once to produce less
+        ;; garbage.  Not sure how elisp works... but profiling shows a speedup
         HEADING-POS HERE FAR END OUTLINE-DATA OLP-WITH-SELF ID-HERE
         TITLE FILE-TITLE FILE-TITLE-OR-BASENAME
         TODO-STATE TODO-RE FILE-TODO-SETTINGS
@@ -381,156 +376,155 @@ list, and write results to another temp file."
                             (cdr (assoc "ROAM_REFS" PROPS))))
                     result-found-nodes))
 
-            ;; This initial condition supports the special case where the
-            ;; very first line of a file is a heading, as would be typical of
+            ;; This initial condition supports the special case where the very
+            ;; first line of a file is a heading, as would be typical for
             ;; people who nix `org-node-prefer-file-level-nodes'.
             (unless (or (looking-at-p "\\*")
                         (org-node-worker--next-heading))
               (throw 'file-done t))
             ;; Loop over the file's subtrees
-            (while
-                (progn
-                  (setq HEADING-POS (point))
-                  (setq LEVEL (skip-chars-forward "*"))
-                  (skip-chars-forward " ")
-                  (setq HERE (point))
-                  (let ((case-fold-search nil))
-                    (if (looking-at TODO-RE)
+            (while (not (eobp))
+              (narrow-to-region (point)
+                                (save-excursion
+                                  (or (org-node-worker--next-heading)
+                                      (point-max))))
+              (setq HEADING-POS (point))
+              (setq LEVEL (skip-chars-forward "*"))
+              (skip-chars-forward " ")
+              (setq HERE (point))
+              (let ((case-fold-search nil))
+                (if (looking-at TODO-RE)
+                    (progn
+                      (setq TODO-STATE (buffer-substring (point) (match-end 0)))
+                      (goto-char (match-end 0))
+                      (skip-chars-forward " ")
+                      (setq HERE (point)))
+                  (setq TODO-STATE nil))
+                (if (looking-at "\\[#[A-Z0-9]+\\]")
+                    (progn
+                      (setq PRIORITY (match-string 0))
+                      (goto-char (match-end 0))
+                      (skip-chars-forward " ")
+                      (setq HERE (point)))
+                  (setq PRIORITY nil)))
+              ;; Skip statistics-cookie such as "[2/10]"
+              (when (looking-at "\\[[0-9]*/[0-9]*\\]")
+                (goto-char (match-end 0))
+                (skip-chars-forward " ")
+                (setq HERE (point)))
+              ;; Tags in heading
+              (if (re-search-forward " +\\(:.+:\\) *$" (pos-eol) t)
+                  (progn
+                    (setq TITLE (org-node-worker--org-link-display-format
+                                 (buffer-substring HERE (match-beginning 0))))
+                    (setq TAGS (split-string (match-string 1) ":" t)))
+                (setq TITLE
+                      (org-node-worker--org-link-display-format
+                       (buffer-substring HERE (pos-eol))))
+                (setq TAGS nil))
+              ;; Gotta go forward 1 line, see if it is a planning-line, and
+              ;; if it is, then go forward 1 more line, and if that is a
+              ;; :PROPERTIES: line, then we're good
+              ;; actually--just check at the start if there is an id
+              (forward-line 1)
+              (setq HERE (point))
+              (setq FAR (pos-eol))
+              (setq SCHED
+                    (if (re-search-forward "[[:space:]]*SCHEDULED: +" FAR t)
+                        (prog1 (buffer-substring
+                                (point)
+                                ;; \n just there for safety
+                                (+ 1 (point) (skip-chars-forward "^]>\n")))
+                          (goto-char HERE))
+                      nil))
+              (setq DEADLINE
+                    (if (re-search-forward "[[:space:]]*DEADLINE: +" FAR t)
+                        (prog1 (buffer-substring
+                                (point)
+                                (+ 1 (point) (skip-chars-forward "^]>\n")))
+                          (goto-char HERE))
+                      nil))
+              (if (or SCHED
+                      DEADLINE
+                      (re-search-forward "[[:space:]]*CLOSED: +" FAR t))
+                  ;; Alright, so there was a planning-line, meaning any
+                  ;; :PROPERTIES: must be on the next line.
+                  (progn
+                    (forward-line 1)
+                    (setq FAR (pos-eol)))
+                ;; No planning-line, who knows what it is (a new
+                ;; heading?), return to safety
+                (goto-char (1+ HEADING-POS)))
+              (setq PROPS
+                    (if (re-search-forward "^[[:space:]]*:properties:" FAR t)
                         (progn
-                          (setq TODO-STATE (buffer-substring (point) (match-end 0)))
-                          (goto-char (match-end 0))
-                          (skip-chars-forward " ")
-                          (setq HERE (point)))
-                      (setq TODO-STATE nil))
-                    (if (looking-at "\\[#[A-Z0-9]+\\]")
-                        (progn
-                          (setq PRIORITY (match-string 0))
-                          (goto-char (match-end 0))
-                          (skip-chars-forward " ")
-                          (setq HERE (point)))
-                      (setq PRIORITY nil)))
-                  ;; Skip statistics-cookie such as "[2/10]"
-                  (when (looking-at "\\[[0-9]*/[0-9]*\\]")
-                    (goto-char (match-end 0))
-                    (skip-chars-forward " ")
-                    (setq HERE (point)))
-                  ;; Tags in heading
-                  (if (re-search-forward " +\\(:.+:\\) *$" (pos-eol) t)
-                      (progn
-                        (setq TITLE (org-node-worker--org-link-display-format
-                                     (buffer-substring HERE (match-beginning 0))))
-                        (setq TAGS (split-string (match-string 1) ":" t)))
-                    (setq TITLE
-                          (org-node-worker--org-link-display-format
-                           (buffer-substring HERE (pos-eol))))
-                    (setq TAGS nil))
-                  ;; Now we must be careful.  Imagine this subtree is just
-                  ;; a heading, empty of content, and the very next line is
-                  ;; another heading.  Gotta go forward 1 line, see if it
-                  ;; is a planning-line, and if it is, then go forward 1
-                  ;; more line, and if that is a :PROPERTIES: line, then we
-                  ;; know it belongs to the current subtree.  If we had
-                  ;; just allowed the search for :PROPERTIES: to cross 2
-                  ;; lines, we could have matched a property drawer for the
-                  ;; wrong heading.
-                  (forward-line 1)
-                  (setq HERE (point))
-                  (setq FAR (pos-eol))
-                  (setq SCHED
-                        (if (re-search-forward "[[:space:]]*SCHEDULED: +" FAR t)
-                            (prog1 (buffer-substring
-                                    (point)
-                                    ;; \n just there for safety
-                                    (+ 1 (point) (skip-chars-forward "^]>\n")))
-                              (goto-char HERE))
-                          nil))
-                  (setq DEADLINE
-                        (if (re-search-forward "[[:space:]]*DEADLINE: +" FAR t)
-                            (prog1 (buffer-substring
-                                    (point)
-                                    (+ 1 (point) (skip-chars-forward "^]>\n")))
-                              (goto-char HERE))
-                          nil))
-                  (if (or SCHED
-                          DEADLINE
-                          (re-search-forward "[[:space:]]*CLOSED: +" FAR t))
-                      ;; Alright, so there was a planning-line, meaning any
-                      ;; :PROPERTIES: must be on the next line.
-                      (progn
-                        (forward-line 1)
-                        (setq FAR (pos-eol)))
-                    ;; No planning-line, who knows what it is (a new
-                    ;; heading?), return to safety
-                    (goto-char (1+ HEADING-POS)))
-                  (setq PROPS
-                        (if (re-search-forward "^[[:space:]]*:properties:" FAR t)
-                            (progn
-                              (forward-line 1)
-                              (org-node-worker--collect-properties
-                               (point)
-                               ;; TODO: Can we better handle a missing :END:?
-                               ;; Thinking the function above can do verification.
-                               (if (re-search-forward "^[[:space:]]*:end:" nil t)
-                                   (prog1 (pos-bol)
-                                     ;; For safety in case seeking :END: landed us
-                                     ;; way down the file.  Some error will hopefully
-                                     ;; be printed about this subtree, but we can
-                                     ;; keep going sanely from here on.
-                                     (goto-char FAR))
-                                 (error "Couldn't find matching :END: drawer in file %s at position %d"
-                                        FILE (point)))
-                               FILE))
-                          nil))
-                  (setq ID (cdr (assoc "ID" PROPS)))
-                  ;; nil ID allowed
-                  (push (list HEADING-POS TITLE LEVEL ID) OUTLINE-DATA)
-                  (when ID
-                    (setq OLP (org-node-worker--pos->olp OUTLINE-DATA HEADING-POS))
-                    (push (list
-                           :title TITLE
-                           :is-subtree t
-                           :level LEVEL
-                           :id ID
-                           :pos HEADING-POS
-                           :tags TAGS
-                           :todo TODO-STATE
-                           :file-path FILE
-                           :scheduled SCHED
-                           :deadline DEADLINE
-                           :file-title FILE-TITLE
-                           :file-title-or-basename FILE-TITLE-OR-BASENAME
-                           :olp OLP
-                           :properties PROPS
-                           :priority PRIORITY
-                           :aliases
-                           (split-string-and-unquote
-                            (or (cdr (assoc "ROAM_ALIASES" PROPS)) ""))
-                           :refs (org-node-worker--split-refs-field
-                                  (cdr (assoc "ROAM_REFS" PROPS))))
-                          result-found-nodes))
-                  ;; Now collect links while we're here!
-                  (setq ID-HERE (or ID (org-node-worker--pos->parent-id
-                                        OUTLINE-DATA HEADING-POS FILE-ID)))
-                  (when ID-HERE
-                    (setq END (save-excursion
-                                (when (org-node-worker--next-heading)
-                                  (1- (point)))))
-                    (setq OLP-WITH-SELF (append OLP (list TITLE)))
-                    ;; Don't count org-super-links backlinks
-                    (when (re-search-forward $backlink-drawer-re END t)
-                      (or (search-forward ":end:" END t)
-                          (error "Couldn't find matching :END: drawer in file %s at position %d"
-                                 FILE (point))))
-                    (setq HERE (point))
-                    ;; Gotcha... collect links inside the heading, not
-                    ;; just the body text
-                    (goto-char HEADING-POS)
-                    (org-node-worker--collect-links-until
-                     (pos-eol) ID-HERE OLP-WITH-SELF $plain-re $merged-re)
-                    (goto-char HERE)
-                    (org-node-worker--collect-links-until
-                     END ID-HERE OLP-WITH-SELF $plain-re $merged-re))
-                  (org-node-worker--next-heading))))
+                          (forward-line 1)
+                          (org-node-worker--collect-properties
+                           (point)
+                           ;; TODO: Can we better handle a missing :END:?
+                           ;; Thinking the function above can do verification.
+                           (if (re-search-forward "^[[:space:]]*:end:" nil t)
+                               (prog1 (pos-bol)
+                                 ;; For safety in case seeking :END: landed us
+                                 ;; way down the file.  Some error will hopefully
+                                 ;; be printed about this subtree, but we can
+                                 ;; keep going sanely from here on.
+                                 (goto-char FAR))
+                             (error "Couldn't find matching :END: drawer in file %s at position %d"
+                                    FILE (point)))
+                           FILE))
+                      nil))
+              (setq ID (cdr (assoc "ID" PROPS)))
+              ;; nil ID allowed
+              (push (list HEADING-POS TITLE LEVEL ID) OUTLINE-DATA)
+              (when ID
+                (setq OLP (org-node-worker--pos->olp OUTLINE-DATA HEADING-POS))
+                (push (list
+                       :title TITLE
+                       :is-subtree t
+                       :level LEVEL
+                       :id ID
+                       :pos HEADING-POS
+                       :tags TAGS
+                       :todo TODO-STATE
+                       :file-path FILE
+                       :scheduled SCHED
+                       :deadline DEADLINE
+                       :file-title FILE-TITLE
+                       :file-title-or-basename FILE-TITLE-OR-BASENAME
+                       :olp OLP
+                       :properties PROPS
+                       :priority PRIORITY
+                       :aliases
+                       (split-string-and-unquote
+                        (or (cdr (assoc "ROAM_ALIASES" PROPS)) ""))
+                       :refs (org-node-worker--split-refs-field
+                              (cdr (assoc "ROAM_REFS" PROPS))))
+                      result-found-nodes))
+              ;; Now collect links while we're here!
+              (setq ID-HERE (or ID (org-node-worker--pos->parent-id
+                                    OUTLINE-DATA HEADING-POS FILE-ID)))
+              (when ID-HERE
+                (setq END (save-excursion
+                            (when (org-node-worker--next-heading)
+                              (1- (point)))))
+                (setq OLP-WITH-SELF (append OLP (list TITLE)))
+                ;; Don't count org-super-links backlinks
+                (when (re-search-forward $backlink-drawer-re END t)
+                  (or (search-forward ":end:" END t)
+                      (error "Couldn't find matching :END: drawer in file %s at position %d"
+                             FILE (point))))
+                (setq HERE (point))
+                ;; Gotcha... collect links inside the heading, not
+                ;; just the body text
+                (goto-char HEADING-POS)
+                (org-node-worker--collect-links-until
+                 (pos-eol) ID-HERE OLP-WITH-SELF $plain-re $merged-re)
+                (goto-char HERE)
+                (org-node-worker--collect-links-until
+                 END ID-HERE OLP-WITH-SELF $plain-re $merged-re))
+              (goto-char (point-max))
+              (widen)))
 
         (( t error )
          ;; Don't crash the whole process when there is a problem scanning one
