@@ -112,11 +112,11 @@ REMOVE, remove it instead."
     (skip-chars-forward "[:space:]")
     (let* ((id (buffer-substring-no-properties
                 (point) (+ (point) (skip-chars-forward "^ \n"))))
-           (node (gethash id org-node--node-by-id)))
+           (node (gethash id org-node--id<>node)))
       (when node
         ;; Make the full string to which the :BACKLINKS: property should be set
         (let* ((reflinks (org-node-get-reflinks node))
-               (backlinks (gethash id org-node--backlinks-by-id))
+               (backlinks (gethash id org-node--id<>backlinks))
                (citations (org-node-get-citations node))
                (combined
                 (thread-last
@@ -130,7 +130,7 @@ REMOVE, remove it instead."
                   (--map (org-link-make-string
                           (concat "id:" it)
                           (org-node-get-title
-                           (or (gethash it org-node--node-by-id)
+                           (or (gethash it org-node--id<>node)
                                (error "ID in backlink tables not known to main org-nodes table: %s"
                                       it)))))))
                (links-string (string-join combined "  ")))
@@ -258,10 +258,10 @@ all areas where text is added/changed/deleted."
                 (setq id path)
                 (setq file (org-id-find-id-file id)))
             ;; "Reflink"
-            (setq id (gethash (concat type ":" path) org-node--id-by-ref))
+            (setq id (gethash (concat type ":" path) org-node--ref<>id))
             (setq file (ignore-errors
                          (org-node-get-file-path
-                          (gethash id org-node--node-by-id)))))
+                          (gethash id org-node--id<>node)))))
           (when (null file)
             (push id org-node-backlink--fails))
           (when (and id file)

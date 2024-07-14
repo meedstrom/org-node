@@ -36,7 +36,8 @@ mode exists for people who prefer to turn that off."
         (with-current-buffer buf
           (remove-hook 'post-command-hook #'org-roam-buffer--redisplay-h t))))))
 
-;;; Method 1: Fake roam backlinks, no SQLite
+
+;;;; NoSQL method: fabricate knockoff roam backlinks
 
 ;;;###autoload
 (define-minor-mode org-node-roam-no-sql-mode
@@ -83,8 +84,8 @@ without having SQLite installed."
 
 
 ;; Eval to see examples of what it has to work with...
-;; (seq-random-elt (hash-table-keys org-node--backlinks-by-id))
-;; (seq-random-elt (hash-table-values org-node--backlinks-by-id))
+;; (seq-random-elt (hash-table-keys org-node--id<>backlinks))
+;; (seq-random-elt (hash-table-values org-node--id<>backlinks))
 
 (defun org-node-roam--make-backlinks (target-roam-node &rest _)
   "Make org-roam-backlink objects targeting TARGET-ROAM-NODE.
@@ -92,15 +93,11 @@ Designed as override advice for `org-roam-backlinks-get'."
   (require 'org-roam)
   (let ((target-id (org-roam-node-id target-roam-node)))
     (when target-id
-      (let ((links (gethash target-id org-node--backlinks-by-id))
-            ;; TODO: this probs necessary, but verify in org-roam-buffer becsue
-            ;; i expect we see duplicates, and if not, why not?
-            ;; (links (delete-dups (gethash target-id org-node--backlinks-by-id)))
-            )
+      (let ((links (gethash target-id org-node--id<>backlinks)))
         (cl-loop
          for link-data in links
          as src-id = (plist-get link-data :origin)
-         as src-node = (gethash src-id org-node--node-by-id)
+         as src-node = (gethash src-id org-node--id<>node)
          when src-node
          collect (org-roam-backlink-create
                   :target-node target-roam-node
@@ -109,22 +106,22 @@ Designed as override advice for `org-roam-backlinks-get'."
                   :properties (plist-get link-data :properties)))))))
 
 ;; Eval to see examples of what it has to work with...
-;; (seq-random-elt (hash-table-keys org-node--reflinks-by-ref))
-;; (seq-random-elt (hash-table-values org-node--reflinks-by-ref))
+;; (seq-random-elt (hash-table-keys org-node--ref<>reflinks))
+;; (seq-random-elt (hash-table-values org-node--ref<>reflinks))
 
 (defun org-node-roam--make-reflinks (target-roam-node &rest _)
   "Make org-roam-reflink objects targeting TARGET-ROAM-NODE.
 Designed as override advice for `org-roam-reflinks-get'."
   (require 'org-roam)
   (let* ((target-id (org-roam-node-id target-roam-node))
-         (node (gethash target-id org-node--node-by-id)))
+         (node (gethash target-id org-node--id<>node)))
     (when node
       (cl-loop
        for ref in (org-node-get-refs node)
        as reflinks = (cl-loop
-                      for link in (gethash ref org-node--reflinks-by-ref)
+                      for link in (gethash ref org-node--ref<>reflinks)
                       as src-id = (plist-get link :origin)
-                      as src-node = (gethash src-id org-node--node-by-id)
+                      as src-node = (gethash src-id org-node--id<>node)
                       when src-node
                       collect (org-roam-reflink-create
                                :ref (plist-get link :dest)
@@ -134,7 +131,7 @@ Designed as override advice for `org-roam-reflinks-get'."
        when reflinks append reflinks))))
 
 
-;;; Method 2: feed the DB
+;;;; Shim method: feed Roam's DB
 
 ;;;###autoload
 (define-minor-mode org-node-roam-db-shim-mode
@@ -300,7 +297,7 @@ Adapted from `org-roam-db-insert-refs'."
                                  (plist-get link :pos)
                                  (plist-get link :properties))))
     ;; See `org-roam-db-insert-link'
-    (dolist (link (append (gethash id org-node--backlinks-by-id)
+    (dolist (link (append (gethash id org-node--id<>backlinks)
                           (org-node-get-reflinks node)))
       (org-roam-db-query [:insert :into links
                           :values $v1]
