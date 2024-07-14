@@ -111,8 +111,8 @@ A comparison of three similar systems, all permitting org-id as first-class citi
 | Command to fix link descriptions  | --       | yes                | --                   |
 | List dead links                   | --       | yes                | --                   |
 | Warn about duplicate titles       | --       | yes                | --                   |
-| Node exclusion                    | yes      | limited            | not applicable       |
 | Principled "related"-section      | --       | --                 | yes                  |
+| Node exclusion                    | yes      | limited            | not applicable       |
 | Customize how backlinks shown     | yes      | --                 | yes                  |
 | Support org-ref                   | yes      | --                 | not applicable       |
 | Support =roam:= links               | yes      | -- (WONTFIX)       | not applicable       |
@@ -120,7 +120,7 @@ A comparison of three similar systems, all permitting org-id as first-class citi
 |-----------------------------------+----------+--------------------+----------------------|
 | Some query-able cache             | EmacSQL  | hash tables        | --                   |
 | Async caching                     | --       | yes                | not applicable       |
-| *Time to re-cache my 3000 nodes*    | 2m 48s   | 0m 02s             | not applicable       |
+| *Time to re-cache my 3000 nodes*    | *2m 48s*   | *0m 02s*             | not applicable       |
 
 * Setup
 
@@ -145,7 +145,7 @@ Pick some good keys and try them out.
 
 To browse config options, type =M-x customize-group RET org-node RET=.
 
-Final tip for the newbie: there's no separate command for creating a new node!  Reuse one of the commands above... and type the name of a node that doesn't exist.  Try it and see what happens!
+Final tip: there's no separate command for creating a new node!  Reuse one of the commands above... and type the name of a node that doesn't exist.  Try it and see what happens!
 
 ** Use Org-roam at the same time?
 
@@ -171,9 +171,9 @@ Finally, make sure org-id knows all the files org-roam knows about (you'd think 
 
 With that done, try out the commands we went over in [[https://github.com/meedstrom/org-node?tab=readme-ov-file#quick-start][Quick start]].  There's more under [[https://github.com/meedstrom/org-node?tab=readme-ov-file#toolbox][Toolbox]].  Enjoy!
 
-If you want to keep using =M-x org-roam-buffer-toggle=, see the next section.
-
 ** Backlink solution 1: borrow org-roam's backlink buffer
+Backlinks are bread and butter.  As a Roam user, you can just keep using =M-x org-roam-buffer-toggle=.  You even get some new ways to keep its data fresh without so much reliance on org-roam.
+
 **** *Option 1A.*  Let org-roam manage its own DB
 
 If you didn't have laggy saves, this is fine.  In other words, keep =org-roam-db-update-on-save= at t.
@@ -188,16 +188,16 @@ Use this minor mode:
 (setq org-roam-db-update-on-save nil)
 #+end_src
 
-To full-reset the DB, either of these should work
-- =C-u M-x org-roam-db-sync=
-- =M-x org-node-roam-db-reset=, bearing in mind results aren't 100% identical.
+There is even a command to full-reset the DB:
 
+- Original: =C-u M-x org-roam-db-sync=
+- Substitute: =M-x org-node-roam-db-reset=, bearing in mind results aren't 100% identical.
 
 **** *Option 1C*.  Cut out the DB altogether
 
 No need to compile SQLite!  Type =M-x org-node-roam-no-sql-mode=, then see what populates your Roam buffer henceforth.  Hopefully you see the same links as before.
 
-If you're happy with the result, and you don't need =roam:= links functionality, you can disable =org-roam-db-autosync-mode= in favour of the slimmer =M-x org-node-roam-redisplay-mode=.  As an init snippet:
+If you're happy with the result, and you don't need =roam:= links functionality, you can disable =org-roam-db-autosync-mode= entirely in favour of the slimmer =M-x org-node-roam-redisplay-mode=.  As an init snippet:
 
 #+begin_src elisp
 (org-roam-db-autosync-mode 0)
@@ -206,7 +206,7 @@ If you're happy with the result, and you don't need =roam:= links functionality,
 #+end_src
 
 ** Backlink solution 2: print inside the file
-I rarely have the screen space to display a backlink buffer.  So this is better.
+I rarely have the screen space to display a backlink buffer.  So this is better. 😏
 
 **** *Option 2A*.  Let org-node add a =:BACKLINKS:= property to all nodes
 
@@ -258,7 +258,7 @@ Example capture templates follow. The secret sauce is =(function org-node-captur
          :immediate-finish t)))
 #+end_src
 
-With that done, the commands =org-node-find= & =org-node-insert-link= can also outsource to org-capture when creating new nodes:
+With that done, the everyday commands =org-node-find= & =org-node-insert-link= can also outsource to org-capture when creating new nodes:
 
 #+begin_src elisp
 (setq org-node-creation-fn #'org-capture)
@@ -325,14 +325,12 @@ NB: this workaround won't help the in-buffer completions provided by =org-node-c
 *** Limitation: TRAMP
 Working over TRAMP is untested, but I suspect it won't work.  Org-node tries to be very fast, often nulling =file-name-handler-alist=, which TRAMP needs.
 
-If you need TRAMP, use org-roam, which is made to /not/ re-access files or directories so often anyway (which would be slow over a network connection), in favor of trusting its own DB.
-
-That design caused me no end of problems with out-of-sync DB, so it's a feature that org-node checks the disk files more often, but then it needs to be fast, and here we are.
+If you need TRAMP, use org-roam, which is made to /not/ re-access files or directories so often anyway (which would also be slow over a network connection), in favor of trusting its own DB.
 
 *** Limitation: undead backlinks
 You may notice backlinks staying after you erased the forward link.  For performance reasons, org-node waits for idle before cleaning up.
 
-The same mechanism is responsible for the org-roam-buffer's display of link contexts shifting to display irrelevant text as the underlying file is edited; this too is corrected on idle.
+The same mechanism is responsible for shifting the org-roam-buffer's display of backlink context towards irrelevant context as the underlying file is edited; this too is corrected on idle.
 
 *** Toolbox
 
