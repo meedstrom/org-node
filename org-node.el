@@ -33,6 +33,8 @@
 ;;      must be significant overhead on the child processes... nix it
 ;; TODO A workflow to allow pseudo-untitled (numeric-titled) nodes
 ;;      - Need a bunch of commands, like jump to node from fulltext search
+;; TODO Maybe merge reflinks and citations
+;;      - they only need to be separate for feeding to roam
 
 (require 'compat)
 (require 'cl-lib)
@@ -46,7 +48,7 @@
 ;;;; Obsoletions
 
 (define-obsolete-variable-alias
-  'org-node-collection 'org-node--node-by-candidate "2024-07-11")
+  'org-node-collection 'org-node--candidate<>node "2024-07-11")
 
 (let ((aliases '(org-node-slug-fn org-node-filename-fn
                  org-node-cache-rescan-file-hook org-node-rescan-hook
@@ -179,12 +181,12 @@ visited.  The smaller this list, the faster `org-node-reset'."
   "Predicate returning t to include a node, or nil to exclude it.
 
 The filtering only has an impact on the table
-`org-node--node-by-candidate', which forms the basis for
-completions in the minibuffer, and `org-node--id-by-title', used
+`org-node--candidate<>node', which forms the basis for
+completions in the minibuffer, and `org-node--title<>id', used
 by the in-buffer `org-node-complete-at-point'.  In other words,
 passing nil means the user cannot autocomplete to the node, but
 Lisp code can still find it in the \"main\" table,
-`org-node--node-by-id'.
+`org-node--id<>node'.
 
 This function is applied once for every org-id node found, and
 receives the node data as a single argument: an object which form
@@ -319,8 +321,7 @@ NODE is an object which form you can observe in examples from
 (C-h o RET org-node-get RET).
 
 If a node has aliases, it is passed to this function again for
-every alias, in which case TITLE argument is actually one of the
-aliases."
+every alias, in which case TITLE is actually one of the aliases."
   :type '(radio
           (function-item org-node-affix-bare)
           (function-item org-node-affix-with-olp)
@@ -346,21 +347,21 @@ For use as `org-node-affixation-fn'."
             (string-join (nreverse result))))
         nil))
 
-(defvar org-node--affixation-triplet-by-title (make-hash-table :test #'equal)
+(defvar org-node--title<>affixation-triplet (make-hash-table :test #'equal)
   "1:1 table mapping titles or aliases to affixation triplets.")
 
 (defun org-node--affixate-collection (coll)
   "Take COLL and return precomputed affixations for each member."
   (cl-loop for title in coll
-           collect (gethash title org-node--affixation-triplet-by-title)))
+           collect (gethash title org-node--title<>affixation-triplet)))
 
 (defun org-node-collection (str pred action)
   "Custom COLLECTION for `completing-read'.
 
-Based on `org-node--node-by-candidate' and affixes each candidate
+Based on `org-node--candidate<>node' and affixes each candidate
 using `org-node-affixation-fn'.
 
-All completions are keys of `org-node--node-by-candidate', but
+All completions are keys of `org-node--candidate<>node', but
 remember that it is possible for `completing-read' to exit with
 user-entered input that didn't match anything.
 
@@ -370,7 +371,7 @@ read more in the manual at (elisp)Programmed Completion."
       (cons 'metadata (unless org-node-alter-candidates
                         (list (cons 'affixation-function
                                     #'org-node--affixate-collection))))
-    (complete-with-action action org-node--node-by-candidate str pred)))
+    (complete-with-action action org-node--candidate<>node str pred)))
 
 (defvar org-node-hist nil
   "Minibuffer history.")
@@ -392,7 +393,7 @@ For each slot, there exists a getter function
 For example, the field \"deadline\" has a getter
 `org-node-get-deadline'.  So you would type
 \"(org-node-get-deadline NODE)\", where NODE is one of the
-elements of the `hash-table-values' of `org-node--node-by-id'.
+elements of the `hash-table-values' of `org-node--id<>node'.
 
 For real-world usage of these getters, see examples in the
 documentation of `org-node-filter-fn' or the package README.
@@ -442,23 +443,23 @@ or you can visit the homepage:
 
 ;;;; Tables
 
-(defvar org-node--node-by-id (make-hash-table :test #'equal)
+(defvar org-node--id<>node (make-hash-table :test #'equal)
   "1:1 table mapping ids to nodes.
 To peek on the contents, try \\[org-node-peek] a few times, which
 can demonstrate the data format.  See also the type `org-node-get'.")
 
-(defvaralias 'org-nodes 'org-node--node-by-id)
+(defvaralias 'org-nodes 'org-node--id<>node)
 
-(defvar org-node--node-by-candidate (make-hash-table :test #'equal)
+(defvar org-node--candidate<>node (make-hash-table :test #'equal)
   "1:1 table mapping completion candidates to nodes.")
 
-(defvar org-node--id-by-title (make-hash-table :test #'equal)
+(defvar org-node--title<>id (make-hash-table :test #'equal)
   "1:1 table mapping raw titles (and ROAM_ALIASES) to IDs.")
 
-(defvar org-node--id-by-ref (make-hash-table :test #'equal)
+(defvar org-node--ref<>id (make-hash-table :test #'equal)
   "1:1 table mapping ROAM_REFS members to the adjacent ID.")
 
-(defvar org-node--backlinks-by-id (make-hash-table :test #'equal)
+(defvar org-node--id<>backlinks (make-hash-table :test #'equal)
   "1:N table of ID-links.
 
 The table keys are destination IDs, and the corresponding table
@@ -473,7 +474,7 @@ the ID-node where the link originated.")
 ;; should be "reflinks" and "ref-backlinks".
 ;; Then this would be called... "ref-backlinks-by-reflink"... no...
 ;; Can I not just merge all three tables?
-(defvar org-node--reflinks-by-ref (make-hash-table :test #'equal)
+(defvar org-node--ref<>reflinks (make-hash-table :test #'equal)
   "1:N table mapping refs to latent reflinks.
 
 Refs are plain URI strings such as web addresses, and the list of
@@ -484,33 +485,33 @@ was found.  For details of these plists, see source of
 In truth, this table contains many more rows than the number of
 ROAM_REFS you probably have.  Just eval this and see:
 
-    (string-join (hash-table-keys org-node--reflinks-by-ref) [32])
+    (string-join (hash-table-keys org-node--ref<>reflinks) [32])
 
 That's because the scanner does not know ahead of time which
 links have a corresponding ref-node.
 
 To see whether one of these \"latent\" reflinks has a node
 actually referencing it, check for the the same ref in
-`org-node--id-by-ref'.  Or use the convenience wrapper
+`org-node--ref<>id'.  Or use the convenience wrapper
 `org-node-get-reflinks' if suitable.")
 
-(defvar org-node--cites-by-citekey (make-hash-table :test #'equal)
+(defvar org-node--citekey<>citations (make-hash-table :test #'equal)
   "1:N table mapping @citekeys to latent citations.")
 
 (defun org-node-get-reflinks (node)
   "Get list of reflinks pointing to NODE."
   (cl-loop for ref in (org-node-get-refs node)
-           append (gethash ref org-node--reflinks-by-ref)))
+           append (gethash ref org-node--ref<>reflinks)))
 
 (defun org-node-get-backlinks (node)
   "Get list of ID-links pointing to NODE."
-  (gethash (org-node-get-id node) org-node--backlinks-by-id))
+  (gethash (org-node-get-id node) org-node--id<>backlinks))
 
 (defun org-node-get-citations (node)
   "Get list of citations pointing to NODE.
 A citation is anywhere that a @citekey occurred."
   (cl-loop for ref in (org-node-get-refs node)
-           append (gethash ref org-node--cites-by-citekey)))
+           append (gethash ref org-node--citekey<>citations)))
 
 (defun org-node-peek (&optional ht)
   "Print some random rows of table `org-nodes'.
@@ -560,7 +561,7 @@ delete too many backlinks on cleanup."
     (advice-remove 'delete-file #'org-node--handle-save)))
 
 (defun org-node-cache-ensure (&optional synchronous force)
-  "Ensure that `org-node--node-by-id' and other tables are ready for use.
+  "Ensure that `org-node--id<>node' and other tables are ready for use.
 Specifically, do the following:
 
 - Initialize `org-id-locations' if it is not already.
@@ -574,12 +575,12 @@ needed or already ongoing, block Emacs until it is done.
 
 When SYNCHRONOUS is nil, return immediately and let the caching
 proceed in the background.  As that may take a few seconds, that
-would mean that the `org-node--node-by-id' table is probably still outdated
+would mean that the `org-node--id<>node' table is probably still outdated
 by the time you query it, but that is acceptable in many
 situations such as in an user command since the table is mostly
 correct - and fully correct by the time of the next invocation.
 
-If the `org-node--node-by-id' table is currently empty, behave as if
+If the `org-node--id<>node' table is currently empty, behave as if
 SYNCHRONOUS t, unless SYNCHRONOUS is the symbol `must-async'."
   (unless (eq synchronous 'must-async)
     ;; HACK The warn-function becomes a no-op after the first run, so gotta run
@@ -638,9 +639,9 @@ advice on `rename-file' or `delete-file'."
                    '(".org" ".org_archive" ".org.gpg"))
       (org-node--scan-targeted (list file)))))
 
-;; Experimental
+;; Maybe?
 ;; (add-hook 'org-node-insert-link-hook #'org-node--schedule-idle-reset)
-;; (add-hook 'org-open-link-functions #'org-node--schedule-idle-reset)
+;; (add-hook 'org-open-at-point-functions #'org-node--schedule-idle-reset)
 (defun org-node--schedule-idle-reset (&rest _)
   (cancel-timer org-node--idle-timer)
   (setq org-node--idle-timer
@@ -766,8 +767,8 @@ didn't do so already, or local changes have been made."
 (defun org-node--scan (files finalizer)
   "Begin async scanning FILES for id-nodes and links.
 
-When finished, run the FINALIZER function to update current
-tables."
+When finished, pass a list of scan results to the FINALIZER
+function to update current tables."
   (unless org-node--max-jobs
     (setq org-node--max-jobs (org-node--count-logical-cores)))
   (org-node--ensure-compiled-fn org-node-filter-fn)
@@ -897,7 +898,7 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
                 ;; First-time init with autoloads can have bugs for
                 ;; seemingly magical reasons that go away afterwards
                 ;; (e.g. it says the files aren't on disk but they are).
-                ;; Better UX not to report a problem at this time.
+                ;; Better UX not to report any problem the first init.
                 (unless org-node--first-init
                   (let ((buf (get-buffer " *org-node*")))
                     (when buf
@@ -905,7 +906,7 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
                       (setq org-node--stderr-name "*org-node errors*")
                       (with-current-buffer buf
                         (rename-buffer org-node--stderr-name)))
-                    (message "An org-node worker failed to scan, not producing %s.  See buffer %s"
+                    (message "An org-node worker failed to produce %s.  See buffer %s"
                              results-file org-node--stderr-name)))
               (erase-buffer)
               (insert-file-contents results-file)
@@ -917,14 +918,14 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
 ;;;; Scan finalizers
 
 (defun org-node--finalize-full (results)
-  (let ((first-time (hash-table-empty-p org-node--node-by-id)))
-    (clrhash org-node--node-by-id)
-    (clrhash org-node--node-by-candidate)
-    (clrhash org-node--id-by-ref)
-    (clrhash org-node--id-by-title)
-    (clrhash org-node--reflinks-by-ref)
-    (clrhash org-node--backlinks-by-id)
-    (clrhash org-node--cites-by-citekey)
+  (let ((first-time (hash-table-empty-p org-node--id<>node)))
+    (clrhash org-node--id<>node)
+    (clrhash org-node--candidate<>node)
+    (clrhash org-node--ref<>id)
+    (clrhash org-node--title<>id)
+    (clrhash org-node--ref<>reflinks)
+    (clrhash org-node--id<>backlinks)
+    (clrhash org-node--citekey<>citations)
     (-let (((missing-files _ nodes id-links reflinks cites) results))
       (org-node--forget-id-locations missing-files)
       (dolist (node nodes)
@@ -962,28 +963,28 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
 ;;;; "Record" functions
 
 (defun org-node--record-id-links (links)
-  "Save LINKS to table `org-node--backlinks-by-id'.
+  "Save LINKS to table `org-node--id<>backlinks'.
 LINKS plists are demonstrated in source of
 `org-node-worker--collect-links-until'."
   (dolist (link links)
-    (push link (gethash (plist-get link :dest) org-node--backlinks-by-id))))
+    (push link (gethash (plist-get link :dest) org-node--id<>backlinks))))
 
 (defun org-node--record-reflinks (links)
-  "Save LINKS to table `org-node--reflinks-by-ref'.
+  "Save LINKS to table `org-node--ref<>reflinks'.
 LINKS plists are demonstrated in source of
 `org-node-worker--collect-links-until'."
   (dolist (link links)
     (push link (gethash
                 ;; TODO stop concatting, use only dest, if that works cleanly
                 (concat (plist-get link :type) ":" (plist-get link :dest))
-                org-node--reflinks-by-ref))))
+                org-node--ref<>reflinks))))
 
 (defun org-node--record-cites (cites)
   (dolist (cite cites)
-    (push cite (gethash (plist-get cite :key) org-node--cites-by-citekey))))
+    (push cite (gethash (plist-get cite :key) org-node--citekey<>citations))))
 
 (defun org-node--record-node (node-recipe)
-  "Add a node to `org-node--node-by-id' and other tables.
+  "Add a node to `org-node--id<>node' and other tables.
 
 The input NODE-RECIPE is a list of arguments to pass to
 `org-node--make-obj'."
@@ -996,15 +997,15 @@ The input NODE-RECIPE is a list of arguments to pass to
     (unless (member path org-id-files)
       (push path org-id-files))
     ;; Register the node
-    (puthash id node org-node--node-by-id)
+    (puthash id node org-node--id<>node)
     (dolist (ref (org-node-get-refs node))
-      (puthash ref id org-node--id-by-ref))
+      (puthash ref id org-node--ref<>id))
     ;; Setup completion candidates
     (when (funcall org-node-filter-fn node)
       (dolist (title (cons (org-node-get-title node)
                            (org-node-get-aliases node)))
-        (let ((collision (gethash title org-node--id-by-title)))
-          (puthash title id org-node--id-by-title)
+        (let ((collision (gethash title org-node--title<>id)))
+          (puthash title id org-node--title<>id)
           (when (and collision (not (equal id collision)))
             (when org-node-warn-title-collisions
               (message "Two nodes have same name: %s = %s (%s)"
@@ -1014,16 +1015,16 @@ The input NODE-RECIPE is a list of arguments to pass to
               ;; Absorb the affixations into one candidate string
               (puthash (concat (nth 1 affx) (nth 0 affx) (nth 2 affx))
                        node
-                       org-node--node-by-candidate)
+                       org-node--candidate<>node)
             ;; Raw title as candidate (to be affixated by `org-node-collection')
-            (puthash title node org-node--node-by-candidate)
-            (puthash title affx org-node--affixation-triplet-by-title))))
+            (puthash title node org-node--candidate<>node)
+            (puthash title affx org-node--title<>affixation-triplet))))
       ;; Let ROAM_REFS work as aliases too (but don't apply the affixation fn)
       (dolist (ref (org-node-get-refs node))
-        (puthash ref node org-node--node-by-candidate)
+        (puthash ref node org-node--candidate<>node)
         (puthash ref
                  (list (propertize ref 'face 'org-cite) nil nil)
-                 org-node--affixation-triplet-by-title)))))
+                 org-node--title<>affixation-triplet)))))
 
 
 ;;;; "Dirty" functions
@@ -1035,27 +1036,27 @@ FILES, and remove the corresponding completion candidates."
   (when files
     (org-node--dirty-forget-completions-in files)
     (cl-loop
-     for node being the hash-values of org-node--node-by-id
+     for node being the hash-values of org-node--id<>node
      when (member (org-node-get-file-path node) files)
      collect (org-node-get-id node) into ids
      and append (org-node-get-refs node) into refs
      and collect (org-node-get-title node) into titles
      finally do
      (dolist (id ids)
-       (remhash id org-node--node-by-id))
+       (remhash id org-node--id<>node))
      (dolist (ref refs)
-       (remhash ref org-node--id-by-ref))
+       (remhash ref org-node--ref<>id))
      (dolist (title titles)
-       (remhash title org-node--id-by-title)))))
+       (remhash title org-node--title<>id)))))
 
 (defun org-node--dirty-forget-completions-in (files)
   "Remove the completion candidates for all nodes in FILES."
   (when files
     (cl-loop
-     for candidate being the hash-keys of org-node--node-by-candidate
+     for candidate being the hash-keys of org-node--candidate<>node
      using (hash-values node)
      when (member (org-node-get-file-path node) files)
-     do (remhash candidate org-node--node-by-candidate))))
+     do (remhash candidate org-node--candidate<>node))))
 
 (defun org-node--dirty-ensure-link-known (&optional id &rest _)
   "Record the ID-link at point."
@@ -1073,7 +1074,7 @@ FILES, and remove the corresponding completion candidates."
                   :dest dest
                   :properties (list :outline (ignore-errors
                                                (org-get-outline-path t))))
-            (gethash dest org-node--backlinks-by-id)))))
+            (gethash dest org-node--id<>backlinks)))))
 
 (defun org-node--dirty-ensure-node-known ()
   "Record the node at point.
@@ -1088,7 +1089,7 @@ to this node on account of it \"not existing yet\".  Actually,
 also necessary is `org-node--dirty-ensure-link-known'."
   (let ((id (org-entry-get nil "ID" t))
         (case-fold-search t))
-    (unless (gethash id org-node--node-by-id)
+    (unless (gethash id org-node--id<>node)
       (save-excursion
         (without-restriction
           (goto-char (point-min))
@@ -1143,14 +1144,14 @@ be misleading."
   (if (not org-node-cache-mode)
       (message "Scan complete (Hint: Turn on org-node-cache-mode)")
     (let ((n-subtrees (cl-loop
-                       for node being the hash-values of org-node--node-by-id
+                       for node being the hash-values of org-node--id<>node
                        count (org-node-get-is-subtree node)))
           (n-backlinks (length (apply #'append
                                       (hash-table-values
-                                       org-node--backlinks-by-id))))
+                                       org-node--id<>backlinks))))
           (n-reflinks (cl-loop
-                       for ref being the hash-keys of org-node--id-by-ref
-                       sum (length (gethash ref org-node--reflinks-by-ref)))))
+                       for ref being the hash-keys of org-node--ref<>id
+                       sum (length (gethash ref org-node--ref<>reflinks)))))
       (message "org-node saw %d files, %d subtrees, %d ID-links, %d reflinks in %.2fs"
                (- (hash-table-count org-nodes) n-subtrees)
                n-subtrees
@@ -1466,7 +1467,7 @@ To visit a node after creating it, either let-bind
 
     (org-node--create TITLE ID)
     (org-node-cache-ensure t)
-    (let ((node (gethash ID org-node--node-by-id)))
+    (let ((node (gethash ID org-node--id<>node)))
       (if node (org-node--goto node)))"
   (setq org-node-proposed-title title)
   (setq org-node-proposed-id id)
@@ -1595,7 +1596,7 @@ type the name of a node that does not exist.  That enables this
       ;; the title; let them type it now
       (let ((input (completing-read "Node: " #'org-node-collection
                                     () () () 'org-node-hist)))
-        (setq node (gethash input org-node--node-by-candidate))
+        (setq node (gethash input org-node--candidate<>node))
         (if node
             (progn
               (setq title (org-node-get-title node))
@@ -1655,7 +1656,7 @@ To behave like `org-roam-node-find' when creating new nodes, set
   (org-node-cache-ensure)
   (let* ((input (completing-read "Node: " #'org-node-collection
                                  () () () 'org-node-hist))
-         (node (gethash input org-node--node-by-candidate)))
+         (node (gethash input org-node--candidate<>node)))
     (if node
         (org-node--goto node)
       (org-node--create input (org-id-new)))))
@@ -1665,8 +1666,8 @@ To behave like `org-roam-node-find' when creating new nodes, set
   "Visit a random node."
   (interactive)
   (org-node-cache-ensure)
-  (org-node--goto (nth (random (hash-table-count org-node--node-by-candidate))
-                       (hash-table-values org-node--node-by-candidate))))
+  (org-node--goto (nth (random (hash-table-count org-node--candidate<>node))
+                       (hash-table-values org-node--candidate<>node))))
 
 ;;;###autoload
 (defun org-node-insert-link (&optional region-as-initial-input)
@@ -1695,12 +1696,12 @@ Optional argument REGION-AS-INITIAL-INPUT t means behave like
                          (buffer-substring-no-properties beg end))))
          (init (if (or region-as-initial-input
                        (when region-text
-                         (try-completion region-text org-node--id-by-title)))
+                         (try-completion region-text org-node--title<>id)))
                    region-text
                  nil))
          (input (completing-read "Node: " #'org-node-collection
                                  () () init 'org-node-hist))
-         (node (gethash input org-node--node-by-candidate))
+         (node (gethash input org-node--candidate<>node))
          (id (if node (org-node-get-id node) (org-id-new)))
          (link-desc (or region-text
                         ;; HACK input is already what the user selected, but
@@ -1752,7 +1753,7 @@ On the topic of Org-roam emulation, bonus tips:
   (org-node-cache-ensure)
   (let ((node (gethash (completing-read "Node: " #'org-node-collection
                                         () () () 'org-node-hist)
-                       org-node--node-by-candidate)))
+                       org-node--candidate<>node)))
     (let ((id (org-node-get-id node))
           (title (org-node-get-title node))
           (level (or (org-current-level) 0)))
@@ -1782,7 +1783,7 @@ adding keywords to the things to exclude:
   (org-node-cache-ensure)
   (let ((node (gethash (completing-read "Node: " #'org-node-collection
                                         () () () 'org-node-hist)
-                       org-node--node-by-candidate)))
+                       org-node--candidate<>node)))
     (let ((id (org-node-get-id node))
           (title (org-node-get-title node))
           (level (or (org-current-level) 0))
@@ -2001,7 +2002,7 @@ so it matches the destination's current title."
                              (substring (cadr parts) 0 -2)))
                      (id (when (string-prefix-p "id:" target)
                            (substring target 3)))
-                     (node (gethash id org-node--node-by-id))
+                     (node (gethash id org-node--id<>node))
                      (true-title (when node
                                    (org-node-get-title node)))
                      (answered-yes nil))
@@ -2256,8 +2257,8 @@ write_file(lisp_data, file.path(dirname(tsv), \"feedback-arcs.eld\"))")
         (setq tabulated-list-entries
               (cl-loop
                for (origin . dest) in feedbacks
-               as origin-node = (gethash origin org-node--node-by-id)
-               as dest-node = (gethash dest org-node--node-by-id)
+               as origin-node = (gethash origin org-node--id<>node)
+               as dest-node = (gethash dest org-node--id<>node)
                collect
                (list (cons origin dest)
                      (vector (list (org-node-get-title origin-node)
@@ -2274,13 +2275,13 @@ write_file(lisp_data, file.path(dirname(tsv), \"feedback-arcs.eld\"))")
       (display-buffer (current-buffer)))))
 
 (defun org-node--make-digraph-tsv-string ()
-  "From `org-node--backlinks-by-id', generate a list of
+  "From `org-node--id<>backlinks', generate a list of
 destination-origin pairs, expressed as Tab-Separated Values."
   (concat
    "src\tdest\n"
    (string-join
     (-uniq (cl-loop
-            for dest being the hash-keys of org-node--backlinks-by-id
+            for dest being the hash-keys of org-node--id<>backlinks
             using (hash-values links)
             append (cl-loop
                     for link in links
@@ -2299,10 +2300,10 @@ destination-origin pairs, expressed as Tab-Separated Values."
 (defun org-node-list-dead-links ()
   (interactive)
   (let ((dead-links
-         (cl-loop for dest being the hash-keys of org-node--backlinks-by-id
-                  unless (gethash dest org-node--node-by-id)
+         (cl-loop for dest being the hash-keys of org-node--id<>backlinks
+                  unless (gethash dest org-node--id<>node)
                   append (--map (cons dest it)
-                                (gethash dest org-node--backlinks-by-id)))))
+                                (gethash dest org-node--id<>backlinks)))))
     (message "%d dead links found" (length dead-links))
     (pop-to-buffer (get-buffer-create "*Dead Links*"))
     (tabulated-list-mode)
@@ -2315,7 +2316,7 @@ destination-origin pairs, expressed as Tab-Separated Values."
           (cl-loop
            for (dest . link) in dead-links
            as origin-node = (gethash (plist-get link :origin)
-                                     org-node--node-by-id)
+                                     org-node--id<>node)
            if (not (equal dest (plist-get link :dest)))
            do (error "IDs not equal: %s, %s" dest (plist-get link :dest))
            else if (not origin-node)
@@ -2336,7 +2337,7 @@ destination-origin pairs, expressed as Tab-Separated Values."
 ;; (defun org-node-find-plain-link ()
 ;;   (interactive)
 ;;   (let* ((every-link (cl-loop
-;;                       for list being the hash-values of org-node--reflinks-by-ref
+;;                       for list being the hash-values of org-node--ref<>reflinks
 ;;                       append list))
 ;;          (disambiguated
 ;;           (cl-loop for link in every-link
@@ -2344,10 +2345,10 @@ destination-origin pairs, expressed as Tab-Separated Values."
 ;;                    )
 ;;           )
 ;;          (link-data (gethash (completing-read "Find where link is: "
-;;                                               org-node--reflinks-by-ref)
-;;                              org-node--reflinks-by-ref))
+;;                                               org-node--ref<>reflinks)
+;;                              org-node--ref<>reflinks))
 ;;          (origin-id (plist-get link-data :origin))
-;;          (node (gethash origin-id org-node--node-by-id)))
+;;          (node (gethash origin-id org-node--id<>node)))
 ;;     (if node
 ;;         (org-node--goto node)
 ;;       (message "Not sure where is ID %s" link-data))))
@@ -2405,11 +2406,11 @@ Designed for `completion-at-point-functions', which see."
          (not (save-match-data (org-in-regexp org-link-any-re)))
          (list (car bounds)
                (cdr bounds)
-               org-node--id-by-title
+               org-node--title<>id
                :exclusive 'no
                :exit-function
                (lambda (text _)
-                 (when-let ((id (gethash text org-node--id-by-title)))
+                 (when-let ((id (gethash text org-node--title<>id)))
                    (atomic-change-group
                      (delete-char (- (length text)))
                      (insert (org-link-make-string
@@ -2441,7 +2442,8 @@ If already visiting that node, then follow the link normally."
              (not (and (derived-mode-p 'org-mode)
                        (equal (org-entry-get nil "ID" t)
                               (org-node-get-id found)))))
-        (always (org-node--goto found))
+        (progn (org-node--goto found)
+               t)
       nil)))
 
 
@@ -2452,13 +2454,13 @@ If already visiting that node, then follow the link normally."
 
 This may refer to the current Org heading, else an ancestor
 heading, else the file-level node, whichever has an ID first."
-  (gethash (org-entry-get nil "ID" t) org-node--node-by-id))
+  (gethash (org-entry-get nil "ID" t) org-node--id<>node))
 
 (defun org-node-read ()
   "Prompt for a known ID-node."
   (gethash (completing-read "Node: " #'org-node-collection
                             () () () 'org-node-hist)
-           org-node--node-by-candidate))
+           org-node--candidate<>node))
 
 (provide 'org-node)
 

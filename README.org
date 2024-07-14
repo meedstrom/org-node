@@ -1,5 +1,5 @@
 #+startup: content
-* org-node
+* org-node 0.3
 ** News [2024-07-11]
 Version 0.2 in July brought many changes!  *If anything broke for you*, you can rollback to the 0.1pre branch:
 
@@ -40,7 +40,7 @@ Renames
 - Rename user option =org-node-slug-fn= to =org-node-filename-fn=
 - Rename function =org-node-slugify-as-url= to =org-node-slugify-for-web=
 - Rename function =org-node-new-by-roam-capture= to =org-node-new-via-roam-capture=
-- Rename variable =org-node-collection= to =org-node--node-by-candidate=
+- Rename variable =org-node-collection= to =org-node--candidate<>node=
 - Rename many private functions and variables
 
 Changes
@@ -301,17 +301,17 @@ I plan to use Emacs on an e-reader like a Kindle and work with buffers of 4000+ 
 *** Limitation: TRAMP
 Working over TRAMP is untested, but I suspect it won't work.  Org-node tries to be very fast, often nulling =file-name-handler-alist=, which TRAMP needs.
 
-If you need TRAMP, use org-roam, which is made to /not/ re-access files or directories so often anyway (which can be slow anyway over a remote connection), in favor of trusting its own DB.
+If you need TRAMP, use org-roam, which is made to /not/ re-access files or directories so often (which can be slow anyway over a remote connection), in favor of trusting its own DB.
 
 *** Limitation: unique titles
 
 If two ID-nodes exist with the same title, one of them disappears from minibuffer completions.
 
-That's just the nature of completion.  Other packages such as Org-roam have the same limitation.  Much can be said for embracing the uniqueness constraint, and org-node will print messages telling you about title collisions.
+That's just the nature of completion.  Other packages such as Roam have the same limitation.  Much can be said for embracing the uniqueness constraint, and org-node will print messages telling you about title collisions.
 
 Anyway, there's a workaround.  Assuming you leave =org-node-affixation-fn= at its default setting, just set =org-node-alter-candidates= to t.
 
-This lets you match against the node outline path and not only the title, which resolves most conflicts given that the most likely source of conflict is subheadings in disparate files, named the same.  [[https://fosstodon.org/@nickanderson/112249581810196258][Some people]] depend on that workflow.
+This lets you match against the node outline path and not only the title, which resolves most conflicts given that the most likely source of conflict is subheadings in disparate files, named the same.  [[https://fosstodon.org/@nickanderson/112249581810196258][Some people]] make this trick part of their workflow.
 
 NB: this workaround won't help the in-buffer completions provided by =org-node-complete-at-point-mode=, but with some luck you'll never notice.
 
@@ -320,7 +320,7 @@ NB: this workaround won't help the in-buffer completions provided by =org-node-c
 *** Limitation: excluding notes
 The option =org-node-filter-fn= works well for excluding TODO items that happen to have an ID, and excluding org-drill items and that sort of thing, but beyond that, it has limited utility because unlike org-roam, *child ID nodes of an excluded node are not excluded!*
 
-So let's say you have a big archive file, fulla IDs, and you want to exclude all of them from appearing as search hits.  Putting a =:ROAM_EXCLUDE: t= at the top won't do it.  As it stands, what I'd suggest is unfortunately, look at the file name.
+So let's say you have a big archive file, fulla IDs, and you want to exclude all of them from appearing in the minibuffer.  Putting a =:ROAM_EXCLUDE: t= at the top won't do it.  As it stands, what I'd suggest is to use the file name.
 
 While the point of IDs is to avoid depending on exact filenames, it's often pragmatic to let up on purism just a bit :-) It works well for me to filter out any file or directory that happens to contain "archive" in the name, via the last line here:
 
@@ -352,7 +352,7 @@ Basic commands:
 Rarer commands:
 
 - =org-node-lint-all-files=
-  - An utility to help fix a broken setup: it runs org-lint on all known files and generates a report of syntax problems.  Org-node [[https://github.com/meedstrom/org-node/issues/8#issuecomment-2101316447][assumes all files have valid syntax]], in particular around PROPERTIES drawers.
+  - Can help you fix a broken setup: it runs org-lint on all known files and generates a report of syntax problems.  Org-node [[https://github.com/meedstrom/org-node/issues/8#issuecomment-2101316447][assumes all files have valid syntax]].
 - =org-node-list-dead-links=
   - List links where the destination ID could not be found
 - =org-node-rewrite-links-ask=
