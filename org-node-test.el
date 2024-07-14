@@ -1,20 +1,10 @@
 ;;; -*- lexical-binding: t; -*-
 
-;; TODO Rename to -test.el
-
-;; Should test:
-;; - That all nodes have all required properties non-nil (e.g. :title)
-;; ...
-
 (require 'ert)
 (require 'org-node)
 (require 'org-node-roam)
 (require 'org-node-worker)
 (require 'org-node-backlink)
-
-
-;;(org-node-worker--split-refs-field
-;; "@foo https://gnu.org [cite:@citeKey abcd ; @citekey2 cdefgh]")
 
 (ert-deftest org-node-test--parse-refs ()
   (let ((result (org-node-worker--split-refs-field
@@ -42,7 +32,7 @@
                    "d3"))))
 
 (ert-deftest org-node-test--parse-testfile2.org ()
-  (org-node-cache--scan-targeted (list "testfile2.org"))
+  (org-node--scan-targeted (list "testfile2.org"))
   (org-node-cache-ensure t)
   (let ((node (gethash "bb02315f-f329-4566-805e-1bf17e6d892d" org-node--node-by-id)))
     (should (equal (org-node-get-olp node) nil))
@@ -69,7 +59,7 @@
 
 (ert-deftest org-node-test--goto-random ()
   (require 'seq)
-  (org-node-cache--scan-targeted (list "testfile2.org"))
+  (org-node--scan-targeted (list "testfile2.org"))
   (org-node-cache-ensure t)
   (let ((node (seq-random-elt (hash-table-values org-node--node-by-id))))
     (org-node--goto node)
