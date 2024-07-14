@@ -1,14 +1,32 @@
 ;;; -*- lexical-binding: t; -*-
 
+;; TODO Rename to -test.el
+
 ;; Should test:
 ;; - That all nodes have all required properties non-nil (e.g. :title)
 ;; ...
 
 (require 'ert)
 (require 'org-node)
+(require 'org-node-roam)
+(require 'org-node-worker)
+(require 'org-node-backlink)
 
 
-(ert-deftest oldata-fns ()
+;;(org-node-worker--split-refs-field
+;; "@foo https://gnu.org [cite:@citeKey abcd ; @citekey2 cdefgh]")
+
+(ert-deftest org-node-test--parse-refs ()
+  (let ((result (org-node-worker--split-refs-field
+                 "[cite:@citeKey abcd ; @citeKey2 cdefgh] @foo [[https://gnu.org/A Link With Spaces/index.htm][baz]] https://gnu.org ")))
+    (should (--all-p (member it result)
+                     '("@citeKey2"
+                       "@citeKey"
+                       "@foo"
+                       "https://gnu.org/A Link With Spaces/index.htm"
+                       "https://gnu.org")))))
+
+(ert-deftest org-node-test--oldata-fns ()
   (let ((olp '((3730 "A subheading" 2 "33dd")
                (2503 "A top heading" 1 "d3rh")
                (1300 "A sub-subheading" 3 "d3csae")
@@ -23,7 +41,7 @@
     (should (equal (org-node-worker--pos->parent-id olp 1300 nil)
                    "d3"))))
 
-(ert-deftest parse-testfile2.org ()
+(ert-deftest org-node-test--parse-testfile2.org ()
   (org-node-cache--scan-targeted (list "testfile2.org"))
   (org-node-cache-ensure t)
   (let ((node (gethash "bb02315f-f329-4566-805e-1bf17e6d892d" org-node--node-by-id)))
@@ -36,7 +54,7 @@
     (should (equal (org-node-get-title node) "3rd-level, has ID"))
     (should (equal (org-node-get-todo node) nil))))
 
-(ert-deftest multiple-id-dirs ()
+(ert-deftest org-node-test--multiple-id-dirs ()
   (mkdir "/tmp/org-node/test1" t)
   (mkdir "/tmp/org-node/test2" t)
   (write-region "" nil "/tmp/org-node/test2/emptyfile.org")
@@ -49,7 +67,7 @@
     (should (equal (car (org-node--root-dirs (org-node-files)))
                    "/tmp/org-node/test2/"))))
 
-(ert-deftest goto-random ()
+(ert-deftest org-node-test--goto-random ()
   (require 'seq)
   (org-node-cache--scan-targeted (list "testfile2.org"))
   (org-node-cache-ensure t)
@@ -59,7 +77,7 @@
     (should (equal (abbreviate-file-name (buffer-file-name))
                    (org-node-get-file-path node)))))
 
-(ert-deftest split-file-list ()
+(ert-deftest org-node-test--split-file-list ()
   (should (equal 4 (length (org-node--split-into-n-sublists
                             '(a v e e) 7))))
   (should (equal 1 (length (org-node--split-into-n-sublists
@@ -68,7 +86,7 @@
                             '(a v e e q l fk k k ki i o r r r r r r r r r r g g g g g gg)
                             4)))))
 
-(ert-deftest various ()
+(ert-deftest org-node-test--various ()
   (let ((org-node-ask-directory "/tmp/org-node/test/")
         ;; NOTE you should manually test the other creation-fns
         (org-node-creation-fn #'org-node-new-file))
