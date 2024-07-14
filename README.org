@@ -15,7 +15,6 @@ New features
   - Deprecates advice that was in [[https://github.com/meedstrom/org-node?tab=readme-ov-file#option-1b--tell-org-node-to-write-to-the-org-roam-db][Backlinks Option 1B]]
 - New mode: =org-node-roam-no-sql-mode=
   - Deprecates advice that was in [[https://github.com/meedstrom/org-node?tab=readme-ov-file#option-1c--cut-out-the-db-altogether][Backlinks Option 1C]]
-    - [2024-07-13] bugged atm
 - New mode: =org-node-roam-redisplay-mode=
 - New mode: =org-node-complete-at-point-mode=
 - New user option: =org-node-prefer-file-level-nodes=

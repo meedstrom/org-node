@@ -100,8 +100,9 @@
       (let ((node (gethash "not-an-uuid5678" org-node--node-by-id))
             (expected-filename (funcall org-node-filename-fn "A top-level heading")))
         (should (equal (org-node-get-title node) "A top-level heading"))
-        (should (equal (org-node-get-file-title node) expected-filename))
-        (should (equal (org-node-get-file-title-or-basename node) expected-filename))))))
+        (should (equal (org-node-get-file-title node) nil))
+        (should (equal (org-node-get-file-title-or-basename node)
+                       expected-filename))))))
 
 (provide 'org-node-test)
 
