@@ -11,6 +11,8 @@
                       "Your config may have misspelled `org-node-backlink-mode' as `org-node-backlinks-mode'"))
     (apply #'org-node-backlink-mode args)))
 
+;;;; Minor mode
+
 ;;;###autoload
 (define-globalized-minor-mode org-node-backlink-global-mode
   org-node-backlink-mode
@@ -46,6 +48,9 @@
                  #'org-node-backlink--flag-change t)
     (remove-hook 'before-save-hook
                  #'org-node-backlink--fix-changed-parts-of-buffer t)))
+
+
+;;;; Validation of one buffer at a time
 
 (defvar org-node-backlink--fix-ctr 0)
 (defvar org-node-backlink--files-to-fix nil)
@@ -108,21 +113,11 @@ REMOVE, remove it instead."
     (let* ((id (buffer-substring-no-properties
                 (point) (+ (point) (skip-chars-forward "^ \n"))))
            (node (gethash id org-node--node-by-id)))
-      ;; The node may not yet have been scanned by org-node, because it was
-      ;; created just now, in a capture buffer which triggered a save hook
-      ;; which led us here.  There's probably an async process looking at the
-      ;; file right now but we're slightly too early.  In fact, I wager this
-      ;; happens every time, so backlinks are always added using slightly
-      ;; outdated metadata.  TODO: Maybe don't run on save hook but rather on
-      ;; handle-finished-job?
       (when node
         ;; Make the full string to which the :BACKLINKS: property should be set
         (let* ((reflinks (org-node-get-reflinks node))
                (backlinks (gethash id org-node--backlinks-by-id))
-               ;; TODO record-node should process ROAM_REFS in a way that's
-               ;;      aware of citations
-               ;; (citations (--keep (gethash it org-node--cites-by-citekey)
-               ;;                (org-node-get-refs node)))
+               (citations (org-node-get-citations node))
                (combined
                 (thread-last
                   (append reflinks backlinks)
@@ -217,21 +212,21 @@ all areas where text is added/changed/deleted."
       (put-text-property beg end 'org-node-flag t))))
 
 
-;;; Link-insertion advice
-;;
-;; This logic is independent from the save-hook
-;; `org-node-backlink--fix-changed-parts-of-buffer', because that operates on
-;; the file being saved -- in other words, making the file navel-gaze its own
-;; content to see if it looks correct according to current links tables.
-;; Technically, that would be enough to result in correct backlinks everywhere
-;; if you just run it on all files, and that's more-or-less how
-;; `org-node-backlink-fix-all' works, but we don't want to run it all the time.
-;;
+;;;; Link-insertion advice
+
+;; This logic is independent from the per-buffer validation, because that
+;; operates on the file being saved -- in other words, making the file
+;; navel-gaze its own content to see if it looks correct according to current
+;; links tables.  Technically, that would be enough to result in correct
+;; backlinks everywhere if you just run it on all files, and that's
+;; more-or-less how `org-node-backlink-fix-all' works, but we don't want to do
+;; that on every save.
+
 ;; By contrast, the below code does not look up tables, just reacts to the
 ;; exact link being inserted, which has two benefits:
-;;
+
 ;; 1. You can observe backlinks appearing in realtime before a buffer is saved
-;;
+
 ;; 2. It's actually necessary, because a link being inserted does not mean we
 ;;    should check the current file but rather visit and edit the target file.
 ;;    If we didn't have the below code, we'd have save the current buffer (in

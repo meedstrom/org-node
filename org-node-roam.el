@@ -8,11 +8,13 @@
   (declare (obsolete 'org-node-roam-db-feed "2024-07-11"))
   (unless warned-once
     (setq warned-once t)
-    (display-warning 'org-node "Deprecated function `org-node-feed-file-to-roam-db', use `org-node-roam-db-shim-mode' instead"))
+    (display-warning 'org-node "Your config uses deprecated `org-node-feed-file-to-roam-db', use `org-node-roam-db-shim-mode' instead"))
   (org-node-roam-db-feed files))
 
-(org-node--defobsolete org-node--fabricate-roam-backlinks org-node-roam--make-backlinks)
-(org-node--defobsolete org-node--fabricate-roam-reflinks org-node-roam--make-reflinks)
+(org-node--defobsolete
+ org-node--fabricate-roam-backlinks org-node-roam--make-backlinks)
+(org-node--defobsolete
+ org-node--fabricate-roam-reflinks org-node-roam--make-reflinks)
 
 ;;;###autoload
 (define-minor-mode org-node-roam-redisplay-mode
@@ -38,9 +40,9 @@ mode exists for people who prefer to turn that off."
 
 ;;;###autoload
 (define-minor-mode org-node-roam-no-sql-mode
-  "Instruct org-roam to use fake `org-roam-backlink-p' objects from
-org-node so that you can use \\[org-roam-buffer-toggle] without
-having SQLite installed."
+  "Instruct org-roam to use fake `org-roam-backlink-p' objects etc
+from org-node so that you can use \\[org-roam-buffer-toggle]
+without having SQLite installed."
   :global t
   (require 'org-roam)
   (if org-node-roam-no-sql-mode
@@ -85,7 +87,7 @@ having SQLite installed."
 ;; (seq-random-elt (hash-table-values org-node--backlinks-by-id))
 
 (defun org-node-roam--make-backlinks (target-roam-node &rest _)
-  "Return org-roam-backlink objects targeting TARGET-ROAM-NODE.
+  "Make org-roam-backlink objects targeting TARGET-ROAM-NODE.
 Designed as override advice for `org-roam-backlinks-get'."
   (require 'org-roam)
   (let ((target-id (org-roam-node-id target-roam-node)))
@@ -111,7 +113,7 @@ Designed as override advice for `org-roam-backlinks-get'."
 ;; (seq-random-elt (hash-table-values org-node--reflinks-by-ref))
 
 (defun org-node-roam--make-reflinks (target-roam-node &rest _)
-  "Return org-roam-reflink objects targeting TARGET-ROAM-NODE.
+  "Make org-roam-reflink objects targeting TARGET-ROAM-NODE.
 Designed as override advice for `org-roam-reflinks-get'."
   (require 'org-roam)
   (let* ((target-id (org-roam-node-id target-roam-node))
@@ -136,10 +138,9 @@ Designed as override advice for `org-roam-reflinks-get'."
 
 ;;;###autoload
 (define-minor-mode org-node-roam-db-shim-mode
-  ""
+  "Send "
   :global t
   (require 'org-roam)
-  (remove-hook 'org-node-rescan-hook 'org-node-feed-file-to-roam-db) ;; deprec
   (if org-node-roam-db-shim-mode
       (progn
         (unless org-node-cache-mode
@@ -153,14 +154,14 @@ Designed as override advice for `org-roam-reflinks-get'."
   (emacsql-with-transaction (org-roam-db)
     (cl-loop for node being the hash-values of org-nodes
              when (member (org-node-get-file-path node) files)
-             do
-             (org-node-roam--db-add-node node)
-             (org-node-roam--db-add-links (org-node-get-id node)))))
+             do (org-node-roam--db-add-node node))))
 
 (defun org-node-roam-db-reset ()
+  "Wipe the Roam DB and rebuild."
   (interactive)
   (require 'org-roam)
   (require 'emacsql)
+  (org-node-cache-ensure)
   (org-roam-db)
   (org-roam-db-clear-all)
   (org-roam-db--close)
@@ -172,48 +173,51 @@ Designed as override advice for `org-roam-reflinks-get'."
              do (when (= 0 (% (cl-incf ctr) 10))
                   (message "Inserting into %s... %d/%d"
                            org-roam-db-location ctr max))
-             (org-node-roam--db-add-node node)
-             (org-node-roam--db-add-links (org-node-get-id node)))))
+             (org-node-roam--db-add-node node))))
 
-(defun org-node-roam--ref->list (ref node-id)
-  "Code adapted from `org-roam-db-insert-refs'"
+;; (let ((s "... \"https://gnu.org/A Link With Spaces/index.htm\" ..."))
+;;   (string-match org-link-any-re s)
+;;   (match-string 0 s))
+
+;; (let ((s "...[[https://gnu.org/A Link With Spaces/index.htm][foo]] ..."))
+;;   (string-match org-link-any-re s)
+;;   (match-string 0 s))
+
+(defun org-node-roam--convert-ref (ref node-id)
+  "Convert ref as org-roam expects it.
+Adapted from `org-roam-db-insert-refs'."
   (let (rows)
-    (cond (;; @citeKey
-           (string-prefix-p "@" ref)
+    (cond ((string-prefix-p "@" ref) ;; Ref is a @citekey
            (push (vector node-id (substring ref 1) "cite") rows))
-          (;; [cite:@citeKey]
-           ;; Turns out a given citation can contain multiple keys
-           (string-prefix-p "[cite:" ref)
-           (condition-case nil
-               (let ((cite-obj (org-cite-parse-objects ref)))
-                 (org-element-map cite-obj 'citation-reference
-                   (lambda (cite)
-                     (let ((key (org-element-property :key cite)))
-                       (push (vector node-id key "cite") rows)))))
-             (error
-              (lwarn '(org-node) :warning
-                     "%s:%s\tInvalid cite %s, skipping..."
-                     (buffer-file-name) (point) ref))))
-          (;; https://google.com, cite:citeKey
-           (string-match org-link-any-re (org-link-encode ref '(#x20)))
+
+          ((string-match org-link-any-re ref)
+           ;; Ref is a link, such as https://gnu.org or file:/home/me
+
+           ;; Org-roam actually scans for links matching `org-link-any-re',
+           ;; which combines bracket-re, angle-re and plain-re (in that order);
+           ;; but org-node-worker.el only scans links matching plain-re atm.
+           ;;
+           ;; It looks like it's done to be able to have links with spaces.  So
+           ;; I will probs migrate org-node use that regexp too.
+           ;;
+           ;; But until I do it, this org-link-encode stuff won't do anything.
            (setq ref (org-link-encode ref '(#x20)))
-           (let ((ref-url (url-generic-parse-url
-                           (or (match-string 2 ref) (match-string 0 ref))))
-                 (link-type ()) ;; clear url-type for backward compatible.
-                 (path ()))
-             (setq link-type (url-type ref-url))
+           (let* ((ref-url (url-generic-parse-url (match-string 2 ref)))
+                  (type (url-type ref-url))
+                  path)
+             ;; ??? https://github.com/org-roam/org-roam/commit/4e6f9346903f4083684e099d25e534d6daca1f7c
              (setf (url-type ref-url) nil)
              (setq path (org-link-decode (url-recreate-url ref-url)))
+             ;; org-roam supports org-ref
              (if (and (boundp 'org-ref-cite-types)
-                      (or (assoc link-type org-ref-cite-types)
-                          (member link-type org-ref-cite-types)))
+                      (or (assoc type org-ref-cite-types)
+                          (member type org-ref-cite-types)))
                  (dolist (key (org-roam-org-ref-path-to-keys path))
-                   (push (vector node-id key link-type) rows))
-               (push (vector node-id path link-type) rows))))
+                   (push (vector node-id key type) rows))
+               (push (vector node-id path type) rows))))
           (t
-           (lwarn '(org-node) :warning
-                  "%s:%s\tInvalid ref %s, skipping..."
-                  (buffer-file-name) (point) ref)))
+           (lwarn '(org-node) :warning "Invalid ref %s in %s"
+                  ref (buffer-file-name))))
     rows))
 
 (defun org-node-roam--db-add-node (node)
@@ -283,28 +287,28 @@ Designed as override advice for `org-roam-reflinks-get'."
          (vector id file-path level pos todo priority
                  scheduled deadline title properties olp))))
     ;; See `org-roam-db-insert-refs'
-    (dolist (ref-chunk roam-refs)
-      (dolist (individual-ref (org-node-roam--ref->list ref-chunk id))
-        (org-roam-db-query [:insert :into refs
-                            :values $v1]
-                           individual-ref)))
+    (dolist (ref roam-refs)
+      (org-roam-db-query [:insert :into refs
+                          :values $v1]
+                         (org-node-roam--convert-ref ref id)))
     ;; See `org-roam-db-insert-citation'
-    ;; TODO once we have that info
-    ))
-
-(defun org-node-roam--db-add-links (target-id)
-  "Add ID-links and reflinks pointing to TARGET-ID."
-  ;; See `org-roam-db-insert-link'
-  (dolist (link (append (gethash target-id org-node--backlinks-by-id)
-                        (org-node-get-reflinks
-                         (gethash target-id org-node--node-by-id))))
-    (org-roam-db-query [:insert :into links
-                        :values $v1]
-                       (vector (plist-get link :pos)
-                               (plist-get link :origin)
-                               target-id
-                               (plist-get link :type)
-                               (plist-get link :properties)))))
+    (dolist (cite (org-node-get-citations node))
+      (org-roam-db-query [:insert :into citations
+                          :values $v1]
+                         (vector (plist-get link :origin)
+                                 (plist-get link :key)
+                                 (plist-get link :pos)
+                                 (plist-get link :properties))))
+    ;; See `org-roam-db-insert-link'
+    (dolist (link (append (gethash id org-node--backlinks-by-id)
+                          (org-node-get-reflinks node)))
+      (org-roam-db-query [:insert :into links
+                          :values $v1]
+                         (vector (plist-get link :pos)
+                                 (plist-get link :origin)
+                                 id
+                                 (plist-get link :type)
+                                 (plist-get link :properties))))))
 
 (provide 'org-node-roam)
 
