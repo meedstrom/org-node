@@ -291,21 +291,17 @@ Wouldn't it be nice if, clicking on that link, you're automatically sent to that
 (add-hook 'org-open-at-point-functions #'org-node-try-visit-ref-node)
 #+end_src
 
-*** Limitation: excluding notes
-The option =org-node-filter-fn= works well for excluding TODO items that happen to have an ID, and excluding org-drill items and that sort of thing, but beyond that, it has limited utility because unlike org-roam, *child ID nodes of an excluded node are not excluded!*
+*** Limitation: undead backlinks
+You may notice backlinks stick around after you erased the forward link.  That's a performance tradeoff.
 
-So let's say you have a big archive file, fulla IDs, and you want to exclude all of them from appearing as search hits.  Putting a =:ROAM_EXCLUDE: t= at the top won't do it.  As it stands, what I'd suggest is unfortunately, look at the file name.
+I plan to use Emacs on an e-reader like a Kindle and work with buffers of 4000+ links, and I still think it's reasonable to expect zero latency.  Thus org-node waits for idle before cleaning links tables.
 
-While the point of IDs is to avoid depending on exact filenames, it's often pragmatic to let up on purism just a bit :-) It works well for me to filter out any file or directory that happens to contain "archive" in the name, via the last line here:
+# The same mechanism is responsible for shifting the org-roam-buffer's display of backlink context towards irrelevant context as the underlying file is edited; this too is corrected on idle.
 
-#+begin_src elisp
-(setq org-node-filter-fn
-      (lambda (node)
-        (not (or (org-node-get-todo node) ;; Ignore headings with todo state
-                 (member "drill" (org-node-get-tags node)) ;; Ignore :drill:
-                 (assoc "ROAM_EXCLUDE" (org-node-get-properties node))
-                 (string-search "archive" (org-node-get-file-path node))))))
-#+end_src
+*** Limitation: TRAMP
+Working over TRAMP is untested, but I suspect it won't work.  Org-node tries to be very fast, often nulling =file-name-handler-alist=, which TRAMP needs.
+
+If you need TRAMP, use org-roam, which is made to /not/ re-access files or directories so often anyway (which can be slow anyway over a remote connection), in favor of trusting its own DB.
 
 *** Limitation: unique titles
 
@@ -321,15 +317,21 @@ NB: this workaround won't help the in-buffer completions provided by =org-node-c
 
 # Maybe I'll add distinguishers like "1" "2" "3" to each naming conflict?
 
-*** Limitation: TRAMP
-Working over TRAMP is untested, but I suspect it won't work.  Org-node tries to be very fast, often nulling =file-name-handler-alist=, which TRAMP needs.
+*** Limitation: excluding notes
+The option =org-node-filter-fn= works well for excluding TODO items that happen to have an ID, and excluding org-drill items and that sort of thing, but beyond that, it has limited utility because unlike org-roam, *child ID nodes of an excluded node are not excluded!*
 
-If you need TRAMP, use org-roam, which is made to /not/ re-access files or directories so often anyway (which would also be slow over a network connection), in favor of trusting its own DB.
+So let's say you have a big archive file, fulla IDs, and you want to exclude all of them from appearing as search hits.  Putting a =:ROAM_EXCLUDE: t= at the top won't do it.  As it stands, what I'd suggest is unfortunately, look at the file name.
 
-*** Limitation: undead backlinks
-You may notice backlinks staying after you erased the forward link.  For performance reasons, org-node waits for idle before cleaning up.
+While the point of IDs is to avoid depending on exact filenames, it's often pragmatic to let up on purism just a bit :-) It works well for me to filter out any file or directory that happens to contain "archive" in the name, via the last line here:
 
-The same mechanism is responsible for shifting the org-roam-buffer's display of backlink context towards irrelevant context as the underlying file is edited; this too is corrected on idle.
+#+begin_src elisp
+(setq org-node-filter-fn
+      (lambda (node)
+        (not (or (org-node-get-todo node) ;; Ignore headings with todo state
+                 (member "drill" (org-node-get-tags node)) ;; Ignore :drill:
+                 (assoc "ROAM_EXCLUDE" (org-node-get-properties node))
+                 (string-search "archive" (org-node-get-file-path node))))))
+#+end_src
 
 *** Toolbox
 
@@ -398,4 +400,4 @@ API cheatsheet between org-roam and org-node.
 | Get =ROAM_REFS=                           | =(org-roam-node-refs NODE)=          | =(org-node-get-refs NODE)=                                              |
 | Get =ROAM_ALIASES=                        | =(org-roam-node-aliases NODE)=       | =(org-node-get-aliases NODE)=                                           |
 | Get =ROAM_EXCLUDE=                        |                                    | =(assoc "ROAM_EXCLUDE" (org-node-get-properties NODE))=, no inheritance |
-| Ensure fresh data                       | =(org-roam-db-sync)=                 | =(org-node-cache--scan-new-or-modified)=                                |
+| Ensure fresh data                       | =(org-roam-db-sync)=                 | =(org-node-cache-ensure t t)=           |
