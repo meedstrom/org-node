@@ -49,16 +49,20 @@
   'org-node-collection 'org-node--node-by-candidate "2024-07-11")
 
 (let ((aliases '(org-node-slug-fn org-node-filename-fn
-                 org-node-cache-rescan-file-hook org-node-rescan-hook)))
+                 org-node-cache-rescan-file-hook org-node-rescan-hook
+                 org-node-format-candidate-fn nil)))
   (defun org-node--warn-obsolete-variables ()
     "To be called when turning a mode on."
     (while aliases
       (let ((old (pop aliases))
             (new (pop aliases)))
         (when (and (boundp old) (symbol-value old))
-          (lwarn 'org-node :warning "Your config uses old variable: %S,  new name: %S"
-                 old new)
-          (set new (symbol-value old)))))))
+          (unless new
+            (lwarn 'org-node :warning "User option removed: %S" old))
+          (when new
+            (lwarn 'org-node :warning "Your config uses old variable: %S,  new name: %S"
+                   old new)
+            (set new (symbol-value old))))))))
 
 (defmacro org-node--defobsolete (old new &optional interactive)
   "Define OLD as a function that runs NEW.
@@ -121,15 +125,14 @@ files you have made along the way."
 May be useful for injecting your authinfo and EasyPG settings so
 that org-node can scan for ID nodes inside .org.gpg files.
 
-I don't use EPG so I don't know if that's enough to make it work.
-Probably not.  Get me working on it by dropping me a line on
-https://github.com/meedstrom/org-node/issues or Mastodon:
-@meedstrom@emacs.ch."
+I don't use EPG so I don't know if that's enough to make it
+work---probably not.  Get me working on it by dropping me a line
+on https://github.com/meedstrom/org-node/issues or Mastodon:
+@meedstrom@emacs.ch"
   :group 'org-node
   :type 'alist)
 
-;; TODO Maybe suggest `utf-8-auto-unix', but first find out if the
-;; coding-system-for-write infers from coding-system-for-read
+;; TODO Maybe suggest `utf-8-auto-unix', but is it a sane system for write?
 (defcustom org-node-perf-assume-coding-system nil
   "Coding system to assume while scanning ID nodes.
 
@@ -137,17 +140,17 @@ Picking a specific coding system can speed up `org-node-reset',
 sometimes significantly.  Set nil to let Emacs figure it out anew
 on every file.
 
+On MS Windows this probably should be nil.  Same if you access
+your files from multiple platforms.
+
 Modern GNU/Linux, BSD and Mac systems almost always encode new
 files as `utf-8-unix'.
-
-On Windows this probably should be nil.  Same if you access your
-files from multiple platforms.
 
 Note that if your Org collection is old and has survived several
 system migrations, or some of it was generated via Pandoc
 conversion or downloaded, it's very possible that there's a mix
 of coding systems among them.  In that case, setting this
-variable non-nil may cause org-node to fail to scan some of them."
+variable may cause org-node to fail to scan some of them."
   :group 'org-node
   :type '(choice coding-system (const nil)))
 
@@ -175,38 +178,38 @@ visited.  The smaller this list, the faster `org-node-reset'."
     (not (assoc "ROAM_EXCLUDE" (org-node-get-properties node))))
   "Predicate returning t to include a node, or nil to exclude it.
 
-The filtering only has an impact on `org-node--node-by-candidate', which
-forms the basis for completions in the minibuffer, and
-`org-node--id-by-title', used by the in-buffer
-`org-node-complete-at-point'.  In other words, passing nil means
-the user cannot autocomplete to the node, but Lisp code can still
-find it in `org-node--node-by-id'.
+The filtering only has an impact on the table
+`org-node--node-by-candidate', which forms the basis for
+completions in the minibuffer, and `org-node--id-by-title', used
+by the in-buffer `org-node-complete-at-point'.  In other words,
+passing nil means the user cannot autocomplete to the node, but
+Lisp code can still find it in the \"main\" table,
+`org-node--node-by-id'.
 
 This function is applied once for every org-id node found, and
 receives the node data as a single argument: an object which form
-you can observe in examples from \\[org-node-peek] and
-specified in the type `org-node-get' (search with C-h o).
+you can observe in examples from \\[org-node-peek] and specified
+in the type `org-node-get' (C-h o RET org-node-get RET).
 
 See the following example for a way to filter out nodes with a
 ROAM_EXCLUDE property, or that have any kind of TODO state, or
-are tagged :drill:, or where the full file path contains the word
-\"archive\".
+are tagged :drill:, or where the full file path contains a
+directory named \"archive\".
 
 (setq org-node-filter-fn
       (lambda (node)
-        (and (not (assoc \"ROAM_EXCLUDE\" (org-node-get-properties node)))
-             (not (org-node-get-todo node))
-             (not (string-search \"archive\" (org-node-get-file-path node)))
-             (not (member \"drill\" (org-node-get-tags node))))))"
+        (not (or (assoc \"ROAM_EXCLUDE\" (org-node-get-properties node))
+                 (org-node-get-todo node)
+                 (string-search \"/archive/\" (org-node-get-file-path node))
+                 (member \"drill\" (org-node-get-tags node))))))"
   :group 'org-node
   :type 'function)
 
 (defcustom org-node-insert-link-hook '()
   "Hook run after inserting a link to an Org-ID node.
 
-Called with two arguments: the ID and the link description.
-
-Point will be positioned at the link."
+Called with two arguments: the ID and the link description, and
+point is positioned in the new link."
   :group 'org-node
   :type 'hook)
 
@@ -245,14 +248,7 @@ IDs\", configure `org-node-extra-id-dirs-exclude'.
 
 Tip: If it happened anyway, try \\[org-node-forget-dir], because
 merely removing a directory from this list does not forget the
-IDs already found.
-
-Warning: If you have custom elements in `directory-abbrev-alist',
-none of them should match the part of a file path that comes
-after one of the dirs listed here.  This is because upstream
-Org-id applies `abbreviate-file-name' to all files, but that is
-an expensive operation which Org-node opted against - it will
-only do it up to the directory."
+IDs already found."
   :group 'org-node
   :type '(repeat directory))
 
@@ -267,9 +263,9 @@ only do it up to the directory."
 This option only influences how the function `org-node-files'
 should seek files found in `org-node-extra-id-dirs'.  It is meant
 as a way to avoid collecting IDs inside versioned backup files
-causing org-id to complain about \"duplicate IDs\".
+causing org-id to complain about duplicate IDs.
 
-For all other \"excludey\" purposes, you probably want to
+For all other \"excludey\" purposes, you probably mean to
 configure `org-node-filter-fn' instead.
 
 If you have accidentally added a directory of backup files, try
@@ -319,7 +315,8 @@ It receives two arguments: NODE and TITLE, and it must return a
 list of three strings: completion, prefix and suffix.
 
 NODE is an object which form you can observe in examples from
-\\[org-node-peek] and specified in type `org-node-get'.
+\\[org-node-peek] and specified in type `org-node-get'
+(C-h o RET org-node-get RET).
 
 If a node has aliases, it is passed to this function again for
 every alias, in which case TITLE argument is actually one of the
@@ -715,8 +712,6 @@ eventually and not dropped."
   "Count of finished subprocesses.")
 (defvar org-node--stderr-name " *org-node*"
   "Name of buffer for the subprocesses stderr.")
-(defvar org-node--time-at-init-scan nil
-  "Timestamp used to measure time it took to rebuild cache.")
 
 (defvar org-node--max-jobs nil
   "Number of subprocesses to run.
@@ -876,14 +871,18 @@ tables."
                              (org-node--handle-finished-job n-jobs finalizer)))
                 org-node--processes))))))
 
-(defvar org-node--time-at-start-finalize nil)
+(defvar org-node--first-init t
+  "True if org-node has not been initialized yet.
+Muffles some messages.")
 
 (defun org-node--handle-finished-job (n-jobs finalizer)
   "Check if this was the last process to return (by counting up
 to N-JOBS), then if so, wrap-up and call FINALIZER."
   (when (eq n-jobs (cl-incf org-node--done-ctr))
-    (when org-node--debug (garbage-collect))
-    (setq org-node--time-at-start-finalize (current-time))
+    (when org-node--debug
+      (setq org-node--first-init nil)
+      (garbage-collect))
+    (setq org-node--time-at-finalize (current-time))
     (let ((file-name-handler-alist nil)
           (coding-system-for-read org-node-perf-assume-coding-system)
           (coding-system-for-write org-node-perf-assume-coding-system)
@@ -895,14 +894,19 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
             (when (file-exists-p err-file)
               (message "org-node: problems scanning some files, see %s" err-file))
             (if (not (file-exists-p results-file))
-                (let ((buf (get-buffer " *org-node*")))
-                  (when buf
-                    ;; Had 1+ errors, so unhide stderr buffer from now on
-                    (setq org-node--stderr-name "*org-node errors*")
-                    (with-current-buffer buf
-                      (rename-buffer org-node--stderr-name)))
-                  (message "An org-node worker failed to scan files, not producing %s.  See buffer %s"
-                           results-file org-node--stderr-name))
+                ;; First-time init with autoloads can have bugs for
+                ;; seemingly magical reasons that go away afterwards
+                ;; (e.g. it says the files aren't on disk but they are).
+                ;; Better UX not to report a problem at this time.
+                (unless org-node--first-init
+                  (let ((buf (get-buffer " *org-node*")))
+                    (when buf
+                      ;; Had 1+ errors, so unhide stderr buffer from now on
+                      (setq org-node--stderr-name "*org-node errors*")
+                      (with-current-buffer buf
+                        (rename-buffer org-node--stderr-name)))
+                    (message "An org-node worker failed to scan, not producing %s.  See buffer %s"
+                             results-file org-node--stderr-name)))
               (erase-buffer)
               (insert-file-contents results-file)
               (push (read (buffer-string)) result-sets)))))
@@ -921,15 +925,16 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
     (clrhash org-node--reflinks-by-ref)
     (clrhash org-node--backlinks-by-id)
     (clrhash org-node--cites-by-citekey)
-    (-let (((missing-files _found-files nodes id-links reflinks cites) results))
+    (-let (((missing-files _ nodes id-links reflinks cites) results))
       (org-node--forget-id-locations missing-files)
       (dolist (node nodes)
         (org-node--record-node node))
       (org-node--record-id-links id-links)
       (org-node--record-reflinks reflinks)
       (org-node--record-cites cites))
-    ;; Unnecessary noise at emacs init
-    (unless first-time
+    ;; Don't add to emacs init noise
+    (if org-node--first-init
+        (setq org-node--first-init nil)
       (org-id-locations-save)
       (org-node--print-elapsed))))
 
@@ -994,11 +999,17 @@ The input NODE-RECIPE is a list of arguments to pass to
     (puthash id node org-node--node-by-id)
     (dolist (ref (org-node-get-refs node))
       (puthash ref id org-node--id-by-ref))
+    ;; Setup completion candidates
     (when (funcall org-node-filter-fn node)
       (dolist (title (cons (org-node-get-title node)
                            (org-node-get-aliases node)))
-        (let ((collision (gethash title org-node--id-by-title))
-              (affx (funcall org-node-affixation-fn node title)))
+        (let ((collision (gethash title org-node--id-by-title)))
+          (puthash title id org-node--id-by-title)
+          (when (and collision (not (equal id collision)))
+            (when org-node-warn-title-collisions
+              (message "Two nodes have same name: %s = %s (%s)"
+                       id collision title))))
+        (let ((affx (funcall org-node-affixation-fn node title)))
           (if org-node-alter-candidates
               ;; Absorb the affixations into one candidate string
               (puthash (concat (nth 1 affx) (nth 0 affx) (nth 2 affx))
@@ -1006,14 +1017,8 @@ The input NODE-RECIPE is a list of arguments to pass to
                        org-node--node-by-candidate)
             ;; Raw title as candidate (to be affixated by `org-node-collection')
             (puthash title node org-node--node-by-candidate)
-            (puthash title affx org-node--affixation-triplet-by-title))
-          (puthash title id org-node--id-by-title)
-          (when (and collision org-node-warn-title-collisions)
-            (unless (equal id collision)
-              (message "Two nodes have same name: %s, %s (%s)"
-                       id collision title)))))
-      ;; Let ROAM_REFS work as aliases too
-      ;; (But don't apply the affixation fn)
+            (puthash title affx org-node--affixation-triplet-by-title))))
+      ;; Let ROAM_REFS work as aliases too (but don't apply the affixation fn)
       (dolist (ref (org-node-get-refs node))
         (puthash ref node org-node--node-by-candidate)
         (puthash ref
@@ -1121,9 +1126,11 @@ also necessary is `org-node--dirty-ensure-link-known'."
   "Whether to run in a way suitable for debugging.")
 
 (defvar org-node--time-elapsed 1
-  "Time elapsed by the last cache reset.")
+  "Duration of the last cache reset.")
 
+(defvar org-node--time-at-init-scan nil)
 (defvar org-node--time-at-last-child-done nil)
+(defvar org-node--time-at-finalize nil)
 
 (defun org-node--print-elapsed ()
   "Print time elapsed since `org-node--time-at-init-scan'.
@@ -1149,11 +1156,11 @@ be misleading."
                n-subtrees
                n-backlinks
                n-reflinks
-               ;; For reproducible profiling
                (setq org-node--time-elapsed
+                     ;; For reproducible profiling
                      (+ (float-time
                          (time-subtract (current-time)
-                                        org-node--time-at-start-finalize))
+                                        org-node--time-at-finalize))
                         (float-time
                          (time-subtract org-node--time-at-last-child-done
                                         org-node--time-at-init-scan))))))))
@@ -1183,7 +1190,7 @@ element is wrapped in its own list."
 
 ;; NOTE Very important macro for the backlink mode, because backlink insertion
 ;;      opens an Org file, and if doing that is laggy, then every link
-;;      insertion is laggy.
+;;      insertion is laggy
 (defmacro org-node--with-quick-file-buffer (file &rest body)
   "Pseudo-backport of Emacs 29 `org-with-file-buffer'.
 Also integrates `org-with-wide-buffer' behavior, some magic
@@ -1335,7 +1342,10 @@ consult the filesystem, just compares substrings to each other."
 - Symbol nil: put file in the most populous root directory in
        `org-id-locations' without asking
 - String: a directory path in which to put the file
-- Symbol t: ask every time, starting from the current directory"
+- Symbol t: ask every time, starting from the current directory
+
+This variable controls the directory component, but the file
+basename is controlled by `org-node-filename-fn'."
   :group 'org-node
   :type 'boolean)
 
@@ -1361,7 +1371,7 @@ Built-in choices:
           (function-item org-node-slugify-for-web)
           function))
 
-;; Some useful test cases if you want to hack!
+;; Useful test cases if you want to hack on this!
 
 ;; (org-node-slugify-for-web "A/B testing")
 ;; (org-node-slugify-for-web "\"But there's still a chance, right?\"")
@@ -1812,7 +1822,7 @@ Leave a link in the source file, and show the newly created file.
 You may find it a common situation that the subtree had not yet
 been assigned an ID nor any other property that you normally
 assign to a proper node.  Thus, this creates an ID for you if
-there was no ID, copies over any inherited tags, and runs
+there was no ID, copies over all inherited tags, and runs
 `org-node-creation-hook'.
 
 Adding to that, see below for an example advice that copies any
@@ -1824,17 +1834,18 @@ as more \"truthful\" than today's date.
 
 (advice-add \\='org-node-extract-subtree :around
             (defun my-inherit-creation-date (orig-fn &rest args)
-              (let ((inherited-creation-date
+              (let ((parent-creation
                      (save-excursion
-                       (while (not (or (org-entry-get nil \"CREATED\")
-                                       (bobp)))
-                         (org-up-heading-or-point-min))
+                       (without-restriction
+                         (while (not (or (org-entry-get nil \"CREATED\")
+                                         (bobp)))
+                           (org-up-heading-or-point-min)))
                        (org-entry-get nil \"CREATED\"))))
                 (apply orig-fn args)
                 ;; Now in the new buffer
                 (org-entry-put nil \"CREATED\"
-                               (or inherited-creation-date
-                                   (format-time-string \"[%F %a]\")))))))"
+                               (or parent-creation
+                                   (format-time-string \"[%F %a]\"))))))"
   (interactive nil org-mode)
   (unless (derived-mode-p 'org-mode)
     (user-error "This command expects an org-mode buffer"))
@@ -1905,6 +1916,7 @@ as more \"truthful\" than today's date.
              "\n"))
           (run-hooks 'org-node-creation-hook)
           (save-buffer)
+          ;; TODO: arrange so the backlink-mode backlink appears
           (org-node--scan-targeted (list path-to-write source-path)))))))
 
 ;;;###autoload
