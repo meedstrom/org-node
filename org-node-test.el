@@ -11,26 +11,26 @@
 ;;      org 9.5 @keys.  See org-ref manual for syntax.  Basically worker.el
 ;;      just need some more branches on merged-re and plain-re matches.
 ;;
-;;      In short, what's relevant to us: org-ref v3 citations always match
-;;      plain-re because they are URIs starting with citep:, citet:, citealp:
-;;      and many others, but it's the old story where you have to match any-re
-;;      first in case it is bracketed, with spaces inside.  Like [[citep:See
-;;      &kitchin-2015-examp page 2]].  Anyway, then just extract each &key.
-;;      Finally, have to consult some org-ref variable first to get all the
-;;      defined URI types.
+;;      In short, what's relevant to us: org-ref v3 citations are always URIs
+;;      starting with citep:, citet:, citealp: and many others, but it's the
+;;      old story where you have to match bracket-re first in case it is
+;;      bracketed, with spaces inside.  Like [[citep:See &kitchin-2015-examp
+;;      page 2]].  Anyway, then just extract each &key.  Finally, have to
+;;      consult some org-ref variable first to get all the defined URI types.
 ;;
 ;;      Wow!  I just combine the lessons I learned for supporting bracketed
 ;;      link with spaces, for extracting @citekeys, and for consulting an
 ;;      org-super-links variable!  Easy peasy.
-(ert-deftest org-node-test--parse-refs ()
-  (let ((result (org-node-worker--split-refs-field
-                 "[cite:@citeKey abcd ; @citeKey2 cdefgh] @foo [[https://gnu.org/A Link With Spaces/index.htm][baz]] https://gnu.org ")))
+(ert-deftest org-node-test--split-refs-field ()
+  (let ((result
+         (org-node-worker--split-refs-field
+          "[cite:@citeKey abcd ; @citeKey2 cdefgh] @foo [[https://gnu.org/A Link With Spaces/index.htm][baz]] https://gnu.org ")))
     (should (--all-p (member it result)
                      '("@citeKey2"
                        "@citeKey"
                        "@foo"
-                       "https://gnu.org/A Link With Spaces/index.htm"
-                       "https://gnu.org")))))
+                       "//gnu.org/A Link With Spaces/index.htm"
+                       "//gnu.org")))))
 
 (ert-deftest org-node-test--oldata-fns ()
   (let ((olp '((3730 "A subheading" 2 "33dd")
@@ -47,7 +47,7 @@
     (should (equal (org-node-worker--pos->parent-id olp 1300 nil)
                    "d3"))))
 
-(ert-deftest org-node-test--parse-testfile2.org ()
+(ert-deftest org-node-test--parsing-testfile2.org ()
   (org-node--scan-targeted (list "testfile2.org"))
   (org-node-cache-ensure t)
   (let ((node (gethash "bb02315f-f329-4566-805e-1bf17e6d892d" org-node--id<>node)))
@@ -60,7 +60,7 @@
     (should (equal (org-node-get-title node) "3rd-level, has ID"))
     (should (equal (org-node-get-todo node) nil))))
 
-(ert-deftest org-node-test--multiple-id-dirs ()
+(ert-deftest org-node-test--having-multiple-id-dirs ()
   (mkdir "/tmp/org-node/test1" t)
   (mkdir "/tmp/org-node/test2" t)
   (write-region "" nil "/tmp/org-node/test2/emptyfile.org")

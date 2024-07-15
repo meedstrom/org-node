@@ -109,24 +109,27 @@ then update the :BACKLINKS: property in this entry.  With arg
 REMOVE, remove it instead."
   (if remove?
       (org-entry-delete nil "BACKLINKS")
+    ;; Um... I think this way of grabbing the ID is a holdover from when I was
+    ;; using fundamental-mode buffers?
     (skip-chars-forward "[:space:]")
     (let* ((id (buffer-substring-no-properties
                 (point) (+ (point) (skip-chars-forward "^ \n"))))
            (node (gethash id org-node--id<>node)))
       (when node
         ;; Make the full string to which the :BACKLINKS: property should be set
-        (let* ((reflinks (org-node-get-reflinks node))
-               (backlinks (gethash id org-node--id<>backlinks))
-               (citations (org-node-get-citations node))
-               (combined
+        (let* ((combined
                 (thread-last
-                  (append reflinks backlinks)
+                  (append (gethash id org-node--id<>id-links)
+                          (org-node-get-reflinks node)
+                          (org-node-get-citations node))
+                  ;; Extract just the origin IDs
                   (--map (plist-get it :origin))
                   (-uniq)
-                  (-non-nil) ;; REVIEW why can there be nils?
+                  (-non-nil) ;; REVIEW no nils anymore, I hope
                   (-sort #'string-lessp)
-                  ;; At this point we have a sorted list of ids of
-                  ;; every node that links to here.  Now format them as links.
+                  ;; At this point we have a sorted list of IDs of every node
+                  ;; that links to here.  (Yes, sorted UUIDs---nearly
+                  ;; senseless.)  Now format them pretty Org links.
                   (--map (org-link-make-string
                           (concat "id:" it)
                           (org-node-get-title
