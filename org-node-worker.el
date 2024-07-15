@@ -25,31 +25,82 @@ that will match any of the TODO keywords within."
                (split-string)
                (regexp-opt)))
 
+;; (defconst org-node-worker--plain-re
+;;   (let* ((types-re "\\(b\\(?:bdb\\|ibtex\\)\\|do\\(?:cview\\|i\\)\\|e\\(?:lisp\\|ww\\)\\|f\\(?:ile\\(?:\\+\\(?:\\(?:emac\\|sy\\)s\\)\\)?\\|tp\\)\\|gnus\\|h\\(?:elp\\|ttps?\\)\\|i\\(?:d\\|nfo\\|rc\\)\\|m\\(?:ailto\\|he\\)\\|news\\|rmail\\|shell\\|w3m\\)")
+;;          (non-space-bracket "[^][ \t\n()<>]")
+;;          (parenthesis `(seq (any "<([")
+;;                         (0+ (or (regex ,non-space-bracket)
+;;                                 (seq (any "<([")
+;;                                      (0+ (regex ,non-space-bracket))
+;;                                      (any "])>"))))
+;;                         (any "])>"))))
+;;     (rx-to-string `(seq word-start
+;;                     (regexp ,types-re)
+;;                     ":" (group
+;;                          (1+ (or (regex ,non-space-bracket)
+;;                                  ,parenthesis))
+;;                          (or (regexp "[^[:punct:][:space:]\n]")
+;;                              ?- ?/ ,parenthesis)))))
+;;   "Copy of `org-link-plain-re'.")
+
+(defconst org-node-worker--citation-prefix-re
+  (rx "[cite"
+      (opt "/" (group (one-or-more (any "/_-" alnum)))) ;style
+      ":"
+      (zero-or-more (any "\t\n ")))
+  "Copy of `org-element-citation-prefix-re'.")
+
+(defconst org-node-worker--citation-key-re
+  "@\\([!#-+./:<>-@^-`{-~[:word:]-]+\\)"
+  "Copy of `org-element-citation-key-re'.")
+
+;; TODO: Extract org-ref v3 &citekeys too (easy, lot of prior art here)
 (defun org-node-worker--split-refs-field (roam-refs)
-  "Split a ROAM-REFS field correctly."
+  "Split a ROAM-REFS field correctly.
+What this means?   See org-node-test.el."
   (when roam-refs
     (with-temp-buffer
       (insert roam-refs)
       (goto-char 1)
-      (let (refs beg end)
-        (while (search-forward "[cite:" nil t)
-          (setq beg (match-beginning 0))
-          (setq end (search-forward "]"))
-          (goto-char beg)
-          ;; The regexp is `org-element-citation-key-re'
-          (while (re-search-forward "@\\([!#-+./:<>-@^-`{-~[:word:]-]+\\)"
-                                    end t)
-            (push (match-string 0) refs))
-          (delete-region beg end))
-        (goto-char 1)
+      (let (citekeys links beg end)
+        ;; Extract all [[bracketed links]]
         (while (search-forward "[[" nil t)
           (setq beg (match-beginning 0))
-          (setq end (search-forward "]]"))
-          (goto-char beg)
-          (push (buffer-substring (+ 2 beg) (1- (search-forward "]")))
-                refs)
-          (delete-region beg end))
-        (append refs (split-string-and-unquote (buffer-string)))))))
+          ;; TODO lint warn: close-bracket missing in ROAM_REFS property
+          (when (setq end (search-forward "]]" nil 'move))
+            (goto-char beg)
+            (push (buffer-substring (+ 2 beg) (1- (search-forward "]")))
+                  links)
+            (delete-region beg end)))
+        (goto-char 1)
+        ;; Extract all @key out of [cite/style: @key1; @key2; @key3]
+        (while (re-search-forward org-node-worker--citation-prefix-re nil t)
+          (setq beg (match-beginning 0))
+          ;; TODO lint warn: close-bracket missing in ROAM_REFS property
+          (when (setq end (search-forward "]" nil 'move))
+            (goto-char beg)
+            (while (re-search-forward org-node-worker--citation-key-re end t)
+              (push (match-string 0) citekeys))
+            (delete-region beg end)))
+        ;; Return merged list
+        (append citekeys
+                (cl-loop
+                 for link? in (append (split-string-and-unquote (buffer-string))
+                                      links)
+                 ;; Strip "https:" part
+                 if (string-match "^\\(.*?\\):" link?)
+                 collect (progn
+                           ;; Remember the prefix for completions later
+                           (push (cons (substring link? (match-end 0))
+                                       (match-string 1 link?))
+                                 org-node-worker--result-ref-paths-types)
+                           ;; .. but the actual ref is just the //path
+                           (substring link? (match-end 0)))
+                 ;; (Debatable) this is neither uri://path nor @citekey, but
+                 ;; let it count as a ref anyway
+                 else collect link?))))))
+
+(defvar org-node-worker--result-ref-paths-types nil)
 
 (defun org-node-worker--elem-index (elem list)
   "Like `-elem-index', return first index of ELEM in LIST."
@@ -244,6 +295,8 @@ process does not have to load org.el."
 (defvar org-node-worker--result-found-id-links nil)
 (defvar org-node-worker--result-found-reflinks nil)
 (defvar org-node-worker--result-found-citations nil)
+(defvar org-node-worker--temp-buf nil
+  "An extra buffer.")
 
 (defun org-node-worker--collect-dangerously ()
   "Dangerous!  Assumes the current buffer is a temp buffer!
@@ -259,6 +312,7 @@ list, and write results to another temp file."
     ;; The variable `i' was set via the command line that launched this process
     (insert-file-contents (org-node-worker--tmpfile "file-list-%d.eld" i)))
   (setq $files (read (buffer-string)))
+  (setq org-node-worker--temp-buf (get-buffer-create " *org-node temp*" t))
   (let ((case-fold-search t)
         result-missing-files
         result-found-nodes
@@ -526,6 +580,8 @@ list, and write results to another temp file."
               (goto-char (point-max))
               (widen)))
 
+        ;; TODO: Don't write an errors.txt, just write into an errors field in
+        ;; the results.eld.  Then make a tabulated-list for the user's purvey.
         (( t error )
          ;; Don't crash the whole process when there is a problem scanning one
          ;; file, report the problem and continue to the next file
@@ -543,6 +599,7 @@ list, and write results to another temp file."
        (prin1-to-string (list result-missing-files
                               result-found-files
                               result-found-nodes
+                              org-node-worker--result-ref-paths-types
                               org-node-worker--result-found-id-links
                               org-node-worker--result-found-reflinks
                               org-node-worker--result-found-citations
