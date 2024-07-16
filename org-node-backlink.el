@@ -18,7 +18,8 @@
   org-node-backlink-mode
   (lambda ()
     (when (derived-mode-p 'org-mode)
-      (org-node-backlink-mode))))
+      (org-node-backlink-mode)))
+  :group 'org-node)
 
 ;;;###autoload
 (define-minor-mode org-node-backlink-mode
@@ -119,9 +120,8 @@ REMOVE, remove it instead."
         ;; Make the full string to which the :BACKLINKS: property should be set
         (let* ((combined
                 (thread-last
-                  (append (gethash id org-node--id<>id-links)
-                          (org-node-get-reflinks node)
-                          (org-node-get-citations node))
+                  (append (org-node-get-id-links node)
+                          (org-node-get-reflinks node))
                   ;; Extract just the origin IDs
                   (--map (plist-get it :origin))
                   (-uniq)
@@ -147,6 +147,8 @@ REMOVE, remove it instead."
 run `org-node-backlink--fix-subtree-here' at each affected
 subtree.  For a huge file, this is much faster than using
 `org-node-backlink--fix-whole-buffer'."
+  (unless (derived-mode-p 'org-mode)
+    (error "Backlink function called in non-Org buffer"))
   (when org-node-backlink-mode
     ;; Catch any error because this runs at `before-save-hook' which MUST fail
     ;; gracefully and let the user save anyway
@@ -210,7 +212,9 @@ subtree.  For a huge file, this is much faster than using
 
 Designed for `after-change-functions', so this effectively flags
 all areas where text is added/changed/deleted."
-  (when (derived-mode-p 'org-mode)
+  (unless (derived-mode-p 'org-mode)
+    (error "Backlink function called in non-Org buffer"))
+  (when org-node-backlink-mode
     (with-silent-modifications
       (put-text-property beg end 'org-node-flag t))))
 
@@ -244,7 +248,7 @@ all areas where text is added/changed/deleted."
 (defun org-node-backlink--add-in-target (&rest _)
   "For known link at point, leave a backlink in the target node."
   (unless (derived-mode-p 'org-mode)
-    (error "Called in non-org buffer"))
+    (error "Backlink function called in non-Org buffer"))
   (when org-node-backlink-mode
     (org-node-cache-ensure)
     (let ((elm (org-element-context)))
