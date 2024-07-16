@@ -102,8 +102,8 @@ A comparison of three similar systems, all permitting org-id as first-class citi
 | Ref search                        | yes      | yes (as aliases)   | not applicable       |
 | Org 9.5 @citekeys as refs         | yes      | yes                | not applicable       |
 | Can have rich search completion   | yes      | yes                | not applicable       |
-| Can work thru org-roam-capture    | yes      | yes                | --                   |
-| Can work thru org-capture         | --       | yes                | --                   |
+| Can work thru org-roam-capture    | yes      | yes                |                      |
+| Can work thru org-capture         | --       | yes                |                      |
 | Can show backlinks in same window | --       | yes                | yes                  |
 | Avoid double-counting =:BACKLINKS:= | --       | yes                | not applicable       |
 | Grep across all files             | --       | yes                | --                   |
@@ -272,13 +272,16 @@ I find unsatisfactory the config options in org-id (Why? See [[http://edstrom.de
 Example setting:
 
 #+begin_src elisp
-(setq org-node-extra-id-dirs '("/home/kept/org/"
-                               "/home/me/Dropbox/project2/"
-                               "/mnt/stuff/"))
+(setq org-node-extra-id-dirs
+      '("/home/kept/org/"
+        "~/Syncthing/project2/"
+        "/mnt/stuff/"))
 #+end_src
 
 
 # *** Completion-at-point
+# Not sure how/why people use =org-roam-completion-everywhere=, but it's popular so here you go for an equivalent.
+
 # #+begin_src elisp
 # (org-node-complete-at-point-mode)
 # #+end_src
