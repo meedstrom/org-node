@@ -87,6 +87,11 @@ autoloaded)."
 (org-node--defobsolete org-node-new-by-roam-capture org-node-new-via-roam-capture)
 (org-node--defobsolete org-node-get-backlinks org-node-get-id-links)
 
+;; Autoload deprecated names from the subpackages
+(autoload 'org-node-roam-db-shim-mode "org-node-fakeroam")
+(autoload 'org-node-roam-db-reset "org-node-fakeroam")
+(autoload 'org-node-roam-redisplay-mode "org-node-fakeroam")
+
 
 ;;;; Options
 
