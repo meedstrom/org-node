@@ -2,19 +2,23 @@
 
 (require 'org-node)
 (require 'ol)
+(require 'org-roam)
+(require 'emacsql)
 
 ;;;###autoload
 (defun org-node-feed-file-to-roam-db (&optional files)
-  (declare (obsolete 'org-node-roam-db-feed "2024-07-11"))
+  (declare (obsolete 'org-node-roam--db-feed "2024-07-11"))
   (unless warned-once
     (setq warned-once t)
     (display-warning 'org-node "Your config uses deprecated `org-node-feed-file-to-roam-db', use `org-node-roam-db-shim-mode' instead"))
-  (org-node-roam-db-feed files))
+  (org-node-roam--db-feed files))
 
 (org-node--defobsolete
  org-node--fabricate-roam-backlinks org-node-roam--mk-fake-backlinks)
 (org-node--defobsolete
  org-node--fabricate-roam-reflinks org-node-roam--mk-fake-reflinks)
+(org-node--defobsolete
+ org-node-roam-db-feed org-node-roam--db-feed)
 
 ;;;###autoload
 (define-minor-mode org-node-roam-redisplay-mode
@@ -139,31 +143,34 @@ Designed as override advice for `org-roam-reflinks-get'."
 (define-minor-mode org-node-roam-db-shim-mode
   "Send "
   :global t
-  (require 'org-roam)
   (if org-node-roam-db-shim-mode
       (progn
         (unless org-node-cache-mode
           (message "`org-node-roam-db-shim-mode' will do nothing without `org-node-cache-mode'"))
-        (add-hook 'org-node-rescan-hook #'org-node-roam-db-feed))
-    (remove-hook 'org-node-rescan-hook #'org-node-roam-db-feed)))
+        (add-hook 'org-node-rescan-hook #'org-node-roam--db-feed))
+    (remove-hook 'org-node-rescan-hook #'org-node-roam--db-feed)))
 
-(defun org-node-roam-db-feed (files)
+(defun org-node-roam--db-feed (files)
   "Tell the Roam DB about all nodes and links involving FILES."
-  (require 'org-roam)
-  (require 'emacsql)
   (emacsql-with-transaction (org-roam-db)
+    (dolist (file files)
+      (org-roam-db-query [:delete :from files
+                          :where (= file $s1)]
+                         file))
     (cl-loop for node being the hash-values of org-nodes
-             when (member (org-node-get-file-path node) (ensure-list files))
-             do (org-node-roam--db-add-node node))))
+             when (member (org-node-get-file-path node) files)
+             do
+             (org-roam-db-query [:delete :from links
+                                 :where (= dest $s1)]
+                                (org-node-get-id node))
+             (org-node-roam--db-add-node node))))
 
-;; Was hoping to just run this on every save, is SQLite really so slow
-;; accepting 0-2 MB of data?  Must be some way to make it instant, else how do
+;; Was hoping to just run this on every save, is SQLite really so slow to
+;; accept 0-2 MB of data?  Must be some way to make it instant, else how do
 ;; people work with petabytes?
 (defun org-node-roam-db-reset ()
   "Wipe the Roam DB and rebuild."
   (interactive)
-  (require 'org-roam)
-  (require 'emacsql)
   (org-node-cache-ensure)
   (org-roam-db)
   (org-roam-db-clear-all)
