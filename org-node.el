@@ -926,31 +926,65 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
         (when errors
           (message "org-node met errors, see M-x org-node-list-scan-problems"))))))
 
-;; NOTE For performance, we do not bother to update the links tables on file
-;; modification.  Doing so would not be simple puthash operations, but need
-;; looping to find all matches of :dest as well as :origin, and that gets slow
-;; when saving a big file containing 5000 links -- slow enough to annoy users
-;; of `auto-save-visited-mode', at minimum.
-;;
-;; Fortunately it isn't needed, our insert-link advices will already record
-;; links added during normal usage!  What's left undone til next full scan:
-;; 1. deleted links remain in the table --> undead backlinks
-;; 2. the :pos value can be off which could affect org-roam-buffer
 (defun org-node--finalize-modified (results)
-  (-let (((missing-files found-files nodes path*type _ errors) results))
+  (-let (((missing-files found-files nodes path<>type links errors) results))
     (org-node--forget-id-locations missing-files)
     (org-node--dirty-forget-files missing-files)
     ;; In case a title was edited
     (org-node--dirty-forget-completions-in found-files)
-    (dolist (pair path*type)
+
+    (let ((before (hash-table-values org-node--dest<>links)))
+      (when org-node-eagerly-update-link-tables
+        ;; Geez this just takes 10 ms for my SP7 @ 1.1 GHz in a file with
+        ;; 500 nodes & 3000+ links.  Is something broken?
+        (cl-loop with ids-of-nodes-scanned = (cl-loop
+                                              for node in nodes
+                                              collect (plist-get node :id))
+                 with to-clean = nil
+                 for link-set being the hash-values of org-node--dest<>links
+                 using (hash-keys dest)
+                 do (cl-loop
+                     with clean-this-dest = nil
+                     for link in link-set
+                     if (member (plist-get link :origin) ids-of-nodes-scanned)
+                     do (setq clean-this-dest t)
+                     else collect link into cleaned-link-set
+                     finally do
+                     (when clean-this-dest
+                       (push (cons dest cleaned-link-set) to-clean)))
+                 finally do
+                 (dolist (pair to-clean)
+                   (puthash (car pair) (cdr pair) org-node--dest<>links))
+                 (setq test ids-of-nodes-scanned))
+        (dolist (link links)
+          (push link (gethash (plist-get link :dest) org-node--dest<>links))))
+      (message "%s" (length (-difference before
+                                         (hash-table-values org-node--dest<>links)))))
+    (dolist (pair path<>type)
       (puthash (car pair) (cdr pair) org-node--uri-path<>uri-type))
     (dolist (node nodes)
       (org-node--record-node node))
     (dolist (err errors)
       (push err org-node--errors))
     (when errors
-      (message "org-node met errors, see M-x org-node-list-scan-problems"))
+      (message "org-node found issues, see M-x org-node-list-scan-problems"))
     (run-hook-with-args 'org-node-rescan-hook found-files)))
+
+(defcustom org-node-eagerly-update-link-tables nil
+  "Update backlink tables on every save.
+
+By default, we do not bother to do this on every save (only after
+`org-node--idle-timer'), because it can slow down saving a big
+file containing thousands of links -- enough to annoy users of
+`auto-save-visited-mode', at least.
+
+Fortunately it is rarely needed, since the insert-link advices of
+`org-node-cache-mode' will already record links added during
+normal usage!  What's left undone til idle:
+1. deleted links remain in the table --> undead backlinks
+2. :pos values can desync, which can affect org-roam-buffer"
+  :group 'org-node
+  :type 'boolean)
 
 (defun org-node--record-node (node-recipe)
   "Add a node to `org-node--id<>node' and other tables.
