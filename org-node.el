@@ -34,15 +34,13 @@
 ;;      must be significant overhead on the child processes... nix it
 ;; TODO A workflow to allow pseudo-untitled (numeric-titled) nodes
 ;;      - Need a bunch of commands, like jump to node from fulltext search
-;; TODO Maybe merge reflinks and citations
-;;      - they only need to be separate for feeding to roam
 
-(require 'compat)
 (require 'cl-lib)
 (require 'subr-x)
+(require 'compat)
 (require 'dash)
-(require 'org-id)
 (require 'org)
+(require 'org-id)
 (require 'org-node-worker)
 
 
@@ -477,29 +475,43 @@ can demonstrate the data format.  See also the type `org-node'.")
   "1:1 table")
 
 (defvar org-node--dest<>links (make-hash-table :test #'equal)
-  "1:N table of ID-links.
+  "1:N table of links.
 
 The table keys are destination IDs, and the corresponding table
 value is a list of plists describing each link, including naming
 the ID-node where the link originated.")
 
-(defun org-node-get-reflinks (node)
-  "Get list of reflinks pointing to NODE.
-This includes citations - to get only citations, try
-`org-node-get-citations'."
-  (cl-loop for ref in (org-node-get-refs node)
-           append (gethash ref org-node--dest<>links)))
+(defvar org-node--origin<>links (make-hash-table :test #'equal)
+  "1:N table of links.")
 
 (defun org-node-get-id-links (node)
-  "Get list of ID-links pointing to NODE."
+  "Get list of ID-link objects pointing to NODE.
+
+A link object is a plist with these fields:
+:origin - ID of origin node (where the link was found)
+:pos - buffer position where the link was found
+:dest - ID of destination node, or a ref that belongs to it
+:type - link type, such as \"https\", \"ftp\", \"info\" or
+        \"man\".  For ID-links this is always \"id\".  For a
+        citation this is always nil.
+
+This function only returns ID-links; you can expect :dest to
+always be the ID of NODE.  To see other link types, use
+`org-node-get-reflinks'."
   (gethash (org-node-get-id node) org-node--dest<>links))
 
-(defun org-node-get-citations (node)
-  "Get list of citations pointing to NODE."
+(defun org-node-get-reflinks (node)
+  "Get list of reflink objects pointing to NODE.
+Typical reflinks are URLs or @citekeys occurring in any document,
+and they are considered to point to NODE when NODE has a
+:ROAM_REFS: property that includes that same string.
+
+The reflink object has the same shape as an ID-link object (see
+`org-node-get-id-links'), and the ref string goes in the :dest
+field.  Also, citations have :type nil, so you can distinguish
+citations from other links this way."
   (cl-loop for ref in (org-node-get-refs node)
-           append (cl-loop for link in (gethash ref org-node--dest<>links)
-                           when (null (plist-get link :type))
-                           collect link)))
+           append (gethash ref org-node--dest<>links)))
 
 (defun org-node-peek (&optional ht)
   "Print some random rows of table `org-nodes'.
@@ -671,32 +683,31 @@ multiple files are being renamed) will be handled
 eventually and not dropped."
     (if (eq t files)
         (setq full-scan-requested t)
-      (setq file-queue (-union (-map #'abbreviate-file-name files) file-queue)))
-    (if (-any-p #'process-live-p org-node--processes)
-        (progn
-          (unless wait-start
-            (setq wait-start (current-time)))
-          (if (> (float-time (time-since wait-start)) 30)
-              ;; Timeout subprocess stuck in some infinite loop (eats battery)
-              (progn
-                (setq wait-start nil)
-                (message "org-node: some processes worked longer than 30 sec, killed")
-                (while-let ((old-process (pop org-node--processes)))
-                  (delete-process old-process)))
-            ;; Retry soon
-            (cancel-timer org-node--retry-timer)
-            (setq org-node--retry-timer
-                  (run-with-timer 1 nil #'org-node--try-launch-scan))))
-      ;; Scan now
-      (setq wait-start nil)
-      (if full-scan-requested
+      (setq file-queue (-union file-queue (-map #'abbreviate-file-name files))))
+    (let (must-retry)
+      (if (-any-p #'process-live-p org-node--processes)
           (progn
-            (setq full-scan-requested nil)
-            (org-node--scan (org-node-files) #'org-node--finalize-full))
-        ;; Targeted scan of specific files
-        (org-node--scan file-queue #'org-node--finalize-modified)
-        (setq file-queue nil))
-      (when file-queue
+            (unless wait-start
+              (setq wait-start (current-time)))
+            (if (> (float-time (time-since wait-start)) 30)
+                ;; Timeout subprocess stuck in some infinite loop
+                (progn
+                  (setq wait-start nil)
+                  (message "org-node: processes worked longer than 30 sec, killing")
+                  (while-let ((old-process (pop org-node--processes)))
+                    (delete-process old-process)))
+              (setq must-retry t)))
+        ;; All clear, scan now
+        (setq wait-start nil)
+        (if full-scan-requested
+            (progn
+              (setq full-scan-requested nil)
+              (org-node--scan (org-node-files) #'org-node--finalize-full)
+              (when file-queue (setq must-retry t)))
+          ;; Targeted scan of specific files
+          (org-node--scan file-queue #'org-node--finalize-modified)
+          (setq file-queue nil)))
+      (when must-retry
         (cancel-timer org-node--retry-timer)
         (setq org-node--retry-timer
               (run-with-timer 1 nil #'org-node--try-launch-scan))))))
@@ -914,11 +925,11 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
     (clrhash org-node--title<>id)
     (clrhash org-node--ref<>id)
     (setq org-node--errors nil)
-    (-let (((missing-files _ nodes path*type links errors) results))
+    (-let (((missing-files _ nodes path<>type links errors) results))
       (org-node--forget-id-locations missing-files)
       (dolist (link links)
         (push link (gethash (plist-get link :dest) org-node--dest<>links)))
-      (dolist (pair path*type)
+      (dolist (pair path<>type)
         (puthash (car pair) (cdr pair) org-node--uri-path<>uri-type))
       (dolist (node nodes)
         (org-node--record-node node))
@@ -1046,6 +1057,8 @@ The input NODE-RECIPE is a list of arguments for passing to
             (puthash title node org-node--candidate<>node)
             (puthash title affx org-node--title<>affixation-triplet)))))))
 
+(defvar org-node--conflicts nil)
+
 
 ;;;; "Dirty" functions
 ;; Help keep the cache reasonably in sync without having to do a full reset
@@ -1156,13 +1169,14 @@ also necessary to do is `org-node--dirty-ensure-link-known'."
 (defvar org-node--time-at-finalize nil)
 
 (defvar org-node--errors nil)
+;; TODO use lister or something like it instead of tabulated list
 (defun org-node-list-scan-problems ()
   (interactive)
-  (with-current-buffer (get-buffer-create "*org-node scan problems")
+  (with-current-buffer (get-buffer-create "*org-node scan problems*")
     (tabulated-list-mode)
     (setq tabulated-list-format
-          [("File+position (newest result on top)" 35 t)
-           ("Error/warning" 5 t)])
+          [("File+position (newest result on top)" 40 t)
+           ("Error/warning" 0 t)])
     (tabulated-list-init-header)
     (setq tabulated-list-entries nil)
     (dolist (err org-node--errors)
@@ -1176,7 +1190,11 @@ also necessary to do is `org-node--dirty-ensure-link-known'."
                                'follow-link t)
                          signal))
               tabulated-list-entries)))
-    (tabulated-list-print)))
+    (if tabulated-list-entries
+        (progn
+          (tabulated-list-print)
+          (switch-to-buffer (current-buffer)))
+      (message "No scan problems detected in this way"))))
 
 (defun org-node--print-elapsed ()
   "Print time elapsed since `org-node--time-at-init-scan'.

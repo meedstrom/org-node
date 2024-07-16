@@ -10,10 +10,8 @@
 ;;;###autoload
 (defun org-node-feed-file-to-roam-db (&optional files)
   (declare (obsolete 'org-node-fakeroam--db-update-files "2024-07-11"))
-  (display-warning 'org-node "Your config uses deprecated `org-node-feed-file-to-roam-db', use `org-node-fakeroam-db-feed-mode' instead")
-  (org-node-fakeroam--db-update-files files))
+  (display-warning 'org-node "Your config uses deprecated `org-node-feed-file-to-roam-db', use `org-node-fakeroam-db-feed-mode' instead"))
 
-;; Used to be autoloaded
 (org-node--defobsolete
  org-node-roam-db-shim-mode org-node-fakeroam-db-feed-mode t)
 (org-node--defobsolete
@@ -22,13 +20,10 @@
  org-node-roam-redisplay-mode org-node-fakeroam-redisplay-mode t)
 (org-node--defobsolete
  org-node-roam-no-sql-mode org-node-fakeroam-nosql-mode t)
-
 (org-node--defobsolete
  org-node--fabricate-roam-backlinks org-node-fakeroam--mk-backlinks)
 (org-node--defobsolete
  org-node--fabricate-roam-reflinks org-node-fakeroam--mk-reflinks)
-(org-node--defobsolete
- org-node-roam-db-feed org-node-fakeroam--db-update-files)
 
 
 ;;;; Bonus tools
