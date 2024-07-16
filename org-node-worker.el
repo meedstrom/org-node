@@ -25,7 +25,7 @@ that will match any of the TODO keywords within."
                (split-string)
                (regexp-opt)))
 
-(defvar org-node-worker--result-paths-types nil)
+(defvar org-node-worker--result:paths-types nil)
 
 (defun org-node-worker--elem-index (elem list)
   "Like `-elem-index', return first index of ELEM in LIST."
@@ -113,36 +113,12 @@ in one of the elements."
   (if (re-search-forward "^\\*+ " nil 'move)
       (goto-char (pos-bol))))
 
-;; (defconst org-node-worker--plain-re
-;;   (let* ((types-re "\\(b\\(?:bdb\\|ibtex\\)\\|do\\(?:cview\\|i\\)\\|e\\(?:lisp\\|ww\\)\\|f\\(?:ile\\(?:\\+\\(?:\\(?:emac\\|sy\\)s\\)\\)?\\|tp\\)\\|gnus\\|h\\(?:elp\\|ttps?\\)\\|i\\(?:d\\|nfo\\|rc\\)\\|m\\(?:ailto\\|he\\)\\|news\\|rmail\\|shell\\|w3m\\)")
-;;          (non-space-bracket "[^][ \t\n()<>]")
-;;          (parenthesis `(seq (any "<([")
-;;                         (0+ (or (regex ,non-space-bracket)
-;;                                 (seq (any "<([")
-;;                                      (0+ (regex ,non-space-bracket))
-;;                                      (any "])>"))))
-;;                         (any "])>"))))
-;;     (rx-to-string `(seq word-start
-;;                     (regexp ,types-re)
-;;                     ":" (group
-;;                          (1+ (or (regex ,non-space-bracket)
-;;                                  ,parenthesis))
-;;                          (or (regexp "[^[:punct:][:space:]\n]")
-;;                              ?- ?/ ,parenthesis)))))
-;;   "Copy of `org-link-plain-re'.")
-
-(defconst org-node-worker--citation-prefix-re
-  (rx "[cite"
-      (opt "/" (group (one-or-more (any "/_-" alnum)))) ;style
-      ":"
-      (zero-or-more (any "\t\n ")))
-  "Copy of `org-element-citation-prefix-re'.")
-
 (defconst org-node-worker--citation-key-re
   "@\\([!#-+./:<>-@^-`{-~[:word:]-]+\\)"
   "Copy of `org-element-citation-key-re'.")
 
-;; REVIEW I don't know for sure what people put in ROAM_REFS
+;; REVIEW I don't know for sure what people put in ROAM_REFS... check my
+;; assumptions
 (defun org-node-worker--split-refs-field (roam-refs)
   "Split a ROAM-REFS field correctly.
 What this means?   See org-node-test.el."
@@ -171,7 +147,7 @@ What this means?   See org-node-test.el."
          collect (let ((path (substring link? (match-end 0))))
                    ;; Remember the uri: prefix for completions later
                    (push (cons path (match-string 1 link?))
-                         org-node-worker--result-paths-types)
+                         org-node-worker--result:paths-types)
                    ;; .. but the actual ref is just the //path
                    path))))))
 
@@ -197,12 +173,14 @@ process does not have to load org.el."
         link-type path)
     (while (re-search-forward merged-re end t)
       (if (setq path (match-string 1))
-          ;; Link is the bracketed kind.  Is there an URI: style link inside?
-          ;; Here is the magic that allows links to have spaces, it is not
-          ;; possible with plain-re alone.
-          (when (string-match plain-re path)
-            (setq link-type (match-string 1 path)
-                  path (string-trim-left path ".*?:")))
+          ;; Link is the [[bracketed]] kind.  Is there an URI: style link
+          ;; inside?  Here is the magic that allows links to have spaces, it is
+          ;; not possible with plain-re alone.
+          (if (string-match plain-re path)
+              (setq link-type (match-string 1 path)
+                    path (string-trim-left path ".*?:"))
+            ;; Nothing of interest between the brackets
+            nil)
         ;; Link is the unbracketed kind
         (setq link-type (match-string 3)
               path (match-string 4)))
@@ -218,7 +196,7 @@ process does not have to load org.el."
                       :dest path
                       ;; Because org-roam asks for it
                       :properties (list :outline olp-with-self))
-                org-node-worker--result-found-links))))
+                org-node-worker--result:found-links))))
     ;; Start over and look for @citekeys
     (goto-char beg)
     ;; NOTE Should ideally search for `org-element-citation-prefix-re', but
@@ -242,39 +220,45 @@ process does not have to load org.el."
                           :dest (match-string 0)
                           ;; Because org-roam asks for it
                           :properties (list :outline olp-with-self))
-                    org-node-worker--result-found-links)))))))
-  ;; FIXME Surprisingly, fail to scan many nodes... whY?
-  ;; (goto-char (1- end))
-  )
+                    org-node-worker--result:found-links)))))))
+  (goto-char (or end (point-max))))
 
-(defun org-node-worker--collect-properties (beg end file)
+(defun org-node-worker--collect-properties (beg end)
   "Assuming BEG and END delimit the region in between
 :PROPERTIES:...:END:, collect the properties into an alist."
-  (let (res)
-    (goto-char beg)
-    (while (not (>= (point) end))
-      (skip-chars-forward "[:space:]")
-      (unless (looking-at-p ":")
-        (error "Possibly malformed property drawer in %s at position %d"
-               file (point)))
-      (forward-char)
-      (push (cons (upcase
-                   (buffer-substring
-                    (point)
-                    (1- (or (search-forward ":" (pos-eol) t)
-                            (error "Possibly malformed property drawer in file %s at position %d"
-                                   file (point))))))
-                  (string-trim
-                   (buffer-substring
-                    (point) (pos-eol))))
-            res)
-      (forward-line 1))
-    res))
+  (catch 'break
+    (let (result)
+      (goto-char beg)
+      (while (not (>= (point) end))
+        (skip-chars-forward "[:space:]")
+        (unless (looking-at-p ":")
+          (push (list org-node-worker--curr-file (point)
+                      "Possibly malformed property drawer")
+                org-node-worker--result:problems)
+          (throw 'break nil))
+        (forward-char)
+        (push (cons (upcase
+                     (buffer-substring
+                      (point)
+                      (1- (or (search-forward ":" (pos-eol) t)
+                              (progn
+                                (push (list org-node-worker--curr-file (point)
+                                            "Possibly malformed property drawer")
+                                      org-node-worker--result:problems)
+                                (throw 'break nil))))))
+                    (string-trim
+                     (buffer-substring
+                      (point) (pos-eol))))
+              result)
+        (forward-line 1))
+      result)))
 
 
 ;;; Main
 
-(defvar org-node-worker--result-found-links nil)
+(defvar org-node-worker--result:found-links nil)
+(defvar org-node-worker--result:problems nil)
+(defvar org-node-worker--curr-file nil)
 
 ;; (defvar org-node-worker--temp-buf nil
 ;;   "One extra buffer.")
@@ -293,16 +277,15 @@ list, and write results to another temp file."
     ;; The variable `i' was set via the command line that launched this process
     (insert-file-contents (org-node-worker--tmpfile "file-list-%d.eld" i)))
   (setq $files (read (buffer-string)))
-  (setq org-node-worker--temp-buf (get-buffer-create " *org-node temp*" t))
+  ;; (setq org-node-worker--temp-buf (get-buffer-create " *org-node temp*" t))
   (let ((case-fold-search t)
-        result-missing-files
-        result-found-nodes
-        result-found-files
-        result-errors
+        result:missing-files
+        result:found-nodes
+        result:found-files
         ;; Perf
         (file-name-handler-alist $file-name-handler-alist)
         (coding-system-for-read $assume-coding-system)
-        (coding-system-for-write $assume-coding-system) ;; same as mother emacs
+        (coding-system-for-write $assume-coding-system)
         ;; Assigned on every iteration, so let-bind once to produce less
         ;; garbage.  Not sure how elisp works... but profiling shows a speedup
         HEADING-POS HERE FAR END OUTLINE-DATA OLP-WITH-SELF ID-HERE
@@ -316,9 +299,10 @@ list, and write results to another temp file."
               ;; We got here because user deleted a file in a way that we
               ;; didn't notice.  If it was actually a rename file-done outside
               ;; Emacs, the new name will get picked up on next reset.
-              (push FILE result-missing-files)
+              (push FILE result:missing-files)
               (throw 'file-done t))
-            (push FILE result-found-files)
+            (push FILE result:found-files)
+            (setq org-node-worker--curr-file FILE)
             (erase-buffer)
             ;; NOTE: Here I used `insert-file-contents-literally' in the past,
             ;; converting each captured substring afterwards with
@@ -349,8 +333,7 @@ list, and write results to another temp file."
                                 (if (re-search-forward "^[[:space:]]*:end:" nil t)
                                     (pos-bol)
                                   (error "Couldn't find matching :END: drawer in file %s at position %d"
-                                         FILE (point)))
-                                FILE)
+                                         FILE (point))))
                           (goto-char 1)))
                     nil))
             (setq FILE-TAGS
@@ -410,11 +393,11 @@ list, and write results to another temp file."
                       (or (cdr (assoc "ROAM_ALIASES" PROPS)) ""))
                      :refs (org-node-worker--split-refs-field
                             (cdr (assoc "ROAM_REFS" PROPS))))
-                    result-found-nodes))
+                    result:found-nodes))
 
             ;; Jump forward to first heading.  Though we may already be there
             ;; if the very first line of file is a heading, typical for people
-            ;; who nix `org-node-prefer-file-level-nodes' - then don't jump.
+            ;; who nix `org-node-prefer-file-level-nodes' -- then don't jump.
             (unless (or (looking-at-p "\\*")
                         (org-node-worker--next-heading))
               (throw 'file-done t))
@@ -507,11 +490,10 @@ list, and write results to another temp file."
                                  ;; keep going sanely from here on.
                                  (goto-char FAR))
                              (error "Couldn't find matching :END: drawer in file %s at position %d"
-                                    FILE (point)))
-                           FILE))
+                                    FILE (point)))))
                       nil))
               (setq ID (cdr (assoc "ID" PROPS)))
-              ;; nil ID allowed
+              ;; (nil ID allowed)
               (push (list HEADING-POS TITLE LEVEL ID) OUTLINE-DATA)
               (when ID
                 (setq OLP (org-node-worker--pos->olp OUTLINE-DATA HEADING-POS))
@@ -536,7 +518,7 @@ list, and write results to another temp file."
                         (or (cdr (assoc "ROAM_ALIASES" PROPS)) ""))
                        :refs (org-node-worker--split-refs-field
                               (cdr (assoc "ROAM_REFS" PROPS))))
-                      result-found-nodes))
+                      result:found-nodes))
               ;; Now collect links while we're here!
               (setq ID-HERE (or ID (org-node-worker--pos->parent-id
                                     OUTLINE-DATA HEADING-POS FILE-ID)))
@@ -546,6 +528,7 @@ list, and write results to another temp file."
                               (1- (point)))))
                 (setq OLP-WITH-SELF (append OLP (list TITLE)))
                 ;; Don't count org-super-links backlinks
+                ;; TODO: Generalize this mechanic to skip src blocks too
                 (when (re-search-forward $backlink-drawer-re END t)
                   (or (search-forward ":end:" END t)
                       (error "Couldn't find matching :END: drawer in file %s at position %d"
@@ -562,20 +545,20 @@ list, and write results to another temp file."
               (goto-char (point-max))
               (widen)))
 
-        ;; Don't crash the process when there is a problem scanning one
-        ;; file, report the problem and continue to the next file
+        ;; Don't crash the process when there is an error,
+        ;; report the error signal and continue to the next file
         (( t error )
-         (push (list FILE (point) err) result-errors))))
+         (push (list FILE (point) err) org-node-worker--result:problems))))
 
     (let ((print-length nil)
           (print-level nil))
       (write-region
-       (prin1-to-string (list result-missing-files
-                              result-found-files
-                              result-found-nodes
-                              org-node-worker--result-paths-types
-                              org-node-worker--result-found-links
-                              result-errors
+       (prin1-to-string (list result:missing-files
+                              result:found-files
+                              result:found-nodes
+                              org-node-worker--result:paths-types
+                              org-node-worker--result:found-links
+                              org-node-worker--result:problems
                               (current-time)))
        nil
        (org-node-worker--tmpfile "results-%d.eld" i)))))

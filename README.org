@@ -1,7 +1,7 @@
 #+startup: content
 * org-node 0.3
 ** News
-Version 0.2+ in July brought many changes!  *If anything broke for you*, you can rollback to the 0.1pre branch:
+The month of July brought many changes!  *If anything broke for you*, you can rollback to the 0.1pre branch:
 
 #+begin_src elisp
 (use-package org-node
@@ -11,11 +11,11 @@ Version 0.2+ in July brought many changes!  *If anything broke for you*, you can
 #+end_src
 
 New features
-- New mode: =org-node-roam-db-shim-mode=
+- New mode: =org-node-fakeroam-db-feed-mode=
   - Deprecates advice that was in [[https://github.com/meedstrom/org-node?tab=readme-ov-file#option-1b--tell-org-node-to-write-to-the-org-roam-db][Backlinks Option 1B]]
-- New mode: =org-node-roam-no-sql-mode=
+- New mode: =org-node-fakeroam-nosql-mode=
   - Deprecates advice that was in [[https://github.com/meedstrom/org-node?tab=readme-ov-file#option-1c--cut-out-the-db-altogether][Backlinks Option 1C]]
-- New mode: =org-node-roam-redisplay-mode=
+- New mode: =org-node-fakeroam-redisplay-mode=
 - New mode: =org-node-complete-at-point-mode=
 - New user option: =org-node-prefer-file-level-nodes=
 - New user option: =org-node-warn-title-collisions=
@@ -27,36 +27,20 @@ New features
 - New command: =org-node-list-dead-links=
 - New command: =org-node-list-feedback-arcs=
 - New command: =org-node-grep=
-- ... and other minor functions
-
-Removals
-- Remove user option: =org-node-perf-gc-cons-threshold=
-- Remove user option: =org-node-format-candidate-fn= (in favour of =org-node-affixation-fn=)
-- Remove variable: =org-node-cache-reset-hook=
-- Remove variable: =org-node-cache-rescan-file-hook= (in favour of =org-node-rescan-hook=, now called with 1 argument)
+- ... and other stuff
 
 Renames
 - Rename command =org-node-random= to =org-node-visit-random=
-- Rename user option =org-node-slug-fn= to =org-node-filename-fn=
-- Rename function =org-node-slugify-as-url= to =org-node-slugify-for-web=
-- Rename function =org-node-new-by-roam-capture= to =org-node-new-via-roam-capture=
-- Rename variable =org-node-collection= to =org-node--candidate<>node=
-- Rename many private functions and variables
+- Rename many functions and variables
+  - Don't worry, you'll get warning messages for each old name used in your initfiles
 
 Changes
 - Minibuffer completions are now "rich" by default.  To revert to vanilla, set =(setq org-node-affixation-fn #'org-node-affix-bare)=.
 - Don't automatically turn on cache-mode, just pester the user
 - Command =org-node-put-created= now respects =org-timestamp-formats= instead of just putting the date as [YYYY-MM-DD].
 - Visiting a node will now reveal the surrounding Org context and do =(recenter 0)=.  If you prefer another behavior, redefine =org-node--goto=.
-- Fix: catch some nodes that did not get scanned
-- Fix: the feature of feeding files to the Roam DB (now called =org-node-roam-db-shim-mode=) was subtly broken because it'd trigger the hook before the scan completed, so it'd always be a bit outdated, now fixed.
-- Fix: quickly update completions when a heading was edited, instead of seeing multiple stale candidates
-- Fix: accept multiple =#+todo:= lines
-- Fix: fix =:BACKLINKS:= members sometimes disappearing
-- Fix: fix =org-node-insert-transclusion-as-subtree= inserting asterisks after the link
-- Fix: fix some backlink-mode errors
-- Fix: fix org-get-title missing in Emacs 28
 - Perf: backlink-mode no longer tries to clean up =:CACHED_BACKLINKS:= (deprecated in May); if you still have those lying around, checkout 0.1pre and run =M-x org-node-backlink-fix-all=
+- Many fixes
 
 ** What's all this
 
@@ -74,7 +58,7 @@ I found org-roam too slow, so I made [[https://github.com/meedstrom/quickroam][q
 
 ** What's a "node"?
 
-My life can be divided into two periods "*before org-roam*" and "*after org-roam*".  I crossed a kind of gap once I got a good way to link between my notes.  It's odd to remember when I just relied on browsing hierarchies of subtrees -- what an odd way to work!
+My life can be divided into two periods "*before org-roam*" and "*after org-roam*".  I crossed a kind of gap once I got a good way to link between my notes.  It's odd to remember when I just relied on browsing subtrees and folders -- what a strange way to work!
 
 I used to lose track of things I had written, under some forgotten heading in a forgotten file in a forgotten directory.  The org-roam method let me *find* and *build on* my own work, instead of having repetitive [[https://en.wikipedia.org/wiki/Cryptomnesia][cryptomnesia]] and staying on square one forever.
 
@@ -84,13 +68,13 @@ Right off the bat, that imposes two requirements: a method to search for notes, 
 
 Just searching for Org files is too coarse, and just searching for any subtree anywhere brings in too much clutter.
 
-Here's what org-roam invented.  It turns out that if you limit the search-hits to just those files and subtrees you've deigned to assign an org-id -- which roughly maps to /everything you've ever thought it was worth linking to/ -- it filters out the noise excellently.
+*Here's what org-roam invented.*  It turns out that if you limit the search-hits to just those files and subtrees you've deigned to assign an org-id -- which roughly maps to /everything you've ever thought it was worth linking to/ -- it filters out the noise excellently.
 
 Once a subtree has an ID you can link to, it's a "node" because it has joined the wider graph, the network of linked nodes.  I wish the English language had more distinct sounds for the words "node" and "note", but to clarify, I'll say "ID-node" when the distinction matters.
 
 ** Features
 
-A comparison of three similar systems, all permitting org-id as first-class citizen, and not locking you into an "one-note-per-file" concept.
+A comparison of three similar systems, all permitting org-id as first-class citizen, not locking you into the all-too-common "one-note-per-file" concept.
 
 | Feature                           | org-roam | org-node           | [[https://github.com/toshism/org-super-links][org-super-links]]      |
 |-----------------------------------+----------+--------------------+----------------------|
@@ -162,7 +146,7 @@ If you've struggled in the past with big files taking a long time to save, consi
 (setq org-roam-link-auto-replace nil) ;; don't look for "roam:" links on save
 #+end_src
 
-Finally, make sure org-id knows all the files org-roam knows about (you'd think it would, but that isn't a given!).  Either run =M-x org-roam-update-org-id-locations=, or edit the following setting so it includes your =org-roam-directory=.  If your =org-roam-directory= is "~/org/":
+Finally, make sure org-id knows all the files org-roam knows about (you'd think it would, but that isn't a given!).  Either run =M-x org-roam-update-org-id-locations=, or edit the following setting so it includes your =org-roam-directory=.  If that is "~/org/", then:
 
 #+begin_src elisp
 (setq org-node-extra-id-dirs '("~/org/"))
@@ -175,7 +159,7 @@ Backlinks are bread and butter.  As a Roam user, you can just keep using =M-x or
 
 **** *Option 1A.*  Let org-roam manage its own DB
 
-If you didn't have laggy saves, this is fine.  In other words, keep =org-roam-db-update-on-save= at t.
+If you didn't have laggy saves, this is fine.  In other words, keep variable =org-roam-db-update-on-save= at t.
 
 
 **** *Option 1B*.  Tell org-node to write to the org-roam DB
@@ -183,25 +167,25 @@ If you didn't have laggy saves, this is fine.  In other words, keep =org-roam-db
 Use this minor mode:
 
 #+begin_src elisp
-(org-node-roam-db-shim-mode)
+(org-node-fakeroam-db-feed-mode)
 (setq org-roam-db-update-on-save nil)
 #+end_src
 
 There is even a command to full-reset the DB:
 
 - Original: =C-u M-x org-roam-db-sync=
-- Substitute: =M-x org-node-roam-db-reset=, bearing in mind results aren't 100% identical.
+- Substitute: =M-x org-node-fakeroam-db-rebuild=, bearing in mind results aren't 100% identical.
 
 **** *Option 1C*.  Cut out the DB altogether
 
-No need to compile SQLite!  Type =M-x org-node-roam-no-sql-mode=, then see what populates your Roam buffer henceforth.  Hopefully you see the same links as before.
+No need to compile SQLite!  Type =M-x org-node-fakeroam-nosql-mode=, then see what populates your Roam buffer henceforth.  Hopefully you see the same links as before.
 
-If you're happy with the result, and don't need =roam:= links, you can disable =org-roam-db-autosync-mode= entirely in favour of the slimmer =M-x org-node-roam-redisplay-mode=.  As an init snippet:
+If you're happy with the result, *and* don't need =roam:= links, you can disable =org-roam-db-autosync-mode= entirely in favour of the slimmer =M-x org-node-fakeroam-redisplay-mode=.  As an init snippet:
 
 #+begin_src elisp
 (org-roam-db-autosync-mode 0)
-(org-node-roam-no-sql-mode)
-(org-node-roam-redisplay-mode)
+(org-node-fakeroam-nosql-mode)
+(org-node-fakeroam-redisplay-mode)
 #+end_src
 
 ** Backlink solution 2: print inside the file
@@ -280,7 +264,7 @@ Example setting:
 
 
 # *** Completion-at-point
-# Not sure how/why people use =org-roam-completion-everywhere=, but it's popular so here you go for an equivalent.
+# Not sure how/when people use =org-roam-completion-everywhere=, but it's popular so here you go for an equivalent.
 
 # #+begin_src elisp
 # (org-node-complete-at-point-mode)
@@ -295,13 +279,6 @@ Wouldn't it be nice if, clicking on that link, you're automatically sent to that
 #+begin_src elisp
 (add-hook 'org-open-at-point-functions #'org-node-try-visit-ref-node)
 #+end_src
-
-*** Limitation: undead backlinks
-You may notice backlinks stick around after you erased the forward link.  That's a performance tradeoff.
-
-I plan to use Emacs on an e-reader like a Kindle and work with buffers of 4000+ links, and I still think it's reasonable to expect zero latency.  Thus org-node waits for idle before cleaning links tables.
-
-# The same mechanism is responsible for shifting the org-roam-buffer's display of backlink context towards irrelevant context as the underlying file is edited; this too is corrected on idle.
 
 *** Limitation: TRAMP
 Working over TRAMP is untested, but I suspect it won't work.  Org-node tries to be very fast, often nulling =file-name-handler-alist=, which TRAMP needs.
@@ -381,7 +358,7 @@ API cheatsheet between org-roam and org-node.
 
 | Action                                  | org-roam                           | org-node                                                              |
 |-----------------------------------------+------------------------------------+-----------------------------------------------------------------------|
-| Get ID near point                       | =(org-roam-id-at-point)=             | =(org-entry-get nil "ID" t)=                                            |
+| Get ID near point                       | =(org-roam-id-at-point)=             | =(org-id-get nil nil nil t)=                                            |
 | Get node at point                       | =(org-roam-node-at-point)=           | =(org-node-at-point)=                                                   |
 | Get list of files                       | =(org-roam-list-files)=              | =(org-node-files)=                                                      |
 | Prompt user to pick a node              | =(org-roam-node-read)=               | =(org-node-read)=                                                       |
@@ -390,8 +367,8 @@ API cheatsheet between org-roam and org-node.
 | Get title                               | =(org-roam-node-title NODE)=         | =(org-node-get-title NODE)=                                             |
 | Get title of file where NODE is         | =(org-roam-node-file-title NODE)=    | =(org-node-get-file-title NODE)=                                        |
 | Get title /or/ name of file where NODE is |                                    | =(org-node-get-file-title-or-basename NODE)=                            |
+| Get name of file where NODE is          | =(org-roam-node-file NODE)=          | =(org-node-get-file-path NODE)=                                         |
 | Get ID                                  | =(org-roam-node-id NODE)=            | =(org-node-get-id NODE)=                                                |
-| Get filename                            | =(org-roam-node-file NODE)=          | =(org-node-get-file-path NODE)=                                         |
 | Get tags                                | =(org-roam-node-tags NODE)=          | =(org-node-get-tags NODE)=, no inheritance                              |
 | Get outline level                       | =(org-roam-node-level NODE)=         | =(org-node-get-level NODE)=                                             |
 | Get whether this is a subtree           | =(zerop (org-roam-node-level NODE))= | =(org-node-get-is-subtree NODE)=                                        |
@@ -405,4 +382,4 @@ API cheatsheet between org-roam and org-node.
 | Get =ROAM_REFS=                           | =(org-roam-node-refs NODE)=          | =(org-node-get-refs NODE)=                                              |
 | Get =ROAM_ALIASES=                        | =(org-roam-node-aliases NODE)=       | =(org-node-get-aliases NODE)=                                           |
 | Get =ROAM_EXCLUDE=                        |                                    | =(assoc "ROAM_EXCLUDE" (org-node-get-properties NODE))=, no inheritance |
-| Ensure fresh data                       | =(org-roam-db-sync)=                 | =(org-node-cache-ensure t t)=           |
+| Ensure fresh data                       | =(org-roam-db-sync)=                 | =(org-node-cache-ensure t t)=                                         |
