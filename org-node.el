@@ -2317,11 +2317,12 @@ write_file(lisp_data, file.path(dirname(tsv), \"feedback-arcs.eld\"))")
       (setq feedbacks (read (buffer-string)))
       (when (listp feedbacks)
         (erase-buffer)
-        (setq tabulated-list-format
-              [("Node containing link" 39 t)
-               ("Target of link" 78 t)])
+        (tabulated-list-mode)
         (add-hook 'tabulated-list-revert-hook #'org-node-list-feedback-arcs
                   nil t)
+        (setq tabulated-list-format
+              [("Node containing link" 39 t)
+               ("Target of link" 0 t)])
         (tabulated-list-init-header)
         (setq tabulated-list-entries
               (cl-loop
