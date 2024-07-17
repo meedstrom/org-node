@@ -107,11 +107,6 @@ Called with one argument: a list of files re-scanned."
   :group 'org-node
   :type 'hook)
 
-(defcustom org-node-warn-title-collisions t
-  "Whether to print messages on finding duplicate node titles."
-  :group 'org-node
-  :type 'boolean)
-
 (defcustom org-node-prefer-file-level-nodes t
   "If t, write a title and file-level property drawer when
 making a new file, otherwise write a more traditional top-level
@@ -923,7 +918,8 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
     (clrhash org-node--candidate<>node)
     (clrhash org-node--title<>id)
     (clrhash org-node--ref<>id)
-    (setq org-node--errors nil)
+    (setq org-node--problems nil)
+    (setq org-node--collisions nil)
     (seq-let (missing-files _ nodes path<>type links errors) results
       (org-node--forget-id-locations missing-files)
       (dolist (link links)
@@ -933,14 +929,16 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
       (dolist (node nodes)
         (org-node--record-node node))
       (dolist (err errors)
-        (push err org-node--errors))
+        (push err org-node--problems))
       ;; Don't add to emacs init noise
       (if org-node--first-init
           (setq org-node--first-init nil)
         (org-id-locations-save)
         (org-node--print-elapsed)
+        (when (and org-node--collisions org-node-warn-title-collisions)
+          (message "Some nodes have same title, see M-x org-node-list-collisions"))
         (when errors
-          (message "org-node met errors, see M-x org-node-list-scan-problems"))))))
+          (message "Scan had problems, see M-x org-node-list-scan-problems"))))))
 
 (defun org-node--finalize-modified (results)
   (seq-let (missing-files found-files nodes path<>type links errors) results
@@ -977,7 +975,7 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
     (dolist (node nodes)
       (org-node--record-node node))
     (dolist (err errors)
-      (push err org-node--errors))
+      (push err org-node--problems))
     (when errors
       (message "org-node found issues, see M-x org-node-list-scan-problems"))
     (run-hook-with-args 'org-node-rescan-hook found-files)))
@@ -1031,16 +1029,8 @@ The input NODE-RECIPE is a list of arguments for passing to
       (dolist (title (cons (org-node-get-title node)
                            (org-node-get-aliases node)))
         (let ((collision (gethash title org-node--title<>id)))
-          (when (and collision
-                     org-node-warn-title-collisions
-                     (not (equal id collision)))
-            (push (list (format "Two nodes have same name (%s)" title)
-                        id
-                        collision)
-                  org-node--conflicts)
-            ;; TODO dont warn now but after, in a tabulated list
-            (message "Two nodes have same name: %s = %s (%s)"
-                     id collision title)))
+          (when (and collision (not (equal id collision)))
+            (push (list title id collision) org-node--collisions)))
         (puthash title id org-node--title<>id)
         (let ((affx (funcall org-node-affixation-fn node title)))
           (if org-node-alter-candidates
@@ -1051,8 +1041,6 @@ The input NODE-RECIPE is a list of arguments for passing to
             ;; Just title as candidate, to be affixated by `org-node-collection'
             (puthash title node org-node--candidate<>node)
             (puthash title affx org-node--title<>affixation-triplet)))))))
-
-(defvar org-node--conflicts nil)
 
 
 ;;;; "Dirty" functions
@@ -1162,35 +1150,6 @@ also necessary to do is `org-node--dirty-ensure-link-known'."
 (defvar org-node--time-at-init-scan nil)
 (defvar org-node--time-at-last-child-done nil)
 (defvar org-node--time-at-finalize nil)
-
-(defvar org-node--errors nil)
-(defun org-node-list-scan-problems ()
-  (interactive)
-  (with-current-buffer (get-buffer-create "*org-node scan problems*")
-    (tabulated-list-mode)
-    (setq tabulated-list-format
-          [("Scan choked near position" 27 t)
-           ("Issue (newest on top)" 0 t)])
-    (tabulated-list-init-header)
-    (setq tabulated-list-entries nil)
-    (dolist (err org-node--errors)
-      (seq-let (file pos signal) err
-        (push (list err (vector
-                         ;; Clickable link
-                         (list (format "%s:%d"
-                                       (file-name-nondirectory file) pos)
-                               'face 'link
-                               'action `(lambda (_button)
-                                          (find-file ,file)
-                                          (goto-char ,pos))
-                               'follow-link t)
-                         (format "%s" signal)))
-              tabulated-list-entries)))
-    (if tabulated-list-entries
-        (progn
-          (tabulated-list-print)
-          (switch-to-buffer (current-buffer)))
-      (message "No scan problems detected in this way"))))
 
 (defun org-node--print-elapsed ()
   "Print time elapsed since `org-node--time-at-init-scan'.
@@ -2427,6 +2386,78 @@ destination-origin pairs, expressed as Tab-Separated Values."
 ;;         (org-node--goto node)
 ;;       (message "Not sure where is ID %s" link-data))))
 
+(defcustom org-node-warn-title-collisions t
+  "Whether to print messages on finding duplicate node titles."
+  :group 'org-node
+  :type 'boolean)
+
+(defvar org-node--collisions nil)
+(defun org-node-list-collisions ()
+  (interactive)
+  (with-current-buffer (get-buffer-create "*org-node title collisions*")
+    (tabulated-list-mode)
+    (add-hook 'tabulated-list-revert-hook #'org-node-list-collisions nil t)
+    (setq tabulated-list-format
+          [("Non-unique name" 30 t)
+           ("ID" 37 t)
+           ("Other ID" 0 t)])
+    (tabulated-list-init-header)
+    (setq tabulated-list-entries nil)
+    (dolist (row org-node--collisions)
+      (seq-let (msg id1 id2) row
+        (push (list row
+                    (vector
+                     msg
+                     (list id1
+                           'action `(lambda (_button)
+                                      (org-id-goto ,id1))
+                           'face 'link
+                           'follow-link t)
+                     (list id2
+                           'action `(lambda (_button)
+                                      (org-id-goto ,id2))
+                           'face 'link
+                           'follow-link t)))
+              tabulated-list-entries)))
+    (if tabulated-list-entries
+        (progn
+          (tabulated-list-print)
+          (switch-to-buffer (current-buffer)))
+      (message "Congratulations, no title collisions! (in %d filtered nodes)"
+               (hash-table-count org-node--title<>id)))))
+
+(defvar org-node--problems nil)
+(defun org-node-list-scan-problems ()
+  (interactive)
+  (with-current-buffer (get-buffer-create "*org-node scan problems*")
+    (tabulated-list-mode)
+    (add-hook 'tabulated-list-revert-hook #'org-node-list-scan-problems nil t)
+    (setq tabulated-list-format
+          [("Scan choked near position" 27 t)
+           ("Issue (newest on top)" 0 t)])
+    (tabulated-list-init-header)
+    (setq tabulated-list-entries nil)
+    (dolist (problem org-node--problems)
+      (seq-let (file pos signal) problem
+        (push (list problem
+                    (vector
+                     ;; Clickable link
+                     (list (format "%s:%d"
+                                   (file-name-nondirectory file) pos)
+                           'face 'link
+                           'action `(lambda (_button)
+                                      (find-file ,file)
+                                      (goto-char ,pos))
+                           'follow-link t)
+                     (format "%s" signal)))
+              tabulated-list-entries)))
+    (if tabulated-list-entries
+        (progn
+          (tabulated-list-print)
+          (switch-to-buffer (current-buffer)))
+      (message "Congratulations, no problems scanning %d nodes!"
+               (hash-table-count org-node--id<>node)))))
+
 
 ;;;; CAPF (Completion-At-Point Function)
 
@@ -2464,7 +2495,7 @@ Also turn off Org-roam's equivalent, if active."
                      org-node--roam-settings))))
 
 (defun org-node--install-capf-in-buffer ()
-  "Instruct in-buffer completion to match known ID node titles."
+  "Conf in-buffer completion to try `org-node-complete-at-point'."
   (and buffer-file-name
        (derived-mode-p 'org-mode)
        (equal "org" (file-name-extension buffer-file-name))
@@ -2476,10 +2507,11 @@ Also turn off Org-roam's equivalent, if active."
 Designed for `completion-at-point-functions', which see."
   (let ((bounds (bounds-of-thing-at-point 'word)))
     (and bounds
-         ;; For some reason it gets added to non-org buffers like grep results
+         ;; For some reason it runs in non-org buffers like grep results?
          (derived-mode-p 'org-mode)
          (not (org-in-src-block-p))
-         (not (save-match-data (org-in-regexp org-link-any-re)))
+         (not (save-match-data
+                (org-in-regexp org-link-any-re)))
          (list (car bounds)
                (cdr bounds)
                org-node--title<>id
