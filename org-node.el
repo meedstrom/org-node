@@ -35,9 +35,10 @@
 ;;      - Need a bunch of commands, like jump to node from fulltext search
 
 (require 'cl-lib)
+(require 'seq)
 (require 'subr-x)
-(require 'compat)
 (require 'dash)
+(require 'compat)
 (require 'org)
 (require 'org-id)
 (require 'org-node-worker)
@@ -102,7 +103,7 @@ autoloaded)."
 It is not run after a full cache reset, only after a file is
 saved or renamed, causing an incremental update to the cache.
 
-Called with one argument: the list of files re-scanned."
+Called with one argument: a list of files re-scanned."
   :group 'org-node
   :type 'hook)
 
@@ -122,7 +123,7 @@ This affects the behavior of `org-node-new-file',
 If you change your mind about this setting, the Org-roam commands
 `org-roam-promote-entire-buffer' and
 `org-roam-demote-entire-buffer' can help you transition the
-files you have made along the way."
+files you already have."
   :group 'org-node
   :type 'boolean)
 
@@ -143,14 +144,13 @@ on https://github.com/meedstrom/org-node/issues or Mastodon:
 (defcustom org-node-perf-assume-coding-system nil
   "Coding system to assume while scanning ID nodes.
 
-Picking a specific coding system can speed up `org-node-reset',
-sometimes significantly.  Set nil to let Emacs figure it out anew
-on every file.
+Picking a specific coding system can speed up `org-node-reset'.
+Set nil to let Emacs figure it out anew on every file.
 
 On MS Windows this probably should be nil.  Same if you access
 your files from multiple platforms.
 
-Modern GNU/Linux, BSD and Mac systems almost always encode new
+Modern GNU/Linux, BSD and MacOS systems almost always encode new
 files as `utf-8-unix'.
 
 Note that if your Org collection is old and has survived several
@@ -215,8 +215,8 @@ directory named \"archive\".
 (defcustom org-node-insert-link-hook '()
   "Hook run after inserting a link to an Org-ID node.
 
-Called with two arguments: the ID and the link description, and
-point is positioned in the new link."
+Called with two arguments: the ID and the link description, with
+point in the new link."
   :group 'org-node
   :type 'hook)
 
@@ -239,19 +239,17 @@ a timestamp in the filename."
 (defcustom org-node-extra-id-dirs (list)
   "Directories in which to search Org files for IDs.
 
-Same idea as `org-id-extra-files', but specifies only directories
-to achieve a similar convenience to `org-agenda-files'.
-
-Unlike with `org-agenda-files', directories listed here may be
-scanned again in order to find new files that have appeared.
+Unlike other variables such as `org-id-extra-files' and
+`org-agenda-files', directories listed here are scanned again
+over time in order to find new files that have appeared.
 
 These directories are only scanned as long as
 `org-node-cache-mode' is active.  They are scanned
 recursively (looking in subdirectories, sub-subdirectories etc).
 
 To avoid accidentally picking up duplicate files such as
-versioned backups, causing org-id to complain about \"duplicate
-IDs\", configure `org-node-extra-id-dirs-exclude'.
+versioned backups, causing org-id to complain about duplicate
+IDs, configure `org-node-extra-id-dirs-exclude'.
 
 Tip: If it happened anyway, try \\[org-node-forget-dir], because
 merely removing a directory from this list does not forget the
@@ -293,7 +291,7 @@ in precisely \".org\" or \".org_archive\" anyway."
 This means that org-node will concatenate the result of
 `org-node-affixation-fn' into a single string, so what the
 user types in the minibuffer can match against the prefix and
-suffix.
+suffix as well as against the node title.
 
 (Tip: users of the orderless library on versions from 2024-07-11
 can match the prefix and suffix via `orderless-annotation',
@@ -480,9 +478,6 @@ The table keys are destination IDs, and the corresponding table
 value is a list of plists describing each link, including naming
 the ID-node where the link originated.")
 
-(defvar org-node--origin<>links (make-hash-table :test #'equal)
-  "1:N table of links.")
-
 (defun org-node-get-id-links (node)
   "Get list of ID-link objects pointing to NODE.
 
@@ -668,13 +663,17 @@ rm on the command line instead of using \\[delete-file].")
 (defvar org-node--retry-timer (timer-create))
 (defvar org-node--known-files nil)
 
-;; TODO Shorten.
-;; How?  At the moment, we line up a specific file for scan even if a "full"
-;; scan will happen or has just happened, for (IIRC) reasons:
+;; TODO Shorten.  How?  At the moment, we line up a specific file for scan even
+;; if a "full" scan will happen or has just happened, for (IIRC) reasons:
+;;
 ;; 1. Ongoing full scan may have already gone past the targeted
-;;    file by the time the order comes in
-;; 2. Targeting a deleted file will clean it out of org-id-locations
-;; 3. Only a targeted scan will execute `org-node-rescan-hook'
+;;    file by the time the order comes in (unlikely)
+;; 2. Targeting a deleted file will clean it out of org-id-locations (full scan
+;;    will not be aware of deleted files... actually that's a FIXME)
+;; 3. Only a targeted scan will execute `org-node-rescan-hook', for good reason
+;;
+;; Hm, points 2 and 3 could be taken care of at full scan by comparing to a
+;; table of previously known file<>mtime.
 (let (file-queue wait-start full-scan-requested)
   (defun org-node--try-launch-scan (&optional files)
     "Ensure that multiple calls occurring in a short time (like when
@@ -682,9 +681,10 @@ multiple files are being renamed) will be handled
 eventually and not dropped."
     (if (eq t files)
         (setq full-scan-requested t)
-      (setq file-queue (-union file-queue (-map #'abbreviate-file-name files))))
+      (setq file-queue
+            (seq-union file-queue (mapcar #'abbreviate-file-name files))))
     (let (must-retry)
-      (if (-any-p #'process-live-p org-node--processes)
+      (if (seq-some #'process-live-p org-node--processes)
           (progn
             (unless wait-start
               (setq wait-start (current-time)))
@@ -924,7 +924,7 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
     (clrhash org-node--title<>id)
     (clrhash org-node--ref<>id)
     (setq org-node--errors nil)
-    (-let (((missing-files _ nodes path<>type links errors) results))
+    (seq-let (missing-files _ nodes path<>type links errors) results
       (org-node--forget-id-locations missing-files)
       (dolist (link links)
         (push link (gethash (plist-get link :dest) org-node--dest<>links)))
@@ -943,39 +943,35 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
           (message "org-node met errors, see M-x org-node-list-scan-problems"))))))
 
 (defun org-node--finalize-modified (results)
-  (-let (((missing-files found-files nodes path<>type links errors) results))
+  (seq-let (missing-files found-files nodes path<>type links errors) results
     (org-node--forget-id-locations missing-files)
     (org-node--dirty-forget-files missing-files)
     ;; In case a title was edited
     (org-node--dirty-forget-completions-in found-files)
-
-    (let ((before (hash-table-values org-node--dest<>links)))
-      (when org-node-eagerly-update-link-tables
-        ;; Geez this just takes 10 ms for my SP7 @ 1.1 GHz in a file with
-        ;; 500 nodes & 3000+ links.  Is something broken?
-        (cl-loop with ids-of-nodes-scanned = (cl-loop
-                                              for node in nodes
-                                              collect (plist-get node :id))
-                 with to-clean = nil
-                 for link-set being the hash-values of org-node--dest<>links
-                 using (hash-keys dest)
-                 do (cl-loop
-                     with clean-this-dest = nil
-                     for link in link-set
-                     if (member (plist-get link :origin) ids-of-nodes-scanned)
-                     do (setq clean-this-dest t)
-                     else collect link into cleaned-link-set
-                     finally do
-                     (when clean-this-dest
-                       (push (cons dest cleaned-link-set) to-clean)))
-                 finally do
-                 (dolist (pair to-clean)
-                   (puthash (car pair) (cdr pair) org-node--dest<>links))
-                 (setq test ids-of-nodes-scanned))
-        (dolist (link links)
-          (push link (gethash (plist-get link :dest) org-node--dest<>links))))
-      (message "%s" (length (-difference before
-                                         (hash-table-values org-node--dest<>links)))))
+    (when org-node-eagerly-update-link-tables
+      ;; Gobsmacked.  This just takes 10 ms for my SP7 @ 1.1 GHz in a file with
+      ;; 500 nodes & 6600 links. Borked?  TODO: Test whether dups accrete
+      (cl-loop with ids-of-nodes-scanned = (cl-loop
+                                            for node in nodes
+                                            collect (plist-get node :id))
+               with to-clean = nil
+               for link-set being the hash-values of org-node--dest<>links
+               using (hash-keys dest)
+               do (cl-loop
+                   with clean-this-dest = nil
+                   for link in link-set
+                   if (member (plist-get link :origin) ids-of-nodes-scanned)
+                   do (setq clean-this-dest t)
+                   else collect link into cleaned-link-set
+                   finally do
+                   (when clean-this-dest
+                     (push (cons dest cleaned-link-set) to-clean)))
+               finally do
+               (dolist (pair to-clean)
+                 (puthash (car pair) (cdr pair) org-node--dest<>links)))
+      ;; Having erased links by :origin, it's safe to add them (again).
+      (dolist (link links)
+        (push link (gethash (plist-get link :dest) org-node--dest<>links))))
     (dolist (pair path<>type)
       (puthash (car pair) (cdr pair) org-node--uri-path<>uri-type))
     (dolist (node nodes)
@@ -1168,26 +1164,27 @@ also necessary to do is `org-node--dirty-ensure-link-known'."
 (defvar org-node--time-at-finalize nil)
 
 (defvar org-node--errors nil)
-;; TODO use lister or something like it instead of tabulated list
 (defun org-node-list-scan-problems ()
   (interactive)
   (with-current-buffer (get-buffer-create "*org-node scan problems*")
     (tabulated-list-mode)
     (setq tabulated-list-format
-          [("File+position (newest result on top)" 40 t)
-           ("Error/warning" 0 t)])
+          [("Scan choked near position" 27 t)
+           ("Issue (newest on top)" 0 t)])
     (tabulated-list-init-header)
     (setq tabulated-list-entries nil)
     (dolist (err org-node--errors)
-      (-let ((file pos signal) err)
+      (seq-let (file pos signal) err
         (push (list err (vector
-                         (list file
+                         ;; Clickable link
+                         (list (format "%s:%d"
+                                       (file-name-nondirectory file) pos)
                                'face 'link
                                'action `(lambda (_button)
                                           (find-file ,file)
-                                          (goto-line ,pos))
+                                          (goto-char ,pos))
                                'follow-link t)
-                         signal))
+                         (format "%s" signal)))
               tabulated-list-entries)))
     (if tabulated-list-entries
         (progn
@@ -2448,25 +2445,27 @@ Also turn off Org-roam's equivalent, if active."
         (setq org-roam-completion-everywhere nil)
         (add-hook 'org-mode-hook #'org-node--install-capf-in-buffer)
         ;; Add to already-open buffers
-        (dolist (buf (org-buffer-list))
+        (dolist (buf (buffer-list))
           (with-current-buffer buf
-            (add-hook 'completion-at-point-functions
-                      #'org-node-complete-at-point nil t))))
+            (when (and buffer-file-name (derived-mode-p 'org-mode))
+              (add-hook 'completion-at-point-functions
+                        #'org-node-complete-at-point nil t)))))
     ;; Turn off
     (remove-hook 'org-mode-hook #'org-node--install-capf-in-buffer)
     ;; Remove from already-open buffers
-    (dolist (buf (org-buffer-list))
+    (dolist (buf (buffer-list))
       (with-current-buffer buf
         (remove-hook 'completion-at-point-functions
                      #'org-node-complete-at-point t)))
-    ;; Maybe reenable Org-roam's version
+    ;; Maybe reenable Org-roam's capf
     (setq org-roam-completion-everywhere
           (alist-get 'org-roam-completion-everywhere
                      org-node--roam-settings))))
 
 (defun org-node--install-capf-in-buffer ()
-  (and (derived-mode-p 'org-mode)
-       buffer-file-name
+  "Instruct in-buffer completion to match known ID node titles."
+  (and buffer-file-name
+       (derived-mode-p 'org-mode)
        (equal "org" (file-name-extension buffer-file-name))
        (add-hook 'completion-at-point-functions
                  #'org-node-complete-at-point nil t)))
