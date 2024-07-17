@@ -112,15 +112,12 @@ having SQLite installed."
    :priority (org-node-get-priority node)
    :properties (org-node-get-properties node)))
 
-;; Eval to see examples of what it has to work with!
-;; (seq-random-elt (hash-table-keys org-node--dest<>links))
-;; (seq-random-elt (hash-table-values org-node--dest<>links))
-
 (defun org-node-fakeroam--mk-backlinks (target-roam-node &rest _)
   "Make org-roam-backlink objects targeting TARGET-ROAM-NODE.
 Designed as override advice for `org-roam-backlinks-get'."
   (let ((target-id (org-roam-node-id target-roam-node)))
-    (when target-id
+    (if (not target-id)
+        (error "org-node-fakeroam: Going to get backlinks, but given nil id")
       (let ((links (gethash target-id org-node--dest<>links)))
         (cl-loop
          for link-data in links
@@ -190,12 +187,11 @@ Designed as override advice for `org-roam-reflinks-get'."
 ;; This thing just exists because the above is not instant.
 ;; But even this gets a bit slow on the deletion queries...
 (defun org-node-fakeroam--db-update-files (files)
-  "Tell the Roam DB about all nodes and links involving FILES."
+  "Update the Roam DB about nodes and links involving FILES."
   (emacsql-with-transaction (org-roam-db)
     (dolist (file files)
-      ;; (org-roam-db-query [:delete :from files :where (= file $s1)] file))
-      ;; Same as
-      (org-roam-db-clear-file file))
+      (org-roam-db-query [:delete :from files :where (= file $s1)]
+                         file))
     (cl-loop
      for node being the hash-values of org-node--id<>node
      when (member (org-node-get-file-path node) files)
