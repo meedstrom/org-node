@@ -2366,25 +2366,47 @@ destination-origin pairs, expressed as Tab-Separated Values."
                           dest))))
     (tabulated-list-print)))
 
-;; TODO
-;; (defun org-node-find-plain-link ()
-;;   (interactive)
-;;   (let* ((every-link (cl-loop
-;;                       for list being the hash-values of org-node--dest<>links
-;;                       append list))
-;;          (disambiguated
-;;           (cl-loop for link in every-link
-;;                    collect (plist-get link :pos)
-;;                    )
-;;           )
-;;          (link-data (gethash (completing-read "Find where link is: "
-;;                                               org-node--dest<>links)
-;;                              org-node--dest<>links))
-;;          (origin-id (plist-get link-data :origin))
-;;          (node (gethash origin-id org-node--id<>node)))
-;;     (if node
-;;         (org-node--goto node)
-;;       (message "Not sure where is ID %s" link-data))))
+(defun org-node-list-reflinks ()
+  "List all reflinks and their locations.
+
+Useful to see how many times you've inserted a link that is very
+similar to another, but not identical, preventing its association
+to ROAM_REFS."
+  (interactive)
+  (let ((plain-links (cl-loop
+                       for list being the hash-values of org-node--dest<>links
+                       append (cl-loop
+                               for link in list
+                               unless (equal "id" (plist-get link :type))
+                               collect link))))
+    (with-current-buffer (get-buffer-create "*org-node reflinks*")
+      (tabulated-list-mode)
+      (add-hook 'tabulated-list-revert-hook #'org-node-list-reflinks nil t)
+      (setq tabulated-list-format
+            [("REF?" 4 t)
+             ("Inside node" 30 t)
+             ("Potential reflink" 0 t)])
+      (tabulated-list-init-header)
+      (setq tabulated-list-entries nil)
+      (dolist (link plain-links)
+        (-let (((&plist :type :dest :origin :pos) link))
+          (let ((node (gethash origin org-node--id<>node)))
+            (push (list link
+                        (vector
+                         (if (gethash dest org-node--ref<>id) "y" "")
+                         (if node
+                             (list (org-node-get-title node)
+                                   'action `(lambda (_button)
+                                              (org-id-goto ,origin)
+                                              (goto-char ,pos))
+                                   'face 'link
+                                   'follow-link t)
+                           origin)
+                         (if type (concat type ":" dest) dest)))
+                  tabulated-list-entries))))
+      (switch-to-buffer (current-buffer))
+      (tabulated-list-print)
+      (tabulated-list-sort 2))))
 
 (defcustom org-node-warn-title-collisions t
   "Whether to print messages on finding duplicate node titles."

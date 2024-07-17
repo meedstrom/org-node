@@ -337,6 +337,8 @@ Rarer commands:
   - Can help you fix a broken setup: it runs org-lint on all known files and generates a report of syntax problems.  Org-node [[https://github.com/meedstrom/org-node/issues/8#issuecomment-2101316447][assumes all files have valid syntax]].
 - =org-node-list-dead-links=
   - List links where the destination ID could not be found
+- =org-node-list-reflinks=
+  - List citations and non-ID links
 - =org-node-rewrite-links-ask=
   - Look for link descriptions that got out of sync with the current node title, then prompt at each link to update it
 - =org-node-rename-file-by-title=
