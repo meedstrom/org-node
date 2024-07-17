@@ -196,7 +196,7 @@ Lisp code can still find it in the \"main\" table,
 This function is applied once for every org-id node found, and
 receives the node data as a single argument: an object which form
 you can observe in examples from \\[org-node-peek] and specified
-in the type `org-node-get' (C-h o RET org-node-get RET).
+in the type `org-node' (C-h o org-node RET).
 
 See the following example for a way to filter out nodes with a
 ROAM_EXCLUDE property, or that have any kind of TODO state, or
@@ -323,7 +323,7 @@ list of three strings: completion, prefix and suffix.
 
 NODE is an object which form you can observe in examples from
 \\[org-node-peek] and specified in type `org-node'
-(C-h o RET org-node RET).
+(C-h o org-node RET).
 
 If a node has aliases, it is passed to this function again for
 every alias, in which case TITLE is actually one of the aliases."
@@ -1411,7 +1411,7 @@ consult the filesystem, just compares substrings to each other."
 This variable controls the directory component, but the file
 basename is controlled by `org-node-filename-fn'."
   :group 'org-node
-  :type 'boolean)
+  :type '(choice boolean string))
 
 (defun org-node-guess-or-ask-dir (prompt)
   "Maybe prompt for a directory, and if so, show string PROMPT.
@@ -2371,12 +2371,15 @@ destination-origin pairs, expressed as Tab-Separated Values."
 ;;   org-node--found-systems)
 
 (defun org-node-list-dead-links ()
+  "List links that lead to no known ID."
   (interactive)
   (let ((dead-links
          (cl-loop for dest being the hash-keys of org-node--dest<>links
+                  using (hash-values links)
                   unless (gethash dest org-node--id<>node)
-                  append (--map (cons dest it)
-                                (gethash dest org-node--dest<>links)))))
+                  append (cl-loop for link in links
+                                  when (equal "id" (plist-get link :type))
+                                  collect (cons dest link)))))
     (message "%d dead links found" (length dead-links))
     (pop-to-buffer (get-buffer-create "*Dead Links*"))
     (tabulated-list-mode)
