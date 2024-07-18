@@ -330,21 +330,22 @@ every alias, in which case TITLE is actually one of the aliases."
 (defun org-node-affix-bare (_node title)
   "Use TITLE as-is.
 For use as `org-node-affixation-fn'."
-  (list title nil nil))
+  (list title "" ""))
 
 (defun org-node-affix-with-olp (node title)
   "Prepend TITLE with NODE's outline path.
 For use as `org-node-affixation-fn'."
   (list title
-        (when (org-node-get-is-subtree node)
+        (if (org-node-get-is-subtree node)
           (let ((ancestors (cons (org-node-get-file-title-or-basename node)
                                  (org-node-get-olp node)))
                 (result nil))
             (dolist (anc ancestors)
               (push (propertize anc 'face 'completions-annotations) result)
               (push " > " result))
-            (apply #'concat (nreverse result))))
-        nil))
+            (apply #'concat (nreverse result)))
+          "")
+        ""))
 
 (defvar org-node--title<>affixation-triplet (make-hash-table :test #'equal)
   "1:1 table mapping titles or aliases to affixation triplets.")
@@ -609,7 +610,8 @@ SYNCHRONOUS t, unless SYNCHRONOUS is the symbol `must-async'."
     (setq org-id-locations (org-id-alist-to-hash org-id-locations)))
   (when (hash-table-empty-p org-id-locations)
     (org-id-locations-load)
-    (when (hash-table-empty-p org-id-locations)
+    (when (and (hash-table-empty-p org-id-locations)
+               (null org-node-extra-id-dirs))
       (org-node--die "org-id-locations empty, try `org-id-update-id-locations' or `org-roam-update-org-id-locations'"))))
 
 (defun org-node--handle-save (&optional arg1 arg2 &rest _)
@@ -746,7 +748,8 @@ didn't do so already, or local changes have been made."
                            (native-comp-available-p)
                            (require 'comp)
                            (comp-el-to-eln-filename lib)))
-         (elc-path (org-node-worker--tmpfile "worker.elc")))
+         (elc-path (org-node-worker--tmpfile "worker.elc"))
+         (byte-compile-warnings '(not free-vars)))
     (mkdir (org-node-worker--tmpfile) t)
     (if native-path
         (unless (file-newer-than-file-p native-path lib)
