@@ -321,16 +321,16 @@ list, and write results to another temp file."
             (goto-char 1)
             (setq OUTLINE-DATA nil)
 
-            ;; If the very first line of file is a heading, typical for people
-            ;; who nix `org-node-prefer-file-level-nodes', don't try to scan
-            ;; any file-level data.  Also, our usage of
+            ;; If the very first line of file is a heading (typical for people
+            ;; who nix `org-node-prefer-file-level-nodes'), don't try to scan
+            ;; any file-level data.  Anyway, our usage of
             ;; `org-node-worker--next-heading' cannot handle that edge-case so
-            ;; we MUST check it anyway.
+            ;; we MUST check.
             (if (looking-at-p "\\*")
                 (progn
                   (setq FILE-ID nil)
                   (setq FILE-TITLE nil)
-                  (setq FILE-TITLE-OR-BASENAME FILE)
+                  (setq FILE-TITLE-OR-BASENAME (file-name-nondirectory FILE))
                   (setq TODO-RE $global-todo-re))
               ;; Narrow until first heading
               (when (org-node-worker--next-heading)
@@ -345,37 +345,39 @@ list, and write results to another temp file."
                           ;; File is pretty much just a property drawer
                           (point-max)))
               (goto-char 1)
-              ;; REVIEW Ugh, progn-prog1 combinations
               (setq PROPS
                     (if (re-search-forward "^[[:space:]]*:properties:" FAR t)
                         (progn
                           (forward-line 1)
-                          (prog1 (org-node-worker--collect-properties
-                                  (point)
-                                  (if (re-search-forward "^[[:space:]]*:end:" nil t)
-                                      (pos-bol)
-                                    (error "Couldn't find matching :END: drawer")))
-                            (goto-char 1)))
+                          (org-node-worker--collect-properties
+                           (point)
+                           (if (re-search-forward "^[[:space:]]*:end:" nil t)
+                               (pos-bol)
+                             (error "Couldn't find :END: of drawer"))))
                       nil))
+              (setq DRAWER-END (point))
+              (goto-char 1)
               (setq FILE-TAGS
                     (if (re-search-forward "^#\\+filetags: " FAR t)
-                        (prog1 (split-string
-                                (buffer-substring (point) (pos-eol))
-                                ":" t)
-                          (goto-char 1))
+                        (split-string
+                         (buffer-substring (point) (pos-eol))
+                         ":" t)
                       nil))
+              (goto-char 1)
               (setq TODO-RE
                     (if (re-search-forward $file-todo-option-re FAR t)
                         (progn
                           (setq FILE-TODO-SETTINGS nil)
                           ;; Because you can have multiple #+todo: lines...
                           (while (progn
-                                   (push (buffer-substring (point) (pos-eol)) FILE-TODO-SETTINGS)
-                                   (re-search-forward $file-todo-option-re FAR t)))
-                          (goto-char 1)
+                                   (push (buffer-substring (point) (pos-eol))
+                                         FILE-TODO-SETTINGS)
+                                   (re-search-forward
+                                    $file-todo-option-re FAR t)))
                           (org-node-worker--make-todo-regexp
                            (string-join FILE-TODO-SETTINGS " ")))
                       $global-todo-re))
+              (goto-char 1)
               (setq FILE-TITLE (when (re-search-forward "^#\\+title: " FAR t)
                                  (org-node-worker--org-link-display-format
                                   (buffer-substring (point) (pos-eol)))))
@@ -383,19 +385,18 @@ list, and write results to another temp file."
                     (or FILE-TITLE (file-name-nondirectory FILE)))
               (setq FILE-ID (cdr (assoc "ID" PROPS)))
               (when FILE-ID
-                ;; Collect links & citations before first heading
-                (setq END (save-excursion
-                            (when (org-node-worker--next-heading)
-                              (1- (point)))))
+                (goto-char DRAWER-END)
                 (setq HERE (point))
+
                 ;; Don't count org-super-links backlinks as forward links
-                (when (re-search-forward $backlink-drawer-re END t)
-                  (let ((drawer-beg (point)))
-                    (unless (search-forward ":end:" END t)
+                (if (re-search-forward $backlink-drawer-re nil t)
+                  (progn
+                    (setq END (point))
+                    (unless (search-forward ":end:" nil t)
                       (error "Couldn't find matching :END: drawer"))
                     (org-node-worker--collect-links-until
-                     END FILE-ID nil $plain-re $merged-re)
-                    (setq END drawer-beg)))
+                     nil FILE-ID nil $plain-re $merged-re))
+                  (setq END (point-max)))
                 (goto-char HERE)
                 (org-node-worker--collect-links-until
                  END FILE-ID nil $plain-re $merged-re)
@@ -421,7 +422,7 @@ list, and write results to another temp file."
             ;; Loop over the file's headings
             (while (not (eobp))
               (catch 'entry-done
-                ;; Narrow til next heading, as a safety measure
+                ;; Narrow til next heading
                 (narrow-to-region (point)
                                   (save-excursion
                                     (or (org-node-worker--next-heading)
@@ -429,28 +430,25 @@ list, and write results to another temp file."
                 (setq HEADING-POS (point))
                 (setq LEVEL (skip-chars-forward "*"))
                 (skip-chars-forward " ")
-                (setq HERE (point))
                 (let ((case-fold-search nil))
-                  (if (looking-at TODO-RE)
-                      (progn
-                        (setq TODO-STATE (buffer-substring (point) (match-end 0)))
-                        (goto-char (match-end 0))
-                        (skip-chars-forward " ")
-                        (setq HERE (point)))
-                    (setq TODO-STATE nil))
-                  (if (looking-at "\\[#[A-Z0-9]+\\]")
-                      (progn
-                        (setq PRIORITY (match-string 0))
-                        (goto-char (match-end 0))
-                        (skip-chars-forward " ")
-                        (setq HERE (point)))
-                    (setq PRIORITY nil)))
+                  (setq TODO-STATE
+                        (if (looking-at TODO-RE)
+                            (prog1 (buffer-substring (point) (match-end 0))
+                              (goto-char (match-end 0))
+                              (skip-chars-forward " "))
+                          nil))
+                  (setq PRIORITY
+                        (if (looking-at "\\[#[A-Z0-9]+\\]")
+                            (prog1 (match-string 0)
+                              (goto-char (match-end 0))
+                              (skip-chars-forward " "))
+                          nil)))
                 ;; Skip statistics-cookie such as "[2/10]"
                 (when (looking-at "\\[[0-9]*/[0-9]*\\]")
                   (goto-char (match-end 0))
-                  (skip-chars-forward " ")
-                  (setq HERE (point)))
-                ;; Tags in heading
+                  (skip-chars-forward " "))
+                (setq HERE (point))
+                ;; Tags in heading?
                 (if (re-search-forward " +\\(:.+:\\) *$" (pos-eol) t)
                     (progn
                       (setq TITLE (org-node-worker--org-link-display-format
@@ -481,14 +479,13 @@ list, and write results to another temp file."
                                   (+ 1 (point) (skip-chars-forward "^]>\n")))
                             (goto-char HERE))
                         nil))
-                (if (or SCHED
-                        DEADLINE
-                        (re-search-forward "[[:space:]]*CLOSED: +" FAR t))
+                (when (or SCHED
+                          DEADLINE
+                          (re-search-forward "[[:space:]]*CLOSED: +" FAR t))
                     ;; Alright, so there was a planning-line, meaning any
                     ;; :PROPERTIES: must be on the next line.
-                    (progn
-                      (forward-line 1)
-                      (setq FAR (pos-eol))))
+                  (forward-line 1)
+                  (setq FAR (pos-eol)))
                 (setq PROPS
                       (if (re-search-forward "^[[:space:]]*:properties:" FAR t)
                           (progn
@@ -497,10 +494,11 @@ list, and write results to another temp file."
                              (point)
                              (if (re-search-forward "^[[:space:]]*:end:" nil t)
                                  (prog1 (pos-bol)
-                                   ;; For safety in case seeking :END: landed us
-                                   ;; way down the file.  Some error will hopefully
-                                   ;; be printed about this subtree, but we can
-                                   ;; keep going sanely from here on.
+                                   ;; In case seeking :END: landed us way down
+                                   ;; the file.  Some error will likely be
+                                   ;; printed about this subtree, but we can
+                                   ;; keep going.
+                                   ;; REVIEW What?
                                    (goto-char FAR))
                                (error "Couldn't find matching :END: drawer"))))
                         nil))
@@ -538,16 +536,18 @@ list, and write results to another temp file."
                                    OUTLINE-DATA HEADING-POS FILE-ID)
                                   (throw 'entry-done t)))
                 (setq OLP-WITH-SELF (append OLP (list TITLE)))
+                (setq HERE (point))
                 ;; Don't count org-super-links backlinks
                 ;; TODO: Generalize this mechanic to skip src blocks too
-                (setq HERE (point))
-                (when (setq DRAWER-BEG
+                (if (setq DRAWER-BEG
                             (re-search-forward $backlink-drawer-re nil t))
                   (unless (setq DRAWER-END (search-forward ":end:" nil t))
                     (push (list FILE (point)
                                 "Couldn't find matching :END: drawer")
                           org-node-worker--result:problems)
-                    (throw 'entry-done t)))
+                    (throw 'entry-done t))
+                  ;; Danger, Robinson
+                  (setq DRAWER-END nil))
                 ;; Gotcha... collect links inside the heading
                 (goto-char HEADING-POS)
                 (org-node-worker--collect-links-until
@@ -567,8 +567,10 @@ list, and write results to another temp file."
         ;; Don't crash the process when there is an error signal,
         ;; report it and continue to the next file
         (( t error )
-         (push (list FILE (point) err) org-node-worker--result:problems))))
+         (push (list FILE (point) err) org-node-worker--result:problems)
+         (setq buffer-read-only nil))))
 
+    (setq buffer-read-only nil)
     (let ((print-length nil)
           (print-level nil))
       (write-region

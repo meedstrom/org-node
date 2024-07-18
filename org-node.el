@@ -77,7 +77,7 @@ autoloaded)."
        (declare (obsolete ',new "July 2024"))
        (unless warned-once
          (setq warned-once t)
-         (lwarn 'org-node :warning "You or your config used old function name: %S,  new name: %S"
+         (lwarn 'org-node :warning "Your config uses old function name: %S,  new name: %S"
                 ',old ',new))
        (apply ',new args))))
 
@@ -827,17 +827,25 @@ function to update current tables."
         ;; through the org-node-worker.el functions with edebug
         (progn
           (delete-file (org-node-worker--tmpfile "results-0.eld"))
-          (with-temp-file (org-node-worker--tmpfile "file-list-0.eld")
-            (let ((standard-output (current-buffer))
-                  (print-length nil))
-              (prin1 files)))
+          (let ((print-length nil))
+            (write-region (prin1-to-string files)
+                          nil
+                          (org-node-worker--tmpfile "file-list-0.eld")))
           (setq i 0)
+          (setq org-node-worker--result:found-links nil)
+          (setq org-node-worker--result:problems nil)
+          (setq org-node-worker--result:paths-types nil)
           (when (bound-and-true-p editorconfig-mode)
             (message "Maybe disable editorconfig-mode while debugging"))
-          (pop-to-buffer (get-buffer-create "*org-node debug*"))
-          (erase-buffer)
-          (org-node-worker--collect-dangerously)
-          (org-node--handle-finished-job 1 finalizer))
+          (load-file compiled-lib)
+          (garbage-collect)
+          (setq org-node--time-at-init-scan (current-time))
+          (with-current-buffer (get-buffer-create "*org-node debug*")
+            (when (eq 'show org-node--debug)
+              (pop-to-buffer (current-buffer)))
+            (erase-buffer)
+            (org-node-worker--collect-dangerously)
+            (org-node--handle-finished-job 1 finalizer)))
 
       ;; If not debugging, split the work over many child processes
       (let* ((file-lists
@@ -940,6 +948,7 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
           (message "Some nodes have same title, see M-x org-node-list-collisions"))
         (when errors
           (message "Scan had problems, see M-x org-node-list-scan-problems"))))))
+
 
 (defun org-node--finalize-modified (results)
   (seq-let (missing-files found-files nodes path<>type links errors) results
