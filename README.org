@@ -25,14 +25,19 @@ New features
 - New command: =org-node-lint-all-files=
   - Run org-lint on all known files, then report the results.  Use it to fix a broken setup; org-node [[https://github.com/meedstrom/org-node/issues/8#issuecomment-2101316447][assumes all files contain valid Org syntax]].  In particular, malformed PROPERTIES drawers easily break the scan.
 - New command: =org-node-list-dead-links=
+- New command: =org-node-list-reflinks=
 - New command: =org-node-list-feedback-arcs=
+- New command: =org-node-list-scan-problems=
+- New command: =org-node-list-collisions=
 - New command: =org-node-grep=
-- ... and other stuff
 
 Renames
 - Rename command =org-node-random= to =org-node-visit-random=
 - Rename many functions and variables
-  - Don't worry, you'll get warning messages for each old name used in your initfiles
+  - Don't worry, you'll get warning messages for each old name set/used in your initfiles
+
+Removals
+- Remove many functions and variables
 
 Changes
 - Minibuffer completions are now "rich" by default.  To revert to vanilla, set =(setq org-node-affixation-fn #'org-node-affix-bare)=.
@@ -86,8 +91,8 @@ A comparison of three similar systems, all permitting org-id as first-class citi
 | Ref search                        | yes      | yes (as aliases)   | not applicable       |
 | Org 9.5 @citekeys as refs         | yes      | yes                | not applicable       |
 | Can have rich search completion   | yes      | yes                | not applicable       |
-| Can work thru org-roam-capture    | yes      | yes                |                      |
-| Can work thru org-capture         | --       | yes                |                      |
+| Can work thru org-roam-capture    | yes      | yes                | ?                    |
+| Can work thru org-capture         | --       | yes                | ?                    |
 | Can show backlinks in same window | --       | yes                | yes                  |
 | Avoid double-counting =:BACKLINKS:= | --       | yes                | not applicable       |
 | Grep across all files             | --       | yes                | --                   |
@@ -263,12 +268,12 @@ Example setting:
 #+end_src
 
 
-# *** Completion-at-point
-# Not sure how/when people use =org-roam-completion-everywhere=, but it's popular so here you go for an equivalent.
+*** Completion-at-point
+I don't use any in-buffer completion in Org buffers so don't feel like you have to, but there is the option:
 
-# #+begin_src elisp
-# (org-node-complete-at-point-mode)
-# #+end_src
+#+begin_src elisp
+(org-node-complete-at-point-mode)
+#+end_src
 
 *** Instruct org-open-at-point to visit ref
 
