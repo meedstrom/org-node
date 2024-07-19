@@ -1,7 +1,10 @@
 #+startup: content
 * org-node 0.3
 ** News
-The month of July brought many changes!  *If anything broke for you*, you can rollback to the 0.1pre branch. If you use [[https://github.com/radian-software/straight.el][straight]], you can do this like this:
+The month of July brought many changes!
+
+*** Reversion instructions
+*If anything broke for you*, you can rollback to the 0.1pre branch. If you use [[https://github.com/radian-software/straight.el][straight]], you can do this like this:
 
 #+begin_src elisp
 (use-package org-node
@@ -24,7 +27,7 @@ Otherwise, you can use something like [[https://github.com/quelpa/quelpa][quelpa
   :hook (org-mode . org-node-cache-mode))    
 #+end_src
 
-** New features
+*** New features
 - New mode: =org-node-fakeroam-db-feed-mode=
   - Deprecates advice that was in [[https://github.com/meedstrom/org-node?tab=readme-ov-file#option-1b--tell-org-node-to-write-to-the-org-roam-db][Backlinks Option 1B]]
 - New mode: =org-node-fakeroam-nosql-mode=
