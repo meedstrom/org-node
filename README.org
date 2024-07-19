@@ -48,15 +48,15 @@ Otherwise, you can use something like [[https://github.com/quelpa/quelpa][quelpa
 - New command: =org-node-list-collisions=
 - New command: =org-node-grep=
 
-Renames
+*Renames*
 - Rename command =org-node-random= to =org-node-visit-random=
 - Rename many functions and variables
   - Don't worry, you'll get warning messages for each old name set/used in your initfiles
 
-Removals
+*Removals*
 - Remove many functions and variables
 
-Changes
+*Changes*
 - Minibuffer completions are now "rich" by default.  To revert to vanilla, set =(setq org-node-affixation-fn #'org-node-affix-bare)=.
 - Don't automatically turn on cache-mode, just pester the user
 - Command =org-node-put-created= now respects =org-timestamp-formats= instead of just putting the date as [YYYY-MM-DD].
