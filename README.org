@@ -1,7 +1,10 @@
 #+startup: content
 * org-node 0.3
 ** News
-The month of July brought many changes!  *If anything broke for you*, you can rollback to the 0.1pre branch:
+The month of July brought many changes!
+
+*** Reversion instructions
+*If anything broke for you*, you can rollback to the 0.1pre branch. If you use [[https://github.com/radian-software/straight.el][straight]], you can do this like this:
 
 #+begin_src elisp
 (use-package org-node
@@ -10,7 +13,21 @@ The month of July brought many changes!  *If anything broke for you*, you can ro
   :hook (org-mode . org-node-cache-mode))
 #+end_src
 
-New features
+Otherwise, you can use something like [[https://github.com/quelpa/quelpa][quelpa]] or [[https://github.com/slotThe/vc-use-package][vc-use-package]] in combination with =use-package=:
+
+#+begin_src elisp
+(use-package org-node 
+  :quelpa (org-node :fetcher github :repo "meedstrom/org-node" :commit "a29e5d6b07d9ae0319437e1d7bdbb9fe5967b30d")
+  :hook (org-mode . org-node-cache-mode))
+#+end_src
+
+#+begin_src elisp
+(use-package org-node
+  :vc (:fetcher github :repo "meedstrom/org-node" :rev "a29e5d6b07d9ae0319437e1d7bdbb9fe5967b30d")
+  :hook (org-mode . org-node-cache-mode))    
+#+end_src
+
+*** New features
 - New mode: =org-node-fakeroam-db-feed-mode=
   - Deprecates advice that was in [[https://github.com/meedstrom/org-node?tab=readme-ov-file#option-1b--tell-org-node-to-write-to-the-org-roam-db][Backlinks Option 1B]]
 - New mode: =org-node-fakeroam-nosql-mode=
@@ -31,15 +48,15 @@ New features
 - New command: =org-node-list-collisions=
 - New command: =org-node-grep=
 
-Renames
+*Renames*
 - Rename command =org-node-random= to =org-node-visit-random=
 - Rename many functions and variables
   - Don't worry, you'll get warning messages for each old name set/used in your initfiles
 
-Removals
+*Removals*
 - Remove many functions and variables
 
-Changes
+*Changes*
 - Minibuffer completions are now "rich" by default.  To revert to vanilla, set =(setq org-node-affixation-fn #'org-node-affix-bare)=.
 - Don't automatically turn on cache-mode, just pester the user
 - Command =org-node-put-created= now respects =org-timestamp-formats= instead of just putting the date as [YYYY-MM-DD].
