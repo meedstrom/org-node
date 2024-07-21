@@ -249,6 +249,7 @@ all areas where text is added/changed/deleted."
   "For known link at point, leave a backlink in the target node."
   (unless (derived-mode-p 'org-mode)
     (error "Backlink function called in non-Org buffer"))
+  (require 'org-element)
   (when org-node-backlink-mode
     (org-node-cache-ensure)
     (let ((elm (org-element-context)))

@@ -27,8 +27,6 @@
 
 ;;; Code:
 
-;; NOTE Big file? Use `consult-outline'!
-
 ;; TODO The perf-* user options have almost no effect anymore, there
 ;;      must be significant overhead on the child processes... nix it
 ;; TODO A workflow to allow pseudo-untitled (numeric-titled) nodes
@@ -41,54 +39,14 @@
 (require 'compat)
 (require 'org)
 (require 'org-id)
+(require 'org-node-obsolete)
 (require 'org-node-worker)
 
-
-;;;; Obsoletions
-
-(define-obsolete-variable-alias
-  'org-node-collection 'org-node--candidate<>node "2024-07-11")
-
-(let ((aliases '(org-node-cache-rescan-file-hook org-node-rescan-hook
-                 org-node-format-candidate-fn nil)))
-  (defun org-node--warn-obsolete-variables ()
-    "To be called when turning a mode on."
-    (while aliases
-      (let ((old (pop aliases))
-            (new (pop aliases)))
-        (when (and (boundp old) (symbol-value old))
-          (unless new
-            (lwarn 'org-node :warning "User option removed: %S" old))
-          (when new
-            (lwarn 'org-node :warning "Your config uses old variable: %S,  new name: %S"
-                   old new)
-            (set new (symbol-value old))))))))
-
-(defmacro org-node--defobsolete (old new &optional interactive)
-  "Define OLD as a function that runs NEW.
-Also, running OLD will emit a deprecation warning the first time.
-If INTERACTIVE, define it as an interactive function (but not
-autoloaded)."
-  `(let (warned-once)
-     (defun ,old (&rest args)
-       ,@(if interactive '((interactive)))
-       (declare (obsolete ',new "July 2024"))
-       (unless warned-once
-         (setq warned-once t)
-         (lwarn 'org-node :warning "Your config uses old function name: %S,  new name: %S"
-                ',old ',new))
-       (apply ',new args))))
-
-(org-node--defobsolete org-nodeify-entry org-node-nodeify-entry t)
-(org-node--defobsolete org-node-random org-node-visit-random t)
-(org-node--defobsolete org-node-slugify-as-url org-node-slugify-for-web)
-(org-node--defobsolete org-node-new-by-roam-capture org-node-new-via-roam-capture)
-(org-node--defobsolete org-node-get-backlinks org-node-get-id-links)
-
-;; Autoload deprecated names from the subpackages
-(autoload 'org-node-roam-db-shim-mode "org-node-fakeroam")
-(autoload 'org-node-roam-db-reset "org-node-fakeroam")
-(autoload 'org-node-roam-redisplay-mode "org-node-fakeroam")
+(declare-function 'org-super-links-convert-link-to-super "org-super-links")
+(declare-function 'consult--grep "consult")
+(declare-function 'consult--grep-make-builder "consult")
+(declare-function 'org-roam-capture "org-roam")
+(declare-function 'org-roam-node-slug "org-roam")
 
 
 ;;;; Options
@@ -166,13 +124,13 @@ files, since it is a series of regexps applied to every file name
 visited.  The smaller this list, the faster `org-node-reset'."
   :group 'org-node
   :type '(choice (const :tag "Keep all" t)
-          (set
-           (function-item jka-compr-handler)
-           (function-item epa-file-handler)
-           (function-item tramp-file-name-handler)
-           (function-item tramp-completion-file-name-handler)
-           (function-item tramp-archive-file-name-handler)
-           (function-item file-name-non-special))))
+                 (set
+                  (function-item jka-compr-handler)
+                  (function-item epa-file-handler)
+                  (function-item tramp-file-name-handler)
+                  (function-item tramp-completion-file-name-handler)
+                  (function-item tramp-archive-file-name-handler)
+                  (function-item file-name-non-special))))
 
 (defcustom org-node-filter-fn
   (lambda (node)
@@ -335,13 +293,13 @@ For use as `org-node-affixation-fn'."
 For use as `org-node-affixation-fn'."
   (list title
         (if (org-node-get-is-subtree node)
-          (let ((ancestors (cons (org-node-get-file-title-or-basename node)
-                                 (org-node-get-olp node)))
-                (result nil))
-            (dolist (anc ancestors)
-              (push (propertize anc 'face 'completions-annotations) result)
-              (push " > " result))
-            (apply #'concat (nreverse result)))
+            (let ((ancestors (cons (org-node-get-file-title-or-basename node)
+                                   (org-node-get-olp node)))
+                  (result nil))
+              (dolist (anc ancestors)
+                (push (propertize anc 'face 'completions-annotations) result)
+                (push " > " result))
+              (apply #'concat (nreverse result)))
           "")
         ""))
 
@@ -2138,7 +2096,7 @@ so it matches the destination's current title."
   (require 'org-faces)
   (defface org-node--rewrite-face
     `((t :inherit 'org-link
-       :inverse-video ,(not (face-inverse-video-p 'org-link))))
+         :inverse-video ,(not (face-inverse-video-p 'org-link))))
     "Face for use in `org-node-rewrite-links-ask'.")
   (org-node-cache-ensure)
   (when (org-node--consent-to-bothersome-modes-for-mass-edit)
@@ -2501,11 +2459,11 @@ similar to another, but not identical, preventing its association
 to ROAM_REFS."
   (interactive)
   (let ((plain-links (cl-loop
-                       for list being the hash-values of org-node--dest<>links
-                       append (cl-loop
-                               for link in list
-                               unless (equal "id" (plist-get link :type))
-                               collect link))))
+                      for list being the hash-values of org-node--dest<>links
+                      append (cl-loop
+                              for link in list
+                              unless (equal "id" (plist-get link :type))
+                              collect link))))
     (with-current-buffer (get-buffer-create "*org-node reflinks*")
       (tabulated-list-mode)
       (add-hook 'tabulated-list-revert-hook #'org-node-list-reflinks nil t)
