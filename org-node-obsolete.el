@@ -1,8 +1,7 @@
 ;;; org-node-obsolete.el --- Outta sight so I'm not tempted to clean them up -*- lexical-binding: t; -*-
 
 ;; One-shot variable warnings
-(let ((aliases '(org-node-slug-fn org-node-filename-fn
-                 org-node-cache-rescan-file-hook org-node-rescan-hook
+(let ((aliases '(org-node-cache-rescan-file-hook org-node-rescan-hook
                  org-node-format-candidate-fn nil
                  org-node-collection nil)))
   (defun org-node--warn-obsolete-variables ()
