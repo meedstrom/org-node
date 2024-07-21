@@ -390,31 +390,45 @@ list, and write results to another temp file."
 
                 ;; Don't count org-super-links backlinks as forward links
                 (if (re-search-forward $backlink-drawer-re nil t)
-                  (progn
-                    (setq END (point))
-                    (unless (search-forward ":end:" nil t)
-                      (error "Couldn't find matching :END: drawer"))
-                    (org-node-worker--collect-links-until
-                     nil FILE-ID nil $plain-re $merged-re))
+                    (progn
+                      (setq END (point))
+                      (unless (search-forward ":end:" nil t)
+                        (error "Couldn't find matching :END: drawer"))
+                      (org-node-worker--collect-links-until
+                       nil FILE-ID nil $plain-re $merged-re))
                   (setq END (point-max)))
                 (goto-char HERE)
                 (org-node-worker--collect-links-until
                  END FILE-ID nil $plain-re $merged-re)
-                (push (list
-                       :title FILE-TITLE-OR-BASENAME ;; A title is mandatory
-                       :level 0
-                       :tags FILE-TAGS
-                       :file-path FILE
-                       :pos 1
-                       :file-title FILE-TITLE
-                       :file-title-or-basename FILE-TITLE-OR-BASENAME
-                       :properties PROPS
-                       :id FILE-ID
-                       :aliases (split-string-and-unquote
-                                 (or (cdr (assoc "ROAM_ALIASES" PROPS)) ""))
-                       :refs (org-node-worker--split-refs-field
-                              (cdr (assoc "ROAM_REFS" PROPS))))
-                      result:found-nodes))
+                ;; A plist would be more readable than a record, but I profiled
+                ;; it, using:
+                ;; (benchmark-run-compiled 10 (setq org-node--done-ctr 6) (org-node--handle-finished-job 7 #'org-node--finalize-full))
+                ;; Result passing plists to `org-node--make-obj':
+                ;; (8.152532984 15 4.110698459000105)
+                ;; Result passing records as-is:
+                ;; (5.928453786 10 2.7291036080000595)
+                (push
+                 (record 'org-node
+                         (split-string-and-unquote
+                          (or (cdr (assoc "ROAM_ALIASES" PROPS)) ""))
+                         nil
+                         FILE
+                         FILE-TITLE-OR-BASENAME
+                         FILE-TITLE-OR-BASENAME
+                         FILE-ID
+                         nil
+                         0
+                         nil
+                         1
+                         nil
+                         PROPS
+                         (org-node-worker--split-refs-field
+                          (cdr (assoc "ROAM_REFS" PROPS)))
+                         nil
+                         FILE-TAGS
+                         FILE-TITLE
+                         nil)
+                 result:found-nodes))
               (goto-char (point-max))
               ;; We should now be at the first heading
               (widen))
@@ -482,8 +496,8 @@ list, and write results to another temp file."
                 (when (or SCHED
                           DEADLINE
                           (re-search-forward "[[:space:]]*CLOSED: +" FAR t))
-                    ;; Alright, so there was a planning-line, meaning any
-                    ;; :PROPERTIES: must be on the next line.
+                  ;; Alright, so there was a planning-line, meaning any
+                  ;; :PROPERTIES: must be on the next line.
                   (forward-line 1)
                   (setq FAR (pos-eol)))
                 (setq PROPS
@@ -507,29 +521,29 @@ list, and write results to another temp file."
                 (push (list HEADING-POS TITLE LEVEL ID) OUTLINE-DATA)
                 (when ID
                   (setq OLP (org-node-worker--pos->olp OUTLINE-DATA HEADING-POS))
-                  (push (list
-                         :title TITLE
-                         :is-subtree t
-                         :level LEVEL
-                         :id ID
-                         :pos HEADING-POS
-                         :tags TAGS
-                         :todo TODO-STATE
-                         :file-path FILE
-                         :scheduled SCHED
-                         :deadline DEADLINE
-                         :file-title FILE-TITLE
-                         :file-title-or-basename FILE-TITLE-OR-BASENAME
-                         :olp OLP
-                         :properties PROPS
-                         :priority PRIORITY
-                         :aliases
-                         (split-string-and-unquote
-                          (or (cdr (assoc "ROAM_ALIASES" PROPS)) ""))
-                         :refs (org-node-worker--split-refs-field
-                                (cdr (assoc "ROAM_REFS" PROPS))))
-                        result:found-nodes))
-
+                  (push
+                   ;; NOTE Must be in same order as the defstruct
+                   (record 'org-node
+                           (split-string-and-unquote
+                            (or (cdr (assoc "ROAM_ALIASES" PROPS)) ""))
+                           DEADLINE
+                           FILE
+                           FILE-TITLE
+                           FILE-TITLE-OR-BASENAME
+                           ID
+                           t
+                           LEVEL
+                           OLP
+                           HEADING-POS
+                           PRIORITY
+                           PROPS
+                           (org-node-worker--split-refs-field
+                            (cdr (assoc "ROAM_REFS" PROPS)))
+                           SCHED
+                           TAGS
+                           TITLE
+                           TODO-STATE)
+                   result:found-nodes))
                 ;; Now collect links while we're here!
                 (setq ID-HERE (or ID
                                   (org-node-worker--pos->parent-id
@@ -540,12 +554,12 @@ list, and write results to another temp file."
                 ;; Don't count org-super-links backlinks
                 ;; TODO: Generalize this mechanic to skip src blocks too
                 (if (setq DRAWER-BEG
-                            (re-search-forward $backlink-drawer-re nil t))
-                  (unless (setq DRAWER-END (search-forward ":end:" nil t))
-                    (push (list FILE (point)
-                                "Couldn't find matching :END: drawer")
-                          org-node-worker--result:problems)
-                    (throw 'entry-done t))
+                          (re-search-forward $backlink-drawer-re nil t))
+                    (unless (setq DRAWER-END (search-forward ":end:" nil t))
+                      (push (list FILE (point)
+                                  "Couldn't find matching :END: drawer")
+                            org-node-worker--result:problems)
+                      (throw 'entry-done t))
                   ;; Danger, Robinson
                   (setq DRAWER-END nil))
                 ;; Gotcha... collect links inside the heading
