@@ -2,7 +2,7 @@
 * org-node 0.4pre
 ** News
 - Did an unclean push that possibly broke updating on Straight/Elpaca, so I took this opportunity to rename branch "master" to "main".
-  - Development now happens in a separate "dev" branch, though "main" should usually be close enough to base PRs on.
+  - Development may or may not happen in a separate "dev" branch, but you can base PRs on "main".
 - Deprecated option =org-node-filename-fn= -- instead, configure =org-node-datestamp-format= and =org-node-slug-fn=.
   - The old option will work for a while.
 
@@ -10,6 +10,7 @@
 ** News
 The month of July brought many changes!  *If anything broke for you*, you can rollback to the 0.1pre branch.
 
+*** How to rollback
 With [[https://github.com/radian-software/straight.el][straight]], rollback like:
 #+begin_src elisp
 (use-package org-node

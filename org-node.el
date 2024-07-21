@@ -28,8 +28,6 @@
 
 ;;; Code:
 
-;; TODO The perf-* user options have almost no effect anymore, there
-;;      must be significant overhead on the child processes... nix it
 ;; TODO A workflow to allow pseudo-untitled (numeric-titled) nodes
 ;;      - Need a bunch of commands, like jump to node from fulltext search
 
@@ -46,8 +44,11 @@
 (declare-function 'org-super-links-convert-link-to-super "org-super-links")
 (declare-function 'consult--grep "consult")
 (declare-function 'consult--grep-make-builder "consult")
-(declare-function 'org-roam-capture "org-roam")
-(declare-function 'org-roam-node-slug "org-roam")
+(declare-function 'org-roam-node-slug "org-roam-node")
+(declare-function 'org-roam-node-create "org-roam-node")
+(declare-function 'org-node--try-launch-scan "org-node")
+(declare-function 'org-roam-capture- "org-roam-capture")
+(declare-function 'wgrep-change-to-wgrep-mode "wgrep")
 
 
 ;;;; Options
@@ -1038,6 +1039,7 @@ FILES, and remove the corresponding completion candidates."
 (defun org-node--dirty-ensure-link-known (&optional id &rest _)
   "Record the ID-link at point."
   (when (derived-mode-p 'org-mode)
+    (require 'org-element)
     (org-node--init-ids)
     (when-let ((origin (org-entry-get nil "ID" t))
                (dest (if (gethash id org-id-locations)
@@ -1224,38 +1226,35 @@ errors are very easy to miss."
     (error "%s" err-string)))
 
 (defun org-node--consent-to-bothersome-modes-for-mass-edit ()
-  (--all-p (if (and (boundp it) (symbol-value it))
-               (y-or-n-p (format "%S is active - proceed anyway?" it))
-             t)
-           '(auto-save-visited-mode
-             git-auto-commit-mode)))
+  (cl-loop for mode in '(auto-save-visited-mode
+                         git-auto-commit-mode)
+           when (and (boundp mode)
+                     (symbol-value mode)
+                     (not (y-or-n-p
+                           (format "%S is active - proceed anyway?" mode))))
+           return nil
+           finally return t))
 
 ;; Profiling
 ;; (progn (garbage-collect) (car (benchmark-run-compiled 10 (org-node-files))))
-(let (mem)
-  (defun org-node-files (&optional memoized)
-    "List files in `org-id-locations' or `org-node-extra-id-dirs'.
-
-With argument MEMOIZED t, return the same list as the last time
-something called this function, skipping work."
-    (if (and memoized mem)
-        mem
-      (setq mem
-            (-union
-             (hash-table-values org-id-locations)
-             (let ((file-name-handler-alist nil)) ;; cuts 200 ms to 70 ms
-               (cl-loop
-                for dir in org-node-extra-id-dirs
-                append (cl-loop
-                        for file in (directory-files-recursively
-                                     dir (rx (or ".org" ".org_archive") eos)
-                                     nil t)
-                        unless (cl-loop
-                                for exclude in org-node-extra-id-dirs-exclude
-                                when (string-search exclude file)
-                                return t)
-                        ;; Abbreviating because org-id does too
-                        collect (abbreviate-file-name file)))))))))
+(defun org-node-files (&optional _)
+  "List files in `org-id-locations' or `org-node-extra-id-dirs'."
+  (declare (advertised-calling-convention () "2024-07-21"))
+  (-union
+   (hash-table-values org-id-locations)
+   (let ((file-name-handler-alist nil)) ;; cuts 200 ms to 70 ms
+     (cl-loop
+      for dir in org-node-extra-id-dirs
+      append (cl-loop
+              for file in (directory-files-recursively
+                           dir (rx (or ".org" ".org_archive") eos)
+                           nil t)
+              unless (cl-loop
+                      for exclude in org-node-extra-id-dirs-exclude
+                      when (string-search exclude file)
+                      return t)
+              ;; Abbreviating because org-id does too
+              collect (abbreviate-file-name file))))))
 
 (defun org-node--forget-id-locations (files)
   "Remove references to FILES in `org-id-locations'.
@@ -1949,23 +1948,26 @@ as more \"truthful\" than today's date.
      (format-time-string org-node-datestamp-format)
      (funcall org-node-slug-fn title)
      ".org")))
+
 (defun org-node--time-format-to-regexp (format-string)
   "Rough"
   (let ((example (format-time-string format-string)))
     (if (string-match-p (rx (any "+([\\")) example)
         (error "org-node: Not set up to handle backslashes in datestamps")
-      (thread-last example
-                   (replace-regexp-in-string "[[:alpha:]]+" "[[:alpha:]]+")
-                   (replace-regexp-in-string "[[:digit:]]+" "[[:digit:]]+")
-                   (concat "^")))))
+      (concat "^"
+              (replace-regexp-in-string
+               "[[:digit:]]+" "[[:digit:]]+"
+               (replace-regexp-in-string
+                "[[:alpha:]]+" "[[:alpha:]]+"
+                example t))))))
 
-(defun org-node-rename-file-by-title-if-roam ()
+(defun org-node-rename-file-by-title-maybe ()
   "Rename current file according to TITLE.
 In addition to the checks described in
 `org-node-rename-file-by-title', will refuse to rename files that
 are outside `org-roam-directory'.  Suitable as a save hook:
 
-    (add-hook 'after-save-hook #'org-node-rename-file-by-title-if-roam)"
+    (add-hook 'after-save-hook #'org-node-rename-file-by-title-maybe)"
   (unless (bound-and-true-p org-roam-directory)
     (user-error "org-node-rename-file-by-title-if-roam: Variable `org-roam-directory' must be set"))
   (when (string-prefix-p (expand-file-name org-roam-directory)
@@ -1985,14 +1987,12 @@ When called from a hook (or from Lisp in general), will also
 check if the file appears to be under
 `org-roam-dailies-directory' or `org-journal-dir', and do nothing
 in these cases.  Used interactively, it is still possible to
-rename files in these directories (or if manually passing
+act on files in these directories (or if Lisp code passes
 INTERACTIVE t).
 
-Suitable as a save hook:
-
-    (add-hook 'after-save-hook #'org-node-rename-file-by-title)
-
-See also the alternative `org-node-rename-file-by-title-if-roam', which wraps this function."
+Note that it is rarely a good idea to run this on a save-hook.
+See the alternative `org-node-rename-file-by-title-maybe',
+which wraps this function."
   (interactive "p" org-mode)
   (when (stringp interactive)
     (user-error "org-node-rename-file-by-title: PATH argument deprecated"))
@@ -2029,7 +2029,8 @@ See also the alternative `org-node-rename-file-by-title-if-roam', which wraps th
                                                   (regexp-quote date-prefix)))
                (new-path (file-name-concat
                           (file-name-directory path)
-                          ;; HACK Use old behavior if old option set
+                          ;; HACK 2024-07-21
+                          ;; Use old behavior if old option set
                           (if org-node-filename-fn
                               (funcall org-node-filename-fn title)
                             (concat date-prefix
