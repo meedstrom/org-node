@@ -1963,54 +1963,77 @@ as more \"truthful\" than today's date.
 
 ;;;###autoload
 (defun org-node-rename-file-by-title (&optional path)
-  "Rename the current file according to `org-node-filename-fn'.
+  "Rename the current non-daily org-roam file according to match
+  a changed title.
 
-When called from Lisp, can take argument PATH to operate on the
-file located there."
+   When called from Lisp, can take argument PATH to operate on the
+   file located there.
+
+   It can be automated by adding:
+   `(add-hook 'after-save-hook #'org-node-rename-file-by-title)'."
   (interactive nil org-mode)
-  (unless (derived-mode-p 'org-mode)
-    (user-error "Only works in org-mode buffers"))
-  (unless path
-    (setq path (buffer-file-name)))
-  (unless (equal "org" (file-name-extension path))
-    (user-error "File doesn't end in .org: %s" path))
-  (let* ((title (or (cadar (org-collect-keywords '("TITLE")))
-                    (save-excursion
-                      (without-restriction
-                        (goto-char 1)
-                        (or (org-at-heading-p)
-                            (outline-next-heading))
-                        (org-get-heading t t t t)))))
-         (name (file-name-nondirectory path))
-         (new-path (file-name-concat (file-name-directory path)
-                                     (funcall org-node-filename-fn title)))
-         (visiting (find-buffer-visiting path))
-         (visiting-on-window (and visiting (get-buffer-window visiting))))
-    (if (equal path new-path)
-        (message "Filename already correct: %s" path)
-      (if (and visiting (buffer-modified-p visiting))
-          (message "Unsaved file, letting it be: %s" path)
-        (if (get-file-buffer new-path)
-            (message "A buffer is already visiting the would-be new filename")
-          (unless (file-writable-p path)
-            (user-error "No permissions to rename file: %s" path))
-          (unless (file-writable-p new-path)
-            (user-error "No permissions to write a new file at: %s" new-path))
-          ;; Unnecessary b/c `rename-file' will already warn, but hey
-          (when (file-exists-p new-path)
-            (user-error "Canceled because a file exists at: %s" new-path))
-          ;; Kill buffer before renaming, because it will not follow the rename
-          (when visiting
-            (kill-buffer visiting))
-          (rename-file path new-path)
-          ;; Visit the file again if you had it open
-          (when visiting
-            (let ((buf (find-file-noselect new-path)))
-              (when visiting-on-window
-                (set-window-buffer visiting-on-window buf))))
-          (message "File %s renamed to %s"
-                   (file-name-nondirectory path)
-                   (file-name-nondirectory new-path)))))))
+  (if (not (and
+            (derived-mode-p 'org-mode)
+            (string-prefix-p
+             (expand-file-name org-roam-directory)
+             (buffer-file-name))
+            (not (string-prefix-p
+                  (expand-file-name org-roam-dailies-directory)
+                  (buffer-file-name)))))
+      (when (called-interactively-p 'any)
+        (user-error "Only works in (non-daily) org-roam buffers"))
+    (unless path
+      (setq path (buffer-file-name)))
+    (unless (equal "org" (file-name-extension path))
+      (when (called-interactively-p 'any)
+        (user-error "File doesn't end in .org: %s" path)))
+    (let* ((title (or (cadar (org-collect-keywords '("TITLE")))
+                      (save-excursion
+                        (without-restriction
+                          (goto-char 1)
+                          (or (org-at-heading-p)
+                              (outline-next-heading))
+                          (org-get-heading t t t t)))))
+           (full-name (file-name-nondirectory path))
+           (date-prefix (car (split-string full-name "-")))
+           (unprefixed-name (cadr (split-string full-name "-")))
+           (new-path (file-name-concat
+                      (file-name-directory path)
+                      (concat date-prefix
+                              "-"
+                              (org-roam-node-slug
+                               (org-roam-node-create :title title)) ".org")))
+           (visiting (find-buffer-visiting path))
+           (visiting-on-window (and visiting (get-buffer-window visiting))))
+      (if (equal path new-path)
+          (when (called-interactively-p 'any)
+            (message "Filename already correct: %s" path))
+        (if (and visiting (buffer-modified-p visiting))
+            (when (called-interactively-p 'any)
+              (message "Unsaved file, letting it be: %s" path))
+          (if (get-file-buffer new-path)
+              (if (called-interactively-p 'any)
+                  (message "A buffer is already visiting the would-be new filename")
+                (user-error "A buffer is already visiting the would-be new filename"))
+            (unless (file-writable-p path)
+              (user-error "No permissions to rename file: %s" path))
+            (unless (file-writable-p new-path)
+              (user-error "No permissions to write a new file at: %s" new-path))
+            ;; Unnecessary b/c `rename-file' will already warn, but hey
+            (when (file-exists-p new-path)
+              (user-error "Canceled because a file exists at: %s" new-path))
+            ;; Kill buffer before renaming, because it will not follow the rename
+            (when visiting
+              (kill-buffer visiting))
+            (rename-file path new-path)
+            ;; Visit the file again if you had it open
+            (when visiting
+              (let ((buf (find-file-noselect new-path)))
+                (when visiting-on-window
+                  (set-window-buffer visiting-on-window buf))))
+            (message "File %s renamed to %s"
+                     (file-name-nondirectory path)
+                     (file-name-nondirectory new-path))))))))
 
 ;;;###autoload
 (defun org-node-rewrite-links-ask (&optional files)
