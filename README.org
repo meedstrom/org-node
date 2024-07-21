@@ -3,7 +3,8 @@
 ** News
 - Did an unclean push that possibly broke updating on Straight/Elpaca, so I took this opportunity to rename branch "master" to "main".
   - Development now happens in a separate "dev" branch, though "main" should usually be close enough to base PRs on.
-- Deprecated option =org-node-filename-fn= in favour of two options: =org-node-datestamp-format= and =org-node-slug-fn=.
+- Deprecated option =org-node-filename-fn= -- instead, configure =org-node-datestamp-format= and =org-node-slug-fn=.
+  - The old option will work for a while.
 
 * org-node 0.3
 ** News
