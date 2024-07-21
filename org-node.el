@@ -1954,11 +1954,11 @@ as more \"truthful\" than today's date.
 (defun org-node--name-file (title)
   (if org-node-filename-fn
       (concat (string-remove-suffix ".org"
-                                    (funcall #'org-node-filename-fn title))
+                                    (funcall org-node-filename-fn title))
               ".org")
     (concat
      (format-time-string org-node-datestamp-format)
-     (funcall #'org-node-slug-fn title)
+     (funcall org-node-slug-fn title)
      ".org")))
 (defun org-node--time-format-to-regexp (format-string)
   "Rough"
