@@ -16,7 +16,7 @@ The month of July brought many changes!
 Otherwise, you can use something like [[https://github.com/quelpa/quelpa][quelpa]] or [[https://github.com/slotThe/vc-use-package][vc-use-package]] in combination with =use-package=:
 
 #+begin_src elisp
-(use-package org-node 
+(use-package org-node
   :quelpa (org-node :fetcher github :repo "meedstrom/org-node" :commit "a29e5d6b07d9ae0319437e1d7bdbb9fe5967b30d")
   :hook (org-mode . org-node-cache-mode))
 #+end_src
@@ -24,7 +24,7 @@ Otherwise, you can use something like [[https://github.com/quelpa/quelpa][quelpa
 #+begin_src elisp
 (use-package org-node
   :vc (:fetcher github :repo "meedstrom/org-node" :rev "a29e5d6b07d9ae0319437e1d7bdbb9fe5967b30d")
-  :hook (org-mode . org-node-cache-mode))    
+  :hook (org-mode . org-node-cache-mode))
 #+end_src
 
 *** New features
@@ -158,7 +158,8 @@ These settings help you feel at home using both packages side-by-side:
 
 #+begin_src elisp
 (setq org-node-creation-fn #'org-node-new-via-roam-capture)
-(setq org-node-filename-fn #'org-node-slugify-like-roam)
+(setq org-node-slug-fn #'org-node-slugify-like-roam-actual)
+(setq org-node-datestamp-format "%Y%m%d%H%M%S-")
 #+end_src
 
 If you've struggled in the past with big files taking a long time to save, consider these org-roam settings:
@@ -364,7 +365,7 @@ Rarer commands:
 - =org-node-rewrite-links-ask=
   - Look for link descriptions that got out of sync with the current node title, then prompt at each link to update it
 - =org-node-rename-file-by-title=
-  - Auto-rename the file based on the current =#+title= and =org-node-filename-fn=
+  - Auto-rename the file based on the current =#+title= and =org-node-slug-fn=
 - =org-node-backlink-fix-all=
   - Update =BACKLINKS= property in all nodes (takes a while)
 - =org-node-grep=
