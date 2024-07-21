@@ -93,6 +93,22 @@
                             '(a v e e q l fk k k ki i o r r r r r r r r r r g g g g g gg)
                             4)))))
 
+(ert-deftest org-node-test--file-naming ()
+  (let ((org-node-filename-fn #'org-node-slugify-for-web))
+    (should (equal (org-node--name-file "19 Foo bar Baz 588")
+                   "19-foo-bar-baz-588.org")))
+  (let ((org-node-filename-fn nil)
+        (org-node-datestamp-format "")
+        (org-node-slug-fn #'org-node-slugify-for-web))
+    (should (equal (org-node--name-file "19 Foo bar Baz 588")
+                   "19-foo-bar-baz-588.org"))
+    (should (equal (funcall org-node-slug-fn "19 Foo bar Baz 588")
+                   "19-foo-bar-baz-588")))
+  (should (equal (org-node--time-format-to-regexp "%Y%M%d")
+                 "^[[:digit:]]+"))
+  (should (equal (org-node--time-format-to-regexp "%A%Y%M%d-")
+                 "^[[:alpha:]]+[[:digit:]]+-")))
+
 (ert-deftest org-node-test--various ()
   (let ((org-node-ask-directory "/tmp/org-node/test/")
         ;; NOTE you should manually test the other creation-fns
