@@ -2,6 +2,7 @@
 
 ;; One-shot variable warnings
 (let ((aliases '(org-node-cache-rescan-file-hook org-node-rescan-hook
+                 org-node-cache-reset-hook nil
                  org-node-format-candidate-fn nil
                  org-node-collection nil)))
   (defun org-node--warn-obsolete-variables ()
@@ -24,8 +25,8 @@ If INTERACTIVE, define it as an interactive function.  But
 remember, it is not autoloaded."
   `(let (warned-once)
      (defun ,old (&rest args)
-       ,@(if interactive '((interactive)))
        (declare (obsolete ',new "July 2024"))
+       ,@(if interactive '((interactive)))
        (unless warned-once
          (setq warned-once t)
          (lwarn 'org-node :warning "Your config uses old function name: %S,  new name: %S"
@@ -34,6 +35,10 @@ remember, it is not autoloaded."
 
 (org-node--defobsolete org-nodeify-entry
                        org-node-nodeify-entry t)
+
+;; Existed for just an hour or so
+(org-node--defobsolete org-node-rename-file-by-title-if-roam
+                       org-node-rename-file-by-title-maybe)
 
 (org-node--defobsolete org-node-random
                        org-node-visit-random t)
@@ -62,20 +67,21 @@ remember, it is not autoloaded."
 (org-node--defobsolete org-node-roam-no-sql-mode
                        org-node-fakeroam-nosql-mode t)
 
-;; New autoloads because fakeroam used to be loaded together with core
+;; New autoloads because fakeroam used to be loaded together with core (and
+;; didn't need autoloads)
 
 ;;;###autoload
-(defun org-node-feed-file-to-roam-db (&optional files)
+(defun org-node-feed-file-to-roam-db (&optional _)
   (declare (obsolete 'org-node-fakeroam--db-update-files "2024-07-11"))
   (display-warning 'org-node "Your config uses deprecated `org-node-feed-file-to-roam-db', use `org-node-fakeroam-db-feed-mode' instead"))
 
 ;;;###autoload
-(defun org-node--fabricate-roam-backlinks (&optional files)
+(defun org-node--fabricate-roam-backlinks (&optional _)
   (declare (obsolete 'org-node-fakeroam--mk-backlinks "2024-07-11"))
   (display-warning 'org-node "Your config uses deprecated `org-node--fabricate-roam-backlinks', use `org-node-fakeroam-nosql-mode' instead"))
 
 ;;;###autoload
-(defun org-node--fabricate-roam-reflinks (&optional files)
+(defun org-node--fabricate-roam-reflinks (&optional _)
   (declare (obsolete 'org-node-fakeroam--mk-reflinks "2024-07-11"))
   (display-warning 'org-node "Your config uses deprecated `org-node--fabricate-roam-reflinks', use `org-node-fakeroam-nosql-mode' instead"))
 
