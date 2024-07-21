@@ -497,9 +497,8 @@ delete too many backlinks on cleanup."
         (advice-add 'delete-file :after #'org-node--handle-save)
         (org-node-cache-ensure 'must-async t)
         (setq org-node--idle-timer
-              (run-with-idle-timer 60 t #'org-node--schedule-idle-reset))
-        (when (boundp 'org-node-cache-reset-hook)
-          (display-warning 'org-node "Deprecated 2024-07-11: org-node-cache-reset-hook removed, update your initfiles")))
+              (run-with-idle-timer
+               (* 30 (1+ org-node--time-elapsed)) nil #'org-node--scan-all)))
     (remove-hook 'after-save-hook #'org-node--handle-save)
     (remove-hook 'org-node-creation-hook #'org-node--dirty-ensure-node-known)
     (remove-hook 'org-node-insert-link-hook #'org-node--dirty-ensure-link-known)
@@ -507,6 +506,14 @@ delete too many backlinks on cleanup."
     (advice-remove 'org-insert-link #'org-node--dirty-ensure-link-known)
     (advice-remove 'rename-file #'org-node--handle-save)
     (advice-remove 'delete-file #'org-node--handle-save)))
+
+(defvar org-node--idle-timer (timer-create)
+  "Timer for intermittently checking `org-node-extra-id-dirs'
+for new, changed or deleted files.
+
+This redundant behavior helps detect changes made by something
+other than the current instance of Emacs, such as an user typing
+rm on the command line instead of using \\[delete-file].")
 
 (defun org-node-cache-ensure (&optional synchronous force)
   "Ensure that `org-node--id<>node' and other tables are ready for use.
@@ -587,24 +594,6 @@ advice on `rename-file' or `delete-file'."
     (when (--any-p (string-suffix-p it file)
                    '(".org" ".org_archive" ".org.gpg"))
       (org-node--scan-targeted (list file)))))
-
-;; Maybe?
-;; (add-hook 'org-node-insert-link-hook #'org-node--schedule-idle-reset)
-;; (add-hook 'org-open-at-point-functions #'org-node--schedule-idle-reset)
-(defun org-node--schedule-idle-reset (&rest _)
-  (cancel-timer org-node--idle-timer)
-  (setq org-node--idle-timer
-        (run-with-idle-timer
-         (* 30 (1+ org-node--time-elapsed)) nil #'org-node--schedule-idle-reset))
-  nil)
-
-(defvar org-node--idle-timer (timer-create)
-  "Timer for intermittently checking `org-node-extra-id-dirs'
-for new, changed or deleted files.
-
-This redundant behavior helps detect changes made by something
-other than the current instance of Emacs, such as an user typing
-rm on the command line instead of using \\[delete-file].")
 
 
 ;;;; Scanning
