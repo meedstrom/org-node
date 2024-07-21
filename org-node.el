@@ -1968,14 +1968,6 @@ as more \"truthful\" than today's date.
                    (replace-regexp-in-string "[[:alpha:]]+" "[[:alpha:]]+")
                    (replace-regexp-in-string "[[:digit:]]+" "[[:digit:]]+")
                    (concat "^")))))
-;; (org-node--time-format-to-regexp "%Y%m%d%H%M%S-")
-
-;; for roam users
-(setq org-node-datestamp-format "%Y%m%d%H%M%S-")
-(setq org-node-slug-fn #'org-node-slugify-like-roam-actual)
-
-;; (defun org-node-datestamp-like-roam ()
-;;   (format-time-string "%Y%m%d%H%M%S-"))
 
 (defun org-node-rename-file-by-title-if-roam ()
   "Rename current file according to TITLE.
