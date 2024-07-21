@@ -3,7 +3,7 @@
 (require 'ert)
 (require 'dash)
 (require 'org-node)
-(require 'org-node-roam)
+(require 'org-node-fakeroam)
 (require 'org-node-worker)
 (require 'org-node-backlink)
 
@@ -23,6 +23,7 @@
 ;;      org-super-links variable!  Easy peasy.
 (ert-deftest org-node-test--split-refs-field ()
   (let ((result
+         ;; TODO Simplify, noone is likely to insert a full [cite] as a ref
          (org-node-worker--split-refs-field
           "[cite:@citeKey abcd ; @citeKey2 cdefgh] @foo [[https://gnu.org/A Link With Spaces/index.htm][baz]] https://gnu.org ")))
     (should (--all-p (member it result)
