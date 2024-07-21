@@ -388,10 +388,10 @@ or you can visit the homepage:
               "Returns list of ancestor headings to this node.")
   (pos        nil :read-only t :type integer :documentation
               "Returns char position of the node. File-level node always 1.")
-  (properties nil :read-only t :type alist :documentation
-              "Returns alist of properties from the :PROPERTIES: drawer.")
   (priority   nil :read-only t :type string :documentation
               "Returns priority such as [#A], as a string.")
+  (properties nil :read-only t :type alist :documentation
+              "Returns alist of properties from the :PROPERTIES: drawer.")
   (refs       nil :read-only t :type list :documentation
               "Returns list of ROAM_REFS registered on the node.")
   (scheduled  nil :read-only t :type string :documentation
@@ -689,6 +689,9 @@ If left at nil, will be set at runtime to the result of
   "Compile org-node-worker.el, in case the user's package manager
 didn't do so already, or local changes have been made."
   (let* ((file-name-handler-alist nil)
+         ;; FIXME When working on a checked-out repo, this will still just find
+         ;;       elpaca/straight's clone.  So the developer has to paste in
+         ;;       the true library path here...
          (lib (find-library-name "org-node-worker"))
          (native-path (and (featurep 'native-compile)
                            (native-comp-available-p)
@@ -955,13 +958,9 @@ normal usage!  What's left undone til idle:
   :group 'org-node
   :type 'boolean)
 
-(defun org-node--record-node (node-recipe)
-  "Add a node to `org-node--id<>node' and other tables.
-
-The input NODE-RECIPE is a list of arguments for passing to
-`org-node--make-obj'."
-  (let* ((node (apply #'org-node--make-obj node-recipe))
-         (id (org-node-get-id node))
+(defun org-node--record-node (node)
+  "Add NODE to `org-node--id<>node' and related to other tables."
+  (let* ((id (org-node-get-id node))
          (path (org-node-get-file-path node))
          (refs (org-node-get-refs node)))
     ;; Share id location with org-id & do so with manual `puthash' and `push'
