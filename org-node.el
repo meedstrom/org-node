@@ -2030,10 +2030,11 @@ See also the alternative `org-node-rename-file-by-title-if-roam', which wraps th
                                   (outline-next-heading))
                               (org-get-heading t t t t)))))
                (basename (file-name-nondirectory path))
-               (date-prefix (progn
-                              (string-match (org-node--time-format-to-regexp
-                                             org-node-datestamp-format))
-                              (or (match-string 0 basename) "")))
+               (date-prefix (if (string-match (org-node--time-format-to-regexp
+                                               org-node-datestamp-format)
+                                              basename)
+                                (match-string 0 basename)
+                              ""))
                (unprefixed-name (string-trim-left basename
                                                   (regexp-quote date-prefix)))
                (new-path (file-name-concat
@@ -2042,7 +2043,8 @@ See also the alternative `org-node-rename-file-by-title-if-roam', which wraps th
                           (if org-node-filename-fn
                               (funcall org-node-filename-fn title)
                             (concat date-prefix
-                                    (funcall org-node-slug-fn title)))))
+                                    (funcall org-node-slug-fn title)
+                                    ".org"))))
                (visiting (find-buffer-visiting path))
                (visiting-on-window (and visiting (get-buffer-window visiting))))
 
