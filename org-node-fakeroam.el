@@ -97,15 +97,15 @@ Designed as override advice for `org-roam-backlinks-get'."
         (error "org-node-fakeroam: Going to get backlinks, but given nil id")
       (let ((links (gethash target-id org-node--dest<>links)))
         (cl-loop
-         for link-data in links
-         as src-id = (plist-get link-data :origin)
+         for link in links
+         as src-id = (org-node-link-origin link)
          as src-node = (gethash src-id org-node--id<>node)
          when src-node
          collect (org-roam-backlink-create
                   :target-node target-roam-node
                   :source-node (org-node-fakeroam--mk-node src-node)
-                  :point (plist-get link-data :pos)
-                  :properties (plist-get link-data :properties)))))))
+                  :point (org-node-link-pos link)
+                  :properties (org-node-link-properties link)))))))
 
 (defun org-node-fakeroam--mk-reflinks (target-roam-node &rest _)
   "Make org-roam-reflink objects targeting TARGET-ROAM-NODE.
@@ -117,14 +117,14 @@ Designed as override advice for `org-roam-reflinks-get'."
        for ref in (org-node-get-refs node)
        append (cl-loop
                for link in (gethash ref org-node--dest<>links)
-               as src-id = (plist-get link :origin)
+               as src-id = (org-node-link-origin link)
                as src-node = (gethash src-id org-node--id<>node)
                when src-node
                collect (org-roam-reflink-create
-                        :ref (plist-get link :dest)
+                        :ref (org-node-link-dest link)
                         :source-node (org-node-fakeroam--mk-node src-node)
-                        :point (plist-get link :pos)
-                        :properties (plist-get link :properties)))))))
+                        :point (org-node-link-pos link)
+                        :properties (org-node-link-pos properties)))))))
 
 
 ;;;; Feed method: supply data to Roam's DB
@@ -245,26 +245,25 @@ This includes all links and citations that touch NODE."
                              ;; Ref is a @citekey
                              (vector id (substring ref 1) "cite")))))
     ;; See `org-roam-db-insert-citation'
-    ;; Confu
     (dolist (cite (cl-loop for link in (org-node-get-reflinks node)
-                           when (null (plist-get link :type))
+                           when (null (org-node-link-type link))
                            collect link))
       (org-roam-db-query [:insert :into citations :values $v1]
-                         (vector (plist-get cite :origin)
-                                 (plist-get cite :dest)
-                                 (plist-get cite :pos)
-                                 (plist-get cite :properties))))
+                         (vector (org-node-link-origin cite)
+                                 (org-node-link-dest cite)
+                                 (org-node-link-pos cite)
+                                 (org-node-link-properties cite))))
     ;; See `org-roam-db-insert-link'
     (dolist (link (append (org-node-get-id-links node)
                           (org-node-get-reflinks node)))
       ;; Don't add citations (type=nil), they go in a separate table
-      (when (plist-get link :type)
+      (when (org-node-link-type link)
         (org-roam-db-query [:insert :into links :values $v1]
-                           (vector (plist-get link :pos)
-                                   (plist-get link :origin)
+                           (vector (org-node-link-pos link)
+                                   (org-node-link-origin link)
                                    id
-                                   (plist-get link :type)
-                                   (plist-get link :properties)))))))
+                                   (org-node-link-type link)
+                                   (org-node-link-properties properties)))))))
 
 (provide 'org-node-fakeroam)
 

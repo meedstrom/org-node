@@ -123,7 +123,7 @@ REMOVE, remove it instead."
                   (append (org-node-get-id-links node)
                           (org-node-get-reflinks node))
                   ;; Extract just the origin IDs
-                  (--map (plist-get it :origin))
+                  (-map  #'org-node-link-origin)
                   (-uniq)
                   (-non-nil) ;; REVIEW no nils anymore, I hope
                   (-sort #'string-lessp)

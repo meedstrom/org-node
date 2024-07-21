@@ -190,12 +190,13 @@ process does not have to load org.el."
                   (goto-char (pos-bol))
                   (or (looking-at-p "[[:space:]]*# ")
                       (looking-at-p "[[:space:]]*#\\+")))
-          (push (list :origin id-here
-                      :pos (point)
-                      :type link-type
-                      :dest path
-                      ;; Because org-roam asks for it
-                      :properties (list :outline olp-with-self))
+          (push (record 'org-node-link
+                        id-here
+                        (point)
+                        link-type
+                        path
+                        ;; Because org-roam asks for it
+                        (list :outline olp-with-self))
                 org-node-worker--result:found-links))))
     ;; Start over and look for @citekeys
     (goto-char beg)
@@ -214,12 +215,13 @@ process does not have to load org.el."
                 ;; On a # comment or #+keyword, skip citation
                 ;; (NOTE: don't skip whole line as in the other fn)
                 (goto-char closing-bracket)
-              (push (list :origin id-here
-                          :pos (point)
-                          :type nil
-                          :dest (match-string 0)
-                          ;; Because org-roam asks for it
-                          :properties (list :outline olp-with-self))
+              (push (record 'org-node-link
+                            id-here
+                            (point)
+                            nil
+                            (match-string 0)
+                            ;; Because org-roam asks for it
+                            (list :outline olp-with-self))
                     org-node-worker--result:found-links)))))))
   (goto-char (or end (point-max))))
 

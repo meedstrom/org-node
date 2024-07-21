@@ -403,6 +403,15 @@ or you can visit the homepage:
   (todo       nil :read-only t :type string :documentation
               "Returns node's TODO state."))
 
+(cl-defstruct (org-node-link (:constructor org-node-link--make-obj)
+                             (:copier nil)
+                             (:conc-name org-node-link-))
+  origin
+  pos
+  type
+  dest
+  properties)
+
 
 ;;;; Tables
 
@@ -884,7 +893,8 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
     (seq-let (missing-files _ nodes path<>type links errors) results
       (org-node--forget-id-locations missing-files)
       (dolist (link links)
-        (push link (gethash (plist-get link :dest) org-node--dest<>links)))
+        (push link
+              (gethash (org-node-link-dest link) org-node--dest<>links)))
       (dolist (pair path<>type)
         (puthash (car pair) (cdr pair) org-node--uri-path<>uri-type))
       (dolist (node nodes)
@@ -913,14 +923,14 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
       ;; 500 nodes & 6600 links. Borked?  TODO: Test whether dups accrete
       (cl-loop with ids-of-nodes-scanned = (cl-loop
                                             for node in nodes
-                                            collect (plist-get node :id))
+                                            collect (org-node-get-id node))
                with to-clean = nil
                for link-set being the hash-values of org-node--dest<>links
                using (hash-keys dest)
                do (cl-loop
                    with clean-this-dest = nil
                    for link in link-set
-                   if (member (plist-get link :origin) ids-of-nodes-scanned)
+                   if (member (org-node-link-origin link) ids-of-nodes-scanned)
                    do (setq clean-this-dest t)
                    else collect link into cleaned-link-set
                    finally do
@@ -931,7 +941,7 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
                  (puthash (car pair) (cdr pair) org-node--dest<>links)))
       ;; Having erased links by :origin, it's safe to add them (again).
       (dolist (link links)
-        (push link (gethash (plist-get link :dest) org-node--dest<>links))))
+        (push link (gethash (org-node-link-dest link) org-node--dest<>links))))
     (dolist (pair path<>type)
       (puthash (car pair) (cdr pair) org-node--uri-path<>uri-type))
     (dolist (node nodes)
@@ -1045,12 +1055,13 @@ FILES, and remove the corresponding completion candidates."
                        (let ((elm (org-element-context)))
                          (when (equal "id" (org-element-property :type elm))
                            (org-element-property :path elm))))))
-      (push (list :origin origin
-                  :pos (point)
-                  :type "id"
-                  :dest dest
-                  :properties (list :outline (ignore-errors
-                                               (org-get-outline-path t))))
+      (push (org-node-link--make-obj
+             :origin origin
+             :pos (point)
+             :type "id"
+             :dest dest
+             :properties (list :outline (ignore-errors
+                                          (org-get-outline-path t))))
             (gethash dest org-node--dest<>links)))))
 
 (defun org-node--dirty-ensure-node-known ()
@@ -2313,7 +2324,8 @@ network to quality-control it.  Rationale:
   (unless (executable-find "Rscript")
     (user-error
      "This command requires GNU R, with R packages tidyverse and igraph"))
-  (let ((r-code "library(stringr)
+  (let ((feedbacks nil)
+        (r-code "library(stringr)
 library(readr)
 library(igraph)
 
@@ -2382,8 +2394,8 @@ destination-origin pairs, expressed as Tab-Separated Values."
             using (hash-values links)
             append (cl-loop
                     for link in links
-                    when (equal "id" (plist-get link :type))
-                    collect (concat dest "\t" (plist-get link :origin)))))
+                    when (equal "id" (org-node-link-type link))
+                    collect (concat dest "\t" (org-node-link-origin link)))))
     "\n")))
 
 ;; TODO command to list the coding systems of all files
@@ -2403,7 +2415,7 @@ destination-origin pairs, expressed as Tab-Separated Values."
                   using (hash-values links)
                   unless (gethash dest org-node--id<>node)
                   append (cl-loop for link in links
-                                  when (equal "id" (plist-get link :type))
+                                  when (equal "id" (org-node-link-type link))
                                   collect (cons dest link)))))
     (message "%d dead links found" (length dead-links))
     (pop-to-buffer (get-buffer-create "*Dead Links*"))
@@ -2416,12 +2428,12 @@ destination-origin pairs, expressed as Tab-Separated Values."
     (setq tabulated-list-entries
           (cl-loop
            for (dest . link) in dead-links
-           as origin-node = (gethash (plist-get link :origin)
+           as origin-node = (gethash (org-node-link-origin link)
                                      org-node--id<>node)
-           if (not (equal dest (plist-get link :dest)))
-           do (error "IDs not equal: %s, %s" dest (plist-get link :dest))
+           if (not (equal dest (org-node-link-dest link)))
+           do (error "IDs not equal: %s, %s" dest (org-node-link-dest link))
            else if (not origin-node)
-           do (error "Node not found for ID: %s" (plist-get link :origin))
+           do (error "Node not found for ID: %s" (org-node-link-origin link))
            else
            collect (list link
                          (vector
@@ -2429,11 +2441,12 @@ destination-origin pairs, expressed as Tab-Separated Values."
                                 'face 'link
                                 'action `(lambda (_button)
                                            (org-node--goto ,origin-node)
-                                           (goto-char ,(plist-get link :pos)))
+                                           (goto-char ,(org-node-link-pos link)))
                                 'follow-link t)
                           dest))))
     (tabulated-list-print)))
 
+;; FIXME
 (defun org-node-list-reflinks ()
   "List all reflinks and their locations.
 
@@ -2445,7 +2458,7 @@ to ROAM_REFS."
                       for list being the hash-values of org-node--dest<>links
                       append (cl-loop
                               for link in list
-                              unless (equal "id" (plist-get link :type))
+                              unless (equal "id" (org-node-link-type link))
                               collect link))))
     (with-current-buffer (get-buffer-create "*org-node reflinks*")
       (tabulated-list-mode)
@@ -2457,7 +2470,10 @@ to ROAM_REFS."
       (tabulated-list-init-header)
       (setq tabulated-list-entries nil)
       (dolist (link plain-links)
-        (-let (((&plist :type :dest :origin :pos) link))
+        (let ((type (org-node-link-type link))
+              (dest (org-node-link-dest link))
+              (origin (org-node-link-origin link))
+              (pos (org-node-link-pos link)))
           (let ((node (gethash origin org-node--id<>node)))
             (push (list link
                         (vector
