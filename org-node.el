@@ -49,6 +49,7 @@
 (declare-function 'org-node--try-launch-scan "org-node")
 (declare-function 'org-roam-capture- "org-roam-capture")
 (declare-function 'wgrep-change-to-wgrep-mode "wgrep")
+(declare-function 'wgrep-finish-edit "wgrep")
 
 
 ;;;; Options
@@ -1245,14 +1246,13 @@ errors are very easy to miss."
            return nil
            finally return t))
 
-;; Profiling
-;; (progn (garbage-collect) (car (benchmark-run-compiled 10 (org-node-files))))
+;; (progn (byte-compile #'org-node-files) (garbage-collect) (benchmark-run 10 (org-node-files)))
 (defun org-node-files (&optional _)
   "List files in `org-id-locations' or `org-node-extra-id-dirs'."
-  (declare (advertised-calling-convention () "2024-07-21"))
-  (-union
+  (declare (advertised-calling-convention nil "2024-07-21"))
+  (-union ;; 10x faster than `seq-union'
    (hash-table-values org-id-locations)
-   (let ((file-name-handler-alist nil)) ;; cuts 200 ms to 70 ms
+   (let ((file-name-handler-alist nil)) ;; Cuts 200 ms to 70 ms
      (cl-loop
       for dir in org-node-extra-id-dirs
       append (cl-loop
@@ -1280,6 +1280,7 @@ for you."
 
 ;;;; Filename functions
 
+;; (progn (byte-compile #'org-node--root-dirs) (garbage-collect) (benchmark-run 100 (org-node--root-dirs (hash-table-values org-id-locations)))
 (defun org-node--root-dirs (file-list)
   "Infer root directories of FILE-LIST.
 
@@ -1306,8 +1307,8 @@ contains no members of FILE-LIST itself.
 
 FILE-LIST must be a list of full paths.  This function does not
 consult the filesystem, just compares substrings to each other."
-  (let* ((files (-uniq file-list))
-         (dirs (-uniq (mapcar #'file-name-directory files))))
+  (let* ((files (seq-uniq file-list))
+         (dirs (seq-uniq (mapcar #'file-name-directory files))))
     ;; Example: if there is /home/roam/courses/Math1A/, but ancestor dir
     ;; /home/roam/ is also a member of the set, throw out the child
     (cl-loop for dir in dirs
@@ -2260,8 +2261,7 @@ to `org-node-extra-id-dirs-exclude'."
          (report-buffer (get-buffer-create "*org-node lint report*"))
          (files (-difference (org-node-files) org-node--linted))
          (ctr (length org-node--linted))
-         (ctrmax (+ (length files) (length org-node--linted)))
-         (entries nil))
+         (ctrmax (+ (length files) (length org-node--linted))))
     (with-current-buffer report-buffer
       (when (or (null files) C-u)
         ;; Start over
@@ -2390,17 +2390,17 @@ destination-origin pairs, expressed as Tab-Separated Values."
   (concat
    "src\tdest\n"
    (string-join
-    (-uniq (cl-loop
-            for dest being the hash-keys of org-node--dest<>links
-            using (hash-values links)
-            append (cl-loop
-                    for link in links
-                    when (equal "id" (org-node-link-type link))
-                    collect (concat dest "\t" (org-node-link-origin link)))))
+    (seq-uniq (cl-loop
+               for dest being the hash-keys of org-node--dest<>links
+               using (hash-values links)
+               append (cl-loop
+                       for link in links
+                       when (equal "id" (org-node-link-type link))
+                       collect (concat dest "\t" (org-node-link-origin link)))))
     "\n")))
 
 ;; TODO command to list the coding systems of all files
-;;      to help with `org-node-perf-assume-coding-system'
+;;      to help validate `org-node-perf-assume-coding-system'
 ;; (defvar org-node--found-systems nil)
 ;; (defun org-node-list-file-coding-systems ()
 ;;   (dolist (file (take 20 (org-node-files)))
@@ -2447,7 +2447,6 @@ destination-origin pairs, expressed as Tab-Separated Values."
                           dest))))
     (tabulated-list-print)))
 
-;; FIXME
 (defun org-node-list-reflinks ()
   "List all reflinks and their locations.
 
