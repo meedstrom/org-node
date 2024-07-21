@@ -1,30 +1,33 @@
 #+startup: content
+* org-node 0.4pre
+** News
+- Did an unclean push that possibly broke updating on Straight/Elpaca, so I took this opportunity to rename branch "master" to "main".
+  - Development now happens in a separate "dev" branch, though "main" should usually be close enough to base PRs on.
+- Deprecated option =org-node-filename-fn= in favour of two options: =org-node-datestamp-format= and =org-node-slug-fn=.
+
 * org-node 0.3
 ** News
-The month of July brought many changes!
+The month of July brought many changes!  *If anything broke for you*, you can rollback to the 0.1pre branch.
 
-*** Reversion instructions
-*If anything broke for you*, you can rollback to the 0.1pre branch. If you use [[https://github.com/radian-software/straight.el][straight]], you can do this like this:
-
+With [[https://github.com/radian-software/straight.el][straight]], rollback like:
 #+begin_src elisp
 (use-package org-node
   :straight (org-node :type git :host github :repo "meedstrom/org-node"
-                      :branch "0.1pre")
-  :hook (org-mode . org-node-cache-mode))
+                      :branch "0.1pre"))
 #+end_src
 
-Otherwise, you can use something like [[https://github.com/quelpa/quelpa][quelpa]] or [[https://github.com/slotThe/vc-use-package][vc-use-package]] in combination with =use-package=:
-
+With [[https://github.com/quelpa/quelpa][quelpa]]:
 #+begin_src elisp
 (use-package org-node
-  :quelpa (org-node :fetcher github :repo "meedstrom/org-node" :commit "a29e5d6b07d9ae0319437e1d7bdbb9fe5967b30d")
-  :hook (org-mode . org-node-cache-mode))
+  :quelpa (org-node :fetcher github :repo "meedstrom/org-node"
+                    :commit "a29e5d6b07d9ae0319437e1d7bdbb9fe5967b30d"))
 #+end_src
 
+With [[https://github.com/slotThe/vc-use-package][vc-use-package]]:
 #+begin_src elisp
 (use-package org-node
-  :vc (:fetcher github :repo "meedstrom/org-node" :rev "a29e5d6b07d9ae0319437e1d7bdbb9fe5967b30d")
-  :hook (org-mode . org-node-cache-mode))
+  :vc (:fetcher github :repo "meedstrom/org-node"
+                :rev "a29e5d6b07d9ae0319437e1d7bdbb9fe5967b30d"))
 #+end_src
 
 *** New features
@@ -44,12 +47,9 @@ Otherwise, you can use something like [[https://github.com/quelpa/quelpa][quelpa
 - New command: =org-node-list-dead-links=
 - New command: =org-node-list-reflinks=
 - New command: =org-node-list-feedback-arcs=
-- New command: =org-node-list-scan-problems=
-- New command: =org-node-list-collisions=
 - New command: =org-node-grep=
 
 *Renames*
-- Rename command =org-node-random= to =org-node-visit-random=
 - Rename many functions and variables
   - Don't worry, you'll get warning messages for each old name set/used in your initfiles
 
@@ -59,7 +59,7 @@ Otherwise, you can use something like [[https://github.com/quelpa/quelpa][quelpa
 *Changes*
 - Minibuffer completions are now "rich" by default.  To revert to vanilla, set =(setq org-node-affixation-fn #'org-node-affix-bare)=.
 - Don't automatically turn on cache-mode, just pester the user
-- Command =org-node-put-created= now respects =org-timestamp-formats= instead of just putting the date as [YYYY-MM-DD].
+- Command =org-node-put-created= respects =org-timestamp-formats= instead of just putting the date as [YYYY-MM-DD].
 - Visiting a node will now reveal the surrounding Org context and do =(recenter 0)=.  If you prefer another behavior, redefine =org-node--goto=.
 - Perf: backlink-mode no longer tries to clean up =:CACHED_BACKLINKS:= (deprecated in May); if you still have those lying around, checkout 0.1pre and run =M-x org-node-backlink-fix-all=
 - Many fixes
