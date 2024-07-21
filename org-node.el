@@ -49,8 +49,7 @@
 (define-obsolete-variable-alias
   'org-node-collection 'org-node--candidate<>node "2024-07-11")
 
-(let ((aliases '(org-node-slug-fn org-node-filename-fn
-                 org-node-cache-rescan-file-hook org-node-rescan-hook
+(let ((aliases '(org-node-cache-rescan-file-hook org-node-rescan-hook
                  org-node-format-candidate-fn nil)))
   (defun org-node--warn-obsolete-variables ()
     "To be called when turning a mode on."
