@@ -1,10 +1,11 @@
 #+startup: content
 * org-node 0.4pre
 ** News
-- Did an unclean push that possibly broke updating on Straight/Elpaca, so I took this opportunity to rename branch "master" to "main".
-  - Development may or may not happen in a separate "dev" branch, but you can base PRs on "main".
-- Deprecated option =org-node-filename-fn= -- instead, configure =org-node-datestamp-format= and =org-node-slug-fn=.
-  - The old option will work for a while.
+- Fixed bug eating CPU during idle, sorry about that!
+- Renamed default branch "master" to "main".  GitHub says the transition is automatic... we'll see.
+  - Created "dev" branch for unstable/untested work.
+- Deprecated option =org-node-filename-fn= (again) -- instead, configure =org-node-datestamp-format= and =org-node-slug-fn=.
+  - Why? This lets =org-node-rename-file-by-title-maybe= preserve the date prefix if there is one.
 
 * org-node 0.3
 ** News
@@ -64,7 +65,6 @@ With [[https://github.com/slotThe/vc-use-package][vc-use-package]]:
 - Command =org-node-put-created= respects =org-timestamp-formats= instead of just putting the date as [YYYY-MM-DD].
 - Visiting a node will now reveal the surrounding Org context and do =(recenter 0)=.  If you prefer another behavior, redefine =org-node--goto=.
 - Perf: backlink-mode no longer tries to clean up =:CACHED_BACKLINKS:= (deprecated in May); if you still have those lying around, checkout 0.1pre and run =M-x org-node-backlink-fix-all=
-- Many fixes
 
 ** What's all this
 
@@ -359,24 +359,24 @@ Basic commands:
 Rarer commands:
 
 - =org-node-lint-all-files=
-  - Can help you fix a broken setup: it runs org-lint on all known files and generates a report of syntax problems.  Org-node [[https://github.com/meedstrom/org-node/issues/8#issuecomment-2101316447][assumes all files have valid syntax]].
+  - Can help you fix a broken setup: it runs org-lint on all known files and generates a report of syntax problems, for you to correct at will.  Org-node [[https://github.com/meedstrom/org-node/issues/8#issuecomment-2101316447][assumes all files have valid syntax]], though many of the problems reported by org-lint are survivable.
 - =org-node-list-dead-links=
   - List links where the destination ID could not be found
 - =org-node-list-reflinks=
   - List citations and non-ID links
 - =org-node-rewrite-links-ask=
-  - Look for link descriptions that got out of sync with the current node title, then prompt at each link to update it
+  - Look for link descriptions that got out of sync with the corresponding node title, then prompt at each link to update it
 - =org-node-rename-file-by-title=
-  - Auto-rename the file based on the current =#+title= and =org-node-slug-fn=
+  - Auto-rename the file based on the current =#+title=
 - =org-node-backlink-fix-all=
-  - Update =BACKLINKS= property in all nodes (takes a while)
+  - Update =BACKLINKS= property in all nodes
 - =org-node-grep=
   - (Requires [[https://github.com/minad/consult][consult]]) Grep across all known Org files.  Very useful combined with [[https://github.com/oantolin/embark][embark]]-export & [[wgrep][wgrep]], to search-and-replace a given string everywhere in every directory, for example to rename a tag everywhere.
 - =org-node-list-feedback-arcs=
   - (Requires GNU R) Explore [[https://en.wikipedia.org/wiki/Feedback_arc_set][feedback arcs]] in your ID link network.  Can be a nice [[https://edstrom.dev/zvjjm/slipbox-workflow#ttqyc][occasional QA routine]].
 - =org-node-rename-asset-and-rewrite-links=
   - Interactively rename an asset such as an image file and try to update all Org links to them.  Requires [[https://github.com/mhayashi1120/Emacs-wgrep][wgrep]].
-    - NOTE: For now, it only looks for links inside the root directory that it prompts you for, and sub and sub-subdirectories and so on -- but won't find a link in a completely different place.  Like if you have Org files under /media linking to assets in /home, those links won't be updated.
+    - NOTE: For now, it only looks for links inside the root directory that it prompts you for, and sub and sub-subdirectories and so on -- but won't find a link outside that root directory.  Like if you have Org files under /mnt linking to assets in /home, those links won't be updated.
 
 * Appendix
 ** Appendix I: Rosetta stone
