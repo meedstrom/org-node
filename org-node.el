@@ -185,8 +185,7 @@ NOT applied by `org-node-new-via-roam-capture' -- see org-roam's
 `org-roam-capture-new-node-hook' instead.
 
 A good member to put in this hook is `org-node-put-created',
-especially since the default `org-node-filename-fn' does not put
-a timestamp in the filename."
+since the default `org-node-datestamp-format' is null."
   :group 'org-node
   :type 'hook)
 
@@ -271,7 +270,7 @@ To read more about affixations, see docstring
 one candidate at a time, not the whole collection.
 
 It receives two arguments: NODE and TITLE, and it must return a
-list of three strings: completion, prefix and suffix.
+list of three strings: title, prefix and suffix.
 
 NODE is an object which form you can observe in examples from
 \\[org-node-peek] and specified in type `org-node'
@@ -312,6 +311,17 @@ For use as `org-node-affixation-fn'."
   "Take COLL and return precomputed affixations for each member."
   (cl-loop for title in coll
            collect (gethash title org-node--title<>affixation-triplet)))
+
+;; ;; Debug version
+;; (defun org-node--affixate-collection (coll)
+;;   "Take COLL and return precomputed affixations for each member."
+;;   (cl-loop for title in coll
+;;            as triplet = (gethash title org-node--title<>affixation-triplet)
+;;            if (car triplet) collect triplet else do
+;;            (error "nil triplet for title %s" title)))
+;; (gethash nil org-node--title<>affixation-triplet)
+;; (gethash nil org-node--candidate<>node)
+;; (gethash nil org-node--cand)
 
 (defun org-node-collection (str pred action)
   "Custom COLLECTION for `completing-read'.
@@ -1363,11 +1373,18 @@ Built-in choices:
 (defcustom org-node-datestamp-format ""
   "Passed to `format-time-string' to prepend to filenames.
 
-Example: \"%Y%m%d%H%M%S-\"."
+Example from Org-roam: \"%Y%m%d%H%M%S-\"
+Example from Denote: \"%Y%m%dT%H%M%S--\""
   :type 'string)
 
-;; DEPRECATED
-(defvar org-node-filename-fn nil)
+(defvar org-node-filename-fn nil
+  "Deprecated. Please set these variables
+
+- `org-node-datestamp-format'
+- `org-node-slug-fn'
+
+and then set this variable to nil (or remove from initfiles and
+restart).")
 
 ;; Useful test cases if you want to hack on this!
 
@@ -1971,6 +1988,7 @@ as more \"truthful\" than today's date.
                 "[[:alpha:]]+" "[[:alpha:]]+"
                 example t))))))
 
+;; FIXME (buffer-modified-p) returns t on after-save-hook
 (defun org-node-rename-file-by-title-maybe ()
   "Rename current file according to TITLE.
 In addition to the checks described in
