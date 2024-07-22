@@ -6,6 +6,7 @@
   - Created "dev" branch for unstable/untested work.
 - Deprecated option =org-node-filename-fn= (again) -- instead, configure =org-node-datestamp-format= and =org-node-slug-fn=.
   - Why? This lets =org-node-rename-file-by-title-maybe= preserve the date prefix if there is one.
+- (For programmers) Links are now represented by struct objects "org-node-link", and not by plists
 
 * org-node 0.3
 ** News
