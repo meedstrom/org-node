@@ -2258,8 +2258,10 @@ this action may make no practical impact unless you also add DIR
 to `org-node-extra-id-dirs-exclude'."
   (interactive "DForget all IDs in directory: ")
   (org-node-cache-ensure t)
-  (let ((files (-intersection (directory-files-recursively dir "\\.org$")
-                              (hash-table-values org-id-locations))))
+  (let ((files (seq-intersection
+                (mapcar #'abbreviate-file-name
+                        (directory-files-recursively dir "\\.org$"))
+                (hash-table-values org-id-locations))))
     (when files
       (message "Forgetting all IDs in directory... (%s)" dir)
       (org-node--forget-id-locations files)
