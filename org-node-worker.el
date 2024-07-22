@@ -415,7 +415,7 @@ list, and write results to another temp file."
                           (or (cdr (assoc "ROAM_ALIASES" PROPS)) ""))
                          nil
                          FILE
-                         FILE-TITLE-OR-BASENAME
+                         FILE-TITLE
                          FILE-TITLE-OR-BASENAME
                          FILE-ID
                          nil
@@ -428,7 +428,7 @@ list, and write results to another temp file."
                           (cdr (assoc "ROAM_REFS" PROPS)))
                          nil
                          FILE-TAGS
-                         FILE-TITLE
+                         FILE-TITLE-OR-BASENAME ;; Title mandatory
                          nil)
                  result:found-nodes))
               (goto-char (point-max))
