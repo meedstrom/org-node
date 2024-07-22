@@ -1975,16 +1975,22 @@ as more \"truthful\" than today's date.
       (concat (string-remove-suffix ".org"
                                     (funcall org-node-filename-fn title))
               ".org")
-    (concat
-     (format-time-string org-node-datestamp-format)
-     (funcall org-node-slug-fn title)
-     ".org")))
+    (if org-node-slug-fn
+        (concat
+         (and org-node-datestamp-format
+              (format-time-string org-node-datestamp-format))
+         (funcall org-node-slug-fn title)
+         ".org")
+      (error "`org-node-slug-fn' not set"))))
 
+;; Special purpose
 (defun org-node--time-format-to-regexp (format-string)
-  "Rough"
+  "Attempt to generate a regexp that would match anything produced
+when FORMAT-STRING is given to `format-time-string'.
+Rough."
   (let ((example (format-time-string format-string)))
-    (if (string-match-p (rx (any "+([\\")) example)
-        (error "org-node: Not set up to handle backslashes in datestamps")
+    (if (string-match-p (rx (any "^*+([\\")) example)
+        (error "org-node: Not prepared to rename files with current `org-node-datestamp-format'")
       (concat "^"
               (replace-regexp-in-string
                "[[:digit:]]+" "[[:digit:]]+"
@@ -2052,9 +2058,11 @@ which wraps this function."
                                   (outline-next-heading))
                               (org-get-heading t t t t)))))
                (basename (file-name-nondirectory path))
-               (date-prefix (if (string-match (org-node--time-format-to-regexp
-                                               org-node-datestamp-format)
-                                              basename)
+               (date-prefix (if (and org-node-datestamp-format
+                                     (string-match
+                                      (org-node--time-format-to-regexp
+                                       org-node-datestamp-format)
+                                      basename))
                                 (match-string 0 basename)
                               ""))
                (unprefixed-name (string-trim-left basename
