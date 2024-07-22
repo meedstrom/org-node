@@ -506,7 +506,6 @@ delete too many backlinks on cleanup."
   :global t
   :group 'org-node
   (remove-hook 'org-mode-hook #'org-node-cache-mode)
-  (cancel-timer org-node--idle-timer)
   (if org-node-cache-mode
       (progn
         (add-hook 'after-save-hook #'org-node--handle-save)
@@ -516,10 +515,8 @@ delete too many backlinks on cleanup."
         (advice-add 'org-insert-link :after #'org-node--dirty-ensure-link-known)
         (advice-add 'rename-file :after #'org-node--handle-save)
         (advice-add 'delete-file :after #'org-node--handle-save)
-        (org-node-cache-ensure 'must-async t)
-        (setq org-node--idle-timer
-              (run-with-idle-timer
-               (* 30 (1+ org-node--time-elapsed)) nil #'org-node--scan-all)))
+        (org-node-cache-ensure 'must-async t))
+    (cancel-timer org-node--idle-timer)
     (remove-hook 'after-save-hook #'org-node--handle-save)
     (remove-hook 'org-node-creation-hook #'org-node--dirty-ensure-node-known)
     (remove-hook 'org-node-insert-link-hook #'org-node--dirty-ensure-link-known)
@@ -527,14 +524,6 @@ delete too many backlinks on cleanup."
     (advice-remove 'org-insert-link #'org-node--dirty-ensure-link-known)
     (advice-remove 'rename-file #'org-node--handle-save)
     (advice-remove 'delete-file #'org-node--handle-save)))
-
-(defvar org-node--idle-timer (timer-create)
-  "Timer for intermittently checking `org-node-extra-id-dirs'
-for new, changed or deleted files.
-
-This redundant behavior helps detect changes made by something
-other than the current instance of Emacs, such as an user typing
-rm on the command line instead of using \\[delete-file].")
 
 (defun org-node-cache-ensure (&optional synchronous force)
   "Ensure that `org-node--id<>node' and other tables are ready for use.
@@ -751,7 +740,7 @@ function to update current tables."
         (coding-system-for-read org-node-perf-assume-coding-system)
         (coding-system-for-write org-node-perf-assume-coding-system))
     (when org-node--debug (garbage-collect))
-    (setq org-node--time-at-init-scan (current-time))
+    (setq org-node--time-at-scan-begin (current-time))
     (setq org-node--done-ctr 0)
     (when (-any-p #'process-live-p org-node--processes)
       ;; We should never end up here, but just in case
@@ -812,7 +801,7 @@ function to update current tables."
             (message "Maybe disable editorconfig-mode while debugging"))
           (load-file compiled-lib)
           (garbage-collect)
-          (setq org-node--time-at-init-scan (current-time))
+          (setq org-node--time-at-scan-begin (current-time))
           (with-current-buffer (get-buffer-create "*org-node debug*")
             (when (eq 'show org-node--debug)
               (pop-to-buffer (current-buffer)))
@@ -913,16 +902,30 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
         (org-node--record-node node))
       (dolist (err errors)
         (push err org-node--problems))
+      (org-id-locations-save)
+      (setq org-node--time-elapsed
+            ;; For reproducible profiling: don't count time taken by
+            ;; other sentinels or timers or I/O in between
+            (+ (float-time
+                (time-subtract (current-time)
+                               org-node--time-at-finalize))
+               (float-time
+                (time-subtract org-node--time-at-last-child-done
+                               org-node--time-at-scan-begin))))
+      ;; Now begin the idle timer... this would have been done in the mode
+      ;; turn-on, but I wanted to base it on --time-elapsed
+      (unless (member org-node--idle-timer timer-idle-list)
+        (setq org-node--idle-timer
+              (run-with-idle-timer
+               (* 30 (1+ org-node--time-elapsed)) t #'org-node--scan-all)))
       ;; Don't add to emacs init noise
       (if org-node--first-init
           (setq org-node--first-init nil)
-        (org-id-locations-save)
         (org-node--print-elapsed)
         (when (and org-node--collisions org-node-warn-title-collisions)
           (message "Some nodes have same title, see M-x org-node-list-collisions"))
         (when errors
           (message "Scan had problems, see M-x org-node-list-scan-problems"))))))
-
 
 (defun org-node--finalize-modified (results)
   (seq-let (missing-files found-files nodes path<>type links errors) results
@@ -1126,15 +1129,23 @@ also necessary to do is `org-node--dirty-ensure-link-known'."
 (defvar org-node--debug nil
   "Whether to run in a way suitable for debugging.")
 
+(defvar org-node--idle-timer (timer-create)
+  "Timer for intermittently checking `org-node-extra-id-dirs'
+for new, changed or deleted files.
+
+This redundant behavior helps detect changes made by something
+other than the current instance of Emacs, such as an user typing
+rm on the command line instead of using \\[delete-file].")
+
 (defvar org-node--time-elapsed 1
   "Duration of the last cache reset.")
 
-(defvar org-node--time-at-init-scan nil)
+(defvar org-node--time-at-scan-begin nil)
 (defvar org-node--time-at-last-child-done nil)
 (defvar org-node--time-at-finalize nil)
 
 (defun org-node--print-elapsed ()
-  "Print time elapsed since `org-node--time-at-init-scan'.
+  "Print time elapsed since `org-node--time-at-scan-begin'.
 Also report statistics about the nodes and links found.
 
 Currently, the printed message implies that all of org-node's
@@ -1157,15 +1168,7 @@ be misleading."
                n-subtrees
                n-backlinks
                n-reflinks
-               (setq org-node--time-elapsed
-                     ;; For reproducible profiling: don't count time taken by
-                     ;; other sentinels or timers in between
-                     (+ (float-time
-                         (time-subtract (current-time)
-                                        org-node--time-at-finalize))
-                        (float-time
-                         (time-subtract org-node--time-at-last-child-done
-                                        org-node--time-at-init-scan))))))))
+               org-node--time-elapsed))))
 
 (defun org-node--split-into-n-sublists (big-list n)
   "Split BIG-LIST into a list of N sublists.
