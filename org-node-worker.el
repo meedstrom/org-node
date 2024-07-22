@@ -402,8 +402,8 @@ list, and write results to another temp file."
                 (goto-char HERE)
                 (org-node-worker--collect-links-until
                  END FILE-ID nil $plain-re $merged-re)
-                ;; A plist would be more readable than a record, but I profiled
-                ;; it, using:
+                ;; NOTE: A plist would be more readable than a record, but I
+                ;; profiled it using:
                 ;; (benchmark-run-compiled 10 (setq org-node--done-ctr 6) (org-node--handle-finished-job 7 #'org-node--finalize-full))
                 ;; Result passing plists to `org-node--make-obj':
                 ;; (8.152532984 15 4.110698459000105)

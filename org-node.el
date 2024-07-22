@@ -450,13 +450,13 @@ can demonstrate the data format.  See also the type `org-node'.")
   "1:N table of links.
 
 The table keys are destination IDs, and the corresponding table
-value is a list of plists describing each link, including naming
-the ID-node where the link originated.")
+value is a list of `org-node-link' records describing each link,
+with info such as the ID-node where the link originated.")
 
 (defun org-node-get-id-links (node)
   "Get list of ID-link objects pointing to NODE.
+Each object is of type `org-node-link' with these fields:
 
-A link object is a plist with these fields:
 :origin - ID of origin node (where the link was found)
 :pos - buffer position where the link was found
 :dest - ID of destination node, or a ref that belongs to it
@@ -464,8 +464,8 @@ A link object is a plist with these fields:
         \"man\".  For ID-links this is always \"id\".  For a
         citation this is always nil.
 
-This function only returns ID-links; you can expect :dest to
-always be the ID of NODE.  To see other link types, use
+This function only returns ID-links, so you can expect the DEST
+to always equal the ID of NODE.  To see other link types, use
 `org-node-get-reflinks'."
   (gethash (org-node-get-id node) org-node--dest<>links))
 
@@ -476,9 +476,9 @@ and they are considered to point to NODE when NODE has a
 :ROAM_REFS: property that includes that same string.
 
 The reflink object has the same shape as an ID-link object (see
-`org-node-get-id-links'), and the ref string goes in the :dest
-field.  Also, citations have :type nil, so you can distinguish
-citations from other links this way."
+`org-node-get-id-links'), but instead of an ID in the DEST field,
+you have a ref string such an URL.  Also, citations have TYPE
+nil, so you can distinguish citations from other links this way."
   (cl-loop for ref in (org-node-get-refs node)
            append (gethash ref org-node--dest<>links)))
 
