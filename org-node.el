@@ -1101,7 +1101,7 @@ also necessary to do is `org-node--dirty-ensure-link-known'."
                 (fpath (abbreviate-file-name (file-truename buffer-file-name)))
                 (ftitle (cadar (org-collect-keywords '("TITLE")))))
             (org-node--record-node
-             (list
+             (org-node--make-obj
               :title (or heading ftitle)
               :id id
               :is-subtree (if heading t)
