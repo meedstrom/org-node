@@ -40,6 +40,9 @@ remember, it is not autoloaded."
 (org-node--defobsolete org-node-rename-file-by-title-if-roam
                        org-node-rename-file-by-title-maybe)
 
+(org-node--defobsolete org-node-slugify-like-roam-defaults
+                       org-node-slugify-like-roam-default)
+
 (org-node--defobsolete org-node-random
                        org-node-visit-random t)
 
