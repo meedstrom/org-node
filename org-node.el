@@ -714,10 +714,13 @@ eventually and not dropped."
 (defvar org-node--stderr-name " *org-node*"
   "Name of buffer for the subprocesses stderr.")
 
-(defvar org-node--max-jobs nil
+;; NOTE: On most systems it does not matter how many subprocesses go to
+;; work, since it will only block Emacs on first autoload.
+(defcustom org-node-perf-max-jobs 0
   "Number of subprocesses to run.
-If left at nil, will be set at runtime to the result of
-`org-node--count-logical-cores'.")
+If left at 0, will be set at runtime to the result of
+`org-node--count-logical-cores'."
+  :type 'natnum)
 
 (defun org-node--count-logical-cores ()
   "Return sum of available processor cores, minus 1."
@@ -773,8 +776,8 @@ didn't do so already, or local changes have been made."
 
 When finished, pass a list of scan results to the FINALIZER
 function to update current tables."
-  (unless org-node--max-jobs
-    (setq org-node--max-jobs (org-node--count-logical-cores)))
+  (when (= 0 org-node-perf-max-jobs)
+    (setq org-node-perf-max-jobs (org-node--count-logical-cores)))
   (org-node--ensure-compiled-fn org-node-filter-fn)
   (org-node--ensure-compiled-fn org-node-affixation-fn)
   (let ((compiled-lib (org-node--ensure-compiled-lib))
@@ -853,7 +856,7 @@ function to update current tables."
 
       ;; If not debugging, split the work over many child processes
       (let* ((file-lists
-              (org-node--split-into-n-sublists files org-node--max-jobs))
+              (org-node--split-into-n-sublists files org-node-perf-max-jobs))
              (n-jobs (length file-lists)))
         (dotimes (i n-jobs)
           (delete-file (org-node-worker--tmpfile "results-%d.eld" i))
@@ -902,23 +905,25 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
         (dotimes (i n-jobs)
           (let ((results-file (org-node-worker--tmpfile "results-%d.eld" i)))
             (if (not (file-exists-p results-file))
-                ;; Warn.  But don't warn on first run, for better UX.
-                ;; First-time init with autoloads can have bugs for
-                ;; seemingly magical reasons that go away afterwards
-                ;; (e.g. it says the files aren't on disk but they are).
-                (unless org-node--first-init
-                  (let ((buf (get-buffer " *org-node*")))
-                    (when buf
-                      ;; Had 1+ errors, so unhide stderr buffer from now on
-                      (setq org-node--stderr-name "*org-node errors*")
-                      (with-current-buffer buf
-                        (rename-buffer org-node--stderr-name)))
+                (let ((buf (get-buffer " *org-node*")))
+                  (when buf
+                    ;; Had 1+ errors, so unhide stderr buffer from now on
+                    (setq org-node--stderr-name "*org-node errors*")
+                    (with-current-buffer buf
+                      (rename-buffer org-node--stderr-name)))
+                  ;; Don't warn on first run, for better UX.  First-time init
+                  ;; thru autoloads can have bugs for seemingly magical reasons
+                  ;; that go away afterwards (e.g. it says the files aren't on
+                  ;; disk but they are).
+                  (unless org-node--first-init
                     (message "An org-node worker failed to produce %s.  See buffer %s"
                              results-file org-node--stderr-name)))
               (erase-buffer)
               (insert-file-contents results-file)
               (push (read (buffer-string)) result-sets)))))
       (setq org-node--time-at-last-child-done (-last-item (car result-sets)))
+      ;; Merge N result-sets into one result-set and run FINALIZER on it.
+      ;; NOTE: I'd like to see what a cl-loop expression would look like...
       (funcall finalizer (--reduce (-zip-with #'nconc it acc) result-sets)))))
 
 

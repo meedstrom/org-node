@@ -18,14 +18,14 @@
                    old new)
             (set new (symbol-value old))))))))
 
-(defmacro org-node--defobsolete (old new &optional interactive)
+(defmacro org-node--defobsolete (old new &optional interactive when)
   "Define OLD as a function that runs NEW.
 Also, running OLD will emit a deprecation warning the first time.
 If INTERACTIVE, define it as an interactive function.  But
 remember, it is not autoloaded."
   `(let (warned-once)
      (defun ,old (&rest args)
-       (declare (obsolete ',new "July 2024"))
+       (declare (obsolete ',new ,(or when "July 2024")))
        ,@(if interactive '((interactive)))
        (unless warned-once
          (setq warned-once t)
