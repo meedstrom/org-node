@@ -5,7 +5,7 @@
 - Renamed default branch "master" to "main".  GitHub says the transition is automatic... we'll see.
   - Created "dev" branch for unstable/untested work.
 - Deprecated option =org-node-filename-fn= (again) -- instead, configure =org-node-datestamp-format= and =org-node-slug-fn=.
-  - Why? This lets =org-node-rename-file-by-title-maybe= preserve the date prefix if there is one.
+  - Why? This lets =org-node-rename-file-by-title= preserve the date prefix if there is one.
 - (For programmers) Links are now represented by struct objects "org-node-link", and not by plists
 
 * org-node 0.3
@@ -215,7 +215,7 @@ If you're happy with the result, *and* don't need =roam:= links, you can disable
 #+end_src
 
 ** Backlink solution 2: print inside the file
-I rarely have the screen space to display a backlink buffer.  Because the buffer needs my active involvement to keep open, I go long periods seeing no backlinks.  So this solution can be a great complement.
+I rarely have the screen space to display a backlink buffer.  Because the buffer needs my active involvement to keep open, I go long periods seeing no backlinks.  So this solution can be a great complement (or stand alone).
 
 **** *Option 2A*.  Let org-node add a =:BACKLINKS:= property to all nodes
 
@@ -290,7 +290,7 @@ Example setting:
 
 
 *** Completion-at-point
-I don't use any in-buffer completion in Org buffers so don't feel like you have to, but there is the option:
+I don't use any completion in Org buffers so don't feel like you have to, but there is the option:
 
 #+begin_src elisp
 (org-node-complete-at-point-mode)

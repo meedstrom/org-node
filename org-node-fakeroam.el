@@ -1,4 +1,7 @@
-;;; org-node-fakeroam.el --- Rudimentary Org-roam replica -*- lexical-binding: t; -*-
+;;; org-node-fakeroam.el --- Rudimentary Org-roam replica -*-  no-byte-compile: t;  no-native-compile: t; lexical-binding: t; -*-
+
+;; NOTE: Above file-local variables set `no-byte-compile' because org-roam and
+;;       emacsql are external packages that may not be present!
 
 (require 'org-node)
 (require 'ol)
