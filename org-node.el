@@ -54,6 +54,8 @@
 
 ;;; Code:
 
+;; TODO Externalize org-node-fakeroam.el so it can pull in dependencies
+
 ;; TODO A workflow to allow pseudo-untitled (numeric-titled) nodes
 ;;      - Need a bunch of commands, like jump to node from fulltext search
 
@@ -1463,37 +1465,41 @@ a small wrapper such as:
 
 Applying the above to \"Löb's Theorem\" results in something like
 \"20240604223645-lobs-theorem.org\"."
-  (thread-last title
-               (string-glyph-decompose)
-               (string-to-list)
-               (--reject (< 767 it 818)) ;; Remove diacritics
-               (concat)
-               (string-glyph-compose)
-               (downcase)
-               (string-trim)
-               (replace-regexp-in-string "[[:space:]]+" "-")
-               (replace-regexp-in-string "[^[:alnum:]\\/-]" "")
-               (replace-regexp-in-string "\\/" "-")
-               (replace-regexp-in-string "--*" "-")
-               (replace-regexp-in-string "^-" "")
-               (replace-regexp-in-string "-$" "")))
+  (if (version<= "29" emacs-version)
+      (thread-last title
+                   (string-glyph-decompose)
+                   (string-to-list)
+                   (--reject (< 767 it 818)) ;; Remove diacritics
+                   (concat)
+                   (string-glyph-compose)
+                   (downcase)
+                   (string-trim)
+                   (replace-regexp-in-string "[[:space:]]+" "-")
+                   (replace-regexp-in-string "[^[:alnum:]\\/-]" "")
+                   (replace-regexp-in-string "\\/" "-")
+                   (replace-regexp-in-string "--*" "-")
+                   (replace-regexp-in-string "^-" "")
+                   (replace-regexp-in-string "-$" ""))
+    (error "Emacs 29 required for `org-node-slugify-for-web'")))
 
 (defun org-node-slugify-like-roam-default (title)
   "From TITLE, make a filename in the default org-roam style.
 Unlike `org-node-slugify-like-roam-actual', does not load
 org-roam."
-  (thread-last title
-               (string-glyph-decompose)
-               (string-to-list)
-               (--reject (< 767 it 818)) ;; Remove diacritics
-               (concat)
-               (string-glyph-compose)
-               (downcase)
-               (string-trim)
-               (replace-regexp-in-string "[^[:alnum:][:digit:]]" "_")
-               (replace-regexp-in-string "__*" "_")
-               (replace-regexp-in-string "^_" "")
-               (replace-regexp-in-string "_$" "")))
+  (if (version<= "29" emacs-version)
+      (thread-last title
+                   (string-glyph-decompose)
+                   (string-to-list)
+                   (--reject (< 767 it 818)) ;; Remove diacritics
+                   (concat)
+                   (string-glyph-compose)
+                   (downcase)
+                   (string-trim)
+                   (replace-regexp-in-string "[^[:alnum:][:digit:]]" "_")
+                   (replace-regexp-in-string "__*" "_")
+                   (replace-regexp-in-string "^_" "")
+                   (replace-regexp-in-string "_$" ""))
+    (error "Emacs 29 required for `org-node-slugify-like-roam-default'")))
 
 (defun org-node-slugify-like-roam-actual (title)
   "Call on `org-roam-node-slug' to transform TITLE."
@@ -1539,8 +1545,8 @@ org-roam."
                                  (equal (org-node-get-title node)
                                         (org-get-heading t t t t)))
                       (goto-char pos)
-                      (org-fold-show-context)
-                      (org-fold-show-entry)
+                      (org-show-context)
+                      (org-show-entry)
                       (recenter 0)))
                 (unless (pos-visible-in-window-p pos)
                   (goto-char pos))))
@@ -2198,8 +2204,8 @@ so it matches the destination's current title."
                                  desc (org-node-get-aliases node))))
                   (switch-to-buffer (current-buffer))
                   (goto-char end)
-                  (org-fold-show-context)
-                  (org-fold-show-entry)
+                  (org-show-context)
+                  (org-show-entry)
                   (recenter)
                   (highlight-regexp exact-link 'org-node--rewrite-face)
                   (unwind-protect
@@ -2563,8 +2569,8 @@ to ROAM_REFS."
                                    'action `(lambda (_button)
                                               (org-id-goto ,origin)
                                               (goto-char ,pos)
-                                              (org-fold-show-context)
-                                              (org-fold-show-entry))
+                                              (org-show-context)
+                                              (org-show-entry))
                                    'face 'link
                                    'follow-link t)
                            origin)
