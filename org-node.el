@@ -933,44 +933,43 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
 ;;;; Scan finalizers
 
 (defun org-node--finalize-full (results)
-  (let ((first-time (hash-table-empty-p org-node--id<>node)))
-    (clrhash org-node--id<>node)
-    (clrhash org-node--dest<>links)
-    (clrhash org-node--candidate<>node)
-    (clrhash org-node--title<>id)
-    (clrhash org-node--ref<>id)
-    (setq org-node--problems nil)
-    (setq org-node--collisions nil)
-    (seq-let (missing-files _ nodes path<>type links errors) results
-      (org-node--forget-id-locations missing-files)
-      (dolist (link links)
-        (push link
-              (gethash (org-node-link-dest link) org-node--dest<>links)))
-      (dolist (pair path<>type)
-        (puthash (car pair) (cdr pair) org-node--uri-path<>uri-type))
-      (dolist (node nodes)
-        (org-node--record-node node))
-      (dolist (err errors)
-        (push err org-node--problems))
-      (org-id-locations-save)
-      (setq org-node--time-elapsed
-            ;; For reproducible profiling: don't count time taken by
-            ;; other sentinels or timers or I/O in between these periods
-            (+ (float-time
-                (time-subtract (current-time)
-                               org-node--time-at-finalize))
-               (float-time
-                (time-subtract org-node--time-at-last-child-done
-                               org-node--time-at-scan-begin))))
-      (org-node--maybe-adjust-idle-timer)
-      ;; Don't contribute to emacs init noise
-      (if org-node--first-init
-          (setq org-node--first-init nil)
-        (org-node--print-elapsed)
-        (when (and org-node--collisions org-node-warn-title-collisions)
-          (message "Some nodes share title, see M-x org-node-list-collisions")))
-      (when errors
-        (message "Scan had problems, see M-x org-node-list-scan-problems")))))
+  (clrhash org-node--id<>node)
+  (clrhash org-node--dest<>links)
+  (clrhash org-node--candidate<>node)
+  (clrhash org-node--title<>id)
+  (clrhash org-node--ref<>id)
+  (setq org-node--problems nil)
+  (setq org-node--collisions nil)
+  (seq-let (missing-files _ nodes path<>type links errors) results
+    (org-node--forget-id-locations missing-files)
+    (dolist (link links)
+      (push link
+            (gethash (org-node-link-dest link) org-node--dest<>links)))
+    (dolist (pair path<>type)
+      (puthash (car pair) (cdr pair) org-node--uri-path<>uri-type))
+    (dolist (node nodes)
+      (org-node--record-node node))
+    (dolist (err errors)
+      (push err org-node--problems))
+    (org-id-locations-save)
+    (setq org-node--time-elapsed
+          ;; For reproducible profiling: don't count time taken by
+          ;; other sentinels or timers or I/O in between these periods
+          (+ (float-time
+              (time-subtract (current-time)
+                             org-node--time-at-finalize))
+             (float-time
+              (time-subtract org-node--time-at-last-child-done
+                             org-node--time-at-scan-begin))))
+    (org-node--maybe-adjust-idle-timer)
+    ;; Don't contribute to emacs init noise
+    (if org-node--first-init
+        (setq org-node--first-init nil)
+      (org-node--print-elapsed)
+      (when (and org-node--collisions org-node-warn-title-collisions)
+        (message "Some nodes share title, see M-x org-node-list-collisions")))
+    (when errors
+      (message "Scan had problems, see M-x org-node-list-scan-problems"))))
 
 (defun org-node--finalize-modified (results)
   (seq-let (missing-files found-files nodes path<>type links errors) results
@@ -1161,7 +1160,7 @@ also necessary to do is `org-node--dirty-ensure-link-known'."
               :olp (org-get-outline-path)
               ;; Less important
               :properties props
-              :tags (org-get-tags-at)
+              :tags (org-get-tags(replace-regexp-in-string "[[:space:]]+" "-" title))
               :todo (if heading (org-get-todo-state))
               :deadline (cdr (assoc "DEADLINE" props))
               :scheduled (cdr (assoc "SCHEDULED" props))))))))))
@@ -1449,22 +1448,10 @@ restart).")
 (defun org-node-slugify-for-web (title)
   "From TITLE, make a filename that looks nice as URL component.
 
-A title like \"Löb's Theorem\" becomes \"lobs-theorem.org\".
+A title like \"Löb's Theorem\" becomes \"lobs-theorem\".
 Note that while diacritical marks are stripped, it retains
 Unicode symbols classified as alphabetic or numeric, so for
-example kanji and Greek letters remain.
-
-As a surprise, it does NOT preface the name with a timestamp like
-many zettelkasten packages do.  If you want that, you can use
-a small wrapper such as:
-
-(setq org-node-filename-fn
-      (lambda (title)
-       (concat (format-time-string \"%Y%m%d%H%M%S-\")
-               (org-node-slugify-as-url title))))
-
-Applying the above to \"Löb's Theorem\" results in something like
-\"20240604223645-lobs-theorem.org\"."
+example kanji and Greek letters remain."
   (if (version<= "29" emacs-version)
       (thread-last title
                    (string-glyph-decompose)
@@ -1512,7 +1499,7 @@ org-roam."
 (defun org-node-slugify-like-roam (title)
   "From TITLE, make a filename in the default org-roam style."
   (unless (fboundp #'org-roam-node-slug)
-    (user-error "org-roam required to run `org-node-slugify-like-roam-actual'"))
+    (user-error "org-roam required to run `org-node-slugify-like-roam'"))
   (require 'org-roam)
   (message "Variable `org-node-filename-fn' deprecated, please update config")
   (concat (format-time-string "%Y%m%d%H%M%S-")
@@ -2660,6 +2647,7 @@ to ROAM_REFS."
   "Use `org-node-complete-at-point' in all Org buffers.
 Also turn off Org-roam's equivalent, if active."
   :global t
+  :require 'org-node
   (when (featurep 'org-roam)
     (unless (assoc 'org-roam-completion-everywhere org-node--roam-settings)
       (push (cons 'org-roam-completion-everywhere
