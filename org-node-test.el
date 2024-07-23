@@ -7,6 +7,8 @@
 (require 'org-node-worker)
 (require 'org-node-backlink)
 
+;; (-all-p #'org-node-link-p (apply #'append (hash-table-values org-node--dest<>links)))
+
 ;; TODO Maybe org-ref &keys can easily be supported, on same principle as the
 ;;      org 9.5 @keys.  See org-ref manual for syntax.  Basically worker.el
 ;;      just need some more branches on merged-re and plain-re matches.
