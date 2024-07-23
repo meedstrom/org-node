@@ -144,7 +144,7 @@ Add an init snippet like this (assuming [[https://github.com/radian-software/str
 
 If you're new to these concepts, fear not.  The main things for day-to-day operation are two verbs: "find" and "insert link".
 
-Pick some good keys and try them out.
+Pick some short keys and try them out.
 
 #+begin_src elisp
 (keymap-set global-map "M-s f" #'org-node-find)

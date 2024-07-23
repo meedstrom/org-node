@@ -540,7 +540,8 @@ delete too many backlinks on cleanup."
         (advice-add 'org-insert-link :after #'org-node--dirty-ensure-link-known)
         (advice-add 'rename-file :after #'org-node--handle-save)
         (advice-add 'delete-file :after #'org-node--handle-save)
-        (org-node-cache-ensure 'must-async t))
+        (org-node-cache-ensure 'must-async t)
+        (org-node--maybe-adjust-idle-timer))
     (cancel-timer org-node--idle-timer)
     (remove-hook 'after-save-hook #'org-node--handle-save)
     (remove-hook 'org-node-creation-hook #'org-node--dirty-ensure-node-known)
@@ -629,6 +630,22 @@ advice on `rename-file' or `delete-file'."
     (when (--any-p (string-suffix-p it file)
                    '(".org" ".org_archive" ".org.gpg"))
       (org-node--scan-targeted (list file)))))
+
+(defun org-node--maybe-adjust-idle-timer ()
+  "Adjust `org-node--idle-timer' based on duration of last scan.
+If not running, start it.
+
+This function mainly exists to give the user something to
+override if they disagree with the timer delay or even having a
+timer."
+  (let ((new-delay (* 25 (1+ org-node--time-elapsed))))
+    (when (or (not (member org-node--idle-timer timer-idle-list))
+              ;; Disarm a footgun (gh:meedstrom/org-node#21)
+              (not (> (float-time (or (current-idle-time) 0))
+                      (- new-delay 1))))
+      (cancel-timer org-node--idle-timer)
+      (setq org-node--idle-timer
+            (run-with-idle-timer new-delay t #'org-node--scan-all)))))
 
 
 ;;;; Scanning
@@ -930,27 +947,22 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
       (org-id-locations-save)
       (setq org-node--time-elapsed
             ;; For reproducible profiling: don't count time taken by
-            ;; other sentinels or timers or I/O in between
+            ;; other sentinels or timers or I/O in between these periods
             (+ (float-time
                 (time-subtract (current-time)
                                org-node--time-at-finalize))
                (float-time
                 (time-subtract org-node--time-at-last-child-done
                                org-node--time-at-scan-begin))))
-      ;; Now begin the idle timer... this would have been done in the mode
-      ;; turn-on, but I wanted to base it on --time-elapsed
-      (unless (member org-node--idle-timer timer-idle-list)
-        (setq org-node--idle-timer
-              (run-with-idle-timer
-               (* 30 (1+ org-node--time-elapsed)) t #'org-node--scan-all)))
-      ;; Don't add to emacs init noise
+      (org-node--maybe-adjust-idle-timer)
+      ;; Don't contribute to emacs init noise
       (if org-node--first-init
           (setq org-node--first-init nil)
         (org-node--print-elapsed)
         (when (and org-node--collisions org-node-warn-title-collisions)
-          (message "Some nodes have same title, see M-x org-node-list-collisions"))
-        (when errors
-          (message "Scan had problems, see M-x org-node-list-scan-problems"))))))
+          (message "Some nodes share title, see M-x org-node-list-collisions")))
+      (when errors
+        (message "Scan had problems, see M-x org-node-list-scan-problems")))))
 
 (defun org-node--finalize-modified (results)
   (seq-let (missing-files found-files nodes path<>type links errors) results
@@ -1761,13 +1773,13 @@ Optional argument REGION-AS-INITIAL-INPUT t means behave as
                         (setq end (point))
                         (org-link-display-format
                          (buffer-substring-no-properties beg end))))
-         (init (if (or region-as-initial-input
-                       (when region-text
-                         (try-completion region-text org-node--title<>id)))
-                   region-text
-                 nil))
+         (initial (if (or region-as-initial-input
+                          (when region-text
+                            (try-completion region-text org-node--title<>id)))
+                      region-text
+                    nil))
          (input (completing-read "Node: " #'org-node-collection
-                                 () () init 'org-node-hist))
+                                 () () initial 'org-node-hist))
          (node (gethash input org-node--candidate<>node))
          (id (if node (org-node-get-id node) (org-id-new)))
          (link-desc (or region-text
