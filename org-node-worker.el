@@ -130,12 +130,13 @@ What this means?   See org-node-test.el."
         ;; Extract all [[bracketed links]]
         (while (search-forward "[[" nil t)
           (setq beg (match-beginning 0))
-          ;; TODO warn close-bracket missing in ROAM_REFS property
-          (when (setq end (search-forward "]]" nil 'move))
-            (goto-char beg)
-            (push (buffer-substring (+ 2 beg) (1- (search-forward "]")))
-                  links)
-            (delete-region beg end)))
+          (if (setq end (search-forward "]]" nil t))
+              (progn
+                (goto-char beg)
+                (push (buffer-substring (+ 2 beg) (1- (search-forward "]")))
+                      links)
+                (delete-region beg end))
+            (error "Missing close-bracket in ROAM_REFS property")))
         ;; Return merged list
         (cl-loop
          for link? in (append links (split-string-and-unquote (buffer-string)))
