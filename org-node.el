@@ -1403,11 +1403,11 @@ the first heading if there is no #+TITLE.
 
 Built-in choices:
 - `org-node-slugify-for-web'
-- `org-node-slugify-like-roam-defaults'
+- `org-node-slugify-like-roam-default'
 - `org-node-slugify-like-roam-actual'"
   :type '(radio
           (function-item org-node-slugify-for-web)
-          (function-item org-node-slugify-like-roam-defaults)
+          (function-item org-node-slugify-like-roam-default)
           (function-item org-node-slugify-like-roam-actual)
           function))
 
@@ -1473,7 +1473,7 @@ Applying the above to \"Löb's Theorem\" results in something like
                (replace-regexp-in-string "^-" "")
                (replace-regexp-in-string "-$" "")))
 
-(defun org-node-slugify-like-roam-defaults (title)
+(defun org-node-slugify-like-roam-default (title)
   "From TITLE, make a filename in the default org-roam style.
 Unlike `org-node-slugify-like-roam-actual', does not load
 org-roam."
