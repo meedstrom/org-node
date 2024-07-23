@@ -1522,20 +1522,26 @@ org-roam."
   (if node
       (let ((file (org-node-get-file-path node)))
         (if (file-exists-p file)
-            (progn
+            (let ((pos (org-node-get-pos node)))
               (find-file file)
               (widen)
-              ;; TODO Maybe don't move point if node pos is already inside
-              ;;      visible part of buffer and point is under its entry
-              ;; (unless (pos-visible-in-window-p ))
-              (goto-char (org-node-get-pos node))
-              (when (org-node-get-is-subtree node)
-                (org-fold-show-context)
-                (org-fold-show-entry)
-                (recenter 0)))
+              ;; Don't move point if node pos is already inside
+              ;; visible part of buffer and point is in its entry
+              (if (org-node-get-is-subtree node)
+                  (progn
+                    (unless (and (pos-visible-in-window-p pos)
+                                 (not (org-invisible-p pos))
+                                 (equal (org-node-get-title node)
+                                        (org-get-heading t t t t)))
+                      (goto-char pos)
+                      (org-fold-show-context)
+                      (org-fold-show-entry)
+                      (recenter 0)))
+                (unless (pos-visible-in-window-p pos)
+                  (goto-char pos))))
           (message "org-node: Didn't find a file, resetting cache...")
           (org-node--scan-all)))
-    (error "`org-node-goto' received a nil argument")))
+    (error "`org-node--goto' received a nil argument")))
 
 (defun org-node--create (title id)
   "Call `org-node-creation-fn' with necessary variables set.
@@ -2551,7 +2557,9 @@ to ROAM_REFS."
                              (list (org-node-get-title node)
                                    'action `(lambda (_button)
                                               (org-id-goto ,origin)
-                                              (goto-char ,pos))
+                                              (goto-char ,pos)
+                                              (org-fold-show-context)
+                                              (org-fold-show-entry))
                                    'face 'link
                                    'follow-link t)
                            origin)
