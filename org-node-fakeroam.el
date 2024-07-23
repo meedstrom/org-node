@@ -266,7 +266,7 @@ This includes all links and citations that touch NODE."
                                    (org-node-link-origin link)
                                    id
                                    (org-node-link-type link)
-                                   (org-node-link-properties properties)))))))
+                                   (org-node-link-properties link)))))))
 
 (provide 'org-node-fakeroam)
 
