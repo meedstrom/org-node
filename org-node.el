@@ -1,4 +1,4 @@
-;;; org-node.el --- Use org-id locations as a pile of notes -*- lexical-binding: t; -*-
+;;; org-node.el --- Like org-roam, treat org-id entries as linked notes -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2024 Martin Edström
 ;;
@@ -21,9 +21,35 @@
 ;; Package-Requires: ((emacs "28.1") (compat "29.1.4.5") (dash "2.19.1"))
 ;; URL:              https://github.com/meedstrom/org-node
 
-;; This file is not part of GNU Emacs.
-
 ;;; Commentary:
+
+;; If you were the sort of person to prefer "id:" links over "file:" links or
+;; any other type of link, you're in the right place!  Now you can rely on IDs
+;; and worry less about mentally tracking your subtree hierarchies and
+;; directory structures.  As long as you've assigned an ID to something, you
+;; can find it later.
+
+;; In fact, you're likely to stop using any other method of browsing.  The
+;; philosophy is the same as org-roam: if you assign an ID every time you make
+;; an entry that you know you might want to link to from elsewhere, then it
+;; tends to work out that the `org-node-find' command can find more or less
+;; every entry you'd ever want to search for.
+
+;; Anyway, that's just the core of it as described to someone not familiar with
+;; zettelkasten.  In fact, out of the simplicity arises something powerful,
+;; more to be experienced than explained.
+
+;; Compared to other systems:
+
+;; - org-roam: Same idea, compatible disk format(!), but org-node can opt out
+;;   of file-level property drawers and #+titles, and it tries to rely in a
+;;   bare-metal way on upstream org-id and org-capture.  For example, headings
+;;   with IDs in some Git README are considered part of your collection -- if
+;;   it's known to org-id, it's known to org-node.
+
+;; - denote: Org-node is Org only, no support for "denote:" links or Markdown.
+;;   Filenames have no meaning (and can be automatically managed), and you can
+;;   have as many "notes" as you want inside one file.
 
 ;;; Code:
 
@@ -933,8 +959,6 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
     ;; In case a title was edited
     (org-node--dirty-forget-completions-in found-files)
     (when org-node-eagerly-update-link-tables
-      ;; Gobsmacked.  This just takes 10 ms for my SP7 @ 1.1 GHz in a file with
-      ;; 500 nodes & 6600 links. Borked?  TODO: Test whether dups accrete
       (cl-loop with ids-of-nodes-scanned = (cl-loop
                                             for node in nodes
                                             collect (org-node-get-id node))
@@ -953,7 +977,8 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
                finally do
                (dolist (pair to-clean)
                  (puthash (car pair) (cdr pair) org-node--dest<>links)))
-      ;; Having erased links by :origin, it's safe to add them (again).
+      ;; Having erased the links that were known to originate in the re-scanned
+      ;; nodes, it's safe to add them (again).
       (dolist (link links)
         (push link (gethash (org-node-link-dest link) org-node--dest<>links))))
     (dolist (pair path<>type)
@@ -971,8 +996,7 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
 
 By default, we do not bother to do this on every save (only after
 `org-node--idle-timer'), because it can slow down saving a big
-file containing thousands of links -- enough to annoy users of
-`auto-save-visited-mode', at least.
+file containing thousands of links, on constrained devices.
 
 Fortunately it is rarely needed, since the insert-link advices of
 `org-node-cache-mode' will already record links added during
@@ -1361,7 +1385,8 @@ Behavior depends on the user option `org-node-ask-directory'."
 
 (defcustom org-node-slug-fn #'org-node-slugify-for-web
   "Function taking a node title and returning a filename.
-Receives one argument: the value of an Org #+TITLE keyword.
+Receives one argument: the value of an Org #+TITLE keyword, or
+the first heading if there is no #+TITLE.
 
 Built-in choices:
 - `org-node-slugify-for-web'
@@ -2414,6 +2439,7 @@ write_file(lisp_data, file.path(dirname(tsv), \"feedback-arcs.eld\"))")
         (tabulated-list-print))
       (display-buffer (current-buffer)))))
 
+;; TODO: Temp merge all refs into corresponding ID
 (defun org-node--make-digraph-tsv-string ()
   "From `org-node--dest<>links', generate a list of
 destination-origin pairs, expressed as Tab-Separated Values."
@@ -2429,8 +2455,8 @@ destination-origin pairs, expressed as Tab-Separated Values."
                        collect (concat dest "\t" (org-node-link-origin link)))))
     "\n")))
 
-;; TODO command to list the coding systems of all files
-;;      to help validate `org-node-perf-assume-coding-system'
+;; TODO: Command to list the coding systems of all files
+;;       to help validate `org-node-perf-assume-coding-system'
 ;; (defvar org-node--found-systems nil)
 ;; (defun org-node-list-file-coding-systems ()
 ;;   (dolist (file (take 20 (org-node-files)))
