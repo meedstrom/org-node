@@ -25,23 +25,23 @@
 
 ;; (-all-p #'org-node-link-p (apply #'append (hash-table-values org-node--dest<>links)))
 
-;; TODO Maybe org-ref &keys can easily be supported, on same principle as the
-;;      org 9.5 @keys.  See org-ref manual for syntax.  Basically worker.el
-;;      just need some more branches on merged-re and plain-re matches.
+;; TODO: Maybe org-ref &keys can easily be supported, on same principle as the
+;;       org 9.5 @keys.  See org-ref manual for syntax.  Basically worker.el
+;;       just need some more branches on merged-re and plain-re matches.
 ;;
-;;      In short, what's relevant to us: org-ref v3 citations are always URIs
-;;      starting with citep:, citet:, citealp: and many others, but it's the
-;;      old story where you have to match bracket-re first in case it is
-;;      bracketed, with spaces inside.  Like [[citep:See &kitchin-2015-examp
-;;      page 2]].  Anyway, then just extract each &key.  Finally, have to
-;;      consult some org-ref variable first to get all the defined URI types.
+;;       In short, what's relevant to us: org-ref v3 citations are always URIs
+;;       starting with citep:, citet:, citealp: and many others, but it's the
+;;       old story where you have to match bracket-re first in case it is
+;;       bracketed, with spaces inside.  Like [[citep:See &kitchin-2015-examp
+;;       page 2]].  Anyway, then just extract each &key.  Finally, have to
+;;       consult some org-ref variable first to get all the defined URI types.
 ;;
-;;      Wow!  I just combine the lessons I learned for supporting bracketed
-;;      link with spaces, for extracting @citekeys, and for consulting an
-;;      org-super-links variable!  Easy peasy.
+;;       Wow!  I just combine the lessons I learned for supporting bracketed
+;;       link with spaces, for extracting @citekeys, and for consulting an
+;;       org-super-links variable!  Easy peasy.
 (ert-deftest org-node-test--split-refs-field ()
   (let ((result
-         ;; TODO Simplify, noone is likely to insert a full [cite] as a ref
+         ;; TODO: Simplify, noone is likely to insert a full [cite] as a ref
          (org-node-worker--split-refs-field
           "[cite:@citeKey abcd ; @citeKey2 cdefgh] @foo [[https://gnu.org/A Link With Spaces/index.htm][baz]] https://gnu.org ")))
     (should (--all-p (member it result)
@@ -108,7 +108,7 @@
   (should (equal 1 (length (org-node--split-into-n-sublists
                             '(a v e e) 1))))
   (should (equal 4 (length (org-node--split-into-n-sublists
-                            '(a v e e q l fk k k ki i o r r r r r r r r r r g g g g g gg)
+                            '(a v e e q l fk k k ki i o r r r r r r  r g g gg)
                             4)))))
 
 (ert-deftest org-node-test--file-naming ()

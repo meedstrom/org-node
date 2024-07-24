@@ -97,7 +97,7 @@ in one of the elements."
                               pos oldata)))
          ;; Drop all the data about positions below HEADING-POS (using `nthcdr'
          ;; because oldata is in reverse order)
-         ;; TODO Is it faster to do (ntake (nreverse ...))?
+         ;; TODO: Is it faster to do (ntake (nreverse ...))?
          (data-until-pos (nthcdr (org-node-worker--elem-index pos-data oldata)
                                  oldata)))
     (let ((previous-level (caddr (car data-until-pos))))
