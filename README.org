@@ -8,14 +8,14 @@
 - (For programmers) Links are now represented by struct objects "org-node-link", and not by plists
 
 * org-node 0.3
-The month of July brought many changes!  *If anything broke for you*, you can rollback to the 0.1pre branch.
+The month of July brought many changes!  *If anything broke for you*, you can rollback to the v0.1 branch.
 
 *** How to rollback
 With [[https://github.com/radian-software/straight.el][Straight]], rollback like:
 #+begin_src elisp
 (use-package org-node
   :straight (org-node :type git :host github :repo "meedstrom/org-node"
-                      :branch "0.1pre"))
+                      :branch "v0.1"))
 #+end_src
 
 With [[https://github.com/quelpa/quelpa][quelpa]]:
@@ -25,11 +25,11 @@ With [[https://github.com/quelpa/quelpa][quelpa]]:
                     :commit "a29e5d6b07d9ae0319437e1d7bdbb9fe5967b30d"))
 #+end_src
 
-With elpaca:
+With [[https://github.com/progfolio/elpaca][elpaca]]:
 #+begin_src elisp
 (use-package org-node
   :ensure (:type git :host github :repo "meedstrom/org-node"
-           :branch "0.1pre"))
+           :branch "v0.1"))
 #+end_src
 
 With [[https://github.com/slotThe/vc-use-package][vc-use-package]]:
