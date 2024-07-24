@@ -55,7 +55,7 @@
 ;;; Code:
 
 ;; TODO: After 8 August, externalize org-node-fakeroam.el so it can pull its own
-;;       dependencies.  Then, submit to Melpa.
+;;       dependencies
 
 ;; TODO: A workflow to allow pseudo-untitled (numeric-titled) nodes
 ;;       - Need a bunch of commands for that, like select node by fulltext
@@ -72,14 +72,14 @@
 (require 'org-node-obsolete)
 
 (declare-function 'org-super-links-convert-link-to-super "org-super-links")
-(declare-function 'consult--grep "consult")
-(declare-function 'consult--grep-make-builder "consult")
-(declare-function 'org-roam-node-slug "org-roam-node")
-(declare-function 'org-roam-node-create "org-roam-node")
-(declare-function 'org-node--try-launch-scan "org-node")
-(declare-function 'org-roam-capture- "org-roam-capture")
-(declare-function 'wgrep-change-to-wgrep-mode "wgrep")
 (declare-function 'wgrep-finish-edit "wgrep")
+(declare-function 'wgrep-change-to-wgrep-mode "wgrep")
+(declare-function 'org-roam-node-create "org-roam-node")
+(declare-function 'org-roam-node-slug "org-roam-node")
+;; (declare-function 'org-node--try-launch-scan "org-node")
+;; (declare-function 'org-roam-capture- "org-roam-capture")
+;; (declare-function 'consult--grep "consult")
+;; (declare-function 'consult--grep-make-builder "consult")
 
 
 ;;;; Options
@@ -116,12 +116,13 @@ files you already have."
   "Alist of variable-value pairs that child processes should set.
 
 May be useful for injecting your authinfo and EasyPG settings so
-that org-node can scan for ID nodes inside .org.gpg files.
+that org-node can scan for ID nodes inside .org.gpg files.  Also,
+`org-node-perf-keep-file-name-handlers', should include the EPA
+handler.
 
-I don't use EPG so I don't know if that's enough to make it
-work---probably not.  Get me working on it by dropping me a line
-on https://github.com/meedstrom/org-node/issues or Mastodon:
-@meedstrom@emacs.ch"
+I do not use EPG, so that is probably not enough to make it work.
+Report an issue on https://github.com/meedstrom/org-node/issues
+or drop me a line on Mastodon: @meedstrom@emacs.ch"
   :group 'org-node
   :type 'alist)
 
@@ -667,8 +668,11 @@ timer."
 
 (defvar org-node--retry-timer (timer-create))
 (defvar org-node--known-files nil)
+(defvar org-node--file-queue nil)
+(defvar org-node--wait-start nil)
+(defvar org-node--full-scan-requested nil)
 
-;; TODO Shorten.  How?  At the moment, we line up a specific file for scan even
+;; TODO: Shorten.  How?  At the moment, we line up a specific file for scan even
 ;; if a "full" scan will happen or has just happened, for (IIRC) reasons:
 ;;
 ;; 1. Ongoing full scan may have already gone past the targeted
@@ -679,42 +683,43 @@ timer."
 ;;
 ;; Hm, points 2 and 3 could be taken care of at full scan by comparing to a
 ;; table of previously known file<>mtime.
-(let (file-queue wait-start full-scan-requested)
-  (defun org-node--try-launch-scan (&optional files)
-    "Ensure that multiple calls occurring in a short time (like when
+(defun org-node--try-launch-scan (&optional files)
+  "Ensure that multiple calls occurring in a short time (like when
 multiple files are being renamed) will be handled
 eventually and not dropped."
-    (if (eq t files)
-        (setq full-scan-requested t)
-      (setq file-queue
-            (seq-union file-queue (mapcar #'abbreviate-file-name files))))
-    (let (must-retry)
-      (if (seq-some #'process-live-p org-node--processes)
+  (if (eq t files)
+      (setq org-node--full-scan-requested t)
+    (setq org-node--file-queue
+          (seq-union org-node--file-queue
+                     (mapcar #'abbreviate-file-name files))))
+  (let (must-retry)
+    (if (seq-some #'process-live-p org-node--processes)
+        (progn
+          (unless org-node--wait-start
+            (setq org-node--wait-start (current-time)))
+          (if (> (float-time (time-since org-node--wait-start)) 30)
+              ;; Timeout subprocess stuck in some infinite loop
+              (progn
+                (setq org-node--wait-start nil)
+                (message "org-node: processes worked longer than 30 sec, killing")
+                (while-let ((old-process (pop org-node--processes)))
+                  (delete-process old-process)))
+            (setq must-retry t)))
+      ;; All clear, scan now
+      (setq org-node--wait-start nil)
+      (if org-node--full-scan-requested
           (progn
-            (unless wait-start
-              (setq wait-start (current-time)))
-            (if (> (float-time (time-since wait-start)) 30)
-                ;; Timeout subprocess stuck in some infinite loop
-                (progn
-                  (setq wait-start nil)
-                  (message "org-node: processes worked longer than 30 sec, killing")
-                  (while-let ((old-process (pop org-node--processes)))
-                    (delete-process old-process)))
+            (setq org-node--full-scan-requested nil)
+            (org-node--scan (org-node-files) #'org-node--finalize-full)
+            (when org-node--file-queue
               (setq must-retry t)))
-        ;; All clear, scan now
-        (setq wait-start nil)
-        (if full-scan-requested
-            (progn
-              (setq full-scan-requested nil)
-              (org-node--scan (org-node-files) #'org-node--finalize-full)
-              (when file-queue (setq must-retry t)))
-          ;; Targeted scan of specific files
-          (org-node--scan file-queue #'org-node--finalize-modified)
-          (setq file-queue nil)))
-      (when must-retry
-        (cancel-timer org-node--retry-timer)
-        (setq org-node--retry-timer
-              (run-with-timer 1 nil #'org-node--try-launch-scan))))))
+        ;; Targeted scan of specific files
+        (org-node--scan org-node--file-queue #'org-node--finalize-modified)
+        (setq org-node--file-queue nil)))
+    (when must-retry
+      (cancel-timer org-node--retry-timer)
+      (setq org-node--retry-timer
+            (run-with-timer 1 nil #'org-node--try-launch-scan)))))
 
 (defvar org-node--processes nil
   "List of subprocesses.")
@@ -1341,7 +1346,7 @@ for you."
 
 ;;;; Filename functions
 
-;; (progn (byte-compile #'org-node--root-dirs) (garbage-collect) (benchmark-run 100 (org-node--root-dirs (hash-table-values org-id-locations)))
+;; (progn (byte-compile #'org-node--root-dirs) (garbage-collect) (benchmark-run 100 (org-node--root-dirs (hash-table-values org-id-locations))))
 (defun org-node--root-dirs (file-list)
   "Infer root directories of FILE-LIST.
 
@@ -1461,15 +1466,14 @@ Built-in choices:
                        (or (alist-get char diacritics-alist)
                            char))
                      string))))
-;; (org-node--emacs28-strip-diacritics "Martin Edström")
 
 (defun org-node-slugify-for-web (title)
   "From TITLE, make a filename that looks nice as URL component.
 
-A title like \"Löb's Theorem\" becomes \"lobs-theorem\".
-Note that while diacritical marks are stripped, it retains
-Unicode symbols classified as alphabetic or numeric, so for
-example kanji and Greek letters remain."
+A title like \"Löb's Theorem\" becomes \"lobs-theorem\".  Note
+that while diacritical marks are stripped, it retains most
+symbols that belong to the alphabet category in Unicode,
+preserving for example kanji and Greek letters."
   (if (version<= "29" emacs-version)
       (thread-last title
                    (string-glyph-decompose)
@@ -1666,7 +1670,7 @@ time some necessary variables are set."
                               :title org-node-proposed-title
                               :id    org-node-proposed-id))))
 
-;; TODO write a template to capture into an org-journal file
+;; TODO: write a template to capture into an org-journal file
 ;; (defun org-node-capture-target-day ()
 ;;   )
 
