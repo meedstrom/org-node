@@ -83,6 +83,7 @@
 (declare-function #'org-roam-capture- "org-roam-capture")
 (declare-function #'org-roam-node-create "org-roam-node")
 (declare-function #'org-roam-node-slug "org-roam-node")
+(defvar org-timestamp-formats)
 
 
 ;;;; Options
@@ -869,12 +870,12 @@ function to update current tables."
              (n-jobs (length file-lists)))
         (dotimes (i n-jobs)
           (delete-file (org-node-worker--tmpfile "results-%d.eld" i))
-          (let ((write-region-inhibit-fsync nil) ;; Default t in emacs30
-                (print-length nil)
-                (print-level nil))
-            (write-region (prin1-to-string (pop file-lists))
-                          nil
-                          (org-node-worker--tmpfile "file-list-%d.eld" i)))
+          ;; NOTE: `with-temp-file' beats `write-region' because write-region
+          ;;       CANNOT be muffled by `save-silently' or `inhibit-message'
+          (with-temp-file (org-node-worker--tmpfile "file-list-%d.eld" i)
+            (let ((write-region-inhibit-fsync nil) ;; Default t in emacs30
+                  (print-length nil))
+              (insert (prin1-to-string (pop file-lists)))))
           (push (make-process
                  :name (format "org-node-%d" i)
                  :noquery t
