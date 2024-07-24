@@ -11,7 +11,7 @@
 The month of July brought many changes!  *If anything broke for you*, you can rollback to the 0.1pre branch.
 
 *** How to rollback
-With [[https://github.com/radian-software/straight.el][straight]], rollback like:
+With [[https://github.com/radian-software/straight.el][Straight]], rollback like:
 #+begin_src elisp
 (use-package org-node
   :straight (org-node :type git :host github :repo "meedstrom/org-node"
@@ -25,11 +25,18 @@ With [[https://github.com/quelpa/quelpa][quelpa]]:
                     :commit "a29e5d6b07d9ae0319437e1d7bdbb9fe5967b30d"))
 #+end_src
 
+With elpaca:
+#+begin_src elisp
+(use-package org-node
+  :ensure (:type git :host github :repo "meedstrom/org-node"
+           :branch "0.1pre"))
+#+end_src
+
 With [[https://github.com/slotThe/vc-use-package][vc-use-package]]:
 #+begin_src elisp
 (use-package org-node
   :vc (:fetcher github :repo "meedstrom/org-node"
-                :rev "a29e5d6b07d9ae0319437e1d7bdbb9fe5967b30d"))
+       :rev "a29e5d6b07d9ae0319437e1d7bdbb9fe5967b30d"))
 #+end_src
 
 *** New features
@@ -135,7 +142,7 @@ Add an init snippet like this (assuming [[https://github.com/radian-software/str
 #+begin_src elisp
 (use-package org-node
   :straight (org-node :type git :host github :repo "meedstrom/org-node")
-  :hook (org-mode . org-node-cache-mode))
+  :after org :config (org-node-cache-mode))
 #+end_src
 
 ** Quick start

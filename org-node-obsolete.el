@@ -4,6 +4,7 @@
 (let ((aliases '(org-node-cache-rescan-file-hook org-node-rescan-hook
                  org-node-cache-reset-hook nil
                  org-node-format-candidate-fn nil
+                 org-node-filename-fn nil
                  org-node-collection nil)))
   (defun org-node--warn-obsolete-variables ()
     "To be called when turning some mode on."
@@ -14,23 +15,24 @@
           (unless new
             (lwarn 'org-node :warning "Your config uses removed variable: %S" old))
           (when new
-            (lwarn 'org-node :warning "Your config uses old variable: %S,  new name: %S"
-                   old new)
+            (lwarn 'org-node :warning "Your config uses old variable: %S, which will be removed by %s.  New name: %S"
+                   old "30 July 2024" new)
             (set new (symbol-value old))))))))
 
-(defmacro org-node--defobsolete (old new &optional interactive when)
+(defmacro org-node--defobsolete (old new &optional interactive when removed-by)
   "Define OLD as a function that runs NEW.
 Also, running OLD will emit a deprecation warning the first time.
 If INTERACTIVE, define it as an interactive function.  But
-remember, it is not autoloaded."
+remember, it is still not autoloaded.  Optional string WHEN says
+when it was deprecated and REMOVED-BY when it may be removed."
   `(let (warned-once)
      (defun ,old (&rest args)
        (declare (obsolete ',new ,(or when "July 2024")))
        ,@(if interactive '((interactive)))
        (unless warned-once
          (setq warned-once t)
-         (lwarn 'org-node :warning "Your config uses old function name: %S,  new name: %S"
-                ',old ',new))
+         (lwarn 'org-node :warning "Your config uses old function name: %S, which will be removed by %s.  New name: %S"
+                ',old ,(or removed-by "8 August 2024") ',new))
        (apply ',new args))))
 
 (org-node--defobsolete org-nodeify-entry
