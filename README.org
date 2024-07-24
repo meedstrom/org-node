@@ -1,13 +1,5 @@
 #+startup: content
 * org-node 0.4pre
-- Fixed bug eating CPU during idle, sorry about that!
-- Renamed default branch "master" to "main".  GitHub says the transition is automatic... we'll see.
-  - Created "dev" branch for unstable/untested work.
-- Deprecated option =org-node-filename-fn= (again) -- instead, configure =org-node-datestamp-format= and =org-node-slug-fn=.
-  - Why? This lets =org-node-rename-file-by-title= preserve the date prefix if there is one.
-- (For programmers) Links are now represented by struct objects "org-node-link", and not by plists
-
-* org-node 0.3
 The month of July brought many changes!  *If anything broke for you*, you can rollback to the v0.1 branch.
 
 *** How to rollback
@@ -18,18 +10,18 @@ With [[https://github.com/radian-software/straight.el][Straight]], rollback like
                       :branch "v0.1"))
 #+end_src
 
-With [[https://github.com/quelpa/quelpa][quelpa]]:
-#+begin_src elisp
-(use-package org-node
-  :quelpa (org-node :fetcher github :repo "meedstrom/org-node"
-                    :commit "a29e5d6b07d9ae0319437e1d7bdbb9fe5967b30d"))
-#+end_src
-
-With [[https://github.com/progfolio/elpaca][elpaca]]:
+With [[https://github.com/progfolio/elpaca][Elpaca]]:
 #+begin_src elisp
 (use-package org-node
   :ensure (:fetcher github :repo "meedstrom/org-node"
            :branch "v0.1"))
+#+end_src
+
+With [[https://github.com/quelpa/quelpa][Quelpa]]:
+#+begin_src elisp
+(use-package org-node
+  :quelpa (org-node :fetcher github :repo "meedstrom/org-node"
+                    :commit "a29e5d6b07d9ae0319437e1d7bdbb9fe5967b30d"))
 #+end_src
 
 With [[https://github.com/slotThe/vc-use-package][vc-use-package]]:
@@ -39,7 +31,8 @@ With [[https://github.com/slotThe/vc-use-package][vc-use-package]]:
        :rev "a29e5d6b07d9ae0319437e1d7bdbb9fe5967b30d"))
 #+end_src
 
-*** New features
+*** News
+*Features*
 - New mode: =org-node-fakeroam-db-feed-mode=
   - Deprecates advice that was in [[https://github.com/meedstrom/org-node?tab=readme-ov-file#option-1b][Backlinks Option 1B]]
 - New mode: =org-node-fakeroam-nosql-mode=
@@ -62,15 +55,17 @@ With [[https://github.com/slotThe/vc-use-package][vc-use-package]]:
 - Rename many functions and variables
   - Don't worry, you'll get warning messages for each old name set/used in your initfiles
 
-*Removals*
-- Remove many functions and variables
-
 *Changes*
-- Minibuffer completions are now "rich" by default.  To revert to vanilla, set =(setq org-node-affixation-fn #'org-node-affix-bare)=.
-- Don't automatically turn on cache-mode, just pester the user
-- Command =org-node-put-created= respects =org-timestamp-formats= instead of just putting the date as [YYYY-MM-DD].
-- Visiting a node will now reveal the surrounding Org context and do =(recenter 0)=.  If you prefer another behavior, redefine =org-node--goto=.
-- Perf: backlink-mode no longer tries to clean up =:CACHED_BACKLINKS:= (deprecated in May); if you still have those lying around, checkout v0.1 and run =M-x org-node-backlink-fix-all=
+- Fixed v0.3 bug eating CPU during idle, sorry about that!
+- Renamed default branch "master" to "main".  GitHub says the transition is automatic... we'll see.
+  - Created "dev" branch for unstable/untested work.
+- Deprecated option =org-node-filename-fn= -- instead, configure =org-node-datestamp-format= and =org-node-slug-fn=.
+  - Why? This lets =org-node-rename-file-by-title= preserve the date prefix if there is one.
+  - In a related vein, =org-node-slug-fn= changed meaning, so if you wrote a custom lambda back in v0.1, you may get odd filenames.
+- Minibuffer completions are now "rich" by default.  Revert with =(setq org-node-affixation-fn #'org-node-affix-bare)=.
+- Commands won't automatically turn on cache-mode, just pester the user about it being off
+- If you still have =:CACHED_BACKLINKS:= properties lying around: they're long deprecated and backlink-mode will no longer look for and delete them.  Checkout v0.1 and run =M-x org-node-backlink-fix-all=.
+- (For programmers) Links are now represented by struct objects
 
 ** What's all this
 
@@ -223,7 +218,7 @@ If you're happy with the result, *and* don't need =roam:= links, you can disable
 #+end_src
 
 ** Backlink solution 2: print inside the file
-I rarely have the screen space to display a backlink buffer.  Because the buffer needs my active involvement to keep open, I go long periods seeing no backlinks.  So this solution can be a great complement (or stand alone).
+I rarely have the screen space to display a backlink buffer.  Because it needs my active involvement to keep visible, I go long periods seeing no backlinks.  So this solution can be a great complement (or stand alone).
 
 *** *Option 2A*
 *Let org-node add a :BACKLINKS: property to all nodes.*
