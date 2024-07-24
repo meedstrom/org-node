@@ -46,7 +46,7 @@ With [[https://github.com/slotThe/vc-use-package][vc-use-package]]:
   - Deprecates advice that was in [[https://github.com/meedstrom/org-node?tab=readme-ov-file#option-1c--cut-out-the-db-altogether][Backlinks Option 1C]]
 - New mode: =org-node-fakeroam-redisplay-mode=
 - New mode: =org-node-complete-at-point-mode=
-- New user option: =org-node-prefer-file-level-nodes=
+- New user option: =org-node-prefer-with-heading=
 - New user option: =org-node-warn-title-collisions=
 - New user option: =org-node-alter-candidates=
 - New user option: =org-node-affixation-fn=
@@ -70,7 +70,7 @@ With [[https://github.com/slotThe/vc-use-package][vc-use-package]]:
 - Don't automatically turn on cache-mode, just pester the user
 - Command =org-node-put-created= respects =org-timestamp-formats= instead of just putting the date as [YYYY-MM-DD].
 - Visiting a node will now reveal the surrounding Org context and do =(recenter 0)=.  If you prefer another behavior, redefine =org-node--goto=.
-- Perf: backlink-mode no longer tries to clean up =:CACHED_BACKLINKS:= (deprecated in May); if you still have those lying around, checkout 0.1pre and run =M-x org-node-backlink-fix-all=
+- Perf: backlink-mode no longer tries to clean up =:CACHED_BACKLINKS:= (deprecated in May); if you still have those lying around, checkout v0.1 and run =M-x org-node-backlink-fix-all=
 
 ** What's all this
 
@@ -188,12 +188,12 @@ With that done, try out the commands we went over in [[https://github.com/meedst
 ** Backlink solution 1: borrow org-roam's backlink buffer
 Backlinks are bread and butter.  As a Roam user, you can just keep using =M-x org-roam-buffer-toggle=, but you get some new ways to keep its data fresh, circumventing Roam's autosync mode.
 
-**** *Option 1A.*  Let org-roam manage its own DB
+*** *Option 1A.*  Let org-roam manage its own DB
 
 If you didn't have laggy saves, this is fine.  In other words, keep variable =org-roam-db-update-on-save= at t.
 
 
-**** *Option 1B*.  Tell org-node to write to the org-roam DB
+*** *Option 1B*.  Tell org-node to write to the org-roam DB
 
 Use this minor mode:
 
@@ -207,7 +207,7 @@ There is even a command to full-reset the DB:
 - Original: =C-u M-x org-roam-db-sync=
 - Substitute: =M-x org-node-fakeroam-db-rebuild=, bearing in mind results aren't 100% identical.
 
-**** *Option 1C*.  Cut out the DB altogether
+*** *Option 1C*.  Cut out the DB altogether
 
 No need to compile SQLite!  Type =M-x org-node-fakeroam-nosql-mode=, then see what populates your Roam buffer henceforth.  Hopefully you see the same links as before.
 
@@ -222,7 +222,7 @@ If you're happy with the result, *and* don't need =roam:= links, you can disable
 ** Backlink solution 2: print inside the file
 I rarely have the screen space to display a backlink buffer.  Because the buffer needs my active involvement to keep open, I go long periods seeing no backlinks.  So this solution can be a great complement (or stand alone).
 
-**** *Option 2A*.  Let org-node add a =:BACKLINKS:= property to all nodes
+*** *Option 2A*.  Let org-node add a =:BACKLINKS:= property to all nodes
 
 For a first-time run, type =M-x org-node-backlink-fix-all=.  (Don't worry, if you change your mind, you can undo with =M-x org-node-backlink-regret=.)
 
@@ -232,7 +232,7 @@ Then start using the minor mode =org-node-backlink-mode=, which keeps these prop
 (add-hook 'org-mode-hook #'org-node-backlink-mode)
 #+end_src
 
-**** *Option 2B.*  Let [[https://github.com/toshism/org-super-links][org-super-links]] manage a =:BACKLINKS:...:END:= drawer in all nodes
+*** *Option 2B.*  Let [[https://github.com/toshism/org-super-links][org-super-links]] manage a =:BACKLINKS:...:END:= drawer in all nodes
 
 I /think/ the following should work. Totally untested, let me know!
 
@@ -244,8 +244,8 @@ Alas, this is currently directed towards people who used org-super-links from th
 
 Good news: this option goes well together with option 1B or 1C, because org-node is careful to avoid counting org-super-links backlinks as forward-links, so by building the Roam buffer on org-node data, it will display correctly.  As far as I can tell by reading the code, using Roam's own data must result in displaying twice the amount of links in both directions.
 
-** Misc
-*** Org-capture
+* Misc
+** Org-capture
 
 You may have heard that org-roam has its own set of capture templates: the =org-roam-capture-templates=.
 
@@ -280,7 +280,7 @@ With that done, the everyday commands =org-node-find= & =org-node-insert-link= c
 (setq org-node-creation-fn #'org-capture)
 #+end_src
 
-*** Managing org-id-locations
+** Managing org-id-locations
 
 I find unsatisfactory the config options in org-id (Why? See [[http://edstrom.dev/wjwrl/taking-ownership-of-org-id][Taking ownership of org-id]]), so org-node gives you an extra way to feed data to org-id, making sure we won't run into "ID not found" situations.
 
@@ -294,14 +294,14 @@ Example setting:
 #+end_src
 
 
-*** Completion-at-point
+** Completion-at-point
 I don't use any completion in Org buffers so don't feel like you have to, but there is the option:
 
 #+begin_src elisp
 (org-node-complete-at-point-mode)
 #+end_src
 
-*** Instruct org-open-at-point to visit ref
+** Instruct org-open-at-point to visit ref
 
 Say there's a link to a web URL, and you've forgot you also have a node listing that exact URL in its =ROAM_REFS= property.
 
@@ -311,12 +311,12 @@ Wouldn't it be nice if, clicking on that link, you're automatically sent to that
 (add-hook 'org-open-at-point-functions #'org-node-try-visit-ref-node)
 #+end_src
 
-*** Limitation: TRAMP
+** Limitation: TRAMP
 Working over TRAMP is untested, but I suspect it won't work.  Org-node tries to be very fast, often nulling =file-name-handler-alist=, which TRAMP needs.
 
 If you need TRAMP, use org-roam, which is made to /not/ re-access files or directories so often (which can be slow anyway over a remote connection), in favor of trusting its own DB.
 
-*** Limitation: unique titles
+** Limitation: unique titles
 
 If two ID-nodes exist with the same title, one of them disappears from minibuffer completions.
 
@@ -330,7 +330,7 @@ NB: this workaround won't help the in-buffer completions provided by =org-node-c
 
 # Maybe I'll add distinguishers like "1" "2" "3" to each naming conflict?
 
-*** Limitation: excluding notes
+** Limitation: excluding notes
 The option =org-node-filter-fn= works well for excluding TODO items that happen to have an ID, and excluding org-drill items and that sort of thing, but beyond that, it has limited utility because unlike org-roam, *child ID nodes of an excluded node are not excluded!*
 
 So let's say you have a big archive file, fulla IDs, and you want to exclude all of them from appearing in the minibuffer.  Putting a =:ROAM_EXCLUDE: t= at the top won't do it.  As it stands, what I'd suggest is to use the file name.
@@ -346,7 +346,7 @@ While the point of IDs is to avoid depending on exact filenames, it's often prag
                  (string-search "archive" (org-node-get-file-path node))))))
 #+end_src
 
-*** Toolbox
+** Toolbox
 
 Basic commands:
 
