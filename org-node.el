@@ -976,7 +976,7 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
     (org-node--maybe-adjust-idle-timer)
     (when org-node--first-init
       (setq org-node--first-init nil))
-    (while-let (fn (pop org-node--temp-extra-fns))
+    (while-let ((fn (pop org-node--temp-extra-fns)))
       (funcall fn))
     (when (and org-node--collisions org-node-warn-title-collisions)
       (message "Some nodes share title, see M-x org-node-list-collisions"))
