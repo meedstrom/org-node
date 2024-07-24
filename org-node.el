@@ -1176,15 +1176,16 @@ also necessary to do is `org-node--dirty-ensure-link-known'."
 (defvar org-node--debug nil
   "Whether to run in a way suitable for debugging.")
 
+;; FIXME: Sure, it detects them, but won't run `org-node-rescan-hook' on them
 (defvar org-node--idle-timer (timer-create)
-  "Timer for intermittently checking `org-node-extra-id-dirs'
+  "Timer for intermittently checking `org-node-extra-id-dirs'.
 for new, changed or deleted files.
 
 This redundant behavior helps detect changes made by something
 other than the current instance of Emacs, such as an user typing
 rm on the command line instead of using \\[delete-file].")
 
-(defvar org-node--time-elapsed 1
+(defvar org-node--time-elapsed 1.0
   "Duration of the last cache reset.")
 
 (defvar org-node--time-at-scan-begin nil)
