@@ -98,10 +98,13 @@ Called with one argument: a list of files re-scanned."
   :group 'org-node
   :type 'hook)
 
-(defcustom org-node-prefer-level-zero t
-  "If t, write a title and file-level property drawer when
-making a new file, otherwise write a more traditional top-level
-heading.
+(defcustom org-node-prefer-with-heading nil
+  "Make a heading even when creating isolated file nodes.
+If nil, write a #+TITLE and a file-level property-drawer instead.
+In other words:
+
+- if nil, use outline level 0
+- if t, use outline level 1
 
 This affects the behavior of `org-node-new-file',
 `org-node-extract-subtree', and `org-node-capture-target'.
@@ -1638,16 +1641,16 @@ which it gets some necessary variables."
                    (file-name-nondirectory path-to-write))
         (mkdir (file-name-directory path-to-write) t)
         (find-file path-to-write)
-        (if org-node-prefer-level-zero
-            (insert ":PROPERTIES:"
+        (if org-node-prefer-with-heading
+            (insert "* " org-node-proposed-title
+                    "\n:PROPERTIES:"
                     "\n:ID:       " org-node-proposed-id
                     "\n:END:"
-                    "\n#+title: " org-node-proposed-title
                     "\n")
-          (insert "* " org-node-proposed-title
-                  "\n:PROPERTIES:"
+          (insert ":PROPERTIES:"
                   "\n:ID:       " org-node-proposed-id
                   "\n:END:"
+                  "\n#+title: " org-node-proposed-title
                   "\n"))
         (goto-char (point-max))
         (unwind-protect
@@ -1743,16 +1746,16 @@ type the name of a node that does not exist.  That enables this
             (error "File or buffer already exists: %s" path-to-write)
           (mkdir (file-name-directory path-to-write) t)
           (find-file path-to-write)
-          (if org-node-prefer-level-zero
-              (insert ":PROPERTIES:"
+          (if org-node-prefer-with-heading
+              (insert "* " title
+                      "\n:PROPERTIES:"
                       "\n:ID:       " id
                       "\n:END:"
-                      "\n#+title: " title
                       "\n")
-            (insert "* " title
-                    "\n:PROPERTIES:"
+            (insert ":PROPERTIES:"
                     "\n:ID:       " id
                     "\n:END:"
+                    "\n#+title: " title
                     "\n"))
           (unwind-protect
               (run-hooks 'org-node-creation-hook)
@@ -2016,7 +2019,7 @@ as more \"truthful\" than today's date.
           (find-file path-to-write)
           (org-paste-subtree)
           (save-buffer)
-          (when org-node-prefer-level-zero
+          (unless org-node-prefer-with-heading
             ;; Replace the root heading and its properties with file-level
             ;; keywords &c.
             (goto-char (point-min))
