@@ -1166,7 +1166,7 @@ also necessary to do is `org-node--dirty-ensure-link-known'."
               :olp (org-get-outline-path)
               ;; Less important
               :properties props
-              :tags (org-get-tags(replace-regexp-in-string "[[:space:]]+" "-" title))
+              :tags (org-get-tags)
               :todo (if heading (org-get-todo-state))
               :deadline (cdr (assoc "DEADLINE" props))
               :scheduled (cdr (assoc "SCHEDULED" props))))))))))
