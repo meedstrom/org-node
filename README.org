@@ -41,9 +41,9 @@ With [[https://github.com/slotThe/vc-use-package][vc-use-package]]:
 
 *** New features
 - New mode: =org-node-fakeroam-db-feed-mode=
-  - Deprecates advice that was in [[https://github.com/meedstrom/org-node?tab=readme-ov-file#option-1b--tell-org-node-to-write-to-the-org-roam-db][Backlinks Option 1B]]
+  - Deprecates advice that was in [[https://github.com/meedstrom/org-node?tab=readme-ov-file#option-1b][Backlinks Option 1B]]
 - New mode: =org-node-fakeroam-nosql-mode=
-  - Deprecates advice that was in [[https://github.com/meedstrom/org-node?tab=readme-ov-file#option-1c--cut-out-the-db-altogether][Backlinks Option 1C]]
+  - Deprecates advice that was in [[https://github.com/meedstrom/org-node?tab=readme-ov-file#option-1c][Backlinks Option 1C]]
 - New mode: =org-node-fakeroam-redisplay-mode=
 - New mode: =org-node-complete-at-point-mode=
 - New user option: =org-node-prefer-with-heading=
@@ -188,7 +188,7 @@ With that done, try out the commands we went over in [[https://github.com/meedst
 ** Backlink solution 1: borrow org-roam's backlink buffer
 Backlinks are bread and butter.  As a Roam user, you can just keep using =M-x org-roam-buffer-toggle=, but you get some new ways to keep its data fresh, circumventing Roam's autosync mode.
 
-*** *Option 1A
+*** Option 1A
 *Let org-roam manage its own DB.*
 
 If you didn't have laggy saves, this is fine.  In other words, keep variable =org-roam-db-update-on-save= at t.
@@ -225,8 +225,8 @@ If you're happy with the result, *and* don't need =roam:= links, you can disable
 ** Backlink solution 2: print inside the file
 I rarely have the screen space to display a backlink buffer.  Because the buffer needs my active involvement to keep open, I go long periods seeing no backlinks.  So this solution can be a great complement (or stand alone).
 
-*** *Option 2A*.
-Let org-node add a =:BACKLINKS:= property to all nodes
+*** *Option 2A*
+*Let org-node add a =:BACKLINKS:= property to all nodes.*
 
 For a first-time run, type =M-x org-node-backlink-fix-all=.  (Don't worry, if you change your mind, you can undo with =M-x org-node-backlink-regret=.)
 
@@ -236,8 +236,8 @@ Then start using the minor mode =org-node-backlink-mode=, which keeps these prop
 (add-hook 'org-mode-hook #'org-node-backlink-mode)
 #+end_src
 
-*** *Option 2B.*
-Let [[https://github.com/toshism/org-super-links][org-super-links]] manage a =:BACKLINKS:...:END:= drawer in all nodes
+*** *Option 2B*
+*Let [[https://github.com/toshism/org-super-links][org-super-links]] manage a =:BACKLINKS:...:END:= drawer under all nodes.*
 
 I /think/ the following should work. Totally untested, let me know!
 
