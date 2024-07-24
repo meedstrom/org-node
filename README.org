@@ -58,8 +58,6 @@ With [[https://github.com/slotThe/vc-use-package][vc-use-package]]:
 
 *Changes*
 - Fixed v0.3 bug eating CPU during idle, sorry about that!
-- Renamed default branch "master" to "main".  GitHub says the transition is automatic... we'll see.
-  - Created "dev" branch for unstable/untested work.
 - Deprecated option =org-node-filename-fn= -- instead, configure =org-node-datestamp-format= and =org-node-slug-fn=.
   - Why? This lets =org-node-rename-file-by-title= preserve the date prefix if there is one.
   - In a related vein, =org-node-slug-fn= changed meaning, so if you wrote a custom lambda back in v0.1, you may get odd filenames.
@@ -67,6 +65,8 @@ With [[https://github.com/slotThe/vc-use-package][vc-use-package]]:
 - Commands won't automatically turn on cache-mode, just pester the user about it being off
 - If you still have =:CACHED_BACKLINKS:= properties lying around: they're long deprecated and backlink-mode will no longer look for and delete them.  Checkout v0.1 and run =M-x org-node-backlink-fix-all=.
 - (For programmers) Links are now represented by struct objects
+- Renamed default branch "master" to "main".  GitHub says the transition is automatic... we'll see.
+  - Created "dev" branch for unstable/untested work.
 
 ** What's all this
 
