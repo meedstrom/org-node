@@ -97,11 +97,12 @@ in one of the elements."
                               pos oldata)))
          ;; Drop all the data about positions below HEADING-POS (using `nthcdr'
          ;; because oldata is in reverse order)
+         ;; TODO Is it faster to do (ntake (nreverse ...))?
          (data-until-pos (nthcdr (org-node-worker--elem-index pos-data oldata)
                                  oldata)))
     (let ((previous-level (caddr (car data-until-pos))))
       ;; Work backwards towards the top of the file
-      ;; NOTE: Tried catch-while-throw and dolist, but `cl-loop' wins at perf
+      ;; NOTE: Profiled dolist and catch-while-throw too, but `cl-loop' wins at perf
       (cl-loop for row in data-until-pos
                when (> previous-level (caddr row))
                do (setq previous-level (caddr row))
@@ -603,7 +604,8 @@ list, and write results to another temp file."
          (setq buffer-read-only nil))))
 
     (setq buffer-read-only nil)
-    (let ((print-length nil)
+    (let ((write-region-inhibit-fsync nil) ;; Default t in batch mode
+          (print-length nil)
           (print-level nil))
       (write-region
        (prin1-to-string (list result:missing-files

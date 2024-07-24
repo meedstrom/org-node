@@ -102,7 +102,7 @@
     (should (equal (abbreviate-file-name (buffer-file-name))
                    (org-node-get-file-path node)))))
 
-(ert-deftest org-node-test--split-file-list ()
+(ert-deftest org-node-test--split-into-n-sublists ()
   (should (equal 4 (length (org-node--split-into-n-sublists
                             '(a v e e) 7))))
   (should (equal 1 (length (org-node--split-into-n-sublists
@@ -153,7 +153,5 @@
         (should (equal (org-node-get-file-title node) nil))
         (should (equal (org-node-get-file-title-or-basename node)
                        expected-filename))))))
-
-(provide 'org-node-test)
 
 ;;; org-node-test.el ends here

@@ -1,6 +1,5 @@
 #+startup: content
 * org-node 0.4pre
-** News
 - Fixed bug eating CPU during idle, sorry about that!
 - Renamed default branch "master" to "main".  GitHub says the transition is automatic... we'll see.
   - Created "dev" branch for unstable/untested work.
@@ -9,7 +8,6 @@
 - (For programmers) Links are now represented by struct objects "org-node-link", and not by plists
 
 * org-node 0.3
-** News
 The month of July brought many changes!  *If anything broke for you*, you can rollback to the 0.1pre branch.
 
 *** How to rollback
