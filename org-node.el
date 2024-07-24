@@ -92,13 +92,13 @@
 (defcustom org-node-rescan-hook nil
   "Hook run after scanning specific files.
 It is not run after a full cache reset, only after a file is
-saved or renamed, causing an incremental update to the cache.
+saved or renamed causing an incremental update to the cache.
 
 Called with one argument: a list of files re-scanned."
   :group 'org-node
   :type 'hook)
 
-(defcustom org-node-prefer-file-level-nodes t
+(defcustom org-node-prefer-level-zero t
   "If t, write a title and file-level property drawer when
 making a new file, otherwise write a more traditional top-level
 heading.
@@ -1453,7 +1453,7 @@ Built-in choices:
 ;; (org-node-slugify-for-web "칹え🐛")
 
 ;; https://irreal.org/blog/?p=11896
-(defun org-node--emacs28-strip-diacritics (string)
+(defun org-node--emacs25-strip-diacritics (string)
   (let ((diacritics-alist
          (seq-mapn (lambda (a b) (cons a b))
                    "ÀÁÂÃÄÅàáâãäåÒÓÔÕÕÖØòóôõöøÈÉÊËèéêëðÇçÐÌÍÎÏìíîïÙÚÛÜùúûüÑñŠšŸÿýŽža"
@@ -1487,7 +1487,7 @@ example kanji and Greek letters remain."
                    (replace-regexp-in-string "^-" "")
                    (replace-regexp-in-string "-$" ""))
     (thread-last title
-                 (org-node--emacs28-strip-diacritics)
+                 (org-node--emacs25-strip-diacritics)
                  (downcase)
                  (string-trim)
                  (replace-regexp-in-string "[[:space:]]+" "-")
@@ -1634,7 +1634,7 @@ which it gets some necessary variables."
                    (file-name-nondirectory path-to-write))
         (mkdir (file-name-directory path-to-write) t)
         (find-file path-to-write)
-        (if org-node-prefer-file-level-nodes
+        (if org-node-prefer-level-zero
             (insert ":PROPERTIES:"
                     "\n:ID:       " org-node-proposed-id
                     "\n:END:"
@@ -1739,7 +1739,7 @@ type the name of a node that does not exist.  That enables this
             (error "File or buffer already exists: %s" path-to-write)
           (mkdir (file-name-directory path-to-write) t)
           (find-file path-to-write)
-          (if org-node-prefer-file-level-nodes
+          (if org-node-prefer-level-zero
               (insert ":PROPERTIES:"
                       "\n:ID:       " id
                       "\n:END:"
@@ -2012,7 +2012,7 @@ as more \"truthful\" than today's date.
           (find-file path-to-write)
           (org-paste-subtree)
           (save-buffer)
-          (when org-node-prefer-file-level-nodes
+          (when org-node-prefer-level-zero
             ;; Replace the root heading and its properties with file-level
             ;; keywords &c.
             (goto-char (point-min))
