@@ -38,7 +38,9 @@
 
 ;;;###autoload
 (define-minor-mode org-node-backlink-mode
-  "Keep :BACKLINKS: properties updated."
+  "Keep :BACKLINKS: properties updated.
+
+-----"
   :group 'org-node
   (if org-node-backlink-mode
       (progn
@@ -47,9 +49,9 @@
         (add-hook 'org-node-insert-link-hook
                   #'org-node-backlink--add-in-target nil t)
         (add-hook 'after-change-functions
-                  #'org-node-backlink--flag-change nil t)
+                  #'org-node-backlink--flag-buffer-modification nil t)
         (add-hook 'before-save-hook
-                  #'org-node-backlink--fix-changed-parts-of-buffer nil t)
+                  #'org-node-backlink--fix-flagged-parts-of-buffer nil t)
         ;; We won't clean up this advice when the mode is turned off, because
         ;; it's a buffer-local mode and advices cannot be buffer-local, but
         ;; it's OK because it's made to no-op where the mode is inactive.
@@ -61,9 +63,9 @@
     (remove-hook 'org-node-insert-link-hook
                  #'org-node-backlink--add-in-target t)
     (remove-hook 'after-change-functions
-                 #'org-node-backlink--flag-change t)
+                 #'org-node-backlink--flag-buffer-modification t)
     (remove-hook 'before-save-hook
-                 #'org-node-backlink--fix-changed-parts-of-buffer t)))
+                 #'org-node-backlink--fix-flagged-parts-of-buffer t)))
 
 
 ;;;; Validation of one buffer at a time
@@ -157,8 +159,8 @@ REMOVE, remove it instead."
                 (org-entry-put nil "BACKLINKS" links-string))
             (org-entry-delete nil "BACKLINKS")))))))
 
-(defun org-node-backlink--fix-changed-parts-of-buffer ()
-  "Look for areas flagged by `org-node-backlink--flag-change' and
+(defun org-node-backlink--fix-flagged-parts-of-buffer ()
+  "Look for areas flagged by `org-node-backlink--flag-buffer-modification' and
 run `org-node-backlink--fix-subtree-here' at each affected
 subtree.  For a huge file, this is much faster than using
 `org-node-backlink--fix-whole-buffer'."
@@ -222,7 +224,7 @@ subtree.  For a huge file, this is much faster than using
          (message "org-node: Printing backtrace")
          (backtrace))))))
 
-(defun org-node-backlink--flag-change (beg end _)
+(defun org-node-backlink--flag-buffer-modification (beg end _)
   "Add text property `org-node-flag' to region between BEG and END.
 
 Designed for `after-change-functions', so this effectively flags
@@ -301,7 +303,7 @@ all areas where text is added/changed/deleted."
                  (or (org-get-heading t t t t)
                      (cadar (org-collect-keywords '("TITLE")))
                      (file-name-nondirectory buffer-file-name))))))
-        ;; Ensure that `org-node-backlink--fix-changed-parts-of-buffer' will
+        ;; Ensure that `org-node-backlink--fix-flagged-parts-of-buffer' will
         ;; not later remove the backlink we're adding
         (org-node--dirty-ensure-node-known)
         (let ((org-node--imminent-recovery-msg
@@ -347,7 +349,7 @@ all areas where text is added/changed/deleted."
         (setq new-value src-link))
       (unless (equal current-backlinks-value new-value)
         ;; TODO don't inhibit all modification hooks, just
-        ;;      inhibit `org-node-backlink--flag-change'
+        ;;      inhibit `org-node-backlink--flag-buffer-modification'
         (let ((inhibit-modification-hooks t))
           (org-entry-put nil "BACKLINKS" new-value))))))
 

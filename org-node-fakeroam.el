@@ -1,12 +1,44 @@
-;;; org-node-fakeroam.el --- Rudimentary Org-roam replica -*-  no-byte-compile: t;  no-native-compile: t; lexical-binding: t; -*-
+;;; org-node-fakeroam.el --- Replacements for org-roam autosync mode -*-  no-byte-compile: t;  no-native-compile: t; lexical-binding: t; -*-
 
-;; NOTE: Above file-local variables set `no-byte-compile' because org-roam and
-;;       emacsql are external packages that may not be present!
+;; Copyright (C) 2024 Martin Edström
+
+;; This program is free software: you can redistribute it and/or modify
+;; it under the terms of the GNU General Public License as published by
+;; the Free Software Foundation, either version 3 of the License, or
+;; (at your option) any later version.
+
+;; This program is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+;; GNU General Public License for more details.
+
+;; You should have received a copy of the GNU General Public License
+;; along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 (require 'org-node)
 (require 'ol)
-(require 'org-roam)
-(require 'emacsql)
+(if (not (fboundp 'org-roam-list-files))
+    (user-error "Install org-roam to use fakeroam modes")
+  (require 'org-roam)
+  (require 'emacsql))
+
+(defun org-node-fakeroam--precompile ()
+  "Compile all fakeroam functions.
+Because org-node-fakeroam.el depends on org-roam, which is not an
+explicit dependency of org-node, it is uncompilable at package
+installation and must be compiled at runtime after ensuring that
+the user has installed org-roam themselves."
+  (if (not (fboundp 'org-roam-list-files))
+      (user-error "Install org-roam to use fakeroam modes")
+    (require 'org-roam)
+    (require 'emacsql)
+    (dolist (fn '(org-node-fakeroam--mk-node
+                  org-node-fakeroam--mk-backlinks
+                  org-node-fakeroam--mk-reflinks
+                  org-node-fakeroam--db-update-files
+                  org-node-fakeroam--db-add-node))
+      (unless (compiled-function-p (symbol-function fn))
+        (byte-compile fn)))))
 
 ;;;###autoload
 (define-minor-mode org-node-fakeroam-redisplay-mode
@@ -17,7 +49,9 @@ mode exists for people who prefer to turn that off.
 
 As a bonus, advise the Roam buffer to open faster, by nullifying
 startup options such as `org-startup-indented' inside the context
-previews.  See `org-node-fakeroam--accelerate-get-contents'."
+previews.  See `org-node-fakeroam--accelerate-get-contents'.
+
+-----"
   :global t
   :group 'org-node
   (if org-node-fakeroam-redisplay-mode
@@ -53,11 +87,14 @@ machine.  This may eliminate most of that."
   "Override org-roam backlink-getters to look up org-node tables.
 
 As a result, \\[org-roam-buffer-toggle] will function without
-having SQLite installed."
+having SQLite installed.
+
+-----"
   :global t
   :group 'org-node
   (if org-node-fakeroam-nosql-mode
       (progn
+        (org-node-fakeroam--precompile)
         (unless org-node-cache-mode
           (message "`org-node-fakeroam-nosql-mode' will do nothing without `org-node-cache-mode'"))
         (advice-add 'org-roam-backlinks-get :override
@@ -134,11 +171,14 @@ Designed as override advice for `org-roam-reflinks-get'."
 
 ;;;###autoload
 (define-minor-mode org-node-fakeroam-db-feed-mode
-  "Supply data to the org-roam database on save."
+  "Supply data to the org-roam database on save.
+
+-----"
   :global t
   :group 'org-node
   (if org-node-fakeroam-db-feed-mode
       (progn
+        (org-node-fakeroam--precompile)
         (unless org-node-cache-mode
           (message "`org-node-fakeroam-db-feed-mode' will do nothing without `org-node-cache-mode'"))
         (add-hook 'org-node-rescan-hook #'org-node-fakeroam--db-update-files))

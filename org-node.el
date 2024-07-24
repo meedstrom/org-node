@@ -55,10 +55,12 @@
 
 ;;; Code:
 
-;; TODO Externalize org-node-fakeroam.el so it can pull in dependencies
+;; TODO: After 8 August, externalize org-node-fakeroam.el so it can pull its own
+;;       dependencies.  Then, submit to Melpa.
 
-;; TODO A workflow to allow pseudo-untitled (numeric-titled) nodes
-;;      - Need a bunch of commands, like jump to node from fulltext search
+;; TODO: A workflow to allow pseudo-untitled (numeric-titled) nodes
+;;       - Need a bunch of commands for that, like select node by fulltext
+;;         search
 
 (require 'cl-lib)
 (require 'seq)
@@ -533,7 +535,9 @@ When called from Lisp, peek on any hash table HT."
 
 Without this mode active, commands such as `org-node-find' may
 present out-of-date completions, and `org-node-backlink-mode' may
-delete too many backlinks on cleanup."
+delete too many backlinks on cleanup.
+
+-----"
   :global t
   :group 'org-node
   (remove-hook 'org-mode-hook #'org-node-cache-mode)
@@ -2667,7 +2671,9 @@ to ROAM_REFS."
 (defvar org-node--roam-settings nil)
 (define-minor-mode org-node-complete-at-point-mode
   "Use `org-node-complete-at-point' in all Org buffers.
-Also turn off Org-roam's equivalent, if active."
+Also turn off Org-roam's equivalent, if active.
+
+-----"
   :global t
   :require 'org-node
   (when (featurep 'org-roam)
