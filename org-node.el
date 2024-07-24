@@ -61,6 +61,8 @@
 ;;       - Need a bunch of commands for that, like select node by fulltext
 ;;         search
 
+;; TODO: Maybe rename object getters -get- to just :
+
 (require 'cl-lib)
 (require 'seq)
 (require 'subr-x)
@@ -71,15 +73,15 @@
 (require 'org-node-worker)
 (require 'org-node-obsolete)
 
-(declare-function 'org-super-links-convert-link-to-super "org-super-links")
-(declare-function 'wgrep-finish-edit "wgrep")
-(declare-function 'wgrep-change-to-wgrep-mode "wgrep")
-(declare-function 'org-roam-node-create "org-roam-node")
-(declare-function 'org-roam-node-slug "org-roam-node")
-;; (declare-function 'org-node--try-launch-scan "org-node")
-;; (declare-function 'org-roam-capture- "org-roam-capture")
-;; (declare-function 'consult--grep "consult")
-;; (declare-function 'consult--grep-make-builder "consult")
+(declare-function #'org-element-property "org-element")
+(declare-function #'org-super-links-convert-link-to-super "org-super-links")
+(declare-function #'consult--grep "consult")
+(declare-function #'consult--grep-make-builder "consult")
+(declare-function #'wgrep-finish-edit "wgrep")
+(declare-function #'wgrep-change-to-wgrep-mode "wgrep")
+(declare-function #'org-roam-capture- "org-roam-capture")
+(declare-function #'org-roam-node-create "org-roam-node")
+(declare-function #'org-roam-node-slug "org-roam-node")
 
 
 ;;;; Options
@@ -129,7 +131,7 @@ or drop me a line on Mastodon: @meedstrom@emacs.ch"
   :group 'org-node
   :type 'alist)
 
-;; TODO Maybe suggest `utf-8-auto-unix', but is it a sane system for write?
+;; TODO: Maybe suggest `utf-8-auto-unix', but is it a sane system for write?
 (defcustom org-node-perf-assume-coding-system nil
   "Coding system to assume while scanning ID nodes.
 
@@ -348,17 +350,6 @@ For use as `org-node-affixation-fn'."
   (cl-loop for title in coll
            collect (gethash title org-node--title<>affixation-triplet)))
 
-;; ;; Debug version of above
-;; (defun org-node--affixate-collection (coll)
-;;   "Take COLL and return precomputed affixations for each member."
-;;   (cl-loop for title in coll
-;;            as triplet = (gethash title org-node--title<>affixation-triplet)
-;;            if (car triplet) collect triplet else do
-;;            (error "nil triplet for title %s" title)))
-;; (gethash nil org-node--title<>affixation-triplet)
-;; (gethash nil org-node--candidate<>node)
-;; (gethash nil org-node--cand)
-
 (defun org-node-collection (str pred action)
   "Custom COLLECTION for `completing-read'.
 
@@ -452,8 +443,7 @@ or you can visit the homepage:
               "Returns node's TODO state."))
 
 (cl-defstruct (org-node-link (:constructor org-node-link--make-obj)
-                             (:copier nil)
-                             (:conc-name org-node-link-))
+                             (:copier nil))
   origin
   pos
   type
@@ -480,7 +470,7 @@ can demonstrate the data format.  See also the type `org-node'.")
   "1:1 table mapping ROAM_REFS members to the adjacent ID.")
 
 (defvar org-node--uri-path<>uri-type (make-hash-table :test #'equal)
-  "1:1 table")
+  "1:1 table mapping //paths to types:.")
 
 (defvar org-node--dest<>links (make-hash-table :test #'equal)
   "1:N table of links.
@@ -681,10 +671,11 @@ timer."
 ;; 1. Ongoing full scan may have already gone past the targeted
 ;;    file by the time the order comes in (unlikely)
 ;; 2. Targeting a deleted file will clean it out of org-id-locations (full scan
-;;    will not be aware of deleted files... actually that's a FIXME)
+;;    will not be aware of deleted files... actually yes, because it tries to
+;;    scan every file recorded in org-id-locations)
 ;; 3. Only a targeted scan will execute `org-node-rescan-hook', for good reason
 ;;
-;; Hm, points 2 and 3 could be taken care of at full scan by comparing to a
+;; Hm, point 3 could be taken care of at full scan by comparing to a
 ;; table of previously known file<>mtime.
 (defun org-node--try-launch-scan (&optional files)
   "Ensure that multiple calls occurring in a short time (like when
@@ -763,7 +754,7 @@ didn't do so already, or local changes have been made."
   (let* ((file-name-handler-alist nil)
          ;; FIXME When working on a checked-out repo, this will still just find
          ;;       elpaca/straight's clone.  So the developer has to paste in
-         ;;       the true library path here...
+         ;;       the true library path here.
          (lib (find-library-name "org-node-worker"))
          (native-path (and (featurep 'native-compile)
                            (native-comp-available-p)
@@ -877,18 +868,19 @@ function to update current tables."
              (n-jobs (length file-lists)))
         (dotimes (i n-jobs)
           (delete-file (org-node-worker--tmpfile "results-%d.eld" i))
-          (with-temp-file (org-node-worker--tmpfile "file-list-%d.eld" i)
-            (let ((standard-output (current-buffer))
-                  (print-length nil)
-                  (print-level nil))
-              (prin1 (pop file-lists))))
+          (let ((write-region-inhibit-fsync nil) ;; Default t in emacs30
+                (print-length nil)
+                (print-level nil))
+            (write-region (prin1-to-string (pop file-lists))
+                          nil
+                          (org-node-worker--tmpfile "file-list-%d.eld" i)))
           (push (make-process
                  :name (format "org-node-%d" i)
                  :noquery t
                  :stderr (get-buffer-create org-node--stderr-name)
                  :command
-                 ;; Ensure the children run the same binary executable as used
-                 ;; by this Emacs, so compiled-lib is correct for it
+                 ;; Ensure the children run the same binary executable as
+                 ;; this Emacs, so the compiled-lib fits
                  (list (expand-file-name invocation-name invocation-directory)
                        "--quick"
                        "--batch"
@@ -939,8 +931,7 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
               (insert-file-contents results-file)
               (push (read (buffer-string)) result-sets)))))
       (setq org-node--time-at-last-child-done (-last-item (car result-sets)))
-      ;; Merge N result-sets into one result-set and run FINALIZER on it.
-      ;; NOTE: I'd like to see what a cl-loop expression would look like...
+      ;; Merge N result-sets into one result-set, to run FINALIZER once
       (funcall finalizer (--reduce (-zip-with #'nconc it acc) result-sets)))))
 
 
@@ -957,8 +948,7 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
   (seq-let (missing-files _ nodes path<>type links errors) results
     (org-node--forget-id-locations missing-files)
     (dolist (link links)
-      (push link
-            (gethash (org-node-link-dest link) org-node--dest<>links)))
+      (push link (gethash (org-node-link-dest link) org-node--dest<>links)))
     (dolist (pair path<>type)
       (puthash (car pair) (cdr pair) org-node--uri-path<>uri-type))
     (dolist (node nodes)
@@ -989,7 +979,7 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
   (seq-let (missing-files found-files nodes path<>type links errors) results
     (org-node--forget-id-locations missing-files)
     (org-node--dirty-forget-files missing-files)
-    ;; In case a title was edited
+    ;; In case a title was edited: don't persist old revisions of the title
     (org-node--dirty-forget-completions-in found-files)
     (when org-node-eagerly-update-link-tables
       (cl-loop with ids-of-nodes-scanned = (cl-loop
@@ -2058,14 +2048,11 @@ as more \"truthful\" than today's date.
          ".org")
       (error "`org-node-slug-fn' not set"))))
 
-;; Special purpose
-(defun org-node--time-format-to-regexp (format-string)
-  "Attempt to generate a regexp that would match anything produced
-when FORMAT-STRING is given to `format-time-string'.
-Rough."
-  (let ((example (format-time-string format-string)))
+(defun org-node--make-regexp-for-time-format (format)
+  "Make regexp to match a (format-time-string FORMAT) result."
+  (let ((example (format-time-string format)))
     (if (string-match-p (rx (any "^*+([\\")) example)
-        (error "org-node: Not prepared to rename files with current `org-node-datestamp-format'")
+        (error "org-node: Unable to safely rename with current `org-node-datestamp-format'.  This is not inherent in your choice of format, I am just not smart enough")
       (concat "^"
               (replace-regexp-in-string
                "[[:digit:]]+" "[[:digit:]]+"
@@ -2135,7 +2122,7 @@ which wraps this function."
                (basename (file-name-nondirectory path))
                (date-prefix (if (and org-node-datestamp-format
                                      (string-match
-                                      (org-node--time-format-to-regexp
+                                      (org-node--make-regexp-for-time-format
                                        org-node-datestamp-format)
                                       basename))
                                 (match-string 0 basename)
