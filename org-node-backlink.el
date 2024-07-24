@@ -274,16 +274,13 @@ all areas where text is added/changed/deleted."
             (type (org-element-property :type elm))
             id file)
         (when (and path type)
-          ;; REVIEW Here is actually interesting space to consider merging
-          ;; some code for backlinks and reflinks by just considering ids
-          ;; themselves as a kind of ref...
           (if (equal "id" type)
               ;; Classic backlink
               (progn
                 (setq id path)
                 (setq file (org-id-find-id-file id)))
             ;; "Reflink"
-            (setq id (gethash (concat type ":" path) org-node--ref<>id))
+            (setq id (gethash path org-node--ref<>id))
             (setq file (ignore-errors
                          (org-node-get-file-path
                           (gethash id org-node--id<>node)))))
