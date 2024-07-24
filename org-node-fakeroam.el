@@ -164,7 +164,7 @@ Designed as override advice for `org-roam-reflinks-get'."
                         :ref (org-node-link-dest link)
                         :source-node (org-node-fakeroam--mk-node src-node)
                         :point (org-node-link-pos link)
-                        :properties (org-node-link-pos properties)))))))
+                        :properties (org-node-link-pos link)))))))
 
 
 ;;;; Feed method: supply data to Roam's DB
