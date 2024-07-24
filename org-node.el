@@ -1444,6 +1444,18 @@ restart).")
 ;; (org-node-slugify-for-web "#emacs")
 ;; (org-node-slugify-for-web "칹え🐛")
 
+;; https://irreal.org/blog/?p=11896
+(defun org-node--emacs28-strip-diacritics (string)
+  (let ((diacritics-alist
+         (seq-mapn (lambda (a b) (cons a b))
+                   "ÀÁÂÃÄÅàáâãäåÒÓÔÕÕÖØòóôõöøÈÉÊËèéêëðÇçÐÌÍÎÏìíîïÙÚÛÜùúûüÑñŠšŸÿýŽža"
+                   "AAAAAAaaaaaaOOOOOOOooooooEEEEeeeeeCcDIIIIiiiiUUUUuuuuNnSsYyyZz")))
+    (concat (seq-map (lambda (char)
+                       (or (alist-get char diacritics-alist)
+                           char))
+                     string))))
+;; (org-node--emacs28-strip-diacritics "Martin Edström")
+
 (defun org-node-slugify-for-web (title)
   "From TITLE, make a filename that looks nice as URL component.
 
@@ -1466,7 +1478,16 @@ example kanji and Greek letters remain."
                    (replace-regexp-in-string "--*" "-")
                    (replace-regexp-in-string "^-" "")
                    (replace-regexp-in-string "-$" ""))
-    (error "Emacs 29 required for `org-node-slugify-for-web'")))
+    (thread-last title
+                 (org-node--emacs28-strip-diacritics)
+                 (downcase)
+                 (string-trim)
+                 (replace-regexp-in-string "[[:space:]]+" "-")
+                 (replace-regexp-in-string "[^[:alnum:]\\/-]" "")
+                 (replace-regexp-in-string "\\/" "-")
+                 (replace-regexp-in-string "--*" "-")
+                 (replace-regexp-in-string "^-" "")
+                 (replace-regexp-in-string "-$" ""))))
 
 (defun org-node-slugify-like-roam-default (title)
   "From TITLE, make a filename in the default org-roam style.
