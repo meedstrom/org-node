@@ -2,7 +2,8 @@
 * org-node 0.4pre
 The month of July brought many changes!  *If anything broke for you*, you can rollback to the v0.1 branch.
 
-*** How to rollback
+*** Reversion instructions
+
 With [[https://github.com/radian-software/straight.el][Straight]], rollback like:
 #+begin_src elisp
 (use-package org-node
