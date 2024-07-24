@@ -237,7 +237,9 @@ purely deleted, it flags the preceding and succeeding char."
   (when org-node-backlink-mode
     (with-silent-modifications
       (if (= beg end)
-          (put-text-property (1- beg) (1+ end) 'org-node-flag t)
+          (put-text-property (max (1- beg) 1)
+                             (min (1+ end) (point-max))
+                             'org-node-flag t)
         (put-text-property beg end 'org-node-flag t)))))
 
 
