@@ -1,0 +1,7 @@
+Debian stable will be stuck on Emacs 28 until 2025 :-(
+
+List of 28-isms to drop in future
+
+- (cadar (org-collect-keywords "TITLE")) -> (org-get-title)
+- (org-node--emacs28-strip-diacritics)
+- what the compiler tells you is obsolete

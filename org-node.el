@@ -33,7 +33,8 @@
 ;; philosophy is the same as org-roam: if you assign an ID every time you make
 ;; an entry that you know you might want to link to from elsewhere, then it
 ;; tends to work out that the `org-node-find' command can find more or less
-;; every entry you'd ever want to search for.
+;; every entry you'd ever want to search for.  Pretty soon you've forgot that
+;; your files have names.
 
 ;; Anyway, that's just the core of it as described to someone not familiar with
 ;; zettelkasten.  In fact, out of the simplicity arises something powerful,
@@ -41,11 +42,11 @@
 
 ;; Compared to other systems:
 
-;; - org-roam: Same idea, compatible disk format(!), but org-node can opt out
-;;   of file-level property drawers and #+titles, and it tries to rely in a
-;;   bare-metal way on upstream org-id and org-capture.  For example, headings
-;;   with IDs in some Git README are considered part of your collection -- if
-;;   it's known to org-id, it's known to org-node.
+;; - org-roam: Same idea, compatible disk format(!), but org-node lets you opt
+;;   out of file-level property drawers, and it tries to rely in a bare-metal
+;;   way on upstream org-id and org-capture.  For example, headings with IDs in
+;;   some Git README are considered part of your collection -- if it's known to
+;;   org-id, it's known to org-node.
 
 ;; - denote: Org-node is Org only, no support for "denote:" links or Markdown.
 ;;   Filenames have no meaning (and can be automatically managed), and you can
@@ -65,8 +66,8 @@
 (require 'compat)
 (require 'org)
 (require 'org-id)
-(require 'org-node-obsolete)
 (require 'org-node-worker)
+(require 'org-node-obsolete)
 
 (declare-function 'org-super-links-convert-link-to-super "org-super-links")
 (declare-function 'consult--grep "consult")
@@ -139,7 +140,8 @@ Note that if your Org collection is old and has survived several
 system migrations, or some of it was generated via Pandoc
 conversion or downloaded, it's very possible that there's a mix
 of coding systems among them.  In that case, setting this
-variable may cause org-node to fail to scan some of them."
+variable may cause org-node to fail to scan some of them, or
+display their titles with strange glyphs."
   :group 'org-node
   :type '(choice coding-system (const nil)))
 
@@ -340,7 +342,7 @@ For use as `org-node-affixation-fn'."
   (cl-loop for title in coll
            collect (gethash title org-node--title<>affixation-triplet)))
 
-;; ;; Debug version
+;; ;; Debug version of above
 ;; (defun org-node--affixate-collection (coll)
 ;;   "Take COLL and return precomputed affixations for each member."
 ;;   (cl-loop for title in coll
@@ -354,17 +356,19 @@ For use as `org-node-affixation-fn'."
 (defun org-node-collection (str pred action)
   "Custom COLLECTION for `completing-read'.
 
-Ahead of time, org-node takes titles/aliases/refs from
-`org-node--title<>id', saves the result of
-`org-node-affixation-fn' on each, and puts each maybe-affixed
-thing into `org-node--candidate<>node'.  Finally, this function
-then either simply reads candidates off that table or attaches
-affixations in realtime, based on the user option
-`org-node-alter-candidates'.
+Ahead of time, org-node takes titles/aliases from
+`org-node--title<>id', runs `org-node-affixation-fn' on each, and
+depending on the user option `org-node-alter-candidates' it
+either saves the affixed thing directly into
+`org-node--candidate<>node' or into a secondary table
+`org-node--title<>affixation-triplet'.  Finally, this function
+then either simply reads candidates off the candidates table or
+attaches the affixations in realtime.
 
-All completions are keys of `org-node--candidate<>node', but
-remember that it is possible for `completing-read' to exit with
-user-entered input that didn't match anything.
+Regardless of which, all completions are guaranteed to be keys of
+`org-node--candidate<>node', but remember that it is possible for
+`completing-read' to exit with user-entered input that didn't
+match anything.
 
 Arguments STR, PRED and ACTION are handled behind the scenes,
 read more in the manual at (elisp)Programmed Completion."
@@ -376,7 +380,6 @@ read more in the manual at (elisp)Programmed Completion."
 
 (defvar org-node-hist nil
   "Minibuffer history.")
-(put 'org-node-hist 'history-length 1000)
 
 
 ;;;; The metadata struct
@@ -454,12 +457,12 @@ or you can visit the homepage:
 
 ;;;; Tables
 
+(defvaralias 'org-nodes 'org-node--id<>node)
+
 (defvar org-node--id<>node (make-hash-table :test #'equal)
   "1:1 table mapping ids to nodes.
 To peek on the contents, try \\[org-node-peek] a few times, which
 can demonstrate the data format.  See also the type `org-node'.")
-
-(defvaralias 'org-nodes 'org-node--id<>node)
 
 (defvar org-node--candidate<>node (make-hash-table :test #'equal)
   "1:1 table mapping completion candidates to nodes.")
@@ -1214,9 +1217,9 @@ be misleading."
 (defun org-node--split-into-n-sublists (big-list n)
   "Split BIG-LIST into a list of N sublists.
 
-In the special case where BIG-LIST contains fewer than N
-elements, the return value is just like BIG-LIST except that each
-element is wrapped in its own list."
+In the unlikely case where BIG-LIST contains N or fewer elements,
+the return value is just like BIG-LIST except that each element
+is wrapped in its own list."
   (let ((sublist-length (max 1 (/ (length big-list) n)))
         result)
     (dotimes (i n)
@@ -1401,6 +1404,22 @@ Behavior depends on the user option `org-node-ask-directory'."
         org-node-ask-directory
       (car (org-node--root-dirs (org-node-files t))))))
 
+(defvar org-node-filename-fn nil
+  "Deprecated. Please set these variables
+
+- `org-node-datestamp-format'
+- `org-node-slug-fn'
+
+and then set this variable to nil (or remove from initfiles and
+restart).")
+
+(defcustom org-node-datestamp-format ""
+  "Passed to `format-time-string' to prepend to filenames.
+
+Example from Org-roam: \"%Y%m%d%H%M%S-\"
+Example from Denote: \"%Y%m%dT%H%M%S--\""
+  :type 'string)
+
 (defcustom org-node-slug-fn #'org-node-slugify-for-web
   "Function taking a node title and returning a filename.
 Receives one argument: the value of an Org #+TITLE keyword, or
@@ -1415,22 +1434,6 @@ Built-in choices:
           (function-item org-node-slugify-like-roam-default)
           (function-item org-node-slugify-like-roam-actual)
           function))
-
-(defcustom org-node-datestamp-format ""
-  "Passed to `format-time-string' to prepend to filenames.
-
-Example from Org-roam: \"%Y%m%d%H%M%S-\"
-Example from Denote: \"%Y%m%dT%H%M%S--\""
-  :type 'string)
-
-(defvar org-node-filename-fn nil
-  "Deprecated. Please set these variables
-
-- `org-node-datestamp-format'
-- `org-node-slug-fn'
-
-and then set this variable to nil (or remove from initfiles and
-restart).")
 
 ;; Useful test cases if you want to hack on this!
 
@@ -2067,11 +2070,11 @@ In addition to the checks described in
 are outside `org-roam-directory'.  Suitable as a save hook:
 
     (add-hook 'after-save-hook #'org-node-rename-file-by-title-maybe)"
-  (unless (bound-and-true-p org-roam-directory)
-    (user-error "org-node-rename-file-by-title-if-roam: Variable `org-roam-directory' must be set"))
-  (when (string-prefix-p (expand-file-name org-roam-directory)
-                         (buffer-file-name))
-    (org-node-rename-file-by-title)))
+  (when (derived-mode-p 'org-mode)
+    (unless (bound-and-true-p org-roam-directory)
+      (user-error "org-node-rename-file-by-title-maybe: Variable `org-roam-directory' must be set (org-roam not needed)"))
+    (when (string-prefix-p org-roam-directory (buffer-file-name))
+      (org-node-rename-file-by-title))))
 
 ;;;###autoload
 (defun org-node-rename-file-by-title (&optional interactive)
@@ -2126,8 +2129,6 @@ which wraps this function."
                                       basename))
                                 (match-string 0 basename)
                               ""))
-               (unprefixed-name (string-trim-left basename
-                                                  (regexp-quote date-prefix)))
                (new-path (file-name-concat
                           (file-name-directory path)
                           ;; HACK 2024-07-21
