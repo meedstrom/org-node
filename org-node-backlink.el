@@ -159,6 +159,7 @@ REMOVE, remove it instead."
                 (org-entry-put nil "BACKLINKS" links-string))
             (org-entry-delete nil "BACKLINKS")))))))
 
+;; FIXME: Only operates where text has been added, not deleted
 (defun org-node-backlink--fix-flagged-parts-of-buffer ()
   "Look for areas flagged by `org-node-backlink--flag-buffer-modification' and
 run `org-node-backlink--fix-subtree-here' at each affected
@@ -185,6 +186,7 @@ subtree.  For a huge file, this is much faster than using
                   (end (make-marker))
                   (case-fold-search t)
                   prop)
+              ;; (goto-char start)
               (while (< start (point-max))
                 (setq prop (get-text-property start 'org-node-flag))
                 (set-marker end (or (text-property-not-all
@@ -224,16 +226,19 @@ subtree.  For a huge file, this is much faster than using
          (message "org-node: Printing backtrace")
          (backtrace))))))
 
-(defun org-node-backlink--flag-buffer-modification (beg end _)
+(defun org-node-backlink--flag-buffer-modification (beg end _n-deleted-chars)
   "Add text property `org-node-flag' to region between BEG and END.
 
 Designed for `after-change-functions', so this effectively flags
-all areas where text is added/changed/deleted."
+all areas where text is added/changed/deleted.  Where text was
+purely deleted, it flags the preceding and succeeding char."
   (unless (derived-mode-p 'org-mode)
     (error "Backlink function called in non-Org buffer"))
   (when org-node-backlink-mode
     (with-silent-modifications
-      (put-text-property beg end 'org-node-flag t))))
+      (if (= beg end)
+          (put-text-property (1- beg) (1+ end) 'org-node-flag t)
+        (put-text-property beg end 'org-node-flag t)))))
 
 
 ;;;; Link-insertion advice
