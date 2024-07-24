@@ -626,15 +626,15 @@ file is gone.
 Either operate on ARG2 if it seems to be a file name, else ARG1,
 else the current buffer file.  Meant for `after-save-hook' or as
 advice on `rename-file' or `delete-file'."
-  (let ((file (cond ((and (stringp arg2) (file-exists-p arg2)) ;; rename-file
-                     arg2)
-                    ((stringp arg1) ;; delete-file
-                     arg1)
-                    ((stringp buffer-file-name) ;; after-save-hook
-                     buffer-file-name))))
-    (when (--any-p (string-suffix-p it file)
+  (let ((files (cond ((and (stringp arg2) (file-exists-p arg2)) ;; rename-file
+                      (list arg1 arg2))
+                     ((stringp arg1) ;; delete-file
+                      (list arg1))
+                     ((stringp buffer-file-name) ;; after-save-hook
+                      (list buffer-file-name)))))
+    (when (--any-p (string-suffix-p it (car files))
                    '(".org" ".org_archive" ".org.gpg"))
-      (org-node--scan-targeted (list file)))))
+      (org-node--scan-targeted files))))
 
 (defun org-node--maybe-adjust-idle-timer ()
   "Adjust `org-node--idle-timer' based on duration of last scan.
