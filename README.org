@@ -226,7 +226,7 @@ If you're happy with the result, *and* don't need =roam:= links, you can disable
 I rarely have the screen space to display a backlink buffer.  Because the buffer needs my active involvement to keep open, I go long periods seeing no backlinks.  So this solution can be a great complement (or stand alone).
 
 *** *Option 2A*
-*Let org-node add a =:BACKLINKS:= property to all nodes.*
+*Let org-node add a :BACKLINKS: property to all nodes.*
 
 For a first-time run, type =M-x org-node-backlink-fix-all=.  (Don't worry, if you change your mind, you can undo with =M-x org-node-backlink-regret=.)
 
@@ -237,7 +237,7 @@ Then start using the minor mode =org-node-backlink-mode=, which keeps these prop
 #+end_src
 
 *** *Option 2B*
-*Let [[https://github.com/toshism/org-super-links][org-super-links]] manage a =:BACKLINKS:...:END:= drawer under all nodes.*
+*Let [[https://github.com/toshism/org-super-links][org-super-links]] manage a :BACKLINKS:...:END: drawer under all nodes.*
 
 I /think/ the following should work. Totally untested, let me know!
 
