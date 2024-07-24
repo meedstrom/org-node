@@ -968,12 +968,12 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
               (time-subtract org-node--time-at-last-child-done
                              org-node--time-at-scan-begin))))
     (org-node--maybe-adjust-idle-timer)
-    ;; Don't contribute to emacs init noise
-    (if org-node--first-init
-        (setq org-node--first-init nil)
-      (org-node--print-elapsed)
-      (when (and org-node--collisions org-node-warn-title-collisions)
-        (message "Some nodes share title, see M-x org-node-list-collisions")))
+    (when org-node--first-init
+      (setq org-node--first-init nil))
+    (while-let (fn (pop org-node--temp-extra-fns))
+      (funcall fn))
+    (when (and org-node--collisions org-node-warn-title-collisions)
+      (message "Some nodes share title, see M-x org-node-list-collisions"))
     (when errors
       (message "Scan had problems, see M-x org-node-list-scan-problems"))))
 
@@ -2309,10 +2309,17 @@ to replacing all the links, finally rename the asset file itself."
                            (format-time-string (car org-timestamp-formats))
                            "]"))))
 
+(defvar org-node--temp-extra-fns nil
+  "Extra functions to run at the end of a full scan.
+The list is emptied on each use.  Primarily exists to give the
+interactive command `org-node-reset' a way to print the time
+elapsed.")
+
 ;;;###autoload
 (defun org-node-reset ()
   "Wipe and rebuild the cache."
   (interactive)
+  (push #'org-node--print-elapsed org-node--temp-extra-fns)
   (org-node-cache-ensure nil t))
 
 ;;;###autoload
