@@ -1,8 +1,8 @@
 ;;; org-node-obsolete.el --- Outta sight so I'm not tempted to clean them up -*- lexical-binding: t; -*-
 
+
 ;; One-shot variable warnings
 (let ((aliases '(org-node-cache-rescan-file-hook org-node-rescan-hook
-                 org-node-prefer-file-level-nodes org-node-prefer-level-zero
                  org-node-cache-reset-hook nil
                  org-node-format-candidate-fn nil
                  org-node-filename-fn nil
@@ -16,9 +16,22 @@
           (unless new
             (lwarn 'org-node :warning "Your config uses removed variable: %S" old))
           (when new
-            (lwarn 'org-node :warning "Your config uses old variable: %S, which will be removed by %s.  New name: %S"
+            (lwarn 'org-node :warning "Your config uses old variable: %S, will be removed by %s.  New name: %S"
                    old "30 July 2024" new)
             (set new (symbol-value old))))))))
+
+;; All these hacks...  But I like renaming things
+(advice-add 'org-node--warn-obsolete-variables :after
+            (let (warned-once)
+              (lambda ()
+                (unless warned-once
+                  (setq warned-once t)
+                  (when (boundp 'org-node-prefer-file-level-nodes)
+                    (display-warning
+                     'org-node "Your config uses old variable: `org-node-prefer-file-level-nodes', will be removed by 8 August 2024.  New option is `org-node-prefer-with-heading', with opposite meaning!")
+                    (setq org-node-prefer-with-heading
+                          (not org-node-prefer-file-level-nodes)))))))
+
 
 (defmacro org-node--defobsolete (old new &optional interactive when removed-by)
   "Define OLD as a function that runs NEW.
