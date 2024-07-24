@@ -1948,92 +1948,88 @@ it can be desirable if you know the subtree had been part of the
 source file for ages so that you see the ancestor's creation-date
 as more \"truthful\" than today's date.
 
-(advice-add \\='org-node-extract-subtree :around
-            (defun my-inherit-creation-date (orig-fn &rest args)
-              (let ((parent-creation
-                     (save-excursion
-                       (without-restriction
-                         (while (not (or (org-entry-get nil \"CREATED\")
-                                         (bobp)))
-                           (org-up-heading-or-point-min)))
-                       (org-entry-get nil \"CREATED\"))))
-                (apply orig-fn args)
-                ;; Now in the new buffer
-                (org-entry-put nil \"CREATED\"
-                               (or parent-creation
-                                   (format-time-string \"[%F %a]\"))))))"
+
+(defun my-inherit-creation-date (orig-fn &rest args)
+       (let ((parent-creation (org-entry-get nil \"CREATED\" t)))
+         (apply orig-fn args)
+         ;; Now in the new buffer
+         (org-entry-put nil \"CREATED\"
+                        (or parent-creation
+                            (format-time-string \"[%F %a]\")))))"
   (interactive nil org-mode)
   (unless (derived-mode-p 'org-mode)
     (user-error "This command expects an org-mode buffer"))
   (org-node-cache-ensure)
   (let ((dir (org-node-guess-or-ask-dir "Extract to new file in directory: ")))
-    (save-excursion
-      (when (org-invisible-p)
-        (user-error "Better not run this command in an invisible region"))
-      (org-back-to-heading t)
-      (save-buffer)
-      (when (org-invisible-p)
-        (user-error "Better not run this command in an invisible region"))
-      (let* ((tags (org-get-tags))
-             (title (org-get-heading t t t t))
-             (id (org-id-get-create))
-             (boundary (save-excursion
-                         (org-end-of-meta-data t)
-                         (point)))
-             ;; Why is CATEGORY autocreated by `org-entry-properties'...  It's
-             ;; an invisible property that's always present and usually not
-             ;; interesting, unless user has entered some explicit value
-             (explicit-category (save-excursion
-                                  (when (search-forward ":category:" boundary t)
-                                    (org-entry-get nil "CATEGORY"))))
-             (properties (--filter (not (equal "CATEGORY" (car it)))
-                                   (org-entry-properties nil 'standard)))
-             (path-to-write (file-name-concat
-                             dir (org-node--name-file title)))
-             (source-path buffer-file-name))
-        (if (file-exists-p path-to-write)
-            (message "A file already exists named %s" path-to-write)
-          (org-cut-subtree)
-          ;; Leave a link under the parent heading pointing to the subheading
-          ;; that was extracted.
-          (save-excursion
-            (org-up-heading-safe)
-            (when (org-at-heading-p)
-              (org-end-of-meta-data t))
-            (open-line 1)
-            (insert (format-time-string
-                     (format "[%s] Created " (car org-timestamp-formats)))
-                    (org-link-make-string (concat "id:" id) title)
-                    "\n"))
-          (save-buffer)
-          (find-file path-to-write)
-          (org-paste-subtree)
-          (save-buffer)
-          (unless org-node-prefer-with-heading
-            ;; Replace the root heading and its properties with file-level
-            ;; keywords &c.
-            (goto-char (point-min))
-            (org-end-of-meta-data t)
-            (kill-region (point-min) (point))
-            (org-map-region #'org-promote (point-min) (point-max))
-            (insert
-             ":PROPERTIES:\n"
-             (string-join (--map (concat ":" (car it) ": " (cdr it))
-                                 properties)
-                          "\n")
-             "\n:END:"
-             (if explicit-category
-                 (concat "\n#+category: " explicit-category)
-               "")
-             (if tags
-                 (concat "\n#+filetags: :" (string-join tags ":") ":")
-               "")
-             "\n#+title: " title
-             "\n"))
-          (run-hooks 'org-node-creation-hook)
-          (save-buffer)
-          ;; TODO: arrange so the backlink-mode backlink appears
-          (org-node--scan-targeted (list path-to-write source-path)))))))
+    (when (org-invisible-p)
+      (user-error "Better not run this command in an invisible region"))
+    (org-back-to-heading t)
+    (save-buffer)
+    (when (org-invisible-p)
+      (user-error "Better not run this command in an invisible region"))
+    (let* ((tags (org-get-tags))
+           (title (org-get-heading t t t t))
+           (id (org-id-get-create))
+           (boundary (save-excursion
+                       (org-end-of-meta-data t)
+                       (point)))
+           ;; Why is CATEGORY autocreated by `org-entry-properties'...  It's
+           ;; an invisible property that's always present and usually not
+           ;; interesting, unless user has entered some explicit value
+           (explicit-category (save-excursion
+                                (when (search-forward ":category:" boundary t)
+                                  (org-entry-get nil "CATEGORY"))))
+           (properties (--filter (not (equal "CATEGORY" (car it)))
+                                 (org-entry-properties nil 'standard)))
+           (path-to-write (file-name-concat
+                           dir (org-node--name-file title)))
+           (source-path buffer-file-name))
+      (if (file-exists-p path-to-write)
+          (message "A file already exists named %s" path-to-write)
+        (org-cut-subtree)
+        ;; Leave a link under the parent heading pointing to the subheading
+        ;; that was extracted.
+        (save-excursion
+          (without-restriction
+            (org-up-heading-or-point-min)
+            (goto-char (org-entry-end-position))
+            (if (org-invisible-p)
+                (message "Invisible area, not inserting link to extracted")
+              (open-line 1)
+              (insert "\n"
+                      (format-time-string
+                       (format "[%s] Created " (car org-timestamp-formats)))
+                      (org-link-make-string (concat "id:" id) title)
+                      "\n"))))
+        (save-buffer)
+        (find-file path-to-write)
+        (org-paste-subtree)
+        (save-buffer)
+        (unless org-node-prefer-with-heading
+          ;; Replace the root heading and its properties with file-level
+          ;; keywords &c.
+          (goto-char (point-min))
+          (org-end-of-meta-data t)
+          (kill-region (point-min) (point))
+          (org-map-region #'org-promote (point-min) (point-max))
+          (insert
+           ":PROPERTIES:\n"
+           (string-join (--map (concat ":" (car it) ": " (cdr it))
+                               properties)
+                        "\n")
+           "\n:END:"
+           (if explicit-category
+               (concat "\n#+category: " explicit-category)
+             "")
+           (if tags
+               (concat "\n#+filetags: :" (string-join tags ":") ":")
+             "")
+           "\n#+title: " title
+           "\n"))
+        (run-hooks 'org-node-creation-hook)
+        (save-buffer)
+        ;; TODO: arrange so the backlink-mode backlink appears
+        (org-node--scan-targeted (list path-to-write source-path))))))
 
 ;; Transitional wrapper
 (defun org-node--name-file (title)
