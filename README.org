@@ -28,7 +28,7 @@ With [[https://github.com/quelpa/quelpa][quelpa]]:
 With [[https://github.com/progfolio/elpaca][elpaca]]:
 #+begin_src elisp
 (use-package org-node
-  :ensure (:type git :host github :repo "meedstrom/org-node"
+  :ensure (:fetcher github :repo "meedstrom/org-node"
            :branch "v0.1"))
 #+end_src
 
