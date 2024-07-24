@@ -2,6 +2,7 @@
 
 ;; One-shot variable warnings
 (let ((aliases '(org-node-cache-rescan-file-hook org-node-rescan-hook
+                 org-node-prefer-file-level-nodes org-node-prefer-level-zero
                  org-node-cache-reset-hook nil
                  org-node-format-candidate-fn nil
                  org-node-filename-fn nil
