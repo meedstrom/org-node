@@ -34,7 +34,6 @@ With [[https://github.com/slotThe/vc-use-package][vc-use-package]]:
 
 ** News
 *Features*
-- Org-ref citations now work
 - New mode: =org-node-fakeroam-db-feed-mode=
   - Deprecates advice that was in [[https://github.com/meedstrom/org-node?tab=readme-ov-file#option-1b][Backlinks Option 1B]]
 - New mode: =org-node-fakeroam-nosql-mode=
@@ -106,11 +105,12 @@ A comparison of three similar systems, all permitting org-id as first-class citi
 | Backlinks                         | yes      | yes                | yes                  |
 | Node search and insert            | yes      | yes                | -- (suggests [[https://github.com/alphapapa/org-ql][org-ql]]) |
 | Node aliases                      | yes      | yes                | --                   |
+| Node exclusion                    | yes      | limited            | not applicable       |
 | Rich backlinks buffer             | yes      | yes (org-roam's)   | --                   |
 | Reflinks                          | yes      | yes (as backlinks) | --                   |
 | Ref search                        | yes      | yes (as aliases)   | not applicable       |
 | Org 9.5 @citekeys as refs         | yes      | yes                | not applicable       |
-| Support org-ref v2 and v3         | yes      | yes                | not applicable       |
+| Support org-ref v2 and v3         | yes      | limited            | not applicable       |
 | Can have rich search completion   | yes      | yes                | not applicable       |
 | Can work thru org-roam-capture    | yes      | yes                | ?                    |
 | Can work thru org-capture         | --       | yes                | ?                    |
@@ -120,7 +120,6 @@ A comparison of three similar systems, all permitting org-id as first-class citi
 | List dead links                   | --       | yes                | --                   |
 | Warn about duplicate titles       | --       | yes                | --                   |
 | Rename file when title changes    | --       | yes                | --                   |
-| Node exclusion                    | yes      | limited            | not applicable       |
 | Principled "related"-section      | --       | --                 | yes                  |
 | Customize how backlinks shown     | yes      | --                 | yes                  |
 | Support =roam:= links               | yes      | -- (WONTFIX)       | not applicable       |
