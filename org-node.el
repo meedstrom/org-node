@@ -1051,10 +1051,14 @@ normal usage!  What's left undone til idle:
         (puthash ref node org-node--candidate<>node)
         (puthash ref
                  (list (propertize ref 'face 'org-cite)
-                       (if-let (type (gethash ref org-node--uri-path<>uri-type))
-                           (propertize (concat type ":")
-                                       'face 'completions-annotations))
-                       nil)
+                       (propertize
+                        (let ((type (gethash ref org-node--uri-path<>uri-type)))
+                          (if type
+                              (concat type ":")
+                            "@"))
+                        'face
+                        'completions-annotations)
+                       "")
                  org-node--title<>affixation-triplet))
       (dolist (title (cons (org-node-get-title node)
                            (org-node-get-aliases node)))

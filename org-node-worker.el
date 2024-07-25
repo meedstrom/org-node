@@ -156,36 +156,42 @@ What this means?   See org-node-test.el."
         ;; Return merged list
         (cl-loop
          for link? in (append links (split-string-and-unquote (buffer-string)))
-         ;; @citekey
-         if (string-prefix-p "@" link?)
-         collect link?
+         ;; @citekey or &citekey
+         if (string-match (rx (or bol (any ";:"))
+                              (group (any "@&") (+ (not (any ";]")))))
+                          link?)
+         collect (substring (match-string 1 link?) 1)
          ;; Some sort of uri://path
          else when (string-match "^\\(.*?\\):" link?)
-         collect (let ((path (substring link? (match-end 0))))
+         collect (let ((path (string-replace
+                              "%20" " "
+                              (substring link? (match-end 0)))))
                    ;; Remember the uri: prefix for completions later
                    (push (cons path (match-string 1 link?))
                          org-node-worker--result:paths-types)
                    ;; .. but the actual ref is just the //path
                    path))))))
 
-;; TODO: Extract org-ref v3 &citekeys too
+(defconst org-node-worker--org-ref-type-re
+  (regexp-opt
+   ;; Default keys of `org-ref-cite-types' 2024-07-25
+   '("cite" "nocite" "citet" "citet*" "citep" "citep*" "citealt" "citealt*" "citealp" "citealp*" "citenum" "citetext" "citeauthor" "citeauthor*" "citeyear" "citeyearpar" "Citet" "Citep" "Citealt" "Citealp" "Citeauthor" "Citet*" "Citep*" "Citealt*" "Citealp*" "Citeauthor*" "Cite" "parencite" "Parencite" "footcite" "footcitetext" "textcite" "Textcite" "smartcite" "Smartcite" "cite*" "parencite*" "supercite" "autocite" "Autocite" "autocite*" "Autocite*" "citetitle" "citetitle*" "citeyear" "citeyear*" "citedate" "citedate*" "citeurl" "fullcite" "footfullcite" "notecite" "Notecite" "pnotecite" "Pnotecite" "fnotecite" "cites" "Cites" "parencites" "Parencites" "footcites" "footcitetexts" "smartcites" "Smartcites" "textcites" "Textcites" "supercites" "autocites" "Autocites" "bibentry")))
+
 (defun org-node-worker--collect-links-until
     (end id-here olp-with-self plain-re merged-re)
   "From here to buffer position END, look for forward-links.
 Argument ID-HERE is the ID of the subtree where this function is
 being executed (or that of an ancestor heading, if the current
-subtree has none), and will be put in each link's metadata.
+subtree has none), to be included in each link's metadata.
 
 It is important that END does not extend past any sub-heading, as
 the subheading potentially has an ID of its own.
 
 Argument OLP-WITH-SELF is the outline path to the current
 subtree, with its own heading tacked onto the end.  This is data
-that org-roam expects to have.
+that org-roam expects to have, so too org-node-fakeroam.
 
-Argument PLAIN-RE is expected to be the value of
-`org-link-plain-re', passed in this way only so that the child
-process does not have to load org.el."
+Arguments PLAIN-RE and MERGED-RE..."
   (let ((beg (point))
         link-type path)
     (while (re-search-forward merged-re end t)
@@ -203,22 +209,37 @@ process does not have to load org.el."
               path (match-string 4)))
       (when link-type
         (unless (save-excursion
-                  ;; On a # comment or #+keyword, skip
+                  ;; If point is on a # comment or #+keyword line, skip
                   (goto-char (pos-bol))
                   (or (looking-at-p "[[:space:]]*# ")
                       (looking-at-p "[[:space:]]*#\\+")))
+          (if (and (string-search "&" path)
+                   ;; (not (member link-type '("https" "http" "id"))) ;; PERF?
+                   (string-match-p org-node-worker--org-ref-type-re link-type))
+              ;; A citep:, citealt: or some such.  Specifically org-ref v3
+              ;; because PATH contains at least one ampersand.
+              (while (string-match "&.+\\b" path)
+                (let ((citekey (match-string 0 path)))
+                  (setq path (substring path (match-end 0)))
+                  (push (record 'org-node-link
+                                id-here
+                                (point)
+                                link-type
+                                (substring citekey 1) ;; drop &
+                                (list :outline olp-with-self))
+                        org-node-worker--result:found-links))))
           (push (record 'org-node-link
                         id-here
                         (point)
                         link-type
-                        path
-                        ;; Because org-roam asks for it
+                        (string-replace "%20" " " path) ;; sane?
                         (list :outline olp-with-self))
                 org-node-worker--result:found-links))))
-    ;; Start over and look for @citekeys
+    ;; Start over and look for Org 9.5 @citekeys
     (goto-char beg)
-    ;; NOTE Should ideally search for `org-element-citation-prefix-re', but
-    ;; hoping this is good enough.
+    ;; NOTE: Technically this search matches org-ref [[cite too, causing a bit
+    ;; extra work, but tricky to workaround since point may be right on a [cite
+    ;; when we start
     (while (search-forward "[cite" end t)
       (let ((closing-bracket (save-excursion (search-forward "]" end t))))
         (when closing-bracket
@@ -236,8 +257,7 @@ process does not have to load org.el."
                             id-here
                             (point)
                             nil
-                            (match-string 0)
-                            ;; Because org-roam asks for it
+                            (substring (match-string 0) 1) ;; drop @
                             (list :outline olp-with-self))
                     org-node-worker--result:found-links)))))))
   (goto-char (or end (point-max))))
@@ -616,7 +636,11 @@ list, and write results to another temp file."
                               org-node-worker--result:problems
                               (current-time)))
        nil
-       (org-node-worker--tmpfile "results-%d.eld" i)))))
+       (org-node-worker--tmpfile "results-%d.eld" i))))
+  ;; TODO: Does emacs in batch mode garbage-collect at the end? I guess not but
+  ;;       if it does then maybe exec a kill -9 on itself here.  That'd mess
+  ;;       with the sentinel but...
+  )
 
 (provide 'org-node-worker)
 
