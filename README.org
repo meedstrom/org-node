@@ -1,8 +1,8 @@
 #+startup: content
-* org-node 0.4pre
-The month of July brought many changes!  *If anything broke for you*, you can rollback to the v0.1 branch.
+* org-node 0.4
+The month of July brought many changes!  *If anything broke for you*, you can rollback to the "v0.1" branch.
 
-*** Reversion instructions
+** Reversion instructions
 
 With [[https://github.com/radian-software/straight.el][Straight]], rollback like:
 #+begin_src elisp
@@ -32,8 +32,9 @@ With [[https://github.com/slotThe/vc-use-package][vc-use-package]]:
        :rev "a29e5d6b07d9ae0319437e1d7bdbb9fe5967b30d"))
 #+end_src
 
-*** News
+** News
 *Features*
+- Org-ref citations now work
 - New mode: =org-node-fakeroam-db-feed-mode=
   - Deprecates advice that was in [[https://github.com/meedstrom/org-node?tab=readme-ov-file#option-1b][Backlinks Option 1B]]
 - New mode: =org-node-fakeroam-nosql-mode=
@@ -57,7 +58,7 @@ With [[https://github.com/slotThe/vc-use-package][vc-use-package]]:
   - Don't worry, you'll get warning messages for each old name set/used in your initfiles
 
 *Changes*
-- Fixed v0.3 bug eating CPU during idle, sorry about that!
+- Fixed v0.2 bug eating CPU during idle, sorry about that!
 - Deprecated option =org-node-filename-fn= -- instead, configure =org-node-datestamp-format= and =org-node-slug-fn=.
   - Why? This lets =org-node-rename-file-by-title= preserve the date prefix if there is one.
   - In a related vein, =org-node-slug-fn= changed meaning, so if you wrote a custom lambda back in v0.1, you may get odd filenames.
@@ -111,6 +112,7 @@ A comparison of three similar systems, all permitting org-id as first-class citi
 | Reflinks                          | yes      | yes (as backlinks) | --                   |
 | Ref search                        | yes      | yes (as aliases)   | not applicable       |
 | Org 9.5 @citekeys as refs         | yes      | yes                | not applicable       |
+| Support org-ref v2 and v3         | yes      | yes                | not applicable       |
 | Can have rich search completion   | yes      | yes                | not applicable       |
 | Can work thru org-roam-capture    | yes      | yes                | ?                    |
 | Can work thru org-capture         | --       | yes                | ?                    |
@@ -123,7 +125,6 @@ A comparison of three similar systems, all permitting org-id as first-class citi
 | Principled "related"-section      | --       | --                 | yes                  |
 | Node exclusion                    | yes      | limited            | not applicable       |
 | Customize how backlinks shown     | yes      | --                 | yes                  |
-| Org-ref &citekeys as refs         | yes      | --                 | not applicable       |
 | Support =roam:= links               | yes      | -- (WONTFIX)       | not applicable       |
 | Can have separate note piles      | yes      | -- (WONTFIX)       | not applicable       |
 |-----------------------------------+----------+--------------------+----------------------|
@@ -336,7 +337,7 @@ The option =org-node-filter-fn= works well for excluding TODO items that happen 
 
 So let's say you have a big archive file, fulla IDs, and you want to exclude all of them from appearing in the minibuffer.  Putting a =:ROAM_EXCLUDE: t= at the top won't do it.  As it stands, what I'd suggest is to use the file name.
 
-While the point of IDs is to avoid depending on exact filenames, it's often pragmatic to let up on purism just a bit :-) It works well for me to filter out any file or directory that happens to contain "archive" in the name, via the last line here:
+While a big point of IDs is to avoid depending on filenames, it's often pragmatic to let up on purism just a bit :-) It works well for me to filter out any file or directory that happens to contain "archive" in the name, via the last line here:
 
 #+begin_src elisp
 (setq org-node-filter-fn
