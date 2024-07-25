@@ -91,6 +91,7 @@ Can be quit midway through and resumed later.  With
   (when (or (null org-node-backlink--files-to-fix) current-prefix-arg)
     ;; Start over
     (org-node-cache-ensure t t)
+    (setq org-node-backlink--fix-ctr 0)
     (setq org-node-backlink--files-to-fix
           (-uniq (hash-table-values org-id-locations))))
   (when (or (not (= 0 org-node-backlink--fix-ctr)) ;; resume interrupted
@@ -110,9 +111,7 @@ Can be quit midway through and resumed later.  With
             (org-node-backlink--fix-whole-buffer remove?)))))
     (if org-node-backlink--files-to-fix
         ;; Keep going
-        (run-with-timer 1 nil #'org-node-backlink-fix-all remove?)
-      ;; Reset
-      (setq org-node-backlink--fix-ctr 0))))
+        (run-with-timer 1 nil #'org-node-backlink-fix-all remove?))))
 
 (defun org-node-backlink--fix-whole-buffer (&optional remove?)
   (save-excursion

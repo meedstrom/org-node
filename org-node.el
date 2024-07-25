@@ -592,9 +592,10 @@ SYNCHRONOUS t, unless SYNCHRONOUS is the symbol `must-async'."
     (org-node--scan-all))
   (when (eq t synchronous)
     ;; Block until all processes finish
-    (if org-node-cache-mode
-        (message "org-node caching...")
-      (message "org-node caching... (Hint: Turn on org-node-cache-mode)"))
+    (when (seq-some #'process-live-p org-node--processes)
+      (if org-node-cache-mode
+          (message "org-node caching...")
+        (message "org-node caching... (Hint: Turn on org-node-cache-mode)")))
     (mapc #'accept-process-output org-node--processes)
     ;; Just in case... see docstring of `org-node--create'.
     ;; Not super happy about this edge-case, it's a wart of the current design
@@ -886,6 +887,10 @@ function to update current tables."
                  (list (expand-file-name invocation-name invocation-directory)
                        "--quick"
                        "--batch"
+                       ;; TODO: Maybe someone does something crazy like pandoc
+                       ;; the entirety of SciHub to .org to see how org-node
+                       ;; copes?  Maybe sum the filesizes of FILES and use the
+                       ;; 800kb default GC if it's more than like 1GB of text.
                        "--eval" "(setq gc-cons-threshold most-positive-fixnum)"
                        "--eval" (format "(setq i %d)" i)
                        "--eval" (format "(setq temporary-file-directory \"%s\")"
@@ -2330,13 +2335,15 @@ to `org-node-extra-id-dirs-exclude'."
   (org-node-cache-ensure t)
   (let ((files (seq-intersection
                 (mapcar #'abbreviate-file-name
-                        (directory-files-recursively dir "\\.org$"))
+                        (directory-files-recursively dir "."))
                 (hash-table-values org-id-locations))))
-    (when files
-      (message "Forgetting all IDs in directory... (%s)" dir)
-      (org-node--forget-id-locations files)
-      (org-id-locations-save)
-      (org-node-reset))))
+    (if files
+        (progn
+          (message "Forgetting all IDs in directory... (%s)" dir)
+          (org-node--forget-id-locations files)
+          (org-id-locations-save)
+          (org-node-reset))
+      (message "No files in: %s" dir))))
 
 ;;;###autoload
 (defun org-node-grep ()
