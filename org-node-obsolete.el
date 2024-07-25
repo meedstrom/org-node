@@ -3,10 +3,10 @@
 
 ;; One-shot variable warnings
 (let ((aliases '(org-node-cache-rescan-file-hook org-node-rescan-hook
-                 org-node-cache-reset-hook nil
-                 org-node-format-candidate-fn nil
-                 org-node-filename-fn nil
-                 org-node-collection nil)))
+                                                 org-node-cache-reset-hook nil
+                                                 org-node-format-candidate-fn nil
+                                                 org-node-filename-fn nil
+                                                 org-node-collection nil)))
   (defun org-node--warn-obsolete-variables ()
     "To be called when turning some mode on."
     (while aliases
@@ -32,7 +32,6 @@
                     (setq org-node-prefer-with-heading
                           (not org-node-prefer-file-level-nodes)))))))
 
-
 (defmacro org-node--defobsolete (old new &optional interactive when removed-by)
   "Define OLD as a function that runs NEW.
 Also, running OLD will emit a deprecation warning the first time.
@@ -52,13 +51,6 @@ when it was deprecated and REMOVED-BY when it may be removed."
 (org-node--defobsolete org-nodeify-entry
                        org-node-nodeify-entry t)
 
-;; Existed for just an hour or so
-(org-node--defobsolete org-node-rename-file-by-title-if-roam
-                       org-node-rename-file-by-title-maybe)
-
-(org-node--defobsolete org-node-slugify-like-roam-defaults
-                       org-node-slugify-like-roam-default)
-
 (org-node--defobsolete org-node-random
                        org-node-visit-random t)
 
@@ -67,9 +59,6 @@ when it was deprecated and REMOVED-BY when it may be removed."
 
 (org-node--defobsolete org-node-new-by-roam-capture
                        org-node-new-via-roam-capture)
-
-(org-node--defobsolete org-node-get-backlinks
-                       org-node-get-id-links)
 
 
 ;;; Function names from fakeroam

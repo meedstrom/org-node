@@ -119,6 +119,7 @@ A comparison of three similar systems, all permitting org-id as first-class citi
 | Command to fix link descriptions  | --       | yes                | --                   |
 | List dead links                   | --       | yes                | --                   |
 | Warn about duplicate titles       | --       | yes                | --                   |
+| Rename file when title changes    | --       | yes                | --                   |
 | Node exclusion                    | yes      | limited            | not applicable       |
 | Principled "related"-section      | --       | --                 | yes                  |
 | Customize how backlinks shown     | yes      | --                 | yes                  |
@@ -355,7 +356,7 @@ Basic commands:
 - =org-node-insert-transclusion-as-subtree=
 - =org-node-visit-random=
 - =org-node-extract-subtree=
-  - A bizarro counterpart to =org-roam-extract-subtree=.  Export the subtree at point into a file-level node, *leave a link where the subtree was,* and show the new file as current buffer.
+  - A bizarro counterpart to =org-roam-extract-subtree=.  Export the subtree at point into a file-level node, *leave a link where the subtree was*, and show the new file as current buffer.
 - =org-node-nodeify-entry=
   - (Trivial) Give an ID to the subtree at point, and run the hook =org-node-creation-hook=
 - =org-node-insert-heading=
@@ -373,6 +374,7 @@ Rarer commands:
   - Look for link descriptions that got out of sync with the corresponding node title, then prompt at each link to update it
 - =org-node-rename-file-by-title=
   - Auto-rename the file based on the current =#+title=
+    - For an after-save-hook, check out =org-node-rename-file-by-title-maybe=
 - =org-node-backlink-fix-all=
   - Update =BACKLINKS= property in all nodes
 - =org-node-grep=
