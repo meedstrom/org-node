@@ -158,7 +158,7 @@ What this means?   See org-node-test.el."
          for link? in (append links (split-string-and-unquote (buffer-string)))
          ;; @citekey or &citekey
          if (string-match (rx (or bol (any ";:"))
-                              (group (any "@&") (+ (not (any ";]")))))
+                              (group (any "@&") (+ (not (any " ;]")))))
                           link?)
          collect (substring (match-string 1 link?) 1)
          ;; Some sort of uri://path
