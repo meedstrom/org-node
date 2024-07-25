@@ -29,16 +29,17 @@
   (setq org-node-worker--result:paths-types nil)
   (let ((result
          (org-node-worker--split-refs-field
-          (concat "[cite:@citeKey abcd ; @citeKey2 cdefgh;@citeKey3] @foo "
+          (concat " \"[cite:@citekey abcd ; @citekey2 cdefgh;@citekey3]\""
+                  " \"[[cite:&citekey4 abcd ; &citekey5 cdefgh;&citekey6]]\""
                   " [[https://gnu.org/A Link With Spaces/index.htm][baz]]"
-                  " https://gnu.org [citep:&citeKey4]"
+                  " https://gnu.org [citep:&citekey7]  @foo &bar "
                   " info:with%20escaped%20spaces"))))
     (should (--all-p (member it result)
-                     '("citeKey2"
-                       "citeKey"
-                       "citeKey3"
+                     '("citekey"
+                       "citekey4"
+                       "citekey7"
                        "foo"
-                       "citeKey4"
+                       "bar"
                        "with escaped spaces"
                        "//gnu.org/A Link With Spaces/index.htm"
                        "//gnu.org")))

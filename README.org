@@ -295,7 +295,7 @@ Example setting:
 
 
 ** Completion-at-point
-I don't use any completion in Org buffers so don't feel like you have to, but there is the option:
+I don't use any completion in Org buffers so it's certainly not for everyone, but there is the option:
 
 #+begin_src elisp
 (org-node-complete-at-point-mode)
