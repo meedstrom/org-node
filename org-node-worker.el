@@ -129,12 +129,6 @@ in one of the elements."
   (if (re-search-forward "^\\*+ " nil 'move)
       (goto-char (pos-bol))))
 
-(defconst org-node-worker--citation-key-re
-  "@\\([!#-+./:<>-@^-`{-~[:word:]-]+\\)"
-  "Copy of `org-element-citation-key-re'.")
-
-;; REVIEW I don't know for sure what people put in ROAM_REFS... check my
-;; assumptions
 (defun org-node-worker--split-refs-field (roam-refs)
   "Split a ROAM-REFS field correctly.
 What this means?   See org-node-test.el."
@@ -171,6 +165,10 @@ What this means?   See org-node-test.el."
                          org-node-worker--result:paths-types)
                    ;; .. but the actual ref is just the //path
                    path))))))
+
+(defconst org-node-worker--citation-key-re
+  "@\\([!#-+./:<>-@^-`{-~[:word:]-]+\\)"
+  "Copy of `org-element-citation-key-re'.")
 
 (defconst org-node-worker--org-ref-type-re
   (regexp-opt
