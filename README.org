@@ -345,6 +345,9 @@ While a big point of IDs is to avoid depending on filenames, it's often pragmati
                  (string-search "archive" (org-node-get-file-path node))))))
 #+end_src
 
+** Limitation: org-ref
+We support the builtin @citations, not (yet) org-ref &citations, since amending =org-link-plain-re= to match them slows down my scan about 50%.  But, you can still find nodes with e.g. =:ROAM_REFS: &citekey=, just not see backlinks based on &citekey.
+
 ** Toolbox
 
 Basic commands:
