@@ -170,10 +170,10 @@ What this means?   See org-node-test.el."
   "@\\([!#-+./:<>-@^-`{-~[:word:]-]+\\)"
   "Copy of `org-element-citation-key-re'.")
 
-(defconst org-node-worker--org-ref-type-re
-  (regexp-opt
-   ;; Default keys of `org-ref-cite-types' 2024-07-25
-   '("cite" "nocite" "citet" "citet*" "citep" "citep*" "citealt" "citealt*" "citealp" "citealp*" "citenum" "citetext" "citeauthor" "citeauthor*" "citeyear" "citeyearpar" "Citet" "Citep" "Citealt" "Citealp" "Citeauthor" "Citet*" "Citep*" "Citealt*" "Citealp*" "Citeauthor*" "Cite" "parencite" "Parencite" "footcite" "footcitetext" "textcite" "Textcite" "smartcite" "Smartcite" "cite*" "parencite*" "supercite" "autocite" "Autocite" "autocite*" "Autocite*" "citetitle" "citetitle*" "citeyear" "citeyear*" "citedate" "citedate*" "citeurl" "fullcite" "footfullcite" "notecite" "Notecite" "pnotecite" "Pnotecite" "fnotecite" "cites" "Cites" "parencites" "Parencites" "footcites" "footcitetexts" "smartcites" "Smartcites" "textcites" "Textcites" "supercites" "autocites" "Autocites" "bibentry")))
+;; (defconst org-node-worker--org-ref-type-re
+;;   (regexp-opt
+;;    ;; Default keys of `org-ref-cite-types' 2024-07-25
+;;    '("cite" "nocite" "citet" "citet*" "citep" "citep*" "citealt" "citealt*" "citealp" "citealp*" "citenum" "citetext" "citeauthor" "citeauthor*" "citeyear" "citeyearpar" "Citet" "Citep" "Citealt" "Citealp" "Citeauthor" "Citet*" "Citep*" "Citealt*" "Citealp*" "Citeauthor*" "Cite" "parencite" "Parencite" "footcite" "footcitetext" "textcite" "Textcite" "smartcite" "Smartcite" "cite*" "parencite*" "supercite" "autocite" "Autocite" "autocite*" "Autocite*" "citetitle" "citetitle*" "citeyear" "citeyear*" "citedate" "citedate*" "citeurl" "fullcite" "footfullcite" "notecite" "Notecite" "pnotecite" "Pnotecite" "fnotecite" "cites" "Cites" "parencites" "Parencites" "footcites" "footcitetexts" "smartcites" "Smartcites" "textcites" "Textcites" "supercites" "autocites" "Autocites" "bibentry")))
 
 (defun org-node-worker--collect-links-until
     (end id-here olp-with-self plain-re merged-re)
@@ -211,21 +211,23 @@ Arguments PLAIN-RE and MERGED-RE..."
                   (goto-char (pos-bol))
                   (or (looking-at-p "[[:space:]]*# ")
                       (looking-at-p "[[:space:]]*#\\+")))
-          (if (and (string-search "&" path)
-                   ;; (not (member link-type '("https" "http" "id"))) ;; PERF?
-                   (string-match-p org-node-worker--org-ref-type-re link-type))
-              ;; A citep:, citealt: or some such.  Specifically org-ref v3
-              ;; because PATH contains at least one ampersand.
-              (while (string-match "&.+\\b" path)
-                (let ((citekey (match-string 0 path)))
-                  (setq path (substring path (match-end 0)))
-                  (push (record 'org-node-link
-                                id-here
-                                (point)
-                                link-type
-                                (substring citekey 1) ;; drop &
-                                (list :outline olp-with-self))
-                        org-node-worker--result:found-links))))
+          ;; The org-ref code is here. Problem is we have to patch merged-re
+          ;; and plain-re to match the hundred org-ref types, and that slows
+          ;; things down.
+          ;; (if (and (string-search "&" path)
+          ;;          (string-match-p org-node-worker--org-ref-type-re link-type))
+          ;;     ;; A citep:, citealt: or some such.  Specifically org-ref v3
+          ;;     ;; because PATH contains at least one ampersand.
+          ;;     (while (string-match "&.+\\b" path)
+          ;;       (let ((citekey (match-string 0 path)))
+          ;;         (setq path (substring path (match-end 0)))
+          ;;         (push (record 'org-node-link
+          ;;                       id-here
+          ;;                       (point)
+          ;;                       link-type
+          ;;                       (substring citekey 1) ;; drop &
+          ;;                       (list :outline olp-with-self))
+          ;;               org-node-worker--result:found-links))))
           (push (record 'org-node-link
                         id-here
                         (point)
