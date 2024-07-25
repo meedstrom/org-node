@@ -53,12 +53,10 @@ With [[https://github.com/slotThe/vc-use-package][vc-use-package]]:
 - New command: =org-node-list-feedback-arcs=
 - New command: =org-node-grep=
 
-*Renames*
-- Rename many functions and variables
-  - Don't worry, you'll get warning messages for each old name set/used in your initfiles
-
 *Changes*
 - Fixed v0.2 bug eating CPU during idle, sorry about that!
+- Rename many functions and variables
+  - Don't worry, you'll get warning messages for each old name set/used in your initfiles
 - Deprecated option =org-node-filename-fn= -- instead, configure =org-node-datestamp-format= and =org-node-slug-fn=.
   - Why? This lets =org-node-rename-file-by-title= preserve the date prefix if there is one.
   - In a related vein, =org-node-slug-fn= changed meaning, so if you wrote a custom lambda back in v0.1, you may get odd filenames.
@@ -71,7 +69,7 @@ With [[https://github.com/slotThe/vc-use-package][vc-use-package]]:
 
 ** What's all this
 
-I found org-roam too slow, so I made [[https://github.com/meedstrom/quickroam][quickroam]].  And that idea spun off into this package, a standalone thing.  I hope it's also easier to learn.
+I found org-roam too slow, so I made [[https://github.com/meedstrom/quickroam][quickroam]].  And that idea spun off into this package, a standalone thing.  I hope it's also easier to pick up than org-roam.
 
 - *If you were using org-roam*, there is nothing to migrate.  You can use both packages.  It's exactly the same on-disk format: "notes" are identified by their org-id.
 
@@ -118,12 +116,11 @@ A comparison of three similar systems, all permitting org-id as first-class citi
 | Can work thru org-capture         | --       | yes                | ?                    |
 | Can show backlinks in same window | --       | yes                | yes                  |
 | Support org-super-links           | --       | yes                | not applicable       |
-| Grep across all files             | --       | yes                | --                   |
 | Command to fix link descriptions  | --       | yes                | --                   |
 | List dead links                   | --       | yes                | --                   |
 | Warn about duplicate titles       | --       | yes                | --                   |
-| Principled "related"-section      | --       | --                 | yes                  |
 | Node exclusion                    | yes      | limited            | not applicable       |
+| Principled "related"-section      | --       | --                 | yes                  |
 | Customize how backlinks shown     | yes      | --                 | yes                  |
 | Support =roam:= links               | yes      | -- (WONTFIX)       | not applicable       |
 | Can have separate note piles      | yes      | -- (WONTFIX)       | not applicable       |
