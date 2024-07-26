@@ -1,6 +1,6 @@
 #+startup: content
 * org-node 0.4
-The month of July brought many changes!  *If anything broke for you*, you can rollback to the "v0.1" branch.
+The month of July brought many changes with 0.2, 0.3, 0.4!  *If anything broke for you*, you can rollback to 0.1:
 
 ** Reversion instructions
 
@@ -121,6 +121,7 @@ A comparison of three similar systems, all permitting org-id as first-class citi
 | Warn about duplicate titles       | --       | yes                | --                   |
 | Rename file when title changes    | --       | yes                | --                   |
 | Principled "related"-section      | --       | --                 | yes                  |
+| Daily-notes                       | yes      | --                 | --                   |
 | Customize how backlinks shown     | yes      | --                 | yes                  |
 | Support =roam:= links               | yes      | -- (WONTFIX)       | not applicable       |
 | Can have separate note piles      | yes      | -- (WONTFIX)       | not applicable       |
@@ -346,7 +347,7 @@ While a big point of IDs is to avoid depending on filenames, it's often pragmati
 #+end_src
 
 ** Limitation: org-ref
-We support the builtin @citations, not (yet) org-ref &citations, since amending =org-link-plain-re= to match them slows down my scan about 50%.  But, you can still find nodes with e.g. =:ROAM_REFS: &citekey=, just not see backlinks based on &citekey.
+We support the builtin @citations, not (yet) org-ref &citations, since amending =org-link-plain-re= to match them slows down my scan about 50%.  But, you can still find nodes with e.g. =:ROAM_REFS: &citekey=, just not see backlinks.
 
 ** Toolbox
 

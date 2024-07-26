@@ -228,19 +228,19 @@ since the default `org-node-datestamp-format' is null."
   :group 'org-node
   :type 'hook)
 
-(defcustom org-node-extra-id-dirs (list)
+(defcustom org-node-extra-id-dirs nil
   "Directories in which to search Org files for IDs.
 
-Unlike other variables such as `org-id-extra-files' and
-`org-agenda-files', directories listed here are scanned again
-over time in order to find new files that have appeared.
+Unlike variable `org-id-extra-files', accept directories.  Unlike
+variable `org-agenda-files', directories are scanned again over
+time in order to find new files that have appeared.
 
 These directories are only scanned as long as
 `org-node-cache-mode' is active.  They are scanned
 recursively (looking in subdirectories, sub-subdirectories etc).
 
 To avoid accidentally picking up duplicate files such as
-versioned backups, causing org-id to complain about duplicate
+versioned backups, causing org-id complaints about duplicate
 IDs, configure `org-node-extra-id-dirs-exclude'.
 
 Tip: If it happened anyway, try \\[org-node-forget-dir], because
@@ -309,7 +309,8 @@ To read more about affixations, see docstring
 one candidate at a time, not the whole collection.
 
 It receives two arguments: NODE and TITLE, and it must return a
-list of three strings: title, prefix and suffix.
+list of three strings: title, prefix and suffix.  Actually,
+prefix and suffix can be nil.  Title should be TITLE unmodified.
 
 NODE is an object which form you can observe in examples from
 \\[org-node-peek] and specified in type `org-node'
@@ -326,7 +327,7 @@ every alias, in which case TITLE is actually one of the aliases."
 (defun org-node-affix-bare (_node title)
   "Use TITLE as-is.
 For use as `org-node-affixation-fn'."
-  (list title "" ""))
+  (list title nil nil))
 
 (defun org-node-affix-with-olp (node title)
   "Prepend TITLE with NODE's outline path.
@@ -340,8 +341,8 @@ For use as `org-node-affixation-fn'."
                 (push (propertize anc 'face 'completions-annotations) result)
                 (push " > " result))
               (apply #'concat (nreverse result)))
-          "")
-        ""))
+          nil)
+        nil))
 
 (defvar org-node--title<>affixation-triplet (make-hash-table :test #'equal)
   "1:1 table mapping titles or aliases to affixation triplets.")
@@ -638,16 +639,12 @@ advice on `rename-file' or `delete-file'."
 
 (defun org-node--maybe-adjust-idle-timer ()
   "Adjust `org-node--idle-timer' based on duration of last scan.
-If not running, start it.
-
-This function mainly exists to give the user something to
-override if they disagree with the timer delay or even having a
-timer."
+If not running, start it."
   (let ((new-delay (* 25 (1+ org-node--time-elapsed))))
     (when (or (not (member org-node--idle-timer timer-idle-list))
-              ;; Disarm a footgun (gh:meedstrom/org-node#21)
+              ;; Don't repeat potentially forever
               (not (> (float-time (or (current-idle-time) 0))
-                      (- new-delay 1))))
+                      new-delay)))
       (cancel-timer org-node--idle-timer)
       (setq org-node--idle-timer
             (run-with-idle-timer new-delay t #'org-node--scan-all)))))
@@ -667,8 +664,8 @@ timer."
 (defvar org-node--wait-start nil)
 (defvar org-node--full-scan-requested nil)
 
-;; TODO: Shorten.  How?  At the moment, we line up a specific file for scan even
-;; if a "full" scan will happen or has just happened, for (IIRC) reasons:
+;; TODO: Shorten.  How?  At the moment, we line up a specific file for scan
+;; even if a "full" scan will happen or has just happened, for (IIRC) reasons:
 ;;
 ;; 1. Ongoing full scan may have already gone past the targeted
 ;;    file by the time the order comes in (unlikely)
@@ -680,7 +677,7 @@ timer."
 ;; Hm, point 3 could be taken care of at full scan by comparing to a
 ;; table of previously known file<>mtime.
 (defun org-node--try-launch-scan (&optional files)
-  "Ensure that multiple calls occurring in a short time (like when
+  "Ensure that multiple calls occurring in a short time \(like when
 multiple files are being renamed) will be handled
 eventually and not dropped."
   (if (eq t files)
@@ -724,12 +721,13 @@ eventually and not dropped."
 (defvar org-node--stderr-name " *org-node*"
   "Name of buffer for the subprocesses stderr.")
 
-;; NOTE: On most systems it does not matter how many subprocesses go to
-;; work, since it will only block Emacs on first autoload.
 (defcustom org-node-perf-max-jobs 0
   "Number of subprocesses to run.
 If left at 0, will be set at runtime to the result of
-`org-node--count-logical-cores'."
+`org-node--count-logical-cores'.
+
+On most systems, this setting hardly matters since Emacs will
+only be blocked the first time org-node builds its cache."
   :type 'natnum)
 
 (defun org-node--count-logical-cores ()
@@ -754,9 +752,9 @@ If left at 0, will be set at runtime to the result of
   "Compile org-node-worker.el, in case the user's package manager
 didn't do so already, or local changes have been made."
   (let* ((file-name-handler-alist nil)
-         ;; FIXME When working on a checked-out repo, this will still just find
-         ;;       elpaca/straight's clone.  So the developer has to paste in
-         ;;       the true library path here.
+         ;; FIXME: When working on a checked-out repo, this will still just
+         ;;        find elpaca/straight's clone.  So the developer has to paste
+         ;;        in the true library path here.
          (lib (find-library-name "org-node-worker"))
          (native-path (and (featurep 'native-compile)
                            (native-comp-available-p)
@@ -1198,7 +1196,10 @@ for new, changed or deleted files.
 
 This redundant behavior helps detect changes made by something
 other than the current instance of Emacs, such as an user typing
-rm on the command line instead of using \\[delete-file].")
+rm on the command line instead of using \\[delete-file].
+
+This timer is set by `org-node--maybe-adjust-idle-timer'.
+Override that function to configure timer behavior.")
 
 (defvar org-node--time-elapsed 1.0
   "Duration of the last cache reset.")
@@ -1363,7 +1364,7 @@ for you."
 If FILE-LIST is the `hash-table-values' of `org-id-locations',
 this function will in many cases spit out a list of one item
 because many people keep their Org files in one root
-directory (with various subdirectories).
+directory \(with various subdirectories).
 
 If it finds more than one root, it sorts by count of files they
 contain, so that the most populous root directory will be the
@@ -1377,9 +1378,9 @@ the 3 members
 - \"/home/kept/bar.org\"
 - \"/home/kept/archive/baz.org\"
 
-the return value will not be (\"/home/\"), but
-(\"/home/kept/\" \"/home/me/Syncthing/\"), because \"/home\"
-contains no members of FILE-LIST itself.
+the return value will not be \(\"/home/\"), but
+\(\"/home/kept/\" \"/home/me/Syncthing/\"), because \"/home\"
+contains no members of FILE-LIST directly.
 
 FILE-LIST must be a list of full paths.  This function does not
 consult the filesystem, just compares substrings to each other."
@@ -1484,7 +1485,7 @@ A title like \"Löb's Theorem\" becomes \"lobs-theorem\".  Note
 that while diacritical marks are stripped, it retains most
 symbols that belong to the alphabet category in Unicode,
 preserving for example kanji and Greek letters."
-  (if (version<= "29" emacs-version)
+  (if (<= 29 emacs-major-version)
       (thread-last title
                    (string-glyph-decompose)
                    (string-to-list)
@@ -1514,7 +1515,7 @@ preserving for example kanji and Greek letters."
   "From TITLE, make a filename in the default org-roam style.
 Unlike `org-node-slugify-like-roam-actual', does not load
 org-roam."
-  (if (version<= "29" emacs-version)
+  (if (<= 29 emacs-major-version)
       (thread-last title
                    (string-glyph-decompose)
                    (string-to-list)
@@ -1680,9 +1681,49 @@ time some necessary variables are set."
                               :title org-node-proposed-title
                               :id    org-node-proposed-id))))
 
-;; TODO: write a template to capture into an org-journal file
-;; (defun org-node-capture-target-day ()
-;;   )
+;; Experimental
+(defun org-node--daily-capture-target ()
+  (org-node-cache-ensure)
+  (require 'org-journal)
+  (let* ((day (org-read-date))
+         (node (gethash day org-node--candidate<>node)))
+    (if node
+        ;; Node exists; capture into it
+        (let ((title (org-node-get-title node))
+              (id (org-node-get-id node)))
+          (find-file (org-node-get-file-path node))
+          (widen)
+          (goto-char (org-node-get-pos node))
+          (org-show-context)
+          (org-show-entry)
+          (unless (and (= 1 (point)) (org-at-heading-p))
+            (when (outline-next-heading)
+              (backward-char 1))))
+      ;; Node does not exist; capture into new file
+      (let* ((dir org-journal-dir)
+             (title day)
+             (id (org-id-new))
+             (path-to-write (expand-file-name (concat day ".org") dir)))
+        (if (or (file-exists-p path-to-write)
+                (find-buffer-visiting path-to-write))
+            (error "File or buffer already exists: %s" path-to-write)
+          (mkdir (file-name-directory path-to-write) t)
+          (find-file path-to-write)
+          (if org-node-prefer-with-heading
+              (insert "* " title
+                      "\n:PROPERTIES:"
+                      "\n:ID:       " id
+                      "\n:END:"
+                      "\n")
+            (insert ":PROPERTIES:"
+                    "\n:ID:       " id
+                    "\n:END:"
+                    "\n#+title: " title
+                    "\n"))
+          (unwind-protect
+              (run-hooks 'org-node-creation-hook)
+            (save-buffer)
+            (org-node--scan-targeted (list path-to-write))))))))
 
 (defun org-node-capture-target ()
   "Can be used as target in a capture template.
@@ -2335,7 +2376,17 @@ elapsed.")
 
 Note that if DIR can be found under `org-node-extra-id-dirs',
 this action may make no practical impact unless you also add DIR
-to `org-node-extra-id-dirs-exclude'."
+to `org-node-extra-id-dirs-exclude'.
+
+In case of unsolvable problems, how to wipe org-id-locations:
+
+(progn
+  (delete-file org-id-locations-file)
+  (setq org-id-locations nil)
+  (setq org-id--locations-checksum nil)
+  (setq org-agenda-text-search-extra-files nil)
+  (setq org-id-files nil)
+  (setq org-id-extra-files nil))"
   (interactive "DForget all IDs in directory: ")
   (org-node-cache-ensure t)
   (let ((files (seq-intersection
