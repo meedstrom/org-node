@@ -988,7 +988,7 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
     (org-node--dirty-forget-files missing-files)
     ;; In case a title was edited: don't persist old revisions of the title
     (org-node--dirty-forget-completions-in found-files)
-    (when org-node-eagerly-update-link-tables
+    (when org-node-perf-eagerly-update-link-tables
       (cl-loop with ids-of-nodes-scanned = (cl-loop
                                             for node in nodes
                                             collect (org-node-get-id node))
@@ -1021,18 +1021,24 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
       (message "org-node found issues, see M-x org-node-list-scan-problems"))
     (run-hook-with-args 'org-node-rescan-hook found-files)))
 
-(defcustom org-node-eagerly-update-link-tables nil
+(defcustom org-node-perf-eagerly-update-link-tables t
   "Update backlink tables on every save.
 
-By default, we do not bother to do this on every save (only after
-`org-node--idle-timer'), because it can slow down saving a big
-file containing thousands of links, on constrained devices.
+Note that no matter this value, the tables will be corrected
+anyway on idle via `org-node--idle-timer'.
+
+A setting of t MAY slow down saving a big file containing
+thousands of links on constrained devices.
 
 Fortunately it is rarely needed, since the insert-link advices of
 `org-node-cache-mode' will already record links added during
 normal usage!  What's left undone til idle:
+
 1. deleted links remain in the table --> undead backlinks
-2. :pos values can desync, which can affect org-roam-buffer"
+2. :pos values can desync, which can affect org-roam-buffer
+
+The reason for default t is better experience with
+`org-node-backlink-mode'."
   :group 'org-node
   :type 'boolean)
 
