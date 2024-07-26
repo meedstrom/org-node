@@ -9,7 +9,7 @@
                  (org-node-collection nil))))
   (defun org-node--warn-obsolete-variables ()
     "To be called when turning some mode on."
-    (while-let (row (pop aliases))
+    (while-let ((row (pop aliases)))
       (seq-let (old new removed-by) row
         (when (and (boundp old) (symbol-value old))
           (unless new
