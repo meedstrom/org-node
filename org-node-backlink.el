@@ -351,9 +351,9 @@ purely deleted, it flags the preceding and succeeding char."
             (setq new-value (string-join links "  ")))
         (setq new-value src-link))
       (unless (equal current-backlinks-value new-value)
-        ;; TODO: don't inhibit all modification hooks, just
-        ;;       inhibit `org-node-backlink--flag-buffer-modification'
-        (let ((inhibit-modification-hooks t))
+        (let ((after-change-functions
+               (remq 'org-node-backlink--flag-buffer-modification
+                     after-change-functions)))
           (org-entry-put nil "BACKLINKS" new-value))))))
 
 (provide 'org-node-backlink)
