@@ -1,26 +1,25 @@
 ;;; org-node-obsolete.el --- Outta sight so I'm not tempted to clean them up -*- lexical-binding: t; -*-
 
-
 ;; One-shot variable warnings
-(let ((aliases '(org-node-cache-rescan-file-hook org-node-rescan-hook
-                                                 org-node-cache-reset-hook nil
-                                                 org-node-format-candidate-fn nil
-                                                 org-node-filename-fn nil
-                                                 org-node-collection nil)))
+(let ((aliases '((org-node-eagerly-update-link-tables org-node-perf-eagerly-update-link-tables "8 August 2024")
+                 (org-node-cache-rescan-file-hook org-node-rescan-hook)
+                 (org-node-cache-reset-hook nil)
+                 (org-node-format-candidate-fn nil)
+                 (org-node-filename-fn nil)
+                 (org-node-collection nil))))
   (defun org-node--warn-obsolete-variables ()
     "To be called when turning some mode on."
-    (while aliases
-      (let ((old (pop aliases))
-            (new (pop aliases)))
+    (while-let (row (pop aliases))
+      (seq-let (old new removed-by) row
         (when (and (boundp old) (symbol-value old))
           (unless new
             (lwarn 'org-node :warning "Your config uses removed variable: %S" old))
           (when new
             (lwarn 'org-node :warning "Your config uses old variable: %S, will be removed by %s.  New name: %S"
-                   old "30 July 2024" new)
+                   old (or removed-by "30 July 2024") new)
             (set new (symbol-value old))))))))
 
-;; All these hacks...  But I like renaming things
+;; All these hacks...  because I like renaming things
 (advice-add 'org-node--warn-obsolete-variables :after
             (let (warned-once)
               (lambda ()
