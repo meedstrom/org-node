@@ -18,7 +18,7 @@
 (require 'ert)
 (require 'dash)
 (require 'org-node)
-(require 'org-node-worker)
+(require 'org-node-parser)
 (require 'org-node-backlink)
 ;; (require 'org-node-fakeroam)
 
@@ -26,9 +26,9 @@
 ;; (-all-p #'org-node-link-p (apply #'append (hash-table-values org-node--dest<>links)))
 
 (ert-deftest org-node-test--split-refs-field ()
-  (setq org-node-worker--result:paths-types nil)
+  (setq org-node-parser--result:paths-types nil)
   (let ((result
-         (org-node-worker--split-refs-field
+         (org-node-parser--split-refs-field
           (concat " \"[cite:@citekey abcd ; @citekey2 cdefgh;@citekey3]\""
                   " \"[[cite:&citekey4 abcd ; &citekey5 cdefgh;&citekey6]]\""
                   " [[https://gnu.org/A Link With Spaces/index.htm][baz]]"
@@ -44,11 +44,11 @@
                        "//gnu.org/A Link With Spaces/index.htm"
                        "//gnu.org")))
     (should (equal "https" (cdr (assoc "//gnu.org/A Link With Spaces/index.htm"
-                                       org-node-worker--result:paths-types))))
+                                       org-node-parser--result:paths-types))))
     (should (equal "https" (cdr (assoc "//gnu.org"
-                                       org-node-worker--result:paths-types))))
+                                       org-node-parser--result:paths-types))))
     (should (equal nil (cdr (assoc "citeKey"
-                                   org-node-worker--result:paths-types))))))
+                                   org-node-parser--result:paths-types))))))
 
 (ert-deftest org-node-test--oldata-fns ()
   (let ((olp '((3730 "A subheading" 2 "33dd")
@@ -57,12 +57,12 @@
                (1001 "A subheading" 2 "d3")
                (199 "Another top heading" 1)
                (123 "First heading in file is apparently third-level" 3))))
-    (should (equal (org-node-worker--pos->olp olp 1300)
+    (should (equal (org-node-parser--pos->olp olp 1300)
                    '("Another top heading" "A subheading")))
-    (should (equal (org-node-worker--pos->olp olp 2503)
+    (should (equal (org-node-parser--pos->olp olp 2503)
                    nil))
-    (should-error (org-node-worker--pos->olp olp 2500))
-    (should (equal (org-node-worker--pos->parent-id olp 1300 nil)
+    (should-error (org-node-parser--pos->olp olp 2500))
+    (should (equal (org-node-parser--pos->parent-id olp 1300 nil)
                    "d3"))))
 
 (ert-deftest org-node-test--parsing-testfile2.org ()

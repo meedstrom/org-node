@@ -1,4 +1,4 @@
-;;; org-node-worker.el --- Gotta go fast -*- lexical-binding: t; -*-
+;;; org-node-parser.el --- Gotta go fast -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2024 Martin Edström
 ;;
@@ -19,7 +19,7 @@
   (require 'cl-macs)
   (require 'subr-x))
 
-(defun org-node-worker--tmpfile (&optional basename &rest args)
+(defun org-node-parser--tmpfile (&optional basename &rest args)
   "Return a path that puts BASENAME in a temporary directory.
 As a nicety, `format' BASENAME with ARGS too.
 
@@ -30,7 +30,7 @@ OS and `temporary-file-directory'."
                     "org-node"
                     (if basename (apply #'format basename args) "")))
 
-(defun org-node-worker--make-todo-regexp (keywords-string)
+(defun org-node-parser--make-todo-regexp (keywords-string)
   "Make a regexp based on KEYWORDS-STRING,
 that will match any of the TODO keywords within."
   (thread-last keywords-string
@@ -40,9 +40,9 @@ that will match any of the TODO keywords within."
                (split-string)
                (regexp-opt)))
 
-(defvar org-node-worker--result:paths-types nil)
+(defvar org-node-parser--result:paths-types nil)
 
-(defun org-node-worker--elem-index (elem list)
+(defun org-node-parser--elem-index (elem list)
   "Like `-elem-index', return first index of ELEM in LIST."
   (when list
     (let ((list list)
@@ -52,15 +52,15 @@ that will match any of the TODO keywords within."
               list (cdr list)))
       i)))
 
-(defun org-node-worker--pos->parent-id (oldata pos file-id)
+(defun org-node-parser--pos->parent-id (oldata pos file-id)
   "Return ID of the closest ancestor heading that has an ID.
-See `org-node-worker--pos->olp' for explanation of OLDATA and POS.
+See `org-node-parser--pos->olp' for explanation of OLDATA and POS.
 
 Extra argument FILE-ID is the file-level id, used as a fallback
 if no ancestor heading has an ID.  It can be nil."
   (let (;; Drop all the data about positions below HEADING-POS
         (data-until-pos
-         (nthcdr (org-node-worker--elem-index (assoc pos oldata) oldata)
+         (nthcdr (org-node-parser--elem-index (assoc pos oldata) oldata)
                  oldata)))
     (let ((previous-level (nth 2 (car data-until-pos))))
       ;; Work backwards towards the top of the file
@@ -73,7 +73,7 @@ if no ancestor heading has an ID.  It can be nil."
                ;; Even the top-level heading had no id
                if (= 1 previous-level) return file-id))))
 
-(defun org-node-worker--pos->olp (oldata pos)
+(defun org-node-parser--pos->olp (oldata pos)
   "Given buffer position HEADING-POS, return the Org outline path.
 Result should look like a result from `org-get-outline-path'.
 
@@ -98,7 +98,7 @@ in one of the elements."
          ;; Drop all the data about positions below HEADING-POS (using `nthcdr'
          ;; because oldata is in reverse order)
          ;; TODO: Is it faster to do (ntake (nreverse ...))?
-         (data-until-pos (nthcdr (org-node-worker--elem-index pos-data oldata)
+         (data-until-pos (nthcdr (org-node-parser--elem-index pos-data oldata)
                                  oldata)))
     (let ((previous-level (caddr (car data-until-pos))))
       ;; Work backwards towards the top of the file
@@ -112,7 +112,7 @@ in one of the elements."
                return nil))
     olp))
 
-(defun org-node-worker--org-link-display-format (s)
+(defun org-node-parser--org-link-display-format (s)
   "Copypasta from `org-link-display-format'."
   (save-match-data
     (replace-regexp-in-string
@@ -121,7 +121,7 @@ in one of the elements."
      (lambda (m) (or (match-string 2 m) (match-string 1 m)))
      s nil t)))
 
-(defun org-node-worker--next-heading ()
+(defun org-node-parser--next-heading ()
   "Similar to `outline-next-heading'."
   (if (and (bolp) (not (eobp)))
       ;; Prevent matching the same line forever
@@ -129,7 +129,7 @@ in one of the elements."
   (if (re-search-forward "^\\*+ " nil 'move)
       (goto-char (pos-bol))))
 
-(defun org-node-worker--split-refs-field (roam-refs)
+(defun org-node-parser--split-refs-field (roam-refs)
   "Split a ROAM-REFS field correctly.
 What this means?   See org-node-test.el."
   (when roam-refs
@@ -162,20 +162,20 @@ What this means?   See org-node-test.el."
                               (substring link? (match-end 0)))))
                    ;; Remember the uri: prefix for completions later
                    (push (cons path (match-string 1 link?))
-                         org-node-worker--result:paths-types)
+                         org-node-parser--result:paths-types)
                    ;; .. but the actual ref is just the //path
                    path))))))
 
-(defconst org-node-worker--citation-key-re
+(defconst org-node-parser--citation-key-re
   "@\\([!#-+./:<>-@^-`{-~[:word:]-]+\\)"
   "Copy of `org-element-citation-key-re'.")
 
-;; (defconst org-node-worker--org-ref-type-re
+;; (defconst org-node-parser--org-ref-type-re
 ;;   (regexp-opt
 ;;    ;; Default keys of `org-ref-cite-types' 2024-07-25
 ;;    '("cite" "nocite" "citet" "citet*" "citep" "citep*" "citealt" "citealt*" "citealp" "citealp*" "citenum" "citetext" "citeauthor" "citeauthor*" "citeyear" "citeyearpar" "Citet" "Citep" "Citealt" "Citealp" "Citeauthor" "Citet*" "Citep*" "Citealt*" "Citealp*" "Citeauthor*" "Cite" "parencite" "Parencite" "footcite" "footcitetext" "textcite" "Textcite" "smartcite" "Smartcite" "cite*" "parencite*" "supercite" "autocite" "Autocite" "autocite*" "Autocite*" "citetitle" "citetitle*" "citeyear" "citeyear*" "citedate" "citedate*" "citeurl" "fullcite" "footfullcite" "notecite" "Notecite" "pnotecite" "Pnotecite" "fnotecite" "cites" "Cites" "parencites" "Parencites" "footcites" "footcitetexts" "smartcites" "Smartcites" "textcites" "Textcites" "supercites" "autocites" "Autocites" "bibentry")))
 
-(defun org-node-worker--collect-links-until
+(defun org-node-parser--collect-links-until
     (end id-here olp-with-self plain-re merged-re)
   "From here to buffer position END, look for forward-links.
 Argument ID-HERE is the ID of the subtree where this function is
@@ -215,7 +215,7 @@ Arguments PLAIN-RE and MERGED-RE..."
           ;; and plain-re to match the hundred org-ref types, and that slows
           ;; things down.
           ;; (if (and (string-search "&" path)
-          ;;          (string-match-p org-node-worker--org-ref-type-re link-type))
+          ;;          (string-match-p org-node-parser--org-ref-type-re link-type))
           ;;     ;; A citep:, citealt: or some such.  Specifically org-ref v3
           ;;     ;; because PATH contains at least one ampersand.
           ;;     (while (string-match "&.+\\b" path)
@@ -227,14 +227,14 @@ Arguments PLAIN-RE and MERGED-RE..."
           ;;                       link-type
           ;;                       (substring citekey 1) ;; drop &
           ;;                       (list :outline olp-with-self))
-          ;;               org-node-worker--result:found-links))))
+          ;;               org-node-parser--result:found-links))))
           (push (record 'org-node-link
                         id-here
                         (point)
                         link-type
                         (string-replace "%20" " " path) ;; sane?
                         (list :outline olp-with-self))
-                org-node-worker--result:found-links))))
+                org-node-parser--result:found-links))))
     ;; Start over and look for Org 9.5 @citekeys
     (goto-char beg)
     ;; NOTE: Technically this search matches org-ref [[cite too, causing a bit
@@ -259,10 +259,10 @@ Arguments PLAIN-RE and MERGED-RE..."
                             nil
                             (substring (match-string 0) 1) ;; drop @
                             (list :outline olp-with-self))
-                    org-node-worker--result:found-links)))))))
+                    org-node-parser--result:found-links)))))))
   (goto-char (or end (point-max))))
 
-(defun org-node-worker--collect-properties (beg end)
+(defun org-node-parser--collect-properties (beg end)
   "Assuming BEG and END delimit the region in between
 :PROPERTIES:...:END:, collect the properties into an alist."
   (catch 'break
@@ -271,9 +271,9 @@ Arguments PLAIN-RE and MERGED-RE..."
       (while (not (>= (point) end))
         (skip-chars-forward "[:space:]")
         (unless (looking-at-p ":")
-          (push (list org-node-worker--curr-file (point)
+          (push (list org-node-parser--curr-file (point)
                       "Possibly malformed property drawer")
-                org-node-worker--result:problems)
+                org-node-parser--result:problems)
           (throw 'break nil))
         (forward-char)
         (push (cons (upcase
@@ -281,9 +281,9 @@ Arguments PLAIN-RE and MERGED-RE..."
                       (point)
                       (1- (or (search-forward ":" (pos-eol) t)
                               (progn
-                                (push (list org-node-worker--curr-file (point)
+                                (push (list org-node-parser--curr-file (point)
                                             "Possibly malformed property drawer")
-                                      org-node-worker--result:problems)
+                                      org-node-parser--result:problems)
                                 (throw 'break nil))))))
                     (string-trim
                      (buffer-substring
@@ -295,28 +295,28 @@ Arguments PLAIN-RE and MERGED-RE..."
 
 ;;; Main
 
-(defvar org-node-worker--result:found-links nil)
-(defvar org-node-worker--result:problems nil)
-(defvar org-node-worker--curr-file nil)
+(defvar org-node-parser--result:found-links nil)
+(defvar org-node-parser--result:problems nil)
+(defvar org-node-parser--curr-file nil)
 
-;; (defvar org-node-worker--temp-buf nil
+;; (defvar org-node-parser--temp-buf nil
 ;;   "One extra buffer.")
 
-(defun org-node-worker--collect-dangerously ()
+(defun org-node-parser--collect-dangerously ()
   "Dangerous!  Assumes the current buffer is a temp buffer!
 
 Using info in the temp files prepared by `org-node-cache--scan',
 look for ID-nodes and links in all Org files given in the file
 list, and write results to another temp file."
   (let ((file-name-handler-alist nil))
-    (insert-file-contents (org-node-worker--tmpfile "work-variables.eld"))
+    (insert-file-contents (org-node-parser--tmpfile "work-variables.eld"))
     (dolist (var (read (buffer-string)))
       (set (car var) (cdr var)))
     (erase-buffer)
     ;; The variable `i' was set via the command line that launched this process
-    (insert-file-contents (org-node-worker--tmpfile "file-list-%d.eld" i)))
+    (insert-file-contents (org-node-parser--tmpfile "file-list-%d.eld" i)))
   (setq $files (read (buffer-string)))
-  ;; (setq org-node-worker--temp-buf (get-buffer-create " *org-node temp*" t))
+  ;; (setq org-node-parser--temp-buf (get-buffer-create " *org-node temp*" t))
   (let ((case-fold-search t)
         result:missing-files
         result:found-nodes
@@ -343,7 +343,7 @@ list, and write results to another temp file."
               (push FILE result:missing-files)
               (throw 'file-done t))
             (push FILE result:found-files)
-            (setq org-node-worker--curr-file FILE)
+            (setq org-node-parser--curr-file FILE)
             (setq buffer-read-only nil)
             (erase-buffer)
             ;; NOTE: Here I used `insert-file-contents-literally' in the past,
@@ -363,7 +363,7 @@ list, and write results to another temp file."
             ;; If the very first line of file is a heading (typical for people
             ;; who nix `org-node-prefer-file-level-nodes'), don't try to scan
             ;; any file-level data.  Anyway, our usage of
-            ;; `org-node-worker--next-heading' cannot handle that edge-case so
+            ;; `org-node-parser--next-heading' cannot handle that edge-case so
             ;; we MUST check.
             (if (looking-at-p "\\*")
                 (progn
@@ -372,7 +372,7 @@ list, and write results to another temp file."
                   (setq FILE-TITLE-OR-BASENAME (file-name-nondirectory FILE))
                   (setq TODO-RE $global-todo-re))
               ;; Narrow until first heading
-              (when (org-node-worker--next-heading)
+              (when (org-node-parser--next-heading)
                 (narrow-to-region 1 (point))
                 (goto-char 1))
               ;; Rough equivalent of `org-end-of-meta-data' for the file
@@ -388,7 +388,7 @@ list, and write results to another temp file."
                     (if (re-search-forward "^[[:space:]]*:properties:" FAR t)
                         (progn
                           (forward-line 1)
-                          (org-node-worker--collect-properties
+                          (org-node-parser--collect-properties
                            (point)
                            (if (re-search-forward "^[[:space:]]*:end:" nil t)
                                (pos-bol)
@@ -413,12 +413,12 @@ list, and write results to another temp file."
                                          FILE-TODO-SETTINGS)
                                    (re-search-forward
                                     $file-todo-option-re FAR t)))
-                          (org-node-worker--make-todo-regexp
+                          (org-node-parser--make-todo-regexp
                            (string-join FILE-TODO-SETTINGS " ")))
                       $global-todo-re))
               (goto-char 1)
               (setq FILE-TITLE (when (re-search-forward "^#\\+title: " FAR t)
-                                 (org-node-worker--org-link-display-format
+                                 (org-node-parser--org-link-display-format
                                   (buffer-substring (point) (pos-eol)))))
               (setq FILE-TITLE-OR-BASENAME
                     (or FILE-TITLE (file-name-nondirectory FILE)))
@@ -433,11 +433,11 @@ list, and write results to another temp file."
                       (setq END (point))
                       (unless (search-forward ":end:" nil t)
                         (error "Couldn't find matching :END: drawer"))
-                      (org-node-worker--collect-links-until
+                      (org-node-parser--collect-links-until
                        nil FILE-ID nil $plain-re $merged-re))
                   (setq END (point-max)))
                 (goto-char HERE)
-                (org-node-worker--collect-links-until
+                (org-node-parser--collect-links-until
                  END FILE-ID nil $plain-re $merged-re)
                 ;; NOTE: A plist would be more readable than a record, but I
                 ;; profiled it using:
@@ -461,7 +461,7 @@ list, and write results to another temp file."
                          1
                          nil
                          PROPS
-                         (org-node-worker--split-refs-field
+                         (org-node-parser--split-refs-field
                           (cdr (assoc "ROAM_REFS" PROPS)))
                          nil
                          FILE-TAGS
@@ -478,7 +478,7 @@ list, and write results to another temp file."
                 ;; Narrow til next heading
                 (narrow-to-region (point)
                                   (save-excursion
-                                    (or (org-node-worker--next-heading)
+                                    (or (org-node-parser--next-heading)
                                         (point-max))))
                 (setq HEADING-POS (point))
                 (setq LEVEL (skip-chars-forward "*"))
@@ -504,11 +504,11 @@ list, and write results to another temp file."
                 ;; Tags in heading?
                 (if (re-search-forward " +\\(:.+:\\) *$" (pos-eol) t)
                     (progn
-                      (setq TITLE (org-node-worker--org-link-display-format
+                      (setq TITLE (org-node-parser--org-link-display-format
                                    (buffer-substring HERE (match-beginning 0))))
                       (setq TAGS (split-string (match-string 1) ":" t)))
                   (setq TITLE
-                        (org-node-worker--org-link-display-format
+                        (org-node-parser--org-link-display-format
                          (buffer-substring HERE (pos-eol))))
                   (setq TAGS nil))
                 ;; Gotta go forward 1 line, see if it is a planning-line, and
@@ -543,7 +543,7 @@ list, and write results to another temp file."
                       (if (re-search-forward "^[[:space:]]*:properties:" FAR t)
                           (progn
                             (forward-line 1)
-                            (org-node-worker--collect-properties
+                            (org-node-parser--collect-properties
                              (point)
                              (if (re-search-forward "^[[:space:]]*:end:" nil t)
                                  (prog1 (pos-bol)
@@ -559,7 +559,7 @@ list, and write results to another temp file."
                 ;; NOTE: nil ID is allowed
                 (push (list HEADING-POS TITLE LEVEL ID) OUTLINE-DATA)
                 (when ID
-                  (setq OLP (org-node-worker--pos->olp OUTLINE-DATA HEADING-POS))
+                  (setq OLP (org-node-parser--pos->olp OUTLINE-DATA HEADING-POS))
                   (push
                    ;; NOTE Must be in same order as the defstruct
                    (record 'org-node
@@ -576,7 +576,7 @@ list, and write results to another temp file."
                            HEADING-POS
                            PRIORITY
                            PROPS
-                           (org-node-worker--split-refs-field
+                           (org-node-parser--split-refs-field
                             (cdr (assoc "ROAM_REFS" PROPS)))
                            SCHED
                            TAGS
@@ -585,7 +585,7 @@ list, and write results to another temp file."
                    result:found-nodes))
                 ;; Now collect links while we're here!
                 (setq ID-HERE (or ID
-                                  (org-node-worker--pos->parent-id
+                                  (org-node-parser--pos->parent-id
                                    OUTLINE-DATA HEADING-POS FILE-ID)
                                   (throw 'entry-done t)))
                 (setq OLP-WITH-SELF (append OLP (list TITLE)))
@@ -597,22 +597,22 @@ list, and write results to another temp file."
                     (unless (setq DRAWER-END (search-forward ":end:" nil t))
                       (push (list FILE (point)
                                   "Couldn't find matching :END: drawer")
-                            org-node-worker--result:problems)
+                            org-node-parser--result:problems)
                       (throw 'entry-done t))
                   ;; Danger, Robinson
                   (setq DRAWER-END nil))
                 ;; Gotcha... collect links inside the heading
                 (goto-char HEADING-POS)
-                (org-node-worker--collect-links-until
+                (org-node-parser--collect-links-until
                  (pos-eol) ID-HERE OLP-WITH-SELF $plain-re $merged-re)
                 ;; Collect links between property drawer and backlinks drawer
                 (goto-char HERE)
                 (when DRAWER-BEG
-                  (org-node-worker--collect-links-until
+                  (org-node-parser--collect-links-until
                    DRAWER-BEG ID-HERE OLP-WITH-SELF $plain-re $merged-re))
                 ;; Collect links until next heading
                 (goto-char (or DRAWER-END HERE))
-                (org-node-worker--collect-links-until
+                (org-node-parser--collect-links-until
                  (point-max) ID-HERE OLP-WITH-SELF $plain-re $merged-re))
               (goto-char (point-max))
               (widen)))
@@ -620,7 +620,7 @@ list, and write results to another temp file."
         ;; Don't crash the process when there is an error signal,
         ;; report it and continue to the next file
         (( t error )
-         (push (list FILE (point) err) org-node-worker--result:problems)
+         (push (list FILE (point) err) org-node-parser--result:problems)
          (setq buffer-read-only nil))))
 
     (setq buffer-read-only nil)
@@ -631,17 +631,17 @@ list, and write results to another temp file."
        (prin1-to-string (list result:missing-files
                               result:found-files
                               result:found-nodes
-                              org-node-worker--result:paths-types
-                              org-node-worker--result:found-links
-                              org-node-worker--result:problems
+                              org-node-parser--result:paths-types
+                              org-node-parser--result:found-links
+                              org-node-parser--result:problems
                               (current-time)))
        nil
-       (org-node-worker--tmpfile "results-%d.eld" i))))
+       (org-node-parser--tmpfile "results-%d.eld" i))))
   ;; TODO: Does emacs in batch mode garbage-collect at the end? I guess not but
   ;;       if it does then maybe exec a kill -9 on itself here.  That'd mess
   ;;       with the sentinel but...
   )
 
-(provide 'org-node-worker)
+(provide 'org-node-parser)
 
-;;; org-node-worker.el ends here
+;;; org-node-parser.el ends here
