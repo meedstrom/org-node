@@ -41,6 +41,7 @@ With [[https://github.com/slotThe/vc-use-package][vc-use-package]]:
 - New mode: =org-node-fakeroam-redisplay-mode=
 - New mode: =org-node-complete-at-point-mode=
 - New user option: =org-node-prefer-with-heading=
+- New user option: =org-node-datestamp-format=
 - New user option: =org-node-warn-title-collisions=
 - New user option: =org-node-alter-candidates=
 - New user option: =org-node-affixation-fn=

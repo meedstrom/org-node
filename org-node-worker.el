@@ -25,7 +25,7 @@ As a nicety, `format' BASENAME with ARGS too.
 
 On most systems, the resulting string will be
 /tmp/org-node/BASENAME, but it depends on
-`temporary-file-directory'."
+OS and `temporary-file-directory'."
   (file-name-concat temporary-file-directory
                     "org-node"
                     (if basename (apply #'format basename args) "")))

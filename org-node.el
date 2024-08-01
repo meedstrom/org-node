@@ -332,7 +332,7 @@ For use as `org-node-affixation-fn'."
 
 (defun org-node-affix-with-olp (node title)
   "Prepend TITLE with NODE's outline path.
-For use as `org-node-affixation-fn'."
+for use as `org-node-affixation-fn'."
   (list title
         (if (org-node-get-is-subtree node)
             (let ((ancestors (cons (org-node-get-file-title-or-basename node)
