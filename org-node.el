@@ -71,7 +71,7 @@
 (require 'compat)
 (require 'org)
 (require 'org-id)
-(require 'org-node-worker)
+(require 'org-node-parser)
 (require 'org-node-obsolete)
 
 (declare-function #'org-element-property "org-element")
@@ -750,20 +750,20 @@ only be blocked the first time org-node builds its cache."
        1))
 
 (defun org-node--ensure-compiled-lib ()
-  "Compile org-node-worker.el, in case the user's package manager
+  "Compile org-node-parser.el, in case the user's package manager
 didn't do so already, or local changes have been made."
   (let* ((file-name-handler-alist nil)
          ;; FIXME: When working on a checked-out repo, this will still just
          ;;        find elpaca/straight's clone.  So the developer has to paste
          ;;        in the true library path here.
-         (lib (find-library-name "org-node-worker"))
+         (lib (find-library-name "org-node-parser"))
          (native-path (and (featurep 'native-compile)
                            (native-comp-available-p)
                            (require 'comp)
                            (comp-el-to-eln-filename lib)))
-         (elc-path (org-node-worker--tmpfile "worker.elc"))
+         (elc-path (org-node-parser--tmpfile "worker.elc"))
          (byte-compile-warnings '(not free-vars)))
-    (mkdir (org-node-worker--tmpfile) t)
+    (mkdir (org-node-parser--tmpfile) t)
     (if native-path
         (unless (file-newer-than-file-p native-path lib)
           (native-compile lib))
@@ -803,14 +803,14 @@ function to update current tables."
     (setq org-node--processes nil)
     (with-current-buffer (get-buffer-create org-node--stderr-name)
       (erase-buffer))
-    (with-temp-file (org-node-worker--tmpfile "work-variables.eld")
+    (with-temp-file (org-node-parser--tmpfile "work-variables.eld")
       (let ((standard-output (current-buffer))
             (print-length nil)
             (print-level nil))
         (prin1
          ;; NOTE The $sigils in the names are to visually distinguish these
          ;;      "external" variables in the body of
-         ;;      `org-node-worker--collect-dangerously'.
+         ;;      `org-node-parser--collect-dangerously'.
          (append
           org-node-inject-variables
           `(($plain-re . ,org-link-plain-re)
@@ -825,7 +825,7 @@ function to update current tables."
             ($global-todo-re
              . ,(if (stringp (car org-todo-keywords))
                     (org-node--die "Quit because `org-todo-keywords' is configured with obsolete syntax, please fix")
-                  (org-node-worker--make-todo-regexp
+                  (org-node-parser--make-todo-regexp
                    (string-join (-mapcat #'cdr
                                          (default-value 'org-todo-keywords))
                                 " "))))
@@ -840,17 +840,17 @@ function to update current tables."
 
     (if org-node--debug
         ;; Special case for debugging; run single-threaded so we can step
-        ;; through the org-node-worker.el functions with edebug
+        ;; through the org-node-parser.el functions with edebug
         (progn
-          (delete-file (org-node-worker--tmpfile "results-0.eld"))
+          (delete-file (org-node-parser--tmpfile "results-0.eld"))
           (let ((print-length nil))
             (write-region (prin1-to-string files)
                           nil
-                          (org-node-worker--tmpfile "file-list-0.eld")))
+                          (org-node-parser--tmpfile "file-list-0.eld")))
           (setq i 0)
-          (setq org-node-worker--result:found-links nil)
-          (setq org-node-worker--result:problems nil)
-          (setq org-node-worker--result:paths-types nil)
+          (setq org-node-parser--result:found-links nil)
+          (setq org-node-parser--result:problems nil)
+          (setq org-node-parser--result:paths-types nil)
           (when (bound-and-true-p editorconfig-mode)
             (message "Maybe disable editorconfig-mode while debugging"))
           (load-file compiled-lib)
@@ -860,7 +860,7 @@ function to update current tables."
             (when (eq 'show org-node--debug)
               (pop-to-buffer (current-buffer)))
             (erase-buffer)
-            (org-node-worker--collect-dangerously)
+            (org-node-parser--collect-dangerously)
             (org-node--handle-finished-job 1 finalizer)))
 
       ;; If not debugging, split the work over many child processes
@@ -868,10 +868,10 @@ function to update current tables."
               (org-node--split-into-n-sublists files org-node-perf-max-jobs))
              (n-jobs (length file-lists)))
         (dotimes (i n-jobs)
-          (delete-file (org-node-worker--tmpfile "results-%d.eld" i))
+          (delete-file (org-node-parser--tmpfile "results-%d.eld" i))
           ;; NOTE: `with-temp-file' beats `write-region' because write-region
           ;;       CANNOT be muffled by `save-silently' or `inhibit-message'
-          (with-temp-file (org-node-worker--tmpfile "file-list-%d.eld" i)
+          (with-temp-file (org-node-parser--tmpfile "file-list-%d.eld" i)
             (let ((write-region-inhibit-fsync nil) ;; Default t in emacs30
                   (print-length nil))
               (insert (prin1-to-string (pop file-lists)))))
@@ -888,13 +888,13 @@ function to update current tables."
                        ;; TODO: Maybe someone does something crazy like pandoc
                        ;; the entirety of SciHub to .org to see how org-node
                        ;; copes?  Maybe sum the filesizes of FILES and use the
-                       ;; 800kb default GC if it's more than like 1GB of text.
+                       ;; 800kB default GC if it's more than like 1GB of text.
                        "--eval" "(setq gc-cons-threshold most-positive-fixnum)"
                        "--eval" (format "(setq i %d)" i)
                        "--eval" (format "(setq temporary-file-directory \"%s\")"
                                         temporary-file-directory)
                        "--load" compiled-lib
-                       "--funcall" "org-node-worker--collect-dangerously")
+                       "--funcall" "org-node-parser--collect-dangerously")
                  :sentinel (lambda (_process _event)
                              (org-node--handle-finished-job n-jobs finalizer)))
                 org-node--processes))))))
@@ -917,7 +917,7 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
           result-sets)
       (with-temp-buffer
         (dotimes (i n-jobs)
-          (let ((results-file (org-node-worker--tmpfile "results-%d.eld" i)))
+          (let ((results-file (org-node-parser--tmpfile "results-%d.eld" i)))
             (if (not (file-exists-p results-file))
                 (let ((buf (get-buffer " *org-node*")))
                   (when buf
@@ -1172,7 +1172,7 @@ also necessary to do is `org-node--dirty-ensure-link-known'."
               :file-title-or-basename (or ftitle (file-name-nondirectory fpath))
               :aliases (split-string-and-unquote
                         (or (cdr (assoc "ROAM_ALIASES" props)) ""))
-              :refs (org-node-worker--split-refs-field
+              :refs (org-node-parser--split-refs-field
                      (cdr (assoc "ROAM_REFS" props)))
               :pos (if heading (org-entry-beginning-position) 1)
               :level (or (org-current-level) 0)
@@ -2507,8 +2507,8 @@ lisp_data <- str_c(\"(\\\"\", as_ids(fas1), \"\\\")\") |>
   })()
 
 write_file(lisp_data, file.path(dirname(tsv), \"feedback-arcs.eld\"))")
-        (script-file (org-node-worker--tmpfile "analyze_feedback_arcs.R"))
-        (digraph-tsv (org-node-worker--tmpfile "id_node_digraph.tsv")))
+        (script-file (org-node-parser--tmpfile "analyze_feedback_arcs.R"))
+        (digraph-tsv (org-node-parser--tmpfile "id_node_digraph.tsv")))
     (write-region r-code nil script-file)
     (write-region (org-node--make-digraph-tsv-string) nil digraph-tsv)
     (with-current-buffer (get-buffer-create "*feedback arcs*")
@@ -2518,7 +2518,7 @@ write_file(lisp_data, file.path(dirname(tsv), \"feedback-arcs.eld\"))")
       (unless (= 0 (call-process "Rscript" nil t nil script-file digraph-tsv))
         (error "%s" (buffer-string)))
       (erase-buffer)
-      (insert-file-contents (org-node-worker--tmpfile "feedback-arcs.eld"))
+      (insert-file-contents (org-node-parser--tmpfile "feedback-arcs.eld"))
       (setq feedbacks (read (buffer-string)))
       (when (listp feedbacks)
         (erase-buffer)
