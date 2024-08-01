@@ -224,8 +224,10 @@ Applied only by `org-node-new-file', `org-node-capture-target',
 NOT applied by `org-node-new-via-roam-capture' -- see org-roam's
 `org-roam-capture-new-node-hook' instead.
 
-A good member to put in this hook is `org-node-put-created',
-since the default `org-node-datestamp-format' is null."
+A good function for this hook is `org-node-put-created', since
+the default `org-node-datestamp-format' is empty.  In the
+author's experience, recording the creation-date somewhere may
+prove useful later on, e.g. when publishing to a blog."
   :group 'org-node
   :type 'hook)
 
@@ -301,9 +303,8 @@ After changing this setting, please run \\[org-node-reset]."
 (defcustom org-node-affixation-fn #'org-node-affix-with-olp
   "Function to give prefix and suffix to completion candidates.
 
-The results will be indirectly used by the affixation function
-associated with `org-node-collection', i.e. to style the
-appearance of completions during \\[org-node-find] et al.
+The results will style the appearance of completions during
+\\[org-node-find] et al.
 
 To read more about affixations, see docstring
 `completion-extra-properties', however this function operates on
@@ -727,8 +728,8 @@ eventually and not dropped."
 If left at 0, will be set at runtime to the result of
 `org-node--count-logical-cores'.
 
-On most systems, this setting hardly matters since Emacs will
-only be blocked the first time org-node builds its cache."
+Only really affects the speed of \\[org-node-reset], and the
+first-time init, which runs that in a way that blocks Emacs."
   :type 'natnum)
 
 (defun org-node--count-logical-cores ()
@@ -866,7 +867,9 @@ function to update current tables."
       ;; If not debugging, split the work over many child processes
       (let* ((file-lists
               (org-node--split-into-n-sublists files org-node-perf-max-jobs))
-             (n-jobs (length file-lists)))
+             (n-jobs (length file-lists))
+             (gc-ultra (let ((default-directory invocation-directory))
+                         (/ (* 1000 (car (memory-info))) n-jobs))))
         (dotimes (i n-jobs)
           (delete-file (org-node-parser--tmpfile "results-%d.eld" i))
           ;; NOTE: `with-temp-file' beats `write-region' because write-region
@@ -885,11 +888,12 @@ function to update current tables."
                  (list (expand-file-name invocation-name invocation-directory)
                        "--quick"
                        "--batch"
-                       ;; TODO: Maybe someone does something crazy like pandoc
-                       ;; the entirety of SciHub to .org to see how org-node
-                       ;; copes?  Maybe sum the filesizes of FILES and use the
-                       ;; 800kB default GC if it's more than like 1GB of text.
-                       "--eval" "(setq gc-cons-threshold most-positive-fixnum)"
+                       ;; TODO: This assumes the threshold will never be hit,
+                       ;; but maybe someone does something crazy like pandoc
+                       ;; the entirety of SciHub into .org?  Maybe sum the
+                       ;; filesizes and go back to default 800kB GC if we're
+                       ;; dealing with more than like 1GB of org files.
+                       "--eval" (format "(setq gc-cons-threshold %d)" gc-ultra)
                        "--eval" (format "(setq i %d)" i)
                        "--eval" (format "(setq temporary-file-directory \"%s\")"
                                         temporary-file-directory)
@@ -1412,7 +1416,8 @@ consult the filesystem, just compares substrings to each other."
 - Symbol t: ask every time, starting from the current directory
 
 This variable controls the directory component, but the file
-basename is controlled by `org-node-filename-fn'."
+basename is controlled by `org-node-slug-fn' and
+`org-node-datestamp-format'."
   :group 'org-node
   :type '(choice boolean string))
 
@@ -1437,8 +1442,8 @@ restart).")
 (defcustom org-node-datestamp-format ""
   "Passed to `format-time-string' to prepend to filenames.
 
-Example from Org-roam: \"%Y%m%d%H%M%S-\"
-Example from Denote: \"%Y%m%dT%H%M%S--\""
+Example from Org-roam: %Y%m%d%H%M%S-
+Example from Denote: %Y%m%dT%H%M%S--"
   :type 'string)
 
 (defcustom org-node-slug-fn #'org-node-slugify-for-web

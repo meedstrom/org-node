@@ -40,8 +40,6 @@ that will match any of the TODO keywords within."
                (split-string)
                (regexp-opt)))
 
-(defvar org-node-parser--result:paths-types nil)
-
 (defun org-node-parser--elem-index (elem list)
   "Like `-elem-index', return first index of ELEM in LIST."
   (when list
@@ -295,6 +293,7 @@ Arguments PLAIN-RE and MERGED-RE..."
 
 ;;; Main
 
+(defvar org-node-parser--result:paths-types nil)
 (defvar org-node-parser--result:found-links nil)
 (defvar org-node-parser--result:problems nil)
 (defvar org-node-parser--curr-file nil)
@@ -303,7 +302,7 @@ Arguments PLAIN-RE and MERGED-RE..."
 ;;   "One extra buffer.")
 
 (defun org-node-parser--collect-dangerously ()
-  "Dangerous!  Assumes the current buffer is a temp buffer!
+  "Dangerous!  Overwrites the current buffer!
 
 Using info in the temp files prepared by `org-node-cache--scan',
 look for ID-nodes and links in all Org files given in the file
@@ -361,10 +360,10 @@ list, and write results to another temp file."
             (setq OUTLINE-DATA nil)
 
             ;; If the very first line of file is a heading (typical for people
-            ;; who nix `org-node-prefer-file-level-nodes'), don't try to scan
-            ;; any file-level data.  Anyway, our usage of
-            ;; `org-node-parser--next-heading' cannot handle that edge-case so
-            ;; we MUST check.
+            ;; who set `org-node-prefer-with-heading'), don't try to scan any
+            ;; file-level data.  Anyway, our usage of
+            ;; `org-node-parser--next-heading' cannot handle that edge-case, so
+            ;; we must check.
             (if (looking-at-p "\\*")
                 (progn
                   (setq FILE-ID nil)
@@ -378,8 +377,6 @@ list, and write results to another temp file."
               ;; Rough equivalent of `org-end-of-meta-data' for the file
               ;; level, can jump somewhat too far but that's ok
               (setq FAR (if (re-search-forward "^ *?[^#:]" nil t)
-                            ;; NOTE Observe that if first char in file is an Org
-                            ;;      heading star, this sets FAR=1 exactly
                             (1- (point))
                           ;; File is pretty much just a property drawer
                           (point-max)))
@@ -441,10 +438,10 @@ list, and write results to another temp file."
                  END FILE-ID nil $plain-re $merged-re)
                 ;; NOTE: A plist would be more readable than a record, but I
                 ;; profiled it using:
-                ;; (benchmark-run-compiled 10 (setq org-node--done-ctr 6) (org-node--handle-finished-job 7 #'org-node--finalize-full))
-                ;; Result passing plists to `org-node--make-obj':
+                ;; (benchmark-run 10 (setq org-node--done-ctr 6) (org-node--handle-finished-job 7 #'org-node--finalize-full))
+                ;; Result when finalizer passes plists to `org-node--make-obj':
                 ;; (8.152532984 15 4.110698459000105)
-                ;; Result passing records as-is:
+                ;; Result when finalizer accepts premade records:
                 ;; (5.928453786 10 2.7291036080000595)
                 (push
                  (record 'org-node
@@ -561,7 +558,7 @@ list, and write results to another temp file."
                 (when ID
                   (setq OLP (org-node-parser--pos->olp OUTLINE-DATA HEADING-POS))
                   (push
-                   ;; NOTE Must be in same order as the defstruct
+                   ;; NOTE: See the defstruct for the ordering of fields
                    (record 'org-node
                            (split-string-and-unquote
                             (or (cdr (assoc "ROAM_ALIASES" PROPS)) ""))
@@ -583,7 +580,7 @@ list, and write results to another temp file."
                            TITLE
                            TODO-STATE)
                    result:found-nodes))
-                ;; Now collect links while we're here!
+                ;; Heading recorded, now collect links in the entry body!
                 (setq ID-HERE (or ID
                                   (org-node-parser--pos->parent-id
                                    OUTLINE-DATA HEADING-POS FILE-ID)
@@ -601,7 +598,7 @@ list, and write results to another temp file."
                       (throw 'entry-done t))
                   ;; Danger, Robinson
                   (setq DRAWER-END nil))
-                ;; Gotcha... collect links inside the heading
+                ;; Gotcha... collect links inside the heading too
                 (goto-char HEADING-POS)
                 (org-node-parser--collect-links-until
                  (pos-eol) ID-HERE OLP-WITH-SELF $plain-re $merged-re)
@@ -624,21 +621,20 @@ list, and write results to another temp file."
          (setq buffer-read-only nil))))
 
     (setq buffer-read-only nil)
-    (let ((write-region-inhibit-fsync nil) ;; Default t in batch mode
-          (print-length nil)
-          (print-level nil))
-      (write-region
-       (prin1-to-string (list result:missing-files
-                              result:found-files
-                              result:found-nodes
-                              org-node-parser--result:paths-types
-                              org-node-parser--result:found-links
-                              org-node-parser--result:problems
-                              (current-time)))
-       nil
-       (org-node-parser--tmpfile "results-%d.eld" i))))
+    (with-temp-file (org-node-parser--tmpfile "results-%d.eld" i)
+      (let ((write-region-inhibit-fsync nil) ;; Default t in batch mode
+            (print-length nil)
+            (print-level nil))
+        (insert
+         (prin1-to-string (list result:missing-files
+                                result:found-files
+                                result:found-nodes
+                                org-node-parser--result:paths-types
+                                org-node-parser--result:found-links
+                                org-node-parser--result:problems
+                                (current-time)))))))
   ;; TODO: Does emacs in batch mode garbage-collect at the end? I guess not but
-  ;;       if it does then maybe exec a kill -9 on itself here.  That'd mess
+  ;;       if it does then maybe exec a kill -9 on itself here.  That may mess
   ;;       with the sentinel but...
   )
 
