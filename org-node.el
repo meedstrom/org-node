@@ -2011,14 +2011,14 @@ it can be desirable if you know the subtree had been part of the
 source file for ages so that you see the ancestor's creation-date
 as more \"truthful\" than today's date.
 
-
-(defun my-inherit-creation-date (orig-fn &rest args)
-       (let ((parent-creation (org-entry-get nil \"CREATED\" t)))
-         (apply orig-fn args)
-         ;; Now in the new buffer
-         (org-entry-put nil \"CREATED\"
-                        (or parent-creation
-                            (format-time-string \"[%F %a]\")))))"
+(advice-add 'org-node-extract-subtree :around
+            (defun my-inherit-creation-date (orig-fn &rest args)
+                   (let ((parent-creation (org-entry-get nil \"CREATED\" t)))
+                     (apply orig-fn args)
+                     ;; Now in the new buffer
+                     (org-entry-put nil \"CREATED\"
+                                    (or parent-creation
+                                        (format-time-string \"[%F %a]\"))))))"
   (interactive nil org-mode)
   (unless (derived-mode-p 'org-mode)
     (user-error "This command expects an org-mode buffer"))
@@ -2061,7 +2061,7 @@ as more \"truthful\" than today's date.
               (open-line 1)
               (insert "\n"
                       (format-time-string
-                       (format "[%s] Created " (car org-timestamp-formats)))
+                       (format "%s Created " (org-time-stamp-format nil t)))
                       (org-link-make-string (concat "id:" id) title)
                       "\n"))))
         (save-buffer)
@@ -2359,9 +2359,7 @@ to replacing all the links, finally rename the asset file itself."
   (interactive nil org-mode)
   (unless (org-entry-get nil "CREATED")
     (org-entry-put nil "CREATED"
-                   (concat "["
-                           (format-time-string (car org-timestamp-formats))
-                           "]"))))
+                   (format-time-string (org-time-stamp-format nil t)))))
 
 (defvar org-node--temp-extra-fns nil
   "Extra functions to run at the end of a full scan.
