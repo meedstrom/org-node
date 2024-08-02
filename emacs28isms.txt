@@ -4,4 +4,5 @@ List of 28-isms to drop in future
 
 - (cadar (org-collect-keywords "TITLE")) -> (org-get-title)
 - (org-node--emacs25-strip-diacritics)
+- any usages of compat-call
 - what the compiler tells you is obsolete

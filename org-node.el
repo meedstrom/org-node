@@ -17,7 +17,7 @@
 
 ;; Author:           Martin Edström <meedstrom91@gmail.com>
 ;; Created:          2024-04-13
-;; Version:          0.4.2
+;; Version:          0.4.3
 ;; Keywords:         org, hypermedia
 ;; Package-Requires: ((emacs "28.1") (compat "29.1.4.5") (dash "2.19.1"))
 ;; URL:              https://github.com/meedstrom/org-node
@@ -2804,6 +2804,27 @@ Designed for `completion-at-point-functions', which see."
                      (delete-char (- (length text)))
                      (insert (org-link-make-string
                               (concat "id:" id) text)))))))))
+
+(defun org-node--add-to-multivalued-property (prompt property)
+  "Like `org-entry-add-to-multivalued-property' but keep spaces.
+Technically: instead of percent-escaping each space character,
+wrap the whole element in quotes if necessary by using
+`split-string-and-unquote' and `combine-and-quote-strings'."
+  (let ((alias (read-string prompt))
+        (old (split-string-and-unquote
+              (or (org-entry-get nil property) ""))))
+    (unless (member alias old)
+      (org-entry-put nil property
+                     (combine-and-quote-strings
+                      (compat-call sort (cons alias old)))))))
+
+(defun org-node-alias-add ()
+  (interactive)
+  (org-node--add-to-multivalued-property "Alias: " "ROAM_ALIASES"))
+
+(defun org-node-ref-add ()
+  (interactive)
+  (org-node--add-to-multivalued-property "Ref: " "ROAM_REFS"))
 
 
 ;;;; Misc
