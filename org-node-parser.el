@@ -319,6 +319,7 @@ list, and write results to another temp file."
     ;; The variable `i' was set via the command line that launched this process
     (insert-file-contents (org-node-parser--tmpfile "file-list-%d.eld" i)))
   (setq $files (read (buffer-string)))
+  (setq buffer-read-only t)
   ;; (setq org-node-parser--temp-buf (get-buffer-create " *org-node temp*" t))
   (let ((case-fold-search t)
         result:missing-files
@@ -347,16 +348,13 @@ list, and write results to another temp file."
               (throw 'file-done t))
             (push FILE result:found-files)
             (setq org-node-parser--curr-file FILE)
-            (setq buffer-read-only nil)
-            (erase-buffer)
-            ;; NOTE: Here I used `insert-file-contents-literally' in the past,
-            ;; converting each captured substring afterwards with
-            ;; `decode-coding-string', but it still made us record wrong values
-            ;; for HEADING-POS when there was any Unicode in the file.
-            ;; Instead, overriding `coding-system-for-read' and
-            ;; `file-name-handler-alist' recoups much of the performance.
-            (insert-file-contents FILE)
-            (setq buffer-read-only t)
+            ;; NOTE: Don't use `insert-file-contents-literally'.  It gives
+            ;;       wrong values to HEADING-POS when there is any Unicode in
+            ;;       the file.  Just overriding `coding-system-for-read' and
+            ;;       `file-name-handler-alist' grants similar performance.
+            (let ((inhibit-read-only t))
+              (erase-buffer)
+              (insert-file-contents FILE))
             ;; Verify there is at least one ID-node
             (unless (re-search-forward "^[[:space:]]*:id: " nil t)
               (throw 'file-done t))
@@ -621,10 +619,8 @@ list, and write results to another temp file."
         ;; Don't crash the process when there is an error signal,
         ;; report it and continue to the next file
         (( t error )
-         (push (list FILE (point) err) org-node-parser--result:problems)
-         (setq buffer-read-only nil))))
+         (push (list FILE (point) err) org-node-parser--result:problems))))
 
-    (setq buffer-read-only nil)
     (with-temp-file (org-node-parser--tmpfile "results-%d.eld" i)
       (let ((write-region-inhibit-fsync nil) ;; Default t in batch mode
             (print-length nil)
