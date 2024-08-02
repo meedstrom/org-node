@@ -734,8 +734,8 @@ eventually and not dropped."
 If left at 0, will be set at runtime to the result of
 `org-node--count-logical-cores'.
 
-Only really affects the speed of \\[org-node-reset], and the
-first-time init, which runs that in a way that blocks Emacs."
+Affects the speed of \\[org-node-reset], and the first-time init,
+which may block Emacs while executing that same function."
   :type 'natnum)
 
 (defun org-node--count-logical-cores ()
@@ -860,6 +860,7 @@ function to update current tables."
           (setq org-node-parser--result:paths-types nil)
           (when (bound-and-true-p editorconfig-mode)
             (message "Maybe disable editorconfig-mode while debugging"))
+          (setq org-node--first-init nil)
           (load-file compiled-lib)
           (garbage-collect)
           (setq org-node--time-at-scan-begin (current-time))
@@ -878,8 +879,6 @@ function to update current tables."
                          (/ (* 1000 (car (memory-info))) n-jobs))))
         (dotimes (i n-jobs)
           (delete-file (org-node-parser--tmpfile "results-%d.eld" i))
-          ;; NOTE: `with-temp-file' beats `write-region' because write-region
-          ;;       CANNOT be muffled by `save-silently' or `inhibit-message'
           (with-temp-file (org-node-parser--tmpfile "file-list-%d.eld" i)
             (let ((write-region-inhibit-fsync nil) ;; Default t in emacs30
                   (print-length nil))
@@ -896,9 +895,10 @@ function to update current tables."
                        "--batch"
                        ;; TODO: This assumes the threshold will never be hit,
                        ;; but maybe someone does something crazy like pandoc
-                       ;; the entirety of SciHub into .org?  Maybe sum the
-                       ;; filesizes and go back to default 800kB GC if we're
-                       ;; dealing with more than like 1GB of org files.
+                       ;; the entirety of SciHub into .org to see how org-node
+                       ;; copes?  Maybe sum the filesizes and go back to
+                       ;; default 800kB GC if we're dealing with more than like
+                       ;; 1GB of org files.
                        "--eval" (format "(setq gc-cons-threshold %d)" gc-ultra)
                        "--eval" (format "(setq i %d)" i)
                        "--eval" (format "(setq temporary-file-directory \"%s\")"
@@ -916,9 +916,8 @@ Muffles some messages.")
 (defun org-node--handle-finished-job (n-jobs finalizer)
   "Check if this was the last process to return (by counting up
 to N-JOBS), then if so, wrap-up and call FINALIZER."
-  (when (eq n-jobs (cl-incf org-node--done-ctr))
+  (when (eq (cl-incf org-node--done-ctr) n-jobs)
     (when org-node--debug
-      (setq org-node--first-init nil)
       (garbage-collect))
     (setq org-node--time-at-finalize (current-time))
     (let ((file-name-handler-alist nil)
@@ -945,12 +944,13 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
               (erase-buffer)
               (insert-file-contents results-file)
               (push (read (buffer-string)) result-sets)))))
+      ;; FIXME: This timestamp is not guaranteed to be from the last child
       (setq org-node--time-at-last-child-done (-last-item (car result-sets)))
       ;; Merge N result-sets into one result-set, to run FINALIZER once
       (funcall finalizer (--reduce (-zip-with #'nconc it acc) result-sets)))))
 
 
-;;;; Scan finalizers
+;;;; Scan-finalizers
 
 (defun org-node--finalize-full (results)
   (clrhash org-node--id<>node)
@@ -958,9 +958,8 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
   (clrhash org-node--candidate<>node)
   (clrhash org-node--title<>id)
   (clrhash org-node--ref<>id)
-  (setq org-node--problems nil)
-  (setq org-node--collisions nil)
-  (seq-let (missing-files _ nodes path<>type links errors) results
+  (setq org-node--collisions nil) ;; To be populated by `org-node--record-node'
+  (seq-let (missing-files _ nodes path<>type links problems) results
     (org-node--forget-id-locations missing-files)
     (dolist (link links)
       (push link (gethash (org-node-link-dest link) org-node--dest<>links)))
@@ -968,8 +967,6 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
       (puthash (car pair) (cdr pair) org-node--uri-path<>uri-type))
     (dolist (node nodes)
       (org-node--record-node node))
-    (dolist (err errors)
-      (push err org-node--problems))
     (org-id-locations-save)
     (setq org-node--time-elapsed
           ;; For reproducible profiling: don't count time taken by
@@ -985,12 +982,12 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
       (funcall fn))
     (when (and org-node--collisions org-node-warn-title-collisions)
       (message "Some nodes share title, see M-x org-node-list-collisions"))
-    (when errors
+    (when (setq org-node--problems problems)
       (message "Scan had problems, see M-x org-node-list-scan-problems"))
     (setq org-node--first-init nil)))
 
 (defun org-node--finalize-modified (results)
-  (seq-let (missing-files found-files nodes path<>type links errors) results
+  (seq-let (missing-files found-files nodes path<>type links problems) results
     (org-node--forget-id-locations missing-files)
     (org-node--dirty-forget-files missing-files)
     ;; In case a title was edited: don't persist old revisions of the title
@@ -1022,9 +1019,9 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
       (puthash (car pair) (cdr pair) org-node--uri-path<>uri-type))
     (dolist (node nodes)
       (org-node--record-node node))
-    (dolist (err errors)
-      (push err org-node--problems))
-    (when errors
+    (dolist (pbm problems)
+      (push pbm org-node--problems))
+    (when problems
       (message "org-node found issues, see M-x org-node-list-scan-problems"))
     (run-hook-with-args 'org-node-rescan-hook found-files)))
 
@@ -1032,7 +1029,7 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
   "Update backlink tables on every save.
 
 Note that no matter this value, the tables will be corrected
-anyway on idle via `org-node--idle-timer'.
+anyway on idle, via `org-node--idle-timer'.
 
 A setting of t MAY slow down saving a big file containing
 thousands of links on constrained devices.
@@ -1168,9 +1165,11 @@ also necessary is `org-node--dirty-ensure-link-known' elsewhere."
           (goto-char (point-min))
           (re-search-forward (concat "^[[:space:]]*:id: +" id))
           (let ((props (org-entry-properties))
-                (heading (substring-no-properties (org-get-heading t t t t)))
+                (heading (org-get-heading t t t t))
                 (fpath (abbreviate-file-name (file-truename buffer-file-name)))
                 (ftitle (cadar (org-collect-keywords '("TITLE")))))
+            (when heading
+              (setq heading (substring-no-properties heading)))
             (org-node--record-node
              (org-node--make-obj
               :title (or heading ftitle)
