@@ -2170,63 +2170,65 @@ which wraps this function."
                                (expand-file-name org-roam-dailies-directory
                                                  org-roam-directory)
                                path)))))
-        (let* ((title (or (cadar (org-collect-keywords '("TITLE")))
-                          (save-excursion
-                            (without-restriction
-                              ;; No title, use first heading in file
-                              (goto-char 1)
-                              (or (org-at-heading-p)
-                                  (outline-next-heading))
-                              (org-get-heading t t t t)))))
-               (basename (file-name-nondirectory path))
-               (date-prefix (if (and org-node-datestamp-format
-                                     (string-match
-                                      (org-node--make-regexp-for-time-format
-                                       org-node-datestamp-format)
-                                      basename))
-                                (match-string 0 basename)
-                              ""))
-               (new-path (file-name-concat
-                          (file-name-directory path)
-                          ;; HACK 2024-07-21
-                          ;; Use old behavior if old option set
-                          (if org-node-filename-fn
-                              (funcall org-node-filename-fn title)
-                            (concat date-prefix
-                                    (funcall org-node-slug-fn title)
-                                    ".org"))))
-               (visiting (find-buffer-visiting path))
-               (visiting-on-window (and visiting (get-buffer-window visiting))))
+        (let ((title (or (cadar (org-collect-keywords '("TITLE")))
+                         (save-excursion
+                           (without-restriction
+                             ;; No title, use first heading in file
+                             (goto-char 1)
+                             (or (org-at-heading-p)
+                                 (outline-next-heading))
+                             (org-get-heading t t t t))))))
+          (if (not title)
+              (message "File has no title nor heading")
+            (let* ((basename (file-name-nondirectory path))
+                   (date-prefix (if (and org-node-datestamp-format
+                                         (string-match
+                                          (org-node--make-regexp-for-time-format
+                                           org-node-datestamp-format)
+                                          basename))
+                                    (match-string 0 basename)
+                                  ""))
+                   (new-path (file-name-concat
+                              (file-name-directory path)
+                              ;; HACK 2024-07-21
+                              ;; Use old behavior if old option set
+                              (if org-node-filename-fn
+                                  (funcall org-node-filename-fn title)
+                                (concat date-prefix
+                                        (funcall org-node-slug-fn title)
+                                        ".org"))))
+                   (visiting (find-buffer-visiting path))
+                   (visiting-on-window (and visiting (get-buffer-window visiting))))
 
-          (if (equal path new-path)
-              (when interactive
-                (message "Filename already correct: %s" path))
-            (if (and visiting (buffer-modified-p visiting))
-                (when interactive
-                  (message "Unsaved file, letting it be: %s" path))
-              (if (get-file-buffer new-path)
-                  (if interactive
-                      (message "A buffer is already visiting the would-be new filename")
-                    (user-error "A buffer is already visiting the would-be new filename"))
-                (unless (file-writable-p path)
-                  (user-error "No permissions to rename file: %s" path))
-                (unless (file-writable-p new-path)
-                  (user-error "No permissions to write a new file at: %s" new-path))
-                ;; Unnecessary b/c `rename-file' will already warn, but hey
-                (when (file-exists-p new-path)
-                  (user-error "Canceled because a file exists at: %s" new-path))
-                ;; Kill buffer before renaming, because it will not follow the rename
-                (when visiting
-                  (kill-buffer visiting))
-                (rename-file path new-path)
-                ;; Visit the file again if you had it open
-                (when visiting
-                  (let ((buf (find-file-noselect new-path)))
-                    (when visiting-on-window
-                      (set-window-buffer visiting-on-window buf))))
-                (message "File %s renamed to %s"
-                         (file-name-nondirectory path)
-                         (file-name-nondirectory new-path))))))))))
+              (if (equal path new-path)
+                  (when interactive
+                    (message "Filename already correct: %s" path))
+                (if (and visiting (buffer-modified-p visiting))
+                    (when interactive
+                      (message "Unsaved file, letting it be: %s" path))
+                  (if (get-file-buffer new-path)
+                      (if interactive
+                          (message "A buffer is already visiting the would-be new filename")
+                        (user-error "A buffer is already visiting the would-be new filename"))
+                    (unless (file-writable-p path)
+                      (user-error "No permissions to rename file: %s" path))
+                    (unless (file-writable-p new-path)
+                      (user-error "No permissions to write a new file at: %s" new-path))
+                    ;; Unnecessary b/c `rename-file' will already warn, but hey
+                    (when (file-exists-p new-path)
+                      (user-error "Canceled because a file exists at: %s" new-path))
+                    ;; Kill buffer before renaming, because it will not follow the rename
+                    (when visiting
+                      (kill-buffer visiting))
+                    (rename-file path new-path)
+                    ;; Visit the file again if you had it open
+                    (when visiting
+                      (let ((buf (find-file-noselect new-path)))
+                        (when visiting-on-window
+                          (set-window-buffer visiting-on-window buf))))
+                    (message "File %s renamed to %s"
+                             (file-name-nondirectory path)
+                             (file-name-nondirectory new-path))))))))))))
 
 ;;;###autoload
 (defun org-node-rewrite-links-ask (&optional files)
