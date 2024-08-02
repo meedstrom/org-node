@@ -1,4 +1,4 @@
-;;; org-node.el --- Like org-roam, treat org-id entries as linked notes -*- lexical-binding: t; -*-
+;;; org-node.el --- Help link org-id entries together -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2024 Martin Edström
 ;;
@@ -44,14 +44,15 @@
 ;; Compared to other systems:
 
 ;; - org-roam: Same idea, compatible disk format(!), but org-node lets you opt
-;;   out of file-level property drawers, and it tries to rely in a bare-metal
-;;   way on upstream org-id and org-capture.  For example, headings with IDs in
-;;   some Git README are considered part of your collection -- if it's known to
-;;   org-id, it's known to org-node.
+;;   out of file-level property drawers, does not support "roam:" links, and
+;;   tries to rely in a bare-metal way on upstream org-id and org-capture.  As
+;;   a drawback, if a heading in some Git README has an ID, it's considered
+;;   part of your collection -- simply because if it's known to org-id, it's
+;;   known to org-node.  These headings can be filtered after-the-fact.
 
-;; - denote: Org-node is Org only, no support for "denote:" links or Markdown.
-;;   Filenames have no meaning (and can be automatically managed), and you can
-;;   have as many "notes" as you want inside one file.
+;; - denote: Org-node is Org only, no Markdown, no support for "denote:" links.
+;;   Filenames have no meaning (so could match the Denote format if you like),
+;;   and you can have as many "notes" as you want inside one file.
 
 ;;; Code:
 
@@ -63,6 +64,12 @@
 ;;         search
 
 ;; TODO: Maybe rename object getters -get- to just :
+
+;; TODO: If a roam-ref exists like //www.website.com, allow counting
+;;       //www.website.com?key=val&key2=val2#hash as a reflink to the same,
+;;       unless the latter has a roam-ref of its own.
+;;       Would have to wait until all nodes registered, then do some sort of
+;;       `string-prefix-p' filtering...
 
 (require 'cl-lib)
 (require 'seq)
@@ -83,7 +90,6 @@
 (declare-function #'org-roam-capture- "org-roam-capture")
 (declare-function #'org-roam-node-create "org-roam-node")
 (declare-function #'org-roam-node-slug "org-roam-node")
-(defvar org-timestamp-formats)
 
 
 ;;;; Options
@@ -596,7 +602,7 @@ SYNCHRONOUS t, unless SYNCHRONOUS is the symbol `must-async'."
     ;; Block until all processes finish
     (when (seq-some #'process-live-p org-node--processes)
       (if org-node-cache-mode
-          (message "org-node caching...")
+          (message "org-node first-time caching...")
         (message "org-node caching... (Hint: Turn on org-node-cache-mode)")))
     (mapc #'accept-process-output org-node--processes)
     ;; Just in case... see docstring of `org-node--create'.
@@ -975,14 +981,13 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
               (time-subtract org-node--time-at-last-child-done
                              org-node--time-at-scan-begin))))
     (org-node--maybe-adjust-idle-timer)
-    (when org-node--first-init
-      (setq org-node--first-init nil))
     (while-let ((fn (pop org-node--temp-extra-fns)))
       (funcall fn))
     (when (and org-node--collisions org-node-warn-title-collisions)
       (message "Some nodes share title, see M-x org-node-list-collisions"))
     (when errors
-      (message "Scan had problems, see M-x org-node-list-scan-problems"))))
+      (message "Scan had problems, see M-x org-node-list-scan-problems"))
+    (setq org-node--first-init nil)))
 
 (defun org-node--finalize-modified (results)
   (seq-let (missing-files found-files nodes path<>type links errors) results
@@ -1154,7 +1159,7 @@ candidates right away, without having to save the buffer.
 
 2. ensure that `org-node-backlink-mode' won't autoclean backlinks
 to this node on account of it \"not existing yet\".  Actually,
-also necessary to do is `org-node--dirty-ensure-link-known'."
+also necessary is `org-node--dirty-ensure-link-known' elsewhere."
   (let ((id (org-entry-get nil "ID" t))
         (case-fold-search t))
     (unless (gethash id org-node--id<>node)
@@ -1163,7 +1168,7 @@ also necessary to do is `org-node--dirty-ensure-link-known'."
           (goto-char (point-min))
           (re-search-forward (concat "^[[:space:]]*:id: +" id))
           (let ((props (org-entry-properties))
-                (heading (org-get-heading t t t t))
+                (heading (substring-no-properties (org-get-heading t t t t)))
                 (fpath (abbreviate-file-name (file-truename buffer-file-name)))
                 (ftitle (cadar (org-collect-keywords '("TITLE")))))
             (org-node--record-node
@@ -1267,27 +1272,34 @@ is wrapped in its own list."
 ;;      laggy, then every link insertion is laggy.
 (defmacro org-node--with-quick-file-buffer (file &rest body)
   "Pseudo-backport of Emacs 29 `org-with-file-buffer'.
-Also integrates `org-with-wide-buffer' behavior, some magic
-around saving, and tries to open FILE quickly i.e. with
-minimal hooks.
+Also integrates `org-with-wide-buffer' behavior, and tries to
+execute minimal hooks in order to open and close FILE as quickly
+as possible.
 
-In short, if a buffer was visiting FILE, go to that buffer, else
-visit FILE in a new buffer, in which case ignore the usual Org
-startup checks.  Temporarily `widen' the buffer, execute BODY,
-then restore point.  Finally:
+In detail:
 
-- If a new buffer had to be opened: save and kill it.  Mandatory
-  because buffers opened in the quick way look \"wrong\" as many
-  hooks did not run, e.g. no indent-mode, no visual wrap etc.
-- If a buffer had been open: leave it open and leave it unsaved."
+1. If a buffer was visiting FILE, reuse that buffer, else visit
+   FILE in a new buffer, in which case ignore most of the Org
+   startup checks and skip any unsafe file-local variables.
+
+2. Temporarily `widen' the buffer, execute BODY, then restore
+   point.
+
+3a. If a new buffer had to be opened: save and kill it.
+    \(Mandatory because buffers opened in the quick way look
+    \"wrong\", e.g. no indent-mode, no visual wrap etc.)  Also
+    skip any save hooks and kill hooks.
+
+3b. If a buffer had been open: leave it open and unsaved."
   (declare (indent 1) (debug t))
   `(let ((find-file-hook nil)
          (after-save-hook nil)
          (before-save-hook nil)
-         (org-element-use-cache nil) ;; generally prevent bugs
-         (org-inhibit-startup t) ;; don't use org startup options
+         (enable-local-variables :safe)
+         (org-element-use-cache nil) ;; Generally prevent bugs
+         (org-inhibit-startup t) ;; Don't apply startup #+options
          (org-agenda-files nil)
-         (kill-buffer-hook nil) ;; inhibit save-place etc
+         (kill-buffer-hook nil) ;; Inhibit save-place etc
          (kill-buffer-query-functions nil)
          (buffer-list-update-hook nil))
      (let ((was-open (find-buffer-visiting ,file)))
@@ -1461,28 +1473,38 @@ Built-in choices:
           (function-item org-node-slugify-like-roam-actual)
           function))
 
+;; To be removed when Debian stable becomes trixie
+(defun org-node--strip-diacritics (input-string)
+  "Strip diacritics from INPUT-STRING."
+  (if (<= 29 emacs-major-version)
+      ;; Emacs 29+ solution
+      (thread-last input-string
+                   (string-glyph-decompose)
+                   (seq-remove (lambda (char) (< 767 char 818)))
+                   (concat)
+                   (string-glyph-compose))
+    ;; Emacs 25+ solution  https://irreal.org/blog/?p=11896
+    (let ((diacritics-alist
+           (seq-mapn (lambda (a b) (cons a b))
+                     "ÀÁÂÃÄÅàáâãäåÒÓÔÕÕÖØòóôõöøÈÉÊËèéêëðÇçÐÌÍÎÏìíîïÙÚÛÜùúûüÑñŠšŸÿýŽža"
+                     "AAAAAAaaaaaaOOOOOOOooooooEEEEeeeeeCcDIIIIiiiiUUUUuuuuNnSsYyyZz")))
+      (concat (seq-map (lambda (char)
+                         (or (alist-get char diacritics-alist)
+                             char))
+                       input-string)))))
+
 ;; Useful test cases if you want to hack on this!
 
 ;; (org-node-slugify-for-web "A/B testing")
 ;; (org-node-slugify-for-web "\"But there's still a chance, right?\"")
 ;; (org-node-slugify-for-web "Löb's Theorem")
+;; (org-node-slugify-for-web "Mañana Çedilla")
 ;; (org-node-slugify-for-web "How to convince me that 2 + 2 = 3")
 ;; (org-node-slugify-for-web "E. T. Jaynes")
 ;; (org-node-slugify-for-web "Amnesic recentf, org-id-locations? Solution: Run kill-emacs-hook periodically.")
 ;; (org-node-slugify-for-web "Slimline/\"pizza box\" computer chassis")
 ;; (org-node-slugify-for-web "#emacs")
 ;; (org-node-slugify-for-web "칹え🐛")
-
-;; https://irreal.org/blog/?p=11896
-(defun org-node--emacs25-strip-diacritics (string)
-  (let ((diacritics-alist
-         (seq-mapn (lambda (a b) (cons a b))
-                   "ÀÁÂÃÄÅàáâãäåÒÓÔÕÕÖØòóôõöøÈÉÊËèéêëðÇçÐÌÍÎÏìíîïÙÚÛÜùúûüÑñŠšŸÿýŽža"
-                   "AAAAAAaaaaaaOOOOOOOooooooEEEEeeeeeCcDIIIIiiiiUUUUuuuuNnSsYyyZz")))
-    (concat (seq-map (lambda (char)
-                       (or (alist-get char diacritics-alist)
-                           char))
-                     string))))
 
 (defun org-node-slugify-for-web (title)
   "From TITLE, make a filename that looks nice as URL component.
@@ -1491,68 +1513,46 @@ A title like \"Löb's Theorem\" becomes \"lobs-theorem\".  Note
 that while diacritical marks are stripped, it retains most
 symbols that belong to the alphabet category in Unicode,
 preserving for example kanji and Greek letters."
-  (if (<= 29 emacs-major-version)
-      (thread-last title
-                   (string-glyph-decompose)
-                   (string-to-list)
-                   (--reject (< 767 it 818)) ;; Remove diacritics
-                   (concat)
-                   (string-glyph-compose)
-                   (downcase)
-                   (string-trim)
-                   (replace-regexp-in-string "[[:space:]]+" "-")
-                   (replace-regexp-in-string "[^[:alnum:]\\/-]" "")
-                   (replace-regexp-in-string "\\/" "-")
-                   (replace-regexp-in-string "--*" "-")
-                   (replace-regexp-in-string "^-" "")
-                   (replace-regexp-in-string "-$" ""))
-    (thread-last title
-                 (org-node--emacs25-strip-diacritics)
-                 (downcase)
-                 (string-trim)
-                 (replace-regexp-in-string "[[:space:]]+" "-")
-                 (replace-regexp-in-string "[^[:alnum:]\\/-]" "")
-                 (replace-regexp-in-string "\\/" "-")
-                 (replace-regexp-in-string "--*" "-")
-                 (replace-regexp-in-string "^-" "")
-                 (replace-regexp-in-string "-$" ""))))
+  (thread-last title
+               (org-node--strip-diacritics)
+               (downcase)
+               (string-trim)
+               (replace-regexp-in-string "[[:space:]]+" "-")
+               (replace-regexp-in-string "[^[:alnum:]\\/-]" "")
+               (replace-regexp-in-string "\\/" "-")
+               (replace-regexp-in-string "--*" "-")
+               (replace-regexp-in-string "^-" "")
+               (replace-regexp-in-string "-$" "")))
 
 (defun org-node-slugify-like-roam-default (title)
   "From TITLE, make a filename in the default org-roam style.
 Unlike `org-node-slugify-like-roam-actual', does not load
 org-roam."
-  (if (<= 29 emacs-major-version)
-      (thread-last title
-                   (string-glyph-decompose)
-                   (string-to-list)
-                   (--reject (< 767 it 818)) ;; Remove diacritics
-                   (concat)
-                   (string-glyph-compose)
-                   (downcase)
-                   (string-trim)
-                   (replace-regexp-in-string "[^[:alnum:][:digit:]]" "_")
-                   (replace-regexp-in-string "__*" "_")
-                   (replace-regexp-in-string "^_" "")
-                   (replace-regexp-in-string "_$" ""))
-    (error "Emacs 29 required for `org-node-slugify-like-roam-default'")))
+  (thread-last title
+               (org-node--strip-diacritics)
+               (downcase)
+               (string-trim)
+               (replace-regexp-in-string "[^[:alnum:][:digit:]]" "_")
+               (replace-regexp-in-string "__*" "_")
+               (replace-regexp-in-string "^_" "")
+               (replace-regexp-in-string "_$" "")))
 
 (defun org-node-slugify-like-roam-actual (title)
   "Call on `org-roam-node-slug' to transform TITLE."
-  (unless (fboundp #'org-roam-node-slug)
-    (user-error "org-roam required to run `org-node-slugify-like-roam-actual'"))
-  (require 'org-roam)
-  (org-roam-node-slug (org-roam-node-create :title title)))
+  (if (require 'org-roam nil t)
+      (org-roam-node-slug (org-roam-node-create :title title))
+    (user-error "org-roam required for `org-node-slugify-like-roam-actual'")))
 
 ;; DEPRECATED
 (defun org-node-slugify-like-roam (title)
   "From TITLE, make a filename in the default org-roam style."
-  (unless (fboundp #'org-roam-node-slug)
-    (user-error "org-roam required to run `org-node-slugify-like-roam'"))
-  (require 'org-roam)
-  (message "Variable `org-node-filename-fn' deprecated, please update config")
-  (concat (format-time-string "%Y%m%d%H%M%S-")
-          (org-roam-node-slug (org-roam-node-create :title title))
-          ".org"))
+  (if (require 'org-roam nil t)
+      (progn
+        (message "Variable `org-node-filename-fn' deprecated, please update config")
+        (concat (format-time-string "%Y%m%d%H%M%S-")
+                (org-roam-node-slug (org-roam-node-create :title title))
+                ".org"))
+    (user-error "org-roam required for `org-node-slugify-like-roam'")))
 
 
 ;;;; How to create new nodes
@@ -1908,7 +1908,7 @@ minibuffer before selecting some other node you had in mind, to
 which the region should be linkified, you'll prefer
 `org-node-insert-link'.
 
-The commands are actually the same, it is just a difference in
+The commands are the same, it is just a difference in
 initial input.
 
 On the topic of Org-roam emulation, bonus tips:

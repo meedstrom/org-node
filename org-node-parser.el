@@ -100,7 +100,7 @@ in one of the elements."
                                  oldata)))
     (let ((previous-level (caddr (car data-until-pos))))
       ;; Work backwards towards the top of the file
-      ;; NOTE: Profiled dolist and catch-while-throw too, but `cl-loop' wins at perf
+      ;; NOTE: Profiled dolist and catch-while-throw too, `cl-loop' wins at perf
       (cl-loop for row in data-until-pos
                when (> previous-level (caddr row))
                do (setq previous-level (caddr row))
@@ -111,7 +111,7 @@ in one of the elements."
     olp))
 
 (defun org-node-parser--org-link-display-format (s)
-  "Copypasta from `org-link-display-format'."
+  "Copy of `org-link-display-format'."
   (save-match-data
     (replace-regexp-in-string
      ;; The regexp is `org-link-bracket-re'
@@ -158,15 +158,15 @@ What this means?   See org-node-test.el."
          collect (let ((path (string-replace
                               "%20" " "
                               (substring link? (match-end 0)))))
-                   ;; Remember the uri: prefix for completions later
+                   ;; Remember the uri: prefix for pretty completions
                    (push (cons path (match-string 1 link?))
                          org-node-parser--result:paths-types)
                    ;; .. but the actual ref is just the //path
                    path))))))
 
-(defconst org-node-parser--citation-key-re
-  "@\\([!#-+./:<>-@^-`{-~[:word:]-]+\\)"
-  "Copy of `org-element-citation-key-re'.")
+;; (defconst org-node-parser--citation-key-re
+;;   "@\\([!#-+./:<>-@^-`{-~[:word:]-]+\\)"
+;;   "Copy of `org-element-citation-key-re'.")
 
 ;; (defconst org-node-parser--org-ref-type-re
 ;;   (regexp-opt
@@ -176,7 +176,7 @@ What this means?   See org-node-test.el."
 (defun org-node-parser--collect-links-until
     (end id-here olp-with-self plain-re merged-re)
   "From here to buffer position END, look for forward-links.
-Argument ID-HERE is the ID of the subtree where this function is
+vArgument ID-HERE is the ID of the subtree where this function is
 being executed (or that of an ancestor heading, if the current
 subtree has none), to be included in each link's metadata.
 
@@ -223,9 +223,9 @@ Arguments PLAIN-RE and MERGED-RE..."
           ;;                       id-here
           ;;                       (point)
           ;;                       link-type
-          ;;                       (substring citekey 1) ;; drop &
+          ;;                       (substring citekey 1) ;; Drop &
           ;;                       (list :outline olp-with-self))
-          ;;               org-node-parser--result:found-links))))
+          ;;               org-node-parser--result:found-links)))
           (push (record 'org-node-link
                         id-here
                         (point)
@@ -233,31 +233,35 @@ Arguments PLAIN-RE and MERGED-RE..."
                         (string-replace "%20" " " path) ;; sane?
                         (list :outline olp-with-self))
                 org-node-parser--result:found-links))))
+
     ;; Start over and look for Org 9.5 @citekeys
     (goto-char beg)
     ;; NOTE: Technically this search matches org-ref [[cite too, causing a bit
-    ;; extra work, but tricky to workaround since point may be right on a [cite
-    ;; when we start
+    ;; of redundant work, but tricky to workaround since point may be right on
+    ;; a [cite when we start
     (while (search-forward "[cite" end t)
       (let ((closing-bracket (save-excursion (search-forward "]" end t))))
-        (when closing-bracket
-          ;; The regexp is `org-element-citation-key-re'
-          (while (re-search-forward "@\\([!#-+./:<>-@^-`{-~[:word:]-]+\\)"
-                                    closing-bracket t)
-            (if (save-excursion
-                  (goto-char (pos-bol))
-                  (or (looking-at-p "[[:space:]]*# ")
-                      (looking-at-p "[[:space:]]*#\\+")))
-                ;; On a # comment or #+keyword, skip citation
-                ;; (NOTE: don't skip whole line as in the other fn)
-                (goto-char closing-bracket)
-              (push (record 'org-node-link
-                            id-here
-                            (point)
-                            nil
-                            (substring (match-string 0) 1) ;; drop @
-                            (list :outline olp-with-self))
-                    org-node-parser--result:found-links)))))))
+        (if closing-bracket
+            ;; The regexp is `org-element-citation-key-re'
+            (while (re-search-forward "@\\([!#-+./:<>-@^-`{-~[:word:]-]+\\)"
+                                      closing-bracket t)
+              (if (save-excursion
+                    (goto-char (pos-bol))
+                    (or (looking-at-p "[[:space:]]*# ")
+                        (looking-at-p "[[:space:]]*#\\+")))
+                  ;; On a # comment or #+keyword, skip citation
+                  ;; (NOTE: don't just skip line, citations can be multiline)
+                  (goto-char closing-bracket)
+                (push (record 'org-node-link
+                              id-here
+                              (point)
+                              nil
+                              (substring (match-string 0) 1) ;; drop @
+                              (list :outline olp-with-self))
+                      org-node-parser--result:found-links)))
+          (push (list org-node-parser--curr-file (point)
+                      "No closing [cite: bracket")
+                org-node-parser--result:problems)))))
   (goto-char (or end (point-max))))
 
 (defun org-node-parser--collect-properties (beg end)
