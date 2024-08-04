@@ -17,7 +17,7 @@
 
 ;; Author:           Martin Edström <meedstrom91@gmail.com>
 ;; Created:          2024-04-13
-;; Version:          0.4.4
+;; Version:          0.4.5pre
 ;; Keywords:         org, hypermedia
 ;; Package-Requires: ((emacs "28.1") (compat "29.1.4.5") (dash "2.19.1"))
 ;; URL:              https://github.com/meedstrom/org-node
@@ -944,8 +944,8 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
               (erase-buffer)
               (insert-file-contents results-file)
               (push (read (buffer-string)) result-sets)))))
-      ;; FIXME: This timestamp is not guaranteed to be from the last child
-      (setq org-node--time-at-last-child-done (-last-item (car result-sets)))
+      (setq org-node--time-at-last-child-done
+            (-last-item (sort (-map #'-last-item result-sets) #'time-less-p)))
       ;; Merge N result-sets into one result-set, to run FINALIZER once
       (funcall finalizer (--reduce (-zip-with #'nconc it acc) result-sets)))))
 
