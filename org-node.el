@@ -2161,7 +2161,7 @@ which wraps this function."
     (let ((path (buffer-file-name)))
       (unless (equal "org" (file-name-extension path))
         (error "File doesn't end in .org: %s" path))
-      (when (or interactive
+      (when (or
                 ;; Be aware of "dailies" and don't touch
                 (and (or (not (bound-and-true-p org-journal-dir))
                          (not (string-prefix-p org-journal-dir path)))
@@ -2169,7 +2169,12 @@ which wraps this function."
                          (not (string-prefix-p
                                (expand-file-name org-roam-dailies-directory
                                                  org-roam-directory)
-                               path)))))
+                               path))))
+                (and interactive
+                     (yes-or-no-p "WARNING:
+You are currently in a daily file.
+Renaming according to the regular formula probably will not do what you want it to do. 
+Are you sure you want to proceed? ")))
         (let ((title (or (cadar (org-collect-keywords '("TITLE")))
                          (save-excursion
                            (without-restriction
