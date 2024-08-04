@@ -31,6 +31,7 @@
          (org-node-parser--split-refs-field
           (concat " \"[cite:@citekey abcd ; @citekey2 cdefgh;@citekey3]\""
                   " \"[[cite:&citekey4 abcd ; &citekey5 cdefgh;&citekey6]]\""
+                  " \"[[https://gnu.org/A Link With Spaces/index2.htm]]\""
                   " [[https://gnu.org/A Link With Spaces/index.htm][baz]]"
                   " https://gnu.org [citep:&citekey7]  @foo &bar "
                   " info:with%20escaped%20spaces"))))
@@ -42,6 +43,7 @@
                        "bar"
                        "with escaped spaces"
                        "//gnu.org/A Link With Spaces/index.htm"
+                       "//gnu.org/A Link With Spaces/index2.htm"
                        "//gnu.org")))
     (should (equal "https" (cdr (assoc "//gnu.org/A Link With Spaces/index.htm"
                                        org-node-parser--result:paths-types))))

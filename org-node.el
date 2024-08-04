@@ -2805,26 +2805,112 @@ Designed for `completion-at-point-functions', which see."
                      (insert (org-link-make-string
                               (concat "id:" id) text)))))))))
 
-(defun org-node--add-to-multivalued-property (prompt property)
-  "Like `org-entry-add-to-multivalued-property' but keep spaces.
-Technically: instead of percent-escaping each space character,
-wrap the whole element in quotes if necessary by using
-`split-string-and-unquote' and `combine-and-quote-strings'."
-  (let ((alias (read-string prompt))
-        (old (split-string-and-unquote
-              (or (org-entry-get nil property) ""))))
-    (unless (member alias old)
-      (org-entry-put nil property
-                     (combine-and-quote-strings
-                      (compat-call sort (cons alias old)))))))
+;; (defmacro org-node--with-point-at-nearest-node (&rest body)
+;;   "Seek the closest ancestor heading with an ID.
+
+;; Fall back to the file-level property drawer if that has an ID.
+;; If that also lacks ID, just execute BODY without moving point.
+
+;; Upon finding an ID, call `widen' if necessary, place point at
+;; that heading, then evaluate BODY.  Afterwards, if the heading
+;; would still be visible in the window, move point back to where it
+;; was previously.  Otherwise, leave point on the heading so that
+;; any changes made by BODY may be noticed by the user."
+;;   `(let ((here (point-marker))
+;;          (id (org-entry-get nil "ID" t)))
+;;      (when id
+;;        (let ((node-pos (save-excursion
+;;                          (without-restriction
+;;                            (goto-char (point-min))
+;;                            (re-search-forward
+;;                             (rx bol (* space) ":ID:" (+ space) (literal id)))
+;;                            (org-back-to-heading-or-point-min)
+;;                            (point)))))
+;;          (when (< node-pos (point-min))
+;;            (widen))
+;;          (goto-char node-pos)
+;;          ;; (recenter 0)
+;;          ))
+;;      (prog1 (progn ,@body)
+;;        (when id
+;;          (if ))
+;;        (when (pos-visible-in-window-p here)
+;;          (forward-char (- here (point)))
+;;          (set-marker here nil)))))
+
+(defun org-node--call-at-nearest-node (function &rest args)
+  "With point at the relevant heading, call FUNCTION with ARGS.
+
+Prefer the closest ancestor heading that has an ID, else go to
+the file-level property drawer if that contains an ID, else fall
+back on the heading for the current entry.
+
+Afterwards, maybe restore point to where it had been previously,
+so long as the affected heading would still be visible in the
+window."
+  (let* ((where-i-was (point-marker))
+         (id (org-entry-get nil "ID" t))
+         (heading-pos
+          (save-excursion
+            (without-restriction
+              (when id
+                (goto-char (point-min))
+                (re-search-forward
+                 (rx bol (* space) ":ID:" (+ space) (literal id))))
+              (org-back-to-heading-or-point-min)
+              (point)))))
+    (when (and heading-pos (< heading-pos (point-min)))
+      (widen))
+    (save-excursion
+      (when heading-pos
+        (goto-char heading-pos))
+      (apply function args))
+    (when heading-pos
+      (unless (pos-visible-in-window-p heading-pos)
+        (goto-char heading-pos)
+        (recenter 0)
+        (when (pos-visible-in-window-p where-i-was)
+          (forward-char (- where-i-was (point))))))
+    (set-marker where-i-was nil)))
+
+(defun org-node--add-to-property-keep-space (property value)
+  "Add VALUE to PROPERTY for node at point.
+
+Operate on the closest ancestor with an ID, else the current
+entry if no ancestor has an ID.
+
+Then behave like `org-entry-add-to-multivalued-property' but
+preserve spaces: instead of percent-escaping each space character
+as \"%20\", wrap the value in quotes if necessary."
+  (org-node--call-at-nearest-node
+   (lambda ()
+     (let ((old (org-entry-get nil property)))
+       (when old
+         (setq old (split-string-and-unquote old)))
+       (unless (member value old)
+         (org-entry-put nil property (combine-and-quote-strings
+                                      (cons value old))))))))
 
 (defun org-node-alias-add ()
-  (interactive)
-  (org-node--add-to-multivalued-property "Alias: " "ROAM_ALIASES"))
+  "Add to ROAM_ALIASES in nearest relevant property drawer."
+  (interactive nil org-mode)
+  (org-node--add-to-property-keep-space
+   "ROAM_ALIASES" (string-trim (read-string "Alias: "))))
 
 (defun org-node-ref-add ()
-  (interactive)
-  (org-node--add-to-multivalued-property "Ref: " "ROAM_REFS"))
+  "Add to ROAM_REFS in nearest relevant property drawer.
+Wrap the value in double-brackets if necessary."
+  (interactive nil org-mode)
+  (require 'ol)
+  (let ((ref (string-trim (read-string "Ref: "))))
+    (when (and (string-match-p " " ref)
+               (string-match-p org-link-plain-re ref))
+      (setq ref (concat "[[" (string-trim ref (rx "[[") (rx "]]"))
+                        "]]")))
+    (org-node--add-to-property-keep-space "ROAM_REFS" ref)))
+
+;; (defun org-node-tag-add ()
+;;   )
 
 
 ;;;; Misc
