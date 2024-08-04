@@ -2894,19 +2894,20 @@ the link in its ROAM_REFS property, visit that node rather than
 following the link normally.
 
 If already visiting that node, then follow the link normally."
-  (let* ((url (thing-at-point 'url))
-         (found (cl-loop for node being the hash-values of org-nodes
-                         when (member url (org-node-get-refs node))
-                         return node)))
-    (if (and found
-             ;; check that point is not already in the ref node (if so, better
-             ;; to fallback to default `org-open-at-point' logic)
-             (not (and (derived-mode-p 'org-mode)
-                       (equal (org-entry-get nil "ID" t)
-                              (org-node-get-id found)))))
-        (progn (org-node--goto found)
-               t)
-      nil)))
+  (when-let ((url (thing-at-point 'url)))
+    (let* ((dest (car (org-node-parser--split-refs-field url)))
+           (found (cl-loop for node being the hash-values of org-nodes
+                           when (member dest (org-node-get-refs node))
+                           return node)))
+      (if (and found
+               ;; Check that point is not already in said ref node (if so,
+               ;; better to fallback to default `org-open-at-point' logic)
+               (not (and (derived-mode-p 'org-mode)
+                         (equal (org-entry-get nil "ID" t)
+                                (org-node-get-id found)))))
+          (progn (org-node--goto found)
+                 t)
+        nil))))
 
 
 ;;;; API not used inside this package
