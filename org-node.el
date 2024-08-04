@@ -2804,39 +2804,6 @@ Designed for `completion-at-point-functions', which see."
                      (insert (org-link-make-string
                               (concat "id:" id) text)))))))))
 
-;; (defmacro org-node--with-point-at-nearest-node (&rest body)
-;;   "Seek the closest ancestor heading with an ID.
-
-;; Fall back to the file-level property drawer if that has an ID.
-;; If that also lacks ID, just execute BODY without moving point.
-
-;; Upon finding an ID, call `widen' if necessary, place point at
-;; that heading, then evaluate BODY.  Afterwards, if the heading
-;; would still be visible in the window, move point back to where it
-;; was previously.  Otherwise, leave point on the heading so that
-;; any changes made by BODY may be noticed by the user."
-;;   `(let ((here (point-marker))
-;;          (id (org-entry-get nil "ID" t)))
-;;      (when id
-;;        (let ((node-pos (save-excursion
-;;                          (without-restriction
-;;                            (goto-char (point-min))
-;;                            (re-search-forward
-;;                             (rx bol (* space) ":ID:" (+ space) (literal id)))
-;;                            (org-back-to-heading-or-point-min)
-;;                            (point)))))
-;;          (when (< node-pos (point-min))
-;;            (widen))
-;;          (goto-char node-pos)
-;;          ;; (recenter 0)
-;;          ))
-;;      (prog1 (progn ,@body)
-;;        (when id
-;;          (if ))
-;;        (when (pos-visible-in-window-p here)
-;;          (forward-char (- here (point)))
-;;          (set-marker here nil)))))
-
 (defun org-node--call-at-nearest-node (function &rest args)
   "With point at the relevant heading, call FUNCTION with ARGS.
 
