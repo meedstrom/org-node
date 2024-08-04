@@ -943,8 +943,8 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
               (erase-buffer)
               (insert-file-contents results-file)
               (push (read (buffer-string)) result-sets)))))
-      ;; FIXME: This timestamp is not guaranteed to be from the last child
-      (setq org-node--time-at-last-child-done (-last-item (car result-sets)))
+      (setq org-node--time-at-last-child-done
+            (-last-item (sort (-map #'-last-item result-sets) #'time-less-p)))
       ;; Merge N result-sets into one result-set, to run FINALIZER once
       (funcall finalizer (--reduce (-zip-with #'nconc it acc) result-sets)))))
 
