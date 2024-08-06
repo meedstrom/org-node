@@ -1542,6 +1542,23 @@ org-roam."
       (org-roam-node-slug (org-roam-node-create :title title))
     (user-error "org-roam required for `org-node-slugify-like-roam-actual'")))
 
+(defun org-node--daily-note-p ()
+  "Check if current-buffer is an org-mode file in
+`org-roam-dailies-directory'."
+  (when buffer-file-name
+    (when-let ((a (expand-file-name
+                   (buffer-file-name (buffer-base-buffer))))
+               (b (expand-file-name
+                   org-roam-dailies-directory)))
+      (setq a (expand-file-name a))
+      (if (and (eq major-mode 'org-mode)
+               (unless (and a b (equal (file-truename a) (file-truename b)))
+                 (string-prefix-p (replace-regexp-in-string "^\\([A-Za-z]\\):" 'downcase
+                                                            (expand-file-name b) t t)
+                                  (replace-regexp-in-string "^\\([A-Za-z]\\):" 'downcase
+                                                            (expand-file-name a) t t))))
+          t nil))))
+
 ;; DEPRECATED
 (defun org-node-slugify-like-roam (title)
   "From TITLE, make a filename in the default org-roam style."
@@ -1832,67 +1849,67 @@ To behave like `org-roam-node-find' when creating new nodes, set
         (org-node--goto node)
       (org-node--create input (org-id-new)))))
 
-  (defun org-node--daily-note-p ()
-    "Check if current-buffer is an org-mode file in
-`org-roam-dailies-directory' if available)."
-    (when-let ((a (expand-file-name
-                   (buffer-file-name (buffer-base-buffer))))
-               (b (expand-file-name
-                   org-roam-dailies-directory)))
-      (setq a (expand-file-name a))
-      (if (and (eq major-mode 'org-mode)
-               (unless (and a b (equal (file-truename a) (file-truename b)))
-                 (string-prefix-p (replace-regexp-in-string "^\\([A-Za-z]\\):" 'downcase
-                                                            (expand-file-name b) t t)
-                                  (replace-regexp-in-string "^\\([A-Za-z]\\):" 'downcase
-                                                            (expand-file-name a) t t))))
-          t nil)))
-
-
 ;;;###autoload
-(defun org-node--goto-daily (offset)
-  "Go to a daily node with an `offset' from the current buffer."
+(defun org-node-goto-daily (&optional offset)
+  "Go to a daily node with a time `offset' from the current buffer.
+If called interactively, find the daily-note for a date using the calendar,
+creating it if necessary."
   (interactive)
-  (if (org-node--daily-note-p)
-      (let* ((current-node (file-name-base buffer-file-name))
+  (let ((must-be-in-daily ;; if prefix makes reference to base date
+         (let ((prefix
+                ;; ('Some people, when confronted with a problem, think
+                ;;   "I know, I'll use regular expressions."
+                ;;   Now they have two problems.' —Jamie Zawinski)
+                "\\`\\(?:\\+\\{2\\}\\|-\\{2\\}\\)"))
+           ;; = two or more `+' or `-' at beginning of string
+           ;; = (rx (: bos (or (repeat 2 2 "+")
+           ;;                  (repeat 2 2 "-"))))
+           (string-match prefix offset))))
+    (if (and
+         (not (org-node--daily-note-p))
+         must-be-in-daily)
+        (user-error "Not in a daily-note.")
+      (let* ((current-node
+              (if must-be-in-daily
+                  (org-time-string-to-time
+                   (file-name-base buffer-file-name))
+                nil))
              (target-node
-              (org-read-date nil nil offset nil
-                             (org-time-string-to-time current-node)))
-             (node (gethash target-node org-node--candidate<>node)))
-        (if node
-            (org-node--goto node)
-          (org-node--create target-node (org-id-new))))
-    (user-error "Not in a daily-note.")))
+              (org-read-date nil nil offset nil current-node))
+             (node-hash (gethash target-node org-node--candidate<>node)))
+        (if node-hash
+            (org-node--goto node-hash)
+          (org-node--create target-node (org-id-new)))))))
 
 ;;;###autoload
 (defun org-node-goto-prev-day ()
   "Go to the day before the day of the current buffer."
   (interactive)
-  (org-node--goto-daily "--1d"))
+  (org-node-goto-daily "--1d"))
 
 ;;;###autoload
 (defun org-node-goto-next-day ()
   "Go to the day after the day of the current buffer."
   (interactive)
-  (org-node--goto-daily "++1d"))
+  (org-node-goto-daily "++1d"))
 
 ;;;###autoload
 (defun org-node-goto-yesterday ()
   "Go to yesterday."
   (interactive)
-  (org-node--goto-daily "-1d"))
+  (org-node-goto-daily "-1d"))
 
 ;;;###autoload
 (defun org-node-goto-tomorrow ()
   "Go to tomorrow."
   (interactive)
-  (org-node--goto-daily "+1d"))
+  (org-node-goto-daily "+1d"))
 
 ;;;###autoload
 (defun org-node-goto-today ()
   "Go to today."
   (interactive)
-  (org-node--goto-daily "+0d"))
+  (org-node-goto-daily "+0d"))
 
 ;;;###autoload
 (defun org-node-visit-random ()
