@@ -1850,36 +1850,37 @@ To behave like `org-roam-node-find' when creating new nodes, set
       (org-node--create input (org-id-new)))))
 
 ;;;###autoload
-(defun org-node-goto-daily (&optional offset)
-  "Go to a daily node with a time `offset' from the current buffer.
+  (defun org-node-goto-daily (&optional offset)
+    "Go to a daily node with a time `offset' from the current buffer.
 If called interactively, find the daily-note for a date using the calendar,
 creating it if necessary."
-  (interactive)
-  (let ((must-be-in-daily ;; if prefix makes reference to base date
-         (let ((prefix
-                ;; ('Some people, when confronted with a problem, think
-                ;;   "I know, I'll use regular expressions."
-                ;;   Now they have two problems.' —Jamie Zawinski)
-                "\\`\\(?:\\+\\{2\\}\\|-\\{2\\}\\)"))
-           ;; = two or more `+' or `-' at beginning of string
-           ;; = (rx (: bos (or (repeat 2 2 "+")
-           ;;                  (repeat 2 2 "-"))))
-           (string-match prefix offset))))
-    (if (and
-         (not (org-node--daily-note-p))
-         must-be-in-daily)
-        (user-error "Not in a daily-note.")
-      (let* ((current-node
-              (if must-be-in-daily
-                  (org-time-string-to-time
-                   (file-name-base buffer-file-name))
-                nil))
-             (target-node
-              (org-read-date nil nil offset nil current-node))
-             (node-hash (gethash target-node org-node--candidate<>node)))
-        (if node-hash
-            (org-node--goto node-hash)
-          (org-node--create target-node (org-id-new)))))))
+    (interactive)
+    (let ((must-be-in-daily ;; if prefix makes reference to base date
+           (if offset (let ((prefix
+                   ;; ('Some people, when confronted with a problem, think
+                   ;;   "I know, I'll use regular expressions."
+                   ;;   Now they have two problems.' —Jamie Zawinski)
+                   "\\`\\(?:\\+\\{2\\}\\|-\\{2\\}\\)"))
+              ;; = two or more `+' or `-' at beginning of string
+              ;; = (rx (: bos (or (repeat 2 2 "+")
+              ;;                  (repeat 2 2 "-"))))
+                        (string-match prefix offset))
+             nil)))
+      (if (and
+           (not (org-node--daily-note-p))
+           must-be-in-daily)
+          (user-error "Not in a daily-note.")
+        (let* ((current-node
+                (if must-be-in-daily
+                    (org-time-string-to-time
+                     (file-name-base buffer-file-name))
+                  nil))
+               (target-node
+                (org-read-date nil nil offset nil current-node))
+               (node-hash (gethash target-node org-node--candidate<>node)))
+          (if node-hash
+              (org-node--goto node-hash)
+            (org-node--create target-node (org-id-new)))))))
 
 ;;;###autoload
 (defun org-node-goto-prev-day ()
