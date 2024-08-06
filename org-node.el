@@ -1838,7 +1838,7 @@ To behave like `org-roam-node-find' when creating new nodes, set
     (when-let ((a (expand-file-name
                    (buffer-file-name (buffer-base-buffer))))
                (b (expand-file-name
-                   org-roam-daily-reflection-dailies-directory)))
+                   org-roam-dailies-directory)))
       (setq a (expand-file-name a))
       (if (and (eq major-mode 'org-mode)
                (unless (and a b (equal (file-truename a) (file-truename b)))
