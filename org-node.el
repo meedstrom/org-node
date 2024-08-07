@@ -1904,10 +1904,14 @@ or next dailies with potential time gaps."
          (target-node
           (org-read-date nil nil offset nil current-node))
          (node-hash (gethash target-node org-node--candidate<>node))
-         (beginning-of-time 
-          (org-time-string-to-time "1976-06-21"))
+         (beginning-of-time
+          (if org-read-date-force-compatible-dates
+              (org-time-string-to-time "1976-06-21")
+            (org-time-string-to-time "1900-01-01")))
          (end-of-time
-          (org-time-string-to-time "2037-12-31")))
+          (if org-read-date-force-compatible-dates
+              (org-time-string-to-time "2037-01-01")
+            (org-time-string-to-time "2100-01-01"))))
     (cl-loop
      while (and (not node-hash) ;; while node not found
                 ;; and still within reasonable time range
