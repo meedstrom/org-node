@@ -264,7 +264,7 @@ IDs already found."
     ".sync-conflict-")
   "Path substrings of files that should not be searched for IDs.
 
-This option only influences how the function `org-node-files'
+This option only influences how the function `org-node-list-files'
 should seek files found in `org-node-extra-id-dirs'.  It is meant
 as a way to avoid collecting IDs inside versioned backup files
 causing org-id to complain about duplicate IDs.
@@ -276,7 +276,7 @@ If you have accidentally added a directory of backup files, try
 \\[org-node-forget-dir].
 
 It is not necessary to exclude backups or autosaves that end in ~
-or # or .bak since `org-node-files' only considers files that end
+or # or .bak since `org-node-list-files' only considers files that end
 in precisely \".org\" or \".org_archive\" anyway."
   :group 'org-node
   :type '(repeat string))
@@ -643,7 +643,7 @@ advice on `rename-file' or `delete-file'."
                      ((stringp buffer-file-name) ;; after-save-hook
                       (list buffer-file-name)))))
     (when (--any-p (string-suffix-p it (car files))
-                   '(".org" ".org_archive" ".org.gpg"))
+                   '(".org" ".org_archive"))
       (org-node--scan-targeted files))))
 
 (defun org-node--maybe-adjust-idle-timer ()
@@ -712,7 +712,7 @@ eventually and not dropped."
       (if org-node--full-scan-requested
           (progn
             (setq org-node--full-scan-requested nil)
-            (org-node--scan (org-node-files) #'org-node--finalize-full)
+            (org-node--scan (org-node-list-files) #'org-node--finalize-full)
             (when org-node--file-queue
               (setq must-retry t)))
         ;; Targeted scan of specific files
@@ -1340,7 +1340,7 @@ errors are very easy to miss."
            return nil
            finally return t))
 
-;; (progn (byte-compile #'org-node-files) (garbage-collect) (benchmark-run 1 (org-node-files)))
+;; (progn (byte-compile #'org-node-list-files) (garbage-collect) (benchmark-run 1 (org-node-list-files)))
 (let (mem)
   (defun org-node-list-files (&optional instant)
     "List files in `org-id-locations' or `org-node-extra-id-dirs'."
@@ -1443,7 +1443,7 @@ Behavior depends on the user option `org-node-ask-directory'."
       (read-directory-name prompt)
     (if (stringp org-node-ask-directory)
         org-node-ask-directory
-      (car (org-node--root-dirs (org-node-files t))))))
+      (car (org-node--root-dirs (org-node-list-files t))))))
 
 (defvar org-node-filename-fn nil
   "Deprecated. Please set these variables
@@ -1712,9 +1712,9 @@ time some necessary variables are set."
                               :id    org-node-proposed-id))))
 
 ;; Experimental
-(defun org-node--daily-capture-target ()
-  (org-node-cache-ensure)
+(defun org-node--capture-target-daily ()
   (require 'org-journal)
+  (org-node-cache-ensure)
   (let* ((day (org-read-date))
          (node (gethash day org-node--candidate<>node)))
     (if node
@@ -2400,7 +2400,7 @@ so it matches the destination's current title."
     "Face for use in `org-node-rewrite-links-ask'.")
   (org-node-cache-ensure)
   (when (org-node--consent-to-bothersome-modes-for-mass-edit)
-    (dolist (file (or files (org-node-files)))
+    (dolist (file (or files (org-node-list-files)))
       (with-current-buffer (find-file-noselect file)
         (save-excursion
           (without-restriction
@@ -2457,7 +2457,7 @@ to replacing all the links, finally rename the asset file itself."
   (unless (fboundp 'wgrep-change-to-wgrep-mode)
     (user-error "This command requires the wgrep package"))
   (require 'wgrep)
-  (let ((root (car (org-node--root-dirs (org-node-files))))
+  (let ((root (car (org-node--root-dirs (org-node-list-files))))
         (default-directory default-directory))
     (or (equal default-directory root)
         (if (y-or-n-p (format "Go to this folder? %s" root))
@@ -2569,7 +2569,7 @@ In case of unsolvable problems, how to wipe org-id-locations:
   (org-node--init-ids)
   (consult--grep "Grep across all files known to org-node"
                  #'consult--grep-make-builder
-                 (org-node-files)
+                 (org-node-list-files)
                  nil))
 
 (defvar org-node--linted nil
@@ -2582,14 +2582,14 @@ In case of unsolvable problems, how to wipe org-id-locations:
   (org-node--init-ids)
   (let* ((warnings nil)
          (report-buffer (get-buffer-create "*org-node lint report*"))
-         (files (-difference (org-node-files) org-node--linted))
+         (files (-difference (org-node-list-files) org-node--linted))
          (ctr (length org-node--linted))
          (ctrmax (+ (length files) (length org-node--linted))))
     (with-current-buffer report-buffer
       (when (or (null files) C-u)
         ;; Start over
         (when (y-or-n-p "Wipe the previous lint results? ")
-          (setq files (org-node-files))
+          (setq files (org-node-list-files))
           (setq org-node--linted nil)
           (setq tabulated-list-entries nil)
           (let ((inhibit-read-only t))
@@ -2724,10 +2724,10 @@ destination-origin pairs, expressed as Tab-Separated Values."
     "\n")))
 
 ;; TODO: Command to list the coding systems of all files
-;;       to help validate `org-node-perf-assume-coding-system'
+;;       to help choose `org-node-perf-assume-coding-system'
 ;; (defvar org-node--found-systems nil)
 ;; (defun org-node-list-file-coding-systems ()
-;;   (dolist (file (take 20 (org-node-files)))
+;;   (dolist (file (take 20 (org-node-list-files)))
 ;;     (org-node--with-quick-file-buffer file
 ;;       (push buffer-file-coding-system org-node--found-systems)))
 ;;   org-node--found-systems)
