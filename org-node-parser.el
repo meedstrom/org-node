@@ -324,7 +324,7 @@ list, and write results to another temp file."
   (let ((case-fold-search t)
         result:missing-files
         result:found-nodes
-        result:found-files
+        result:mtimes
         ;; Perf
         (file-name-handler-alist $file-name-handler-alist)
         (coding-system-for-read $assume-coding-system)
@@ -346,7 +346,9 @@ list, and write results to another temp file."
               ;; Emacs, the new name will get picked up on next reset.
               (push FILE result:missing-files)
               (throw 'file-done t))
-            (push FILE result:found-files)
+            (push (cons FILE (file-attribute-modification-time
+                              (file-attributes FILE)))
+                  result:mtimes)
             (setq org-node-parser--curr-file FILE)
             ;; NOTE: Don't use `insert-file-contents-literally'.  It gives
             ;;       wrong values to HEADING-POS when there is any Unicode in
@@ -627,7 +629,7 @@ list, and write results to another temp file."
             (print-level nil))
         (insert
          (prin1-to-string (list result:missing-files
-                                result:found-files
+                                result:mtimes
                                 result:found-nodes
                                 org-node-parser--result:paths-types
                                 org-node-parser--result:found-links

@@ -963,10 +963,14 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
   (clrhash org-node--title<>id)
   (clrhash org-node--ref<>id)
   (setq org-node--collisions nil) ;; To be populated by `org-node--record-node'
-  (seq-let (missing-files _ nodes path<>type links problems) results
+  (seq-let (missing-files file<>mtime nodes path<>type links problems) results
     (org-node--forget-id-locations missing-files)
-    (dolist (file missing-files)
-      (remhash file org-node--file<>previews))
+    (dolist (pair file<>mtime)
+      ;; Expire stale data for `org-node-fakeroam--accelerate-get-contents'
+      (unless (equal (cdr pair)
+                     (gethash (car pair) org-node--file<>mtime))
+        (remhash (car pair) org-node--file<>previews)
+        (puthash (car pair) (cdr pair) org-node--file<>mtime)))
     (dolist (link links)
       (push link (gethash (org-node-link-dest link) org-node--dest<>links)))
     (dolist (pair path<>type)
@@ -993,45 +997,52 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
     (setq org-node--first-init nil)))
 
 (defun org-node--finalize-modified (results)
-  (seq-let (missing-files found-files nodes path<>type links problems) results
-    (org-node--forget-id-locations missing-files)
-    (org-node--dirty-forget-files missing-files)
-    (dolist (file missing-files)
-      (remhash file org-node--file<>previews))
-    ;; In case a title was edited: don't persist old revisions of the title
-    (org-node--dirty-forget-completions-in found-files)
-    (when org-node-perf-eagerly-update-link-tables
-      (cl-loop with ids-of-nodes-scanned = (cl-loop
-                                            for node in nodes
-                                            collect (org-node-get-id node))
-               with to-clean = nil
-               for link-set being the hash-values of org-node--dest<>links
-               using (hash-keys dest)
-               do (cl-loop
-                   with clean-this-dest = nil
-                   for link in link-set
-                   if (member (org-node-link-origin link) ids-of-nodes-scanned)
-                   do (setq clean-this-dest t)
-                   else collect link into cleaned-link-set
-                   finally do
-                   (when clean-this-dest
-                     (push (cons dest cleaned-link-set) to-clean)))
-               finally do
-               (dolist (pair to-clean)
-                 (puthash (car pair) (cdr pair) org-node--dest<>links)))
-      ;; Having erased the links that were known to originate in the re-scanned
-      ;; nodes, it's safe to add them (again).
-      (dolist (link links)
-        (push link (gethash (org-node-link-dest link) org-node--dest<>links))))
-    (dolist (pair path<>type)
-      (puthash (car pair) (cdr pair) org-node--uri-path<>uri-type))
-    (dolist (node nodes)
-      (org-node--record-node node))
-    (dolist (pbm problems)
-      (push pbm org-node--problems))
-    (when problems
-      (message "org-node found issues, see M-x org-node-list-scan-problems"))
-    (run-hook-with-args 'org-node-rescan-hook found-files)))
+  (seq-let (missing-files file<>mtime nodes path<>type links problems) results
+    (let ((found-files (mapcar #'car file<>mtime)))
+      (org-node--forget-id-locations missing-files)
+      (org-node--dirty-forget-files missing-files)
+      (dolist (file missing-files)
+        (remhash file org-node--file<>previews))
+      ;; In case a title was edited: don't persist old revisions of the title
+      (org-node--dirty-forget-completions-in found-files)
+      (when org-node-perf-eagerly-update-link-tables
+        (cl-loop with ids-of-nodes-scanned = (cl-loop
+                                              for node in nodes
+                                              collect (org-node-get-id node))
+                 with to-clean = nil
+                 for link-set being the hash-values of org-node--dest<>links
+                 using (hash-keys dest)
+                 do (cl-loop
+                     with clean-this-dest = nil
+                     for link in link-set
+                     if (member (org-node-link-origin link) ids-of-nodes-scanned)
+                     do (setq clean-this-dest t)
+                     else collect link into cleaned-link-set
+                     finally do
+                     (when clean-this-dest
+                       (push (cons dest cleaned-link-set) to-clean)))
+                 finally do
+                 (dolist (pair to-clean)
+                   (puthash (car pair) (cdr pair) org-node--dest<>links)))
+        ;; Having erased the links that were known to originate in the re-scanned
+        ;; nodes, it's safe to add them (again).
+        (dolist (link links)
+          (push link (gethash (org-node-link-dest link) org-node--dest<>links))))
+      (dolist (pair file<>mtime)
+        ;; Expire stale data for `org-node-fakeroam--accelerate-get-contents'
+        (unless (equal (cdr pair)
+                       (gethash (car pair) org-node--file<>mtime))
+          (remhash (car pair) org-node--file<>previews)
+          (puthash (car pair) (cdr pair) org-node--file<>mtime)))
+      (dolist (pair path<>type)
+        (puthash (car pair) (cdr pair) org-node--uri-path<>uri-type))
+      (dolist (node nodes)
+        (org-node--record-node node))
+      (dolist (pbm problems)
+        (push pbm org-node--problems))
+      (when problems
+        (message "org-node found issues, see M-x org-node-list-scan-problems"))
+      (run-hook-with-args 'org-node-rescan-hook found-files))))
 
 (defcustom org-node-perf-eagerly-update-link-tables t
   "Update backlink tables on every save.
