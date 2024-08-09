@@ -56,9 +56,6 @@
 
 ;;; Code:
 
-;; TODO: After 8 August, externalize org-node-fakeroam.el so it can pull its own
-;;       dependencies
-
 ;; TODO: A workflow to allow pseudo-untitled (numeric-titled) nodes
 ;;       - Need a bunch of commands for that, like select node by fulltext
 ;;         search

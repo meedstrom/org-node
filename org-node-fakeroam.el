@@ -1,4 +1,4 @@
-;;; org-node-fakeroam.el --- Replacements for org-roam autosync mode -*-  no-byte-compile: t;  no-native-compile: t; lexical-binding: t; -*-
+;;; org-node-fakeroam.el --- Stand-ins for org-roam-autosync-mode -*-  no-byte-compile: t;  no-native-compile: t; lexical-binding: t; -*-
 
 ;; Copyright (C) 2024 Martin Edström
 
@@ -15,10 +15,23 @@
 ;; You should have received a copy of the GNU General Public License
 ;; along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+;; Author:           Martin Edström <meedstrom91@gmail.com>
+;; Created:          2024-04-13
+;; Version:          0.4.5pre
+;; Keywords:         org, hypermedia
+;; Package-Requires: ((emacs "28.1") (compat "29.1.4.5") (dash "2.19.1"))
+;; URL:              https://github.com/meedstrom/org-node
+
+;;; Commentary:
+
+;; Provide stand-ins for `org-roam-autosync-mode'.
+
+;;; Code:
+
 (require 'org-node)
 (require 'ol)
 (if (not (fboundp 'org-roam-list-files))
-    (user-error "Install org-roam to use fakeroam modes")
+    (user-error "Install org-roam to use org-node-fakeroam stuff")
   (require 'org-roam)
   (require 'emacsql))
 
@@ -29,7 +42,7 @@ explicit dependency of org-node, it is uncompilable at package
 installation and must be compiled at runtime after ensuring that
 the user has installed org-roam themselves."
   (if (not (fboundp 'org-roam-list-files))
-      (user-error "Install org-roam to use fakeroam modes")
+      (user-error "Install org-roam to use org-node-fakeroam stuff")
     (require 'org-roam)
     (require 'emacsql)
     (dolist (fn '(org-node-fakeroam--mk-node
