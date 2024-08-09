@@ -954,6 +954,9 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
 
 ;;;; Scan-finalizers
 
+(defvar org-node--file<>previews (make-hash-table :test #'equal))
+(defvar org-node--file<>mtime (make-hash-table :test #'equal))
+
 (defun org-node--finalize-full (results)
   (clrhash org-node--id<>node)
   (clrhash org-node--dest<>links)
@@ -963,6 +966,8 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
   (setq org-node--collisions nil) ;; To be populated by `org-node--record-node'
   (seq-let (missing-files _ nodes path<>type links problems) results
     (org-node--forget-id-locations missing-files)
+    (dolist (file missing-files)
+      (remhash file org-node--file<>previews))
     (dolist (link links)
       (push link (gethash (org-node-link-dest link) org-node--dest<>links)))
     (dolist (pair path<>type)
@@ -992,6 +997,8 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
   (seq-let (missing-files found-files nodes path<>type links problems) results
     (org-node--forget-id-locations missing-files)
     (org-node--dirty-forget-files missing-files)
+    (dolist (file missing-files)
+      (remhash file org-node--file<>previews))
     ;; In case a title was edited: don't persist old revisions of the title
     (org-node--dirty-forget-completions-in found-files)
     (when org-node-perf-eagerly-update-link-tables

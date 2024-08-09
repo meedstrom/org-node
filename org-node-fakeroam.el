@@ -83,14 +83,24 @@ thru `org-node-fakeroam--accelerate-get-contents', which see.
         (with-current-buffer buf
           (remove-hook 'post-command-hook #'org-roam-buffer--redisplay-h t))))))
 
-(defun org-node-fakeroam--accelerate-get-contents (fn &rest args)
+(defun org-node-fakeroam--accelerate-get-contents (orig-fn file pt)
   "Designed as around-advice for `org-roam-preview-get-contents'.
 
 Normally the first time you open an org-roam-buffer, Emacs hangs
 for as long as a minute on a slow machine when huge files are
-involved.  This may eliminate most of that."
-  (let ((org-inhibit-startup t))
-    (apply fn args)))
+involved.  This may eliminate most of that.
+
+Also caches the results, so when there are backlinks from
+extremely many files, it should only be slow the first time the
+the org-roam-buffer is built."
+  (let* ((cached (alist-get pt (gethash file org-node--file<>previews)))
+         (result (or cached
+                     (let ((org-inhibit-startup t))
+                       (funcall fn file pt)))))
+    (unless cached
+      (push (cons pt result)
+            (gethash file org-node--file<>previews)))
+    result))
 
 
 ;;;; NoSQL method: fabricate knockoff roam backlinks
