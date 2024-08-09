@@ -1339,25 +1339,28 @@ errors are very easy to miss."
            return nil
            finally return t))
 
-;; (progn (byte-compile #'org-node-files) (garbage-collect) (benchmark-run 10 (org-node-files)))
-(defun org-node-files (&optional _)
-  "List files in `org-id-locations' or `org-node-extra-id-dirs'."
-  (declare (advertised-calling-convention nil "2024-07-21"))
-  (-union ;; 10x faster than `seq-union'
-   (hash-table-values org-id-locations)
-   (let ((file-name-handler-alist nil)) ;; Cuts 200 ms to 70 ms
-     (cl-loop
-      for dir in org-node-extra-id-dirs
-      append (cl-loop
-              for file in (directory-files-recursively
-                           dir (rx (or ".org" ".org_archive") eos)
-                           nil t)
-              unless (cl-loop
-                      for exclude in org-node-extra-id-dirs-exclude
-                      when (string-search exclude file)
-                      return t)
-              ;; Abbreviating because org-id does too
-              collect (abbreviate-file-name file))))))
+;; (progn (byte-compile #'org-node-files) (garbage-collect) (benchmark-run 1 (org-node-files)))
+(let (mem)
+  (defun org-node-list-files (&optional instant)
+    "List files in `org-id-locations' or `org-node-extra-id-dirs'."
+    (if (and instant mem)
+        mem
+      (setq mem
+            (-union ;; 10x faster than `seq-union'
+             (hash-table-values org-id-locations)
+             (let ((file-name-handler-alist nil)) ;; Cuts 200 ms to 70 ms
+               (cl-loop
+                for dir in org-node-extra-id-dirs
+                append (cl-loop
+                        for file in (directory-files-recursively
+                                     dir (rx (or ".org" ".org_archive") eos)
+                                     nil t)
+                        unless (cl-loop
+                                for exclude in org-node-extra-id-dirs-exclude
+                                when (string-search exclude file)
+                                return t)
+                        ;; Abbreviating because org-id does too
+                        collect (abbreviate-file-name file)))))))))
 
 (defun org-node--forget-id-locations (files)
   "Remove references to FILES in `org-id-locations'.
