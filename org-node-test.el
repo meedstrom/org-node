@@ -90,7 +90,7 @@
         (org-node-extra-id-dirs '("/tmp/org-node/test1/"
                                   "/tmp/org-node/test2/"))
         (org-node-ask-directory nil))
-    (should (equal (car (org-node--root-dirs (org-node-files)))
+    (should (equal (car (org-node--root-dirs (org-node-list-files)))
                    "/tmp/org-node/test2/"))))
 
 (ert-deftest org-node-test--goto-random ()
