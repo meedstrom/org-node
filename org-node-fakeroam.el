@@ -44,7 +44,9 @@ the user has installed org-roam themselves."
       (user-error "Install org-roam to use org-node-fakeroam stuff")
     (require 'org-roam)
     (require 'emacsql)
-    (dolist (fn '(org-node-fakeroam--mk-node
+    (dolist (fn '(org-node-fakeroam--run-without-fontifying
+                  org-node-fakeroam--accelerate-get-contents
+                  org-node-fakeroam--mk-node
                   org-node-fakeroam--mk-backlinks
                   org-node-fakeroam--mk-reflinks
                   org-node-fakeroam--db-update-files
@@ -73,12 +75,16 @@ previews.  This is done thru
           (message "`org-node-fakeroam-redisplay-mode' may show stale previews without `org-node-cache-mode' enabled"))
         (advice-add #'org-roam-preview-get-contents :around
                     #'org-node-fakeroam--accelerate-get-contents)
+        (advice-add #'org-roam-node-insert-section :around
+                    #'org-node-fakeroam--run-without-fontifying)
         (add-hook 'org-mode-hook #'org-roam-buffer--setup-redisplay-h)
         (dolist (buf (org-buffer-list))
           (with-current-buffer buf
             (add-hook 'post-command-hook #'org-roam-buffer--redisplay-h nil t))))
     (advice-remove #'org-roam-preview-get-contents
                    #'org-node-fakeroam--accelerate-get-contents)
+    (advice-remove #'org-roam-node-insert-section
+                   #'org-node-fakeroam--run-without-fontifying)
     (remove-hook 'org-mode-hook #'org-roam-buffer--setup-redisplay-h)
     (unless org-roam-db-autosync-mode
       (dolist (buf (org-buffer-list))
@@ -97,13 +103,26 @@ from extremely many files.  This caches all results so that
 should only be slow the first time each backlink is visited."
   (let* ((cached (alist-get pt (gethash file org-node--file<>previews)))
          (result (or cached
-                     ;; TODO: User-configurable let-bindings here
+                     ;; TODO: Put user-configurable let-bindings here
                      (let ((org-inhibit-startup t))
-                       (funcall orig-fn file pt)))))
+                       ;; FIXME: Use `org-roam-fontify-like-in-org-mode' by
+                       ;; storing its function definition in an external
+                       ;; variable and calling that (it is currently being
+                       ;; overridden at runtime by our other advice).
+                       (org-fontify-like-in-org-mode
+                        (funcall orig-fn file pt))))))
     (unless cached
       (push (cons pt result)
             (gethash file org-node--file<>previews)))
     result))
+
+(defun org-node-fakeroam--run-without-fontifying (fn &rest args)
+  "Designed as around-advice for `org-roam-node-insert-section'.
+Run FN with ARGS, while overriding
+`org-roam-fontify-like-in-org-mode' so it returns the input."
+  (cl-letf (((symbol-function 'org-roam-fontify-like-in-org-mode)
+             #'identity))
+    (apply fn args)))
 
 
 ;;;; NoSQL method: fabricate knockoff roam backlinks
