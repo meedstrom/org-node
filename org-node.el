@@ -1586,26 +1586,30 @@ org-roam."
   "Visit NODE."
   (if node
       (let ((file (org-node-get-file-path node)))
-        (if (file-exists-p file)
-            (let ((pos (org-node-get-pos node)))
-              (find-file file)
-              (widen)
-              ;; Don't move point if node pos is already inside
-              ;; visible part of buffer and point is in its entry
-              (if (org-node-get-is-subtree node)
-                  (progn
-                    (unless (and (pos-visible-in-window-p pos)
-                                 (not (org-invisible-p pos))
-                                 (equal (org-node-get-title node)
-                                        (org-get-heading t t t t)))
-                      (goto-char pos)
-                      (org-show-context)
-                      (org-show-entry)
-                      (recenter 0)))
-                (unless (pos-visible-in-window-p pos)
-                  (goto-char pos))))
-          (message "org-node: Didn't find a file, resetting cache...")
-          (org-node--scan-all)))
+        (if (backup-file-name-p file)
+            (progn
+              (message "org-node: Accidentally recorded backup file, resetting cache...")
+              (org-node--scan-all))
+          (if (file-exists-p file)
+              (let ((pos (org-node-get-pos node)))
+                (find-file file)
+                (widen)
+                ;; Move point to node heading, unless heading is already inside
+                ;; visible part of buffer and point is at or under it
+                (if (org-node-get-is-subtree node)
+                    (progn
+                      (unless (and (pos-visible-in-window-p pos)
+                                   (not (org-invisible-p pos))
+                                   (equal (org-node-get-title node)
+                                          (org-get-heading t t t t)))
+                        (goto-char pos)
+                        (org-show-context)
+                        (org-show-entry)
+                        (recenter 0)))
+                  (unless (pos-visible-in-window-p pos)
+                    (goto-char pos))))
+            (message "org-node: Didn't find a file, resetting cache...")
+            (org-node--scan-all))))
     (error "`org-node--goto' received a nil argument")))
 
 (defun org-node--create (title id)
