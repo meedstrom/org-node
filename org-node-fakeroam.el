@@ -60,14 +60,17 @@ Normally, `org-roam-db-autosync-mode' sets this up for you - this
 mode exists for people who prefer to turn that off.
 
 As a bonus, advise the Roam buffer to open faster, by nullifying
-certain Org options inside the context previews.  This is done
-thru `org-node-fakeroam--accelerate-get-contents', which see.
+certain Org options inside the context previews, and caching the
+previews.  This is done thru
+`org-node-fakeroam--accelerate-get-contents', which see.
 
 -----"
   :global t
   :group 'org-node
   (if org-node-fakeroam-redisplay-mode
       (progn
+        (unless org-node-cache-mode
+          (message "`org-node-fakeroam-redisplay-mode' may show stale previews without `org-node-cache-mode' enabled"))
         (advice-add #'org-roam-preview-get-contents :around
                     #'org-node-fakeroam--accelerate-get-contents)
         (add-hook 'org-mode-hook #'org-roam-buffer--setup-redisplay-h)
@@ -89,11 +92,12 @@ Normally the first time you open an org-roam-buffer, Emacs hangs
 for as long as a minute on a slow machine when huge files are
 involved.  This may eliminate most of that.
 
-Also caches the results, so when there are backlinks from
-extremely many files, it should only be slow the first time the
-the org-roam-buffer is built."
+Aside from huge files, it is also slow when there are backlinks
+from extremely many files.  This caches all results so that
+should only be slow the first time each backlink is visited."
   (let* ((cached (alist-get pt (gethash file org-node--file<>previews)))
          (result (or cached
+                     ;; TODO: User-configurable let-bindings here
                      (let ((org-inhibit-startup t))
                        (funcall orig-fn file pt)))))
     (unless cached

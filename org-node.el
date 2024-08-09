@@ -1282,7 +1282,7 @@ is wrapped in its own list."
 ;; optional argument that explains why the file is about to be opened, amending
 ;; the autosave recovery prompt.  Hack up something like that.
 (defvar org-node--imminent-recovery-msg
-  "Org-node about to look inside or edit a file, but it's likely you will first get a prompt to recover an auto-save file, ready? "
+  "Org-node is about to look inside a file, but it's likely you will first get a prompt to recover an auto-save file, ready? "
   "For use by `org-node--with-quick-file-buffer'.")
 
 ;; NOTE Very important macro for the backlink mode, because backlink insertion
@@ -1298,7 +1298,7 @@ In detail:
 
 1. If a buffer was visiting FILE, reuse that buffer, else visit
    FILE in a new buffer, in which case ignore most of the Org
-   startup checks and skip any unsafe file-local variables.
+   startup checks and don't ask about file-local variables.
 
 2. Temporarily `widen' the buffer, execute BODY, then restore
    point.
@@ -1308,7 +1308,8 @@ In detail:
     \"wrong\", e.g. no indent-mode, no visual wrap etc.)  Also
     skip any save hooks and kill hooks.
 
-3b. If a buffer had been open: leave it open and unsaved."
+3b. If a buffer had been open: leave it open and leave it
+    unsaved."
   (declare (indent 1) (debug t))
   `(let ((find-file-hook nil)
          (after-save-hook nil)
@@ -1360,9 +1361,11 @@ errors are very easy to miss."
 
 ;; (progn (byte-compile #'org-node-list-files) (garbage-collect) (benchmark-run 1 (org-node-list-files)))
 (let (mem)
-  (defun org-node-list-files (&optional instant)
-    "List files in `org-id-locations' or `org-node-extra-id-dirs'."
-    (if (and instant mem)
+  (defun org-node-list-files (&optional memoized)
+    "List files in `org-id-locations' or `org-node-extra-id-dirs'.
+With optional argument MEMOIZED t, reuse a value from the last
+time something called this, returning instantly."
+    (if (and memoized mem)
         mem
       (setq mem
             (-union ;; 10x faster than `seq-union'
