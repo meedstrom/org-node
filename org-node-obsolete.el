@@ -45,6 +45,8 @@ when it was deprecated and REMOVED-BY when it may be removed."
                 ',old ,(or removed-by "30 August 2024") ',new))
        (apply ',new args))))
 
+(org-node--defobsolete org-node-files org-node-list-files)
+
 (provide 'org-node-obsolete)
 
 ;;; org-node-obsolete.el ends here
