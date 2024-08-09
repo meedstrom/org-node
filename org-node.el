@@ -543,10 +543,6 @@ When called from Lisp, peek on any hash table HT."
 (define-minor-mode org-node-cache-mode
   "Instruct on-save hooks and such things to update the cache.
 
-Without this mode active, commands such as `org-node-find' may
-present out-of-date completions, and `org-node-backlink-mode' may
-delete too many backlinks on cleanup.
-
 -----"
   :global t
   :group 'org-node
@@ -594,10 +590,10 @@ correct - and fully correct by the time of the next invocation.
 If the `org-node--id<>node' table is currently empty, behave as if
 SYNCHRONOUS t, unless SYNCHRONOUS is the symbol `must-async'."
   (unless (eq synchronous 'must-async)
-    ;; HACK The warn-function becomes a no-op after the first run, so gotta run
-    ;; it as late as possible in case of late variable settings.  By running it
-    ;; here, we've waited until the user runs a command.
-    (org-node--warn-obsolete-variables))
+    ;; HACK: The warn-function becomes a no-op after the first run, so gotta
+    ;; run it as late as possible in case of late variable settings.  By
+    ;; running it here, we've waited until the user runs a command.
+    (org-node--warn-obsolete))
   (org-node--init-ids)
   (when (hash-table-empty-p org-nodes)
     (setq synchronous (if (eq synchronous 'must-async) nil t))
@@ -1857,13 +1853,13 @@ To behave like `org-roam-node-find' when creating new nodes, set
       (org-node--create input (org-id-new)))))
 
 ;;;###autoload
-(defun org-node-goto-daily (&optional direction range span) 
+(defun org-node-goto-daily (&optional direction range span)
   "Go to a daily node with a time `offset' from the current buffer.
 If called interactively, find the daily-note for a date using the calendar,
 creating it if necessary."
   (interactive)
   (let* ((offset
-          (if (and direction range span) 
+          (if (and direction range span)
               (concat direction (number-to-string range) span)
             nil))
          (must-be-in-daily ;; if prefix makes reference to base date
@@ -2321,7 +2317,7 @@ which wraps this function."
              (and interactive
                   (yes-or-no-p "WARNING:
 You are currently in a daily file.
-Renaming according to the regular formula probably will not do what you want it to do. 
+Renaming according to the regular formula probably will not do what you want it to do.
 Are you sure you want to proceed? ")))
         (let ((title (or (cadar (org-collect-keywords '("TITLE")))
                          (save-excursion
