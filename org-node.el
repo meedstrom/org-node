@@ -950,8 +950,8 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
               (erase-buffer)
               (insert-file-contents results-file)
               (push (read (buffer-string)) result-sets)))))
-      ;; FIXME: This timestamp is not guaranteed to be from the last child
-      (setq org-node--time-at-last-child-done (-last-item (car result-sets)))
+      (setq org-node--time-at-last-child-done
+            (-last-item (sort (-map #'-last-item result-sets) #'time-less-p)))
       ;; Merge N result-sets into one result-set, to run FINALIZER once
       (funcall finalizer (--reduce (-zip-with #'nconc it acc) result-sets)))))
 
@@ -2957,26 +2957,79 @@ Designed for `completion-at-point-functions', which see."
                      (insert (org-link-make-string
                               (concat "id:" id) text)))))))))
 
-(defun org-node--add-to-multivalued-property (prompt property)
-  "Like `org-entry-add-to-multivalued-property' but keep spaces.
-Technically: instead of percent-escaping each space character,
-wrap the whole element in quotes if necessary by using
-`split-string-and-unquote' and `combine-and-quote-strings'."
-  (let ((alias (read-string prompt))
-        (old (split-string-and-unquote
-              (or (org-entry-get nil property) ""))))
-    (unless (member alias old)
-      (org-entry-put nil property
-                     (combine-and-quote-strings
-                      (compat-call sort (cons alias old)))))))
+(defun org-node--call-at-nearest-node (function &rest args)
+  "With point at the relevant heading, call FUNCTION with ARGS.
+
+Prefer the closest ancestor heading that has an ID, else go to
+the file-level property drawer if that contains an ID, else fall
+back on the heading for the current entry.
+
+Afterwards, maybe restore point to where it had been previously,
+so long as the affected heading would still be visible in the
+window."
+  (let* ((where-i-was (point-marker))
+         (id (org-entry-get nil "ID" t))
+         (heading-pos
+          (save-excursion
+            (without-restriction
+              (when id
+                (goto-char (point-min))
+                (re-search-forward
+                 (rx bol (* space) ":ID:" (+ space) (literal id))))
+              (org-back-to-heading-or-point-min)
+              (point)))))
+    (when (and heading-pos (< heading-pos (point-min)))
+      (widen))
+    (save-excursion
+      (when heading-pos
+        (goto-char heading-pos))
+      (apply function args))
+    (when heading-pos
+      (unless (pos-visible-in-window-p heading-pos)
+        (goto-char heading-pos)
+        (recenter 0)
+        (when (pos-visible-in-window-p where-i-was)
+          (forward-char (- where-i-was (point))))))
+    (set-marker where-i-was nil)))
+
+(defun org-node--add-to-property-keep-space (property value)
+  "Add VALUE to PROPERTY for node at point.
+
+Operate on the closest ancestor with an ID, else the current
+entry if no ancestor has an ID.
+
+Then behave like `org-entry-add-to-multivalued-property' but
+preserve spaces: instead of percent-escaping each space character
+as \"%20\", wrap the value in quotes if necessary."
+  (org-node--call-at-nearest-node
+   (lambda ()
+     (let ((old (org-entry-get nil property)))
+       (when old
+         (setq old (split-string-and-unquote old)))
+       (unless (member value old)
+         (org-entry-put nil property (combine-and-quote-strings
+                                      (cons value old))))))))
 
 (defun org-node-alias-add ()
-  (interactive)
-  (org-node--add-to-multivalued-property "Alias: " "ROAM_ALIASES"))
+  "Add to ROAM_ALIASES in nearest relevant property drawer."
+  (interactive nil org-mode)
+  (org-node--add-to-property-keep-space
+   "ROAM_ALIASES" (string-trim (read-string "Alias: "))))
 
 (defun org-node-ref-add ()
-  (interactive)
-  (org-node--add-to-multivalued-property "Ref: " "ROAM_REFS"))
+  "Add to ROAM_REFS in nearest relevant property drawer.
+Wrap the value in double-brackets if necessary."
+  (interactive nil org-mode)
+  (require 'ol)
+  (let ((ref (string-trim (read-string "Ref: "))))
+    (when (and (string-match-p " " ref)
+               (string-match-p org-link-plain-re ref))
+      (setq ref (concat "[[" (string-trim ref (rx "[[") (rx "]]"))
+                        "]]")))
+    (org-node--add-to-property-keep-space "ROAM_REFS" ref)))
+
+;; (defun org-node-tag-add ()
+;;   )
 
 
 ;;;; Misc
@@ -2994,19 +3047,20 @@ the link in its ROAM_REFS property, visit that node rather than
 following the link normally.
 
 If already visiting that node, then follow the link normally."
-  (let* ((url (thing-at-point 'url))
-         (found (cl-loop for node being the hash-values of org-nodes
-                         when (member url (org-node-get-refs node))
-                         return node)))
-    (if (and found
-             ;; check that point is not already in the ref node (if so, better
-             ;; to fallback to default `org-open-at-point' logic)
-             (not (and (derived-mode-p 'org-mode)
-                       (equal (org-entry-get nil "ID" t)
-                              (org-node-get-id found)))))
-        (progn (org-node--goto found)
-               t)
-      nil)))
+  (when-let ((url (thing-at-point 'url)))
+    (let* ((dest (car (org-node-parser--split-refs-field url)))
+           (found (cl-loop for node being the hash-values of org-nodes
+                           when (member dest (org-node-get-refs node))
+                           return node)))
+      (if (and found
+               ;; Check that point is not already in said ref node (if so,
+               ;; better to fallback to default `org-open-at-point' logic)
+               (not (and (derived-mode-p 'org-mode)
+                         (equal (org-entry-get nil "ID" t)
+                                (org-node-get-id found)))))
+          (progn (org-node--goto found)
+                 t)
+        nil))))
 
 
 ;;;; API not used inside this package
