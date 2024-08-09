@@ -283,6 +283,13 @@ in precisely \".org\" or \".org_archive\" anyway."
   :group 'org-node
   :type '(repeat string))
 
+(defcustom org-node-default-org-roam-capture-template-key nil
+  "Key to pass in case of using org-roam capture templates.
+(To avoid unwanted prompting for capture template, e.g.,
+when default capture tempate might be sensible.)"
+  :group 'org-node
+  :type 'string)
+
 
 ;;;; Pretty completion
 
@@ -1542,6 +1549,23 @@ org-roam."
       (org-roam-node-slug (org-roam-node-create :title title))
     (user-error "org-roam required for `org-node-slugify-like-roam-actual'")))
 
+(defun org-node--daily-note-p ()
+  "Check if current-buffer is an org-mode file in
+`org-roam-dailies-directory'."
+  (when buffer-file-name
+    (when-let ((a (expand-file-name
+                   (buffer-file-name (buffer-base-buffer))))
+               (b (expand-file-name
+                   org-roam-dailies-directory)))
+      (setq a (expand-file-name a))
+      (if (and (eq major-mode 'org-mode)
+               (unless (and a b (equal (file-truename a) (file-truename b)))
+                 (string-prefix-p (replace-regexp-in-string "^\\([A-Za-z]\\):" 'downcase
+                                                            (expand-file-name b) t t)
+                                  (replace-regexp-in-string "^\\([A-Za-z]\\):" 'downcase
+                                                            (expand-file-name a) t t))))
+          t nil))))
+
 ;; DEPRECATED
 (defun org-node-slugify-like-roam (title)
   "From TITLE, make a filename in the default org-roam style."
@@ -1831,6 +1855,130 @@ To behave like `org-roam-node-find' when creating new nodes, set
     (if node
         (org-node--goto node)
       (org-node--create input (org-id-new)))))
+
+;;;###autoload
+(defun org-node-goto-daily (&optional direction range span) 
+  "Go to a daily node with a time `offset' from the current buffer.
+If called interactively, find the daily-note for a date using the calendar,
+creating it if necessary."
+  (interactive)
+  (let* ((offset
+          (if (and direction range span) 
+              (concat direction (number-to-string range) span)
+            nil))
+         (must-be-in-daily ;; if prefix makes reference to base date
+          (if offset (let ((prefix
+                            ;; ('Some people, when confronted with a problem, think
+                            ;;   "I know, I'll use regular expressions."
+                            ;;   Now they have two problems.' —Jamie Zawinski)
+                            "\\`\\(?:\\+\\{2\\}\\|-\\{2\\}\\)"))
+                       ;; = two or more `+' or `-' at beginning of string
+                       ;; = (rx (: bos (or (repeat 2 2 "+")
+                       ;;                  (repeat 2 2 "-"))))
+                       (string-match prefix offset))
+            nil)))
+    (if (and
+         (not (org-node--daily-note-p))
+         must-be-in-daily)
+        (user-error "Not in a daily-note.")
+      (let* ((current-node
+              (if must-be-in-daily
+                  (org-time-string-to-time
+                   (file-name-base buffer-file-name))
+                nil))
+             (target-node
+              (org-read-date nil nil offset nil current-node))
+             (node-hash (gethash target-node org-node--candidate<>node)))
+        (if node-hash
+            (org-node--goto node-hash)
+          (if (member direction '("--" "++")) ;; if next or prev & missing node
+              (org-node--find-next-daily-iterate
+               current-node direction (1+ range) span)
+            (org-node--daily-not-found target-node)))))))
+
+(defun org-node--find-next-daily-iterate (current-node direction range span)
+  "Worker function for `org-node-goto-daily'. Handles looking up previous
+or next dailies with potential time gaps."
+  (let* ((offset
+          (concat direction (number-to-string range) span))
+         (target-node
+          (org-read-date nil nil offset nil current-node))
+         (node-hash (gethash target-node org-node--candidate<>node))
+         (beginning-of-time
+          (if org-read-date-force-compatible-dates
+              (org-time-string-to-time "1976-06-21")
+            (org-time-string-to-time "1900-01-01")))
+         (end-of-time
+          (if org-read-date-force-compatible-dates
+              (org-time-string-to-time "2037-01-01")
+            (org-time-string-to-time "2100-01-01"))))
+    (cl-loop
+     while (and (not node-hash) ;; while node not found
+                ;; and still within reasonable time range
+                (let ((target-node-time
+                       (org-time-string-to-time target-node)))
+                  (and
+                   (time-less-p beginning-of-time
+                                target-node-time)
+                   (time-less-p target-node-time
+                                end-of-time))))
+     do (progn
+          (setq range (1+ range))
+          (setq target-node
+                (org-read-date nil nil
+                               (concat direction (number-to-string range) span)
+                               nil current-node))
+          (setq node-hash (gethash target-node org-node--candidate<>node))))
+    (if node-hash
+        (org-node--goto node-hash)
+      (user-error (concat "Cannot find "
+                          (if (equal direction "--")
+                              "previous"
+                            "next")
+                          " daily entry.")))))
+
+(defun org-node--daily-not-found (target-node)
+  "Handles missing/nascent daily node look-up."
+  (if (fboundp 'org-roam-mode)
+      (progn
+        (require 'org-roam-dailies) ;; in case it's not loaded
+        (org-roam-dailies--capture
+         (org-read-date nil t target-node nil)
+         t
+         (when org-node-default-org-roam-capture-template-key
+           org-node-default-org-roam-capture-template-key)))
+    (message "Cannot load requested file.
+(And org-roam is not available.)")))
+
+;;;###autoload
+(defun org-node-goto-prev-day ()
+  "Go to the day before the day of the current buffer."
+  (interactive)
+  (org-node-goto-daily "--" 1 "d"))
+
+;;;###autoload
+(defun org-node-goto-next-day ()
+  "Go to the day after the day of the current buffer."
+  (interactive)
+  (org-node-goto-daily "++" 1 "d"))
+
+;;;###autoload
+(defun org-node-goto-yesterday ()
+  "Go to yesterday."
+  (interactive)
+  (org-node-goto-daily "-" 1 "d"))
+
+;;;###autoload
+(defun org-node-goto-tomorrow ()
+  "Go to tomorrow."
+  (interactive)
+  (org-node-goto-daily "+" 1 "d"))
+
+;;;###autoload
+(defun org-node-goto-today ()
+  "Go to today."
+  (interactive)
+  (org-node-goto-daily "+" 0 "d"))
 
 ;;;###autoload
 (defun org-node-visit-random ()
@@ -2161,15 +2309,20 @@ which wraps this function."
     (let ((path (buffer-file-name)))
       (unless (equal "org" (file-name-extension path))
         (error "File doesn't end in .org: %s" path))
-      (when (or interactive
-                ;; Be aware of "dailies" and don't touch
-                (and (or (not (bound-and-true-p org-journal-dir))
-                         (not (string-prefix-p org-journal-dir path)))
-                     (or (not (bound-and-true-p org-roam-dailies-directory))
-                         (not (string-prefix-p
-                               (expand-file-name org-roam-dailies-directory
-                                                 org-roam-directory)
-                               path)))))
+      (when (or
+             ;; Be aware of "dailies" and don't touch
+             (and (or (not (bound-and-true-p org-journal-dir))
+                      (not (string-prefix-p org-journal-dir path)))
+                  (or (not (bound-and-true-p org-roam-dailies-directory))
+                      (not (string-prefix-p
+                            (expand-file-name org-roam-dailies-directory
+                                              org-roam-directory)
+                            path))))
+             (and interactive
+                  (yes-or-no-p "WARNING:
+You are currently in a daily file.
+Renaming according to the regular formula probably will not do what you want it to do. 
+Are you sure you want to proceed? ")))
         (let ((title (or (cadar (org-collect-keywords '("TITLE")))
                          (save-excursion
                            (without-restriction
