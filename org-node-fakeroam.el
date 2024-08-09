@@ -48,8 +48,8 @@ Normally, `org-roam-db-autosync-mode' sets this up for you - this
 mode exists for people who prefer to turn that off.
 
 As a bonus, advise the Roam buffer to open faster, by nullifying
-startup options such as `org-startup-indented' inside the context
-previews.  See `org-node-fakeroam--accelerate-get-contents'.
+certain Org options inside the context previews.  This is done
+thru `org-node-fakeroam--accelerate-get-contents', which see.
 
 -----"
   :global t
@@ -73,9 +73,9 @@ previews.  See `org-node-fakeroam--accelerate-get-contents'.
 (defun org-node-fakeroam--accelerate-get-contents (fn &rest args)
   "Designed as around-advice for `org-roam-preview-get-contents'.
 
-Normally in huge files, the first time you open an
-org-roam-buffer, Emacs hangs for as long as a minute on a slow
-machine.  This may eliminate most of that."
+Normally the first time you open an org-roam-buffer, Emacs hangs
+for as long as a minute on a slow machine when huge files are
+involved.  This may eliminate most of that."
   (let ((org-inhibit-startup t))
     (apply fn args)))
 
