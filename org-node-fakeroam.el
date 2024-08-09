@@ -131,7 +131,7 @@ having SQLite installed.
 
 (defun org-node-fakeroam--mk-backlinks (target-roam-node &rest _)
   "Make org-roam-backlink objects targeting TARGET-ROAM-NODE.
-Designed as override advice for `org-roam-backlinks-get'."
+Designed to override `org-roam-backlinks-get'."
   (let ((target-id (org-roam-node-id target-roam-node)))
     (if (not target-id)
         (error "org-node-fakeroam: Going to get backlinks, but given nil id")
@@ -149,7 +149,7 @@ Designed as override advice for `org-roam-backlinks-get'."
 
 (defun org-node-fakeroam--mk-reflinks (target-roam-node &rest _)
   "Make org-roam-reflink objects targeting TARGET-ROAM-NODE.
-Designed as override advice for `org-roam-reflinks-get'."
+Designed to override `org-roam-reflinks-get'."
   (let* ((target-id (org-roam-node-id target-roam-node))
          (node (gethash target-id org-node--id<>node)))
     (when node
@@ -164,7 +164,7 @@ Designed as override advice for `org-roam-reflinks-get'."
                         :ref (org-node-link-dest link)
                         :source-node (org-node-fakeroam--mk-node src-node)
                         :point (org-node-link-pos link)
-                        :properties (org-node-link-pos link)))))))
+                        :properties (org-node-link-properties link)))))))
 
 
 ;;;; Feed method: supply data to Roam's DB
@@ -286,7 +286,7 @@ This includes all links and citations that touch NODE."
                                ;; Ref is //www.gnu.org or some such
                                (vector id ref type)
                              ;; Ref is a @citekey
-                             (vector id (substring ref 1) "cite")))))
+                             (vector id ref "cite")))))
     ;; See `org-roam-db-insert-citation'
     (dolist (cite (cl-loop for link in (org-node-get-reflinks node)
                            when (null (org-node-link-type link))
