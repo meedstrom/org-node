@@ -29,11 +29,10 @@
 ;; directory structures.  As long as you've assigned an ID to something, you
 ;; can find it later.
 
-;; In fact, you're likely to stop using any other method of browsing.  The
-;; philosophy is the same as org-roam: if you assign an ID every time you make
-;; an entry that you know you might want to link to from elsewhere, then it
-;; tends to work out that the `org-node-find' command can find more or less
-;; every entry you'd ever want to search for.  Pretty soon you've forgot that
+;; The philosophy is the same as org-roam: if you assign an ID every time you
+;; make an entry that you know you might want to link to from elsewhere, then
+;; it tends to work out that the `org-node-find' command can jump to more or
+;; less every entry you'd ever want to jump to.  Pretty soon you've forgot that
 ;; your files have names.
 
 ;; Anyway, that's just the core of it as described to someone not familiar with
@@ -42,16 +41,19 @@
 
 ;; Compared to other systems:
 
-;; - org-roam: Same idea, compatible disk format(!), but org-node lets you opt
-;;   out of file-level property drawers, does not support "roam:" links, and
-;;   tries to rely in a bare-metal way on upstream org-id and org-capture.  As
-;;   a drawback, if a heading in some Git README has an ID, it's considered
-;;   part of your collection -- simply because if it's known to org-id, it's
-;;   known to org-node.  These headings can be filtered after-the-fact.
+;; - org-roam: Same idea, compatible disk format(!), but org-node is much
+;;   faster, does not depend on SQLite, lets you opt out of file-level property
+;;   drawers, does not support "roam:" links, and tries to rely in a bare-metal
+;;   way on upstream org-id and org-capture.  As a drawback, if a heading in
+;;   some Git README has an ID, it's considered part of your collection --
+;;   simply because if it's known to org-id, it's known to org-node.  These
+;;   headings can be filtered after-the-fact.
 
 ;; - denote: Org-node is Org only, no Markdown, no support for "denote:" links.
 ;;   Filenames have no meaning (so could match the Denote format if you like),
-;;   and you can have as many "notes" as you want inside one file.
+;;   and you can have as many "notes" as you want inside one file.  You could
+;;   possibly use Denote to search just files and org-node as a more granular
+;;   search.
 
 ;;; Code:
 
@@ -1389,8 +1391,8 @@ contain, so that the most populous root directory will be the
 first element.
 
 Note also that the only directories that may qualify are those
-that directly contain a member of FILE-LIST, so that if you have
-the 3 members
+that directly contain some member of FILE-LIST, so that if you
+have the 3 members
 
 - \"/home/me/Syncthing/foo.org\"
 - \"/home/kept/bar.org\"
@@ -1398,7 +1400,7 @@ the 3 members
 
 the return value will not be \(\"/home/\"), but
 \(\"/home/kept/\" \"/home/me/Syncthing/\"), because \"/home\"
-contains no members of FILE-LIST directly.
+itself contains no direct members of FILE-LIST.
 
 FILE-LIST must be a list of full paths.  This function does not
 consult the filesystem, just compares substrings to each other."
@@ -2899,7 +2901,8 @@ Also turn off Org-roam's equivalent, if active.
 -----"
   :global t
   :require 'org-node
-  (when (featurep 'org-roam)
+  (when (boundp 'org-roam-completion-everywhere)
+    ;; Remember setting
     (unless (assoc 'org-roam-completion-everywhere org-node--roam-settings)
       (push (cons 'org-roam-completion-everywhere
                   org-roam-completion-everywhere)
@@ -2924,8 +2927,7 @@ Also turn off Org-roam's equivalent, if active.
                      #'org-node-complete-at-point t)))
     ;; Maybe reenable Org-roam's capf
     (setq org-roam-completion-everywhere
-          (alist-get 'org-roam-completion-everywhere
-                     org-node--roam-settings))))
+          (alist-get 'org-roam-completion-everywhere org-node--roam-settings))))
 
 (defun org-node--install-capf-in-buffer ()
   "Conf in-buffer completion to try `org-node-complete-at-point'."
