@@ -310,6 +310,46 @@ Commands of interest
 
 Org-node does not yet have a capture target for dailies.
 
+** Tip: On very slow filesystems
+
+I hear that on Termux on Android, filesystem access can be so slow that it's a pain to use org-roam-dailies as well as org-journal. ([[https://github.com/meedstrom/org-node/issues/24#issuecomment-2278605819][19 seconds just to list files under a directory]]!)
+
+Good news!  As an org-node user, you can speed up a lot of their functions by making them just look up org-node tables.  One or more of these overrides may interest you:
+
+#+begin_src elisp
+(advice-add 'org-roam--list-files :override
+            (defun org-node--list-roam-files (dir)
+              "Faster than `org-roam--list-files'."
+              (cl-loop for file in (org-node-list-files t)
+                       when (string-prefix-p dir file)
+                       collect file)))
+
+(advice-add 'org-roam-dailies--list-files :override
+            (defun org-node--list-roam-daily-files (&rest extra-files)
+              "Faster than `org-roam-dailies--list-files'."
+              (let ((dir (expand-file-name org-roam-dailies-directory
+                                           org-roam-directory)))
+                (append extra-files
+                        (cl-loop
+                         for file in (org-node-list-files t)
+                         when (and (string-prefix-p dir file)
+                                   (let ((file (file-name-nondirectory file)))
+                                     (not (or (auto-save-file-name-p file)
+                                              (backup-file-name-p file)
+                                              (string-match "^\\." file)))))
+                         collect file)))))
+
+(advice-add 'org-journal--list-files :override
+            (defun org-node--list-journal-files ()
+              "Faster than `org-journal--list-files'."
+              (cl-loop with re = (org-journal--dir-and-file-format->pattern)
+                       for file in (org-node-list-files t)
+                       when (and (string-match-p re file)
+                                 (or org-journal-encrypt-journal
+                                     (not (string-suffix-p "\\.gpg" file))))
+                       collect file)))
+#+end_src
+
 ** Tip: Word-wrap in the Roam buffer
 This has nothing to do with org-node, but I actually didn't know this for ages.  If you don't hard-wrap ([[https://github.com/org-roam/org-roam/issues/1862][org-roam#1862]]) but prefer visual-line-mode or similar, you have to enable them yourself:
 
