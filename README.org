@@ -318,7 +318,7 @@ Good news!  As an org-node user, you can speed up a lot of their functions by ma
 
 #+begin_src elisp
 (advice-add #'org-journal--list-files :override
-            #'org-node-list-journal-files))
+            #'org-node-list-journal-files)
 
 (advice-add #'org-roam-dailies--list-files :override
             #'org-node-list-roam-daily-files)
