@@ -2918,75 +2918,6 @@ to ROAM_REFS."
       (message "Congratulations, no problems scanning %d nodes!"
                (hash-table-count org-node--id<>node)))))
 
-
-;;;; CAPF (Completion-At-Point Function)
-
-(defvar org-node--roam-settings nil)
-(define-minor-mode org-node-complete-at-point-mode
-  "Use `org-node-complete-at-point' in all Org buffers.
-Also turn off Org-roam's equivalent, if active.
-
------"
-  :global t
-  :require 'org-node
-  (when (boundp 'org-roam-completion-everywhere)
-    ;; Remember setting
-    (unless (assoc 'org-roam-completion-everywhere org-node--roam-settings)
-      (push (cons 'org-roam-completion-everywhere
-                  org-roam-completion-everywhere)
-            org-node--roam-settings)))
-  (if org-node-complete-at-point-mode
-      ;; Turn on
-      (progn
-        (setq org-roam-completion-everywhere nil)
-        (add-hook 'org-mode-hook #'org-node--install-capf-in-buffer)
-        ;; Add to already-open buffers
-        (dolist (buf (buffer-list))
-          (with-current-buffer buf
-            (when (and buffer-file-name (derived-mode-p 'org-mode))
-              (add-hook 'completion-at-point-functions
-                        #'org-node-complete-at-point nil t)))))
-    ;; Turn off
-    (remove-hook 'org-mode-hook #'org-node--install-capf-in-buffer)
-    ;; Remove from already-open buffers
-    (dolist (buf (buffer-list))
-      (with-current-buffer buf
-        (remove-hook 'completion-at-point-functions
-                     #'org-node-complete-at-point t)))
-    ;; Maybe reenable Org-roam's capf
-    (setq org-roam-completion-everywhere
-          (alist-get 'org-roam-completion-everywhere org-node--roam-settings))))
-
-(defun org-node--install-capf-in-buffer ()
-  "Conf in-buffer completion to try `org-node-complete-at-point'."
-  (and buffer-file-name
-       (derived-mode-p 'org-mode)
-       (equal "org" (file-name-extension buffer-file-name))
-       (add-hook 'completion-at-point-functions
-                 #'org-node-complete-at-point nil t)))
-
-(defun org-node-complete-at-point ()
-  "Complete word at point to any known node title, and linkify.
-Designed for `completion-at-point-functions', which see."
-  (let ((bounds (bounds-of-thing-at-point 'word)))
-    (and bounds
-         ;; For some reason it runs in non-org buffers like grep results?
-         (derived-mode-p 'org-mode)
-         (not (org-in-src-block-p))
-         (not (save-match-data
-                (org-in-regexp org-link-any-re)))
-         (list (car bounds)
-               (cdr bounds)
-               org-node--title<>id
-               :exclusive 'no
-               :exit-function
-               (lambda (text _)
-                 (when-let ((id (gethash text org-node--title<>id)))
-                   (atomic-change-group
-                     (delete-char (- (length text)))
-                     (insert (org-link-make-string
-                              (concat "id:" id) text)))))))))
-
 (defun org-node--call-at-nearest-node (function &rest args)
   "With point at the relevant heading, call FUNCTION with ARGS.
 
@@ -3062,6 +2993,75 @@ Wrap the value in double-brackets if necessary."
 ;;   )
 
 
+;;;; CAPF (Completion-At-Point Function)
+
+(defvar org-node--roam-settings nil)
+(define-minor-mode org-node-complete-at-point-mode
+  "Use `org-node-complete-at-point' in all Org buffers.
+Also turn off Org-roam's equivalent, if active.
+
+-----"
+  :global t
+  :require 'org-node
+  (when (boundp 'org-roam-completion-everywhere)
+    ;; Remember setting
+    (unless (assoc 'org-roam-completion-everywhere org-node--roam-settings)
+      (push (cons 'org-roam-completion-everywhere
+                  org-roam-completion-everywhere)
+            org-node--roam-settings)))
+  (if org-node-complete-at-point-mode
+      ;; Turn on
+      (progn
+        (setq org-roam-completion-everywhere nil)
+        (add-hook 'org-mode-hook #'org-node--install-capf-in-buffer)
+        ;; Add to already-open buffers
+        (dolist (buf (buffer-list))
+          (with-current-buffer buf
+            (when (and buffer-file-name (derived-mode-p 'org-mode))
+              (add-hook 'completion-at-point-functions
+                        #'org-node-complete-at-point nil t)))))
+    ;; Turn off
+    (remove-hook 'org-mode-hook #'org-node--install-capf-in-buffer)
+    ;; Remove from already-open buffers
+    (dolist (buf (buffer-list))
+      (with-current-buffer buf
+        (remove-hook 'completion-at-point-functions
+                     #'org-node-complete-at-point t)))
+    ;; Maybe reenable Org-roam's capf
+    (setq org-roam-completion-everywhere
+          (alist-get 'org-roam-completion-everywhere org-node--roam-settings))))
+
+(defun org-node--install-capf-in-buffer ()
+  "Conf in-buffer completion to try `org-node-complete-at-point'."
+  (and buffer-file-name
+       (derived-mode-p 'org-mode)
+       (equal "org" (file-name-extension buffer-file-name))
+       (add-hook 'completion-at-point-functions
+                 #'org-node-complete-at-point nil t)))
+
+(defun org-node-complete-at-point ()
+  "Complete word at point to any known node title, and linkify.
+Designed for `completion-at-point-functions', which see."
+  (let ((bounds (bounds-of-thing-at-point 'word)))
+    (and bounds
+         ;; For some reason it runs in non-org buffers like grep results?
+         (derived-mode-p 'org-mode)
+         (not (org-in-src-block-p))
+         (not (save-match-data
+                (org-in-regexp org-link-any-re)))
+         (list (car bounds)
+               (cdr bounds)
+               org-node--title<>id
+               :exclusive 'no
+               :exit-function
+               (lambda (text _)
+                 (when-let ((id (gethash text org-node--title<>id)))
+                   (atomic-change-group
+                     (delete-char (- (length text)))
+                     (insert (org-link-make-string
+                              (concat "id:" id) text)))))))))
+
+
 ;;;; Misc
 
 (defun org-node-convert-link-to-super (&rest _)
@@ -3091,22 +3091,6 @@ If already visiting that node, then follow the link normally."
           (progn (org-node--goto found)
                  t)
         nil))))
-
-
-;;;; API not used inside this package
-
-(defun org-node-at-point ()
-  "Return the ID-node near point.
-
-This may refer to the current Org heading, else an ancestor
-heading, else the file-level node, whichever has an ID first."
-  (gethash (org-entry-get nil "ID" t) org-node--id<>node))
-
-(defun org-node-read ()
-  "Prompt for a known ID-node."
-  (gethash (completing-read "Node: " #'org-node-collection
-                            () () () 'org-node-hist)
-           org-node--candidate<>node))
 
 (defun org-node-list-journal-files ()
   "Faster than `org-journal--list-files'."
@@ -3139,6 +3123,22 @@ heading, else the file-level node, whichever has an ID first."
   (cl-loop for file in (org-node-list-files t)
            when (string-prefix-p org-roam-directory file)
            collect file))
+
+
+;;;; API not used inside this package
+
+(defun org-node-at-point ()
+  "Return the ID-node near point.
+
+This may refer to the current Org heading, else an ancestor
+heading, else the file-level node, whichever has an ID first."
+  (gethash (org-entry-get nil "ID" t) org-node--id<>node))
+
+(defun org-node-read ()
+  "Prompt for a known ID-node."
+  (gethash (completing-read "Node: " #'org-node-collection
+                            () () () 'org-node-hist)
+           org-node--candidate<>node))
 
 (provide 'org-node)
 
