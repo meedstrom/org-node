@@ -317,14 +317,15 @@ I hear that on Termux on Android, filesystem access can be so slow that it's a p
 Good news!  As an org-node user, you can speed up a lot of their functions by making them just look up org-node tables.  One or more of these overrides may interest you:
 
 #+begin_src elisp
-(advice-add #'org-roam-list-files :override
-            #'org-node-list-roam-files)
+(advice-add #'org-journal--list-files :override
+            #'org-node-list-journal-files))
 
 (advice-add #'org-roam-dailies--list-files :override
             #'org-node-list-roam-daily-files)
 
-(advice-add #'org-journal--list-files :override
-            #'org-node-list-journal-files))
+;; (Good even if fs is not an issue; 850ms to 2ms on my machine)
+(advice-add #'org-roam-list-files :override
+            #'org-node-list-roam-files)
 #+end_src
 
 ** Tip: Word-wrap in the Roam buffer
