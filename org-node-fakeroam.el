@@ -116,13 +116,13 @@ should only be slow the first time each backlink is visited."
             (gethash file org-node--file<>previews)))
     result))
 
-(defun org-node-fakeroam--run-without-fontifying (fn &rest args)
+(defun org-node-fakeroam--run-without-fontifying (orig-fn &rest args)
   "Designed as around-advice for `org-roam-node-insert-section'.
 Run FN with ARGS, while overriding
 `org-roam-fontify-like-in-org-mode' so it returns the input."
   (cl-letf (((symbol-function 'org-roam-fontify-like-in-org-mode)
              #'identity))
-    (apply fn args)))
+    (apply orig-fn args)))
 
 
 ;;;; NoSQL method: fabricate knockoff roam backlinks

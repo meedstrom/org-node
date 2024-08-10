@@ -494,6 +494,13 @@ The table keys are destination IDs, and the corresponding table
 value is a list of `org-node-link' records describing each link,
 with info such as the ID-node where the link originated.")
 
+(defvar org-node--file<>previews (make-hash-table :test #'equal)
+  "1:N table mapping files to previews of backlink contexts.
+For use by `org-node-fakeroam--accelerate-get-contents'.")
+
+(defvar org-node--file<>mtime (make-hash-table :test #'equal)
+  "1:1 table mapping files to their last-modification times.")
+
 (defun org-node-get-id-links (node)
   "Get list of ID-link objects pointing to NODE.
 Each object is of type `org-node-link' with these fields:
@@ -953,9 +960,6 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
 
 ;;;; Scan-finalizers
 
-(defvar org-node--file<>previews (make-hash-table :test #'equal))
-(defvar org-node--file<>mtime (make-hash-table :test #'equal))
-
 (defun org-node--finalize-full (results)
   (clrhash org-node--id<>node)
   (clrhash org-node--dest<>links)
@@ -965,6 +969,8 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
   (setq org-node--collisions nil) ;; To be populated by `org-node--record-node'
   (seq-let (missing-files file<>mtime nodes path<>type links problems) results
     (org-node--forget-id-locations missing-files)
+    (dolist (file missing-files)
+      (remhash file org-node--file<>mtime))
     (dolist (pair file<>mtime)
       ;; Expire stale data for `org-node-fakeroam--accelerate-get-contents'
       (unless (equal (cdr pair)
@@ -1000,9 +1006,10 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
   (seq-let (missing-files file<>mtime nodes path<>type links problems) results
     (let ((found-files (mapcar #'car file<>mtime)))
       (org-node--forget-id-locations missing-files)
-      (org-node--dirty-forget-files missing-files)
       (dolist (file missing-files)
-        (remhash file org-node--file<>previews))
+        (remhash file org-node--file<>mtime))
+      (org-node--dirty-forget-files missing-files)
+      (org-node--dirty-forget-completions-in missing-files)
       ;; In case a title was edited: don't persist old revisions of the title
       (org-node--dirty-forget-completions-in found-files)
       (when org-node-perf-eagerly-update-link-tables
@@ -1360,29 +1367,28 @@ errors are very easy to miss."
            finally return t))
 
 ;; (progn (byte-compile #'org-node-list-files) (garbage-collect) (benchmark-run 1 (org-node-list-files)))
-(let (mem)
-  (defun org-node-list-files (&optional memoized)
-    "List files in `org-id-locations' or `org-node-extra-id-dirs'.
-With optional argument MEMOIZED t, reuse a value from the last
-time something called this, returning instantly."
-    (if (and memoized mem)
-        mem
-      (setq mem
-            (-union ;; 10x faster than `seq-union'
-             (hash-table-values org-id-locations)
-             (let ((file-name-handler-alist nil)) ;; Cuts 200 ms to 70 ms
-               (cl-loop
-                for dir in org-node-extra-id-dirs
-                append (cl-loop
-                        for file in (directory-files-recursively
-                                     dir (rx (or ".org" ".org_archive") eos)
-                                     nil t)
-                        unless (cl-loop
-                                for exclude in org-node-extra-id-dirs-exclude
-                                when (string-search exclude file)
-                                return t)
-                        ;; Abbreviating because org-id does too
-                        collect (abbreviate-file-name file)))))))))
+(defun org-node-list-files (&optional instant)
+  "List files in `org-id-locations' or `org-node-extra-id-dirs'.
+With optional argument INSTANT t, return files already known to
+contain IDs instead of calculating a new list of files that may
+or may not contain IDs.E"
+  (if instant
+      (hash-table-keys org-node--file<>mtime)
+    (-union ;; 10x faster than `seq-union'
+     (hash-table-values org-id-locations)
+     (let ((file-name-handler-alist nil)) ;; Cuts 200 ms to 70 ms
+       (cl-loop
+        for dir in org-node-extra-id-dirs
+        append (cl-loop
+                for file in (directory-files-recursively
+                             dir (rx (or ".org" ".org_archive") eos)
+                             nil t)
+                unless (cl-loop
+                        for exclude in org-node-extra-id-dirs-exclude
+                        when (string-search exclude file)
+                        return t)
+                ;; Abbreviating because org-id does too
+                collect (abbreviate-file-name file)))))))
 
 (defun org-node--forget-id-locations (files)
   "Remove references to FILES in `org-id-locations'.

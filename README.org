@@ -281,7 +281,42 @@ While a big point of IDs is to avoid depending on filenames, it's often pragmati
 #+end_src
 
 ** Limitation: org-ref
-We support the builtin @citations, not (yet) org-ref &citations, since amending =org-link-plain-re= to match them slows down my scan about 50%.  But, you can still find nodes with e.g. =:ROAM_REFS: &citekey=, just not see backlinks.
+We support the builtin @citations, not (yet) org-ref &citations, since amending =org-link-plain-re= to match them slows down my scan about 50%.  You can still find nodes with e.g. =:ROAM_REFS: &citekey=, just not see backlinks.
+
+** Tip: Dailies
+
+You can use [[https://github.com/bastibe/org-journal][org-journal]] for the concept of "dailies".  Example settings that emulate the default style of org-roam dailies:
+
+#+begin_src elisp
+(setq org-journal-dir "~/org/daily/")
+(setq org-journal-file-type 'daily)
+(setq org-journal-file-format "%F.org")
+(setq org-journal-date-prefix "#+title: ")
+(setq org-journal-date-format "%F")
+(setq org-journal-time-prefix "")
+(setq org-journal-time-format "")
+(add-hook 'org-journal-after-header-create-hook #'org-node-nodeify-entry)
+
+;; Workaround https://github.com/bastibe/org-journal/issues/440
+(add-hook 'org-journal-mode-hook
+          (lambda ()
+            (setq outline-regexp (rx (or bos (seq (+ "*") " "))))))
+#+end_src
+
+Commands of interest
+- org-journal-new-entry
+- org-journal-previous-entry / org-journal-next-entry
+- org-journal-open-current-journal-file
+
+Org-node does not yet have a capture target for dailies.
+
+** Tip: Word-wrap in the Roam buffer
+This has nothing to do with org-node, but I actually didn't know this for ages.  If you don't hard-wrap ([[https://github.com/org-roam/org-roam/issues/1862][org-roam#1862]]) but prefer visual-line-mode or similar, you have to enable them yourself:
+
+#+begin_src elisp
+(add-hook 'org-roam-mode-hook #'visual-line-mode)
+(add-hook 'org-roam-mode-hook #'org-indent-mode)
+#+end_src
 
 ** Toolbox
 
