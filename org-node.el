@@ -1372,7 +1372,7 @@ errors are very easy to miss."
   "List files in `org-id-locations' or `org-node-extra-id-dirs'.
 With optional argument INSTANT t, return files already known to
 contain IDs instead of calculating a new list of files that may
-or may not contain IDs.E"
+or may not contain IDs."
   (if instant
       (hash-table-keys org-node--file<>mtime)
     (-union ;; 10x faster than `seq-union'
@@ -2016,6 +2016,37 @@ or next dailies with potential time gaps."
   (org-node-cache-ensure)
   (org-node--goto (nth (random (hash-table-count org-node--candidate<>node))
                        (hash-table-values org-node--candidate<>node))))
+
+(advice-add 'org-roam--list-files :override
+            (defun org-node--list-roam-files (dir)
+              (cl-loop for file in (org-node-list-files t)
+                       when (string-prefix-p dir file)
+                       collect file)))
+
+(advice-add 'org-roam-dailies--list-files :override
+            (defun org-node--list-roam-daily-files (&rest extra-files)
+              "Faster than `org-roam-dailies--list-files'."
+              (let ((dir (expand-file-name org-roam-dailies-directory
+                                           org-roam-directory)))
+                (append extra-files
+                        (cl-loop
+                         for file in (org-node-list-files t)
+                         when (and (string-prefix-p dir file)
+                                   (let ((file (file-name-nondirectory file)))
+                                     (not (or (auto-save-file-name-p file)
+                                              (backup-file-name-p file)
+                                              (string-match "^\\." file)))))
+                         collect file)))))
+
+(advice-add 'org-journal--list-files :override
+            (defun org-node--list-journal-files ()
+              "Faster than `org-journal--list-files'."
+              (cl-loop with re = (org-journal--dir-and-file-format->pattern)
+                       for file in (org-node-list-files t)
+                       when (and (string-match-p re file)
+                                 (or org-journal-encrypt-journal
+                                     (not (string-suffix-p "\\.gpg" file))))
+                       collect file)))
 
 ;;;###autoload
 (defun org-node-insert-link (&optional region-as-initial-input)
