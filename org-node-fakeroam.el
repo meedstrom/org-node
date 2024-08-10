@@ -101,7 +101,7 @@ involved.  This may eliminate most of that.
 
 Aside from huge files, it is also slow when there are backlinks
 from extremely many files.  This caches all results so that
-should only be slow the first time each backlink is visited."
+should only be slow the first time each backlink is checked."
   (let* ((cached (alist-get pt (gethash file org-node--file<>previews)))
          (result (or cached
                      ;; TODO: Put user-configurable let-bindings here
@@ -121,8 +121,7 @@ should only be slow the first time each backlink is visited."
   "Designed as around-advice for `org-roam-node-insert-section'.
 Run FN with ARGS, while overriding
 `org-roam-fontify-like-in-org-mode' so it returns the input."
-  (cl-letf (((symbol-function 'org-roam-fontify-like-in-org-mode)
-             #'identity))
+  (cl-letf (((symbol-function 'org-roam-fontify-like-in-org-mode) #'identity))
     (apply orig-fn args)))
 
 

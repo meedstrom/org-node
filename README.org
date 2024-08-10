@@ -126,17 +126,17 @@ If you didn't have laggy saves, this is fine.  In other words, keep variable =or
 *** *Option 1B*
 *Tell org-node to write to the org-roam DB.*
 
-Use this minor mode:
-
 #+begin_src elisp
-(org-node-fakeroam-db-feed-mode)
 (setq org-roam-db-update-on-save nil)
+(org-node-fakeroam-db-feed-mode)
 #+end_src
 
-There is even a command to full-reset the DB:
+There is also a replacement command for full-resetting the DB if needed:
 
 - Original: =C-u M-x org-roam-db-sync=
-- Substitute: =M-x org-node-fakeroam-db-rebuild=, bearing in mind results aren't 100% identical.
+- Faster: =M-x org-node-fakeroam-db-rebuild=, bearing in mind results aren't 100% identical.
+
+Bonus: if the Roam buffer is sometimes slow, the minor mode =(org-node-fakeroam-redisplay-mode)= should speed it up.
 
 *** *Option 1C*
 *Cut out the DB altogether.*
