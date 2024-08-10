@@ -251,7 +251,6 @@ Working over TRAMP is untested, but I suspect it won't work.  Org-node tries to 
 If you need TRAMP, use org-roam, which is made to /not/ re-access files or directories so often (which can be slow anyway over a remote connection), in favor of trusting its own DB.
 
 ** Limitation: unique titles
-
 If two ID-nodes exist with the same title, one of them disappears from minibuffer completions.
 
 That's just the nature of completion.  Other packages such as Roam have the same limitation.  Much can be said for embracing the uniqueness constraint, and org-node will print messages telling you about title collisions.
@@ -314,22 +313,21 @@ Org-node does not yet have a capture target for dailies.
 
 I hear that on Termux on Android, filesystem access can be so slow that it's a pain to use org-roam-dailies as well as org-journal. ([[https://github.com/meedstrom/org-node/issues/24#issuecomment-2278605819][19 seconds just to list files under a directory]]!)
 
-Good news!  As an org-node user, you can speed up a lot of their functions by making them just look up org-node tables.  One or more of these overrides may interest you:
+Good news!  You can speed up a lot of their functions by making them just look up org-node tables.  One or more of these overrides may interest you:
 
 #+begin_src elisp
-(advice-add #'org-journal--list-files :override
-            #'org-node-list-journal-files)
+(advice-add #'org-roam-list-files :override
+            #'org-node-list-roam-files)
 
 (advice-add #'org-roam-dailies--list-files :override
             #'org-node-list-roam-daily-files)
 
-;; (Good even if fs is not an issue; 850ms to 2ms on my machine)
-(advice-add #'org-roam-list-files :override
-            #'org-node-list-roam-files)
+(advice-add #'org-journal--list-files :override
+            #'org-node-list-journal-files)
 #+end_src
 
 ** Tip: Word-wrap in the Roam buffer
-This has nothing to do with org-node, but I actually didn't know this for ages.  If you don't hard-wrap ([[https://github.com/org-roam/org-roam/issues/1862][org-roam#1862]]) but prefer visual-line-mode or similar, you have to enable them yourself:
+This has nothing to do with org-node, but I actually didn't know this for ages.  If you don't hard-wrap ([[https://github.com/org-roam/org-roam/issues/1862][org-roam#1862]]) but prefer visual-line-mode or similar, you have to enable such things yourself:
 
 #+begin_src elisp
 (add-hook 'org-roam-mode-hook #'visual-line-mode)
