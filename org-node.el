@@ -3107,6 +3107,38 @@ heading, else the file-level node, whichever has an ID first."
                             () () () 'org-node-hist)
            org-node--candidate<>node))
 
+(defun org-node-list-journal-files ()
+  "Faster than `org-journal--list-files'."
+  (require 'org-journal)
+  (cl-loop with re = (org-journal--dir-and-file-format->pattern)
+           for file in (org-node-list-files t)
+           when (and (string-match-p re file)
+                     (or org-journal-encrypt-journal
+                         (not (string-suffix-p "\\.gpg" file))))
+           collect file))
+
+(defun org-node-list-roam-daily-files (&rest extra-files)
+  "Faster than `org-roam-dailies--list-files'."
+  (require 'org-roam-dailies)
+  (let ((dir (expand-file-name org-roam-dailies-directory
+                               org-roam-directory)))
+    (append extra-files
+            (cl-loop
+             for file in (org-node-list-files t)
+             when (and (string-prefix-p dir file)
+                       (let ((file (file-name-nondirectory file)))
+                         (not (or (auto-save-file-name-p file)
+                                  (backup-file-name-p file)
+                                  (string-match "^\\." file)))))
+             collect file))))
+
+(defun org-node-list-roam-files ()
+  "Faster than `org-roam-list-files'."
+  (require 'org-roam)
+  (cl-loop for file in (org-node-list-files t)
+           when (string-prefix-p org-roam-directory file)
+           collect file))
+
 (provide 'org-node)
 
 ;;; org-node.el ends here
