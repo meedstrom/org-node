@@ -1471,28 +1471,35 @@ not verified."
        :sortstr<>id SORTSTR-ID-TBL
        :sorted-ids SORTED-IDS))")
 
-(defvar org-node--default-daily-data nil)
+(defvar org-node--daily-series nil)
 
-(defun org-node--default-daily-prompter (data)
-  (setq org-node--default-daily-data data)
-  (add-hook 'calendar-today-visible-hook #'org-node--default-daily-mark)
-  (add-hook 'calendar-today-invisible-hook #'org-node--default-daily-mark)
+(defun org-node--daily-prompter (data)
+  (setq org-node--daily-series data)
+  (add-hook 'calendar-today-invisible-hook #'org-node--mark-dailies)
+  (add-hook 'calendar-today-visible-hook #'org-node--mark-dailies)
   (unwind-protect
       (org-read-date)
-    (remove-hook 'calendar-today-visible-hook #'org-node--default-daily-mark)
-    (remove-hook 'calendar-today-invisible-hook #'org-node--default-daily-mark)))
+    (remove-hook 'calendar-today-invisible-hook #'org-node--mark-dailies)
+    (remove-hook 'calendar-today-visible-hook #'org-node--mark-dailies)))
 
-(defun org-node--default-daily-mark ()
-  "Mark days in the calendar for which a daily-note is present."
-  (dolist (date (hash-table-keys
-                 (plist-get org-node--default-daily-data :sortstr<>id)))
-    (when (calendar-date-is-visible-p date)
-      (calendar-mark-visible-date date 'org-roam-dailies-calendar-note))))
+(defun org-node--mark-dailies ()
+  "Mark the calendar dates for which there is a daily-note."
+  ;; Going by source of `calendar-date-is-visible-p', it's always 3 months?
+  ;; (cl-loop
+  ;;  for ymd in (hash-table-keys (plist-get org-node--daily-series :sortstr<>id))
+  ;;  as month = (string-to-number (substring ymd 5 7))
+  ;;  as day = (string-to-number (substring ymd 8 10))
+  ;;  as year = (string-to-number (substring ymd 0 4))
+  ;;  when (> 2 (abs (calendar-interval displayed-month displayed-year
+  ;;                                    month year)))
+  ;;  do (calendar-mark-visible-date
+  ;;      (list month day year) 'org-roam-dailies-calendar-note))
+  )
 
 (defvar org-node-series
   '(("d" "Dailies"
      org-node--default-daily-classifier
-     org-node--default-daily-prompter))
+     org-node--daily-prompter))
   "Alist describing each node series.
 
 Each item looks like (KEY NAME CLASSIFIER PROMPTER).
@@ -1581,36 +1588,36 @@ returns strings in YYYY-MM-DD format.")
 (defun org-node-series-refile ()
   )
 
-(transient-append-suffix 'org-node-series-dispatch "d"
-  '("n" "Next in series" org-node-series-next :transient t)
-  )
-
+;; Should be able to type d n for "daily, next"
 (transient-define-prefix org-node-series-dispatch ()
   ["Org-node series"])
 
-(defun org-node-series-next (series)
-  (org-node-series-cycle series +1))
+;; (transient-append-suffix 'org-node-series-dispatch "d"
+;;   '("n" "Next in series" org-node-series-next :transient t)
+;;   )
 
-(defun org-node-series-prev (series)
-  (org-node-series-cycle series -1))
+(defun org-node-series-next (key)
+  (org-node-series-cycle key +1))
 
-(defun org-node-series-cycle (series n)
-  (interactive nil org-mode)
-  ;; TODO retry if necessary until no more ancestor ids
+(defun org-node-series-prev (key)
+  (org-node-series-cycle key -1))
+
+(defun org-node-series-cycle (key n)
+  ;; TODO retry if necessary until no more ancestor ids that may be a daily
   (when (derived-mode-p 'org-mode)
     (let* ((id-here (org-node-id-at-point))
-           (greater nil))
+           (head nil)
+           (series (alist-get (sxhash key) org-node--series-data)))
       (unless (gethash id-here org-nodes)
         (user-error "No known ID-node here, so no series"))
-      (when (cl-loop for id in (nth 4 (assoc series org-node-series))
+      (when (cl-loop for id in (plist-get series :sorted-ids)
                      if (equal id id-here)
                      return t
-                     else do (push id greater))
+                     else do (push id head))
         (let ((node nil)
               (to-check (if (>= n 1)
-                            greater
-                          (drop (length greater)
-                                (nth 4 (assoc series org-node-series))))))
+                            head
+                          (drop (length head) (plist-get series :sorted-ids)))))
           (if (catch 'fail
                 ;; Normally we'd just take the first `pop', but user may have
                 ;; deleted a daily-note that is still in the table, and we do
