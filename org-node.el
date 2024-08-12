@@ -2392,22 +2392,6 @@ out."
                 "[[:alpha:]]+" "[[:alpha:]]+"
                 example t))))))
 
-(defcustom org-node-renames-allowed-dirs nil
-  "Dirs in which files may be auto-renamed.
-Used by `org-node-rename-file-by-title-maybe'.
-
-See also `org-node-renames-disallow-regexp'."
-  :type '(repeat string))
-
-(defcustom org-node-renames-disallow-regexp "daily/"
-  "Regexp matching paths of files not to auto-rename.
-Only needed to filter out files in `org-node-renames-allowed-dirs'.
-
-Used by `org-node-rename-file-by-title-maybe'."
-  :type 'string)
-
-
-
 ;; Unused
 (defun org-node--first-id-in-file ()
   (save-excursion
@@ -2438,6 +2422,21 @@ Used by `org-node-rename-file-by-title-maybe'."
           (org-up-heading-or-point-min))
         id))))
 
+(defcustom org-node-renames-allowed-dirs nil
+  "Dirs in which files may be auto-renamed.
+Used by `org-node-rename-file-by-title'.
+
+See also `org-node-renames-disallow-regexp'."
+  :type '(repeat string))
+
+(defcustom org-node-renames-disallow-regexp "daily/"
+  "Regexp matching paths of files not to auto-rename.
+Only needed to filter out files in `org-node-renames-allowed-dirs'.
+
+Used by `org-node-rename-file-by-title'."
+  :type 'string)
+
+
 ;; FIXME: After running this on an after-save-hook, (buffer-modified-p)
 ;;        returns t, which seems unsafe
 ;;;###autoload
@@ -2454,8 +2453,6 @@ Suitable as a save hook:
 
     (add-hook 'after-save-hook #'org-node-rename-file-by-title)"
   (interactive "p" org-mode)
-  (when (stringp interactive)
-    (user-error "org-node-rename-file-by-title: PATH argument deprecated"))
   (if (not (derived-mode-p 'org-mode))
       (when interactive
         (user-error "Only works in org-mode buffers"))
@@ -2469,8 +2466,7 @@ Suitable as a save hook:
               (cl-loop
                for dir in org-node-renames-allowed-dirs
                if (or (not (string-prefix-p dir path))
-                      (not (string-match-p org-node-renames-disallow-regexp
-                                           path)))
+                      (string-match-p org-node-renames-disallow-regexp path))
                return nil
                finally return t))
           (let ((title (or (cadar (org-collect-keywords '("TITLE")))
@@ -3177,8 +3173,7 @@ Designed for `completion-at-point-functions', which see."
          ;; For some reason it runs in non-org buffers like grep results?
          (derived-mode-p 'org-mode)
          (not (org-in-src-block-p))
-         (not (save-match-data
-                (org-in-regexp org-link-any-re)))
+         (not (save-match-data (org-in-regexp org-link-any-re)))
          (list (car bounds)
                (cdr bounds)
                org-node--title<>id
