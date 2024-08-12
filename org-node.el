@@ -1011,7 +1011,8 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
     (dolist (node nodes)
       (org-node--record-node node))
     (org-id-locations-save)
-    (org-node--series-build)
+    (dolist (spec (org-node-series))
+      (org-node--build-series spec))
     (setq org-node--time-elapsed
           ;; For reproducible profiling: don't count time taken by
           ;; other sentinels or timers or I/O in between these periods
@@ -1525,22 +1526,27 @@ returns strings in YYYY-MM-DD format.")
 
 ;; TODO: is it possible to use gv-letplace or something to avoid let-binding a
 ;; new table and producing garbage on copying value at the end?
-(defun org-node--series-build (series)
-  (let ((table (make-hash-table :test #'equal))
-        (classifier (nth 1 (assoc series org-node-series))))
-    (cl-loop for id being the hash-keys of org-node--id<>node
-             using (hash-values node)
-             as sortstr = (funcall classifier node)
-             when sortstr
-             collect (progn
-                       (puthash sortstr id table)
-                       (cons sortstr id))
-             into items
-             finally do
-             (setf (nth 3 (assoc series org-node-series)) table)
-             (setf (nth 4 (assoc series org-node-series))
-                   (mapcar #'cdr
-                           (cl-sort items #'string-greaterp :key #'car))))))
+(defun org-node--build-series (spec)
+  (let ((table (make-hash-table :test #'equal)))
+    (seq-let (key name classifier prompter) spec
+      (cl-loop for id being the hash-keys of org-node--id<>node
+               using (hash-values node)
+               as sortstr = (funcall classifier node)
+               when sortstr
+               collect (progn
+                         (puthash sortstr id table)
+                         (cons sortstr id))
+               into items
+               finally do
+               (setf (alist-get (sxhash key) org-node--series-data)
+                     (list :key key
+                           :name name
+                           :classifier classifier
+                           :prompter prompter
+                           :sorted-ids (mapcar #'cdr
+                                               (cl-sort items #'string-greaterp
+                                                        :key #'car))
+                           :sortstr<>id table))))))
 
 (defun org-node-series-capture-target ()
   (org-node-cache-ensure)
