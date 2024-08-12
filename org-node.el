@@ -994,7 +994,6 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
   (clrhash org-node--candidate<>node)
   (clrhash org-node--title<>id)
   (clrhash org-node--ref<>id)
-  (clrhash org-node--date<>daily-id)
   (setq org-node--collisions nil) ;; To be populated by `org-node--record-node'
   (seq-let (missing-files file<>mtime nodes path<>type links problems) results
     (org-node--forget-id-locations missing-files)
@@ -1013,7 +1012,7 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
     (dolist (node nodes)
       (org-node--record-node node))
     (org-id-locations-save)
-    (setq org-node--daily-ids (mapcar #'cdr (org-node--sort-dailies)))
+    (org-node--series-build)
     (setq org-node--time-elapsed
           ;; For reproducible profiling: don't count time taken by
           ;; other sentinels or timers or I/O in between these periods
@@ -1117,7 +1116,7 @@ The reason for default t is better experience with
     (dolist (ref refs)
       (puthash ref id org-node--ref<>id))
     ;; Setup completion candidates
-    (when (funcall org-node-filter-fn node)
+    (when (funcall org-node--compiled-filter-fn node)
       ;; Let refs work as aliases
       (dolist (ref refs)
         (puthash ref node org-node--candidate<>node)
@@ -1138,7 +1137,7 @@ The reason for default t is better experience with
           (when (and collision (not (equal id collision)))
             (push (list title id collision) org-node--collisions)))
         (puthash title id org-node--title<>id)
-        (let ((affx (funcall org-node-affixation-fn node title)))
+        (let ((affx (funcall org-node--compiled-affixation-fn node title)))
           (if org-node-alter-candidates
               ;; Absorb the affixations into one candidate string
               (puthash (concat (nth 1 affx) (nth 0 affx) (nth 2 affx))
@@ -1436,6 +1435,8 @@ for you."
 
 
 ;;;; Series
+
+;; (defun org-node-visit-next-by-date-created ())
 
 (defun org-node--series-goto (series)
   (let* ((name (plist-get series :name))
@@ -2361,17 +2362,16 @@ as more \"truthful\" than today's date.
          ".org")
       (error "`org-node-slug-fn' not set"))))
 
+;; "Some people, when confronted with a problem, think
+;; 'I know, I'll use regular expressions.'
+;; Now they have two problems." —Jamie Zawinski
 (defun org-node--make-regexp-for-time-format (format)
   "Make regexp to match a result of (format-time-string FORMAT).
 
 In other words, if FORMAT is e.g. %Y-%m-%d, which can be
 instantiated in many ways such as 2024-08-10, then this should
 return a regexp that can match any of those ways it might turn
-out.
-
-\"Some people, when confronted with a problem, think
- 'I know, I'll use regular expressions.'
- Now they have two problems.\" —Jamie Zawinski"
+out."
   (let ((example (format-time-string format)))
     (if (string-match-p (rx (any "^*+([\\")) example)
         (error "org-node: Unable to safely rename with current `org-node-datestamp-format'.  This is not inherent in your choice of format, I am just not smart enough yet")
@@ -2384,33 +2384,19 @@ out.
 
 (defcustom org-node-renames-allowed-dirs nil
   "Dirs in which files may be auto-renamed.
-Used by `org-node-rename-file-by-title-maybe'."
+Used by `org-node-rename-file-by-title-maybe'.
+
+See also `org-node-renames-disallow-regexp'."
   :type '(repeat string))
 
-(defcustom org-node-renames-disallowed-regexp "daily/"
+(defcustom org-node-renames-disallow-regexp "daily/"
   "Regexp matching paths of files not to auto-rename.
 Only needed to filter out files in `org-node-renames-allowed-dirs'.
 
 Used by `org-node-rename-file-by-title-maybe'."
   :type 'string)
 
-;; FIXME: After running this on an after-save-hook, (buffer-modified-p)
-;;        returns t, which seems unsafe
-(defun org-node-rename-file-by-title-maybe ()
-  "Rename current file according to TITLE.
-In addition to the checks described in
-`org-node-rename-file-by-title', will only rename files in
-`org-node-renames-allowed-dirs'.  Suitable as a save hook:
 
-    (add-hook 'after-save-hook #'org-node-rename-file-by-title-maybe)"
-  (when (derived-mode-p 'org-mode)
-    (when (null org-node-renames-allowed-dirs)
-      (message "New user option `org-node-renames-allowed-dirs' should be configured"))
-    (cl-loop for dir in org-node-renames-allowed-dirs
-             if (and (string-prefix-p dir buffer-file-name)
-                     (not (string-match-p org-node-renames-disallowed-regexp
-                                          buffer-file-name)))
-             return (org-node-rename-file-by-title))))
 
 ;; Unused
 (defun org-node--first-id-in-file ()
@@ -2442,109 +2428,99 @@ In addition to the checks described in
           (org-up-heading-or-point-min))
         id))))
 
-;; (defun org-node-visit-next-by-date-created ())
-
+;; FIXME: After running this on an after-save-hook, (buffer-modified-p)
+;;        returns t, which seems unsafe
 ;;;###autoload
 (defun org-node-rename-file-by-title (&optional interactive)
   "Rename the current file according to `org-node-slug-fn'.
 
 Attempt to check for a prefix in the style of
-`org-node-datestamp-format', and preserve it.  However, if the
-deprecated option `org-node-filename-fn' is set, then overwrite
-the entire filename anyway.
+`org-node-datestamp-format', and preserve it.
 
-When called from a hook (or from Lisp in general), will also
-check if the file appears to be under
-`org-roam-dailies-directory' or `org-journal-dir', and do nothing
-in these cases.  Used interactively, it is still possible to
-act on files in these directories (or if Lisp code passes
-INTERACTIVE t).
+If the file is outside `org-node-renames-allowed-dirs', do
+nothing, or when called interactively, prompt for confirmation.
 
-Note that it is rarely a good idea to run this on a save-hook.
-See the alternative `org-node-rename-file-by-title-maybe',
-which wraps this function."
+Suitable as a save hook:
+
+    (add-hook 'after-save-hook #'org-node-rename-file-by-title)"
   (interactive "p" org-mode)
   (when (stringp interactive)
     (user-error "org-node-rename-file-by-title: PATH argument deprecated"))
   (if (not (derived-mode-p 'org-mode))
       (when interactive
         (user-error "Only works in org-mode buffers"))
-    (let ((path (buffer-file-name)))
+    (let ((path buffer-file-name)
+          (buf (current-buffer)))
       (unless (equal "org" (file-name-extension path))
         (error "File doesn't end in .org: %s" path))
-      (when (or
-             ;; Be aware of "dailies" and don't touch
-             (and (or (not (bound-and-true-p org-journal-dir))
-                      (not (string-prefix-p org-journal-dir path)))
-                  (or (not (bound-and-true-p org-roam-dailies-directory))
-                      (not (string-prefix-p
-                            (expand-file-name org-roam-dailies-directory
-                                              org-roam-directory)
-                            path))))
-             (and interactive
-                  (yes-or-no-p "WARNING:
-You are currently in a daily file.
-Renaming according to the regular formula probably will not do what you want it to do.
-Are you sure you want to proceed? ")))
-        (let ((title (or (cadar (org-collect-keywords '("TITLE")))
-                         (save-excursion
-                           (without-restriction
-                             ;; No title, use first heading in file
-                             (goto-char 1)
-                             (or (org-at-heading-p)
-                                 (outline-next-heading))
-                             (org-get-heading t t t t))))))
-          (if (not title)
-              (message "File has no title nor heading")
-            (let* ((basename (file-name-nondirectory path))
-                   (date-prefix (if (and org-node-datestamp-format
-                                         (string-match
-                                          (org-node--make-regexp-for-time-format
-                                           org-node-datestamp-format)
-                                          basename))
-                                    (match-string 0 basename)
-                                  ""))
-                   (new-path (file-name-concat
-                              (file-name-directory path)
-                              ;; HACK 2024-07-21
-                              ;; Use old behavior if old option set
-                              (if org-node-filename-fn
-                                  (funcall org-node-filename-fn title)
-                                (concat date-prefix
-                                        (funcall org-node-slug-fn title)
-                                        ".org"))))
-                   (visiting (find-buffer-visiting path))
-                   (visiting-on-window (and visiting (get-buffer-window visiting))))
+      (when (null org-node-renames-allowed-dirs)
+        (message "New user option `org-node-renames-allowed-dirs' should be configured"))
+      (if (or interactive
+              (cl-loop
+               for dir in org-node-renames-allowed-dirs
+               if (or (not (string-prefix-p dir path))
+                      (not (string-match-p org-node-renames-disallow-regexp
+                                           path)))
+               return nil
+               finally return t))
+          (let ((title (or (cadar (org-collect-keywords '("TITLE")))
+                           (save-excursion
+                             (without-restriction
+                               ;; No title, use first heading in file
+                               (goto-char 1)
+                               (or (org-at-heading-p)
+                                   (outline-next-heading))
+                               (org-get-heading t t t t))))))
+            (if (not title)
+                (message "File has no title nor heading")
+              (let* ((basename (file-name-nondirectory path))
+                     (date-prefix (if (and org-node-datestamp-format
+                                           (string-match
+                                            (org-node--make-regexp-for-time-format
+                                             org-node-datestamp-format)
+                                            basename))
+                                      (match-string 0 basename)
+                                    ""))
+                     (new-basename (concat date-prefix
+                                           (funcall org-node-slug-fn title)
+                                           ".org"))
+                     (new-path (file-name-concat (file-name-directory path)
+                                                 new-basename))
+                     (visible-window (get-buffer-window buf)))
 
-              (if (equal path new-path)
-                  (when interactive
-                    (message "Filename already correct: %s" path))
-                (if (and visiting (buffer-modified-p visiting))
+                (if (equal path new-path)
                     (when interactive
-                      (message "Unsaved file, letting it be: %s" path))
-                  (if (get-file-buffer new-path)
-                      (if interactive
-                          (message "A buffer is already visiting the would-be new filename")
-                        (user-error "A buffer is already visiting the would-be new filename"))
-                    (unless (file-writable-p path)
-                      (user-error "No permissions to rename file: %s" path))
-                    (unless (file-writable-p new-path)
-                      (user-error "No permissions to write a new file at: %s" new-path))
-                    ;; Unnecessary b/c `rename-file' will already warn, but hey
-                    (when (file-exists-p new-path)
-                      (user-error "Canceled because a file exists at: %s" new-path))
-                    ;; Kill buffer before renaming, because it will not follow the rename
-                    (when visiting
-                      (kill-buffer visiting))
-                    (rename-file path new-path)
-                    ;; Visit the file again if you had it open
-                    (when visiting
-                      (let ((buf (find-file-noselect new-path)))
-                        (when visiting-on-window
-                          (set-window-buffer visiting-on-window buf))))
-                    (message "File %s renamed to %s"
-                             (file-name-nondirectory path)
-                             (file-name-nondirectory new-path))))))))))))
+                      (message "Filename already correct: %s" path))
+                  (if (or (buffer-modified-p buf)
+                          (buffer-modified-p (buffer-base-buffer buf)))
+                      (when interactive
+                        (message "Unsaved file, letting it be: %s" path))
+                    (if (get-file-buffer new-path)
+                        (if interactive
+                            (message "A buffer is already visiting the would-be new filename %s"
+                                     new-basename)
+                          (user-error "A buffer is already visiting the would-be new filename %s"
+                                      new-basename))
+                      (unless (file-writable-p path)
+                        (user-error "No permissions to rename file: %s" path))
+                      (unless (file-writable-p new-path)
+                        (user-error "No permissions to write a new file at: %s" new-path))
+                      ;; Unnecessary b/c `rename-file' will already warn, but hey
+                      (when (file-exists-p new-path)
+                        (user-error "Canceled because a file exists at: %s" new-path))
+
+                      (when (or (not interactive)
+                                (y-or-n-p
+                                 (format "Rename file %s to %s?"
+                                         basename new-basename)))
+                        ;; Kill buffer before renaming, because it will not follow the rename
+                        (kill-buffer buf)
+                        (rename-file path new-path)
+                        (let ((new-buf (find-file-noselect new-path)))
+                          (when visible-window
+                            (set-window-buffer visible-window new-buf)))
+                        (message "File %s renamed to %s"
+                                 basename new-basename))))))))))))
 
 ;;;###autoload
 (defun org-node-rewrite-links-ask (&optional files)

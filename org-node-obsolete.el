@@ -58,6 +58,9 @@ when it was deprecated and REMOVED-BY when it may be removed."
 (org-node--defobsolete org-node-list-roam-files
                        org-node-faster-roam-list-files)
 
+(org-node--defobsolete org-node-rename-file-by-title-maybe
+                       org-node-rename-file-by-title)
+
 (provide 'org-node-obsolete)
 
 ;;; org-node-obsolete.el ends here
