@@ -807,18 +807,23 @@ didn't do so already, or local changes have been made."
 Do nothing if FNSYM has not changed since the last time.
 
 The value of FNSYM may be either a lambda or a function symbol."
-  (let* ((fnval (symbol-value fnsym))
+  (let* ((fnval (let ((fnsymval (symbol-value fnsym)))
+                  (if (symbolp fnsymval)
+                      (symbol-function fnsymval)
+                    fnsymval)))
          (curr-hash (sxhash fnval)))
     (unless (eq (alist-get fnsym org-node--fn-hashes) curr-hash)
       ;; Save hash of definition so we don't need to recompile every time
       (setf (alist-get fnsym org-node--fn-hashes) curr-hash)
-      (when (eq 'closure (car fnval))
-        ;; Turn closure into plain lambda, because native-comp demands it
-        (setq fnval (cons 'lambda (cddr fnval)))
-        (set fnsym fnval))
-      (set comp-sym (if (native-comp-available-p)
-                        (native-compile fnval)
-                      (byte-compile fnval))))))
+      (if (compiled-function-p fnval)
+          (set comp-sym fnval)
+        (when (eq 'closure (car fnval))
+          ;; Turn closure into plain lambda, because native-comp demands it
+          (setq fnval (cons 'lambda (cddr fnval)))
+          (set fnsym fnval))
+        (set comp-sym (if (native-comp-available-p)
+                          (native-compile fnval)
+                        (byte-compile fnval)))))))
 
 (defun org-node--scan (files finalizer)
   "Begin async scanning FILES for id-nodes and links.
