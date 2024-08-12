@@ -69,6 +69,8 @@
 ;;       Would have to wait until all nodes registered, then do some sort of
 ;;       `string-prefix-p' filtering...
 
+;; TODO: org-node-refile
+
 (require 'cl-lib)
 (require 'seq)
 (require 'subr-x)
@@ -2284,10 +2286,19 @@ as more \"truthful\" than today's date.
       (error "`org-node-slug-fn' not set"))))
 
 (defun org-node--make-regexp-for-time-format (format)
-  "Make regexp to match a (format-time-string FORMAT) result."
+  "Make regexp to match a result of (format-time-string FORMAT).
+
+In other words, if FORMAT is e.g. %Y-%m-%d, which can be
+instantiated in many ways such as 2024-08-10, then this should
+return a regexp that can match any of those ways it might turn
+out.
+
+\"Some people, when confronted with a problem, think
+ 'I know, I'll use regular expressions.'
+ Now they have two problems.\" —Jamie Zawinski"
   (let ((example (format-time-string format)))
     (if (string-match-p (rx (any "^*+([\\")) example)
-        (error "org-node: Unable to safely rename with current `org-node-datestamp-format'.  This is not inherent in your choice of format, I am just not smart enough")
+        (error "org-node: Unable to safely rename with current `org-node-datestamp-format'.  This is not inherent in your choice of format, I am just not smart enough yet")
       (concat "^"
               (replace-regexp-in-string
                "[[:digit:]]+" "[[:digit:]]+"
@@ -2567,12 +2578,12 @@ to `org-node-extra-id-dirs-exclude'.
 In case of unsolvable problems, how to wipe org-id-locations:
 
 (progn
-  (delete-file org-id-locations-file)
-  (setq org-id-locations nil)
-  (setq org-id--locations-checksum nil)
-  (setq org-agenda-text-search-extra-files nil)
-  (setq org-id-files nil)
-  (setq org-id-extra-files nil))"
+ (delete-file org-id-locations-file)
+ (setq org-id-locations nil)
+ (setq org-id--locations-checksum nil)
+ (setq org-agenda-text-search-extra-files nil)
+ (setq org-id-files nil)
+ (setq org-id-extra-files nil))"
   (interactive "DForget all IDs in directory: ")
   (org-node-cache-ensure t)
   (let ((files (seq-intersection
@@ -2802,8 +2813,8 @@ destination-origin pairs, expressed as Tab-Separated Values."
   "List all reflinks and their locations.
 
 Useful to see how many times you've inserted a link that is very
-similar to another, but not identical, preventing its association
-to ROAM_REFS."
+similar to another link, but not identical, so that likely only
+one of them is associated with a ROAM_REFS."
   (interactive)
   (let ((plain-links (cl-loop
                       for list being the hash-values of org-node--dest<>links
@@ -2955,8 +2966,9 @@ window."
 (defun org-node--add-to-property-keep-space (property value)
   "Add VALUE to PROPERTY for node at point.
 
-Operate on the closest ancestor with an ID, else the current
-entry if no ancestor has an ID.
+If the current entry has no ID, operate on the closest ancestor
+with an ID.  If there's no ID among any ancestors, operate on the
+current entry.
 
 Then behave like `org-entry-add-to-multivalued-property' but
 preserve spaces: instead of percent-escaping each space character
@@ -2988,6 +3000,15 @@ Wrap the value in double-brackets if necessary."
                         "]]")))
     (org-node--add-to-property-keep-space "ROAM_REFS" ref)))
 
+;; Just set `org-node-prefer-with-heading' = t, run
+;; `org-roam-demote-entire-buffer' on all files, and then you can use the
+;; builtin `org-set-tags-command' from then on.  It'd never have occurred to me
+;; to come up with file-level properties and tags -- they're a hack causing an
+;; explosion of code complexity throughout Org, which I infer given how often
+;; my functions have to handle that special case.  Thinking of just dropping
+;; support in org-node as a protest -- it'll be a more beautiful codebase, to
+;; boot.  But first I should ask around for legitimate use-cases of file-level
+;; properties.
 ;; (defun org-node-tag-add ()
 ;;   )
 
@@ -3091,7 +3112,7 @@ If already visiting that node, then follow the link normally."
                  t)
         nil))))
 
-(defun org-node-list-journal-files ()
+(defun org-node-faster-journal-list-files ()
   "Faster than `org-journal--list-files'."
   (require 'org-journal)
   (cl-loop with re = (org-journal--dir-and-file-format->pattern)
@@ -3101,27 +3122,37 @@ If already visiting that node, then follow the link normally."
                          (not (string-suffix-p "\\.gpg" file))))
            collect file))
 
-(defun org-node-list-roam-daily-files (&rest extra-files)
-  "Faster than `org-roam-dailies--list-files'."
+(defun org-node-faster-roam-list-dailies (&rest extra-files)
+  "Faster than `org-roam-dailies--list-files' on a slow fs."
   (require 'org-roam-dailies)
-  (let ((dir (expand-file-name org-roam-dailies-directory
-                               org-roam-directory)))
-    (append extra-files
-            (cl-loop
+  (let ((daily-dir (file-name-concat org-roam-directory
+                                     org-roam-dailies-directory)))
+    (append (cl-loop
              for file in (org-node-list-files t)
-             when (and (string-prefix-p dir file)
+             when (and (string-prefix-p daily-dir file)
                        (let ((file (file-name-nondirectory file)))
                          (not (or (auto-save-file-name-p file)
                                   (backup-file-name-p file)
                                   (string-match "^\\." file)))))
-             collect file))))
+             collect file)
+            extra-files)))
 
-(defun org-node-list-roam-files ()
+(defun org-node-faster-roam-list-files ()
   "Faster than `org-roam-list-files'."
   (require 'org-roam)
   (cl-loop for file in (org-node-list-files t)
            when (string-prefix-p org-roam-directory file)
            collect file))
+
+(defun org-node-faster-roam-daily-note-p (&optional file)
+  "Faster than `org-roam-dailies--daily-note-p' on a slow fs."
+  (require 'org-roam-dailies)
+  (let ((daily-dir (file-name-concat org-roam-directory
+                                     org-roam-dailies-directory))
+        (path (or file (buffer-file-name (buffer-base-buffer)))))
+    (unless (file-name-absolute-p path)
+      (error "Expected absolute filename but got: %s" path))
+    (string-prefix-p (downcase daily-dir) (downcase path))))
 
 
 ;;;; API not used inside this package

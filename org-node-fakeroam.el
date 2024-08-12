@@ -18,7 +18,7 @@
 ;; Author:           Martin Edström <meedstrom91@gmail.com>
 ;; Created:          2024-04-13
 ;; Keywords:         org, hypermedia
-;; Package-Requires: ((emacs "28.1") (org-node "0.5pre") (org-roam "2.2.2") (compat "29.1.4.5"))
+;; Package-Requires: ((emacs "28.1") (org-node "0.5pre") (org-roam "2.2.2") (emacsql "4.0.0") (compat "29.1.4.5"))
 ;; URL:              https://github.com/meedstrom/org-node
 
 ;;; Commentary:
