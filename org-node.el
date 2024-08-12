@@ -792,11 +792,34 @@ didn't do so already, or local changes have been made."
           (byte-compile-file lib))))
     (or native-path elc-path)))
 
-(defmacro org-node--ensure-compiled-fn (var)
-  "Ensure that the value of variable VAR is a compiled function."
-  `(or (compiled-function-p (if (symbolp ,var) (symbol-function ,var) ,var))
-       ;; Would use native-comp here, but it wrecks Customize
-       (setq ,var (byte-compile ,var))))
+;; (defmacro org-node--ensure-compiled-fn (var)
+;;   "Ensure that the value of variable VAR is a comp-sym function."
+;;   `(or (compiled-function-p (if (symbolp ,var) (symbol-function ,var) ,var))
+;;        ;; Would use native-comp here, but it wrecks Customize
+;;        (if (symbolp ,var)
+;;            (byte-compile ,var)
+;;          (setq ,var (byte-compile ,var)))))
+(defvar org-node--fn-hashes nil)
+(defvar org-node--compiled-affixation-fn nil)
+(defvar org-node--compiled-filter-fn nil)
+
+(defun org-node--shadow (fnsym comp-sym)
+  "Compile function stored at FNSYM and put it in COMP-SYM.
+Do nothing if FNSYM has not changed since the last time.
+
+The value of FNSYM may be either a lambda or a function symbol."
+  (let* ((fnval (symbol-value fnsym))
+         (curr-hash (sxhash fnval)))
+    (unless (eq (alist-get fnsym org-node--fn-hashes) curr-hash)
+      ;; Save hash of definition so we don't need to recompile every time
+      (setf (alist-get fnsym org-node--fn-hashes) curr-hash)
+      (when (eq 'closure (car fnval))
+        ;; Turn closure into plain lambda, because native-comp demands it
+        (setq fnval (cons 'lambda (cddr fnval)))
+        (set fnsym fnval))
+      (set comp-sym (if (native-comp-available-p)
+                        (native-compile fnval)
+                      (byte-compile fnval))))))
 
 (defun org-node--scan (files finalizer)
   "Begin async scanning FILES for id-nodes and links.
@@ -805,8 +828,10 @@ When finished, pass a list of scan results to the FINALIZER
 function to update current tables."
   (when (= 0 org-node-perf-max-jobs)
     (setq org-node-perf-max-jobs (org-node--count-logical-cores)))
-  (org-node--ensure-compiled-fn org-node-filter-fn)
-  (org-node--ensure-compiled-fn org-node-affixation-fn)
+  (org-node--shadow 'org-node-filter-fn 'org-node--compiled-filter-fn)
+  (org-node--shadow 'org-node-affixation-fn 'org-node--compiled-affixation-fn)
+  ;; (org-node--ensure-compiled-fn org-node-filter-fn)
+  ;; (org-node--ensure-compiled-fn org-node-affixation-fn)
   (let ((compiled-lib (org-node--ensure-compiled-lib))
         (file-name-handler-alist nil)
         (coding-system-for-read org-node-perf-assume-coding-system)
@@ -969,6 +994,7 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
   (clrhash org-node--candidate<>node)
   (clrhash org-node--title<>id)
   (clrhash org-node--ref<>id)
+  (clrhash org-node--date<>daily-id)
   (setq org-node--collisions nil) ;; To be populated by `org-node--record-node'
   (seq-let (missing-files file<>mtime nodes path<>type links problems) results
     (org-node--forget-id-locations missing-files)
@@ -987,6 +1013,7 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
     (dolist (node nodes)
       (org-node--record-node node))
     (org-id-locations-save)
+    (setq org-node--daily-ids (mapcar #'cdr (org-node--sort-dailies)))
     (setq org-node--time-elapsed
           ;; For reproducible profiling: don't count time taken by
           ;; other sentinels or timers or I/O in between these periods
@@ -1288,6 +1315,9 @@ is wrapped in its own list."
         (setq big-list (nthcdr sublist-length big-list))))
     (delq nil result)))
 
+
+;;;; Etc
+
 ;; I wish that `find-file-noselect' when called from Lisp would take an
 ;; optional argument that explains why the file is about to be opened, amending
 ;; the autosave recovery prompt.  Hack up something like that.
@@ -1403,6 +1433,194 @@ for you."
     (let ((alist (org-id-hash-to-alist org-id-locations)))
       (cl-loop for file in files do (assoc-delete-all file alist))
       (setq org-id-locations (org-id-alist-to-hash alist)))))
+
+
+;;;; Series
+
+(defun org-node--series-goto (series)
+  (let* ((name (plist-get series :name))
+         (sortstr (funcall (or (plist-get series :prompter)
+                               #'org-node--series-fallback-prompter)
+                           series))
+         (id (gethash sortstr (plist-get series :sortstr<>id)))
+         (node (when id (gethash id org-node--id<>node))))
+    (if node
+        (org-node--goto node)
+      (message "Entry %s not found in series %s" sortstr name))))
+
+(defun org-node--series-fallback-prompter (series)
+  (completing-read "Go to: " (plist-get series :sortstr<>id)))
+
+(defun org-node--default-daily-classifier (node)
+  "Classifier for daily-notes emulating Org-Roam.
+If NODE's full path involves a \"daily\" directory, and NODE is
+file-level as opposed to a subtree node, then return NODE's
+title, which is hopefully in the YYYY-MM-DD format, but this is
+not verified."
+  (when (and (string-search "daily/" (org-node-get-file-path node))
+             (not (org-node-get-is-subtree node)))
+    (org-node-get-title node)))
+
+(defvar org-node--series-data nil
+  "Alist looking like
+((HASH :key KEY
+       :name NAME
+       :classifier CLASSIFIER
+       :prompter PROMPTER
+       :sortstr<>id SORTSTR-ID-TBL
+       :sorted-ids SORTED-IDS))")
+
+(defvar org-node--default-daily-data nil)
+
+(defun org-node--default-daily-prompter (data)
+  (setq org-node--default-daily-data data)
+  (add-hook 'calendar-today-visible-hook #'org-node--default-daily-mark)
+  (add-hook 'calendar-today-invisible-hook #'org-node--default-daily-mark)
+  (unwind-protect
+      (org-read-date)
+    (remove-hook 'calendar-today-visible-hook #'org-node--default-daily-mark)
+    (remove-hook 'calendar-today-invisible-hook #'org-node--default-daily-mark)))
+
+(defun org-node--default-daily-mark ()
+  "Mark days in the calendar for which a daily-note is present."
+  (dolist (date (hash-table-keys
+                 (plist-get org-node--default-daily-data :sortstr<>id)))
+    (when (calendar-date-is-visible-p date)
+      (calendar-mark-visible-date date 'org-roam-dailies-calendar-note))))
+
+(defvar org-node-series
+  '(("d" "Dailies"
+     org-node--default-daily-classifier
+     org-node--default-daily-prompter))
+  "Alist describing each node series.
+
+Each item looks like (KEY NAME CLASSIFIER PROMPTER).
+
+NAME describes this series and KEY is the corresponding key to
+type in \\[org-node-series-dispatch], both strings.
+
+CLASSIFIER is a single-argument function taking an `org-node'
+object and should return an unique string if the node belongs to
+the series, or nil otherwise.
+
+The returned string should be formulated with the intent of
+sorting, because the \(lexicographic) sort order determines the
+order of items in the series.  For example, a series of
+daily-notes is correctly sorted if the sort-string is a date in
+the YYYY-MM-DD format, but not if it is DD/MM/YY.
+
+PROMPTER is either nil or a function that may be used during
+capture or refile, that interactively prompts for a sort-string.
+This highlights the other use of the sort-string: finding the
+node from scant context.  Going back to the example of
+daily-notes, `org-read-date' works well as a prompter because it
+returns strings in YYYY-MM-DD format.")
+
+;; TODO: is it possible to use gv-letplace or something to avoid let-binding a
+;; new table and producing garbage on copying value at the end?
+(defun org-node--series-build (series)
+  (let ((table (make-hash-table :test #'equal))
+        (classifier (nth 1 (assoc series org-node-series))))
+    (cl-loop for id being the hash-keys of org-node--id<>node
+             using (hash-values node)
+             as sortstr = (funcall classifier node)
+             when sortstr
+             collect (progn
+                       (puthash sortstr id table)
+                       (cons sortstr id))
+             into items
+             finally do
+             (setf (nth 3 (assoc series org-node-series)) table)
+             (setf (nth 4 (assoc series org-node-series))
+                   (mapcar #'cdr
+                           (cl-sort items #'string-greaterp :key #'car))))))
+
+(defun org-node-series-capture-target ()
+  (org-node-cache-ensure)
+  (let* ((day (org-read-date))
+         (node (gethash day org-node--candidate<>node)))
+    (if node
+        ;; Node exists; capture into it
+        (let ((title (org-node-get-title node))
+              (id (org-node-get-id node)))
+          (find-file (org-node-get-file-path node))
+          (widen)
+          (goto-char (org-node-get-pos node))
+          (org-show-context)
+          (org-show-entry)
+          (unless (and (= 1 (point)) (org-at-heading-p))
+            (when (outline-next-heading)
+              (backward-char 1))))
+      ;; Node does not exist; capture into new file
+      (let* ((dir org-journal-dir)
+             (title day)
+             (id (org-id-new))
+             (path-to-write (expand-file-name (concat day ".org") dir)))
+        (if (or (file-exists-p path-to-write)
+                (find-buffer-visiting path-to-write))
+            (error "File or buffer already exists: %s" path-to-write)
+          (mkdir (file-name-directory path-to-write) t)
+          (find-file path-to-write)
+          (if org-node-prefer-with-heading
+              (insert "* " title
+                      "\n:PROPERTIES:"
+                      "\n:ID:       " id
+                      "\n:END:"
+                      "\n")
+            (insert ":PROPERTIES:"
+                    "\n:ID:       " id
+                    "\n:END:"
+                    "\n#+title: " title
+                    "\n"))
+          (unwind-protect
+              (run-hooks 'org-node-creation-hook)
+            (save-buffer)
+            (org-node--scan-targeted (list path-to-write))))))))
+
+(defun org-node-series-refile ()
+  )
+
+(transient-append-suffix 'org-node-series-dispatch "d"
+  '("n" "Next in series" org-node-series-next :transient t)
+  )
+
+(transient-define-prefix org-node-series-dispatch ()
+  ["Org-node series"])
+
+(defun org-node-series-next (series)
+  (org-node-series-cycle series +1))
+
+(defun org-node-series-prev (series)
+  (org-node-series-cycle series -1))
+
+(defun org-node-series-cycle (series n)
+  (interactive nil org-mode)
+  ;; TODO retry if necessary until no more ancestor ids
+  (when (derived-mode-p 'org-mode)
+    (let* ((id-here (org-node-id-at-point))
+           (greater nil))
+      (unless (gethash id-here org-nodes)
+        (user-error "No known ID-node here, so no series"))
+      (when (cl-loop for id in (nth 4 (assoc series org-node-series))
+                     if (equal id id-here)
+                     return t
+                     else do (push id greater))
+        (let ((node nil)
+              (to-check (if (>= n 1)
+                            greater
+                          (drop (length greater)
+                                (nth 4 (assoc series org-node-series))))))
+          (if (catch 'fail
+                ;; Normally we'd just take the first `pop', but user may have
+                ;; deleted a daily-note that is still in the table, and we do
+                ;; not clean up the dailies table (TBD), so keep popping until
+                ;; match
+                (while (not node)
+                  (if to-check
+                      (setq node (gethash (pop to-check) org-nodes))
+                    (throw 'fail t))))
+              (message "No %s node" (if (>= n 1) "next" "previous"))
+            (org-node--goto node)))))))
 
 
 ;;;; Filename functions
@@ -1576,34 +1794,6 @@ org-roam."
       (org-roam-node-slug (org-roam-node-create :title title))
     (user-error "org-roam required for `org-node-slugify-like-roam-actual'")))
 
-(defun org-node--daily-note-p ()
-  "Check if current-buffer is an org-mode file in
-`org-roam-dailies-directory'."
-  (when buffer-file-name
-    (when-let ((a (expand-file-name
-                   (buffer-file-name (buffer-base-buffer))))
-               (b (expand-file-name
-                   org-roam-dailies-directory)))
-      (setq a (expand-file-name a))
-      (if (and (eq major-mode 'org-mode)
-               (unless (and a b (equal (file-truename a) (file-truename b)))
-                 (string-prefix-p (replace-regexp-in-string "^\\([A-Za-z]\\):" 'downcase
-                                                            (expand-file-name b) t t)
-                                  (replace-regexp-in-string "^\\([A-Za-z]\\):" 'downcase
-                                                            (expand-file-name a) t t))))
-          t nil))))
-
-;; DEPRECATED
-(defun org-node-slugify-like-roam (title)
-  "From TITLE, make a filename in the default org-roam style."
-  (if (require 'org-roam nil t)
-      (progn
-        (message "Variable `org-node-filename-fn' deprecated, please update config")
-        (concat (format-time-string "%Y%m%d%H%M%S-")
-                (org-roam-node-slug (org-roam-node-create :title title))
-                ".org"))
-    (user-error "org-roam required for `org-node-slugify-like-roam'")))
-
 
 ;;;; How to create new nodes
 
@@ -1619,7 +1809,12 @@ org-roam."
       (let ((file (org-node-get-file-path node)))
         (if (backup-file-name-p file)
             (progn
+              ;; FIXME: How to prevent this from happening?
               (message "org-node: Accidentally recorded backup file, resetting cache...")
+              (org-node--forget-id-locations (list file))
+              (push (lambda ()
+                      (message "org-node: Didn't find a file, resetting cache... done"))
+                    org-node--temp-extra-fns)
               (org-node--scan-all))
           (if (file-exists-p file)
               (let ((pos (org-node-get-pos node)))
@@ -1640,6 +1835,9 @@ org-roam."
                   (unless (pos-visible-in-window-p pos)
                     (goto-char pos))))
             (message "org-node: Didn't find a file, resetting cache...")
+            (push (lambda ()
+                    (message "org-node: Didn't find a file, resetting cache... done"))
+                  org-node--temp-extra-fns)
             (org-node--scan-all))))
     (error "`org-node--goto' received a nil argument")))
 
@@ -1701,7 +1899,7 @@ which it gets some necessary variables."
       (message "org-node-new-file is meant to be called indirectly")
     (let* ((dir (org-node-guess-or-ask-dir "New file in which directory? "))
            (path-to-write (file-name-concat
-                           dir (org-node--name-file org-node-proposed-title))))
+                           dir (org-node--mk-basename org-node-proposed-title))))
       (if (or (file-exists-p path-to-write)
               (find-buffer-visiting path-to-write))
           (message "A file or buffer already exists for path %s"
@@ -1723,7 +1921,7 @@ which it gets some necessary variables."
         (unwind-protect
             (run-hooks 'org-node-creation-hook)
           (save-buffer)
-          ;; REVIEW Redundant?
+          ;; REVIEW: Redundant?
           (org-id-add-location org-node-proposed-id path-to-write))))))
 
 (defun org-node-new-via-roam-capture ()
@@ -1847,7 +2045,7 @@ type the name of a node that does not exist.  That enables this
       ;; Node does not exist; capture into new file
       (let* ((dir (org-node-guess-or-ask-dir "New file in which directory? "))
              (path-to-write (file-name-concat
-                             dir (org-node--name-file title))))
+                             dir (org-node--mk-basename title))))
         (if (or (file-exists-p path-to-write)
                 (find-buffer-visiting path-to-write))
             (error "File or buffer already exists: %s" path-to-write)
@@ -1888,138 +2086,6 @@ To behave like `org-roam-node-find' when creating new nodes, set
       (org-node--create input (org-id-new)))))
 
 ;;;###autoload
-(defun org-node-goto-daily (&optional direction range span)
-  "Go to a daily node with a time `offset' from the current buffer.
-If called interactively, find the daily-note for a date using the calendar,
-creating it if necessary."
-  (interactive)
-  (let* ((offset
-          (if (and direction range span)
-              (concat direction (number-to-string range) span)
-            nil))
-         (must-be-in-daily ;; if prefix makes reference to base date
-          (if offset (let ((prefix
-                            ;; ('Some people, when confronted with a problem, think
-                            ;;   "I know, I'll use regular expressions."
-                            ;;   Now they have two problems.' —Jamie Zawinski)
-                            "\\`\\(?:\\+\\{2\\}\\|-\\{2\\}\\)"))
-                       ;; = two or more `+' or `-' at beginning of string
-                       ;; = (rx (: bos (or (repeat 2 2 "+")
-                       ;;                  (repeat 2 2 "-"))))
-                       (string-match prefix offset))
-            nil)))
-    (if (and
-         (not (org-node--daily-note-p))
-         must-be-in-daily)
-        (user-error "Not in a daily-note.")
-      (let* ((current-node
-              (if must-be-in-daily
-                  (org-time-string-to-time
-                   (file-name-base buffer-file-name))
-                nil))
-             (target-node
-              (org-read-date nil nil offset nil current-node))
-             (node-hash (gethash target-node org-node--candidate<>node)))
-        (if node-hash
-            (org-node--goto node-hash)
-          (if (member direction '("--" "++")) ;; if next or prev & missing node
-              (org-node--find-next-daily-iterate
-               current-node direction (1+ range) span)
-            (org-node--daily-not-found target-node)))))))
-
-(defun org-node--find-next-daily-iterate (current-node direction range span)
-  "Worker function for `org-node-goto-daily'. Handles looking up previous
-or next dailies with potential time gaps."
-  (let* ((offset
-          (concat direction (number-to-string range) span))
-         (target-node
-          (org-read-date nil nil offset nil current-node))
-         (node-hash (gethash target-node org-node--candidate<>node))
-         (beginning-of-time
-          (if org-read-date-force-compatible-dates
-              (org-time-string-to-time "1976-06-21")
-            (org-time-string-to-time "1900-01-01")))
-         (end-of-time
-          (if org-read-date-force-compatible-dates
-              (org-time-string-to-time "2037-01-01")
-            (org-time-string-to-time "2100-01-01"))))
-    (cl-loop
-     while (and (not node-hash) ;; while node not found
-                ;; and still within reasonable time range
-                (let ((target-node-time
-                       (org-time-string-to-time target-node)))
-                  (and
-                   (time-less-p beginning-of-time
-                                target-node-time)
-                   (time-less-p target-node-time
-                                end-of-time))))
-     do (progn
-          (setq range (1+ range))
-          (setq target-node
-                (org-read-date nil nil
-                               (concat direction (number-to-string range) span)
-                               nil current-node))
-          (setq node-hash (gethash target-node org-node--candidate<>node))))
-    (if node-hash
-        (org-node--goto node-hash)
-      (user-error (concat "Cannot find "
-                          (if (equal direction "--")
-                              "previous"
-                            "next")
-                          " daily entry.")))))
-
-(defun org-node--daily-not-found (target-node)
-  "Handles missing/nascent daily node look-up."
-  (if (fboundp 'org-roam-mode)
-      (progn
-        (require 'org-roam-dailies) ;; in case it's not loaded
-        (org-roam-dailies--capture
-         (org-read-date nil t target-node nil)
-         t
-         (when org-node-default-org-roam-capture-template-key
-           org-node-default-org-roam-capture-template-key)))
-    (message "Cannot load requested file.
-(And org-roam is not available.)")))
-
-;;;###autoload
-(defun org-node-goto-prev-day ()
-  "Go to the day before the day of the current buffer."
-  (interactive)
-  (org-node-goto-daily "--" 1 "d"))
-
-;;;###autoload
-(defun org-node-goto-next-day ()
-  "Go to the day after the day of the current buffer."
-  (interactive)
-  (org-node-goto-daily "++" 1 "d"))
-
-;;;###autoload
-(defun org-node-goto-yesterday ()
-  "Go to yesterday."
-  (interactive)
-  (org-node-goto-daily "-" 1 "d"))
-
-;;;###autoload
-(defun org-node-goto-tomorrow ()
-  "Go to tomorrow."
-  (interactive)
-  (org-node-goto-daily "+" 1 "d"))
-
-;;;###autoload
-(defun org-node-goto-today ()
-  "Go to today."
-  (interactive)
-  (org-node-goto-daily "+" 0 "d"))
-
-;;;###autoload
-(defun org-node-visit-random ()
-  "Visit a random node."
-  (interactive)
-  (org-node-cache-ensure)
-  (org-node--goto (nth (random (hash-table-count org-node--candidate<>node))
-                       (hash-table-values org-node--candidate<>node))))
-
-;;;###autoload
 (defun org-node-insert-link (&optional region-as-initial-input)
   "Insert a link to one of your ID nodes.
 
@@ -2054,9 +2120,7 @@ Optional argument REGION-AS-INITIAL-INPUT t means behave as
          (node (gethash input org-node--candidate<>node))
          (id (if node (org-node-get-id node) (org-id-new)))
          (link-desc (or region-text
-                        ;; HACK input is already what the user selected, but
-                        ;; when `org-node-alter-candidates' = t, we dont want
-                        ;; to use the whole completion candidate
+                        (when (not org-node-alter-candidates) input)
                         (and node (--find (string-search it input)
                                           (org-node-get-aliases node)))
                         (and node (org-node-get-title node))
@@ -2172,6 +2236,17 @@ adding keywords to the things to exclude:
       (run-hook-with-args 'org-node-insert-link-hook id title))))
 
 ;;;###autoload
+(defun org-node-visit-random ()
+  "Visit a random node."
+  (interactive)
+  (org-node-cache-ensure)
+  (org-node--goto (nth (random (hash-table-count org-node--candidate<>node))
+                       (hash-table-values org-node--candidate<>node))))
+
+;; (defun org-node-refile ()
+;;   )
+
+;;;###autoload
 (defun org-node-extract-subtree ()
   "Extract subtree at point into a file of its own.
 Leave a link in the source file, and show the newly created file.
@@ -2223,7 +2298,7 @@ as more \"truthful\" than today's date.
            (properties (--filter (not (equal "CATEGORY" (car it)))
                                  (org-entry-properties nil 'standard)))
            (path-to-write (file-name-concat
-                           dir (org-node--name-file title)))
+                           dir (org-node--mk-basename title)))
            (source-path buffer-file-name))
       (if (file-exists-p path-to-write)
           (message "A file already exists named %s" path-to-write)
@@ -2273,8 +2348,8 @@ as more \"truthful\" than today's date.
         (org-node--scan-targeted (list path-to-write source-path))))))
 
 ;; Transitional wrapper
-(defun org-node--name-file (title)
-  (if org-node-filename-fn
+(defun org-node--mk-basename (title)
+  (if (bound-and-true-p org-node-filename-fn)
       (concat (string-remove-suffix ".org"
                                     (funcall org-node-filename-fn title))
               ".org")
@@ -2307,19 +2382,67 @@ out.
                 "[[:alpha:]]+" "[[:alpha:]]+"
                 example t))))))
 
-;; FIXME (buffer-modified-p) returns t on after-save-hook
+(defcustom org-node-renames-allowed-dirs nil
+  "Dirs in which files may be auto-renamed.
+Used by `org-node-rename-file-by-title-maybe'."
+  :type '(repeat string))
+
+(defcustom org-node-renames-disallowed-regexp "daily/"
+  "Regexp matching paths of files not to auto-rename.
+Only needed to filter out files in `org-node-renames-allowed-dirs'.
+
+Used by `org-node-rename-file-by-title-maybe'."
+  :type 'string)
+
+;; FIXME: After running this on an after-save-hook, (buffer-modified-p)
+;;        returns t, which seems unsafe
 (defun org-node-rename-file-by-title-maybe ()
   "Rename current file according to TITLE.
 In addition to the checks described in
-`org-node-rename-file-by-title', will refuse to rename files that
-are outside `org-roam-directory'.  Suitable as a save hook:
+`org-node-rename-file-by-title', will only rename files in
+`org-node-renames-allowed-dirs'.  Suitable as a save hook:
 
     (add-hook 'after-save-hook #'org-node-rename-file-by-title-maybe)"
   (when (derived-mode-p 'org-mode)
-    (unless (bound-and-true-p org-roam-directory)
-      (user-error "org-node-rename-file-by-title-maybe: Variable `org-roam-directory' must be set (org-roam not needed)"))
-    (when (string-prefix-p org-roam-directory (buffer-file-name))
-      (org-node-rename-file-by-title))))
+    (when (null org-node-renames-allowed-dirs)
+      (message "New user option `org-node-renames-allowed-dirs' should be configured"))
+    (cl-loop for dir in org-node-renames-allowed-dirs
+             if (and (string-prefix-p dir buffer-file-name)
+                     (not (string-match-p org-node-renames-disallowed-regexp
+                                          buffer-file-name)))
+             return (org-node-rename-file-by-title))))
+
+;; Unused
+(defun org-node--first-id-in-file ()
+  (save-excursion
+    (without-restriction
+      (goto-char 1)
+      (when (re-search-forward "^[[:space:]]*:ID: +" nil t)
+        (let ((id (buffer-substring-no-properties
+                   (point)
+                   (+ (point) (skip-chars-forward "^\n\t\s")))))
+          (if (string-blank-p id)
+              nil
+            id))))))
+
+;; This function can be removed if one day we drop support for file-level
+;; nodes, because then just (org-entry-get nil "ID" t) will suffice.  That
+;; function demonstrates the maintenance burden of file-level anything:
+;; `org-entry-get' /can/ get the file-level ID but only if point is before
+;; first heading; someone forgot to ensure the INHERIT argument will also work
+;; as intended.  And no fault to them, it's easy to miss; file-level property
+;; drawers were a mistake, they create the need for special cases all over the
+;; place.
+(defun org-node-id-at-point ()
+  (save-excursion
+    (without-restriction
+      (let (id)
+        (while (and (null (setq id (org-entry-get nil "ID")))
+                    (not (bobp)))
+          (org-up-heading-or-point-min))
+        id))))
+
+;; (defun org-node-visit-next-by-date-created ())
 
 ;;;###autoload
 (defun org-node-rename-file-by-title (&optional interactive)
