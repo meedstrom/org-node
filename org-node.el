@@ -1604,7 +1604,7 @@ format, but this is not verified."
                      return t
                      else do (push id head))
         (let ((node nil)
-              (to-check (if (>= n 1)
+              (to-check (if (natnump n)
                             head
                           (drop (1+ (length head))
                                 (plist-get series :sorted-ids)))))
