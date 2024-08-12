@@ -302,15 +302,13 @@ Arguments PLAIN-RE and MERGED-RE..."
 (defvar org-node-parser--result:problems nil)
 (defvar org-node-parser--curr-file nil)
 
-;; (defvar org-node-parser--temp-buf nil
-;;   "One extra buffer.")
-
 (defun org-node-parser--collect-dangerously ()
   "Dangerous!  Overwrites the current buffer!
 
-Using info in the temp files prepared by `org-node-cache--scan',
-look for ID-nodes and links in all Org files given in the file
-list, and write results to another temp file."
+Taking info from the temp files prepared by
+`org-node-cache--scan', such as a file list, look for ID-nodes
+and links in all Org files given in the file list, and write
+the findings to another temp file."
   (let ((file-name-handler-alist nil))
     (insert-file-contents (org-node-parser--tmpfile "work-variables.eld"))
     (dolist (var (read (buffer-string)))
@@ -320,7 +318,6 @@ list, and write results to another temp file."
     (insert-file-contents (org-node-parser--tmpfile "file-list-%d.eld" i)))
   (setq $files (read (buffer-string)))
   (setq buffer-read-only t)
-  ;; (setq org-node-parser--temp-buf (get-buffer-create " *org-node temp*" t))
   (let ((case-fold-search t)
         result:missing-files
         result:found-nodes
@@ -365,7 +362,7 @@ list, and write results to another temp file."
 
             ;; If the very first line of file is a heading (typical for people
             ;; who set `org-node-prefer-with-heading'), don't try to scan any
-            ;; file-level data.  Anyway, our usage of
+            ;; file-level front matter.  Anyway, our usage of
             ;; `org-node-parser--next-heading' cannot handle that edge-case, so
             ;; we must check.
             (if (looking-at-p "\\*")
@@ -379,10 +376,10 @@ list, and write results to another temp file."
                 (narrow-to-region 1 (point))
                 (goto-char 1))
               ;; Rough equivalent of `org-end-of-meta-data' for the file
-              ;; level, can jump somewhat too far but that's ok
+              ;; level front matter, can jump somewhat too far but that's ok
               (setq FAR (if (re-search-forward "^ *?[^#:]" nil t)
                             (1- (point))
-                          ;; File is pretty much just a property drawer
+                          ;; No content other than front matter
                           (point-max)))
               (goto-char 1)
               (setq PROPS
@@ -391,7 +388,7 @@ list, and write results to another temp file."
                           (forward-line 1)
                           (org-node-parser--collect-properties
                            (point)
-                           (if (re-search-forward "^[[:space:]]*:end:" nil t)
+                           (if (re-search-forward "^[[:space:]]*:end:" FAR t)
                                (pos-bol)
                              (error "Couldn't find :END: of drawer"))))
                       nil))
@@ -445,7 +442,7 @@ list, and write results to another temp file."
                 ;; (benchmark-run 10 (setq org-node--done-ctr 6) (org-node--handle-finished-job 7 #'org-node--finalize-full))
                 ;; Result when finalizer passes plists to `org-node--make-obj':
                 ;; (8.152532984 15 4.110698459000105)
-                ;; Result when finalizer accepts premade records:
+                ;; Result when finalizer accepts these premade records:
                 ;; (5.928453786 10 2.7291036080000595)
                 (push
                  (record 'org-node
@@ -491,6 +488,7 @@ list, and write results to another temp file."
                               (goto-char (match-end 0))
                               (skip-chars-forward " "))
                           nil))
+                  ;; [#A] [#B] [#C]
                   (setq PRIORITY
                         (if (looking-at "\\[#[A-Z0-9]+\\]")
                             (prog1 (match-string 0)
@@ -502,7 +500,7 @@ list, and write results to another temp file."
                   (goto-char (match-end 0))
                   (skip-chars-forward " "))
                 (setq HERE (point))
-                ;; Tags in heading?
+                ;; Any tags in heading?
                 (if (re-search-forward " +\\(:.+:\\) *$" (pos-eol) t)
                     (progn
                       (setq TITLE (org-node-parser--org-link-display-format
@@ -592,7 +590,7 @@ list, and write results to another temp file."
                 (setq OLP-WITH-SELF (append OLP (list TITLE)))
                 (setq HERE (point))
                 ;; Don't count org-super-links backlinks
-                ;; TODO: Generalize this mechanic to skip src blocks too
+                ;; TODO: Generalize this mechanism to skip src blocks too
                 (if (setq DRAWER-BEG
                           (re-search-forward $backlink-drawer-re nil t))
                     (unless (setq DRAWER-END (search-forward ":end:" nil t))

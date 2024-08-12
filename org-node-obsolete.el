@@ -5,7 +5,8 @@
     (org-nodeify-entry org-node-nodeify-entry)
     (org-node-random org-node-visit-random)
     (org-node-slugify-as-url org-node-slugify-for-web)
-    (org-node-new-by-roam-capture org-node-new-via-roam-capture)))
+    (org-node-new-by-roam-capture org-node-new-via-roam-capture)
+    (org-node-filename-fn)))
 
 (defun org-node--warn-obsolete ()
   "Maybe print one-shot warnings, then become a no-op."
@@ -45,7 +46,17 @@ when it was deprecated and REMOVED-BY when it may be removed."
                 ',old ,(or removed-by "30 August 2024") ',new))
        (apply ',new args))))
 
-(org-node--defobsolete org-node-files org-node-list-files)
+(org-node--defobsolete org-node-files
+                       org-node-list-files)
+
+(org-node--defobsolete org-node-list-journal-files
+                       org-node-faster-journal-list-files)
+
+(org-node--defobsolete org-node-list-roam-daily-files
+                       org-node-faster-roam-list-dailies)
+
+(org-node--defobsolete org-node-list-roam-files
+                       org-node-faster-roam-list-files)
 
 (provide 'org-node-obsolete)
 
