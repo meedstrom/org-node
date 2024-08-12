@@ -1017,7 +1017,7 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
     (dolist (node nodes)
       (org-node--record-node node))
     (org-id-locations-save)
-    (dolist (spec (org-node-series))
+    (dolist (spec org-node-series)
       (org-node--build-series spec))
     (setq org-node--time-elapsed
           ;; For reproducible profiling: don't count time taken by
@@ -1444,68 +1444,10 @@ for you."
 
 ;; (defun org-node-visit-next-by-date-created ())
 
-(defun org-node--series-goto (series)
-  (let* ((name (plist-get series :name))
-         (sortstr (funcall (or (plist-get series :prompter)
-                               #'org-node--series-fallback-prompter)
-                           series))
-         (id (gethash sortstr (plist-get series :sortstr<>id)))
-         (node (when id (gethash id org-node--id<>node))))
-    (if node
-        (org-node--goto node)
-      (message "Entry %s not found in series %s" sortstr name))))
-
-(defun org-node--series-fallback-prompter (series)
-  (completing-read "Go to: " (plist-get series :sortstr<>id)))
-
-(defun org-node--default-daily-classifier (node)
-  "Classifier for daily-notes emulating Org-Roam.
-If NODE's full path involves a \"daily\" directory, and NODE is
-file-level as opposed to a subtree node, then return NODE's
-title, which is hopefully in the YYYY-MM-DD format, but this is
-not verified."
-  (when (and (string-search "daily/" (org-node-get-file-path node))
-             (not (org-node-get-is-subtree node)))
-    (org-node-get-title node)))
-
-(defvar org-node--series-data nil
-  "Alist looking like
-((HASH :key KEY
-       :name NAME
-       :classifier CLASSIFIER
-       :prompter PROMPTER
-       :sortstr<>id SORTSTR-ID-TBL
-       :sorted-ids SORTED-IDS))")
-
-(defvar org-node--daily-series nil)
-
-(defun org-node--daily-prompter (data)
-  (setq org-node--daily-series data)
-  (add-hook 'calendar-today-invisible-hook #'org-node--mark-dailies)
-  (add-hook 'calendar-today-visible-hook #'org-node--mark-dailies)
-  (unwind-protect
-      (org-read-date)
-    (remove-hook 'calendar-today-invisible-hook #'org-node--mark-dailies)
-    (remove-hook 'calendar-today-visible-hook #'org-node--mark-dailies)))
-
-(defun org-node--mark-dailies ()
-  "Mark the calendar dates for which there is a daily-note."
-  ;; Going by source of `calendar-date-is-visible-p', it's always 3 months?
-  ;; (cl-loop
-  ;;  for ymd in (hash-table-keys (plist-get org-node--daily-series :sortstr<>id))
-  ;;  as month = (string-to-number (substring ymd 5 7))
-  ;;  as day = (string-to-number (substring ymd 8 10))
-  ;;  as year = (string-to-number (substring ymd 0 4))
-  ;;  when (> 2 (abs (calendar-interval displayed-month displayed-year
-  ;;                                    month year)))
-  ;;  do (calendar-mark-visible-date
-  ;;      (list month day year) 'org-roam-dailies-calendar-note))
-  )
-
 (defvar org-node-series
   '(("d" "Dailies"
      org-node--default-daily-classifier
-     org-node--daily-prompter))
+     org-read-date))
   "Alist describing each node series.
 
 Each item looks like (KEY NAME CLASSIFIER PROMPTER).
@@ -1530,6 +1472,51 @@ node from scant context.  Going back to the example of
 daily-notes, `org-read-date' works well as a prompter because it
 returns strings in YYYY-MM-DD format.")
 
+(defvar org-node--series-data nil
+  "Alist describing each node series, internal use.
+It looks like:
+
+((HASH :key STRING
+       :name STRING
+       :classifier FUNCTION
+       :prompter FUNCTION
+       :sortstr<>id HASH-TABLE
+       :sorted-ids LIST))")
+
+(defun org-node--default-daily-classifier (node)
+  "Classifier for daily-notes emulating Org-Roam.
+If NODE's full path involves a \"daily\" directory, and NODE is
+file-level as opposed to a subtree node, then return NODE's
+title, which is hopefully in the YYYY-MM-DD format, but this is
+not verified."
+  (when (and (string-search "daily/" (org-node-get-file-path node))
+             (not (org-node-get-is-subtree node)))
+    (org-node-get-title node)))
+
+;; (defun org-node--default-daily-prompter (data)
+;;   (setq org-node--daily-series data)
+;;   (add-hook 'calendar-today-invisible-hook #'org-node--mark-dailies)
+;;   (add-hook 'calendar-today-visible-hook #'org-node--mark-dailies)
+;;   (unwind-protect
+;;       (org-read-date)
+;;     (remove-hook 'calendar-today-invisible-hook #'org-node--mark-dailies)
+;;     (remove-hook 'calendar-today-visible-hook #'org-node--mark-dailies)))
+
+;; (defvar org-node--daily-series nil)
+;; (defun org-node--mark-dailies ()
+;;   "Mark the calendar dates for which there is a daily-note."
+;;   ;; Going by source of `calendar-date-is-visible-p', it's always 3 months?
+;;   ;; (cl-loop
+;;   ;;  for ymd in (hash-table-keys (plist-get org-node--daily-series :sortstr<>id))
+;;   ;;  as month = (string-to-number (substring ymd 5 7))
+;;   ;;  as day = (string-to-number (substring ymd 8 10))
+;;   ;;  as year = (string-to-number (substring ymd 0 4))
+;;   ;;  when (> 2 (abs (calendar-interval displayed-month displayed-year
+;;   ;;                                    month year)))
+;;   ;;  do (calendar-mark-visible-date
+;;   ;;      (list month day year) 'org-roam-dailies-calendar-note))
+;;   )
+
 ;; TODO: is it possible to use gv-letplace or something to avoid let-binding a
 ;; new table and producing garbage on copying value at the end?
 (defun org-node--build-series (spec)
@@ -1547,54 +1534,67 @@ returns strings in YYYY-MM-DD format.")
                (setf (alist-get (sxhash key) org-node--series-data)
                      (list :key key
                            :name name
-                           :classifier classifier
+                           :classifier (byte-compile classifier)
                            :prompter prompter
-                           :sorted-ids (mapcar #'cdr
-                                               (cl-sort items #'string-greaterp
-                                                        :key #'car))
+                           :sorted-ids
+                           (mapcar #'cdr (cl-sort items #'string> :key #'car))
                            :sortstr<>id table))))))
 
-(defun org-node-series-capture-target ()
-  (org-node-cache-ensure)
-  (let* ((day (org-read-date))
-         (node (gethash day org-node--candidate<>node)))
+(defun org-node--series-goto (series)
+  (let* ((name (plist-get series :name))
+         (sortstr (funcall (or (plist-get series :prompter)
+                               #'org-node--series-fallback-prompter)
+                           series))
+         (id (gethash sortstr (plist-get series :sortstr<>id)))
+         (node (when id (gethash id org-node--id<>node))))
     (if node
-        ;; Node exists; capture into it
-        (let ((title (org-node-get-title node))
-              (id (org-node-get-id node)))
-          (find-file (org-node-get-file-path node))
-          (widen)
-          (goto-char (org-node-get-pos node))
-          (org-show-context)
-          (org-show-entry)
-          (unless (and (= 1 (point)) (org-at-heading-p))
-            (when (outline-next-heading)
-              (backward-char 1))))
-      ;; Node does not exist; capture into new file
-      (let* ((dir org-journal-dir)
-             (title day)
-             (id (org-id-new))
-             (path-to-write (expand-file-name (concat day ".org") dir)))
-        (if (or (file-exists-p path-to-write)
-                (find-buffer-visiting path-to-write))
-            (error "File or buffer already exists: %s" path-to-write)
-          (mkdir (file-name-directory path-to-write) t)
-          (find-file path-to-write)
-          (if org-node-prefer-with-heading
-              (insert "* " title
-                      "\n:PROPERTIES:"
-                      "\n:ID:       " id
-                      "\n:END:"
-                      "\n")
-            (insert ":PROPERTIES:"
-                    "\n:ID:       " id
-                    "\n:END:"
-                    "\n#+title: " title
-                    "\n"))
-          (unwind-protect
-              (run-hooks 'org-node-creation-hook)
-            (save-buffer)
-            (org-node--scan-targeted (list path-to-write))))))))
+        (org-node--goto node)
+      (message "Entry %s not found in series %s" sortstr name))))
+
+(defun org-node--series-fallback-prompter (series)
+  (completing-read "Go to: " (plist-get series :sortstr<>id)))
+
+;; (defun org-node-series-capture-target ()
+;;   (org-node-cache-ensure)
+;;   (let* ((day (org-read-date))
+;;          (node (gethash day org-node--candidate<>node)))
+;;     (if node
+;;         ;; Node exists; capture into it
+;;         (let ((title (org-node-get-title node))
+;;               (id (org-node-get-id node)))
+;;           (find-file (org-node-get-file-path node))
+;;           (widen)
+;;           (goto-char (org-node-get-pos node))
+;;           (org-show-context)
+;;           (org-show-entry)
+;;           (unless (and (= 1 (point)) (org-at-heading-p))
+;;             (when (outline-next-heading)
+;;               (backward-char 1))))
+;;       ;; Node does not exist; capture into new file
+;;       (let* ((dir org-journal-dir)
+;;              (title day)
+;;              (id (org-id-new))
+;;              (path-to-write (expand-file-name (concat day ".org") dir)))
+;;         (if (or (file-exists-p path-to-write)
+;;                 (find-buffer-visiting path-to-write))
+;;             (error "File or buffer already exists: %s" path-to-write)
+;;           (mkdir (file-name-directory path-to-write) t)
+;;           (find-file path-to-write)
+;;           (if org-node-prefer-with-heading
+;;               (insert "* " title
+;;                       "\n:PROPERTIES:"
+;;                       "\n:ID:       " id
+;;                       "\n:END:"
+;;                       "\n")
+;;             (insert ":PROPERTIES:"
+;;                     "\n:ID:       " id
+;;                     "\n:END:"
+;;                     "\n#+title: " title
+;;                     "\n"))
+;;           (unwind-protect
+;;               (run-hooks 'org-node-creation-hook)
+;;             (save-buffer)
+;;             (org-node--scan-targeted (list path-to-write))))))))
 
 (defun org-node-series-refile ()
   )
@@ -1628,7 +1628,8 @@ returns strings in YYYY-MM-DD format.")
         (let ((node nil)
               (to-check (if (>= n 1)
                             head
-                          (drop (length head) (plist-get series :sorted-ids)))))
+                          (drop (1+ (length head))
+                                (plist-get series :sorted-ids)))))
           (if (catch 'fail
                 ;; Normally we'd just take the first `pop', but user may have
                 ;; deleted a daily-note that is still in the table, and we do
@@ -1644,7 +1645,7 @@ returns strings in YYYY-MM-DD format.")
 
 ;;;; Filename functions
 
-;; (progn (byte-compile #'org-node--root-dirs) (garbage-collect) (benchmark-run 100 (org-node--root-dirs (hash-table-values org-id-locations))))
+;; (progn (byte-compile #'org-node--root-dirs) (garbage-collect) (benchmark-run 10 (org-node--root-dirs (hash-table-values org-id-locations))))
 (defun org-node--root-dirs (file-list)
   "Infer root directories of FILE-LIST.
 
@@ -1711,15 +1712,6 @@ Behavior depends on the user option `org-node-ask-directory'."
     (if (stringp org-node-ask-directory)
         org-node-ask-directory
       (car (org-node--root-dirs (org-node-list-files t))))))
-
-(defvar org-node-filename-fn nil
-  "Deprecated. Please set these variables
-
-- `org-node-datestamp-format'
-- `org-node-slug-fn'
-
-and then set this variable to nil (or remove from initfiles and
-restart).")
 
 (defcustom org-node-datestamp-format ""
   "Passed to `format-time-string' to prepend to filenames.
