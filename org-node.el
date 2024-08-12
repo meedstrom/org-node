@@ -1253,7 +1253,7 @@ also necessary is `org-node--dirty-ensure-link-known' elsewhere."
               :scheduled (cdr (assoc "SCHEDULED" props))))))))))
 
 
-;;;; Etc
+;;;; Scanning: Etc
 
 (defvar org-node--debug nil
   "Whether to run in a way suitable for debugging.")
@@ -1483,38 +1483,15 @@ It looks like:
        :sorted-ids LIST))")
 
 (defun org-node--default-daily-classifier (node)
-  "Classifier for daily-notes emulating Org-Roam.
-If NODE's full path involves a \"daily\" directory, and NODE is
-file-level as opposed to a subtree node, then return NODE's
-title, which is hopefully in the YYYY-MM-DD format, but this is
-not verified."
+  "Classifier for daily-notes in the same style as Org-Roam.
+
+It's a daily if NODE's full path involves a \"daily\" directory,
+and NODE is file-level as opposed to a subtree node.  In that
+case, return NODE's title, which is hopefully in the YYYY-MM-DD
+format, but this is not verified."
   (when (and (string-search "daily/" (org-node-get-file-path node))
              (not (org-node-get-is-subtree node)))
     (org-node-get-title node)))
-
-;; (defun org-node--default-daily-prompter (data)
-;;   (setq org-node--daily-series data)
-;;   (add-hook 'calendar-today-invisible-hook #'org-node--mark-dailies)
-;;   (add-hook 'calendar-today-visible-hook #'org-node--mark-dailies)
-;;   (unwind-protect
-;;       (org-read-date)
-;;     (remove-hook 'calendar-today-invisible-hook #'org-node--mark-dailies)
-;;     (remove-hook 'calendar-today-visible-hook #'org-node--mark-dailies)))
-
-;; (defvar org-node--daily-series nil)
-;; (defun org-node--mark-dailies ()
-;;   "Mark the calendar dates for which there is a daily-note."
-;;   ;; Going by source of `calendar-date-is-visible-p', it's always 3 months?
-;;   ;; (cl-loop
-;;   ;;  for ymd in (hash-table-keys (plist-get org-node--daily-series :sortstr<>id))
-;;   ;;  as month = (string-to-number (substring ymd 5 7))
-;;   ;;  as day = (string-to-number (substring ymd 8 10))
-;;   ;;  as year = (string-to-number (substring ymd 0 4))
-;;   ;;  when (> 2 (abs (calendar-interval displayed-month displayed-year
-;;   ;;                                    month year)))
-;;   ;;  do (calendar-mark-visible-date
-;;   ;;      (list month day year) 'org-roam-dailies-calendar-note))
-;;   )
 
 ;; TODO: is it possible to use gv-letplace or something to avoid let-binding a
 ;; new table and producing garbage on copying value at the end?
@@ -1602,8 +1579,10 @@ not verified."
 (transient-define-prefix org-node-series-dispatch ()
   ["Org-node series"])
 
+;; Something like this at reset time
 ;; (transient-append-suffix 'org-node-series-dispatch "d"
 ;;   '("n" "Next in series" org-node-series-next :transient t)
+;;   '("p" "Previous in series" org-node-series-prev :transient t)
 ;;   )
 
 (defun org-node-series-next (key)
@@ -2425,16 +2404,15 @@ out."
   "Dirs in which files may be auto-renamed.
 Used by `org-node-rename-file-by-title'.
 
-See also `org-node-renames-disallow-regexp'."
+To add exceptions, see `org-node-renames-exclude'."
   :type '(repeat string))
 
-(defcustom org-node-renames-disallow-regexp "daily/"
+(defcustom org-node-renames-exclude "daily/"
   "Regexp matching paths of files not to auto-rename.
 Only needed to filter out files in `org-node-renames-allowed-dirs'.
 
 Used by `org-node-rename-file-by-title'."
   :type 'string)
-
 
 ;; FIXME: After running this on an after-save-hook, (buffer-modified-p)
 ;;        returns t, which seems unsafe
@@ -2465,7 +2443,7 @@ Suitable as a save hook:
               (cl-loop
                for dir in org-node-renames-allowed-dirs
                if (or (not (string-prefix-p dir path))
-                      (string-match-p org-node-renames-disallow-regexp path))
+                      (string-match-p org-node-renames-exclude path))
                return nil
                finally return t))
           (let ((title (or (cadar (org-collect-keywords '("TITLE")))
