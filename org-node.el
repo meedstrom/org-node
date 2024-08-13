@@ -1910,10 +1910,12 @@ creating it if necessary."
          (not (org-node--daily-note-p))
          must-be-in-daily)
         (user-error "Not in a daily-note.")
-      (if (member direction '("--" "++")) ;; if next or prev & missing node
-          (org-node--locate-offset-node
-           (file-name-base buffer-file-name)
+      (if (member direction '("--" "++")) ;; if doing "next" or "prev"
+          (org-node--locate-offset-node ;; find the daily with the right offset
+           (file-name-base buffer-file-name) 
            direction range span)
+        ;; else, just calculate the date for the putative daily entry
+        ;; using Org internal date calculating methods (`org-read-date')
         (let* ((current-node
                 (if must-be-in-daily
                     (org-time-string-to-time
@@ -1921,24 +1923,30 @@ creating it if necessary."
                   nil))
                (target-node
                 (org-read-date nil nil offset nil current-node))
+               ;; get the hash of the putative daily node
                (node-hash (gethash target-node org-node--candidate<>node)))          
           (if node-hash
-              (org-node--goto node-hash)
+              (org-node--goto node-hash) ;; goto it, if extant
+            ;; if non-extant (i.e. no hash in `org-nodes'), then
+            ;; do the operations defined in `org-node--daily-not-found'
             (org-node--daily-not-found target-node)))))))
 
 (defun org-node--locate-offset-node (node direction range span)
   "Given a reference `node', a `direction' for offset, a `range'
 of distance and a `span' [currently `span' is ignored], open the
 daily journal entry file of the appropriate date in the current
-window. This function is currently really just used for
-`org-node-goto-prev-day' and `org-node-goto-next-day' commands."
-  (unless (org-node--daily-note-p)
+window.
+(This function is currently really just used for
+`org-node-goto-prev-day' and `org-node-goto-next-day' commands.)"
+  (unless (org-node--daily-note-p) ;; check if actually a daily
     (user-error "Not in a daily-note"))
-  (setq n (or range 1))
-  (setq n (* n (if (equal direction "--")
-                   -1 1)))
-  (let* ((dailies (org-node--calculate-list-of-dailies-dates node))
-         (position
+  (setq n (or range 1)) ;; use `range' or default to `1'
+  (setq n (* n   ;; use `direction' to determine positive or negative `n'
+             (if (equal direction "--")
+                 -1 1)))
+  (let* ((dailies ;; find all of the putative dailies in `org-nodes'
+          (org-node--calculate-list-of-dailies-dates node))
+         (position  ;; determine the position of current daily in the list
           (when node 
             (cl-position-if (lambda (candidate)
                               (string=
@@ -1950,52 +1958,60 @@ window. This function is currently really just used for
           (pcase n
             ((pred (natnump))
              (when (eq position (- (length dailies) 1))
-               (user-error "Already at newest note")))
+               (user-error "Already at newest extant daily.")))
             ((pred (integerp))
              (when (eq position 0)
-               (user-error "Already at oldest note"))))
+               (user-error "Already at oldest extant daily."))))
+          ;; if current daily is not first or last in the list
+          ;; determine which daily is offset from it by `n' entries:
           (setq note (nth (+ position n) dailies))
-          (org-node--goto
+          (org-node--goto ;; goto this entry having found its hash
            (gethash note org-node--candidate<>node)))
-      (user-error "ERROR"))))
+      (user-error "An unknown error has occurred.\
+ Try using `toggle-debug-on-error' to diagnose."))))
 
 (defun org-node--calculate-list-of-dailies-dates (node)
-  "Calculate a list of known dailies, adding
-`node' as part of the list in case `node' actually
-represents the date of an unknown/nascent dailies."
+  "Calculate a list of known dailies, adding `node' as part of the list in case
+`node' actually represents the date of an unknown/nascent dailies."
   (org-node-cache-ensure)
   (delete-dups ;; takes care of (a) the case that `node' actually exists
                ;; and (b) cases of squiggle~ or #autosave or sync-conflict files
                ;; that `org-nodes' may have entries for
-           (sort  ;; sort into calendrial order     
+           (sort  ;; sort into calendrical order     
             (cons node         ;; add in the current node in case it's not actually 
-             (let ((keys ())   ;; (yet) extant
+             (let ((keys ())   ;; (yet) extant and so not in the list of dailies
                    (titles ()))
                (maphash (lambda (k v) (push (cons k v) keys)) org-nodes)
                (let ((titles
-                      (cl-loop
+                      (cl-loop   ;; collect all file-title or basename in `org-nodes'
                        for key in keys
                        collect (org-node-get-file-title-or-basename (cdr key)))))
-                 (cl-loop
+                 (cl-loop  ;; collect only titles which match the daily file-title/basename pattern
                   for title in titles
-                  when
-                  (string-match-p ;; match for YYYY-MM-DD nodes only
+                  when  
+                  (string-match-p ;; match for YYYY-MM-DD nodes only (note: make this customisable??)
                    "^\\(?:[0-9][0-9]\\)\\{1,2\\}-\\(?:1[012]\\|0?[1-9]\\)-\\(?:0?[1-9]\\|[12][0-9]\\|3[01]\\)$"
+                   ;; note: two problems again?
                    title)
                   collect title))))
             'string<)))
 
 (defun org-node--daily-not-found (target-node)
-  "Handles missing/nascent daily node look-up."
-  (if (fboundp 'org-roam-mode)
+  "Handles missing/nascent daily node look-up. Utilises `org-roam`'s
+capture templates if available.
+[Note: should be rewritten to rely solely on `org-node' functions,
+i.e. `org-node''s capture function.]'"
+  (if (fboundp 'org-roam-mode) ;; if org-roam is available then...
       (progn
         (require 'org-roam-dailies) ;; in case it's not loaded
         (org-roam-dailies--capture
          (org-read-date nil t target-node nil)
          t
          (when org-node-default-org-roam-capture-template-key
-           org-node-default-org-roam-capture-template-key)))
-    (message "Cannot load requested file.
+           org-node-default-org-roam-capture-template-key))
+        (set-buffer-modified-p nil)) 
+    (user-error  ;; else, just return an error
+     "Cannot load requested file. 
 (And org-roam is not available.)")))
 
 (defvar-keymap org-node--daily-repeat-next-prev
@@ -2889,6 +2905,7 @@ to ROAM_REFS."
 
 (defvar org-node--collisions nil)
 (defun org-node-list-collisions ()
+  "Determine potential node title collisions."
   (interactive)
   (with-current-buffer (get-buffer-create "*org-node title collisions*")
     (tabulated-list-mode)
@@ -3155,7 +3172,8 @@ heading, else the file-level node, whichever has an ID first."
            collect file))
 
 (defun org-node-list-roam-daily-files (&rest extra-files)
-  "Faster than `org-roam-dailies--list-files'."
+  "Return a list of org-node files in the defined `org-roam-dailies-directory'.
+(Faster than `org-roam-dailies--list-files')."
   (require 'org-roam-dailies)
   (let ((dir (expand-file-name org-roam-dailies-directory
                                org-roam-directory)))
@@ -3170,7 +3188,8 @@ heading, else the file-level node, whichever has an ID first."
              collect file))))
 
 (defun org-node-list-roam-files ()
-  "Faster than `org-roam-list-files'."
+  "Return a list of all files indexed by org-node.
+(Faster than `org-roam-list-files')."
   (require 'org-roam)
   (cl-loop for file in (org-node-list-files t)
            when (string-prefix-p org-roam-directory (file-truename file))
