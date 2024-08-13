@@ -825,22 +825,23 @@ didn't do so already, or local changes have been made."
       fn
     (if (and (symbolp fn) (compiled-function-p (symbol-function fn)))
         (symbol-function fn)
-      (setq fn (org-node--unenclose fn))
+      ;; (setq fn (org-node--unenclose fn))
       (let* ((fn-hash (sxhash fn))
              (compiled (gethash fn-hash org-node--compiled-fns)))
         (unless compiled
-          (setq compiled (if (native-comp-available-p)
+          (setq compiled (if (and (native-comp-available-p)
+                                  (not (eq 'closure (car-safe fn))))
                              (native-compile fn)
                            (byte-compile fn)))
           (puthash fn-hash compiled org-node--compiled-fns))
         compiled))))
 
-(defun org-node--unenclose (sexp)
-  "If SEXP is an anonymous closure, return a plain lambda.
-Else return SEXP unmodified."
-  (if (eq 'closure (car-safe sexp))
-      (cons 'lambda (cddr sexp))
-    sexp))
+;; (defun org-node--unenclose (sexp)
+;;   "If SEXP is an anonymous closure, return a plain lambda.
+;; Else return SEXP unmodified."
+;;   (if (eq 'closure (car-safe sexp))
+;;       (cons 'lambda (cddr sexp))
+;;     sexp))
 
 (defvar org-node--fn-hashes nil)
 (defvar org-node--affixation-compfn nil)
@@ -1469,17 +1470,37 @@ for you."
 
 ;; (defun org-node-visit-next-by-date-created ())
 
-(defvar org-node-series
-  '(("d" "Dailies"
-     :classifier org-node--default-daily-classifier
-     :try-goto (lambda (item)
-                 (let* ((id (cdr item))
-                        (node (gethash id org-nodes)))
-                   (when node
-                     (org-node--goto node)
-                     t)))
+(defun org-node--standard-goto (item)
+  "Assuming ITEM is a cons cell where the cdr is an org-id, try to
+visit the node with that id if it exists."
+  (let* ((id (cdr item))
+         (node (gethash id org-nodes)))
+    (when node
+      (org-node--goto node)
+      t)))
+
+(defcustom org-node-series
+  '(("d" :name "Dailies"
+     :classifier org-node--default-daily-classifier ;; TODO Dedup
      :whereami (lambda ()
                  (file-name-base (buffer-file-name (buffer-base-buffer))))
+     :try-goto (lambda (item)
+                 (when (file-readable-p (cdr item))
+                   (find-file (cdr item))
+                   t))
+     :prompter org-read-date)
+
+    ("c" :name "All nodes by creation-time"
+     :classifier
+     (lambda (node)
+       (let* ((timestamp
+               (cdr (assoc "CREATED"
+                           (org-node-get-properties node)))))
+         (when timestamp
+           (cons timestamp (org-node-get-id node)))))
+     :whereami (lambda ()
+                 (org-entry-get nil "CREATED" t))
+     :try-goto org-node--standard-goto
      :prompter org-read-date))
   "Alist describing each node series.
 
@@ -1503,7 +1524,11 @@ capture or refile, that interactively prompts for a sort-string.
 This highlights the other use of the sort-string: finding the
 node from scant context.  Going back to the example of
 daily-notes, `org-read-date' works well as a prompter because it
-returns strings in YYYY-MM-DD format.")
+returns strings in YYYY-MM-DD format."
+  ;; :type '(alist :key-type key-sequence
+  ;; :value-type (plist :key-type symbol
+  ;; :value-type sexp))
+  :type 'alist)
 
 (defvar org-node--series-info nil
   "Alist describing each node series, internal use.
@@ -1517,39 +1542,51 @@ It looks like:
        :sorted-dataset LIST))")
 
 (defun org-node--default-daily-classifier (node)
-  "Classifier for daily-notes in default Org-Roam style.
+  "Classifier suitable for daily-notes in default Org-Roam style.
 
-Assume that if NODE's file path involves a \"daily\" directory,
-then return the file name without directory or extension, in the
-hope that this leaves just a YYYY-MM-DD date string."
+If NODE's full file path involves a \"daily\" directory,
+then return a cons cell (BASENAME . FULL-PATH).
+
+BASENAME is the file name without directory or extension.
+Assuming it fits the pattern YYYY-MM-DD.org, the result is
+YYYY-MM-DD, but it does not verify."
   (let ((path (org-node-get-file-path node)))
     (when (string-search "daily/" path)
-      (list (file-name-base path)))))
+      (cons (file-name-base path) path))))
 
+;; A possibility: instead of an alist, the sorted-items can be a plain list and
+;; the associated data kept in a hash table.  Dunno which is better, but the
+;; alist seems user-friendly.
 (defun org-node--build-series (spec)
-  (let ((classifier (org-node--as-bytecode (plist-get spec :classifier))))
+  (let ((classifier (org-node--as-bytecode (plist-get spec :classifier)))
+        (unique-cars (make-hash-table :test #'equal)))
     (cl-loop
      for node being the hash-values of org-node--id<>node
      as item = (funcall classifier node)
-     when item collect item into items
+     when (and item (not (gethash (car item) unique-cars)))
+     collect (progn (puthash (car item) t unique-cars)
+                    item)
+     into items
      finally do
-     (setf (alist-get (sxhash (plist-get spec :key)) org-node--series-info)
+     (setf (alist-get (sxhash (car spec)) org-node--series-info)
            (append spec
                    (list :sorted-items
+                         ;; Using `string>' due to most recent dailies probably
+                         ;; being most relevant
                          (cl-sort items #'string> :key #'car)))))))
 
-(defun org-node--series-goto (series)
+(defun org-node-series-goto (series)
   (let* ((name (plist-get series :name))
          (sortstr (funcall (or (plist-get series :prompter)
-                               #'org-node--series-fallback-prompter)
+                               #'org-node--fallback-prompter)
                            series))
-         (id (gethash sortstr (plist-get series :sortstr<>id)))
-         (node (when id (gethash id org-node--id<>node))))
-    (if node
-        (org-node--goto node)
-      (message "Entry %s not found in series %s" sortstr name))))
+         (item (assoc sortstr (plist-get series :sorted-items))))
+    (unless (funcall (plist-get series :try-goto) item)
+      ;; TODO: Now create a node!   Some :creator fn?
+      (message "Function :try-goto couldn't find entry for %s in series %s"
+               sortstr name))))
 
-(defun org-node--series-fallback-prompter (series)
+(defun org-node--fallback-prompter (series)
   (completing-read "Go to: " (plist-get series :sorted-items)))
 
 ;; (defun org-node-series-capture-target ()
@@ -1607,7 +1644,6 @@ hope that this leaves just a YYYY-MM-DD date string."
 ;;   '("p" "Previous in series" org-node-series-prev :transient t)
 ;;   )
 
-
 (defun org-node-series-next (key)
   (org-node-series-prev key 'next))
 
@@ -1616,7 +1652,6 @@ hope that this leaves just a YYYY-MM-DD date string."
   (when (derived-mode-p 'org-mode)
     (let* ((series (alist-get (sxhash key) org-node--series-info))
            (here (funcall (plist-get series :whereami)))
-           ;; (id-here (org-node-id-at-point))
            (head nil))
       (when (cl-loop for item in (plist-get series :sorted-items)
                      if (equal item here)
@@ -2810,7 +2845,7 @@ to replacing all the links, finally rename the asset file itself."
   (interactive nil org-mode)
   (unless (org-entry-get nil "CREATED")
     (org-entry-put nil "CREATED"
-                   (format-time-string (org-time-stamp-format nil t)))))
+                   (format-time-string (org-time-stamp-format t t)))))
 
 (defvar org-node--temp-extra-fns nil
   "Extra functions to run at the end of a full scan.
