@@ -41,23 +41,22 @@ A comparison of three similar systems, all permitting org-id as first-class citi
 | Node aliases                      | yes      | yes                | --                   |
 | Node exclusion                    | yes      | limited            | not applicable       |
 | Rich backlinks buffer             | yes      | yes (org-roam's)   | --                   |
+| Customize how backlinks shown     | yes      | yes (org-roam's)   | yes                  |
 | Reflinks                          | yes      | yes (as backlinks) | --                   |
 | Ref search                        | yes      | yes (as aliases)   | not applicable       |
 | Org 9.5 @citekeys as refs         | yes      | yes                | not applicable       |
 | Support org-ref v2 and v3         | yes      | limited            | not applicable       |
-| Can have rich search completion   | yes      | yes                | not applicable       |
 | Can work thru org-roam-capture    | yes      | yes                | ?                    |
 | Can work thru org-capture         | --       | yes                | ?                    |
 | Can show backlinks in same window | --       | yes                | yes                  |
 | Support org-super-links           | --       | yes                | not applicable       |
 | Command to fix link descriptions  | --       | yes                | --                   |
 | List dead links                   | --       | yes                | --                   |
-| Warn about duplicate titles       | --       | yes                | --                   |
 | Rename file when title changes    | --       | yes                | --                   |
-| Principled "related"-section      | --       | --                 | yes                  |
-| Note series                       | --       | --                 | --                   |
-| Daily-notes                       | yes      | --                 | --                   |
-| Customize how backlinks shown     | yes      | --                 | yes                  |
+| Warn about duplicate titles       | --       | yes                | --                   |
+| Day-nodes                         | yes      | yes                | --                   |
+| Node series                       | --       | yes                | --                   |
+| Principled "related-section"      | --       | --                 | yes                  |
 | Support =roam:= links               | yes      | -- (WONTFIX)       | not applicable       |
 | Can have separate note piles      | yes      | -- (WONTFIX)       | not applicable       |
 |-----------------------------------+----------+--------------------+----------------------|
