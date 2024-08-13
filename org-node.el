@@ -1468,7 +1468,7 @@ for you."
   '(("d" :name "Dailies"
      :classifier org-node--default-daily-classifier
      :creator org-node--default-daily-creator
-     :prompter org-read-date
+     :prompter (lambda (&rest _) (org-read-date))
      :whereami (lambda ()
                  (file-name-base (buffer-file-name (buffer-base-buffer))))
      :try-goto (lambda (item)
@@ -1581,9 +1581,6 @@ YYYY-MM-DD, but it does not verify."
     (when (string-search "daily/" path)
       (cons (file-name-base path) path))))
 
-;; A possibility: instead of an alist, the sorted-items can be a plain list and
-;; the associated data kept in a hash table.  Dunno which is better, but the
-;; alist seems user-friendly.
 (defun org-node--build-series (spec)
   (let ((classifier (org-node--as-bytecode (plist-get (cdr spec) :classifier)))
         (unique-cars (make-hash-table :test #'equal)))
@@ -1602,40 +1599,41 @@ YYYY-MM-DD, but it does not verify."
                          ;; being most relevant
                          (cl-sort items #'string> :key #'car)))))))
 
-(defun org-node-series-goto-or-create (series)
-  (let* ((sortstr (funcall (plist-get series :prompter) series))
+(defun org-node-series-goto-or-create (key)
+  (let* ((series (cdr (alist-get (sxhash key) org-node--series-info)))
+         (sortstr (funcall (plist-get series :prompter) series))
          (item (assoc sortstr (plist-get series :sorted-items))))
     (unless (or (null item)
                 (funcall (plist-get series :try-goto) item))
       (funcall (plist-get series :creator) sortstr))))
 
 (defun org-node-series-next (key)
-  (org-node-series-prev key 'next))
+  (org-node-series-prev key t))
 
 (defun org-node-series-prev (key &optional next)
-  ;; TODO retry if necessary until no more ancestor ids that may be a daily
-  (when (derived-mode-p 'org-mode)
-    (let* ((series (alist-get (sxhash key) org-node--series-info))
-           (here (funcall (plist-get series :whereami)))
-           (head nil))
-      (when (cl-loop for item in (plist-get series :sorted-items)
-                     if (equal item here)
-                     return t
-                     else do (push item head))
-        (let ((to-check (if next
-                            head
-                          (drop (1+ (length head))
-                                (plist-get series :sorted-items))))
-              (target nil))
-          (if (catch 'fail
-                (while (not target)
-                  (if to-check
-                      (setq target (funcall (plist-get series :try-goto)
-                                            (pop to-check)))
-                    (throw 'fail t))))
-              (message "No %s item in series \"%s\""
-                       (if next "next" "previous")
-                       (plist-get series :name))))))))
+  (unless (derived-mode-p 'org-mode)
+    (user-error "Not an Org buffer"))
+  (let* ((series (cdr (alist-get (sxhash key) org-node--series-info)))
+         (here (funcall (plist-get series :whereami)))
+         (head nil))
+    (when (cl-loop for item in (plist-get series :sorted-items)
+                   if (equal item here)
+                   return t
+                   else do (push item head))
+      (let ((to-check (if next
+                          head
+                        (drop (1+ (length head))
+                              (plist-get series :sorted-items))))
+            (target nil))
+        (if (catch 'fail
+              (while (not target)
+                (if to-check
+                    (setq target (funcall (plist-get series :try-goto)
+                                          (pop to-check)))
+                  (throw 'fail t))))
+            (message "No %s item in series \"%s\""
+                     (if next "next" "previous")
+                     (plist-get series :name)))))))
 
 ;; Should be able to type d n for "daily, next"
 (transient-define-prefix org-node-series-dispatch ()
