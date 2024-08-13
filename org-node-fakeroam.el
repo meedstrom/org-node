@@ -18,7 +18,7 @@
 ;; Author:           Martin Edström <meedstrom91@gmail.com>
 ;; Created:          2024-04-13
 ;; Keywords:         org, hypermedia
-;; Package-Requires: ((emacs "28.1") (compat "29.1.4.5") (dash "2.19.1"))
+;; Package-Requires: ((emacs "28.1") (org-node "0.5pre") (org-roam "2.2.2") (emacsql "4.0.0") (compat "29.1.4.5"))
 ;; URL:              https://github.com/meedstrom/org-node
 
 ;;; Commentary:
@@ -27,22 +27,22 @@
 
 ;;; Code:
 
+(require 'cl-lib)
 (require 'org-node)
 (require 'ol)
-(if (not (fboundp 'org-roam-list-files))
-    (user-error "Install org-roam to use org-node-fakeroam stuff")
-  (require 'org-roam)
-  (require 'emacsql))
+(if (require 'org-roam nil t)
+    (require 'emacsql)
+  (user-error "Install org-roam to use org-node-fakeroam library"))
 
 (defun org-node-fakeroam--precompile ()
   "Compile all fakeroam functions.
-Because org-node-fakeroam.el depends on org-roam, which is not an
-explicit dependency of org-node, it is uncompilable at package
-installation and must be compiled at runtime after ensuring that
-the user has installed org-roam themselves."
-  (if (not (fboundp 'org-roam-list-files))
-      (user-error "Install org-roam to use org-node-fakeroam stuff")
-    (require 'org-roam)
+
+This is transitional.  Org-node used to be a single package which
+did not depend explicitly on org-roam, which meant it had to
+defer compiling org-node-fakeroam.el until runtime after ensuring
+that org-roam is available."
+  (if (not (require 'org-roam nil t))
+      (user-error "Install org-roam to use org-node-fakeroam library")
     (require 'emacsql)
     (dolist (fn '(org-node-fakeroam--run-without-fontifying
                   org-node-fakeroam--accelerate-get-contents
@@ -71,6 +71,7 @@ previews.  This is done thru
   :group 'org-node
   (if org-node-fakeroam-redisplay-mode
       (progn
+        (org-node-fakeroam--precompile)
         (unless org-node-cache-mode
           (message "`org-node-fakeroam-redisplay-mode' may show stale previews without `org-node-cache-mode' enabled"))
         (advice-add #'org-roam-preview-get-contents :around
@@ -116,12 +117,12 @@ should only be slow the first time each backlink is checked."
             (gethash file org-node--file<>previews)))
     result))
 
-(defun org-node-fakeroam--run-without-fontifying (orig-fn &rest args)
+(defun org-node-fakeroam--run-without-fontifying (fn &rest args)
   "Designed as around-advice for `org-roam-node-insert-section'.
 Run FN with ARGS, while overriding
 `org-roam-fontify-like-in-org-mode' so it returns the input."
   (cl-letf (((symbol-function 'org-roam-fontify-like-in-org-mode) #'identity))
-    (apply orig-fn args)))
+    (apply fn args)))
 
 
 ;;;; NoSQL method: fabricate knockoff roam backlinks
@@ -215,7 +216,7 @@ Designed to override `org-roam-reflinks-get'."
 
 ;;;###autoload
 (define-minor-mode org-node-fakeroam-db-feed-mode
-  "Supply data to the org-roam database on save.
+  "Supply data to the org-roam SQLite database on save.
 
 -----"
   :global t
@@ -228,9 +229,9 @@ Designed to override `org-roam-reflinks-get'."
         (add-hook 'org-node-rescan-hook #'org-node-fakeroam--db-update-files))
     (remove-hook 'org-node-rescan-hook #'org-node-fakeroam--db-update-files)))
 
-;; Was hoping to just run this on every save, is SQLite really so slow to
-;; accept 0-2 MB of data?  Must be some way to make it instant, else how do
-;; people work with petabytes?
+;; TODO: Was hoping to just run this on every save, is SQLite really so slow to
+;;       accept 0-2 MB of data?  Must be some way to make it instant, else how
+;;       do people work with petabytes?
 (defun org-node-fakeroam-db-rebuild ()
   "Wipe the Roam DB and rebuild."
   (interactive)
@@ -243,7 +244,10 @@ Designed to override `org-roam-reflinks-get'."
     (cl-loop with ctr = 0
              with max = (hash-table-count org-nodes)
              for node being the hash-values of org-nodes
-             do (when (= 0 (% (cl-incf ctr) 10))
+             do (when (= 0 (% (cl-incf ctr)
+                              (cond ((> ctr 200) 100)
+                                    ((> ctr 20) 10)
+                                    (t 1))))
                   (message "Inserting into %s... %d/%d"
                            org-roam-db-location ctr max))
              (org-node-fakeroam--db-add-node node))))

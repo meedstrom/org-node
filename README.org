@@ -55,6 +55,7 @@ A comparison of three similar systems, all permitting org-id as first-class citi
 | Warn about duplicate titles       | --       | yes                | --                   |
 | Rename file when title changes    | --       | yes                | --                   |
 | Principled "related"-section      | --       | --                 | yes                  |
+| Note series                       | --       | --                 | --                   |
 | Daily-notes                       | yes      | --                 | --                   |
 | Customize how backlinks shown     | yes      | --                 | yes                  |
 | Support =roam:= links               | yes      | -- (WONTFIX)       | not applicable       |
@@ -62,7 +63,7 @@ A comparison of three similar systems, all permitting org-id as first-class citi
 |-----------------------------------+----------+--------------------+----------------------|
 | Some query-able cache             | EmacSQL  | hash tables        | --                   |
 | Async caching                     | --       | yes                | not applicable       |
-| *Time to re-cache my 3000 nodes*    | *2m 48s*   | *0m 01s*             | not applicable       |
+| *Time to re-cache my 3000 nodes*    | *2m 48s*   | *0m 02s*             | not applicable       |
 
 * Setup
 
@@ -71,7 +72,8 @@ Add an init snippet like this (assuming [[https://github.com/radian-software/str
 #+begin_src elisp
 (use-package org-node
   :straight (org-node :type git :host github :repo "meedstrom/org-node")
-  :after org :config (org-node-cache-mode))
+  :after org
+  :config (org-node-cache-mode))
 #+end_src
 
 ** Quick start
@@ -81,8 +83,8 @@ If you're new to these concepts, fear not.  The main things for day-to-day opera
 Pick some short keys and try them out.
 
 #+begin_src elisp
-(keymap-set global-map "M-s f" #'org-node-find)
-(keymap-set org-mode-map "M-s i" #'org-node-insert-link)
+(keymap-set global-map "M-s M-f" #'org-node-find)
+(keymap-set org-mode-map "M-s M-i" #'org-node-insert-link)
 #+end_src
 
 To browse config options, type =M-x customize-group RET org-node RET=.
@@ -251,7 +253,6 @@ Working over TRAMP is untested, but I suspect it won't work.  Org-node tries to 
 If you need TRAMP, use org-roam, which is made to /not/ re-access files or directories so often (which can be slow anyway over a remote connection), in favor of trusting its own DB.
 
 ** Limitation: unique titles
-
 If two ID-nodes exist with the same title, one of them disappears from minibuffer completions.
 
 That's just the nature of completion.  Other packages such as Roam have the same limitation.  Much can be said for embracing the uniqueness constraint, and org-node will print messages telling you about title collisions.
@@ -284,8 +285,11 @@ While a big point of IDs is to avoid depending on filenames, it's often pragmati
 We support the builtin @citations, not (yet) org-ref &citations, since amending =org-link-plain-re= to match them slows down my scan about 50%.  You can still find nodes with e.g. =:ROAM_REFS: &citekey=, just not see backlinks.
 
 ** Tip: Dailies
+** Tip: org-journal
 
-You can use [[https://github.com/bastibe/org-journal][org-journal]] for the concept of "dailies".  Example settings that emulate the default style of org-roam dailies:
+You can use pure [[https://github.com/bastibe/org-journal][org-journal]] to implement "dailies".  Be advised it offers no org-capture target, nor a way to refile into a given daily-note.  But that may be enough, if all you need is to create and visit daily-notes.
+
+Try the following settings as a starting point.
 
 #+begin_src elisp
 (setq org-journal-dir "~/org/daily/")
@@ -303,33 +307,28 @@ You can use [[https://github.com/bastibe/org-journal][org-journal]] for the conc
             (setq outline-regexp (rx (or bos (seq (+ "*") " "))))))
 #+end_src
 
-Commands of interest
-- org-journal-new-entry
-- org-journal-previous-entry / org-journal-next-entry
-- org-journal-open-current-journal-file
-
-Org-node does not yet have a capture target for dailies.
-
 ** Tip: On very slow filesystems
 
-I hear that on Termux on Android, filesystem access can be so slow that it's a pain to use org-roam-dailies as well as org-journal. ([[https://github.com/meedstrom/org-node/issues/24#issuecomment-2278605819][19 seconds just to list files under a directory]]!)
+I hear that on Termux on Android, filesystem access can be so slow that it's a pain to use org-roam as well as org-journal. ([[https://github.com/meedstrom/org-node/issues/24#issuecomment-2278605819][19 seconds just to list files under a directory]]!)
 
-Good news!  As an org-node user, you can speed up a lot of their functions by making them just look up org-node tables.  One or more of these overrides may interest you:
+Good news!  You can speed up a lot of their functions by making them just look up org-node tables.  One or more of these overrides may interest you:
 
 #+begin_src elisp
-(advice-add #'org-journal--list-files :override
-            #'org-node-list-journal-files)
+(advice-add #'org-roam-list-files :override
+            #'org-node-faster-roam-list-files)
 
 (advice-add #'org-roam-dailies--list-files :override
-            #'org-node-list-roam-daily-files)
+            #'org-node-faster-roam-list-dailies)
 
-;; (Good even if fs is not an issue; 850ms to 2ms on my machine)
-(advice-add #'org-roam-list-files :override
-            #'org-node-list-roam-files)
+(advice-add #'org-roam-dailies--daily-note-p :override
+            #'org-node-faster-roam-daily-note-p)
+
+(advice-add #'org-journal--list-files :override
+            #'org-node-faster-journal-list-files)
 #+end_src
 
 ** Tip: Word-wrap in the Roam buffer
-This has nothing to do with org-node, but I actually didn't know this for ages.  If you don't hard-wrap ([[https://github.com/org-roam/org-roam/issues/1862][org-roam#1862]]) but prefer visual-line-mode or similar, you have to enable them yourself:
+This has nothing to do with org-node, but I actually didn't know this for ages.  If you don't hard-wrap ([[https://github.com/org-roam/org-roam/issues/1862][org-roam#1862]]) but prefer visual-line-mode or similar, you have to enable such things yourself:
 
 #+begin_src elisp
 (add-hook 'org-roam-mode-hook #'visual-line-mode)
