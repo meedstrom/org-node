@@ -1997,11 +1997,7 @@ which it gets some necessary variables."
                   "\n#+title: " org-node-proposed-title
                   "\n"))
         (goto-char (point-max))
-        (unwind-protect
-            (run-hooks 'org-node-creation-hook)
-          ;; NOTE: Used to save-buffer here, but don't!  Keep the freedom to
-          ;; undo.  As a bonus, saving is a frequent source of latency we skip.
-          (org-node--dirty-ensure-node-known))))))
+        (run-hooks 'org-node-creation-hook)))))
 
 (defun org-node-new-via-roam-capture ()
   "Call `org-roam-capture-' with predetermined arguments.
@@ -2097,9 +2093,7 @@ type the name of a node that does not exist.  That enables this
                     "\n:END:"
                     "\n#+title: " title
                     "\n"))
-          (unwind-protect
-              (run-hooks 'org-node-creation-hook)
-            (org-node--dirty-ensure-node-known)))))))
+          (run-hooks 'org-node-creation-hook))))))
 
 
 ;;;; Commands
