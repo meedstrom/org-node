@@ -283,13 +283,6 @@ in precisely \".org\" or \".org_archive\" anyway."
   :group 'org-node
   :type '(repeat string))
 
-(defcustom org-node-default-org-roam-capture-template-key nil
-  "Key to pass in case of using org-roam capture templates.
-(To avoid unwanted prompting for capture template, e.g.,
-when default capture tempate might be sensible.)"
-  :group 'org-node
-  :type 'string)
-
 
 ;;;; Pretty completion
 
@@ -1593,9 +1586,10 @@ YYYY-MM-DD, but it does not verify."
      into items
      finally do
      (setf (alist-get (sxhash (car spec)) org-node--series-info)
-           (append (cl-loop for it in (cdr spec)
-                            if (functionp it) collect (org-node--as-bytecode it)
-                            else collect it)
+           (append (cl-loop for elt in (cdr spec)
+                            if (functionp elt)
+                            collect (org-node--as-bytecode elt)
+                            else collect elt)
                    (list :sorted-items
                          ;; Using `string>' due to most recent dailies probably
                          ;; being most relevant, thus cycling thru recent
@@ -1620,8 +1614,8 @@ YYYY-MM-DD, but it does not verify."
   (let* ((series (alist-get (sxhash key) org-node--series-info))
          (sortstr (funcall (plist-get series :prompter) series))
          (item (assoc sortstr (plist-get series :sorted-items))))
-    (unless (or (null item)
-                (funcall (plist-get series :try-goto) item))
+    (when (or (null item)
+              (not (funcall (plist-get series :try-goto) item)))
       (funcall (plist-get series :creator) sortstr))))
 
 (defun org-node--series-visit-next (key)
@@ -2005,9 +1999,9 @@ which it gets some necessary variables."
         (goto-char (point-max))
         (unwind-protect
             (run-hooks 'org-node-creation-hook)
-          (save-buffer)
-          ;; REVIEW: Redundant?
-          (org-id-add-location org-node-proposed-id path-to-write))))))
+          ;; NOTE: Used to save-buffer here, but don't!  Keep the freedom to
+          ;; undo.  As a bonus, saving is a frequent source of latency we skip.
+          (org-node--dirty-ensure-node-known))))))
 
 (defun org-node-new-via-roam-capture ()
   "Call `org-roam-capture-' with predetermined arguments.
@@ -2016,10 +2010,10 @@ time some necessary variables are set."
   (if (or (null org-node-proposed-title)
           (null org-node-proposed-id))
       (message "`org-node-new-via-roam-capture' is meant to be called indirectly via `org-node--create'")
-    (unless (fboundp #'org-roam-capture-)
-      (org-node--die "Didn't create node! Either install org-roam or %s"
+    (unless (require 'org-roam nil t)
+      (org-node--die "Didn't create node %s! Either install org-roam or %s"
+                     org-node-proposed-title
                      "configure `org-node-creation-fn'"))
-    (require 'org-roam)
     (org-roam-capture- :node (org-roam-node-create
                               :title org-node-proposed-title
                               :id    org-node-proposed-id))))
@@ -2226,6 +2220,13 @@ represents the date of an unknown/nascent dailies."
                 title)
                collect title))))
     #'string<)))
+
+(defcustom org-node-default-org-roam-capture-template-key nil
+  "Key to pass in case of using org-roam capture templates.
+(To avoid unwanted prompting for capture template, e.g.,
+when default capture tempate might be sensible.)"
+  :group 'org-node
+  :type 'string)
 
 ;; TODO: when we have some equivalent of `org-node--create' (extend it?), use
 ;;      it in place of capture
@@ -3407,6 +3408,15 @@ If already visiting that node, then follow the link normally."
                          (not (string-suffix-p "\\.gpg" file))))
            collect file))
 
+;; 850ms to 2ms
+(defun org-node-faster-roam-list-files ()
+  "Faster than `org-roam-list-files'."
+  (require 'org-roam)
+  (cl-loop with roam-dir = (abbreviate-file-name org-roam-directory)
+           for file in (org-node-list-files t)
+           when (string-prefix-p roam-dir file)
+           collect file))
+
 (defun org-node-faster-roam-list-dailies (&rest extra-files)
   "Faster than `org-roam-dailies--list-files' on a slow fs."
   (require 'org-roam-dailies)
@@ -3422,14 +3432,6 @@ If already visiting that node, then follow the link normally."
                                   (string-match "^\\." file)))))
              collect file)
             extra-files)))
-
-(defun org-node-faster-roam-list-files ()
-  "Faster than `org-roam-list-files'."
-  (require 'org-roam)
-  (cl-loop with roam-dir = (abbreviate-file-name org-roam-directory)
-           for file in (org-node-list-files t)
-           when (string-prefix-p roam-dir file)
-           collect file))
 
 (defun org-node-faster-roam-daily-note-p (&optional file)
   "Faster than `org-roam-dailies--daily-note-p' on a slow fs."
@@ -3450,7 +3452,7 @@ If already visiting that node, then follow the link normally."
 
 This may refer to the current Org heading, else an ancestor
 heading, else the file-level node, whichever has an ID first."
-  (gethash (org-entry-get nil "ID" t) org-node--id<>node))
+  (gethash (org-node-id-at-point) org-node--id<>node))
 
 (defun org-node-read ()
   "Prompt for a known ID-node."
