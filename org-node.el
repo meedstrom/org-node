@@ -1468,17 +1468,6 @@ for you."
 
 ;;;; Series
 
-;; (defun org-node-visit-next-by-date-created ())
-
-(defun org-node--standard-goto (item)
-  "Assuming ITEM is a cons cell where the cdr is an org-id, try to
-visit the node with that id if it exists."
-  (let* ((id (cdr item))
-         (node (gethash id org-nodes)))
-    (when node
-      (org-node--goto node)
-      t)))
-
 (defcustom org-node-series
   '(("d" :name "Dailies"
      :classifier org-node--default-daily-classifier ;; TODO Dedup
@@ -1504,42 +1493,65 @@ visit the node with that id if it exists."
      :prompter org-read-date))
   "Alist describing each node series.
 
-Each item looks like (KEY NAME CLASSIFIER PROMPTER).
+Each item looks like
 
-NAME describes this series and KEY is the corresponding key to
-type in \\[org-node-series-dispatch], both strings.
+(KEY :name STRING
+     :classifier FUNCTION
+     :whereami FUNCTION
+     :prompter FUNCTION
+     :try-goto FUNCTION
+     :create FUNCTION)
+
+KEY uniquely identifies the series, and is the corresponding key
+to type in \\[org-node-series-dispatch].
 
 CLASSIFIER is a single-argument function taking an `org-node'
-object and should return an unique string if the node belongs to
-the series, or nil otherwise.
+object and should return a cons cell or list if the node belongs
+to the series, or nil otherwise.
 
-The returned string should be formulated with the intent of
-sorting, because the \(lexicographic) sort order determines the
-order of items in the series.  For example, a series of
-daily-notes is correctly sorted if the sort-string is a date in
-the YYYY-MM-DD format, but not if it is DD/MM/YY.
+This cell is added to an internal list which is sorted on the
+first element of all cells, using `string>'.  This is what
+determines the order of items in the series.
 
-PROMPTER is either nil or a function that may be used during
-capture or refile, that interactively prompts for a sort-string.
-This highlights the other use of the sort-string: finding the
-node from scant context.  Going back to the example of
-daily-notes, `org-read-date' works well as a prompter because it
-returns strings in YYYY-MM-DD format."
+Function PROMPTER may be used during goto, capture or refile
+actions to interactively prompt for a sort-string.  This
+highlights the other use of the sort-string: finding our way back
+from scant context.
+
+In the example of a series of daily-notes sorted on YYYY-MM-DD,
+`org-read-date' works well as a prompter because it returns
+strings in YYYY-MM-DD format as well.
+
+Function WHEREAMI is much like PROMPTER in that it should return
+a sort-string or nil.  However, it should do this by heuristic
+instead of user interaction.
+
+Function TRY-GOTO takes a single argument: one of the items
+originally created by CLASSIFIER.  That is, a list of not only a
+sort-string but any associated data you put in.  If TRY-GOTO
+succeeds in using this information to visit a place of interest,
+it should return t, otherwise nil.  It should not create or write
+anything on failure - reserve that for the CREATE function.
+
+Function CREATE creates a place that did not exist.  For example,
+if an user picked a date from `org-read-date' but no daily-note
+exists for that date, CREATE is called to create that daily-node."
   ;; :type '(alist :key-type key-sequence
   ;; :value-type (plist :key-type symbol
   ;; :value-type sexp))
   :type 'alist)
 
 (defvar org-node--series-info nil
-  "Alist describing each node series, internal use.
-It looks like:
+  "Alist describing each node series, internal use.")
 
-((HASH :key STRING
-       :name STRING
-       :classifier FUNCTION
-       :prompter FUNCTION
-       :visiter FUNCTION
-       :sorted-dataset LIST))")
+(defun org-node--standard-goto (item)
+  "Assuming ITEM is a cons cell where the cdr is an org-id, try to
+visit the node with that id if it exists."
+  (let* ((id (cdr item))
+         (node (gethash id org-nodes)))
+    (when node
+      (org-node--goto node)
+      t)))
 
 (defun org-node--default-daily-classifier (node)
   "Classifier suitable for daily-notes in default Org-Roam style.
@@ -1589,6 +1601,48 @@ YYYY-MM-DD, but it does not verify."
 (defun org-node--fallback-prompter (series)
   (completing-read "Go to: " (plist-get series :sorted-items)))
 
+(defun org-node-series-refile ()
+  )
+
+;; Should be able to type d n for "daily, next"
+(transient-define-prefix org-node-series-dispatch ()
+  ["Org-node series"])
+
+;; Something like this at reset time
+;; (transient-append-suffix 'org-node-series-dispatch "d"
+;;   '("n" "Next in series" org-node-series-next :transient t)
+;;   '("p" "Previous in series" org-node-series-prev :transient t)
+;;   )
+
+(defun org-node-series-next (key)
+  (org-node-series-prev key 'next))
+
+(defun org-node-series-prev (key &optional next)
+  ;; TODO retry if necessary until no more ancestor ids that may be a daily
+  (when (derived-mode-p 'org-mode)
+    (let* ((series (alist-get (sxhash key) org-node--series-info))
+           (here (funcall (plist-get series :whereami)))
+           (head nil))
+      (when (cl-loop for item in (plist-get series :sorted-items)
+                     if (equal item here)
+                     return t
+                     else do (push item head))
+        (let ((target nil)
+              (to-check (if next
+                            head
+                          (drop (1+ (length head))
+                                (plist-get series :sorted-items)))))
+          (if (catch 'fail
+                (while (not target)
+                  (if to-check
+                      (setq target (funcall (plist-get series :try-goto)
+                                            (pop to-check)))
+                    (throw 'fail t))))
+              (message "No %s item in series %s"
+                       (if next "next" "previous")
+                       (plist-get series :name))))))))
+
+
 ;; (defun org-node-series-capture-target ()
 ;;   (org-node-cache-ensure)
 ;;   (let* ((day (org-read-date))
@@ -1630,47 +1684,6 @@ YYYY-MM-DD, but it does not verify."
 ;;               (run-hooks 'org-node-creation-hook)
 ;;             (save-buffer)
 ;;             (org-node--scan-targeted (list path-to-write))))))))
-
-(defun org-node-series-refile ()
-  )
-
-;; Should be able to type d n for "daily, next"
-(transient-define-prefix org-node-series-dispatch ()
-  ["Org-node series"])
-
-;; Something like this at reset time
-;; (transient-append-suffix 'org-node-series-dispatch "d"
-;;   '("n" "Next in series" org-node-series-next :transient t)
-;;   '("p" "Previous in series" org-node-series-prev :transient t)
-;;   )
-
-(defun org-node-series-next (key)
-  (org-node-series-prev key 'next))
-
-(defun org-node-series-prev (key &optional next)
-  ;; TODO retry if necessary until no more ancestor ids that may be a daily
-  (when (derived-mode-p 'org-mode)
-    (let* ((series (alist-get (sxhash key) org-node--series-info))
-           (here (funcall (plist-get series :whereami)))
-           (head nil))
-      (when (cl-loop for item in (plist-get series :sorted-items)
-                     if (equal item here)
-                     return t
-                     else do (push item head))
-        (let ((target nil)
-              (to-check (if next
-                            head
-                          (drop (1+ (length head))
-                                (plist-get series :sorted-items)))))
-          (if (catch 'fail
-                (while (not target)
-                  (if to-check
-                      (setq target (funcall (plist-get series :try-goto)
-                                            (pop to-check)))
-                    (throw 'fail t))))
-              (message "No %s item in series %s"
-                       (if next "next" "previous")
-                       (plist-get series :name))))))))
 
 
 ;;;; Filename functions
