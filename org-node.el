@@ -1462,35 +1462,38 @@ for you."
       (setq org-id-locations (org-id-alist-to-hash alist)))))
 
 
-;;;; Dailies
-
-
-
 ;;;; Series
 
 (defcustom org-node-series
   '(("d" :name "Dailies"
-     :classifier org-node--default-daily-classifier ;; TODO Dedup
+     :classifier org-node--default-daily-classifier
+     :creator org-node--default-daily-creator
+     :prompter org-read-date
      :whereami (lambda ()
                  (file-name-base (buffer-file-name (buffer-base-buffer))))
      :try-goto (lambda (item)
                  (when (file-readable-p (cdr item))
                    (find-file (cdr item))
-                   t))
-     :prompter org-read-date)
+                   t)))
 
-    ("c" :name "All nodes by creation-time"
-     :classifier
-     (lambda (node)
-       (let* ((timestamp
-               (cdr (assoc "CREATED"
-                           (org-node-get-properties node)))))
-         (when timestamp
-           (cons timestamp (org-node-get-id node)))))
+    ;; NOTE: Obviously, this works best if you have `org-node-put-created' on
+    ;;       `org-node-creation-hook'.  But it can be easily modified to look
+    ;;       at the datestamp in the filename for people who use those.
+    ;;       (Note that keeping such data in the filename doesn't really ever
+    ;;       permit nested nodes to work well: it'll be a crapshoot which of
+    ;;       the nodes in the file "stands for" the file.)
+    ("c" :name "All nodes by chronological order"
+     :try-goto org-node--series-standard-goto
+     :creator org-node--series-standard-creator
+     :prompter org-node--series-standard-prompter
+     :classifier (lambda (node)
+                   (let* ((timestamp
+                           (cdr (assoc "CREATED"
+                                       (org-node-get-properties node)))))
+                     (when timestamp
+                       (cons timestamp (org-node-get-id node)))))
      :whereami (lambda ()
-                 (org-entry-get nil "CREATED" t))
-     :try-goto org-node--standard-goto
-     :prompter org-read-date))
+                 (org-entry-get nil "CREATED" t))))
   "Alist describing each node series.
 
 Each item looks like
@@ -1536,15 +1539,15 @@ anything on failure - reserve that for the CREATE function.
 Function CREATE creates a place that did not exist.  For example,
 if an user picked a date from `org-read-date' but no daily-note
 exists for that date, CREATE is called to create that daily-node."
-  ;; :type '(alist :key-type key-sequence
-  ;; :value-type (plist :key-type symbol
-  ;; :value-type sexp))
   :type 'alist)
 
 (defvar org-node--series-info nil
   "Alist describing each node series, internal use.")
 
-(defun org-node--standard-goto (item)
+(defun org-node--series-standard-creator (sortstr)
+  (org-node--create sortstr (org-id-new)))
+
+(defun org-node--series-standard-goto (item)
   "Assuming ITEM is a cons cell where the cdr is an org-id, try to
 visit the node with that id if it exists."
   (let* ((id (cdr item))
@@ -1552,6 +1555,9 @@ visit the node with that id if it exists."
     (when node
       (org-node--goto node)
       t)))
+
+(defun org-node--series-standard-prompter (series)
+  (completing-read "Go to: " (plist-get series :sorted-items)))
 
 (defun org-node--default-daily-classifier (node)
   "Classifier suitable for daily-notes in default Org-Roam style.
@@ -1565,6 +1571,15 @@ YYYY-MM-DD, but it does not verify."
   (let ((path (org-node-get-file-path node)))
     (when (string-search "daily/" path)
       (cons (file-name-base path) path))))
+
+(defun org-node--default-daily-creator (sortstr)
+  (let ((org-node-ask-directory
+         (if (require 'org-roam-dailies nil t)
+             (file-name-concat org-roam-directory org-roam-dailies-directory)
+           (file-name-concat org-directory "daily/")))
+        (org-node-datestamp-format "")
+        (org-node-slug-fn #'identity))
+    (org-node--create sortstr (org-id-new))))
 
 ;; A possibility: instead of an alist, the sorted-items can be a plain list and
 ;; the associated data kept in a hash table.  Dunno which is better, but the
@@ -1587,32 +1602,12 @@ YYYY-MM-DD, but it does not verify."
                          ;; being most relevant
                          (cl-sort items #'string> :key #'car)))))))
 
-(defun org-node-series-goto (series)
-  (let* ((name (plist-get series :name))
-         (sortstr (funcall (or (plist-get series :prompter)
-                               #'org-node--fallback-prompter)
-                           series))
+(defun org-node-series-goto-or-create (series)
+  (let* ((sortstr (funcall (plist-get series :prompter) series))
          (item (assoc sortstr (plist-get series :sorted-items))))
-    (unless (funcall (plist-get series :try-goto) item)
-      ;; TODO: Now create a node!   Some :creator fn?
-      (message "Function :try-goto couldn't find entry for %s in series %s"
-               sortstr name))))
-
-(defun org-node--fallback-prompter (series)
-  (completing-read "Go to: " (plist-get series :sorted-items)))
-
-(defun org-node-series-refile ()
-  )
-
-;; Should be able to type d n for "daily, next"
-(transient-define-prefix org-node-series-dispatch ()
-  ["Org-node series"])
-
-;; Something like this at reset time
-;; (transient-append-suffix 'org-node-series-dispatch "d"
-;;   '("n" "Next in series" org-node-series-next :transient t)
-;;   '("p" "Previous in series" org-node-series-prev :transient t)
-;;   )
+    (unless (or (null item)
+                (funcall (plist-get series :try-goto) item))
+      (funcall (plist-get series :creator) sortstr))))
 
 (defun org-node-series-next (key)
   (org-node-series-prev key 'next))
@@ -1642,6 +1637,18 @@ YYYY-MM-DD, but it does not verify."
                        (if next "next" "previous")
                        (plist-get series :name))))))))
 
+;; Should be able to type d n for "daily, next"
+(transient-define-prefix org-node-series-dispatch ()
+  ["Org-node series"])
+
+;; Something like this at reset time
+;; (transient-append-suffix 'org-node-series-dispatch "d"
+;;   '("n" "Next in series" org-node-series-next :transient t)
+;;   '("p" "Previous in series" org-node-series-prev :transient t)
+;;   )
+
+(defun org-node-series-refile ()
+  )
 
 ;; (defun org-node-series-capture-target ()
 ;;   (org-node-cache-ensure)
@@ -1987,50 +1994,6 @@ time some necessary variables are set."
     (org-roam-capture- :node (org-roam-node-create
                               :title org-node-proposed-title
                               :id    org-node-proposed-id))))
-
-;; Experimental
-(defun org-node--capture-target-daily ()
-  (require 'org-journal)
-  (org-node-cache-ensure)
-  (let* ((day (org-read-date))
-         (node (gethash day org-node--candidate<>node)))
-    (if node
-        ;; Node exists; capture into it
-        (let ((title (org-node-get-title node))
-              (id (org-node-get-id node)))
-          (find-file (org-node-get-file-path node))
-          (widen)
-          (goto-char (org-node-get-pos node))
-          (org-show-context)
-          (org-show-entry)
-          (unless (and (= 1 (point)) (org-at-heading-p))
-            (when (outline-next-heading)
-              (backward-char 1))))
-      ;; Node does not exist; capture into new file
-      (let* ((dir org-journal-dir)
-             (title day)
-             (id (org-id-new))
-             (path-to-write (expand-file-name (concat day ".org") dir)))
-        (if (or (file-exists-p path-to-write)
-                (find-buffer-visiting path-to-write))
-            (error "File or buffer already exists: %s" path-to-write)
-          (mkdir (file-name-directory path-to-write) t)
-          (find-file path-to-write)
-          (if org-node-prefer-with-heading
-              (insert "* " title
-                      "\n:PROPERTIES:"
-                      "\n:ID:       " id
-                      "\n:END:"
-                      "\n")
-            (insert ":PROPERTIES:"
-                    "\n:ID:       " id
-                    "\n:END:"
-                    "\n#+title: " title
-                    "\n"))
-          (unwind-protect
-              (run-hooks 'org-node-creation-hook)
-            (save-buffer)
-            (org-node--scan-targeted (list path-to-write))))))))
 
 (defun org-node-capture-target ()
   "Can be used as target in a capture template.
