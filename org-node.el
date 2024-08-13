@@ -791,37 +791,60 @@ didn't do so already, or local changes have been made."
           (byte-compile-file lib))))
     (or native-path elc-path)))
 
+;; ;; TODO: Upstream somewhere else
+;; (defun org-node--compile-into (fnsym comp-sym)
+;;   "Compile function stored at FNSYM and put it in COMP-SYM.
+;; Do nothing if FNSYM has not changed since the last time.
+
+;; The symbol value of FNSYM may be either a lambda or another
+;; symbol with a function definition.  It may also be an anonymous
+;; closure, in which case it will be converted to a plain lambda and
+;; FNSYM reassigned to that."
+;;   (let* ((fnval (let ((fnsymval (symbol-value fnsym)))
+;;                   (if (symbolp fnsymval)
+;;                       (symbol-function fnsymval)
+;;                     fnsymval)))
+;;          (hash (progn
+;;                  (when (eq 'closure (car-safe fnval))
+;;                    ;; Turn closure into plain lambda, bc native-comp needs it
+;;                    (setq fnval (cons 'lambda (cddr fnval)))
+;;                    (set fnsym fnval))
+;;                  (sxhash fnval))))
+;;     ;; Recompile only if hash changed
+;;     (unless (eq (alist-get fnsym org-node--fn-hashes) hash)
+;;       (if (compiled-function-p fnval)
+;;           (set comp-sym fnval)
+;;         (set comp-sym (if (native-comp-available-p)
+;;                           (native-compile fnval)
+;;                         (byte-compile fnval))))
+;;       (setf (alist-get fnsym org-node--fn-hashes) hash))))
+
+(defvar org-node--compiled-fns (make-hash-table))
+(defun org-node--as-bytecode (fn)
+  (if (compiled-function-p fn)
+      fn
+    (if (and (symbolp fn) (compiled-function-p (symbol-function fn)))
+        (symbol-function fn)
+      (setq fn (org-node--unenclose fn))
+      (let* ((fn-hash (sxhash fn))
+             (compiled (gethash fn-hash org-node--compiled-fns)))
+        (unless compiled
+          (setq compiled (if (native-comp-available-p)
+                             (native-compile fn)
+                           (byte-compile fn)))
+          (puthash fn-hash compiled org-node--compiled-fns))
+        compiled))))
+
+(defun org-node--unenclose (sexp)
+  "If SEXP is an anonymous closure, return a plain lambda.
+Else return SEXP unmodified."
+  (if (eq 'closure (car-safe sexp))
+      (cons 'lambda (cddr sexp))
+    sexp))
+
 (defvar org-node--fn-hashes nil)
-(defvar org-node--compiled-affixation-fn nil)
-(defvar org-node--compiled-filter-fn nil)
-
-;; TODO: Upstream somewhere else
-(defun org-node--compile-into (fnsym comp-sym)
-  "Compile function stored at FNSYM and put it in COMP-SYM.
-Do nothing if FNSYM has not changed since the last time.
-
-The symbol value of FNSYM may be either a lambda or another
-symbol with a function definition.  It may also be an anonymous
-closure, in which case it will be converted to a plain lambda and
-FNSYM reassigned to that."
-  (let* ((fnval (let ((fnsymval (symbol-value fnsym)))
-                  (if (symbolp fnsymval)
-                      (symbol-function fnsymval)
-                    fnsymval)))
-         (hash (progn
-                 (when (eq 'closure (car-safe fnval))
-                   ;; Turn closure into plain lambda, bc native-comp needs it
-                   (setq fnval (cons 'lambda (cddr fnval)))
-                   (set fnsym fnval))
-                 (sxhash fnval))))
-    ;; Recompile only if hash changed
-    (unless (eq (alist-get fnsym org-node--fn-hashes) hash)
-      (if (compiled-function-p fnval)
-          (set comp-sym fnval)
-        (set comp-sym (if (native-comp-available-p)
-                          (native-compile fnval)
-                        (byte-compile fnval))))
-      (setf (alist-get fnsym org-node--fn-hashes) hash))))
+(defvar org-node--affixation-compfn nil)
+(defvar org-node--filter-compfn nil)
 
 (defun org-node--scan (files finalizer)
   "Begin async scanning FILES for id-nodes and links.
@@ -830,8 +853,12 @@ When finished, pass a list of scan results to the FINALIZER
 function to update current tables."
   (when (= 0 org-node-perf-max-jobs)
     (setq org-node-perf-max-jobs (org-node--count-logical-cores)))
-  (org-node--compile-into 'org-node-filter-fn 'org-node--filter-compfn)
-  (org-node--compile-into 'org-node-affixation-fn 'org-node--affixation-compfn)
+  (setq org-node--filter-compfn
+        (org-node--as-bytecode org-node-filter-fn))
+  (setq org-node--affixation-compfn
+        (org-node--as-bytecode org-node-affixation-fn))
+  ;; (org-node--compile-into 'org-node-filter-fn 'org-node--filter-compfn)
+  ;; (org-node--compile-into 'org-node-affixation-fn 'org-node--affixation-compfn)
   (let ((compiled-lib (org-node--ensure-compiled-lib))
         (file-name-handler-alist nil)
         (coding-system-for-read org-node-perf-assume-coding-system)
@@ -1116,7 +1143,7 @@ The reason for default t is better experience with
     (dolist (ref refs)
       (puthash ref id org-node--ref<>id))
     ;; Setup completion candidates
-    (when (funcall org-node--compiled-filter-fn node)
+    (when (funcall org-node--filter-compfn node)
       ;; Let refs work as aliases
       (dolist (ref refs)
         (puthash ref node org-node--candidate<>node)
@@ -1137,7 +1164,7 @@ The reason for default t is better experience with
           (when (and collision (not (equal id collision)))
             (push (list title id collision) org-node--collisions)))
         (puthash title id org-node--title<>id)
-        (let ((affx (funcall org-node--compiled-affixation-fn node title)))
+        (let ((affx (funcall org-node--affixation-compfn node title)))
           (if org-node-alter-candidates
               ;; Absorb the affixations into one candidate string
               (puthash (concat (nth 1 affx) (nth 0 affx) (nth 2 affx))
@@ -1444,8 +1471,16 @@ for you."
 
 (defvar org-node-series
   '(("d" "Dailies"
-     org-node--default-daily-classifier
-     org-read-date))
+     :classifier org-node--default-daily-classifier
+     :try-goto (lambda (item)
+                 (let* ((id (cdr item))
+                        (node (gethash id org-nodes)))
+                   (when node
+                     (org-node--goto node)
+                     t)))
+     :whereami (lambda ()
+                 (file-name-base (buffer-file-name (buffer-base-buffer))))
+     :prompter org-read-date))
   "Alist describing each node series.
 
 Each item looks like (KEY NAME CLASSIFIER PROMPTER).
@@ -1470,7 +1505,7 @@ node from scant context.  Going back to the example of
 daily-notes, `org-read-date' works well as a prompter because it
 returns strings in YYYY-MM-DD format.")
 
-(defvar org-node--series-data nil
+(defvar org-node--series-info nil
   "Alist describing each node series, internal use.
 It looks like:
 
@@ -1482,38 +1517,26 @@ It looks like:
        :sorted-dataset LIST))")
 
 (defun org-node--default-daily-classifier (node)
-  "Classifier for daily-notes in the same style as Org-Roam.
+  "Classifier for daily-notes in default Org-Roam style.
 
-It's a daily if NODE's full path involves a \"daily\" directory,
-and NODE is file-level as opposed to a subtree node.  In that
-case, return NODE's title, which is hopefully in the YYYY-MM-DD
-format, but this is not verified."
-  (when (and (string-search "daily/" (org-node-get-file-path node))
-             (not (org-node-get-is-subtree node)))
-    (org-node-get-title node)))
+Assume that if NODE's file path involves a \"daily\" directory,
+then return the file name without directory or extension, in the
+hope that this leaves just a YYYY-MM-DD date string."
+  (let ((path (org-node-get-file-path node)))
+    (when (string-search "daily/" path)
+      (list (file-name-base path)))))
 
-;; TODO: is it possible to use gv-letplace or something to avoid let-binding a
-;; new table and producing garbage on copying value at the end?
 (defun org-node--build-series (spec)
-  (let ((table (make-hash-table :test #'equal)))
-    (seq-let (key name classifier prompter) spec
-      (cl-loop for id being the hash-keys of org-node--id<>node
-               using (hash-values node)
-               as sortstr = (funcall classifier node)
-               when sortstr
-               collect (progn
-                         (puthash sortstr id table)
-                         (cons sortstr id))
-               into items
-               finally do
-               (setf (alist-get (sxhash key) org-node--series-data)
-                     (list :key key
-                           :name name
-                           :classifier (byte-compile classifier)
-                           :prompter prompter
-                           :sorted-ids
-                           (mapcar #'cdr (cl-sort items #'string> :key #'car))
-                           :sortstr<>id table))))))
+  (let ((classifier (org-node--as-bytecode (plist-get spec :classifier))))
+    (cl-loop
+     for node being the hash-values of org-node--id<>node
+     as item = (funcall classifier node)
+     when item collect item into items
+     finally do
+     (setf (alist-get (sxhash (plist-get spec :key)) org-node--series-info)
+           (append spec
+                   (list :sorted-items
+                         (cl-sort items #'string> :key #'car)))))))
 
 (defun org-node--series-goto (series)
   (let* ((name (plist-get series :name))
@@ -1527,7 +1550,7 @@ format, but this is not verified."
       (message "Entry %s not found in series %s" sortstr name))))
 
 (defun org-node--series-fallback-prompter (series)
-  (completing-read "Go to: " (plist-get series :sortstr<>id)))
+  (completing-read "Go to: " (plist-get series :sorted-items)))
 
 ;; (defun org-node-series-capture-target ()
 ;;   (org-node-cache-ensure)
@@ -1584,40 +1607,35 @@ format, but this is not verified."
 ;;   '("p" "Previous in series" org-node-series-prev :transient t)
 ;;   )
 
+
 (defun org-node-series-next (key)
-  (org-node-series-cycle key +1))
+  (org-node-series-prev key 'next))
 
-(defun org-node-series-prev (key)
-  (org-node-series-cycle key -1))
-
-(defun org-node-series-cycle (key n)
+(defun org-node-series-prev (key &optional next)
   ;; TODO retry if necessary until no more ancestor ids that may be a daily
   (when (derived-mode-p 'org-mode)
-    (let* ((id-here (org-node-id-at-point))
-           (head nil)
-           (series (alist-get (sxhash key) org-node--series-data)))
-      (unless (gethash id-here org-nodes)
-        (user-error "No known ID-node here, so no series"))
-      (when (cl-loop for id in (plist-get series :sorted-ids)
-                     if (equal id id-here)
+    (let* ((series (alist-get (sxhash key) org-node--series-info))
+           (here (funcall (plist-get series :whereami)))
+           ;; (id-here (org-node-id-at-point))
+           (head nil))
+      (when (cl-loop for item in (plist-get series :sorted-items)
+                     if (equal item here)
                      return t
-                     else do (push id head))
-        (let ((node nil)
-              (to-check (if (natnump n)
+                     else do (push item head))
+        (let ((target nil)
+              (to-check (if next
                             head
                           (drop (1+ (length head))
-                                (plist-get series :sorted-ids)))))
+                                (plist-get series :sorted-items)))))
           (if (catch 'fail
-                ;; Normally we'd just take the first `pop', but user may have
-                ;; deleted a daily-note that is still in the table, and we do
-                ;; not clean up the dailies table (TBD), so keep popping until
-                ;; match
-                (while (not node)
+                (while (not target)
                   (if to-check
-                      (setq node (gethash (pop to-check) org-nodes))
+                      (setq target (funcall (plist-get series :try-goto)
+                                            (pop to-check)))
                     (throw 'fail t))))
-              (message "No %s node" (if (>= n 1) "next" "previous"))
-            (org-node--goto node)))))))
+              (message "No %s item in series %s"
+                       (if next "next" "previous")
+                       (plist-get series :name))))))))
 
 
 ;;;; Filename functions
@@ -1712,7 +1730,7 @@ Built-in choices:
           (function-item org-node-slugify-like-roam-actual)
           function))
 
-;; To be removed when Debian stable becomes trixie
+;; To be removed in 2025 when Debian bumps stable
 (defun org-node--strip-diacritics (input-string)
   "Strip diacritics from INPUT-STRING."
   (if (<= 29 emacs-major-version)
@@ -1746,11 +1764,11 @@ Built-in choices:
 ;; (org-node-slugify-for-web "칹え🐛")
 
 (defun org-node-slugify-for-web (title)
-  "From TITLE, make a filename that looks nice as URL component.
+  "From TITLE, make a string that looks nice as URL component.
 
 A title like \"Löb's Theorem\" becomes \"lobs-theorem\".  Note
 that while diacritical marks are stripped, it retains most
-symbols that belong to the alphabet category in Unicode,
+symbols that belong to the Unicode alphabetic category,
 preserving for example kanji and Greek letters."
   (thread-last title
                (org-node--strip-diacritics)
@@ -1860,7 +1878,7 @@ Built-in choices:
 
 If you choose `org-capture' here, configure
 `org-capture-templates' such that some capture templates use
-`org-node-capture-target' as their target.
+`org-node-capture-target' as their target, else it is pointless.
 
 If you wish to write a custom function instead of any of the
 above three choices, know that two variables are set at the time
