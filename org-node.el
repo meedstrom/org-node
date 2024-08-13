@@ -1477,13 +1477,13 @@ for you."
                    (find-file (cdr item))
                    t)))
 
-    ;; NOTE: Obviously, this works best if you have `org-node-put-created' on
-    ;;       `org-node-creation-hook'.  But it can be easily modified to look
-    ;;       at the datestamp in the filename for people who use those.
+    ;; NOTE: Obviously, this series works best if you have
+    ;;       `org-node-put-created' on `org-node-creation-hook'.  But it can be
+    ;;       easily modified to look at the datestamp in the filename instead.
     ;;       (Note that keeping such data in the filename doesn't really ever
     ;;       permit nested nodes to work well: it'll be a crapshoot which of
     ;;       the nodes in the file "stands for" the file.)
-    ("c" :name "All nodes by chronological order"
+    ("a" :name "All ID-nodes by chronological order"
      :try-goto org-node--series-standard-goto
      :creator org-node--series-standard-creator
      :prompter org-node--series-standard-prompter
@@ -1560,6 +1560,15 @@ visit the node with that id if it exists."
 (defun org-node--series-standard-prompter (series)
   (completing-read "Go to: " (plist-get series :sorted-items)))
 
+(defun org-node--default-daily-creator (sortstr)
+  (let ((org-node-ask-directory
+         (if (require 'org-roam-dailies nil t)
+             (file-name-concat org-roam-directory org-roam-dailies-directory)
+           (file-name-concat org-directory "daily/")))
+        (org-node-datestamp-format "")
+        (org-node-slug-fn #'identity))
+    (org-node--create sortstr (org-id-new))))
+
 (defun org-node--default-daily-classifier (node)
   "Classifier suitable for daily-notes in default Org-Roam style.
 
@@ -1572,15 +1581,6 @@ YYYY-MM-DD, but it does not verify."
   (let ((path (org-node-get-file-path node)))
     (when (string-search "daily/" path)
       (cons (file-name-base path) path))))
-
-(defun org-node--default-daily-creator (sortstr)
-  (let ((org-node-ask-directory
-         (if (require 'org-roam-dailies nil t)
-             (file-name-concat org-roam-directory org-roam-dailies-directory)
-           (file-name-concat org-directory "daily/")))
-        (org-node-datestamp-format "")
-        (org-node-slug-fn #'identity))
-    (org-node--create sortstr (org-id-new))))
 
 ;; A possibility: instead of an alist, the sorted-items can be a plain list and
 ;; the associated data kept in a hash table.  Dunno which is better, but the
@@ -1623,18 +1623,18 @@ YYYY-MM-DD, but it does not verify."
                      if (equal item here)
                      return t
                      else do (push item head))
-        (let ((target nil)
-              (to-check (if next
+        (let ((to-check (if next
                             head
                           (drop (1+ (length head))
-                                (plist-get series :sorted-items)))))
+                                (plist-get series :sorted-items))))
+              (target nil))
           (if (catch 'fail
                 (while (not target)
                   (if to-check
                       (setq target (funcall (plist-get series :try-goto)
                                             (pop to-check)))
                     (throw 'fail t))))
-              (message "No %s item in series %s"
+              (message "No %s item in series \"%s\""
                        (if next "next" "previous")
                        (plist-get series :name))))))))
 
@@ -1650,6 +1650,15 @@ YYYY-MM-DD, but it does not verify."
 
 (defun org-node-series-refile ()
   )
+
+;; Ok, this capture target should call PROMPTER if `org-node-proposed-title' is
+;; nil.  After having a title, attempt TRY-GOTO/CREATOR.
+
+;; What happens if user got here from an org-node-find, and selected a series
+;; capture target?  (Interesting)
+
+;; I think then it should capture to a sub-heading, after calling
+;; TRY-GOTO/CREATOR anyway.
 
 ;; (defun org-node-series-capture-target ()
 ;;   (org-node-cache-ensure)
