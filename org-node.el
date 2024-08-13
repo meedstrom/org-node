@@ -791,39 +791,37 @@ didn't do so already, or local changes have been made."
           (byte-compile-file lib))))
     (or native-path elc-path)))
 
-;; (defmacro org-node--ensure-compiled-fn (var)
-;;   "Ensure that the value of variable VAR is a comp-sym function."
-;;   `(or (compiled-function-p (if (symbolp ,var) (symbol-function ,var) ,var))
-;;        ;; Would use native-comp here, but it wrecks Customize
-;;        (if (symbolp ,var)
-;;            (byte-compile ,var)
-;;          (setq ,var (byte-compile ,var)))))
 (defvar org-node--fn-hashes nil)
 (defvar org-node--compiled-affixation-fn nil)
 (defvar org-node--compiled-filter-fn nil)
 
-(defun org-node--shadow (fnsym comp-sym)
+;; TODO: Upstream somewhere else
+(defun org-node--compile-into (fnsym comp-sym)
   "Compile function stored at FNSYM and put it in COMP-SYM.
 Do nothing if FNSYM has not changed since the last time.
 
-The value of FNSYM may be either a lambda or a function symbol."
+The symbol value of FNSYM may be either a lambda or another
+symbol with a function definition.  It may also be an anonymous
+closure, in which case it will be converted to a plain lambda and
+FNSYM reassigned to that."
   (let* ((fnval (let ((fnsymval (symbol-value fnsym)))
                   (if (symbolp fnsymval)
                       (symbol-function fnsymval)
                     fnsymval)))
-         (curr-hash (sxhash fnval)))
-    (unless (eq (alist-get fnsym org-node--fn-hashes) curr-hash)
-      ;; Save hash of definition so we don't need to recompile every time
-      (setf (alist-get fnsym org-node--fn-hashes) curr-hash)
+         (hash (progn
+                 (when (eq 'closure (car-safe fnval))
+                   ;; Turn closure into plain lambda, bc native-comp needs it
+                   (setq fnval (cons 'lambda (cddr fnval)))
+                   (set fnsym fnval))
+                 (sxhash fnval))))
+    ;; Recompile only if hash changed
+    (unless (eq (alist-get fnsym org-node--fn-hashes) hash)
       (if (compiled-function-p fnval)
           (set comp-sym fnval)
-        (when (eq 'closure (car fnval))
-          ;; Turn closure into plain lambda, because native-comp demands it
-          (setq fnval (cons 'lambda (cddr fnval)))
-          (set fnsym fnval))
         (set comp-sym (if (native-comp-available-p)
                           (native-compile fnval)
-                        (byte-compile fnval)))))))
+                        (byte-compile fnval))))
+      (setf (alist-get fnsym org-node--fn-hashes) hash))))
 
 (defun org-node--scan (files finalizer)
   "Begin async scanning FILES for id-nodes and links.
@@ -832,10 +830,8 @@ When finished, pass a list of scan results to the FINALIZER
 function to update current tables."
   (when (= 0 org-node-perf-max-jobs)
     (setq org-node-perf-max-jobs (org-node--count-logical-cores)))
-  (org-node--shadow 'org-node-filter-fn 'org-node--compiled-filter-fn)
-  (org-node--shadow 'org-node-affixation-fn 'org-node--compiled-affixation-fn)
-  ;; (org-node--ensure-compiled-fn org-node-filter-fn)
-  ;; (org-node--ensure-compiled-fn org-node-affixation-fn)
+  (org-node--compile-into 'org-node-filter-fn 'org-node--filter-compfn)
+  (org-node--compile-into 'org-node-affixation-fn 'org-node--affixation-compfn)
   (let ((compiled-lib (org-node--ensure-compiled-lib))
         (file-name-handler-alist nil)
         (coding-system-for-read org-node-perf-assume-coding-system)
@@ -930,15 +926,14 @@ function to update current tables."
                  :command
                  ;; Ensure the children run the same binary executable as
                  ;; this Emacs, so the compiled-lib fits
-                 (list (expand-file-name invocation-name invocation-directory)
+                 (list (file-name-concat invocation-directory invocation-name)
                        "--quick"
                        "--batch"
                        ;; TODO: This assumes the threshold will never be hit,
                        ;; but maybe someone does something crazy like pandoc
-                       ;; the entirety of SciHub into .org to see how org-node
-                       ;; copes?  Maybe sum the filesizes and go back to
-                       ;; default 800kB GC if we're dealing with more than like
-                       ;; 1GB of org files.
+                       ;; the entirety of SciHub into .org for fun?  Maybe sum
+                       ;; the filesizes and go back to default 800kB GC if
+                       ;; we're dealing with more than like 1GB of org files.
                        "--eval" (format "(setq gc-cons-threshold %d)" gc-ultra)
                        "--eval" (format "(setq i %d)" i)
                        "--eval" (format "(setq temporary-file-directory \"%s\")"
@@ -1483,8 +1478,8 @@ It looks like:
        :name STRING
        :classifier FUNCTION
        :prompter FUNCTION
-       :sortstr<>id HASH-TABLE
-       :sorted-ids LIST))")
+       :visiter FUNCTION
+       :sorted-dataset LIST))")
 
 (defun org-node--default-daily-classifier (node)
   "Classifier for daily-notes in the same style as Org-Roam.
@@ -2157,12 +2152,13 @@ window. This function is currently really just used for
 `node' as part of the list in case `node' actually
 represents the date of an unknown/nascent dailies."
   (org-node-cache-ensure)
-  (delete-dups ;; takes care of (a) the case that `node' actually exists
+  (delete-dups
+   ;; takes care of (a) the case that `node' actually exists
    ;; and (b) cases of squiggle~ or #autosave or sync-conflict files
    ;; that `org-nodes' may have entries for
-   (sort  ;; sort into calendrial order
-    (cons node         ;; add in the current node in case it's not actually
-          (let ((keys ())   ;; (yet) extant
+   (sor
+    (cons node              ; add in the current node in case it's not actually
+          (let ((keys ())   ; (yet) extant
                 (titles ()))
             (maphash (lambda (k v) (push (cons k v) keys)) org-nodes)
             (let ((titles
@@ -2176,31 +2172,26 @@ represents the date of an unknown/nascent dailies."
                 "^\\(?:[0-9][0-9]\\)\\{1,2\\}-\\(?:1[012]\\|0?[1-9]\\)-\\(?:0?[1-9]\\|[12][0-9]\\|3[01]\\)$"
                 title)
                collect title))))
-    'string<)))
+    #'string<)))
 
+;; TODO: when we have some equivalent of `org-node--create' (extend it?), use
+;;      it in place of capture
 (defun org-node--daily-not-found (target-node)
   "Handles missing/nascent daily node look-up."
-  (if (fboundp 'org-roam-mode)
+  (if (require 'org-roam-dailies nil t)
       (progn
-        (require 'org-roam-dailies) ;; in case it's not loaded
         (org-roam-dailies--capture
          (org-read-date nil t target-node nil)
          t
          (when org-node-default-org-roam-capture-template-key
            org-node-default-org-roam-capture-template-key)))
-    (message "Cannot load requested file.
-(And org-roam is not available.)")))
+    (message "Cannot load requested file. (And org-roam is not available.)")))
 
 (defvar-keymap org-node--daily-repeat-next-prev
-  :doc "Use `-', `y', or `p' to move to the first extant previous daily entry,
-and `+', `t', or `n' to move to the first next extant daily entry."
-  "-" #'org-node-goto-prev-day ;; "decrease date"
-  "y" #'org-node-goto-prev-day ;; "yesterday"
-  "p" #'org-node-goto-prev-day ;; "previous date"
-  "+" #'org-node-goto-next-day ;; "decrease date"
-  "t" #'org-node-goto-next-day ;; "tomorrow"
-  "n" #'org-node-goto-next-day ;; "next date"
-  )
+  :doc "Use `p' to move to the previous extant daily entry,
+and `n' to move to the next extant daily entry."
+  "p" #'org-node-goto-prev-day
+  "n" #'org-node-goto-next-day)
 
 ;;;###autoload
 (defun org-node-goto-prev-day ()
@@ -2557,12 +2548,11 @@ out."
 
 ;; This function can be removed if one day we drop support for file-level
 ;; nodes, because then just (org-entry-get nil "ID" t) will suffice.  That
-;; function demonstrates the maintenance burden of file-level anything:
-;; `org-entry-get' /can/ get the file-level ID but only if point is before
-;; first heading; someone forgot to ensure the INHERIT argument will also work
-;; as intended.  And no fault to them, it's easy to miss; file-level property
-;; drawers were a mistake, they create the need for special cases all over the
-;; place.
+;; demonstrates the maintenance burden of file-level anything: `org-entry-get'
+;; /can/ get the file-level ID but only if point is before first heading;
+;; someone forgot to ensure the INHERIT argument will also work as intended.
+;; And no fault to them, it's easy to miss; file-level property drawers were a
+;; mistake, they create the need for special cases all over the place.
 (defun org-node-id-at-point ()
   (save-excursion
     (without-restriction
@@ -3255,18 +3245,6 @@ Wrap the value in double-brackets if necessary."
                         "]]")))
     (org-node--add-to-property-keep-space "ROAM_REFS" ref)))
 
-;; Just set `org-node-prefer-with-heading' = t, run
-;; `org-roam-demote-entire-buffer' on all files, and then you can use the
-;; builtin `org-set-tags-command' from then on.  It'd never have occurred to me
-;; to come up with file-level properties and tags -- they're a hack causing an
-;; explosion of code complexity throughout Org, which I infer given how often
-;; my functions have to handle that special case.  Thinking of just dropping
-;; support in org-node as a protest -- it'll be a more beautiful codebase, to
-;; boot.  But first I should ask around for legitimate use-cases of file-level
-;; properties.
-;; (defun org-node-tag-add ()
-;;   )
-
 
 ;;;; CAPF (Completion-At-Point Function)
 
@@ -3403,8 +3381,9 @@ If already visiting that node, then follow the link normally."
 (defun org-node-faster-roam-daily-note-p (&optional file)
   "Faster than `org-roam-dailies--daily-note-p' on a slow fs."
   (require 'org-roam-dailies)
-  (let ((daily-dir (file-name-concat org-roam-directory
-                                     org-roam-dailies-directory))
+  (let ((daily-dir (abbreviate-file-name
+                    (file-name-concat org-roam-directory
+                                      org-roam-dailies-directory)))
         (path (or file (buffer-file-name (buffer-base-buffer)))))
     (unless (file-name-absolute-p path)
       (error "Expected absolute filename but got: %s" path))
