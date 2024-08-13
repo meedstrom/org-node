@@ -1585,7 +1585,7 @@ YYYY-MM-DD, but it does not verify."
 ;; the associated data kept in a hash table.  Dunno which is better, but the
 ;; alist seems user-friendly.
 (defun org-node--build-series (spec)
-  (let ((classifier (org-node--as-bytecode (plist-get spec :classifier)))
+  (let ((classifier (org-node--as-bytecode (plist-get (cdr spec) :classifier)))
         (unique-cars (make-hash-table :test #'equal)))
     (cl-loop
      for node being the hash-values of org-node--id<>node
