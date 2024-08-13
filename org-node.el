@@ -2075,6 +2075,174 @@ To behave like `org-roam-node-find' when creating new nodes, set
       (org-node--create input (org-id-new)))))
 
 ;;;###autoload
+(defun org-node-goto-daily (&optional direction range span)
+  "Go to a daily node with a time `offset' from the current buffer.
+If called interactively, find the daily-note for a date using the calendar,
+creating it if necessary."
+  (interactive)
+  (let* ((offset
+          (if (and direction range span)
+              (concat direction (number-to-string range) span)
+            nil))
+         (must-be-in-daily ;; if prefix makes reference to base date
+          (if offset (let ((prefix
+                            ;; ('Some people, when confronted with a problem, think
+                            ;;   "I know, I'll use regular expressions."
+                            ;;   Now they have two problems.' —Jamie Zawinski)
+                            "\\`\\(?:\\+\\{2\\}\\|-\\{2\\}\\)"))
+                       ;; = two or more `+' or `-' at beginning of string
+                       ;; = (rx (: bos (or (repeat 2 2 "+")
+                       ;;                  (repeat 2 2 "-"))))
+                       (string-match prefix offset))
+            nil)))
+    (if (and
+         (not (org-node--daily-note-p))
+         must-be-in-daily)
+        (user-error "Not in a daily-note.")
+      (if (member direction '("--" "++")) ;; if next or prev & missing node
+          (org-node--locate-offset-node
+           (file-name-base buffer-file-name)
+           direction range span)
+        (let* ((current-node
+                (if must-be-in-daily
+                    (org-time-string-to-time
+                     (file-name-base buffer-file-name))
+                  nil))
+               (target-node
+                (org-read-date nil nil offset nil current-node))
+               (node-hash (gethash target-node org-node--candidate<>node)))
+          (if node-hash
+              (org-node--goto node-hash)
+            (org-node--daily-not-found target-node)))))))
+
+(defun org-node--locate-offset-node (node direction range span)
+  "Given a reference `node', a `direction' for offset, a `range'
+of distance and a `span' [currently `span' is ignored], open the
+daily journal entry file of the appropriate date in the current
+window. This function is currently really just used for
+`org-node-goto-prev-day' and `org-node-goto-next-day' commands."
+  (unless (org-node--daily-note-p)
+    (user-error "Not in a daily-note"))
+  (setq n (or range 1))
+  (setq n (* n (if (equal direction "--")
+                   -1 1)))
+  (let* ((dailies (org-node--calculate-list-of-dailies-dates node))
+         (position
+          (when node
+            (cl-position-if (lambda (candidate)
+                              (string=
+                               node
+                               candidate))
+                            dailies))))
+    (if position
+        (progn
+          (pcase n
+            ((pred (natnump))
+             (when (eq position (- (length dailies) 1))
+               (user-error "Already at newest note")))
+            ((pred (integerp))
+             (when (eq position 0)
+               (user-error "Already at oldest note"))))
+          (setq note (nth (+ position n) dailies))
+          (org-node--goto
+           (gethash note org-node--candidate<>node)))
+      (user-error "ERROR"))))
+
+(defun org-node--calculate-list-of-dailies-dates (node)
+  "Calculate a list of known dailies, adding
+`node' as part of the list in case `node' actually
+represents the date of an unknown/nascent dailies."
+  (org-node-cache-ensure)
+  (delete-dups ;; takes care of (a) the case that `node' actually exists
+   ;; and (b) cases of squiggle~ or #autosave or sync-conflict files
+   ;; that `org-nodes' may have entries for
+   (sort  ;; sort into calendrial order
+    (cons node         ;; add in the current node in case it's not actually
+          (let ((keys ())   ;; (yet) extant
+                (titles ()))
+            (maphash (lambda (k v) (push (cons k v) keys)) org-nodes)
+            (let ((titles
+                   (cl-loop
+                    for key in keys
+                    collect (org-node-get-file-title-or-basename (cdr key)))))
+              (cl-loop
+               for title in titles
+               when
+               (string-match-p ;; match for YYYY-MM-DD nodes only
+                "^\\(?:[0-9][0-9]\\)\\{1,2\\}-\\(?:1[012]\\|0?[1-9]\\)-\\(?:0?[1-9]\\|[12][0-9]\\|3[01]\\)$"
+                title)
+               collect title))))
+    'string<)))
+
+(defun org-node--daily-not-found (target-node)
+  "Handles missing/nascent daily node look-up."
+  (if (fboundp 'org-roam-mode)
+      (progn
+        (require 'org-roam-dailies) ;; in case it's not loaded
+        (org-roam-dailies--capture
+         (org-read-date nil t target-node nil)
+         t
+         (when org-node-default-org-roam-capture-template-key
+           org-node-default-org-roam-capture-template-key)))
+    (message "Cannot load requested file.
+(And org-roam is not available.)")))
+
+(defvar-keymap org-node--daily-repeat-next-prev
+  :doc "Use `-', `y', or `p' to move to the first extant previous daily entry,
+and `+', `t', or `n' to move to the first next extant daily entry."
+  "-" #'org-node-goto-prev-day ;; "decrease date"
+  "y" #'org-node-goto-prev-day ;; "yesterday"
+  "p" #'org-node-goto-prev-day ;; "previous date"
+  "+" #'org-node-goto-next-day ;; "decrease date"
+  "t" #'org-node-goto-next-day ;; "tomorrow"
+  "n" #'org-node-goto-next-day ;; "next date"
+  )
+
+;;;###autoload
+(defun org-node-goto-prev-day ()
+  "Go to the first extant daily before the day of the current buffer."
+  (interactive)
+  (org-node-goto-daily "--" 1 "d")
+  (set-transient-map org-node--daily-repeat-next-prev nil nil
+                     "Use `-', `p', or `y' to continue going back in time.\
+ Use `+', `n', or `t' to switch to moving forward in time."))
+
+;;;###autoload
+(defun org-node-goto-next-day ()
+  "Go to the next extant daily after the day of the current buffer."
+  (interactive)
+  (org-node-goto-daily "++" 1 "d")
+  (set-transient-map org-node--daily-repeat-next-prev nil nil
+                     "Use `+', `n', or `t' to continue moving forward in time.\
+ Use `-', `p', or `y' to switch to going back in time."))
+
+;;;###autoload
+(defun org-node-goto-yesterday ()
+  "Go to yesterday."
+  (interactive)
+  (org-node-goto-daily "-" 1 "d"))
+
+;;;###autoload
+(defun org-node-goto-tomorrow ()
+  "Go to tomorrow."
+  (interactive)
+  (org-node-goto-daily "+" 1 "d"))
+
+;;;###autoload
+(defun org-node-goto-today ()
+  "Go to today."
+  (interactive)
+  (org-node-goto-daily "+" 0 "d"))
+
+;;;###autoload
+(defun org-node-visit-random ()
+  "Visit a random node."
+  (interactive)
+  (org-node-cache-ensure)
+  (org-node--goto (nth (random (hash-table-count org-node--candidate<>node))
+                       (hash-table-values org-node--candidate<>node))))
+
+;;;###autoload
 (defun org-node-insert-link (&optional region-as-initial-input)
   "Insert a link to one of your ID nodes.
 
