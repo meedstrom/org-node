@@ -1440,6 +1440,10 @@ for you."
       (setq org-id-locations (org-id-alist-to-hash alist)))))
 
 
+;;;; Dailies
+
+
+
 ;;;; Series
 
 ;; (defun org-node-visit-next-by-date-created ())
@@ -3376,8 +3380,9 @@ If already visiting that node, then follow the link normally."
 (defun org-node-faster-roam-list-dailies (&rest extra-files)
   "Faster than `org-roam-dailies--list-files' on a slow fs."
   (require 'org-roam-dailies)
-  (let ((daily-dir (file-name-concat org-roam-directory
-                                     org-roam-dailies-directory)))
+  (let ((daily-dir (abbreviate-file-name
+                    (file-name-concat org-roam-directory
+                                      org-roam-dailies-directory))))
     (append (cl-loop
              for file in (org-node-list-files t)
              when (and (string-prefix-p daily-dir file)
@@ -3391,8 +3396,9 @@ If already visiting that node, then follow the link normally."
 (defun org-node-faster-roam-list-files ()
   "Faster than `org-roam-list-files'."
   (require 'org-roam)
-  (cl-loop for file in (org-node-list-files t)
-           when (string-prefix-p org-roam-directory file)
+  (cl-loop with roam-dir = (abbreviate-file-name org-roam-directory)
+           for file in (org-node-list-files t)
+           when (string-prefix-p roam-dir file)
            collect file))
 
 (defun org-node-faster-roam-daily-note-p (&optional file)
