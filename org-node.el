@@ -1557,7 +1557,7 @@ visit the node with that id if it exists."
   (let ((org-node-ask-directory
          (if (require 'org-roam-dailies nil t)
              (file-name-concat org-roam-directory org-roam-dailies-directory)
-           (file-name-concat org-directory "daily/")))
+           (file-name-as-directory (file-name-concat org-directory "daily"))))
         (org-node-datestamp-format "")
         (org-node-slug-fn #'identity))
     (org-node--create sortstr (org-id-new))))
@@ -2100,8 +2100,7 @@ type the name of a node that does not exist.  That enables this
                     "\n"))
           (unwind-protect
               (run-hooks 'org-node-creation-hook)
-            (save-buffer)
-            (org-node--scan-targeted (list path-to-write))))))))
+            (org-node--dirty-ensure-node-known)))))))
 
 
 ;;;; Commands
