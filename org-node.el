@@ -1845,15 +1845,10 @@ To visit a node after creating it, either let-bind
       (if node (org-node--goto node)))"
   (setq org-node-proposed-title title)
   (setq org-node-proposed-id id)
-  (condition-case err
+  (unwind-protect
       (funcall org-node-creation-fn)
-    (( t debug error )
-     (setq org-node-proposed-title nil)
-     (setq org-node-proposed-id nil)
-     (signal (car err) (cdr err)))
-    (:success
-     (setq org-node-proposed-title nil)
-     (setq org-node-proposed-id nil))))
+    (setq org-node-proposed-title nil)
+    (setq org-node-proposed-id nil)))
 
 (defcustom org-node-creation-fn #'org-node-new-file
   "Function called by `org-node-find' and `org-node-insert-link' to
