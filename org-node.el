@@ -1600,7 +1600,21 @@ YYYY-MM-DD, but it does not verify."
                          ;; being most relevant
                          (cl-sort items #'string> :key #'car)))))))
 
-(defun org-node-series-goto-or-create (key)
+
+(defun org-node-default-daily-goto ()
+  (interactive)
+  (org-node--series-visit-or-create "d"))
+
+(defun org-node-default-daily-next ()
+  (interactive nil org-mode)
+  (org-node--series-visit-next "d"))
+
+(defun org-node-default-daily-previous ()
+  (interactive nil org-mode)
+  (org-node--series-visit-previous "d"))
+
+
+(defun org-node--series-visit-or-create (key)
   (let* ((series (cdr (alist-get (sxhash key) org-node--series-info)))
          (sortstr (funcall (plist-get series :prompter) series))
          (item (assoc sortstr (plist-get series :sorted-items))))
@@ -1608,10 +1622,10 @@ YYYY-MM-DD, but it does not verify."
                 (funcall (plist-get series :try-goto) item))
       (funcall (plist-get series :creator) sortstr))))
 
-(defun org-node-series-next (key)
-  (org-node-series-prev key t))
+(defun org-node--series-visit-next (key)
+  (org-node--series-visit-previous key t))
 
-(defun org-node-series-prev (key &optional next)
+(defun org-node--series-visit-previous (key &optional next)
   (unless (derived-mode-p 'org-mode)
     (user-error "Not an Org buffer"))
   (let* ((series (cdr (alist-get (sxhash key) org-node--series-info)))
@@ -1642,8 +1656,8 @@ YYYY-MM-DD, but it does not verify."
 
 ;; Something like this at reset time
 ;; (transient-append-suffix 'org-node-series-dispatch "d"
-;;   '("n" "Next in series" org-node-series-next :transient t)
-;;   '("p" "Previous in series" org-node-series-prev :transient t)
+;;   '("n" "Next in series" org-node--series-visit-next :transient t)
+;;   '("p" "Previous in series" org-node--series-visit-previous :transient t)
 ;;   )
 
 (defun org-node-series-refile ()
