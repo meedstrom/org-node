@@ -252,7 +252,8 @@ Designed to override `org-roam-reflinks-get'."
              (org-node-fakeroam--db-add-node node))))
 
 ;; This thing just exists because the above is not instant.
-;; But even this gets a bit slow on the deletion queries...
+;; FIXME: Still too damn slow on a file with 400 nodes.  Profiler says most of
+;;        it is in EmacSQL, maybe some SQL PRAGMA settings would fix?
 (defun org-node-fakeroam--db-update-files (files)
   "Update the Roam DB about nodes and links involving FILES."
   (emacsql-with-transaction (org-roam-db)
@@ -263,9 +264,9 @@ Designed to override `org-roam-reflinks-get'."
      for node being the hash-values of org-node--id<>node
      when (member (org-node-get-file-path node) files)
      do (progn
+          ;; Clear backlinks to prevent getting duplicates in next step
           (dolist (dest (cons (org-node-get-id node)
                               (org-node-get-refs node)))
-            ;; Clear backlinks to prevent getting duplicates in next step
             (org-roam-db-query [:delete :from links :where (= dest $s1)]
                                dest))
           (org-node-fakeroam--db-add-node node)))))
