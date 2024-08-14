@@ -1424,7 +1424,12 @@ for you."
      :creator org-node--default-daily-creator
      :prompter (lambda (_series) (org-read-date))
      :whereami (lambda ()
-                 (file-name-base (buffer-file-name (buffer-base-buffer))))
+                 (let ((basename (file-name-base
+                                  (buffer-file-name (buffer-base-buffer)))))
+                   (when (string-match-p
+                          (rx bol (= 4 digit) "-" (= 2 digit) "-" (= 2 digit) eol)
+                          basename)
+                     basename)))
      :try-goto (lambda (item)
                  (when (file-readable-p (cdr item))
                    (find-file (cdr item))
@@ -1594,25 +1599,31 @@ YYYY-MM-DD, but it does not verify."
                if (string> (car item) here)
                do (push item head)
                else return t))
-    (let ((to-check (if next
-                        head
-                      (drop (1+ (length head))
-                            (plist-get series :sorted-items))))
-          (target nil))
-      ;; HACK: Keep trying items as long as :try-goto fails, because an item
-      ;; could be referring to something that has since been deleted from disk
-      ;; (and we can't guarantee up-to-date tables without file-notify).
-      (if (catch 'fail
-            (when (null to-check)
-              (throw 'fail t))
-            (while (not target)
-              (if to-check
-                  (setq target (funcall (plist-get series :try-goto)
-                                        (pop to-check)))
-                (throw 'fail t))))
-          (message "No %s item in series \"%s\""
-                   (if next "next" "previous")
-                   (plist-get series :name))))))
+    (when (or here
+              (when (y-or-n-p
+                     (format "Not in series \"%s\".  Jump to latest item in that series?"
+                             (plist-get series :name)))
+                (setq head (take 1 (plist-get series :sorted-items)))
+                t))
+      (let ((to-check (if next
+                          head
+                        (drop (1+ (length head))
+                              (plist-get series :sorted-items))))
+            (target nil))
+        ;; HACK: Keep trying items as long as :try-goto fails, because an item
+        ;; could be referring to something that has since been deleted from disk
+        ;; (and we can't guarantee up-to-date tables without file-notify).
+        (if (catch 'fail
+              (when (null to-check)
+                (throw 'fail t))
+              (while (not target)
+                (if to-check
+                    (setq target (funcall (plist-get series :try-goto)
+                                          (pop to-check)))
+                  (throw 'fail t))))
+            (message "No %s item in series \"%s\""
+                     (if next "next" "previous")
+                     (plist-get series :name)))))))
 
 ;; Should be able to type d n for "daily, next"
 (transient-define-prefix org-node-series-dispatch ()
