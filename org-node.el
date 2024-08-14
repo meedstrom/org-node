@@ -785,21 +785,29 @@ didn't do so already, or local changes have been made."
           (byte-compile-file lib))))
     (or native-path elc-path)))
 
-(defvar org-node--compiled-fns (make-hash-table))
-(defun org-node--as-bytecode (fn)
+(defvar org-node--compiled-lambdas (make-hash-table))
+(defun org-node--ensure-compiled (fn)
+  "If FN is a symbol with uncompiled function definition, compile it
+and return the same symbol.
+
+If FN is an anonymous lambda, compile it, cache the bytecode, and
+return that bytecode."
   (if (compiled-function-p fn)
       fn
     (if (and (symbolp fn) (compiled-function-p (symbol-function fn)))
-        (symbol-function fn)
-      (let* ((fn-hash (sxhash fn))
-             (compiled (gethash fn-hash org-node--compiled-fns)))
+        fn
+      (let* ((fn-hash (sxhash (if (symbolp fn) (symbol-function fn) fn)))
+             (compiled (gethash fn-hash org-node--compiled-lambdas)))
         (unless compiled
           (setq compiled (if (and (native-comp-available-p)
                                   (not (eq 'closure (car-safe fn))))
                              (native-compile fn)
                            (byte-compile fn)))
-          (puthash fn-hash compiled org-node--compiled-fns))
-        compiled))))
+          (puthash fn-hash compiled org-node--compiled-lambdas))
+        (if (symbolp fn)
+            ;; Calling (byte-compile fn) already stored bytecode in the symbol
+            fn
+          compiled)))))
 
 (defvar org-node--fn-hashes nil)
 (defvar org-node--affixation-compfn nil)
@@ -813,9 +821,9 @@ function to update current tables."
   (when (= 0 org-node-perf-max-jobs)
     (setq org-node-perf-max-jobs (org-node--count-logical-cores)))
   (setq org-node--filter-compfn
-        (org-node--as-bytecode org-node-filter-fn))
+        (org-node--ensure-compiled org-node-filter-fn))
   (setq org-node--affixation-compfn
-        (org-node--as-bytecode org-node-affixation-fn))
+        (org-node--ensure-compiled org-node-affixation-fn))
   (let ((compiled-lib (org-node--ensure-compiled-lib))
         (file-name-handler-alist nil)
         (coding-system-for-read org-node-perf-assume-coding-system)
@@ -1605,7 +1613,7 @@ YYYY-MM-DD, but it does not verify."
       (cons (file-name-base path) path))))
 
 (defun org-node--build-series (spec)
-  (let ((classifier (org-node--as-bytecode (plist-get (cdr spec) :classifier)))
+  (let ((classifier (org-node--ensure-compiled (plist-get (cdr spec) :classifier)))
         (unique-cars (make-hash-table :test #'equal)))
     (cl-loop
      for node being the hash-values of org-node--id<>node
@@ -1618,7 +1626,7 @@ YYYY-MM-DD, but it does not verify."
      (setf (alist-get (sxhash (car spec)) org-node--series-info)
            (append (cl-loop for elt in (cdr spec)
                             if (functionp elt)
-                            collect (org-node--as-bytecode elt)
+                            collect (org-node--ensure-compiled elt)
                             else collect elt)
                    (list :sorted-items
                          ;; Using `string>' due to most recent dailies probably
