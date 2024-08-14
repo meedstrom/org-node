@@ -1602,14 +1602,14 @@ format-constructs occur before these."
 (defun org-node--default-daily-classifier (node)
   "Classifier suitable for daily-notes in default Org-Roam style.
 
-If NODE's full file path involves a \"daily\" directory,
-then return a cons cell (BASENAME . FULL-PATH).
+If NODE's full file path involves a \"daily\" or \"dailies\"
+directory, then return a cons cell (BASENAME . FULL-PATH).
 
 BASENAME is the file name without directory or extension.
 Assuming it fits the pattern YYYY-MM-DD.org, the result is
 YYYY-MM-DD, but it does not verify."
   (let ((path (org-node-get-file-path node)))
-    (when (string-search "daily/" path)
+    (when (string-match-p "/dail\\w+/" path)
       (cons (file-name-base path) path))))
 
 (defun org-node--build-series (spec)
@@ -1635,6 +1635,45 @@ YYYY-MM-DD, but it does not verify."
                          (cl-sort items #'string> :key #'car)))))
     (org-node--add-series-to-menu
      (car spec) (plist-get (cdr spec) :name))))
+
+(defun org-node--add-series-to-menu (key name)
+  (when (ignore-errors (transient-get-suffix 'org-node-series-dispatch key))
+    (transient-remove-suffix 'org-node-series-dispatch key))
+  (transient-append-suffix 'org-node-series-dispatch '(0 -1)
+    (list key name key))
+  (let ((old (car (slot-value (get 'org-node-series-dispatch 'transient--prefix)
+                              :incompatible))))
+    (set-slot-value (get 'org-node-series-dispatch 'transient--prefix)
+                    :incompatible (list (seq-uniq (cons key old))))))
+
+;; Should be able to type d n for "daily, next"
+(transient-define-prefix org-node-series-dispatch ()
+  :incompatible '(("d"))
+  ["Series"
+   ("|" "Invisible" "Placeholder" :if-nil t)
+   ("d" "Dailies" "d")]
+  ["Navigation"
+   ("p" "Previous in series"
+    (lambda (args)
+      (interactive (list (transient-args 'org-node-series-dispatch)))
+      (if args
+          (org-node--series-goto-previous (car args))
+        (message "Choose series before navigating")))
+    :transient t)
+   ("n" "Next in series"
+    (lambda (args)
+      (interactive (list (transient-args 'org-node-series-dispatch)))
+      (if args
+          (org-node--series-goto-next (car args))
+        (message "Choose series before navigating")))
+    :transient t)
+   ("j" "Jump (or create)"
+    (lambda (args)
+      (interactive (list (transient-args 'org-node-series-dispatch)))
+      (if args
+          (org-node--series-jump (car args))
+        (message "Choose series before navigating")))
+    :transient t)])
 
 (defun org-node--series-jump (key)
   (let* ((series (alist-get (sxhash key) org-node--series-info))
@@ -1682,98 +1721,40 @@ YYYY-MM-DD, but it does not verify."
                      (if next "next" "previous")
                      (plist-get series :name)))))))
 
-;; Should be able to type d n for "daily, next"
-(transient-define-prefix org-node-series-dispatch ()
-  :incompatible '(("d"))
-  ["Series"
-   ("|" "Invisible" "Placeholder" :if-nil t)
-   ("d" "Dailies" "d")]
-  ["Navigation"
-   ("p" "Previous in series"
-    (lambda (args)
-      (interactive (list (transient-args 'org-node-series-dispatch)))
-      (if args
-          (org-node--series-goto-previous (car args))
-        (message "Choose series before navigating")))
-    :transient t)
-   ("n" "Next in series"
-    (lambda (args)
-      (interactive (list (transient-args 'org-node-series-dispatch)))
-      (if args
-          (org-node--series-goto-next (car args))
-        (message "Choose series before navigating")))
-    :transient t)
-   ("j" "Jump to (or create)"
-    (lambda (args)
-      (interactive (list (transient-args 'org-node-series-dispatch)))
-      (if args
-          (org-node--series-jump (car args))
-        (message "Choose series before navigating")))
-    :transient t)])
 
-(defun org-node--add-series-to-menu (key name)
-  (when (ignore-errors (transient-get-suffix 'org-node-series-dispatch key))
-    (transient-remove-suffix 'org-node-series-dispatch key))
-  (transient-append-suffix 'org-node-series-dispatch '(0 -1)
-    (list key name key))
-  (let ((old (car (slot-value (get 'org-node-series-dispatch 'transient--prefix)
-                              :incompatible))))
-    (set-slot-value (get 'org-node-series-dispatch 'transient--prefix)
-                    :incompatible (list (seq-uniq (cons key old))))))
 
 (defun org-node-series-refile ()
   )
 
-;; Ok, this capture target should call PROMPTER if `org-node-proposed-title' is
-;; nil.  After having a title, attempt TRY-GOTO/CREATOR.
-
-;; What happens if user got here from an org-node-find, and selected a series
-;; capture target?  (Interesting)
-
-;; I think then it should capture to a sub-heading, after calling
-;; TRY-GOTO/CREATOR anyway.
-
-;; (defun org-node-series-capture-target ()
-;;   (org-node-cache-ensure)
-;;   (let* ((day (org-read-date))
-;;          (node (gethash day org-node--candidate<>node)))
-;;     (if node
-;;         ;; Node exists; capture into it
-;;         (let ((title (org-node-get-title node))
-;;               (id (org-node-get-id node)))
-;;           (find-file (org-node-get-file-path node))
-;;           (widen)
-;;           (goto-char (org-node-get-pos node))
-;;           (org-show-context)
-;;           (org-show-entry)
-;;           (unless (and (= 1 (point)) (org-at-heading-p))
-;;             (when (outline-next-heading)
-;;               (backward-char 1))))
-;;       ;; Node does not exist; capture into new file
-;;       (let* ((dir org-journal-dir)
-;;              (title day)
-;;              (id (org-id-new))
-;;              (path-to-write (expand-file-name (concat day ".org") dir)))
-;;         (if (or (file-exists-p path-to-write)
-;;                 (find-buffer-visiting path-to-write))
-;;             (error "File or buffer already exists: %s" path-to-write)
-;;           (mkdir (file-name-directory path-to-write) t)
-;;           (find-file path-to-write)
-;;           (if org-node-prefer-with-heading
-;;               (insert "* " title
-;;                       "\n:PROPERTIES:"
-;;                       "\n:ID:       " id
-;;                       "\n:END:"
-;;                       "\n")
-;;             (insert ":PROPERTIES:"
-;;                     "\n:ID:       " id
-;;                     "\n:END:"
-;;                     "\n#+title: " title
-;;                     "\n"))
-;;           (unwind-protect
-;;               (run-hooks 'org-node-creation-hook)
-;;             (save-buffer)
-;;             (org-node--scan-targeted (list path-to-write))))))))
+(defvar org-node-current-series-key nil)
+(defun org-node-series-capture-target ()
+  (org-node-cache-ensure)
+  (cl-assert (not org-node-proposed-id))
+  (let ((key (or org-node-current-series-key
+                 (let* ((valid-keys (mapcar #'car org-node-series))
+                        (elaborations
+                         (cl-loop for series in org-node-series
+                                  concat
+                                  (format " %s(%s)"
+                                          (car series)
+                                          (plist-get (cdr series) :name))))
+                        (input (read-char-from-minibuffer
+                                (format "Press any of [%s] to capture into series: %s"
+                                        (string-join valid-keys ",")
+                                        elaborations)
+                                (mapcar #'string-to-char valid-keys))))
+                   (char-to-string input)))))
+    ;; Almost identical to `org-node--series-jump'
+    (org-node--series-jump)
+    (let* ((series (alist-get (sxhash key) org-node--series-info))
+           (sortstr (or org-node-proposed-title
+                        (funcall (plist-get series :prompter) series)))
+           (item (assoc sortstr (plist-get series :sorted-items))))
+      (when (or (null item)
+                (not (funcall (plist-get series :try-goto) item)))
+        (funcall (plist-get series :creator) sortstr))
+      (when (outline-next-heading)
+        (backward-char 1)))))
 
 
 ;;;; Filename functions
@@ -2496,7 +2477,7 @@ Used by `org-node-rename-file-by-title'.
 To add exceptions, see `org-node-renames-exclude'."
   :type '(repeat string))
 
-(defcustom org-node-renames-exclude "daily/"
+(defcustom org-node-renames-exclude "dail\\w+/"
   "Regexp matching paths of files not to auto-rename.
 Only needed to filter out files in `org-node-renames-allowed-dirs'.
 
