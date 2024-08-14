@@ -65,7 +65,7 @@ A comparison of three similar systems, which permit relying on org-id and don't 
 | Some query-able cache          | EmacSQL  | hash tables        | --                   |
 | Async caching                  | --       | yes                | not applicable       |
 | *Time to re-cache my 3000 nodes* | *2m 48s*   | *0m 02s*             | not applicable       |
-| Time to save my 400-node file  | 5 s      |                    |                      |
+| *Time to save file w/ 400 nodes* | *5s*       | *0.06s*              | ?                    |
 
 * Setup
 
@@ -184,29 +184,30 @@ Good news: this option goes well together with option 1B or 1C, because org-node
 * Misc
 ** Org-capture
 
-You may have heard that org-roam has its own set of capture templates: the =org-roam-capture-templates=.
+You may have heard that org-roam has its special set of capture templates: the =org-roam-capture-templates=.
 
-It can make sense for people who understand the magic of capture templates.  I didn't, so I was not confident using a second-order abstraction over an already leaky abstraction.
+People who understand the magic of capture templates, they take this in stride.  Me, I never felt confident using a second-order abstraction over an already leaky abstraction.
 
-Can we reproduce the functionality on top of vanilla org-capture?  That'd be less scary.  The answer is yes!
+Can we just use vanilla org-capture?  That'd be less scary.  The answer is yes!
 
-Example capture templates follow. The secret sauce is =(function org-node-capture-target)=.
+The secret sauce is =(function org-node-capture-target)=.
 
 #+begin_src elisp
 (setq org-capture-templates
-      '(("n" "ID node")
-        ("nc" "Capture into ID node (maybe creating it)"
+      '(("i" "Capture into ID node"
          plain (function org-node-capture-target) nil
-         :empty-lines-after 1)
+         :empty-lines-after 1
+         :no-save t)
 
-        ("nv" "Visit ID node (maybe creating it)"
+        ("j" "Jump to ID node"
          plain (function org-node-capture-target) nil
          :jump-to-captured t
-         :immediate-finish t)
+         :immediate-finish t
+         :no-save t)
 
         ;; Sometimes a handy choice after `org-node-insert-link' to
-        ;; make a stub you'll fill in later
-        ("ni" "Instantly create stub ID node without visiting"
+        ;; make a stub you'll edit later
+        ("q" "Make quick stub ID node"
          plain (function org-node-capture-target) nil
          :immediate-finish t)))
 #+end_src
@@ -224,7 +225,7 @@ To get started with daily-notes, it may be enough to try this command:
 (keymap-set global-map "M-s M-s" #'org-node-series-dispatch)
 #+end_src
 
-In detail, "daily-notes" (or "dailies") are just one of many possible kinds of /node series/.  You could have series about, let's say, historical philosophers, Star Trek episodes, your school curriculum...
+In detail, "daily-notes" (or "dailies") are just one of many possible kinds of /node series/.  You could have series about, let's say, historical events, Star Trek episodes, your school curriculum...
 
 Define more series by adding to the variable =org-node-series=.
 
@@ -250,7 +251,7 @@ It's not for everyone, but there is the option:
 (org-node-complete-at-point-mode)
 #+end_src
 
-** Tell org-open-at-point about =ROAM_REFS=
+** Let org-open-at-point detect refs
 
 Say there's a link to a web URL, and you've forgot you also have a node listing that exact URL in its =ROAM_REFS= property.
 
@@ -317,7 +318,9 @@ Good news.  You can speed up their functions by making them just look up org-nod
 #+end_src
 
 ** Tip: Word-wrap in the Roam buffer?
-This has nothing to do with org-node, but I actually didn't know this for ages.  If you don't hard-wrap but prefer visual-line-mode or similar ([[https://github.com/org-roam/org-roam/issues/1862][org-roam#1862]]), you have to enable such modes yourself, as it (reasonably) doesn't inherit your Org hooks:
+This has nothing to do with org-node, but I actually didn't know this for ages.
+
+If you don't hard-wrap but prefer visual-line-mode or similar ([[https://github.com/org-roam/org-roam/issues/1862][org-roam#1862]]), you have to enable such modes yourself -- it sensibly doesn't inherit your Org hooks:
 
 #+begin_src elisp
 (add-hook 'org-roam-mode-hook #'visual-line-mode)
