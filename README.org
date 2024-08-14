@@ -46,14 +46,14 @@ A comparison of three similar systems, which permit relying on org-id and don't 
 | Ref search                     | yes      | yes (as aliases)   | not applicable       |
 | Org 9.5 @citekeys as refs      | yes      | yes                | not applicable       |
 | Support org-ref v2 and v3      | yes      | limited            | not applicable       |
-| Can work thru org-roam-capture | yes      | yes                | ?                    |
-| Can work thru org-capture      | --       | yes                | ?                    |
+| Work thru org-roam-capture     | yes      | yes                | ?                    |
+| Work thru org-capture          | --       | yes                | ?                    |
 | Daily-nodes                    | yes      | yes                | --                   |
 | Node series                    | --       | yes                | --                   |
 | Show backlinks in same window  | --       | yes                | yes                  |
 | Cooperate with org-super-links | --       | yes                | not applicable       |
-| Can fix link descriptions      | --       | yes                | --                   |
-| Can list dead links            | --       | yes                | --                   |
+| Fix link descriptions          | --       | yes                | --                   |
+| List dead links                | --       | yes                | --                   |
 | Rename file when title changes | --       | yes                | --                   |
 | Warn about duplicate titles    | --       | yes                | --                   |
 | Principled "related-section"   | --       | --                 | yes                  |
@@ -63,9 +63,9 @@ A comparison of three similar systems, which permit relying on org-id and don't 
 | Can have separate note piles   | yes      | -- (WONTFIX)       | not applicable       |
 |--------------------------------+----------+--------------------+----------------------|
 | Some query-able cache          | EmacSQL  | hash tables        | --                   |
-| Async caching                  | --       | yes                | not applicable       |
+| Async cache rebuild            | --       | yes                | not applicable       |
 | *Time to re-cache my 3000 nodes* | *2m 48s*   | *0m 02s*             | not applicable       |
-| *Time to save file w/ 400 nodes* | *5s*       | *0.06s*              | ?                    |
+| *Time to save file w/ 400 nodes* | *>5s*      | *0.06s*              | ?                    |
 
 * Setup
 
