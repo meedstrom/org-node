@@ -329,7 +329,6 @@ If you don't hard-wrap but prefer visual-line-mode or similar ([[https://github.
 
 #+begin_src elisp
 (add-hook 'org-roam-mode-hook #'visual-line-mode)
-(add-hook 'org-roam-mode-hook #'org-indent-mode)
 #+end_src
 
 ** Toolbox
