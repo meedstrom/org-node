@@ -1,11 +1,11 @@
 ;;; org-node-obsolete.el --- Outta sight so I'm not tempted to clean them up -*- lexical-binding: t; -*-
 
 (defvar org-node--obsolete-names
-  '((org-node-eagerly-update-link-tables org-node-perf-eagerly-update-link-tables)
-    (org-nodeify-entry org-node-nodeify-entry)
-    (org-node-random org-node-visit-random)
-    (org-node-slugify-as-url org-node-slugify-for-web)
-    (org-node-new-by-roam-capture org-node-new-via-roam-capture)
+  '((org-node-eagerly-update-link-tables  org-node-perf-eagerly-update-link-tables)
+    (org-nodeify-entry                    org-node-nodeify-entry)
+    (org-node-random                      org-node-visit-random)
+    (org-node-slugify-as-url              org-node-slugify-for-web)
+    (org-node-new-by-roam-capture         org-node-new-via-roam-capture)
     (org-node-filename-fn)))
 
 (defun org-node--warn-obsolete ()
