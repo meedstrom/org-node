@@ -931,6 +931,11 @@ function to update current tables."
   "True if org-node has not been initialized yet.
 Muffles some messages.")
 
+;; Profiling
+;; (benchmark-run 1 (org-node--scan (org-node-list-files) #'org-node--finalize-full))
+;; (benchmark-run 1 (org-node--scan (org-node-list-files t) #'org-node--finalize-full))
+;; (benchmark-run 1 (setq org-node--done-ctr 6) (org-node--handle-finished-job 7 #'org-node--finalize-full))
+
 (defun org-node--handle-finished-job (n-jobs finalizer)
   "Check if this was the last process to return (by counting up
 to N-JOBS), then if so, wrap-up and call FINALIZER."
@@ -992,9 +997,8 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
     (dolist (file missing-files)
       (remhash file org-node--file<>mtime))
     (dolist (pair file<>mtime)
-      ;; Expire stale data for `org-node-fakeroam--accelerate-get-contents'
-      (unless (equal (cdr pair)
-                     (gethash (car pair) org-node--file<>mtime))
+      (unless (eq (cdr pair) (gethash (car pair) org-node--file<>mtime))
+        ;; Expire stale data for `org-node-fakeroam--accelerate-get-contents'
         (remhash (car pair) org-node--file<>previews)
         (puthash (car pair) (cdr pair) org-node--file<>mtime)))
     (dolist (link links)
@@ -1058,9 +1062,8 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
         (dolist (link links)
           (push link (gethash (org-node-link-dest link) org-node--dest<>links))))
       (dolist (pair file<>mtime)
-        ;; Expire stale data for `org-node-fakeroam--accelerate-get-contents'
-        (unless (equal (cdr pair)
-                       (gethash (car pair) org-node--file<>mtime))
+        (unless (eq (cdr pair) (gethash (car pair) org-node--file<>mtime))
+          ;; Expire stale data for `org-node-fakeroam--accelerate-get-contents'
           (remhash (car pair) org-node--file<>previews)
           (puthash (car pair) (cdr pair) org-node--file<>mtime)))
       (dolist (pair path<>type)
