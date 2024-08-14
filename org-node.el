@@ -1586,36 +1586,33 @@ YYYY-MM-DD, but it does not verify."
   (org-node--series-goto-previous key t))
 
 (defun org-node--series-goto-previous (key &optional next)
-  (if (null key)
-      (message "Choose a series before navigating")
-    (unless (derived-mode-p 'org-mode)
-      (user-error "Not an Org buffer"))
-    (let* ((series (alist-get (sxhash key) org-node--series-info))
-           (here (funcall (plist-get series :whereami)))
-           (head nil))
+  (let* ((series (alist-get (sxhash key) org-node--series-info))
+         (here (funcall (plist-get series :whereami)))
+         (head nil))
+    (unless (null here)
       (cl-loop for item in (plist-get series :sorted-items)
                if (string> (car item) here)
                do (push item head)
-               else return t)
-      (let ((to-check (if next
-                          head
-                        (drop (1+ (length head))
-                              (plist-get series :sorted-items))))
-            (target nil))
-        ;; HACK: Keep trying items as long as :try-goto fails, because an item
-        ;; could be referring to something that has since been deleted from disk
-        ;; (and we can't guarantee up-to-date tables without file-notify).
-        (if (catch 'fail
-              (when (null to-check)
-                (throw 'fail t))
-              (while (not target)
-                (if to-check
-                    (setq target (funcall (plist-get series :try-goto)
-                                          (pop to-check)))
-                  (throw 'fail t))))
-            (message "No %s item in series \"%s\""
-                     (if next "next" "previous")
-                     (plist-get series :name)))))))
+               else return t))
+    (let ((to-check (if next
+                        head
+                      (drop (1+ (length head))
+                            (plist-get series :sorted-items))))
+          (target nil))
+      ;; HACK: Keep trying items as long as :try-goto fails, because an item
+      ;; could be referring to something that has since been deleted from disk
+      ;; (and we can't guarantee up-to-date tables without file-notify).
+      (if (catch 'fail
+            (when (null to-check)
+              (throw 'fail t))
+            (while (not target)
+              (if to-check
+                  (setq target (funcall (plist-get series :try-goto)
+                                        (pop to-check)))
+                (throw 'fail t))))
+          (message "No %s item in series \"%s\""
+                   (if next "next" "previous")
+                   (plist-get series :name))))))
 
 ;; Should be able to type d n for "daily, next"
 (transient-define-prefix org-node-series-dispatch ()
