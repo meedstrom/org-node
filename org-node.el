@@ -2518,10 +2518,9 @@ interactively, always prompt for confirmation."
       (if (or interactive
               (cl-loop
                for dir in org-node-renames-allowed-dirs
-               if (or (not (string-prefix-p dir path))
-                      (string-match-p org-node-renames-exclude path))
-               return nil
-               finally return t))
+               if (and (string-prefix-p dir path)
+                       (not (string-match-p org-node-renames-exclude path)))
+               return t))
           (let ((title (or (cadar (org-collect-keywords '("TITLE")))
                            (save-excursion
                              (without-restriction
