@@ -1423,17 +1423,8 @@ for you."
      :classifier org-node--default-daily-classifier
      :creator org-node--default-daily-creator
      :prompter (lambda (_series) (org-read-date))
-     :whereami (lambda ()
-                 (let ((basename (file-name-base
-                                  (buffer-file-name (buffer-base-buffer)))))
-                   (when (string-match-p
-                          (rx bol (= 4 digit) "-" (= 2 digit) "-" (= 2 digit) eol)
-                          basename)
-                     basename)))
-     :try-goto (lambda (item)
-                 (when (file-readable-p (cdr item))
-                   (find-file (cdr item))
-                   t)))
+     :whereami org-node--default-daily-whereami
+     :try-goto org-node--default-daily-goto)
 
     ;; NOTE: Obviously, this series works best if you have
     ;;       `org-node-put-created' on `org-node-creation-hook'.  But it can be
@@ -1445,14 +1436,13 @@ for you."
      :try-goto org-node--series-standard-goto
      :creator org-node--series-standard-creator
      :prompter org-node--series-standard-prompter
+     :whereami (lambda () (org-entry-get nil "CREATED" t))
      :classifier (lambda (node)
                    (let* ((timestamp
                            (cdr (assoc "CREATED"
                                        (org-node-get-properties node)))))
                      (when timestamp
-                       (cons timestamp (org-node-get-id node)))))
-     :whereami (lambda ()
-                 (org-entry-get nil "CREATED" t))))
+                       (cons timestamp (org-node-get-id node)))))))
   "Alist describing each node series.
 
 Each item looks like
@@ -1462,7 +1452,7 @@ Each item looks like
      :whereami FUNCTION
      :prompter FUNCTION
      :try-goto FUNCTION
-     :create FUNCTION)
+     :creator FUNCTION)
 
 KEY uniquely identifies the series, and is the key to type after
 \\[org-node-series-dispatch] to select it.  It may not be \"j\",
@@ -1503,9 +1493,10 @@ succeeds in using this information to visit a place of interest,
 it should return non-nil, else nil.  It should not create or
 write anything on failure - reserve that for the CREATE function.
 
-Function CREATE creates a place that did not exist.  For example,
-if an user picked a date from `org-read-date' but no daily-note
-exists for that date, CREATE is called to create that daily-node."
+Function CREATOR creates a place that did not exist.  For
+example, if the user picked a date from `org-read-date' but no
+daily-note exists for that date, CREATOR is called to create that
+daily-note."
   :type 'alist)
 
 (defvar org-node--series-info nil
@@ -1525,6 +1516,19 @@ visit the node with that id if it exists."
 
 (defun org-node--series-standard-prompter (series)
   (completing-read "Go to: " (plist-get series :sorted-items)))
+
+(defun org-node--default-daily-goto (item)
+  (when (file-readable-p (cdr item))
+    (find-file (cdr item))
+    t))
+
+(defun org-node--default-daily-whereami ()
+  (let ((basename (file-name-base
+                   (buffer-file-name (buffer-base-buffer)))))
+    (when (string-match-p
+           (rx bol (= 4 digit) "-" (= 2 digit) "-" (= 2 digit) eol)
+           basename)
+      basename)))
 
 (defun org-node--default-daily-creator (sortstr)
   (if (eq org-node-creation-fn 'org-node-new-via-roam-capture)
