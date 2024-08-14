@@ -102,27 +102,22 @@ involved.  This may eliminate most of that.
 Aside from huge files, it is also slow when there are backlinks
 from extremely many files.  This caches all results so that
 should only be slow the first time each backlink is checked."
-  (let* ((cached (alist-get pt (gethash file org-node--file<>previews)))
-         (result (or cached
-                     ;; TODO: Put user-configurable let-bindings here
-                     (let ((org-inhibit-startup t))
-                       ;; FIXME: Use `org-roam-fontify-like-in-org-mode' by
-                       ;; storing its function definition in an external
-                       ;; variable and calling that (it is currently being
-                       ;; overridden at runtime by our other advice).
-                       (org-fontify-like-in-org-mode
-                        (funcall orig-fn file pt))))))
-    (unless cached
-      (push (cons pt result)
-            (gethash file org-node--file<>previews)))
-    result))
+  (if-let ((cached (alist-get pt (gethash file org-node--file<>previews))))
+      cached
+    ;; NOTE: Cannot use `org-roam-fontify-like-in-org-mode'
+    ;;       since it is temporarily overridden by
+    ;;       `org-node-fakeroam--run-without-fontifying' when this
+    ;;       runs.  But that's OK, it looks outdated.
+    (setf (alist-get pt (gethash file org-node--file<>previews))
+          (let ((org-inhibit-startup t))
+            (org-fontify-like-in-org-mode (funcall orig-fn file pt))))))
 
-(defun org-node-fakeroam--run-without-fontifying (fn &rest args)
+(defun org-node-fakeroam--run-without-fontifying (orig-fn &rest args)
   "Designed as around-advice for `org-roam-node-insert-section'.
-Run FN with ARGS, while overriding
+Run ORIG-FN with ARGS, while overriding
 `org-roam-fontify-like-in-org-mode' so it returns the input."
   (cl-letf (((symbol-function 'org-roam-fontify-like-in-org-mode) #'identity))
-    (apply fn args)))
+    (apply orig-fn args)))
 
 
 ;;;; NoSQL method: fabricate knockoff roam backlinks

@@ -18,7 +18,7 @@
 ;; Author:           Martin Edström <meedstrom91@gmail.com>
 ;; Created:          2024-04-13
 ;; Keywords:         org, hypermedia
-;; Package-Requires: ((emacs "28.1") (compat "29.1.4.5") (dash "2.19.1"))
+;; Package-Requires: ((emacs "28.1") (compat "29.1.4.5") (dash "2.19.1") (transient "0.7.4"))
 ;; URL:              https://github.com/meedstrom/org-node
 
 ;;; Commentary:
@@ -72,6 +72,7 @@
 (require 'cl-lib)
 (require 'seq)
 (require 'subr-x)
+(require 'transient)
 (require 'dash)
 (require 'compat)
 (require 'org)
@@ -770,7 +771,7 @@ didn't do so already, or local changes have been made."
                            (native-comp-available-p)
                            (require 'comp)
                            (comp-el-to-eln-filename lib)))
-         (elc-path (org-node-parser--tmpfile "worker.elc"))
+         (elc-path (org-node-parser--tmpfile "parser.elc"))
          (byte-compile-warnings '(not free-vars)))
     (mkdir (org-node-parser--tmpfile) t)
     (if native-path
@@ -783,41 +784,12 @@ didn't do so already, or local changes have been made."
           (byte-compile-file lib))))
     (or native-path elc-path)))
 
-;; ;; TODO: Upstream somewhere else
-;; (defun org-node--compile-into (fnsym comp-sym)
-;;   "Compile function stored at FNSYM and put it in COMP-SYM.
-;; Do nothing if FNSYM has not changed since the last time.
-
-;; The symbol value of FNSYM may be either a lambda or another
-;; symbol with a function definition.  It may also be an anonymous
-;; closure, in which case it will be converted to a plain lambda and
-;; FNSYM reassigned to that."
-;;   (let* ((fnval (let ((fnsymval (symbol-value fnsym)))
-;;                   (if (symbolp fnsymval)
-;;                       (symbol-function fnsymval)
-;;                     fnsymval)))
-;;          (hash (progn
-;;                  (when (eq 'closure (car-safe fnval))
-;;                    ;; Turn closure into plain lambda, bc native-comp needs it
-;;                    (setq fnval (cons 'lambda (cddr fnval)))
-;;                    (set fnsym fnval))
-;;                  (sxhash fnval))))
-;;     ;; Recompile only if hash changed
-;;     (unless (eq (alist-get fnsym org-node--fn-hashes) hash)
-;;       (if (compiled-function-p fnval)
-;;           (set comp-sym fnval)
-;;         (set comp-sym (if (native-comp-available-p)
-;;                           (native-compile fnval)
-;;                         (byte-compile fnval))))
-;;       (setf (alist-get fnsym org-node--fn-hashes) hash))))
-
 (defvar org-node--compiled-fns (make-hash-table))
 (defun org-node--as-bytecode (fn)
   (if (compiled-function-p fn)
       fn
     (if (and (symbolp fn) (compiled-function-p (symbol-function fn)))
         (symbol-function fn)
-      ;; (setq fn (org-node--unenclose fn))
       (let* ((fn-hash (sxhash fn))
              (compiled (gethash fn-hash org-node--compiled-fns)))
         (unless compiled
@@ -827,13 +799,6 @@ didn't do so already, or local changes have been made."
                            (byte-compile fn)))
           (puthash fn-hash compiled org-node--compiled-fns))
         compiled))))
-
-;; (defun org-node--unenclose (sexp)
-;;   "If SEXP is an anonymous closure, return a plain lambda.
-;; Else return SEXP unmodified."
-;;   (if (eq 'closure (car-safe sexp))
-;;       (cons 'lambda (cddr sexp))
-;;     sexp))
 
 (defvar org-node--fn-hashes nil)
 (defvar org-node--affixation-compfn nil)
@@ -850,8 +815,6 @@ function to update current tables."
         (org-node--as-bytecode org-node-filter-fn))
   (setq org-node--affixation-compfn
         (org-node--as-bytecode org-node-affixation-fn))
-  ;; (org-node--compile-into 'org-node-filter-fn 'org-node--filter-compfn)
-  ;; (org-node--compile-into 'org-node-affixation-fn 'org-node--affixation-compfn)
   (let ((compiled-lib (org-node--ensure-compiled-lib))
         (file-name-handler-alist nil)
         (coding-system-for-read org-node-perf-assume-coding-system)
@@ -1175,7 +1138,6 @@ The reason for default t is better experience with
   "Remove from cache all ROAM_REFS and IDs that existed within
 FILES, and remove the corresponding completion candidates."
   (when files
-    (org-node--dirty-forget-completions-in files)
     (cl-loop
      for node being the hash-values of org-node--id<>node
      when (member (org-node-get-file-path node) files)
@@ -2104,7 +2066,8 @@ type the name of a node that does not exist.  That enables this
       ;; Node does not exist; capture into new file
       (let* ((dir (org-node-guess-or-ask-dir "New file in which directory? "))
              (path-to-write (file-name-concat
-                             dir (org-node--mk-basename title))))
+                             dir
+                             (org-node--mk-basename title))))
         (if (or (file-exists-p path-to-write)
                 (find-buffer-visiting path-to-write))
             (error "File or buffer already exists: %s" path-to-write)
@@ -2576,17 +2539,11 @@ as more \"truthful\" than today's date.
 
 ;; Transitional wrapper
 (defun org-node--mk-basename (title)
-  (if (bound-and-true-p org-node-filename-fn)
-      (concat (string-remove-suffix ".org"
-                                    (funcall org-node-filename-fn title))
-              ".org")
-    (if org-node-slug-fn
-        (concat
-         (and org-node-datestamp-format
-              (format-time-string org-node-datestamp-format))
-         (funcall org-node-slug-fn title)
-         ".org")
-      (error "`org-node-slug-fn' not set"))))
+  (unless org-node-slug-fn
+    (user-error "`org-node-slug-fn' not set"))
+  (concat (format-time-string org-node-datestamp-format)
+          (funcall org-node-slug-fn title)
+          ".org"))
 
 ;; "Some people, when confronted with a problem, think
 ;; 'I know, I'll use regular expressions.'
@@ -2607,19 +2564,6 @@ out."
                (replace-regexp-in-string
                 "[[:alpha:]]+" "[[:alpha:]]+"
                 example t))))))
-
-;; Unused
-(defun org-node--first-id-in-file ()
-  (save-excursion
-    (without-restriction
-      (goto-char 1)
-      (when (re-search-forward "^[[:space:]]*:ID: +" nil t)
-        (let ((id (buffer-substring-no-properties
-                   (point)
-                   (+ (point) (skip-chars-forward "^\n\t\s")))))
-          (if (string-blank-p id)
-              nil
-            id))))))
 
 ;; This function can be removed if one day we drop support for file-level
 ;; nodes, because then just (org-entry-get nil "ID" t) will suffice.  That
@@ -3259,7 +3203,7 @@ Afterwards, maybe restore point to where it had been previously,
 so long as the affected heading would still be visible in the
 window."
   (let* ((where-i-was (point-marker))
-         (id (org-entry-get nil "ID" t))
+         (id (org-node-id-at-point))
          (heading-pos
           (save-excursion
             (without-restriction
@@ -3287,8 +3231,8 @@ window."
   "Add VALUE to PROPERTY for node at point.
 
 If the current entry has no ID, operate on the closest ancestor
-with an ID.  If there's no ID among any ancestors, operate on the
-current entry.
+with an ID.  If there's no ID anywhere, operate on the current
+entry.
 
 Then behave like `org-entry-add-to-multivalued-property' but
 preserve spaces: instead of percent-escaping each space character
@@ -3454,12 +3398,12 @@ If already visiting that node, then follow the link normally."
              collect file)
             extra-files)))
 
+;; Bonus though it doesn't even use org-node
 (defun org-node-faster-roam-daily-note-p (&optional file)
   "Faster than `org-roam-dailies--daily-note-p' on a slow fs."
   (require 'org-roam-dailies)
-  (let ((daily-dir (abbreviate-file-name
-                    (file-name-concat org-roam-directory
-                                      org-roam-dailies-directory)))
+  (let ((daily-dir (file-name-concat org-roam-directory
+                                     org-roam-dailies-directory))
         (path (or file (buffer-file-name (buffer-base-buffer)))))
     (unless (file-name-absolute-p path)
       (error "Expected absolute filename but got: %s" path))
@@ -3480,6 +3424,18 @@ heading, else the file-level node, whichever has an ID first."
   (gethash (completing-read "Node: " #'org-node-collection
                             () () () 'org-node-hist)
            org-node--candidate<>node))
+
+(defun org-node--first-id-in-file ()
+  (save-excursion
+    (without-restriction
+      (goto-char 1)
+      (when (re-search-forward "^[[:space:]]*:ID: +" nil t)
+        (let ((id (buffer-substring-no-properties
+                   (point)
+                   (+ (point) (skip-chars-forward "^\n\t\s")))))
+          (if (string-blank-p id)
+              nil
+            id))))))
 
 (provide 'org-node)
 
