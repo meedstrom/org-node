@@ -1536,9 +1536,54 @@ visit the node with that id if it exists."
     (find-file (cdr item))
     t))
 
-;; If only it was globally illegal to write datetime libraries,
-;; then everyone might settle around YYYY-MM-DD...
-;; TODO: Handle %s, %V, %y...  is there no library?
+(defun org-node--default-daily-creator (sortstr)
+  (if (eq org-node-creation-fn 'org-node-new-via-roam-capture)
+      ;; HACK: Assume this user wants to use their roam-dailies templates
+      (progn
+        (require 'org-roam-dailies)
+        (org-roam-dailies--capture
+         (encode-time (parse-time-string
+                       (concat sortstr (format-time-string " %H:%M:%S %z"))))
+         t))
+    (let ((org-node-ask-directory
+           (if (require 'org-roam-dailies nil t)
+               (file-name-concat org-roam-directory org-roam-dailies-directory)
+             (file-name-as-directory (file-name-concat org-directory "daily"))))
+          (org-node-datestamp-format "")
+          (org-node-slug-fn #'identity))
+      (org-node--create sortstr (org-id-new)))))
+
+(defun org-node--default-daily-classifier (node)
+  "Classifier suitable for daily-notes in default Org-Roam style.
+
+If NODE's full file path involves a \"daily\" or \"dailies\"
+directory, then return a cons cell (BASENAME . FULL-PATH).
+
+BASENAME is the file name without directory or extension.
+Assuming it fits the pattern YYYY-MM-DD.org, the result is
+YYYY-MM-DD, but it does not verify."
+  (let ((path (org-node-get-file-path node)))
+    (when (string-match-p "/dail\\w+/" path)
+      (cons (file-name-base path) path))))
+
+(defun org-node--default-daily-whereami ()
+  (let ((basename (file-name-base
+                   (buffer-file-name (buffer-base-buffer)))))
+    (when (or (string-match-p
+               (rx bol (= 4 digit) "-" (= 2 digit) "-" (= 2 digit) eol)
+               basename)
+              ;; Wild trick: pretend to return a date even outside the dailies
+              ;; dir, so that we can jump to "next" and "previous" relative to
+              ;; when this file was created!
+              (and (not (string-blank-p org-node-datestamp-format))
+                   (string-match (org-node--make-regexp-for-time-format
+                                  org-node-datestamp-format)
+                                 basename)
+                   (org-node--extract-ymd (match-string 0 basename)
+                                          org-node-datestamp-format)))
+      basename)))
+
+;; TODO: Handle %s, %V, %y...  is there a library?
 (defun org-node--extract-ymd (instance time-format)
   "Try to extract a YYYY-MM-DD date out of string INSTANCE.
 Assume INSTANCE is a string produced by TIME-FORMAT, e.g. if
@@ -1564,128 +1609,6 @@ format-constructs occur before these."
                   (substring instance idx-day (+ idx-day 2))))
       (cl-assert idx-%F)
       (substring instance idx-%F (+ idx-%F 10)))))
-
-(defun org-node--default-daily-whereami ()
-  (let ((basename (file-name-base
-                   (buffer-file-name (buffer-base-buffer)))))
-    (when (or (string-match-p
-               (rx bol (= 4 digit) "-" (= 2 digit) "-" (= 2 digit) eol)
-               basename)
-              ;; Wild trick: pretend to return a date even outside the dailies
-              ;; dir, so that we can jump to "next" and "previous" relative to
-              ;; when this file was created!
-              (and (not (string-blank-p org-node-datestamp-format))
-                   (string-match (org-node--make-regexp-for-time-format
-                                  org-node-datestamp-format)
-                                 basename)
-                   (org-node--extract-ymd (match-string 0 basename)
-                                          org-node-datestamp-format)))
-      basename)))
-
-(defun org-node--default-daily-creator (sortstr)
-  (if (eq org-node-creation-fn 'org-node-new-via-roam-capture)
-      ;; HACK: Assume this user wants to use their roam-dailies templates
-      (progn
-        (require 'org-roam-dailies)
-        (org-roam-dailies--capture
-         (encode-time (parse-time-string
-                       (concat sortstr (format-time-string " %H:%M:%S %z"))))))
-    (let ((org-node-ask-directory
-           (if (require 'org-roam-dailies nil t)
-               (file-name-concat org-roam-directory org-roam-dailies-directory)
-             (file-name-as-directory (file-name-concat org-directory "daily"))))
-          (org-node-datestamp-format "")
-          (org-node-slug-fn #'identity))
-      (org-node--create sortstr (org-id-new)))))
-
-(defun org-node--default-daily-classifier (node)
-  "Classifier suitable for daily-notes in default Org-Roam style.
-
-If NODE's full file path involves a \"daily\" or \"dailies\"
-directory, then return a cons cell (BASENAME . FULL-PATH).
-
-BASENAME is the file name without directory or extension.
-Assuming it fits the pattern YYYY-MM-DD.org, the result is
-YYYY-MM-DD, but it does not verify."
-  (let ((path (org-node-get-file-path node)))
-    (when (string-match-p "/dail\\w+/" path)
-      (cons (file-name-base path) path))))
-
-(defun org-node--build-series (spec)
-  (let ((classifier (org-node--ensure-compiled (plist-get (cdr spec) :classifier)))
-        (unique-cars (make-hash-table :test #'equal)))
-    (cl-loop
-     for node being the hash-values of org-node--id<>node
-     as item = (funcall classifier node)
-     when (and item (not (gethash (car item) unique-cars)))
-     collect (progn (puthash (car item) t unique-cars)
-                    item)
-     into items
-     finally do
-     (setf (alist-get (sxhash (car spec)) org-node--series-info)
-           (append (cl-loop for elt in (cdr spec)
-                            if (functionp elt)
-                            collect (org-node--ensure-compiled elt)
-                            else collect elt)
-                   (list :sorted-items
-                         ;; Using `string>' due to most recent dailies probably
-                         ;; being most relevant, thus cycling thru recent
-                         ;; dailies will have the best perf.
-                         (cl-sort items #'string> :key #'car)))))
-    (org-node--add-series-to-menu
-     (car spec) (plist-get (cdr spec) :name))))
-
-(defun org-node--add-series-to-menu (key name)
-  (when (ignore-errors (transient-get-suffix 'org-node-series-dispatch key))
-    (transient-remove-suffix 'org-node-series-dispatch key))
-  (transient-append-suffix 'org-node-series-dispatch '(0 -1)
-    (list key name key))
-  (let ((old (car (slot-value (get 'org-node-series-dispatch 'transient--prefix)
-                              :incompatible))))
-    (set-slot-value (get 'org-node-series-dispatch 'transient--prefix)
-                    :incompatible (list (seq-uniq (cons key old))))))
-
-;; Should be able to type d n for "daily, next"
-(transient-define-prefix org-node-series-dispatch ()
-  :incompatible '(("d"))
-  ["Series"
-   ("|" "Invisible" "Placeholder" :if-nil t)
-   ("d" "Dailies" "d")]
-  ["Navigation"
-   ("p" "Previous in series"
-    (lambda (args)
-      (interactive (list (transient-args 'org-node-series-dispatch)))
-      (if args
-          (org-node--series-goto-previous (car args))
-        (message "Choose series before navigating")))
-    :transient t)
-   ("n" "Next in series"
-    (lambda (args)
-      (interactive (list (transient-args 'org-node-series-dispatch)))
-      (if args
-          (org-node--series-goto-next (car args))
-        (message "Choose series before navigating")))
-    :transient t)
-   ("j" "Jump (or create)"
-    (lambda (args)
-      (interactive (list (transient-args 'org-node-series-dispatch)))
-      (if args
-          (org-node--series-jump (car args))
-        (message "Choose series before navigating")))
-    :transient t)
-   ;; REVIEW: It's too weird.  Maybe preselect hardcoded template for this
-   ;;         use-case.
-   ;; ("c" "Capture"
-   ;;  (lambda (args)
-   ;;    (interactive (list (transient-args 'org-node-series-dispatch)))
-   ;;    (if args
-   ;;        (progn
-   ;;          (setq org-node-current-series-key (car args))
-   ;;          (unwind-protect
-   ;;              (org-capture)
-   ;;            (setq org-node-current-series-key nil)))
-   ;;      (message "Choose series before navigating"))))
-   ])
 
 (defun org-node--series-jump (key)
   (let* ((series (alist-get (sxhash key) org-node--series-info))
@@ -1763,6 +1686,81 @@ YYYY-MM-DD, but it does not verify."
         (funcall (plist-get series :creator) sortstr))
       (when (outline-next-heading)
         (backward-char 1)))))
+
+(defun org-node--build-series (spec)
+  (let ((classifier (org-node--ensure-compiled (plist-get (cdr spec) :classifier)))
+        (unique-cars (make-hash-table :test #'equal)))
+    (cl-loop
+     for node being the hash-values of org-node--id<>node
+     as item = (funcall classifier node)
+     when (and item (not (gethash (car item) unique-cars)))
+     collect (progn (puthash (car item) t unique-cars)
+                    item)
+     into items
+     finally do
+     (setf (alist-get (sxhash (car spec)) org-node--series-info)
+           (append (cl-loop for elt in (cdr spec)
+                            if (functionp elt)
+                            collect (org-node--ensure-compiled elt)
+                            else collect elt)
+                   (list :sorted-items
+                         ;; Using `string>' due to most recent dailies probably
+                         ;; being most relevant, thus cycling thru recent
+                         ;; dailies will have the best perf.
+                         (cl-sort items #'string> :key #'car)))))
+    (org-node--add-series-to-menu
+     (car spec) (plist-get (cdr spec) :name))))
+
+(defun org-node--add-series-to-menu (key name)
+  (when (ignore-errors (transient-get-suffix 'org-node-series-dispatch key))
+    (transient-remove-suffix 'org-node-series-dispatch key))
+  (transient-append-suffix 'org-node-series-dispatch '(0 -1)
+    (list key name key))
+  (let ((old (car (slot-value (get 'org-node-series-dispatch 'transient--prefix)
+                              :incompatible))))
+    (set-slot-value (get 'org-node-series-dispatch 'transient--prefix)
+                    :incompatible (list (seq-uniq (cons key old))))))
+
+;; Should be able to type d n for "daily, next"
+(transient-define-prefix org-node-series-dispatch ()
+  :incompatible '(("d"))
+  ["Series"
+   ("|" "Invisible" "Placeholder" :if-nil t)
+   ("d" "Dailies" "d")]
+  ["Navigation"
+   ("p" "Previous in series"
+    (lambda (args)
+      (interactive (list (transient-args 'org-node-series-dispatch)))
+      (if args
+          (org-node--series-goto-previous (car args))
+        (message "Choose series before navigating")))
+    :transient t)
+   ("n" "Next in series"
+    (lambda (args)
+      (interactive (list (transient-args 'org-node-series-dispatch)))
+      (if args
+          (org-node--series-goto-next (car args))
+        (message "Choose series before navigating")))
+    :transient t)
+   ("j" "Jump (or create)"
+    (lambda (args)
+      (interactive (list (transient-args 'org-node-series-dispatch)))
+      (if args
+          (org-node--series-jump (car args))
+        (message "Choose series before navigating"))))
+   ;; REVIEW: It's too weird.  Maybe preselect hardcoded template for this
+   ;;         use-case.
+   ;; ("c" "Capture"
+   ;;  (lambda (args)
+   ;;    (interactive (list (transient-args 'org-node-series-dispatch)))
+   ;;    (if args
+   ;;        (progn
+   ;;          (setq org-node-current-series-key (car args))
+   ;;          (unwind-protect
+   ;;              (org-capture)
+   ;;            (setq org-node-current-series-key nil)))
+   ;;      (message "Choose series before navigating"))))
+   ])
 
 
 ;;;; Filename functions
@@ -2330,8 +2328,10 @@ adding keywords to the things to exclude:
   (org-node--goto (nth (random (hash-table-count org-node--candidate<>node))
                        (hash-table-values org-node--candidate<>node))))
 
-;; (defun org-node-refile ()
-;;   )
+;; How should refile work? No creation-fn, I suppose? But-- Ok, just goto
+(defun org-node-refile ()
+
+  )
 
 ;;;###autoload
 (defun org-node-extract-subtree ()
