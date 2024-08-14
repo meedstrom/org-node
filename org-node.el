@@ -1575,15 +1575,13 @@ YYYY-MM-DD, but it does not verify."
     (org-node--add-series-to-menu
      (car spec) (plist-get (cdr spec) :name))))
 
-(defun org-node--series-goto-or-create (key)
-  (if (null key)
-      (message "Choose series before navigating")
-    (let* ((series (alist-get (sxhash key) org-node--series-info))
-           (sortstr (funcall (plist-get series :prompter) series))
-           (item (assoc sortstr (plist-get series :sorted-items))))
-      (when (or (null item)
-                (not (funcall (plist-get series :try-goto) item)))
-        (funcall (plist-get series :creator) sortstr)))))
+(defun org-node--series-jump (key)
+  (let* ((series (alist-get (sxhash key) org-node--series-info))
+         (sortstr (funcall (plist-get series :prompter) series))
+         (item (assoc sortstr (plist-get series :sorted-items))))
+    (when (or (null item)
+              (not (funcall (plist-get series :try-goto) item)))
+      (funcall (plist-get series :creator) sortstr))))
 
 (defun org-node--series-goto-next (key)
   (org-node--series-goto-previous key t))
@@ -1630,17 +1628,23 @@ YYYY-MM-DD, but it does not verify."
    ("p" "Previous in series"
     (lambda (args)
       (interactive (list (transient-args 'org-node-series-dispatch)))
-      (org-node--series-goto-previous (car args)))
+      (if args
+          (org-node--series-goto-previous (car args))
+        (message "Choose series before navigating")))
     :transient t)
    ("n" "Next in series"
     (lambda (args)
       (interactive (list (transient-args 'org-node-series-dispatch)))
-      (org-node--series-goto-next (car args)))
+      (if args
+          (org-node--series-goto-next (car args))
+        (message "Choose series before navigating")))
     :transient t)
    ("j" "Jump"
     (lambda (args)
       (interactive (list (transient-args 'org-node-series-dispatch)))
-      (org-node--series-goto-or-create (car args)))
+      (if args
+          (org-node--series-jump (car args))
+        (message "Choose series before navigating")))
     :transient t)])
 
 (defun org-node--add-series-to-menu (key name)
@@ -2070,23 +2074,24 @@ type the name of a node that does not exist.  That enables this
              (path-to-write (file-name-concat
                              dir
                              (org-node--mk-basename title))))
-        (if (or (file-exists-p path-to-write)
-                (find-buffer-visiting path-to-write))
-            (error "File or buffer already exists: %s" path-to-write)
-          (mkdir (file-name-directory path-to-write) t)
-          (find-file path-to-write)
-          (if org-node-prefer-with-heading
-              (insert "* " title
-                      "\n:PROPERTIES:"
-                      "\n:ID:       " id
-                      "\n:END:"
-                      "\n")
-            (insert ":PROPERTIES:"
+        (when (file-exists-p path-to-write)
+          (error "File already exists: %s" path-to-write))
+        (when (find-buffer-visiting path-to-write)
+          (error "A buffer already has the filename %s" path-to-write))
+        (mkdir (file-name-directory path-to-write) t)
+        (find-file path-to-write)
+        (if org-node-prefer-with-heading
+            (insert "* " title
+                    "\n:PROPERTIES:"
                     "\n:ID:       " id
                     "\n:END:"
-                    "\n#+title: " title
-                    "\n"))
-          (run-hooks 'org-node-creation-hook))))))
+                    "\n")
+          (insert ":PROPERTIES:"
+                  "\n:ID:       " id
+                  "\n:END:"
+                  "\n#+title: " title
+                  "\n"))
+        (run-hooks 'org-node-creation-hook)))))
 
 
 ;;;; Commands
