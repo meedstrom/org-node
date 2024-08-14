@@ -1639,7 +1639,8 @@ YYYY-MM-DD, but it does not verify."
    ("j" "Jump"
     (lambda (args)
       (interactive (list (transient-args 'org-node-series-dispatch)))
-      (org-node--series-goto-or-create (car args))))])
+      (org-node--series-goto-or-create (car args)))
+    :transient t)])
 
 (defun org-node--add-series-to-menu (key name)
   (when (ignore-errors (transient-get-suffix 'org-node-series-dispatch key))
