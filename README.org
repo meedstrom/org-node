@@ -237,7 +237,7 @@ To get started with daily-notes, it may be enough to try this command:
 
 In detail, "daily-notes" (or "dailies") are just one of many possible kinds of /node series/.  You could have series about, let's say, historical philosophers, Star Trek episodes, your school curriculum...
 
-Define series in the variable =org-node-series= -- read its docstring.
+Define more series in the variable =org-node-series=.
 
 Already included is a definition that approximates the org-roam-dailies defaults, but I encourage you to override it to suit your tastes.
 
