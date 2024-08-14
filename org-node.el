@@ -1438,7 +1438,7 @@ for you."
     ;;       `org-node-put-created' on `org-node-creation-hook'.  But it can be
     ;;       easily modified to look at the datestamp in the filename instead.
     ;;       (Note that keeping such data in the filename doesn't really ever
-    ;;       permit nested nodes to work well: it'll be a crapshoot which of
+    ;;       permit nested nodes to work well: it'll be random which of
     ;;       the nodes in the file "stands for" the file.)
     ("a" :name "All ID-nodes by chronological order"
      :try-goto org-node--series-standard-goto
@@ -1672,7 +1672,20 @@ YYYY-MM-DD, but it does not verify."
       (if args
           (org-node--series-jump (car args))
         (message "Choose series before navigating")))
-    :transient t)])
+    :transient t)
+   ;; REVIEW: It's too weird.  Maybe preselect hardcoded template for this
+   ;;         use-case.
+   ;; ("c" "Capture"
+   ;;  (lambda (args)
+   ;;    (interactive (list (transient-args 'org-node-series-dispatch)))
+   ;;    (if args
+   ;;        (progn
+   ;;          (setq org-node-current-series-key (car args))
+   ;;          (unwind-protect
+   ;;              (org-capture)
+   ;;            (setq org-node-current-series-key nil)))
+   ;;      (message "Choose series before navigating"))))
+   ])
 
 (defun org-node--series-jump (key)
   (let* ((series (alist-get (sxhash key) org-node--series-info))
@@ -1720,15 +1733,12 @@ YYYY-MM-DD, but it does not verify."
                      (if next "next" "previous")
                      (plist-get series :name)))))))
 
-
-
 (defun org-node-series-refile ()
   )
 
 (defvar org-node-current-series-key nil)
 (defun org-node-series-capture-target ()
   (org-node-cache-ensure)
-  (cl-assert (not org-node-proposed-id))
   (let ((key (or org-node-current-series-key
                  (let* ((valid-keys (mapcar #'car org-node-series))
                         (elaborations
@@ -1738,13 +1748,12 @@ YYYY-MM-DD, but it does not verify."
                                           (car series)
                                           (plist-get (cdr series) :name))))
                         (input (read-char-from-minibuffer
-                                (format "Press any of [%s] to capture into series: %s"
+                                (format "Press any of [%s] to capture into series: %s "
                                         (string-join valid-keys ",")
                                         elaborations)
                                 (mapcar #'string-to-char valid-keys))))
                    (char-to-string input)))))
     ;; Almost identical to `org-node--series-jump'
-    (org-node--series-jump)
     (let* ((series (alist-get (sxhash key) org-node--series-info))
            (sortstr (or org-node-proposed-title
                         (funcall (plist-get series :prompter) series)))

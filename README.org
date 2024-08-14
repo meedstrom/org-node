@@ -194,7 +194,12 @@ The secret sauce is =(function org-node-capture-target)=.
 
 #+begin_src elisp
 (setq org-capture-templates
-      '(("i" "Capture into ID node"
+      '(("s" "Capture into ID-node series"
+         plain (function org-node-series-capture-target) nil
+         :empty-lines-after 1
+         :no-save t)
+
+        ("i" "Capture into ID node"
          plain (function org-node-capture-target) nil
          :empty-lines-after 1
          :no-save t)
