@@ -1706,7 +1706,7 @@ YYYY-MM-DD, but it does not verify."
           (org-node--series-goto-next (car args))
         (message "Choose series before navigating")))
     :transient t)
-   ("j" "Jump"
+   ("j" "Jump to (or create)"
     (lambda (args)
       (interactive (list (transient-args 'org-node-series-dispatch)))
       (if args
