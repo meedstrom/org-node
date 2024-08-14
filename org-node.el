@@ -808,10 +808,6 @@ return that bytecode."
             fn
           compiled)))))
 
-(defvar org-node--fn-hashes nil)
-(defvar org-node--affixation-compfn nil)
-(defvar org-node--filter-compfn nil)
-
 (defun org-node--scan (files finalizer)
   "Begin async scanning FILES for id-nodes and links.
 
@@ -819,10 +815,6 @@ When finished, pass a list of scan results to the FINALIZER
 function to update current tables."
   (when (= 0 org-node-perf-max-jobs)
     (setq org-node-perf-max-jobs (org-node--count-logical-cores)))
-  (setq org-node--filter-compfn
-        (org-node--ensure-compiled org-node-filter-fn))
-  (setq org-node--affixation-compfn
-        (org-node--ensure-compiled org-node-affixation-fn))
   (let ((compiled-lib (org-node--ensure-compiled-lib))
         (file-name-handler-alist nil)
         (coding-system-for-read org-node-perf-assume-coding-system)
@@ -1107,7 +1099,7 @@ The reason for default t is better experience with
     (dolist (ref refs)
       (puthash ref id org-node--ref<>id))
     ;; Setup completion candidates
-    (when (funcall org-node--filter-compfn node)
+    (when (funcall (org-node--ensure-compiled org-node-filter-fn) node)
       ;; Let refs work as aliases
       (dolist (ref refs)
         (puthash ref node org-node--candidate<>node)
@@ -1128,7 +1120,8 @@ The reason for default t is better experience with
           (when (and collision (not (equal id collision)))
             (push (list title id collision) org-node--collisions)))
         (puthash title id org-node--title<>id)
-        (let ((affx (funcall org-node--affixation-compfn node title)))
+        (let ((affx (funcall (org-node--ensure-compiled org-node-affixation-fn)
+                             node title)))
           (if org-node-alter-candidates
               ;; Absorb the affixations into one candidate string
               (puthash (concat (nth 1 affx) (nth 0 affx) (nth 2 affx))
