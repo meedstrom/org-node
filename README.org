@@ -18,7 +18,7 @@ I found org-roam too slow, so I made [[https://github.com/meedstrom/quickroam][q
 
 My life can be divided into two periods "*before org-roam*" and "*after org-roam*".  I crossed a kind of gap once I got a good way to link between my notes.  It's odd to remember when I just relied on browsing subtrees and folders -- what a strange way to work!
 
-I used to lose track of things I had written, under some forgotten heading in a forgotten file in a forgotten directory.  The org-roam method let me *find* and *build on* my own work, instead of recreating it all the time.
+I used to lose track of things I had written, under some forgotten heading in a forgotten file in a forgotten directory.  The org-roam method let me *find* and *build on* my own work, instead of [[https://en.wikipedia.org/wiki/Cryptomnesia][recreating it all the time]].
 
 At the core, all the "notetaking packages" ([[https://github.com/rtrppl/orgrr][orgrr]]/[[https://github.com/localauthor/zk][zk]]/[[https://github.com/EFLS/zetteldeft][zetteldeft]]/[[https://github.com/org-roam/org-roam][org-roam]]/[[https://github.com/protesilaos/denote][denote]]/[[https://github.com/kaorahi/howm][howm]]/[[https://github.com/kisaragi-hiu/minaduki][minaduki]]/...) try to help you with this: make it easy to link between notes and explore them.
 
