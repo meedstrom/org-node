@@ -591,7 +591,7 @@ correct - and fully correct by the time of the next invocation.
 If the `org-node--id<>node' table is currently empty, behave as if
 SYNCHRONOUS t, unless SYNCHRONOUS is the symbol `must-async'."
   (unless (eq synchronous 'must-async)
-    ;; HACK: The warn-function becomes a no-op after the first run, so gotta
+    ;; The warn-function becomes a no-op after the first run, so gotta
     ;; run it as late as possible in case of late variable settings.  By
     ;; running it here, we've waited until the user runs a command.
     (org-node--warn-obsolete))
@@ -790,24 +790,21 @@ didn't do so already, or local changes have been made."
   "If FN is a symbol with uncompiled function definition, compile it
 and return the same symbol.
 
-If FN is an anonymous lambda, compile it, cache the bytecode, and
-return that bytecode."
-  (if (compiled-function-p fn)
-      fn
-    (if (and (symbolp fn) (compiled-function-p (symbol-function fn)))
-        fn
-      (let* ((fn-hash (sxhash (if (symbolp fn) (symbol-function fn) fn)))
-             (compiled (gethash fn-hash org-node--compiled-lambdas)))
-        (unless compiled
-          (setq compiled (if (and (native-comp-available-p)
-                                  (not (eq 'closure (car-safe fn))))
-                             (native-compile fn)
-                           (byte-compile fn)))
-          (puthash fn-hash compiled org-node--compiled-lambdas))
-        (if (symbolp fn)
-            ;; Calling (byte-compile fn) already stored bytecode in the symbol
-            fn
-          compiled)))))
+If FN is an anonymous lambda, compile it, cache the resulting
+bytecode, and return that bytecode."
+  (cond ((compiled-function-p fn) fn)
+        ((symbolp fn)
+         (if (compiled-function-p (symbol-function fn))
+             fn
+           (if (native-comp-available-p) (native-compile fn) (byte-compile fn))
+           fn))
+        ((let ((lambda-hash (sxhash fn)))
+           (or (gethash lambda-hash org-node--compiled-lambdas)
+               (puthash lambda-hash (if (and (native-comp-available-p)
+                                             (not (eq 'closure (car-safe fn))))
+                                        (native-compile fn)
+                                      (byte-compile fn))
+                        org-node--compiled-lambdas))))))
 
 (defun org-node--scan (files finalizer)
   "Begin async scanning FILES for id-nodes and links.
