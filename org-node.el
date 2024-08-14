@@ -17,7 +17,7 @@
 
 ;; Author:           Martin Edström <meedstrom91@gmail.com>
 ;; Created:          2024-04-13
-;; Version:          0.5pre
+;; Version:          0.5-git
 ;; Keywords:         org, hypermedia
 ;; Package-Requires: ((emacs "28.1") (compat "29.1.4.5") (dash "2.19.1") (transient "0.7.4"))
 ;; URL:              https://github.com/meedstrom/org-node
@@ -2509,15 +2509,12 @@ Used by `org-node-rename-file-by-title'."
 (defun org-node-rename-file-by-title (&optional interactive)
   "Rename the current file according to `org-node-slug-fn'.
 
-Attempt to check for a prefix in the style of
-`org-node-datestamp-format', and preserve it.
+Also attempt to check for a prefix in the style of
+`org-node-datestamp-format', and avoid overwriting it.
 
-If the file is outside `org-node-renames-allowed-dirs', do
-nothing, or when called interactively, prompt for confirmation.
-
-Suitable as a save hook:
-
-    (add-hook 'after-save-hook #'org-node-rename-file-by-title)"
+Suitable on `after-save-hook'.  If the file is outside
+`org-node-renames-allowed-dirs', do nothing.  When called
+interactively, always prompt for confirmation."
   (interactive "p" org-mode)
   (if (not (derived-mode-p 'org-mode))
       (when interactive
@@ -2546,13 +2543,14 @@ Suitable as a save hook:
             (if (not title)
                 (message "File has no title nor heading")
               (let* ((basename (file-name-nondirectory path))
-                     (date-prefix (if (and org-node-datestamp-format
-                                           (string-match
-                                            (org-node--make-regexp-for-time-format
-                                             org-node-datestamp-format)
-                                            basename))
-                                      (match-string 0 basename)
-                                    ""))
+                     (date-prefix
+                      (if (and org-node-datestamp-format
+                               (string-match
+                                (org-node--make-regexp-for-time-format
+                                 org-node-datestamp-format)
+                                basename))
+                          (match-string 0 basename)
+                        ""))
                      (new-basename (concat date-prefix
                                            (funcall org-node-slug-fn title)
                                            ".org"))
@@ -2576,16 +2574,19 @@ Suitable as a save hook:
                       (unless (file-writable-p path)
                         (user-error "No permissions to rename file: %s" path))
                       (unless (file-writable-p new-path)
-                        (user-error "No permissions to write a new file at: %s" new-path))
-                      ;; Unnecessary b/c `rename-file' will already warn, but hey
+                        (user-error "No permissions to write a new file at: %s"
+                                    new-path))
+                      ;; A bit unnecessary bc `rename-file' would error too,
+                      ;; but at least we didn't kill buffer yet
                       (when (file-exists-p new-path)
-                        (user-error "Canceled because a file exists at: %s" new-path))
+                        (user-error "Canceled because a file exists at: %s"
+                                    new-path))
 
                       (when (or (not interactive)
-                                (y-or-n-p
-                                 (format "Rename file %s to %s?"
-                                         basename new-basename)))
-                        ;; Kill buffer before renaming, because it will not follow the rename
+                                (y-or-n-p (format "Rename file %s to %s?"
+                                                  basename new-basename)))
+                        ;; Kill buffer before renaming, because it will not
+                        ;; follow the rename
                         (kill-buffer buf)
                         (rename-file path new-path)
                         (let ((new-buf (find-file-noselect new-path)))
