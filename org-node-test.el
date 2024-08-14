@@ -25,7 +25,7 @@
 
 ;; (-all-p #'org-node-link-p (apply #'append (hash-table-values org-node--dest<>links)))
 
-(ert-deftest org-node-test--split-refs-field ()
+(ert-deftest org-node/test-split-refs-field ()
   (setq org-node-parser--result:paths-types nil)
   (let ((result
          (org-node-parser--split-refs-field
@@ -52,7 +52,14 @@
     (should (equal nil (cdr (assoc "citeKey"
                                    org-node-parser--result:paths-types))))))
 
-(ert-deftest org-node-test--oldata-fns ()
+(ert-deftest org-node/test-time-format-hacks ()
+  (let ((fmt "Wild%Y--%m%dexample%H%M%S-"))
+    (should (equal (org-node--extract-ymd
+                    (format-time-string fmt '(26300 36406 109008 201000))
+                    fmt)
+                   "2024-08-14"))))
+
+(ert-deftest org-node/test-oldata-fns ()
   (let ((olp '((3730 "A subheading" 2 "33dd")
                (2503 "A top heading" 1 "d3rh")
                (1300 "A sub-subheading" 3 "d3csae")
@@ -67,7 +74,7 @@
     (should (equal (org-node-parser--pos->parent-id olp 1300 nil)
                    "d3"))))
 
-(ert-deftest org-node-test--parsing-testfile2.org ()
+(ert-deftest org-node/test-parsing-testfile2.org ()
   (org-node--scan-targeted (list "testfile2.org"))
   (org-node-cache-ensure t)
   (let ((node (gethash "bb02315f-f329-4566-805e-1bf17e6d892d" org-node--id<>node)))
@@ -80,7 +87,7 @@
     (should (equal (org-node-get-title node) "3rd-level, has ID"))
     (should (equal (org-node-get-todo node) nil))))
 
-(ert-deftest org-node-test--having-multiple-id-dirs ()
+(ert-deftest org-node/test-having-multiple-id-dirs ()
   (mkdir "/tmp/org-node/test1" t)
   (mkdir "/tmp/org-node/test2" t)
   (write-region "" nil "/tmp/org-node/test2/emptyfile.org")
@@ -93,7 +100,7 @@
     (should (equal (car (org-node--root-dirs (org-node-list-files)))
                    "/tmp/org-node/test2/"))))
 
-(ert-deftest org-node-test--goto-random ()
+(ert-deftest org-node/test-goto-random ()
   (require 'seq)
   (org-node--scan-targeted (list "testfile2.org"))
   (org-node-cache-ensure t)
@@ -103,7 +110,7 @@
     (should (equal (abbreviate-file-name (buffer-file-name))
                    (org-node-get-file-path node)))))
 
-(ert-deftest org-node-test--split-into-n-sublists ()
+(ert-deftest org-node/test-split-into-n-sublists ()
   (should (equal 4 (length (org-node--split-into-n-sublists
                             '(a v e e) 7))))
   (should (equal 1 (length (org-node--split-into-n-sublists
@@ -112,7 +119,7 @@
                             '(a v e e q l fk k k ki i o r r r r r r  r g g gg)
                             4)))))
 
-(ert-deftest org-node-test--file-naming ()
+(ert-deftest org-node/test-file-naming ()
   (let ((org-node-filename-fn #'org-node-slugify-for-web))
     (should (equal (org-node--name-file "19 Foo bar Baz 588")
                    "19-foo-bar-baz-588.org")))
@@ -128,7 +135,7 @@
   (should (equal (org-node--time-format-to-regexp "%A%Y%M%d-")
                  "^[[:alpha:]]+[[:digit:]]+-")))
 
-(ert-deftest org-node-test--various ()
+(ert-deftest org-node/test-various ()
   (let ((org-node-ask-directory "/tmp/org-node/test/")
         ;; NOTE you should manually test the other creation-fns
         (org-node-creation-fn #'org-node-new-file))

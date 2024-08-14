@@ -1459,6 +1459,8 @@ KEY uniquely identifies the series, and is the key to type after
 \"n\" or \"p\", these keys are reserved for Jump, Next and
 Previous actions.
 
+NAME describes the series, in one or a few words.
+
 CLASSIFIER is a single-argument function taking an `org-node'
 object and should return a cons cell or list if the node belongs
 to the series, or nil if it does not belong to the series.
@@ -1471,32 +1473,36 @@ This is what determines the order of items in the series: after
 all nodes have been processed by CLASSIFIER, the non-nil return
 values are sorted by the sort-string, using `string>'.
 
-Function PROMPTER may be used during Jump, Capture or Refile
-actions to interactively prompt for a sort-string.  This
-highlights the other use of the sort-string: finding our way back
-from scant context.
+Function PROMPTER may be used during jump/capture/refile to
+interactively prompt for a sort-string.  This highlights the
+other use of the sort-string: finding our way back from scant
+context.
 
 In the example of a series of daily-notes sorted on YYYY-MM-DD, a
 simple prompter can use `org-read-date' because it returns
 strings in YYYY-MM-DD format as well.
 
-Function WHEREAMI is much like PROMPTER in that it should return
-a sort-string.  However, it should do this without user
+PROMPTER receives one argument, the series plist, of which an
+useful member may be (plist-get series :sorted-items).
+
+Function WHEREAMI is like PROMPTER in that it should return a
+sort-string.  However, it should do this without user
 interaction, and may return nil.  For example, if the user is not
 currently in a daily-note, the daily-notes' WHEREAMI should
-return nil.
+return nil.  It receives no arguments.
 
 Function TRY-GOTO takes a single argument: one of the items
 originally created by CLASSIFIER.  That is, a list of not only a
 sort-string but any associated data you put in.  If TRY-GOTO
 succeeds in using this information to visit a place of interest,
-it should return non-nil, else nil.  It should not create or
-write anything on failure - reserve that for the CREATE function.
+it should return non-nil, otherwise nil.  It should not create or
+write anything on failure - reserve that for the CREATOR
+function.
 
 Function CREATOR creates a place that did not exist.  For
 example, if the user picked a date from `org-read-date' but no
 daily-note exists for that date, CREATOR is called to create that
-daily-note."
+daily-note.  It receives a would-be sort-string as argument."
   :type 'alist)
 
 (defvar org-node--series-info nil
@@ -1522,12 +1528,50 @@ visit the node with that id if it exists."
     (find-file (cdr item))
     t))
 
+;; If only it was globally illegal to write datetime libraries,
+;; then everyone might settle around YYYY-MM-DD...
+;; TODO: Handle %s, %V, %y...  is there no library?
+(defun org-node--extract-ymd (instance time-format)
+  "Try to extract a YYYY-MM-DD date out of string INSTANCE.
+Assume INSTANCE is a string produced by TIME-FORMAT, e.g. if
+TIME-FORMAT is %Y%m%dT%H%M%SZ then a possible INSTANCE is
+20240814T123307Z.
+
+Will throw an error if TIME-FORMAT does not include either %F or
+all three of %Y, %m and %d.  May return odd results if other
+format-constructs occur before these."
+  (let* ((case-fold-search nil)
+         (idx-year (string-search "%Y" time-format))
+         (idx-month (string-search "%m" time-format))
+         (idx-day (string-search "%d" time-format))
+         (idx-%F (string-search "%F" time-format)))
+    (if (-none-p #'null (list idx-year idx-month idx-day))
+        (progn
+          (if (> idx-month idx-year) (cl-incf idx-month 2))
+          (if (> idx-day idx-year) (cl-incf idx-day 2))
+          (concat (substring instance idx-year (+ idx-year 4))
+                  "-"
+                  (substring instance idx-month (+ idx-month 2))
+                  "-"
+                  (substring instance idx-day (+ idx-day 2))))
+      (cl-assert idx-%F)
+      (substring instance idx-%F (+ idx-%F 10)))))
+
 (defun org-node--default-daily-whereami ()
   (let ((basename (file-name-base
                    (buffer-file-name (buffer-base-buffer)))))
-    (when (string-match-p
-           (rx bol (= 4 digit) "-" (= 2 digit) "-" (= 2 digit) eol)
-           basename)
+    (when (or (string-match-p
+               (rx bol (= 4 digit) "-" (= 2 digit) "-" (= 2 digit) eol)
+               basename)
+              ;; Wild trick: pretend to return a date even outside the dailies
+              ;; dir, so that we can jump to "next" and "previous" relative to
+              ;; when this file was created!
+              (and (not (string-blank-p org-node-datestamp-format))
+                   (string-match (org-node--make-regexp-for-time-format
+                                  org-node-datestamp-format)
+                                 basename)
+                   (org-node--extract-ymd (match-string 0 basename)
+                                          org-node-datestamp-format)))
       basename)))
 
 (defun org-node--default-daily-creator (sortstr)
