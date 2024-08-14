@@ -941,27 +941,37 @@ to N-JOBS), then if so, wrap-up and call FINALIZER."
     (let ((file-name-handler-alist nil)
           (coding-system-for-read org-node-perf-assume-coding-system)
           (coding-system-for-write org-node-perf-assume-coding-system)
-          result-sets)
-      (with-temp-buffer
-        (dotimes (i n-jobs)
-          (let ((results-file (org-node-parser--tmpfile "results-%d.eld" i)))
-            (if (not (file-exists-p results-file))
-                (let ((buf (get-buffer " *org-node*")))
-                  (when buf
-                    ;; Had 1+ errors, so unhide stderr buffer from now on
-                    (setq org-node--stderr-name "*org-node errors*")
-                    (with-current-buffer buf
-                      (rename-buffer org-node--stderr-name)))
-                  ;; Don't warn on first run, for better UX.  First-time init
-                  ;; thru autoloads can have bugs for seemingly magical reasons
-                  ;; that go away afterwards (e.g. it says the files aren't on
-                  ;; disk but they are).
-                  (unless org-node--first-init
-                    (message "An org-node worker failed to produce %s.  See buffer %s"
-                             results-file org-node--stderr-name)))
-              (erase-buffer)
-              (insert-file-contents results-file)
-              (push (read (buffer-string)) result-sets)))))
+          (editorconfig
+           (if (advice-member-p #'editorconfig--advice-insert-file-contents
+                                #'insert-file-contents)
+               (prog1 t
+                 (advice-remove #'insert-file-contents
+                                #'editorconfig--advice-insert-file-contents))))
+          (result-sets nil))
+      (unwind-protect
+          (with-temp-buffer
+            (dotimes (i n-jobs)
+              (let ((results-file (org-node-parser--tmpfile "results-%d.eld" i)))
+                (if (not (file-exists-p results-file))
+                    (let ((buf (get-buffer " *org-node*")))
+                      (when buf
+                        ;; Had 1+ errors, so unhide stderr buffer from now on
+                        (setq org-node--stderr-name "*org-node errors*")
+                        (with-current-buffer buf
+                          (rename-buffer org-node--stderr-name)))
+                      ;; Don't warn on first run, for better UX.  First-time init
+                      ;; thru autoloads can have bugs for seemingly magical reasons
+                      ;; that go away afterwards (e.g. it says the files aren't on
+                      ;; disk but they are).
+                      (unless org-node--first-init
+                        (message "An org-node worker failed to produce %s.  See buffer %s"
+                                 results-file org-node--stderr-name)))
+                  (erase-buffer)
+                  (insert-file-contents results-file)
+                  (push (read (buffer-string)) result-sets)))))
+        (if editorconfig
+            (advice-add #'insert-file-contents :around
+                        #'editorconfig--advice-insert-file-contents)))
       (setq org-node--time-at-last-child-done
             (-last-item (sort (-map #'-last-item result-sets) #'time-less-p)))
       ;; Merge N result-sets into one result-set, to run FINALIZER once
