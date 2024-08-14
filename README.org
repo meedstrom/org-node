@@ -215,6 +215,19 @@ With that done, the everyday commands =org-node-find= & =org-node-insert-link= c
 (setq org-node-creation-fn #'org-capture)
 #+end_src
 
+** Daily-notes and other "node series"
+To get started with daily-notes, it may be enough to try this command:
+
+#+begin_src elisp
+(keymap-set global-map "M-s M-s" #'org-node-series-dispatch)
+#+end_src
+
+In detail, "daily-notes" (or "dailies") are just one of many possible kinds of /node series/.  You could have series about, let's say, historical philosophers, Star Trek episodes, your school curriculum...
+
+Define more series by adding to the variable =org-node-series=.
+
+Already included is a definition that approximates the org-roam-dailies defaults, but I encourage you to override it to suit your tastes.
+
 ** Managing org-id-locations
 
 I find unsatisfactory the config options in org-id (Why? See [[http://edstrom.dev/wjwrl/taking-ownership-of-org-id][Taking ownership of org-id]]), so org-node gives you an extra way to feed data to org-id, making sure we won't run into "ID not found" situations.
@@ -227,19 +240,6 @@ Example setting:
         "~/Syncthing/project2/"
         "/mnt/stuff/"))
 #+end_src
-
-** Daily-notes and other "node series"
-To get started with daily-notes, it may be enough to try this command:
-
-#+begin_src elisp
-(keymap-set global-map "M-s M-s" #'org-node-series-dispatch)
-#+end_src
-
-In detail, "daily-notes" (or "dailies") are just one of many possible kinds of /node series/.  You could have series about, let's say, historical philosophers, Star Trek episodes, your school curriculum...
-
-Define more series in the variable =org-node-series=.
-
-Already included is a definition that approximates the org-roam-dailies defaults, but I encourage you to override it to suit your tastes.
 
 ** Completion-at-point
 I don't use any completion in Org buffers so it's certainly not for everyone, but there is the option:
@@ -297,9 +297,9 @@ We support the builtin @citations, not (yet) org-ref &citations, since amending 
 
 ** Tip: On very slow filesystems
 
-I hear that on Termux on Android, filesystem access can be so slow that it's a pain to use org-roam as well as org-journal. ([[https://github.com/meedstrom/org-node/issues/24#issuecomment-2278605819][19 seconds just to list files under a directory]]!)
+I hear that on Termux on Android, filesystem access can be so slow that it's a pain to cycle dailies with org-roam or org-journal. ([[https://github.com/meedstrom/org-node/issues/24#issuecomment-2278605819][11 seconds just to goto next daily]]!)
 
-Good news!  You can speed up a lot of their functions by making them just look up org-node tables.  One or more of these overrides may interest you:
+Good news.  You can speed up their functions by making them just look up org-node tables.  One or more of these overrides may interest you:
 
 #+begin_src elisp
 (advice-add #'org-roam-list-files :override
