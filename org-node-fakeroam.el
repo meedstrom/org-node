@@ -85,6 +85,7 @@ previews.  This is done thru
         (dolist (buf (org-buffer-list))
           (with-current-buffer buf
             (add-hook 'post-command-hook #'org-roam-buffer--redisplay-h nil t))))
+
     (advice-remove #'org-roam-preview-get-contents
                    #'org-node-fakeroam--accelerate-get-contents)
     (advice-remove #'org-roam-node-insert-section
