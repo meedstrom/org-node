@@ -62,8 +62,6 @@
 ;;       - Need a bunch of commands for that, like select node by fulltext
 ;;         search
 
-;; TODO: Maybe rename object getters -get- to just :
-
 ;; TODO: If a roam-ref exists like //www.website.com, allow counting
 ;;       //www.website.com?key=val&key2=val2#hash as a reflink to the same,
 ;;       unless the latter has a roam-ref of its own.
@@ -91,6 +89,7 @@
 (declare-function #'org-roam-capture- "org-roam-capture")
 (declare-function #'org-roam-node-create "org-roam-node")
 (declare-function #'org-roam-node-slug "org-roam-node")
+(declare-function #'org-roam-dailies--capture "org-roam-dailies")
 
 
 ;;;; Options
@@ -1462,7 +1461,7 @@ for you."
   '(("d" :name "Dailies"
      :classifier org-node--default-daily-classifier
      :creator org-node--default-daily-creator
-     :prompter (lambda (&rest _) (org-read-date))
+     :prompter (lambda (_series) (org-read-date))
      :whereami (lambda ()
                  (file-name-base (buffer-file-name (buffer-base-buffer))))
      :try-goto (lambda (item)
@@ -1499,36 +1498,44 @@ Each item looks like
      :try-goto FUNCTION
      :create FUNCTION)
 
-KEY uniquely identifies the series, and is the corresponding key
-to type in \\[org-node-series-dispatch].
+KEY uniquely identifies the series, and is the key to type after
+\\[org-node-series-dispatch] to select it.  It may not be \"j\",
+\"n\" or \"p\", these keys are reserved for Jump, Next and
+Previous actions.
 
 CLASSIFIER is a single-argument function taking an `org-node'
 object and should return a cons cell or list if the node belongs
-to the series, or nil otherwise.
+to the series, or nil if it does not belong to the series.
 
-This cell is added to an internal list which is sorted on the
-first element of all cells, using `string>'.  This is what
-determines the order of items in the series.
+The list may contain anything, but the first element must be a
+sort-string, i.e. a string suitable for sorting on.  An example
+is a date in the format YYYY-MM-DD, but not in the format MM/DD/YY.
 
-Function PROMPTER may be used during goto, capture or refile
+This is what determines the order of items in the series: after
+all nodes have been processed by CLASSIFIER, the non-nil return
+values are sorted by the sort-string, using `string>'.
+
+Function PROMPTER may be used during Jump, Capture or Refile
 actions to interactively prompt for a sort-string.  This
 highlights the other use of the sort-string: finding our way back
 from scant context.
 
-In the example of a series of daily-notes sorted on YYYY-MM-DD,
-`org-read-date' works well as a prompter because it returns
+In the example of a series of daily-notes sorted on YYYY-MM-DD, a
+simple prompter can use `org-read-date' because it returns
 strings in YYYY-MM-DD format as well.
 
 Function WHEREAMI is much like PROMPTER in that it should return
-a sort-string or nil.  However, it should do this by heuristic
-instead of user interaction.
+a sort-string.  However, it should do this without user
+interaction, and may return nil.  For example, if the user is not
+currently in a daily-note, the daily-notes' WHEREAMI should
+return nil.
 
 Function TRY-GOTO takes a single argument: one of the items
 originally created by CLASSIFIER.  That is, a list of not only a
 sort-string but any associated data you put in.  If TRY-GOTO
 succeeds in using this information to visit a place of interest,
-it should return t, otherwise nil.  It should not create or write
-anything on failure - reserve that for the CREATE function.
+it should return non-nil, else nil.  It should not create or
+write anything on failure - reserve that for the CREATE function.
 
 Function CREATE creates a place that did not exist.  For example,
 if an user picked a date from `org-read-date' but no daily-note
@@ -1554,13 +1561,20 @@ visit the node with that id if it exists."
   (completing-read "Go to: " (plist-get series :sorted-items)))
 
 (defun org-node--default-daily-creator (sortstr)
-  (let ((org-node-ask-directory
-         (if (require 'org-roam-dailies nil t)
-             (file-name-concat org-roam-directory org-roam-dailies-directory)
-           (file-name-as-directory (file-name-concat org-directory "daily"))))
-        (org-node-datestamp-format "")
-        (org-node-slug-fn #'identity))
-    (org-node--create sortstr (org-id-new))))
+  (if (eq org-node-creation-fn 'org-node-new-via-roam-capture)
+      ;; HACK: Assume this user wants to use their roam-dailies templates
+      (progn
+        (require 'org-roam-dailies)
+        (org-roam-dailies--capture
+         (encode-time (parse-time-string
+                       (concat sortstr (format-time-string " %H:%M:%S %z"))))))
+    (let ((org-node-ask-directory
+           (if (require 'org-roam-dailies nil t)
+               (file-name-concat org-roam-directory org-roam-dailies-directory)
+             (file-name-as-directory (file-name-concat org-directory "daily"))))
+          (org-node-datestamp-format "")
+          (org-node-slug-fn #'identity))
+      (org-node--create sortstr (org-id-new)))))
 
 (defun org-node--default-daily-classifier (node)
   "Classifier suitable for daily-notes in default Org-Roam style.
@@ -1595,72 +1609,86 @@ YYYY-MM-DD, but it does not verify."
                          ;; Using `string>' due to most recent dailies probably
                          ;; being most relevant, thus cycling thru recent
                          ;; dailies will have the best perf.
-                         (cl-sort items #'string> :key #'car)))))))
+                         (cl-sort items #'string> :key #'car)))))
+    (org-node--add-series-to-menu
+     (car spec) (plist-get (cdr spec) :name))))
 
+(defun org-node--series-goto-or-create (key)
+  (if (null key)
+      (message "Choose series before navigating")
+    (let* ((series (alist-get (sxhash key) org-node--series-info))
+           (sortstr (funcall (plist-get series :prompter) series))
+           (item (assoc sortstr (plist-get series :sorted-items))))
+      (when (or (null item)
+                (not (funcall (plist-get series :try-goto) item)))
+        (funcall (plist-get series :creator) sortstr)))))
 
-(defun org-node-default-daily-goto ()
-  (interactive)
-  (org-node--series-visit-or-create "d"))
+(defun org-node--series-goto-next (key)
+  (org-node--series-goto-previous key t))
 
-(defun org-node-default-daily-next ()
-  (interactive nil org-mode)
-  (org-node--series-visit-next "d"))
-
-(defun org-node-default-daily-previous ()
-  (interactive nil org-mode)
-  (org-node--series-visit-previous "d"))
-
-
-(defun org-node--series-visit-or-create (key)
-  (let* ((series (alist-get (sxhash key) org-node--series-info))
-         (sortstr (funcall (plist-get series :prompter) series))
-         (item (assoc sortstr (plist-get series :sorted-items))))
-    (when (or (null item)
-              (not (funcall (plist-get series :try-goto) item)))
-      (funcall (plist-get series :creator) sortstr))))
-
-(defun org-node--series-visit-next (key)
-  (org-node--series-visit-previous key t))
-
-(defun org-node--series-visit-previous (key &optional next)
-  (unless (derived-mode-p 'org-mode)
-    (user-error "Not an Org buffer"))
-  (let* ((series (alist-get (sxhash key) org-node--series-info))
-         (here (funcall (plist-get series :whereami)))
-         (head nil))
-    (cl-loop for item in (plist-get series :sorted-items)
-             if (string> (car item) here)
-             do (push item head)
-             else return t)
-    (let ((to-check (if next
-                        head
-                      (drop (1+ (length head))
-                            (plist-get series :sorted-items))))
-          (target nil))
-      ;; HACK: Keep trying items as long as :try-goto fails, because an item
-      ;; could be referring to something that has since been deleted from disk
-      ;; (and we can't guarantee up-to-date tables without file-notify).
-      (if (catch 'fail
-            (when (null to-check)
-              (throw 'fail t))
-            (while (not target)
-              (if to-check
-                  (setq target (funcall (plist-get series :try-goto)
-                                        (pop to-check)))
-                (throw 'fail t))))
-          (message "No %s item in series \"%s\""
-                   (if next "next" "previous")
-                   (plist-get series :name))))))
+(defun org-node--series-goto-previous (key &optional next)
+  (if (null key)
+      (message "Choose a series before navigating")
+    (unless (derived-mode-p 'org-mode)
+      (user-error "Not an Org buffer"))
+    (let* ((series (alist-get (sxhash key) org-node--series-info))
+           (here (funcall (plist-get series :whereami)))
+           (head nil))
+      (cl-loop for item in (plist-get series :sorted-items)
+               if (string> (car item) here)
+               do (push item head)
+               else return t)
+      (let ((to-check (if next
+                          head
+                        (drop (1+ (length head))
+                              (plist-get series :sorted-items))))
+            (target nil))
+        ;; HACK: Keep trying items as long as :try-goto fails, because an item
+        ;; could be referring to something that has since been deleted from disk
+        ;; (and we can't guarantee up-to-date tables without file-notify).
+        (if (catch 'fail
+              (when (null to-check)
+                (throw 'fail t))
+              (while (not target)
+                (if to-check
+                    (setq target (funcall (plist-get series :try-goto)
+                                          (pop to-check)))
+                  (throw 'fail t))))
+            (message "No %s item in series \"%s\""
+                     (if next "next" "previous")
+                     (plist-get series :name)))))))
 
 ;; Should be able to type d n for "daily, next"
 (transient-define-prefix org-node-series-dispatch ()
-  ["Org-node series"])
+  :incompatible '(("d"))
+  ["Series"
+   ("|" "Invisible" "Placeholder" :if-nil t)
+   ("d" "Dailies" "d")]
+  ["Navigation"
+   ("p" "Previous in series"
+    (lambda (args)
+      (interactive (list (transient-args 'org-node-series-dispatch)))
+      (org-node--series-goto-previous (car args)))
+    :transient t)
+   ("n" "Next in series"
+    (lambda (args)
+      (interactive (list (transient-args 'org-node-series-dispatch)))
+      (org-node--series-goto-next (car args)))
+    :transient t)
+   ("j" "Jump"
+    (lambda (args)
+      (interactive (list (transient-args 'org-node-series-dispatch)))
+      (org-node--series-goto-or-create (car args))))])
 
-;; Something like this at reset time
-;; (transient-append-suffix 'org-node-series-dispatch "d"
-;;   '("n" "Next in series" org-node--series-visit-next :transient t)
-;;   '("p" "Previous in series" org-node--series-visit-previous :transient t)
-;;   )
+(defun org-node--add-series-to-menu (key name)
+  (when (ignore-errors (transient-get-suffix 'org-node-series-dispatch key))
+    (transient-remove-suffix 'org-node-series-dispatch key))
+  (transient-append-suffix 'org-node-series-dispatch '(0 -1)
+    (list key name key))
+  (let ((old (car (slot-value (get 'org-node-series-dispatch 'transient--prefix)
+                              :incompatible))))
+    (set-slot-value (get 'org-node-series-dispatch 'transient--prefix)
+                    :incompatible (list (seq-uniq (cons key old))))))
 
 (defun org-node-series-refile ()
   )

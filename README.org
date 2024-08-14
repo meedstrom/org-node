@@ -228,6 +228,18 @@ Example setting:
         "/mnt/stuff/"))
 #+end_src
 
+** Daily-notes and other "node series"
+To get started with daily-notes, it may be enough to try this command:
+
+#+begin_src elisp
+(keymap-set global-map "M-s M-s" #'org-node-series-dispatch)
+#+end_src
+
+In detail, "daily-notes" (or "dailies") are just one of many possible kinds of /node series/.  You could have series about, let's say, historical philosophers, Star Trek episodes, your school curriculum...
+
+Define series in the variable =org-node-series= -- read its docstring.
+
+Already included is a definition that approximates the org-roam-dailies defaults, but I encourage you to override it to suit your tastes.
 
 ** Completion-at-point
 I don't use any completion in Org buffers so it's certainly not for everyone, but there is the option:
@@ -282,29 +294,6 @@ While a big point of IDs is to avoid depending on filenames, it's often pragmati
 
 ** Limitation: org-ref
 We support the builtin @citations, not (yet) org-ref &citations, since amending =org-link-plain-re= to match them slows down my scan about 50%.  You can still find nodes with e.g. =:ROAM_REFS: &citekey=, just not see backlinks.
-
-** Tip: Dailies
-** Tip: org-journal
-
-You can use pure [[https://github.com/bastibe/org-journal][org-journal]] to implement "dailies".  Be advised it offers no org-capture target, nor a way to refile into a given daily-note.  But that may be enough, if all you need is to create and visit daily-notes.
-
-Try the following settings as a starting point.
-
-#+begin_src elisp
-(setq org-journal-dir "~/org/daily/")
-(setq org-journal-file-type 'daily)
-(setq org-journal-file-format "%F.org")
-(setq org-journal-date-prefix "#+title: ")
-(setq org-journal-date-format "%F")
-(setq org-journal-time-prefix "")
-(setq org-journal-time-format "")
-(add-hook 'org-journal-after-header-create-hook #'org-node-nodeify-entry)
-
-;; Workaround https://github.com/bastibe/org-journal/issues/440
-(add-hook 'org-journal-mode-hook
-          (lambda ()
-            (setq outline-regexp (rx (or bos (seq (+ "*") " "))))))
-#+end_src
 
 ** Tip: On very slow filesystems
 
