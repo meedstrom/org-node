@@ -343,9 +343,8 @@ the findings to another temp file."
               ;; Emacs, the new name will get picked up on next reset.
               (push FILE result:missing-files)
               (throw 'file-done t))
-            (push (cons FILE (floor (time-to-seconds
-                                     (file-attribute-modification-time
-                                      (file-attributes FILE)))))
+            (push (cons FILE (file-attribute-modification-time
+                              (file-attributes FILE)))
                   result:mtimes)
             (setq org-node-parser--curr-file FILE)
             ;; NOTE: Don't use `insert-file-contents-literally'.  It gives
