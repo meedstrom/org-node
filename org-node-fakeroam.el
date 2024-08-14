@@ -75,8 +75,9 @@ previews.  This is done thru
         (org-node-fakeroam--precompile)
         (unless org-node-cache-mode
           (message "`org-node-fakeroam-redisplay-mode' may show stale previews without `org-node-cache-mode' enabled"))
-        (add-to-list 'savehist-additional-variables 'org-node--file<>previews)
-        (add-to-list 'savehist-additional-variables 'org-node--file<>mtime)
+        (when (boundp 'savehist-additional-variables)
+          (add-to-list 'savehist-additional-variables 'org-node--file<>previews)
+          (add-to-list 'savehist-additional-variables 'org-node--file<>mtime))
         (advice-add #'org-roam-preview-get-contents :around
                     #'org-node-fakeroam--accelerate-get-contents)
         (advice-add #'org-roam-node-insert-section :around
