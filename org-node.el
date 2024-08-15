@@ -1570,21 +1570,17 @@ YYYY-MM-DD, but it does not verify."
       (cons (file-name-base path) path))))
 
 (defun org-node--default-daily-whereami ()
+  (cl-labels ((verify-date (putative-date)
+                (and
+                 (string-match-p ;; NNNN-NN-NN format
+                  (rx bol (= 4 digit) "-" (= 2 digit) "-" (= 2 digit) eol)
+                  putative-date)
+                 (calendar-date-is-valid-p ;; and actual a Gregorian date
+                  (org-date-to-gregorian putative-date)))))
   (let ((basename (file-name-base
                    (buffer-file-name (buffer-base-buffer)))))
-    (when (or (string-match-p
-               (rx bol (= 4 digit) "-" (= 2 digit) "-" (= 2 digit) eol)
-               basename)
-              ;; Wild trick: pretend to return a date even outside the dailies
-              ;; dir, so that we can jump to "next" and "previous" relative to
-              ;; when this file was created!
-              (and (not (string-blank-p org-node-datestamp-format))
-                   (string-match (org-node--make-regexp-for-time-format
-                                  org-node-datestamp-format)
-                                 basename)
-                   (org-node--extract-ymd (match-string 0 basename)
-                                          org-node-datestamp-format)))
-      basename)))
+    (when (verify-date basename)
+      basename))))
 
 ;; TODO: Handle %s, %V, %y...  is there a library?
 (defun org-node--extract-ymd (instance time-format)
