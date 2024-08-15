@@ -309,7 +309,6 @@ I hear that on Termux on Android, filesystem access can be so slow that it's a p
 Good news.  You can speed up their functions by making them just look up org-node tables.  One or more of these overrides may interest you:
 
 #+begin_src elisp
-;; 850ms to 2ms, woot
 (advice-add #'org-roam-list-files :override
             #'org-node-faster-roam-list-files)
 
@@ -342,7 +341,7 @@ Basic commands:
 - =org-node-insert-transclusion-as-subtree=
 - =org-node-visit-random=
 - =org-node-series-dispatch=
-  - Browse node series
+  - Browse node series -- see README
 - =org-node-extract-subtree=
   - A bizarro counterpart to =org-roam-extract-subtree=.  Export the subtree at point into a file-level node, *leave a link where the subtree was*, and show the new file as current buffer.
 - =org-node-nodeify-entry=
