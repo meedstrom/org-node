@@ -2489,15 +2489,15 @@ Used by `org-node-rename-file-by-title'.
 To add exceptions, see `org-node-renames-exclude'."
   :type '(repeat string))
 
-(defcustom org-node-renames-exclude "dail\\w+/"
+(defcustom org-node-renames-exclude "\\(?:daily\\|dailies\\|journal\\)/"
   "Regexp matching paths of files not to auto-rename.
-Only needed to filter out files in `org-node-renames-allowed-dirs'.
+For use by `org-node-rename-file-by-title'.
 
-Used by `org-node-rename-file-by-title'."
+Only applied to files under `org-node-renames-allowed-dirs'.  If
+a file is not there, it is not considered in any case and there
+is no need to match it here."
   :type 'string)
 
-;; FIXME: After running this on an after-save-hook, (buffer-modified-p)
-;;        returns t, which seems unsafe
 ;;;###autoload
 (defun org-node-rename-file-by-title (&optional interactive)
   "Rename the current file according to `org-node-slug-fn'.
@@ -2505,87 +2505,87 @@ Used by `org-node-rename-file-by-title'."
 Also attempt to check for a prefix in the style of
 `org-node-datestamp-format', and avoid overwriting it.
 
-Suitable on `after-save-hook'.  If the file is outside
-`org-node-renames-allowed-dirs', do nothing.  When called
-interactively, always prompt for confirmation."
+Suitable at the end of `after-save-hook'.  If called from a
+hook, only operate on files in `org-node-renames-allowed-dirs'.
+When called interactively, always prompt for confirmation.
+
+Internal argument INTERACTIVE is automatically set."
   (interactive "p" org-mode)
-  (if (not (derived-mode-p 'org-mode))
+  (let ((path (file-truename buffer-file-name))
+        (buf (current-buffer))
+        (title nil))
+    (cond
+     ((or (not (derived-mode-p 'org-mode))
+          (not (equal "org" (file-name-extension path))))
       (when interactive
-        (user-error "Only works in org-mode buffers"))
-    (let ((path buffer-file-name)
-          (buf (current-buffer)))
-      (unless (equal "org" (file-name-extension path))
-        (error "File doesn't end in .org: %s" path))
-      (when (and (not interactive) (null org-node-renames-allowed-dirs))
-        (user-error "New user option `org-node-renames-allowed-dirs' should be configured"))
-      (if (or interactive
-              (cl-loop
-               for dir in org-node-renames-allowed-dirs
-               if (and (string-prefix-p dir path)
-                       (not (string-match-p org-node-renames-exclude path)))
-               return t))
-          (let ((title (or (cadar (org-collect-keywords '("TITLE")))
-                           (save-excursion
-                             (without-restriction
-                               ;; No title, use first heading in file
-                               (goto-char 1)
-                               (or (org-at-heading-p)
-                                   (outline-next-heading))
-                               (org-get-heading t t t t))))))
-            (if (not title)
-                (message "File has no title nor heading")
-              (let* ((basename (file-name-nondirectory path))
-                     (date-prefix
-                      (if (and org-node-datestamp-format
-                               (string-match
-                                (org-node--make-regexp-for-time-format
-                                 org-node-datestamp-format)
-                                basename))
-                          (match-string 0 basename)
-                        ""))
-                     (new-basename (concat date-prefix
-                                           (funcall org-node-slug-fn title)
-                                           ".org"))
-                     (new-path (file-name-concat (file-name-directory path)
-                                                 new-basename))
-                     (visible-window (get-buffer-window buf)))
-
-                (if (equal path new-path)
-                    (when interactive
-                      (message "Filename already correct: %s" path))
-                  (if (or (buffer-modified-p buf)
-                          (buffer-modified-p (buffer-base-buffer buf)))
-                      (when interactive
-                        (message "Unsaved file, letting it be: %s" path))
-                    (if (get-file-buffer new-path)
-                        (if interactive
-                            (message "A buffer is already visiting the would-be new filename %s"
-                                     new-basename)
-                          (user-error "A buffer is already visiting the would-be new filename %s"
-                                      new-basename))
-                      (unless (file-writable-p path)
-                        (user-error "No permissions to rename file: %s" path))
-                      (unless (file-writable-p new-path)
-                        (user-error "No permissions to write a new file at: %s"
-                                    new-path))
-                      ;; A bit unnecessary bc `rename-file' would error too,
-                      ;; but at least we didn't kill buffer yet
-                      (when (file-exists-p new-path)
-                        (user-error "Canceled because a file exists at: %s"
-                                    new-path))
-
-                      (when (or (not interactive)
-                                (y-or-n-p (format "Rename file %s to %s?"
-                                                  basename new-basename)))
-                        ;; Kill buffer before renaming, because it will not
-                        ;; follow the rename
-                        (kill-buffer buf)
-                        (rename-file path new-path)
-                        (let ((new-buf (find-file-noselect new-path)))
-                          (when visible-window
-                            (set-window-buffer visible-window new-buf)))
-                        (message "File %s renamed to %s"
-                                 basename new-basename))))))))))))
+        (message "Will only rename Org files")))
+     ((and (not interactive) (null org-node-renames-allowed-dirs))
+      (message "User option `org-node-renames-allowed-dirs' should be configured"))
+     ((or interactive
+          (cl-loop
+           for dir in (mapcar #'file-truename org-node-renames-allowed-dirs)
+           if (string-match-p org-node-renames-exclude dir)
+           do (user-error "Regexp `org-node-renames-exclude' would directly match a directory from `org-node-renames-allowed-dirs'")
+           else if (and (string-prefix-p dir path)
+                        (not (string-match-p org-node-renames-exclude path)))
+           return t))
+      (if (not (setq title (or (cadar (org-collect-keywords '("TITLE")))
+                               (save-excursion
+                                 (without-restriction
+                                   ;; No title, treat first heading as title
+                                   (goto-char 1)
+                                   (or (org-at-heading-p)
+                                       (outline-next-heading))
+                                   (org-get-heading t t t t))))))
+          (message "File has no title nor heading")
+        (let* ((name (file-name-nondirectory path))
+               (date-prefix (if (and org-node-datestamp-format
+                                     (string-match
+                                      (org-node--make-regexp-for-time-format
+                                       org-node-datestamp-format)
+                                      name))
+                                (match-string 0 name)
+                              ""))
+               (new-name (concat
+                          date-prefix (funcall org-node-slug-fn title) ".org"))
+               (new-path (file-name-concat (file-name-directory path) new-name))
+               (visible-window (get-buffer-window buf)))
+          (cond
+           ((equal path new-path)
+            (when interactive
+              (message "Filename already correct: %s" path)))
+           ((or (buffer-modified-p buf)
+                (buffer-modified-p (buffer-base-buffer buf)))
+            (when interactive
+              (message "Unsaved file, letting it be: %s" path)))
+           ((prog1 nil
+              (when (get-file-buffer new-path)
+                (user-error "Wanted to rename, but a buffer already visits target: %s"
+                            new-path))
+              (unless (file-writable-p path)
+                (user-error "No permissions to rename file: %s"
+                            path))
+              (unless (file-writable-p new-path)
+                (user-error "No permissions to write a new file at: %s"
+                            new-path))
+              ;; A bit unnecessary bc `rename-file' would error too,
+              ;; but at least we didn't kill buffer yet
+              (when (file-exists-p new-path)
+                (user-error "Canceled because a file exists at: %s"
+                            new-path))))
+           ((or (not interactive)
+                (y-or-n-p (format "Rename file %s to %s?" name new-name)))
+            ;; Kill buffer before renaming, because it will not
+            ;; follow the rename
+            (write-file new-path)
+            (kill-buffer buf)
+            (rename-file path new-path)
+            (let ((new-buf (find-file-noselect new-path)))
+              ;; Don't let remaining save-hooks operate on some random buffer!
+              (set-buffer new-buf)
+              (when visible-window
+                (set-window-buffer visible-window new-buf)))
+            (message "File %s renamed to %s" name new-name)))))))))
 
 ;;;###autoload
 (defun org-node-rewrite-links-ask (&optional files)
