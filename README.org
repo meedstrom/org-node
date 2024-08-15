@@ -64,8 +64,9 @@ A comparison of three similar systems, which permit relying on org-id and don't 
 |--------------------------------+----------+--------------------+----------------------|
 | Some query-able cache          | EmacSQL  | hash tables        | --                   |
 | Async cache rebuild            | --       | yes                | not applicable       |
-| *Time to re-cache my 3000 nodes* | *2m 48s*   | *0m 02s*             | not applicable       |
-| *Time to save file w/ 400 nodes* | *>5s*      | *0.06s*              | ?                    |
+| *Time to cache my 3000 nodes*    | *2m 48s*   | *0m 02s*             | not applicable       |
+| *Time to save file w/ 400 nodes* | *5--10s*   | *<0.05s*             | ?                    |
+| *Time to open minibuffer*        | *1--3s*    | *<0.05s*             | not applicable       |
 
 * Setup
 

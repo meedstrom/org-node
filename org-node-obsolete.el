@@ -6,7 +6,8 @@
     (org-node-random                      org-node-visit-random)
     (org-node-slugify-as-url              org-node-slugify-for-web)
     (org-node-new-by-roam-capture         org-node-new-via-roam-capture)
-    (org-node-filename-fn)))
+    (org-node-filename-fn))
+  "Alist of deprecated symbol names and their new names.")
 
 (defun org-node--warn-obsolete ()
   "Maybe print one-shot warnings, then become a no-op."
@@ -29,12 +30,12 @@
                  old))))))
 
 (defmacro org-node--defobsolete (old new &optional interactive when removed-by)
-  "Define OLD as a function that runs NEW.
+  "Define OLD as effectively an alias for NEW.
 Also, running OLD will emit a deprecation warning the first time.
 
-If INTERACTIVE, define it as an interactive function.  But
-remember, it is still not autoloaded.  Optional string WHEN says
-when it was deprecated and REMOVED-BY when it may be removed."
+If INTERACTIVE, define it as an interactive function (but not
+autoloaded).  Optional string WHEN says when it was deprecated
+and REMOVED-BY when it may be removed."
   `(let (warned-once)
      (add-to-list 'org-node--obsolete-names '(,old ,new ,removed-by))
      (defun ,old (&rest args)
