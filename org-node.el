@@ -1374,12 +1374,18 @@ In detail:
 (defun org-node--die (format-string &rest args)
   "Like `error' but make sure the user sees it.
 Useful because not everyone has `debug-on-error' t, and then
-errors are very easy to miss."
+errors are very easy to miss.
+
+Arguments FORMAT-STRING and ARGS as in `format-message'."
   (let ((err-string (apply #'format-message format-string args)))
     (display-warning 'org-node err-string :error)
     (error "%s" err-string)))
 
 (defun org-node--consent-to-bothersome-modes-for-mass-edit ()
+  "Confirm about certain modes being enabled.
+These are modes such as `auto-save-visited-mode' that can
+interfere with user experience during an incremental mass editing
+operation."
   (cl-loop for mode in '(auto-save-visited-mode
                          git-auto-commit-mode)
            when (and (boundp mode)
@@ -1389,29 +1395,79 @@ errors are very easy to miss."
            return nil
            finally return t))
 
-;; (progn (byte-compile #'org-node-list-files) (garbage-collect) (benchmark-run 1 (org-node-list-files)))
+;; Dear `org-roam-list-files', you take 1368ms.  This takes 7.
+;; (progn (byte-compile #'org-roam-list-files) (garbage-collect) (benchmark-call #'org-roam-list-files))
+;; (progn (byte-compile #'org-node-list-files) (garbage-collect) (benchmark-call #'org-node-list-files))
 (defun org-node-list-files (&optional instant)
   "List files in `org-id-locations' or `org-node-extra-id-dirs'.
 With optional argument INSTANT t, return files already known to
-contain IDs instead of calculating a new list of files that may
-or may not contain IDs."
+contain IDs instead of calculating a new \(often somewhat longer)
+list of files that may or may not contain IDs."
   (if instant
       (hash-table-keys org-node--file<>mtime)
-    (-union ;; 10x faster than `seq-union'
+    (-union ;; 10x faster than `seq-union': 2000ms -> 200ms
      (hash-table-values org-id-locations)
-     (let ((file-name-handler-alist nil)) ;; Cuts 200 ms to 70 ms
+     (let ((file-name-handler-alist nil)) ;; 200ms -> 70ms
        (cl-loop
         for dir in org-node-extra-id-dirs
-        append (cl-loop
-                for file in (directory-files-recursively
-                             dir (rx (or ".org" ".org_archive") eos)
-                             nil t)
-                unless (cl-loop
-                        for exclude in org-node-extra-id-dirs-exclude
-                        when (string-search exclude file)
-                        return t)
-                ;; Abbreviating because org-id does too
-                collect (abbreviate-file-name file)))))))
+        ;; Abbreviating file names because org-id does too
+        append (org-node--abbreviate-all-file-names ;; 35ms -> 7ms
+                (org-node--directory-files-recursively ;; 70ms -> 35ms
+                 dir "org" org-node-extra-id-dirs-exclude)))))))
+
+(defun org-node--directory-files-recursively (dir suffix excludes)
+  "Dumber but faster version of `directory-files-recursively'.
+Return a list of all files under directory DIR, its
+sub-directories, sub-sub-directories and so on, with provisos:
+
+- Don't follow symlinks to other directories.
+- Don't enter directories that start with a dot.
+- Don't enter directories where some substring of the path
+  matches one of EXCLUDES literally.
+- Collect only files that end in SUFFIX literally.
+- Don't collect any file where some substring of the path
+  matches one of EXCLUDES literally.
+- Don't sort final results stably."
+  (let (result)
+    (dolist (file (file-name-all-completions "" dir))
+      (if (directory-name-p file)
+          (unless (string-prefix-p "." file)
+	    (let ((full-file (file-name-concat dir file)))
+	      (when (not (or (cl-loop for substr in excludes
+                                      when (string-search substr full-file)
+                                      return t)
+                             (file-symlink-p (directory-file-name full-file))))
+	        (setq result (nconc result
+                                    (org-node--directory-files-recursively
+			             full-file suffix excludes))))))
+	(when (string-suffix-p suffix file)
+          (let ((full-file (file-name-concat dir file)))
+            (unless (cl-loop for substr in excludes
+                             when (string-search substr full-file)
+                             return t)
+	      (push full-file result))))))
+    result))
+
+(defun org-node--abbreviate-all-file-names (paths)
+  "Abbreviate all file paths in list PATHS.
+Much faster than calling `abbreviate-file-name' once for each
+item in a loop."
+  (let ((homedir-re (directory-abbrev-make-regexp (expand-file-name "~")))
+        (case-fold-search nil))
+    (cl-loop for path in paths
+             if (not (file-name-absolute-p path))
+             do (error "org-node: Non-absolute filename: %s" path)
+             else collect (let (mb1)
+                            ;; Apply `directory-abbrev-alist'
+                            (setq path (directory-abbrev-apply path))
+                            ;; Turn $HOME into ~
+                            (if (and (string-match homedir-re path)
+                                     (setq mb1 (match-beginning 1))
+                                     ;; If homedir is just /, don't change it
+                                     (not (and (= (match-end 0) 1)
+                                               (= (aref path 0) ?/))))
+                                (concat "~" (substring path mb1))
+                              path)))))
 
 (defun org-node--forget-id-locations (files)
   "Remove references to FILES in `org-id-locations'.
@@ -1686,6 +1742,8 @@ format-constructs occur before these."
       (when (or (null item)
                 (not (funcall (plist-get series :try-goto) item)))
         (funcall (plist-get series :creator) sortstr))
+      ;; FIXME: I don't think we can assume what the current buffer is, so we
+      ;;        can't do this
       (when (outline-next-heading)
         (backward-char 1)))))
 
@@ -2544,7 +2602,8 @@ Internal argument INTERACTIVE is automatically set."
                                        org-node-datestamp-format)
                                       name))
                                 (match-string 0 name)
-                              ""))
+                              ;; Couldn't find date prefix, give a new one
+                              (format-time-string org-node-datestamp-format)))
                (new-name (concat
                           date-prefix (funcall org-node-slug-fn title) ".org"))
                (new-path (file-name-concat (file-name-directory path) new-name))
