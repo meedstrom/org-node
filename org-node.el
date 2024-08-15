@@ -1572,14 +1572,17 @@ YYYY-MM-DD, but it does not verify."
 (defun org-node--default-daily-whereami ()
   (cl-labels ((verify-date (putative-date)
                 (and
-                 (string-match-p ;; NNNN-NN-NN format
+                 (string-match-p ;; is it in NNNN-NN-NN format?
                   (rx bol (= 4 digit) "-" (= 2 digit) "-" (= 2 digit) eol)
                   putative-date)
-                 (calendar-date-is-valid-p ;; and actual a Gregorian date
+                 (calendar-date-is-valid-p ;; and an actual Gregorian date?
                   (org-date-to-gregorian putative-date)))))
   (let ((basename (file-name-base
                    (buffer-file-name (buffer-base-buffer)))))
-    (when (verify-date basename)
+    (when 
+        ;; could have `(or ...)' here and re-apply `verify-date'
+        ;; if there is some case for the wild trick that I don't understand
+        (verify-date basename)
       basename))))
 
 ;; TODO: Handle %s, %V, %y...  is there a library?
