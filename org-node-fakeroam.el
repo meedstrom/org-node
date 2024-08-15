@@ -268,7 +268,7 @@ Designed to override `org-roam-reflinks-get'."
          (attr (ignore-errors (file-attributes file))))
     ;; See `org-roam-db-insert-file'
     (org-roam-db-query [:insert :into files :values $v1]
-                       (vector file-path
+                       (vector file
                                (org-node-get-file-title node)
                                (ignore-errors (org-roam-db--file-hash file))
                                (file-attribute-access-time attr)
