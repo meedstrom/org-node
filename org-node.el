@@ -2577,7 +2577,6 @@ Internal argument INTERACTIVE is automatically set."
                 (y-or-n-p (format "Rename file %s to %s?" name new-name)))
             ;; Kill buffer before renaming, because it will not
             ;; follow the rename
-            (write-file new-path)
             (kill-buffer buf)
             (rename-file path new-path)
             (let ((new-buf (find-file-noselect new-path)))
