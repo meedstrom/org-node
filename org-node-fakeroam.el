@@ -310,26 +310,18 @@ This includes all links and citations that touch NODE."
       (org-roam-db-query [:insert :into tags :values $v1]
                          (cl-loop for tag in tags
                                   collect (vector id tag))))
-    ;; See `org-roam-db-insert-node-data'
-    (when is-subtree
-      (let ((scheduled (when-let ((scheduled (org-node-get-scheduled node)))
-                         (format-time-string
-                          "%FT%T%z"
-                          (encode-time (org-parse-time-string scheduled)))))
-            (deadline (when-let ((deadline (org-node-get-deadline node)))
-                        (format-time-string
-                         "%FT%T%z"
-                         (encode-time (org-parse-time-string deadline))))))
-        (org-roam-db-query [:insert :into nodes :values $v1]
-                           (vector id file-path level pos todo priority
-                                   scheduled deadline title properties olp))))
-    ;; See `org-roam-db-insert-file-node'
-    (when (not is-subtree)
-      (let ((scheduled nil)
-            (deadline nil))
-        (org-roam-db-query [:insert :into nodes :values $v1]
-                           (vector id file-path level pos todo priority
-                                   scheduled deadline title properties olp))))
+    ;; See `org-roam-db-insert-file-node' and `org-roam-db-insert-node-data'
+    (let ((scheduled (when-let ((scheduled (org-node-get-scheduled node)))
+                       (format-time-string
+                        "%FT%T%z"
+                        (encode-time (org-parse-time-string scheduled)))))
+          (deadline (when-let ((deadline (org-node-get-deadline node)))
+                      (format-time-string
+                       "%FT%T%z"
+                       (encode-time (org-parse-time-string deadline))))))
+      (org-roam-db-query [:insert :into nodes :values $v1]
+                         (vector id file-path level pos todo priority
+                                 scheduled deadline title properties olp)))
     ;; See `org-roam-db-insert-refs'
     (dolist (ref roam-refs)
       (let ((type (gethash ref org-node--uri-path<>uri-type)))
