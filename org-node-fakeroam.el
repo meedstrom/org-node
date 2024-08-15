@@ -105,22 +105,26 @@ for as long as a minute on a slow machine when huge files are
 involved.  This may eliminate most of that.
 
 Aside from huge files, it is also slow when there are backlinks
-from extremely many files.  This caches all results so that
-should only be slow the first time each backlink is checked."
+coming from from extremely many files.  To deal with that, this
+caches all results so that it should only be slow the first time.
+
+Argument ORIG-FN is presumably `org-roam-preview-get-contents',
+which see for FILE and PT."
   (if-let ((cached (alist-get pt (gethash file org-node--file<>previews))))
       cached
-    ;; NOTE: Cannot use `org-roam-fontify-like-in-org-mode'
+    ;; NOTE: We cannot use `org-roam-fontify-like-in-org-mode'
     ;;       since it is temporarily overridden by
-    ;;       `org-node-fakeroam--run-without-fontifying' when this
-    ;;       runs.  But that's OK, it looks outdated.
+    ;;       `org-node-fakeroam--run-without-fontifying'
+    ;;       at the time this runs.  But that's OK; it looks outdated.
     (setf (alist-get pt (gethash file org-node--file<>previews))
           (let ((org-inhibit-startup t))
-            (org-fontify-like-in-org-mode (funcall orig-fn file pt))))))
+            (delay-mode-hooks
+              (org-fontify-like-in-org-mode (funcall orig-fn file pt)))))))
 
 (defun org-node-fakeroam--run-without-fontifying (orig-fn &rest args)
-  "Designed as around-advice for `org-roam-node-insert-section'.
+  "Intended as around-advice for `org-roam-node-insert-section'.
 Run ORIG-FN with ARGS, while overriding
-`org-roam-fontify-like-in-org-mode' so it returns the input."
+`org-roam-fontify-like-in-org-mode' so it does nothing."
   (cl-letf (((symbol-function 'org-roam-fontify-like-in-org-mode) #'identity))
     (apply orig-fn args)))
 
@@ -132,7 +136,7 @@ Run ORIG-FN with ARGS, while overriding
   "Override org-roam backlink-getters to look up org-node tables.
 
 As a result, \\[org-roam-buffer-toggle] will function without
-having SQLite installed.
+having SQLite installed, and you can delete the org-roam.db.
 
 -----"
   :global t
@@ -175,7 +179,7 @@ having SQLite installed.
    :properties (org-node-get-properties node)))
 
 (defun org-node-fakeroam--mk-backlinks (target-roam-node &rest _)
-  "Make org-roam-backlink objects targeting TARGET-ROAM-NODE.
+  "Make org-roam-backlink objects pointing to TARGET-ROAM-NODE.
 Designed to override `org-roam-backlinks-get'."
   (let ((target-id (org-roam-node-id target-roam-node)))
     (if (not target-id)
@@ -193,7 +197,7 @@ Designed to override `org-roam-backlinks-get'."
                   :properties (org-node-link-properties link)))))))
 
 (defun org-node-fakeroam--mk-reflinks (target-roam-node &rest _)
-  "Make org-roam-reflink objects targeting TARGET-ROAM-NODE.
+  "Make org-roam-reflink objects pointing to TARGET-ROAM-NODE.
 Designed to override `org-roam-reflinks-get'."
   (let* ((target-id (org-roam-node-id target-roam-node))
          (node (gethash target-id org-node--id<>node)))
@@ -229,9 +233,9 @@ Designed to override `org-roam-reflinks-get'."
         (add-hook 'org-node-rescan-hook #'org-node-fakeroam--db-update-files))
     (remove-hook 'org-node-rescan-hook #'org-node-fakeroam--db-update-files)))
 
-;; TODO: Was hoping to just run this on every save, is SQLite really so slow to
-;;       accept 0-2 MB of data?  Must be some way to make it instant, else how
-;;       do people work with petabytes?
+;; TODO: Was hoping to just run this on every save.  Is SQLite really so slow
+;;       to accept 0-2 MB of data?  Must be some way to make it instant, else
+;;       how do people work with petabytes?
 (defun org-node-fakeroam-db-rebuild ()
   "Wipe the Roam DB and rebuild."
   (interactive)
@@ -241,43 +245,41 @@ Designed to override `org-roam-reflinks-get'."
   (org-roam-db--close)
   (delete-file org-roam-db-location)
   (emacsql-with-transaction (org-roam-db)
-    (cl-loop with ctr = 0
-             with max = (hash-table-count org-nodes)
-             for node being the hash-values of org-nodes
-             do (when (= 0 (% (cl-incf ctr)
-                              (cond ((> ctr 200) 100)
-                                    ((> ctr 20) 10)
-                                    (t 1))))
-                  (message "Inserting into %s... %d/%d"
-                           org-roam-db-location ctr max))
-             (org-node-fakeroam--db-add-node node))))
+    (let ((ctr 0)
+          (max (hash-table-count org-nodes))
+          (file-level-data-already-added nil))
+      (cl-loop for node being the hash-values of org-nodes
+               as file = (org-node-get-file-path node)
+               do (when (= 0 (% (cl-incf ctr)
+                                (cond ((> ctr 200) 100)
+                                      ((> ctr 20) 10)
+                                      (t 1))))
+                    (message "Inserting into %s... %d/%d"
+                             org-roam-db-location ctr max))
+               (unless (member file file-level-data-already-added)
+                 (push file file-level-data-already-added)
+                 (org-node-fakeroam--db-add-file-level-data node))
+               (org-node-fakeroam--db-add-node node)))))
 
-;; This thing just exists because the above is not instant.
-;; FIXME: Still too damn slow on a file with 400 nodes.  Profiler says most of
-;;        it is in EmacSQL, maybe some SQL PRAGMA settings would fix?
-(defun org-node-fakeroam--db-update-files (files)
-  "Update the Roam DB about nodes and links involving FILES."
-  (emacsql-with-transaction (org-roam-db)
-    (dolist (file files)
-      (org-roam-db-query [:delete :from files :where (= file $s1)]
-                         file))
-    (cl-loop
-     for node being the hash-values of org-node--id<>node
-     when (member (org-node-get-file-path node) files)
-     do (progn
-          ;; Clear backlinks to prevent getting duplicates in next step
-          (dolist (dest (cons (org-node-get-id node)
-                              (org-node-get-refs node)))
-            (org-roam-db-query [:delete :from links :where (= dest $s1)]
-                               dest))
-          (org-node-fakeroam--db-add-node node)))))
+;; REVIEW: I don't like that this accesses actual files on disk
+;;         when nothing else does
+(defun org-node-fakeroam--db-add-file-level-data (node)
+  "Send to the database the metadata for the file where NODE is."
+  (let* ((file (org-node-get-file-path node))
+         (attr (ignore-errors (file-attributes file))))
+    ;; See `org-roam-db-insert-file'
+    (org-roam-db-query [:insert :into files :values $v1]
+                       (vector file-path
+                               (org-node-get-file-title node)
+                               (ignore-errors (org-roam-db--file-hash file))
+                               (file-attribute-access-time attr)
+                               (file-attribute-modification-time attr)))))
 
 (defun org-node-fakeroam--db-add-node (node)
   "Send to the SQLite database all we know about NODE.
 This includes all links and citations that touch NODE."
   (let ((id         (org-node-get-id node))
         (file-path  (org-node-get-file-path node))
-        (file-title (org-node-get-file-title node))
         (tags       (org-node-get-tags node))  ;; NOTE: no inherits!
         (aliases    (org-node-get-aliases node))
         (roam-refs  (org-node-get-refs node))
@@ -285,22 +287,11 @@ This includes all links and citations that touch NODE."
         (properties (org-node-get-properties node)) ;; NOTE: no inherits!
         (level      (org-node-get-level node))
         (todo       (org-node-get-todo node))
-        (is-subtree (org-node-get-is-subtree node))
+        (scheduled  (org-node-get-scheduled node))
+        (deadline   (org-node-get-deadline node))
         (olp        (org-node-get-olp node))
         (priority   (org-node-get-priority node))
         (pos        (org-node-get-pos node)))
-    ;; See `org-roam-db-insert-file'
-    (let (
-          ;; Potentially slow! Also don't like that these access files on disk
-          ;; when nothing else does.
-          (attr (ignore-errors (file-attributes file-path)))
-          (fhash (ignore-errors (org-roam-db--file-hash file-path))))
-      (org-roam-db-query [:insert :into files :values $v1]
-                         (vector file-path
-                                 file-title
-                                 fhash
-                                 (file-attribute-access-time attr)
-                                 (file-attribute-modification-time attr))))
     ;; See `org-roam-db-insert-aliases'
     (when aliases
       (org-roam-db-query [:insert :into aliases :values $v1]
@@ -312,17 +303,17 @@ This includes all links and citations that touch NODE."
                          (cl-loop for tag in tags
                                   collect (vector id tag))))
     ;; See `org-roam-db-insert-file-node' and `org-roam-db-insert-node-data'
-    (let ((scheduled (when-let ((scheduled (org-node-get-scheduled node)))
-                       (format-time-string
-                        "%FT%T%z"
-                        (encode-time (org-parse-time-string scheduled)))))
-          (deadline (when-let ((deadline (org-node-get-deadline node)))
-                      (format-time-string
-                       "%FT%T%z"
-                       (encode-time (org-parse-time-string deadline))))))
-      (org-roam-db-query [:insert :into nodes :values $v1]
-                         (vector id file-path level pos todo priority
-                                 scheduled deadline title properties olp)))
+    (when scheduled (setq scheduled
+                          (format-time-string
+                           "%FT%T%z"
+                           (encode-time (org-parse-time-string scheduled)))))
+    (when deadline (setq deadline
+                         (format-time-string
+                          "%FT%T%z"
+                          (encode-time (org-parse-time-string deadline)))))
+    (org-roam-db-query [:insert :into nodes :values $v1]
+                       (vector id file-path level pos todo priority
+                               scheduled deadline title properties olp))
     ;; See `org-roam-db-insert-refs'
     (dolist (ref roam-refs)
       (let ((type (gethash ref org-node--uri-path<>uri-type)))
@@ -352,6 +343,32 @@ This includes all links and citations that touch NODE."
                                    id
                                    (org-node-link-type link)
                                    (org-node-link-properties link)))))))
+
+;; This function is a restricted alternative to `org-node-fakeroam-db-rebuild'
+;; because that is not instant.
+;; FIXME: Still too damn slow on a file with 400 nodes.  Profiler says most of
+;;        it is in EmacSQL, maybe some SQL PRAGMA settings would fix?
+(defun org-node-fakeroam--db-update-files (files)
+  "Update the Roam DB about nodes and links involving FILES."
+  (emacsql-with-transaction (org-roam-db)
+    (dolist (file files)
+      (org-roam-db-query [:delete :from files :where (= file $s1)]
+                         file))
+    (let (file-level-data-already-added)
+      (cl-loop
+       for node being the hash-values of org-nodes
+       as file = (org-node-get-file-path node)
+       when (member file files)
+       do
+       (unless (member file file-level-data-already-added)
+         (push file file-level-data-already-added)
+         (org-node-fakeroam--db-add-file-level-data node))
+       ;; Clear backlinks to prevent duplicates
+       (dolist (dest (cons (org-node-get-id node)
+                           (org-node-get-refs node)))
+         (org-roam-db-query [:delete :from links :where (= dest $s1)]
+                            dest))
+       (org-node-fakeroam--db-add-node node)))))
 
 (provide 'org-node-fakeroam)
 
