@@ -555,8 +555,8 @@ When called from Lisp, peek on any hash table HT."
         (add-hook 'org-node-insert-link-hook #'org-node--dirty-ensure-link-known)
         (add-hook 'org-roam-post-node-insert-hook #'org-node--dirty-ensure-link-known)
         (advice-add 'org-insert-link :after #'org-node--dirty-ensure-link-known)
-        (advice-add 'rename-file :after #'org-node--handle-save)
-        (advice-add 'delete-file :after #'org-node--handle-save)
+        (advice-add 'rename-file :after #'org-node--handle-rename)
+        (advice-add 'delete-file :after #'org-node--handle-delete)
         (org-node-cache-ensure 'must-async t)
         (org-node--maybe-adjust-idle-timer))
     (cancel-timer org-node--idle-timer)
@@ -565,8 +565,36 @@ When called from Lisp, peek on any hash table HT."
     (remove-hook 'org-node-insert-link-hook #'org-node--dirty-ensure-link-known)
     (remove-hook 'org-roam-post-node-insert-hook #'org-node--dirty-ensure-link-known)
     (advice-remove 'org-insert-link #'org-node--dirty-ensure-link-known)
-    (advice-remove 'rename-file #'org-node--handle-save)
-    (advice-remove 'delete-file #'org-node--handle-save)))
+    (advice-remove 'rename-file #'org-node--handle-rename)
+    (advice-remove 'delete-file #'org-node--handle-delete)))
+
+(defun org-node--handle-rename (file newname &rest _)
+  "Arrange to scan NEWNAME and forget FILE."
+  (when (member (file-name-extension file) '("org" "org_archive"))
+    (org-node--scan-targeted (list file newname))))
+
+(defun org-node--handle-delete (file &rest _)
+  "Arrange to forget nodes and links in FILE."
+  (when (member (file-name-extension file) '("org" "org_archive"))
+    (org-node--scan-targeted file)))
+
+(defun org-node--handle-save ()
+  "Arrange to re-scan nodes and links in buffer."
+  (let ((file buffer-file-name))
+    (when (member (file-name-extension file) '("org" "org_archive"))
+      (org-node--scan-targeted file))))
+
+(defun org-node--maybe-adjust-idle-timer ()
+  "Adjust `org-node--idle-timer' based on duration of last scan.
+If not running, start it."
+  (let ((new-delay (* 25 (1+ org-node--time-elapsed))))
+    (when (or (not (member org-node--idle-timer timer-idle-list))
+              ;; Don't repeat potentially forever
+              (not (> (float-time (or (current-idle-time) 0))
+                      new-delay)))
+      (cancel-timer org-node--idle-timer)
+      (setq org-node--idle-timer
+            (run-with-idle-timer new-delay t #'org-node--scan-all)))))
 
 (defun org-node-cache-ensure (&optional synchronous force)
   "Ensure that `org-node--id<>node' and other tables are ready for use.
@@ -631,35 +659,6 @@ SYNCHRONOUS t, unless SYNCHRONOUS is the symbol `must-async'."
     (when (and (hash-table-empty-p org-id-locations)
                (null org-node-extra-id-dirs))
       (org-node--die "org-id-locations empty, try `org-id-update-id-locations' or `org-roam-update-org-id-locations'"))))
-
-(defun org-node--handle-save (&optional arg1 arg2 &rest _)
-  "Scan nodes and links in a single file, or forget them if the
-file is gone.
-
-Either operate on ARG2 if it seems to be a file name, else ARG1,
-else the current buffer file.  Meant for `after-save-hook' or as
-advice on `rename-file' or `delete-file'."
-  (let ((files (cond ((and (stringp arg2) (file-exists-p arg2)) ;; rename-file
-                      (list arg1 arg2))
-                     ((stringp arg1) ;; delete-file
-                      (list arg1))
-                     ((stringp buffer-file-name) ;; after-save-hook
-                      (list buffer-file-name)))))
-    (when (--any-p (string-suffix-p it (car files))
-                   '(".org" ".org_archive"))
-      (org-node--scan-targeted files))))
-
-(defun org-node--maybe-adjust-idle-timer ()
-  "Adjust `org-node--idle-timer' based on duration of last scan.
-If not running, start it."
-  (let ((new-delay (* 25 (1+ org-node--time-elapsed))))
-    (when (or (not (member org-node--idle-timer timer-idle-list))
-              ;; Don't repeat potentially forever
-              (not (> (float-time (or (current-idle-time) 0))
-                      new-delay)))
-      (cancel-timer org-node--idle-timer)
-      (setq org-node--idle-timer
-            (run-with-idle-timer new-delay t #'org-node--scan-all)))))
 
 
 ;;;; Scanning
