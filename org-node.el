@@ -70,6 +70,8 @@
 
 ;; TODO: org-node-refile
 
+;; TODO: Support .org.gpg, .org.age
+
 (require 'cl-lib)
 (require 'seq)
 (require 'subr-x)
