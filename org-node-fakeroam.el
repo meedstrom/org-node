@@ -289,11 +289,15 @@ This includes all links and citations that touch NODE."
         (priority   (org-node-get-priority node))
         (pos        (org-node-get-pos node)))
     ;; See `org-roam-db-insert-file'
-    (let ((attr (file-attributes file-path)))
+    (let (
+          ;; Potentially slow! Also don't like that these access files on disk
+          ;; when nothing else does.
+          (attr (ignore-errors (file-attributes file-path)))
+          (fhash (ignore-errors (org-roam-db--file-hash file-path))))
       (org-roam-db-query [:insert :into files :values $v1]
                          (vector file-path
                                  file-title
-                                 (org-roam-db--file-hash file-path)
+                                 fhash
                                  (file-attribute-access-time attr)
                                  (file-attribute-modification-time attr))))
     ;; See `org-roam-db-insert-aliases'
