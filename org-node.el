@@ -1603,7 +1603,7 @@ format-constructs occur before these."
     (if (-none-p #'null (list idx-year idx-month idx-day))
         (progn
           (if (> idx-month idx-year) (cl-incf idx-month 2))
-          (if (> idx-day idx-year) (cl-incf idx-day 2e))
+          (if (> idx-day idx-year) (cl-incf idx-day 2))
           (concat (substring instance idx-year (+ idx-year 4))
                   "-"
                   (substring instance idx-month (+ idx-month 2))
