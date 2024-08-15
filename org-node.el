@@ -1539,10 +1539,11 @@ visit the node with that id if it exists."
 
 (defun org-node--default-daily-creator (sortstr)
   (if (eq org-node-creation-fn 'org-node-new-via-roam-capture)
-      ;; HACK: Assume this user wants to use their roam-dailies templates
+      ;; Assume this user wants to use their roam-dailies templates
       (progn
         (require 'org-roam-dailies)
         (org-roam-dailies--capture
+         ;; HACK
          (encode-time (parse-time-string
                        (concat sortstr (format-time-string " %H:%M:%S %z"))))
          t))
@@ -1602,7 +1603,7 @@ format-constructs occur before these."
     (if (-none-p #'null (list idx-year idx-month idx-day))
         (progn
           (if (> idx-month idx-year) (cl-incf idx-month 2))
-          (if (> idx-day idx-year) (cl-incf idx-day 2))
+          (if (> idx-day idx-year) (cl-incf idx-day 2e))
           (concat (substring instance idx-year (+ idx-year 4))
                   "-"
                   (substring instance idx-month (+ idx-month 2))
@@ -1719,8 +1720,9 @@ format-constructs occur before these."
     (list key name key))
   (let ((old (car (slot-value (get 'org-node-series-dispatch 'transient--prefix)
                               :incompatible))))
-    (set-slot-value (get 'org-node-series-dispatch 'transient--prefix)
-                    :incompatible (list (seq-uniq (cons key old))))))
+    (setf (slot-value (get 'org-node-series-dispatch 'transient--prefix)
+                      :incompatible)
+          (list (seq-uniq (cons key old))))))
 
 ;; Should be able to type d n for "daily, next"
 (transient-define-prefix org-node-series-dispatch ()
@@ -2513,8 +2515,8 @@ interactively, always prompt for confirmation."
           (buf (current-buffer)))
       (unless (equal "org" (file-name-extension path))
         (error "File doesn't end in .org: %s" path))
-      (when (null org-node-renames-allowed-dirs)
-        (message "New user option `org-node-renames-allowed-dirs' should be configured"))
+      (when (and (not interactive) (null org-node-renames-allowed-dirs))
+        (user-error "New user option `org-node-renames-allowed-dirs' should be configured"))
       (if (or interactive
               (cl-loop
                for dir in org-node-renames-allowed-dirs
