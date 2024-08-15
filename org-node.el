@@ -1623,6 +1623,10 @@ format-constructs occur before these."
 (defun org-node--series-goto-previous (key &optional next)
   (let* ((series (alist-get (sxhash key) org-node--series-info))
          (here (funcall (plist-get series :whereami)))
+         (nascent-shift ;; check if buffer has org-node hash
+          (if (gethash here org-node--candidate<>node)
+              1 ;; if so, then offset by 1
+            0)) ;; otherwise, no offset
          (head nil))
     (unless (null here)
       (cl-loop for item in (plist-get series :sorted-items)
@@ -1637,7 +1641,7 @@ format-constructs occur before these."
                 t))
       (let ((to-check (if next
                           head
-                        (drop (1+ (length head))
+                        (drop (+ (length head) nascent-shift)
                               (plist-get series :sorted-items))))
             (target nil))
         ;; HACK: Keep trying items as long as :try-goto fails, because an item
