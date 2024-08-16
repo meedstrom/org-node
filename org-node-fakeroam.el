@@ -100,7 +100,7 @@ previews.  This is done thru
 (defun org-node-fakeroam--accelerate-get-contents (orig-fn file pt)
   "Designed as around-advice for `org-roam-preview-get-contents'.
 
-Normally the first time you open an org-roam-buffer, Emacs hangs
+Normally the first time you open an org-roam buffer, Emacs hangs
 for as long as a minute on a slow machine when huge files are
 involved.  This may eliminate most of that.
 

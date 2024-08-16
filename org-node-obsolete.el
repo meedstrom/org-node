@@ -1,6 +1,6 @@
 ;;; org-node-obsolete.el --- Outta sight so I'm not tempted to clean them up -*- lexical-binding: t; -*-
 
-(defvar org-node--obsolete-names
+(defvar org-node-obsolete-names
   '((org-node-eagerly-update-link-tables  org-node-perf-eagerly-update-link-tables)
     (org-nodeify-entry                    org-node-nodeify-entry)
     (org-node-random                      org-node-visit-random)
@@ -9,9 +9,9 @@
     (org-node-filename-fn))
   "Alist of deprecated symbol names and their new names.")
 
-(defun org-node--warn-obsolete ()
+(defun org-node-obsolete-warn ()
   "Maybe print one-shot warnings, then become a no-op."
-  (while-let ((row (pop org-node--obsolete-names)))
+  (while-let ((row (pop org-node-obsolete-names)))
     (seq-let (old new removed-by) row
       (unless removed-by
         (setq removed-by "10 August 2024"))
@@ -29,7 +29,7 @@
           (lwarn 'org-node :warning "Your config key-binds a removed command: %S"
                  old))))))
 
-(defmacro org-node--defobsolete (old new &optional interactive when removed-by)
+(defmacro org-node-obsolete-defun (old new &optional interactive when removed-by)
   "Define OLD as effectively an alias for NEW.
 Also, running OLD will emit a deprecation warning the first time.
 
@@ -37,7 +37,7 @@ If INTERACTIVE, define it as an interactive function (but not
 autoloaded).  Optional string WHEN says when it was deprecated
 and REMOVED-BY when it may be removed."
   `(let (warned-once)
-     (add-to-list 'org-node--obsolete-names '(,old ,new ,removed-by))
+     (add-to-list 'org-node-obsolete-names '(,old ,new ,removed-by))
      (defun ,old (&rest args)
        (declare (obsolete ',new ,(or when "2024")))
        ,@(if interactive '((interactive)))
@@ -47,20 +47,20 @@ and REMOVED-BY when it may be removed."
                 ',old ,(or removed-by "30 August 2024") ',new))
        (apply ',new args))))
 
-(org-node--defobsolete org-node-files
-                       org-node-list-files)
+(org-node-obsolete-defun org-node-files
+                         org-node-list-files)
 
-(org-node--defobsolete org-node-list-journal-files
-                       org-node-faster-journal-list-files)
+(org-node-obsolete-defun org-node-list-journal-files
+                         org-node-faster-journal-list-files)
 
-(org-node--defobsolete org-node-list-roam-daily-files
-                       org-node-faster-roam-list-dailies)
+(org-node-obsolete-defun org-node-list-roam-daily-files
+                         org-node-faster-roam-list-dailies)
 
-(org-node--defobsolete org-node-list-roam-files
-                       org-node-faster-roam-list-files)
+(org-node-obsolete-defun org-node-list-roam-files
+                         org-node-faster-roam-list-files)
 
-(org-node--defobsolete org-node-rename-file-by-title-maybe
-                       org-node-rename-file-by-title)
+(org-node-obsolete-defun org-node-rename-file-by-title-maybe
+                         org-node-rename-file-by-title)
 
 (provide 'org-node-obsolete)
 
