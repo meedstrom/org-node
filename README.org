@@ -16,15 +16,15 @@ I found org-roam too slow, so I made [[https://github.com/meedstrom/quickroam][q
 
 ** What's a "node"?
 
-My life can be divided into two periods "*before org-roam*" and "*after org-roam*".  I crossed a kind of gap once I got a good way to link between my notes.  It's odd to remember when I just relied on browsing subtrees and folders -- what a strange way to work!
+My life can be divided into two periods "*before org-roam*" and "*after org-roam*".  I crossed a kind of gap once I got a good way to link between my notes.  It's strange to remember when I just relied on browsing subtrees and folders -- what an odd way to work!
 
-I used to lose track of things I had written, under some forgotten heading in a forgotten file in a forgotten directory.  The org-roam method let me *find* and *build on* my own work, instead of [[https://en.wikipedia.org/wiki/Cryptomnesia][recreating it all the time]].
+I used to lose track of things I had written, under some forgotten heading in a forgotten file in a forgotten directory.  The org-roam method let me *find* and *build on* my own work, instead of [[https://en.wikipedia.org/wiki/Cryptomnesia][recreating my work]] all the time.
 
 At the core, all the "notetaking packages" ([[https://github.com/rtrppl/orgrr][orgrr]]/[[https://github.com/localauthor/zk][zk]]/[[https://github.com/EFLS/zetteldeft][zetteldeft]]/[[https://github.com/org-roam/org-roam][org-roam]]/[[https://github.com/protesilaos/denote][denote]]/[[https://github.com/kaorahi/howm][howm]]/[[https://github.com/kisaragi-hiu/minaduki][minaduki]]/...) try to help you with this: make it easy to link between notes and explore them.
 
-Right off the bat, that imposes two requirements: a method to search for notes, since you can't link to something you can't search for, and a design-choice about exactly what kinds of things should turn up as search hits.  What's a "note"?
+Right off the bat, that imposes two requirements: a method to search for notes, since you can't link to something you can't search for, and a design-choice about what kinds of things should turn up as search hits.  What's a "note"?
 
-Just searching for Org files is too coarse, and just searching for any subtree anywhere brings in too much clutter.
+Just searching for Org files is too coarse.  Just searching for any subtree anywhere brings in too much clutter.
 
 *Here's what org-roam invented.*  It turns out that if you limit the search-hits to just those files and subtrees you've deigned to assign an org-id -- which roughly maps to /everything you've ever thought it was worth linking to/ -- it filters out the noise excellently.
 
@@ -34,7 +34,7 @@ Once a subtree has an ID you can link to, it's a "node" because it has joined th
 
 A comparison of three similar systems, which permit relying on org-id and don't lock you into the all-too-common "one-note-per-file" concept.
 
-| Feature                        | org-roam | org-node           | [[https://github.com/toshism/org-super-links][org-super-links]]      |
+| Feature                        | [[https://github.com/org-roam/org-roam][org-roam]] | org-node           | [[https://github.com/toshism/org-super-links][org-super-links]]      |
 |--------------------------------+----------+--------------------+----------------------|
 | Backlinks                      | yes      | yes                | yes                  |
 | Node search and insert         | yes      | yes                | -- (suggests [[https://github.com/alphapapa/org-ql][org-ql]]) |
@@ -81,7 +81,7 @@ Add an init snippet like this (assuming [[https://github.com/radian-software/str
 
 ** Quick start
 
-If you're new to these concepts, fear not.  The main things for day-to-day operation are two verbs: "find" and "insert link".
+If you're new to these concepts, fear not.  The main things for day-to-day operation are two verbs: "find" and "link".
 
 Pick some short keys and try them out.
 
@@ -111,13 +111,15 @@ If you've struggled in the past with big files taking a long time to save, consi
 (setq org-roam-link-auto-replace nil) ;; don't look for "roam:" links on save
 #+end_src
 
-Finally, make sure the underlying org-id knows about the files org-roam does (you'd think it would, but that isn't a given!).  Either run =M-x org-roam-update-org-id-locations=, or edit the following setting so it includes your =org-roam-directory=.  Supposing that is "~/org/", set this:
+Finally, make sure the underlying org-id knows about the files org-roam knows (you'd think it would, but that isn't a given!).
+
+Either run =M-x org-roam-update-org-id-locations=, or edit the following setting so it includes your =org-roam-directory=.  Supposing that is "~/org/", set this:
 
 #+begin_src elisp
 (setq org-node-extra-id-dirs '("~/org/"))
 #+end_src
 
-All that done, try out the commands we went over in [[https://github.com/meedstrom/org-node?tab=readme-ov-file#quick-start][Quick start]].  There's more under [[https://github.com/meedstrom/org-node?tab=readme-ov-file#toolbox][Toolbox]].  Enjoy!
+With that done, try out the commands we went over in [[https://github.com/meedstrom/org-node?tab=readme-ov-file#quick-start][Quick start]].  There's more under [[https://github.com/meedstrom/org-node?tab=readme-ov-file#toolbox][Toolbox]].  Enjoy!
 
 ** Backlink solution 1: borrow org-roam's backlink buffer
 Backlinks are bread and butter.  As a Roam user, you can just keep using =M-x org-roam-buffer-toggle=, but you get some new ways to keep its data fresh, circumventing Roam's autosync mode.
@@ -180,62 +182,63 @@ I /think/ the following should work. Totally untested, let me know!
 
 Bad news: this is currently directed towards people who used org-super-links from the beginning, or people who are just now starting to assign IDs, as there is not yet a command to add new BACKLINKS drawers in bulk to preexisting nodes. ([[https://github.com/toshism/org-super-links/issues/93][org-super-links#93]])
 
-Good news: this option goes well together with option 1B or 1C, because org-node is careful to avoid counting org-super-links backlinks as forward-links, so by building the Roam buffer on org-node data, it will display correctly.  As far as I can tell by reading the code, using Roam's own scanners must result in displaying twice the amount of links in both directions.
-
 * Misc
 ** Org-capture
 
-You may have heard that org-roam has its special set of capture templates: the =org-roam-capture-templates=.
+You may have heard that org-roam has its own special set of capture templates: the =org-roam-capture-templates=.
 
-People who understand the magic of capture templates, they take this in stride.  Me, I never felt confident using a second-order abstraction over an already leaky abstraction.
+People who understand the magic of capture templates, they may take this in stride.  Me, I never felt confident using a second-order abstraction over an already leaky abstraction I didn't fully understand.
 
 Can we just use vanilla org-capture?  That'd be less scary.  The answer is yes!
 
-The secret sauce is =(function org-node-capture-target)=.
+The secret sauce is =(function org-node-capture-target)=:
 
 #+begin_src elisp
 (setq org-capture-templates
-      '(("s" "Capture into ID-node series"
-         plain (function org-node-series-capture-target) nil
-         :empty-lines-after 1
-         :no-save t)
-
-        ("i" "Capture into ID node"
+      '(("i" "Capture into ID node"
          plain (function org-node-capture-target) nil
-         :empty-lines-after 1
-         :no-save t)
+         :empty-lines-after 1)
 
         ("j" "Jump to ID node"
          plain (function org-node-capture-target) nil
          :jump-to-captured t
-         :immediate-finish t
-         :no-save t)
+         :immediate-finish t)
 
-        ;; Sometimes a handy choice after `org-node-insert-link' to
-        ;; make a stub you'll edit later
+        ;; Sometimes handy after `org-node-insert-link' to
+        ;; make a stub you plan to fill in later
         ("q" "Make quick stub ID node"
          plain (function org-node-capture-target) nil
          :immediate-finish t)))
 #+end_src
 
-With that done, the everyday commands =org-node-find= & =org-node-insert-link= can also outsource to org-capture when creating new nodes:
+With that done, you can optionally tell the everyday commands =org-node-find= & =org-node-insert-link= to outsource to org-capture when creating new nodes:
 
 #+begin_src elisp
 (setq org-node-creation-fn #'org-capture)
 #+end_src
 
-** Daily-notes and other "node series"
-To get started with daily-notes, it may be enough to try this command:
+** Node series
+Do you already know about "daily-notes"?  Then get started with this command:
 
 #+begin_src elisp
 (keymap-set global-map "M-s M-s" #'org-node-series-dispatch)
 #+end_src
 
-In detail, "daily-notes" (or "dailies") are just one of many possible kinds of /node series/.  You could have series about, let's say, historical events, Star Trek episodes, your school curriculum...
+It's easiest to explain series if we use "daily-notes" (or "dailies") as an example of a series.
 
-Define more series by adding to the variable =org-node-series=.
+A daily-note is the same idea as an [[https://github.com/bastibe/org-journal][org-journal]] entry: a file/entry where the title is just today's date.
+
+You don't need software for that basic idea, but to make it extra convenient to navigate them and jump back and forth in the series.
+
+Thus, fundamentally, any "journal" or "dailies" software are just operating on a sorted series.  I was resisting having to implement an equivalent to the Org-roam option =org-roam-dailies-directory=, so I ended up generalizing the concept and it's really powerful!
+
+You could have series about, let's say, historical events, Star Trek episodes, your school curriculum...
+
+Define more series in the variable =org-node-series=.
 
 Already included is a definition that approximates the org-roam-dailies defaults, but I encourage you to override it to suit your tastes.
+
+You may be taken aback that defining a new series requires writing 5 lambdas, but once you get the hang of it, you can often reuse those lambdas.
 
 ** Managing org-id-locations
 
