@@ -92,6 +92,11 @@
 (declare-function #'org-roam-node-create "org-roam-node")
 (declare-function #'org-roam-node-slug "org-roam-node")
 (declare-function #'org-roam-dailies--capture "org-roam-dailies")
+(defvar org-roam-completion-everywhere)
+(defvar org-journal-encrypt-journal)
+(defvar org-roam-directory)
+(defvar org-roam-dailies-directory)
+(defvar org-super-links-backlink-into-drawer)
 
 
 ;;;; Options
@@ -2174,7 +2179,7 @@ time some necessary variables are set."
   "Can be used as target in a capture template.
 See `org-capture-templates' for more info about targets.
 
-In simple terms, let's say you have configured
+In simple terms, let\\='s say you have configured
 `org-capture-templates' so it has a template that
 targets `(function org-node-capture-target)'.  Now here's a
 possible workflow:
@@ -2186,7 +2191,7 @@ possible workflow:
 4b. If it was unknown, it will create a file-level node and then capture
     into there.
 
-Additionally, if you've set (setq org-node-creation-fn #'org-capture),
+Additionally, if you\\='ve set (setq org-node-creation-fn #'org-capture),
 commands like `org-node-find' will outsource to org-capture when you
 type the name of a node that does not exist.  That enables this
 \"inverted\" workflow:
@@ -2430,14 +2435,6 @@ adding keywords to the things to exclude:
       (goto-char (marker-position m1))
       (set-marker m1 nil)
       (run-hook-with-args 'org-node-insert-link-hook id title))))
-
-;;;###autoload
-(defun org-node-visit-random ()
-  "Visit a random node."
-  (interactive)
-  (org-node-cache-ensure)
-  (org-node--goto (nth (random (hash-table-count org-node--candidate<>node))
-                       (hash-table-values org-node--candidate<>node))))
 
 ;;;###autoload
 (defun org-node-extract-subtree ()
