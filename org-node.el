@@ -1674,8 +1674,7 @@ YYYY-MM-DD, but it does not verify."
 
 (defun org-node--default-daily-whereami ()
   "Check the filename for a date and return it."
-  (let ((basename (file-name-base
-                   (buffer-file-name (buffer-base-buffer)))))
+  (let ((basename (file-name-base (buffer-file-name (buffer-base-buffer)))))
     (when (or (string-match-p
                (rx bol (= 4 digit) "-" (= 2 digit) "-" (= 2 digit) eol)
                basename)
@@ -1735,9 +1734,10 @@ format-constructs occur before these."
 With optional argument NEXT, actually visit the next entry."
   (let* ((series (alist-get (sxhash key) org-node--series-info))
          (here (funcall (plist-get series :whereami)))
+         (items (plist-get series :sorted-items))
          (head nil))
     (unless (null here)
-      (cl-loop for item in (plist-get series :sorted-items)
+      (cl-loop for item in items
                if (string> (car item) here)
                do (push item head)
                else return t))
@@ -1745,16 +1745,21 @@ With optional argument NEXT, actually visit the next entry."
               (when (y-or-n-p
                      (format "Not in series \"%s\".  Jump to latest item in that series?"
                              (plist-get series :name)))
-                (setq head (take 1 (plist-get series :sorted-items)))
+                (setq head (take 1 items))
                 t))
-      (let ((to-check (if next
-                          head
-                        (drop (1+ (length head))
-                              (plist-get series :sorted-items))))
-            (target nil))
+      (let* (;; Special case: say you create a daily but don't save the buffer
+             ;; (it's \"nascent\").  Then HERE is a sort-string that is not a
+             ;; member of ITEMS at all.  Then navigating back would jump two
+             ;; steps.
+             (nascent-shift
+              (if (equal (car items) here) 1 0))
+             (to-check (if next
+                           head
+                         (drop (+ (length head) nascent-shift) items)))
+             (target nil))
         ;; HACK: Keep trying items as long as :try-goto fails, because an item
-        ;; could be referring to something that has since been deleted from disk
-        ;; (and we can't guarantee up-to-date tables without file-notify).
+        ;; could be referring to something that has since been deleted from
+        ;; disk (and we can't guarantee up-to-date tables without file-notify).
         (if (catch 'fail
               (when (null to-check)
                 (throw 'fail t))
