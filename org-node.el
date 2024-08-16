@@ -1656,7 +1656,25 @@ daily-note.  It receives a would-be sort-string as argument."
              (file-name-as-directory (file-name-concat org-directory "daily"))))
           (org-node-datestamp-format "")
           (org-node-slug-fn #'identity))
-      (org-node--create sortstr (org-id-new)))))
+      (add-hook 'org-node-creation-hook
+                #'org-node--add-this-daily-to-series
+                91)
+      (unwind-protect
+          (org-node--create sortstr (org-id-new))
+        (remove-hook 'org-node-creation-hook
+                     #'org-node--add-this-daily-to-series)))))
+
+;; OK, this trick works.  Should generalize before shipping
+(defun org-node--add-this-daily-to-series ()
+  (let* ((series (alist-get (sxhash "d") org-node--series-info))
+         (node-here (gethash (org-node-id-at-point) org-nodes))
+         (new-item (when node-here
+                     (funcall (plist-get series :classifier) node-here))))
+    (when new-item
+      (push new-item (plist-get series :sorted-items))
+      (sort (plist-get series :sorted-items)
+            (lambda (item1 item2)
+              (string> (car item1) (car item2)))))))
 
 (defun org-node--default-daily-classifier (node)
   "Classifier suitable for daily-notes in default Org-Roam style.
@@ -1678,9 +1696,8 @@ YYYY-MM-DD, but it does not verify."
       (when (or (string-match-p
                  (rx bol (= 4 digit) "-" (= 2 digit) "-" (= 2 digit) eol)
                  basename)
-                ;; Wild trick: pretend to return a date even outside the dailies
-                ;; dir, so that we can jump to "next" and "previous" relative to
-                ;; when this file was created!
+                ;; Even in a non-daily file, pretend it is a daily if possible,
+                ;; to allow entering the series at a more relevant date
                 (and (not (string-blank-p org-node-datestamp-format))
                      (string-match (org-node--make-regexp-for-time-format
                                     org-node-datestamp-format)
