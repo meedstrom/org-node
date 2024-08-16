@@ -1674,20 +1674,21 @@ YYYY-MM-DD, but it does not verify."
 
 (defun org-node--default-daily-whereami ()
   "Check the filename for a date and return it."
-  (let ((basename (file-name-base (buffer-file-name (buffer-base-buffer)))))
-    (when (or (string-match-p
-               (rx bol (= 4 digit) "-" (= 2 digit) "-" (= 2 digit) eol)
-               basename)
-              ;; Wild trick: pretend to return a date even outside the dailies
-              ;; dir, so that we can jump to "next" and "previous" relative to
-              ;; when this file was created!
-              (and (not (string-blank-p org-node-datestamp-format))
-                   (string-match (org-node--make-regexp-for-time-format
-                                  org-node-datestamp-format)
-                                 basename)
-                   (org-node--extract-ymd (match-string 0 basename)
-                                          org-node-datestamp-format)))
-      basename)))
+  (when-let ((buffer-file (buffer-file-name (buffer-base-buffer))))
+    (let ((basename (file-name-base buffer-file)))
+      (when (or (string-match-p
+                 (rx bol (= 4 digit) "-" (= 2 digit) "-" (= 2 digit) eol)
+                 basename)
+                ;; Wild trick: pretend to return a date even outside the dailies
+                ;; dir, so that we can jump to "next" and "previous" relative to
+                ;; when this file was created!
+                (and (not (string-blank-p org-node-datestamp-format))
+                     (string-match (org-node--make-regexp-for-time-format
+                                    org-node-datestamp-format)
+                                   basename)
+                     (org-node--extract-ymd (match-string 0 basename)
+                                            org-node-datestamp-format)))
+        basename))))
 
 ;; TODO: Handle %s, %V, %y...  is there a library?
 (defun org-node--extract-ymd (instance time-format)
