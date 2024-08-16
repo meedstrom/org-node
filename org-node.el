@@ -1673,6 +1673,7 @@ daily-note.  It receives a would-be sort-string as argument."
                      (funcall (plist-get series :classifier) node-here))))
     (when new-item
       (push new-item (plist-get series :sorted-items))
+      ;; `-insert-at' could be faster but not much I think
       (sort (plist-get series :sorted-items)
             (lambda (item1 item2)
               (string> (car item1) (car item2)))))))
