@@ -25,14 +25,15 @@ As a nicety, `format' BASENAME with ARGS too.
 
 On most systems, the resulting string will be
 /tmp/org-node/BASENAME, but it depends on
-OS and `temporary-file-directory'."
+OS and variable `temporary-file-directory'."
   (file-name-concat temporary-file-directory
                     "org-node"
                     (if basename (apply #'format basename args) "")))
 
 (defun org-node-parser--make-todo-regexp (keywords-string)
-  "Make a regexp based on KEYWORDS-STRING,
-that will match any of the TODO keywords within."
+  "Build a regexp from KEYWORDS-STRING.
+The resulting regexp should be able to match any of the TODO
+keywords within."
   (thread-last keywords-string
                (replace-regexp-in-string "(.*?)" "")
                (string-replace "|" "")
@@ -72,7 +73,7 @@ if no ancestor heading has an ID.  It can be nil."
                if (= 1 previous-level) return file-id))))
 
 (defun org-node-parser--pos->olp (oldata pos)
-  "Given buffer position HEADING-POS, return the Org outline path.
+  "Given buffer position POS, return the Org outline path.
 Result should look like a result from `org-get-outline-path'.
 
 Argument OLDATA must be of a form looking like
@@ -87,7 +88,7 @@ asterisks in the heading at that location.
 
 As apparent in the example, OLDATA is expected in \"reverse\"
 order, such that the last heading in the file is represented in
-the first element.  An exact match for HEADING-POS must also be included
+the first element.  An exact match for POS must also be included
 in one of the elements."
   (let* (olp
          (pos-data (or (assoc pos oldata)
@@ -111,7 +112,8 @@ in one of the elements."
     olp))
 
 (defun org-node-parser--org-link-display-format (s)
-  "Copy of `org-link-display-format'."
+  "Copy of `org-link-display-format'.
+Format string S for display."
   (save-match-data
     (replace-regexp-in-string
      ;; The regexp is `org-link-bracket-re'
@@ -129,7 +131,7 @@ in one of the elements."
 
 (defun org-node-parser--split-refs-field (roam-refs)
   "Split a ROAM-REFS field correctly.
-What this means?   See org-node-test.el."
+What this means?  See org-node-test.el."
   (when roam-refs
     (with-temp-buffer
       (insert roam-refs)

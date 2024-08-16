@@ -16,7 +16,7 @@
 ;; see <http://www.gnu.org/licenses/>.
 
 (require 'org-node)
-(require 'cl-macs)
+(require 'cl-lib)
 
 (let (warned-once)
   (defun org-node-backlinks-mode (&rest args)
