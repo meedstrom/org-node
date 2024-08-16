@@ -42,14 +42,12 @@ keywords within."
                (regexp-opt)))
 
 (defun org-node-parser--elem-index (elem list)
-  "Like `-elem-index', return first index of ELEM in LIST."
-  (when list
-    (let ((list list)
-          (i 0))
-      (while (and list (not (equal elem (car-safe list))))
-        (setq i (1+ i)
-              list (cdr list)))
-      i)))
+  "Return first index of ELEM in LIST."
+  (let ((i 0))
+    (while (and list (not (equal elem (car-safe list))))
+      (setq i (1+ i))
+      (setq list (cdr list)))
+    i))
 
 (defun org-node-parser--pos->parent-id (oldata pos file-id)
   "Return ID of the closest ancestor heading that has an ID.
