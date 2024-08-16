@@ -1750,8 +1750,9 @@ With optional argument NEXT, actually visit the next entry."
              ;; (it's \"nascent\").  Then HERE is a sort-string that is not a
              ;; member of ITEMS at all.  Then navigating back would jump two
              ;; steps.
+             ;; TODO: Just add to the series when creating the nascent node
              (nascent-shift
-              (if (equal (car items) here) 1 0))
+              (if (member here (mapcar #'car items)) 1 0))
              (to-check (if next
                            head
                          (drop (+ (length head) nascent-shift) items)))
