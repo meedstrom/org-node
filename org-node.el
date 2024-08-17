@@ -859,7 +859,9 @@ didn't do so already, or local changes have been made."
           (byte-compile-file lib))))
     (or native-path elc-path)))
 
-(defvar org-node--compiled-lambdas (make-hash-table))
+(defvar org-node--compiled-lambdas (make-hash-table)
+  "1:1 table mapping hashed lambdas with compiled versions.")
+
 (defun org-node--ensure-compiled (fn)
   "Return FN as a compiled function.
 
@@ -1710,8 +1712,8 @@ Automatically set, should be nil most of the time.")
 The value of `org-node-proposed-series-key', if non-nil,
 identifies the series to add to."
   (when org-node-proposed-series-key
-    (let* ((series (alist-get (sxhash org-node-proposed-series-key)
-                              org-node--series-info))
+    (let* ((series (cdr (assoc org-node-proposed-series-key
+                               org-node--series-info)))
            (node-here (gethash (org-node-id-at-point) org-nodes))
            (new-item (when node-here
                        (funcall (plist-get series :classifier) node-here))))
@@ -1783,7 +1785,7 @@ format-constructs occur before these."
 
 (defun org-node--series-jump (key)
   "Jump to an entry in series identified by KEY."
-  (let* ((series (alist-get (sxhash key) org-node--series-info))
+  (let* ((series (cdr (assoc key org-node--series-info)))
          (sortstr (funcall (plist-get series :prompter) series))
          (item (assoc sortstr (plist-get series :sorted-items))))
     (when (or (null item)
@@ -1797,7 +1799,7 @@ format-constructs occur before these."
 (defun org-node--series-goto-previous (key &optional next)
   "Visit the previous entry in series identified by KEY.
 With optional argument NEXT, actually visit the next entry."
-  (let* ((series (alist-get (sxhash key) org-node--series-info))
+  (let* ((series (cdr (assoc key org-node--series-info)))
          (here (funcall (plist-get series :whereami)))
          (items (plist-get series :sorted-items))
          (head nil))
@@ -1856,7 +1858,7 @@ With optional argument NEXT, actually visit the next entry."
                                 (mapcar #'string-to-char valid-keys))))
                    (char-to-string input)))))
     ;; Almost identical to `org-node--series-jump'
-    (let* ((series (alist-get (sxhash key) org-node--series-info))
+    (let* ((series (cdr (assoc key org-node--series-info)))
            (sortstr (or org-node-proposed-title
                         (funcall (plist-get series :prompter) series)))
            (item (assoc sortstr (plist-get series :sorted-items))))
@@ -1868,17 +1870,19 @@ With optional argument NEXT, actually visit the next entry."
 (defun org-node--build-series (spec)
   "From plist SPEC, populate `org-node--series-info'.
 Also add a menu entry in `org-node-series-menu'."
-  (let ((classifier (org-node--ensure-compiled (plist-get (cdr spec) :classifier)))
+  (let ((classifier (org-node--ensure-compiled
+                     (plist-get (cdr spec) :classifier)))
         (unique-cars (make-hash-table :test #'equal)))
     (cl-loop
      for node being the hash-values of org-node--id<>node
      as item = (funcall classifier node)
      when (and item (not (gethash (car item) unique-cars)))
-     collect (progn (puthash (car item) t unique-cars)
-                    item)
+     collect (progn
+               (puthash (car item) t unique-cars)
+               item)
      into items
      finally do
-     (setf (alist-get (sxhash (car spec)) org-node--series-info)
+     (setf (assoc (car spec) org-node--series-info)
            (append (cl-loop for elt in (cdr spec)
                             if (functionp elt)
                             collect (org-node--ensure-compiled elt)
