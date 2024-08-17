@@ -1642,40 +1642,50 @@ daily-note.  It receives a would-be sort-string as argument."
 (defun org-node--default-daily-creator (sortstr)
   "Create a daily-note using SORTSTR as the date."
   (if (eq org-node-creation-fn 'org-node-new-via-roam-capture)
-      ;; Assume this user wants to use their roam-dailies templates
+      ;; HACK: Assume this user wants to use their roam-dailies templates
+      ;; TODO: Somehow make `org-node-new-via-roam-capture' able to do this
       (progn
         (require 'org-roam-dailies)
-        (org-roam-dailies--capture
-         ;; HACK
-         (encode-time (parse-time-string
-                       (concat sortstr (format-time-string " %H:%M:%S %z"))))
-         t))
+        (unwind-protect
+            (progn
+              (setq org-node-proposed-key "d")
+              (add-hook 'org-roam-capture-new-node-hook
+                        #'org-node--series-add-this-item)
+              (org-roam-dailies--capture
+               (encode-time (parse-time-string
+                             (concat sortstr (format-time-string
+                                              " %H:%M:%S %z"))))
+               t))
+          (setq org-node-proposed-key nil)
+          (remove-hook 'org-roam-capture-new-node-hook
+                       #'org-node--series-add-this-item)))
     (let ((org-node-ask-directory
            (if (require 'org-roam-dailies nil t)
                (file-name-concat org-roam-directory org-roam-dailies-directory)
              (file-name-as-directory (file-name-concat org-directory "daily"))))
           (org-node-datestamp-format "")
           (org-node-slug-fn #'identity))
-      (add-hook 'org-node-creation-hook
-                #'org-node--add-this-daily-to-series
-                91)
-      (unwind-protect
-          (org-node--create sortstr (org-id-new))
-        (remove-hook 'org-node-creation-hook
-                     #'org-node--add-this-daily-to-series)))))
+      (org-node--create sortstr (org-id-new) "d"))))
 
-;; OK, this trick works.  Should generalize before shipping
-(defun org-node--add-this-daily-to-series ()
-  (let* ((series (alist-get (sxhash "d") org-node--series-info))
-         (node-here (gethash (org-node-id-at-point) org-nodes))
-         (new-item (when node-here
-                     (funcall (plist-get series :classifier) node-here))))
-    (when new-item
-      (push new-item (plist-get series :sorted-items))
-      ;; `-insert-at' could be faster but not much I think
-      (sort (plist-get series :sorted-items)
-            (lambda (item1 item2)
-              (string> (car item1) (car item2)))))))
+(defvar org-node-proposed-series-key nil)
+(defun org-node--series-add-this-item ()
+  "Look at node near point to maybe add an item to a series.
+The value of `org-node-proposed-series-key', if non-nil,
+identifies the series to add to."
+  (when org-node-proposed-series-key
+    (let* ((series (alist-get (sxhash org-node-proposed-series-key)
+                              org-node--series-info))
+           (node-here (gethash (org-node-id-at-point) org-nodes))
+           (new-item (when node-here
+                       (funcall (plist-get series :classifier) node-here))))
+      (when new-item
+        (unless (member new-item (plist-get series :sorted-items))
+          (push new-item (plist-get series :sorted-items))
+          ;; Could be faster with `-insert-at' not much I think, given we'd have
+          ;; to figure out the position and the list is already well-sorted
+          (sort (plist-get series :sorted-items)
+                (lambda (item1 item2)
+                  (string> (car item1) (car item2)))))))))
 
 (defun org-node--default-daily-classifier (node)
   "Classifier suitable for daily-notes in default Org-Roam style.
@@ -2108,7 +2118,7 @@ org-roam."
             (org-node--scan-all))))
     (error "`org-node--goto' received a nil argument")))
 
-(defun org-node--create (title id)
+(defun org-node--create (title id &optional series-key)
   "Call `org-node-creation-fn' with necessary variables set.
 
 When calling from Lisp, you should not assume anything about
@@ -2123,10 +2133,14 @@ To visit a node after creating it, either let-bind
       (if node (org-node--goto node)))"
   (setq org-node-proposed-title title)
   (setq org-node-proposed-id id)
+  (setq org-node-proposed-series-key series-key)
+  (add-hook 'org-node-creation-hook #'org-node--series-add-this-item 90)
   (unwind-protect
       (funcall org-node-creation-fn)
+    (remove-hook 'org-node-creation-hook #'org-node--series-add-this-item)
     (setq org-node-proposed-title nil)
-    (setq org-node-proposed-id nil)))
+    (setq org-node-proposed-id nil)
+    (setq org-node-proposed-series-key nil)))
 
 (defcustom org-node-creation-fn #'org-node-new-file
   "Function called to create a node that does not yet exist.

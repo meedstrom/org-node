@@ -228,7 +228,7 @@ It's easiest to explain series if we use "daily-notes" (or "dailies") as an exam
 
 A daily-note is the same idea as an [[https://github.com/bastibe/org-journal][org-journal]] entry: a file/entry where the title is just today's date.
 
-You don't need software for that basic idea, but to make it extra convenient to navigate them and jump back and forth in the series.
+You don't need software for that basic idea, only to make it extra convenient to navigate them and jump back and forth in the series.
 
 Thus, fundamentally, any "journal" or "dailies" software are just operating on a sorted series.  I was resisting having to implement an equivalent to the Org-roam option =org-roam-dailies-directory=, so I ended up generalizing the concept and it's really powerful!
 
@@ -264,10 +264,11 @@ It's not for everyone, but there is the option:
 
 Say there's a link to a web URL, and you've forgot you also have a node listing that exact URL in its =ROAM_REFS= property.
 
-Wouldn't it be nice if, clicking on that link, you automatically visit to that node instead of being sent to the web?  Here you go:
+Wouldn't it be nice if, clicking on that link, you automatically visit that node instead of being sent to the web?  Here you go:
 
 #+begin_src elisp
-(add-hook 'org-open-at-point-functions #'org-node-try-visit-ref-node)
+(add-hook 'org-open-at-point-functions
+          #'org-node-try-visit-ref-node)
 #+end_src
 
 ** Limitation: TRAMP
