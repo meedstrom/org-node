@@ -74,8 +74,6 @@
 
 ;; TODO: Remove args from insert-link-hook
 
-;; TODO: use (cdr (assoc)) not (alist-get (sxhash))
-
 (require 'cl-lib)
 (require 'seq)
 (require 'subr-x)
@@ -585,9 +583,7 @@ When called from Lisp, peek on any hash table HT."
         (add-hook 'org-node-insert-link-hook #'org-node--dirty-ensure-link-known -50)
         (add-hook 'org-roam-post-node-insert-hook #'org-node--dirty-ensure-link-known -50)
         (advice-add 'org-insert-link :after #'org-node--dirty-ensure-link-known)
-        (advice-add 'rename-file :before #'org-node--drop-series-item)
         (advice-add 'rename-file :after #'org-node--handle-rename)
-        (advice-add 'delete-file :before #'org-node--drop-series-item)
         (advice-add 'delete-file :after #'org-node--handle-delete)
         (org-node-cache-ensure 'must-async t)
         (org-node--maybe-adjust-idle-timer))
@@ -599,32 +595,6 @@ When called from Lisp, peek on any hash table HT."
     (advice-remove 'org-insert-link #'org-node--dirty-ensure-link-known)
     (advice-remove 'rename-file #'org-node--handle-rename)
     (advice-remove 'delete-file #'org-node--handle-delete)))
-
-;; FIXME: Does not delete?
-;;
-;; Maybe there is a more principled way to cleanup, considering that items were
-;; generated to begin with by the :classifier.  Basically take all the nodes
-;; that were known to exist in the file and run :classifier on them, to get
-;; what to delete...
-;;
-;; And what about when some buffer text was just erased?  That's why we have
-;; :try-goto, it gently fails.  Maybe on fail it should auto-cleanup.  Actually
-;; that could be the only time we cleanup, it's enough.
-(defun org-node--drop-series-item (being-deleted &rest _)
-  "Try to unregister any series items at point from their series.
-Look near point in buffer that is visiting file BEING-DELETED, to
-identify an item."
-  (when (equal "org" (file-name-extension being-deleted))
-    ;; NOTE: If identifying the item is sensitive to position of point, this
-    ;;       function may not work every time, because point differs per window
-    (with-current-buffer (find-buffer-visiting being-deleted)
-      (cl-loop
-       for i below (length org-node--series-info)
-       do (cl-symbol-macrolet ((series (cdr (nth i org-node--series-info))))
-            (when-let ((here (funcall (plist-get series :whereami))))
-              (setf (plist-get series :sorted-items)
-                    (cl-delete here (plist-get series :sorted-items)
-                               :key #'car))))))))
 
 (defun org-node--handle-rename (file newname &rest _)
   "Arrange to scan NEWNAME for nodes and links, and forget FILE."
@@ -1799,46 +1769,56 @@ format-constructs occur before these."
 (defun org-node--series-goto-previous (key &optional next)
   "Visit the previous entry in series identified by KEY.
 With optional argument NEXT, actually visit the next entry."
-  (let* ((series (cdr (assoc key org-node--series-info)))
-         (here (funcall (plist-get series :whereami)))
-         (items (plist-get series :sorted-items))
-         (head nil))
-    (unless (null here)
-      (cl-loop for item in items
-               if (string> (car item) here)
-               do (push item head)
-               else return t))
-    (when (or here
-              (when (y-or-n-p
-                     (format "Not in series \"%s\".  Jump to latest item in that series?"
-                             (plist-get series :name)))
-                (setq head (take 1 items))
-                t))
-      (let* (;; Special case: say you create a daily but don't save the buffer
-             ;; (it's \"nascent\").  Then HERE is a sort-string that is not a
-             ;; member of ITEMS at all.  Then navigating back would jump two
-             ;; steps.
-             ;; TODO: Just add to the series when creating the nascent node
-             (nascent-shift
-              (if (member here (mapcar #'car items)) 1 0))
-             (to-check (if next
-                           head
-                         (drop (+ (length head) nascent-shift) items)))
-             (target nil))
-        ;; HACK: Keep trying items as long as :try-goto fails, because an item
-        ;; could be referring to something that has since been deleted from
-        ;; disk (and we can't guarantee up-to-date tables without file-notify).
-        (if (catch 'fail
-              (when (null to-check)
-                (throw 'fail t))
-              (while (not target)
-                (if to-check
-                    (setq target (funcall (plist-get series :try-goto)
-                                          (pop to-check)))
-                  (throw 'fail t))))
+  (cl-symbol-macrolet ((series (cdr (assoc key org-node--series-info))))
+    (let* (;; (series (cdr (assoc key org-node--series-info)))
+           (here (funcall (plist-get series :whereami)))
+           (items (plist-get series :sorted-items))
+           (head nil))
+      (unless (null here)
+        (cl-loop for item in items
+                 if (string> (car item) here)
+                 do (push item head)
+                 else return t))
+      (when (or here
+                (when (y-or-n-p
+                       (format "Not in series \"%s\".  Jump to latest item in that series?"
+                               (plist-get series :name)))
+                  (setq head (take 1 items))
+                  t))
+        (let* (;; Special case: say you create a daily but don't save the buffer
+               ;; (it's \"nascent\").  Then HERE is a sort-string that is not a
+               ;; member of ITEMS at all.  Then navigating back would jump two
+               ;; steps.
+               ;; TODO: Just add to the series when creating the nascent node
+               (nascent-shift
+                (if (member here (mapcar #'car items)) 1 0))
+               (to-check (if next
+                             head
+                           (drop (+ (length head) nascent-shift) items)))
+               (target nil))
+          ;; Keep trying items as long as :try-goto fails, because an item
+          ;; could be referring to something that has since been deleted from
+          ;; disk.  This is also an opportunity to clean stale items.
+          (when
+              (catch 'fail
+                (when (null to-check)
+                  (throw 'fail t))
+                (while (not target)
+                  (let ((item (car to-check)))
+                    (if item
+                        (progn
+                          (pop to-check)
+                          (setq target (funcall (plist-get series :try-goto)
+                                                item))
+                          (when (not target)
+                            (delete item (plist-get series :sorted-items))
+                            ;; (setf (plist-get series :sorted-items))
+
+                            ))
+                      (throw 'fail t)))))
             (message "No %s item in series \"%s\""
                      (if next "next" "previous")
-                     (plist-get series :name)))))))
+                     (plist-get series :name))))))))
 
 (defun org-node-series-capture-target ()
   "Experimental."
