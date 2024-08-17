@@ -1568,7 +1568,7 @@ for you."
      :classifier org-node--default-daily-classifier
      :whereami org-node--default-daily-whereami
      :prompter (lambda (_series) (org-read-date))
-     :try-goto org-node--default-daily-goto
+     :try-goto org-node--default-daily-try-goto
      :creator org-node--default-daily-creator)
 
     ;; NOTE: Obviously, this series works best if you have
@@ -1660,13 +1660,14 @@ daily-note.  It receives a would-be sort-string as argument."
 
 (defun org-node--series-standard-creator (sortstr)
   "Create a node with SORTSTR as the title."
+  (declare (obsolete "2024-08-17"))
   (org-node--create sortstr (org-id-new)))
 
 (defun org-node--series-standard-prompter (series)
   "Prompt for any of the sort-strings in SERIES."
   (completing-read "Go to: " (plist-get series :sorted-items)))
 
-(defun org-node--default-daily-goto (item)
+(defun org-node--default-daily-try-goto (item)
   "Assume cdr of ITEM is a filename and try to visit it."
   (when (file-readable-p (cdr item))
     (find-file (cdr item))
@@ -1700,7 +1701,10 @@ daily-note.  It receives a would-be sort-string as argument."
           (org-node-slug-fn #'identity))
       (org-node--create sortstr (org-id-new) "d"))))
 
-(defvar org-node-proposed-series-key nil)
+(defvar org-node-proposed-series-key nil
+  "Key that identifies the series about to be added to.
+Automatically set, should be nil most of the time.")
+
 (defun org-node--add-series-item ()
   "Look at node near point to maybe add an item to a series.
 The value of `org-node-proposed-series-key', if non-nil,
