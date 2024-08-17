@@ -1662,7 +1662,7 @@ daily-note.  It receives a would-be sort-string as argument."
 
 (defun org-node--series-standard-creator (sortstr)
   "Create a node with SORTSTR as the title."
-  (declare (obsolete "2024-08-17"))
+  (declare (obsolete nil "2024-08-17"))
   (org-node--create sortstr (org-id-new)))
 
 (defun org-node--series-standard-prompter (series)
@@ -1872,17 +1872,17 @@ With optional argument NEXT, actually visit the next entry."
 Also add a menu entry in `org-node-series-menu'."
   (let ((classifier (org-node--ensure-compiled
                      (plist-get (cdr spec) :classifier)))
-        (unique-cars (make-hash-table :test #'equal)))
+        (unique-sortstrs (make-hash-table :test #'equal)))
     (cl-loop
      for node being the hash-values of org-node--id<>node
      as item = (funcall classifier node)
-     when (and item (not (gethash (car item) unique-cars)))
+     when (and item (not (gethash (car item) unique-sortstrs)))
      collect (progn
-               (puthash (car item) t unique-cars)
+               (puthash (car item) t unique-sortstrs)
                item)
      into items
      finally do
-     (setf (assoc (car spec) org-node--series-info)
+     (setf (alist-get (car spec) org-node--series-info nil nil #'equal)
            (append (cl-loop for elt in (cdr spec)
                             if (functionp elt)
                             collect (org-node--ensure-compiled elt)
