@@ -1684,15 +1684,15 @@ daily-note.  It receives a would-be sort-string as argument."
         (require 'org-roam-dailies)
         (unwind-protect
             (progn
-              (setq org-node-proposed-key "d")
+              (setq org-node-proposed-series-key "d")
               (add-hook 'org-roam-capture-new-node-hook
                         #'org-node--add-series-item)
               (org-roam-dailies--capture
-               (encode-time (parse-time-string
-                             (concat sortstr (format-time-string
-                                              " %H:%M:%S %z"))))
+               (encode-time
+                (parse-time-string
+                 (concat sortstr (format-time-string " %H:%M:%S %z"))))
                t))
-          (setq org-node-proposed-key nil)
+          (setq org-node-proposed-series-key nil)
           (remove-hook 'org-roam-capture-new-node-hook
                        #'org-node--add-series-item)))
     (let ((org-node-ask-directory
