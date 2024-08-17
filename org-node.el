@@ -72,6 +72,10 @@
 
 ;; TODO: Support .org.gpg, .org.age
 
+;; TODO: Remove args from insert-link-hook
+
+;; TODO: use (cdr (assoc)) not (alist-get (sxhash))
+
 (require 'cl-lib)
 (require 'seq)
 (require 'subr-x)
@@ -379,6 +383,9 @@ For use as `org-node-affixation-fn'."
   (cl-loop for title in coll
            collect (gethash title org-node--title<>affixation-triplet)))
 
+;; TODO: Maybe use group-function for something
+;; TODO: Assign a category 'org-node, then add an embark action to embark
+;; TODO: Bind a custom exporter to `embark-export'
 (defun org-node-collection (str pred action)
   "Custom COLLECTION for `completing-read'.
 
@@ -397,7 +404,7 @@ Regardless of which, all completions are guaranteed to be keys of
 match anything.
 
 Arguments STR, PRED and ACTION are handled behind the scenes,
-read more in the manual at (elisp)Programmed Completion."
+read more at Info node `(elisp)Programmed Completion'."
   (if (eq action 'metadata)
       (cons 'metadata (unless org-node-alter-candidates
                         (list (cons 'affixation-function
@@ -574,11 +581,13 @@ When called from Lisp, peek on any hash table HT."
   (if org-node-cache-mode
       (progn
         (add-hook 'after-save-hook #'org-node--handle-save)
-        (add-hook 'org-node-creation-hook #'org-node--dirty-ensure-node-known)
-        (add-hook 'org-node-insert-link-hook #'org-node--dirty-ensure-link-known)
-        (add-hook 'org-roam-post-node-insert-hook #'org-node--dirty-ensure-link-known)
+        (add-hook 'org-node-creation-hook #'org-node--dirty-ensure-node-known -50)
+        (add-hook 'org-node-insert-link-hook #'org-node--dirty-ensure-link-known -50)
+        (add-hook 'org-roam-post-node-insert-hook #'org-node--dirty-ensure-link-known -50)
         (advice-add 'org-insert-link :after #'org-node--dirty-ensure-link-known)
+        (advice-add 'rename-file :before #'org-node--drop-series-item)
         (advice-add 'rename-file :after #'org-node--handle-rename)
+        (advice-add 'delete-file :before #'org-node--drop-series-item)
         (advice-add 'delete-file :after #'org-node--handle-delete)
         (org-node-cache-ensure 'must-async t)
         (org-node--maybe-adjust-idle-timer))
@@ -590,6 +599,32 @@ When called from Lisp, peek on any hash table HT."
     (advice-remove 'org-insert-link #'org-node--dirty-ensure-link-known)
     (advice-remove 'rename-file #'org-node--handle-rename)
     (advice-remove 'delete-file #'org-node--handle-delete)))
+
+;; FIXME: Does not delete?
+;;
+;; Maybe there is a more principled way to cleanup, considering that items were
+;; generated to begin with by the :classifier.  Basically take all the nodes
+;; that were known to exist in the file and run :classifier on them, to get
+;; what to delete...
+;;
+;; And what about when some buffer text was just erased?  That's why we have
+;; :try-goto, it gently fails.  Maybe on fail it should auto-cleanup.  Actually
+;; that could be the only time we cleanup, it's enough.
+(defun org-node--drop-series-item (being-deleted &rest _)
+  "Try to unregister any series items at point from their series.
+Look near point in buffer that is visiting file BEING-DELETED, to
+identify an item."
+  (when (equal "org" (file-name-extension being-deleted))
+    ;; NOTE: If identifying the item is sensitive to position of point, this
+    ;;       function may not work every time, because point differs per window
+    (with-current-buffer (find-buffer-visiting being-deleted)
+      (cl-loop
+       for i below (length org-node--series-info)
+       do (cl-symbol-macrolet ((series (cdr (nth i org-node--series-info))))
+            (when-let ((here (funcall (plist-get series :whereami))))
+              (setf (plist-get series :sorted-items)
+                    (cl-delete here (plist-get series :sorted-items)
+                               :key #'car))))))))
 
 (defun org-node--handle-rename (file newname &rest _)
   "Arrange to scan NEWNAME for nodes and links, and forget FILE."
@@ -1531,28 +1566,25 @@ for you."
 (defcustom org-node-series
   '(("d" :name "Dailies"
      :classifier org-node--default-daily-classifier
-     :creator org-node--default-daily-creator
-     :prompter (lambda (_series) (org-read-date))
      :whereami org-node--default-daily-whereami
-     :try-goto org-node--default-daily-goto)
+     :prompter (lambda (_series) (org-read-date))
+     :try-goto org-node--default-daily-goto
+     :creator org-node--default-daily-creator)
 
     ;; NOTE: Obviously, this series works best if you have
     ;;       `org-node-put-created' on `org-node-creation-hook'.  But it can be
     ;;       easily modified to look at the datestamp in the filename instead.
-    ;;       (Note that keeping such data in the filename doesn't really ever
-    ;;       permit nested nodes to work well: it'll be random which of
-    ;;       the nodes in the file "stands for" the file.)
     ("a" :name "All ID-nodes by chronological order"
-     :try-goto org-node--series-standard-goto
-     :creator org-node--series-standard-creator
-     :prompter org-node--series-standard-prompter
-     :whereami (lambda () (org-entry-get nil "CREATED" t))
      :classifier (lambda (node)
                    (let* ((timestamp
                            (cdr (assoc "CREATED"
                                        (org-node-get-properties node)))))
-                     (when timestamp
-                       (cons timestamp (org-node-get-id node)))))))
+                     (when (and timestamp (not (string-blank-p timestamp)))
+                       (cons timestamp (org-node-get-id node)))))
+     :whereami (lambda () (org-entry-get nil "CREATED" t))
+     :prompter org-node--series-standard-prompter
+     :try-goto org-node--series-standard-try-goto
+     :creator (lambda (sortstr) (org-node--create sortstr (org-id-new) "a"))))
   "Alist describing each node series.
 
 Each item looks like
@@ -1565,15 +1597,15 @@ Each item looks like
      :creator FUNCTION)
 
 KEY uniquely identifies the series, and is the key to type after
-\\[org-node-series-dispatch] to select it.  It may not be \"j\",
+\\[org-node-series-menu] to select it.  It may not be \"j\",
 \"n\" or \"p\", these keys are reserved for Jump, Next and
 Previous actions.
 
 NAME describes the series, in one or a few words.
 
 CLASSIFIER is a single-argument function taking an `org-node'
-object and should return a cons cell or list if the node belongs
-to the series, or nil if it does not belong to the series.
+object and should return a cons cell or list if a series-item was
+found, otherwise nil.
 
 The list may contain anything, but the first element must be a
 sort-string, i.e. a string suitable for sorting on.  An example
@@ -1618,17 +1650,17 @@ daily-note.  It receives a would-be sort-string as argument."
 (defvar org-node--series-info nil
   "Alist describing each node series, internal use.")
 
-(defun org-node--series-standard-creator (sortstr)
-  "Create a node with SORTSTR as the title."
-  (org-node--create sortstr (org-id-new)))
-
-(defun org-node--series-standard-goto (item)
+(defun org-node--series-standard-try-goto (item)
   "Assume cdr of ITEM is an org-id and try to visit it."
   (let* ((id (cdr item))
          (node (gethash id org-nodes)))
     (when node
       (org-node--goto node)
       t)))
+
+(defun org-node--series-standard-creator (sortstr)
+  "Create a node with SORTSTR as the title."
+  (org-node--create sortstr (org-id-new)))
 
 (defun org-node--series-standard-prompter (series)
   "Prompt for any of the sort-strings in SERIES."
@@ -1651,7 +1683,7 @@ daily-note.  It receives a would-be sort-string as argument."
             (progn
               (setq org-node-proposed-key "d")
               (add-hook 'org-roam-capture-new-node-hook
-                        #'org-node--series-add-this-item)
+                        #'org-node--add-series-item)
               (org-roam-dailies--capture
                (encode-time (parse-time-string
                              (concat sortstr (format-time-string
@@ -1659,7 +1691,7 @@ daily-note.  It receives a would-be sort-string as argument."
                t))
           (setq org-node-proposed-key nil)
           (remove-hook 'org-roam-capture-new-node-hook
-                       #'org-node--series-add-this-item)))
+                       #'org-node--add-series-item)))
     (let ((org-node-ask-directory
            (if (require 'org-roam-dailies nil t)
                (file-name-concat org-roam-directory org-roam-dailies-directory)
@@ -1669,7 +1701,7 @@ daily-note.  It receives a would-be sort-string as argument."
       (org-node--create sortstr (org-id-new) "d"))))
 
 (defvar org-node-proposed-series-key nil)
-(defun org-node--series-add-this-item ()
+(defun org-node--add-series-item ()
   "Look at node near point to maybe add an item to a series.
 The value of `org-node-proposed-series-key', if non-nil,
 identifies the series to add to."
@@ -1802,8 +1834,6 @@ With optional argument NEXT, actually visit the next entry."
                      (if next "next" "previous")
                      (plist-get series :name)))))))
 
-(defvar org-node-current-series-key nil
-  "Placeholder.")
 (defun org-node-series-capture-target ()
   "Experimental."
   (org-node-cache-ensure)
@@ -1833,7 +1863,7 @@ With optional argument NEXT, actually visit the next entry."
 
 (defun org-node--build-series (spec)
   "From plist SPEC, populate `org-node--series-info'.
-Also add a menu entry in `org-node-series-dispatch'."
+Also add a menu entry in `org-node-series-menu'."
   (let ((classifier (org-node--ensure-compiled (plist-get (cdr spec) :classifier)))
         (unique-cars (make-hash-table :test #'equal)))
     (cl-loop
@@ -1854,22 +1884,26 @@ Also add a menu entry in `org-node-series-dispatch'."
                          ;; being most relevant, thus cycling thru recent
                          ;; dailies will have the best perf.
                          (cl-sort items #'string> :key #'car)))))
-    (org-node--add-series-to-dispatch
-     (car spec) (plist-get (cdr spec) :name))))
+    (org-node--add-series-to-menu (car spec) (plist-get (cdr spec) :name))))
 
-(defun org-node--add-series-to-dispatch (key name)
+(defun org-node--add-series-to-menu (key name)
   "Use KEY and NAME to add an infix command to the Transient."
-  (when (ignore-errors (transient-get-suffix 'org-node-series-dispatch key))
-    (transient-remove-suffix 'org-node-series-dispatch key))
-  (transient-append-suffix 'org-node-series-dispatch '(0 -1)
+  (when (ignore-errors (transient-get-suffix 'org-node-series-menu key))
+    (transient-remove-suffix 'org-node-series-menu key))
+  (transient-append-suffix 'org-node-series-menu '(0 -1)
     (list key name key))
-  (let ((old (car (slot-value (get 'org-node-series-dispatch 'transient--prefix)
+  (let ((old (car (slot-value (get 'org-node-series-menu 'transient--prefix)
                               :incompatible))))
-    (setf (slot-value (get 'org-node-series-dispatch 'transient--prefix)
+    (setf (slot-value (get 'org-node-series-menu 'transient--prefix)
                       :incompatible)
           (list (seq-uniq (cons key old))))))
 
-(transient-define-prefix org-node-series-dispatch ()
+;; Haven't decided name
+(defalias 'org-node-series-dispatch 'org-node-series-menu)
+
+(defvar org-node-current-series-key nil
+  "Placeholder.")
+(transient-define-prefix org-node-series-menu ()
   :incompatible '(("d"))
   ["Series"
    ("|" "Invisible" "Placeholder" :if-nil t)
@@ -1877,21 +1911,21 @@ Also add a menu entry in `org-node-series-dispatch'."
   ["Navigation"
    ("p" "Previous in series"
     (lambda (args)
-      (interactive (list (transient-args 'org-node-series-dispatch)))
+      (interactive (list (transient-args 'org-node-series-menu)))
       (if args
           (org-node--series-goto-previous (car args))
         (message "Choose series before navigating")))
     :transient t)
    ("n" "Next in series"
     (lambda (args)
-      (interactive (list (transient-args 'org-node-series-dispatch)))
+      (interactive (list (transient-args 'org-node-series-menu)))
       (if args
           (org-node--series-goto-next (car args))
         (message "Choose series before navigating")))
     :transient t)
    ("j" "Jump (or create)"
     (lambda (args)
-      (interactive (list (transient-args 'org-node-series-dispatch)))
+      (interactive (list (transient-args 'org-node-series-menu)))
       (if args
           (org-node--series-jump (car args))
         (message "Choose series before navigating"))))
@@ -1899,7 +1933,7 @@ Also add a menu entry in `org-node-series-dispatch'."
    ;;         use-case.
    ;; ("c" "Capture"
    ;;  (lambda (args)
-   ;;    (interactive (list (transient-args 'org-node-series-dispatch)))
+   ;;    (interactive (list (transient-args 'org-node-series-menu)))
    ;;    (if args
    ;;        (progn
    ;;          (setq org-node-current-series-key (car args))
@@ -2135,10 +2169,10 @@ To visit a node after creating it, either let-bind
   (setq org-node-proposed-title title)
   (setq org-node-proposed-id id)
   (setq org-node-proposed-series-key series-key)
-  (add-hook 'org-node-creation-hook #'org-node--series-add-this-item 90)
+  (add-hook 'org-node-creation-hook #'org-node--add-series-item 90)
   (unwind-protect
       (funcall org-node-creation-fn)
-    (remove-hook 'org-node-creation-hook #'org-node--series-add-this-item)
+    (remove-hook 'org-node-creation-hook #'org-node--add-series-item)
     (setq org-node-proposed-title nil)
     (setq org-node-proposed-id nil)
     (setq org-node-proposed-series-key nil)))
@@ -2180,25 +2214,25 @@ which it gets some necessary variables."
              dir (concat (format-time-string org-node-datestamp-format)
                          (funcall org-node-slug-fn org-node-proposed-title)
                          ".org"))))
-      (if (or (file-exists-p path-to-write)
-              (find-buffer-visiting path-to-write))
-          (message "A file or buffer already exists for path %s"
-                   (file-name-nondirectory path-to-write))
-        (mkdir (file-name-directory path-to-write) t)
-        (find-file path-to-write)
-        (if org-node-prefer-with-heading
-            (insert "* " org-node-proposed-title
-                    "\n:PROPERTIES:"
-                    "\n:ID:       " org-node-proposed-id
-                    "\n:END:"
-                    "\n")
-          (insert ":PROPERTIES:"
+      (when (file-exists-p path-to-write)
+        (user-error "File already exists: %s" path-to-write))
+      (when (find-buffer-visiting path-to-write)
+        (user-error "A buffer already exists for filename %s" path-to-write))
+      (mkdir dir t)
+      (find-file path-to-write)
+      (if org-node-prefer-with-heading
+          (insert "* " org-node-proposed-title
+                  "\n:PROPERTIES:"
                   "\n:ID:       " org-node-proposed-id
                   "\n:END:"
-                  "\n#+title: " org-node-proposed-title
-                  "\n"))
-        (goto-char (point-max))
-        (run-hooks 'org-node-creation-hook)))))
+                  "\n")
+        (insert ":PROPERTIES:"
+                "\n:ID:       " org-node-proposed-id
+                "\n:END:"
+                "\n#+title: " org-node-proposed-title
+                "\n"))
+      (goto-char (point-max))
+      (run-hooks 'org-node-creation-hook))))
 
 (defun org-node-new-via-roam-capture ()
   "Call `org-roam-capture-' with predetermined arguments.
