@@ -62,6 +62,12 @@ and REMOVED-BY when it may be removed."
 (org-node-obsolete-defun org-node-rename-file-by-title-maybe
                          org-node-rename-file-by-title)
 
+(org-node-obsolete-defun org-node--series-standard-goto
+                         org-node--series-standard-try-goto)
+
+(org-node-obsolete-defun org-node--default-daily-goto
+                         org-node--default-daily-try-goto)
+
 (provide 'org-node-obsolete)
 
 ;;; org-node-obsolete.el ends here
