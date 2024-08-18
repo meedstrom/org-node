@@ -43,21 +43,12 @@ and REMOVED-BY when it may be removed."
        ,@(if interactive '((interactive)))
        (unless warned-once
          (setq warned-once t)
-         (lwarn 'org-node :warning "Your config uses old function name: %S, which will be removed by %s.  New name: %S"
+         (lwarn 'org-node :warning "Your config uses old function name: %S, which will be REMOVED by %s.  Please use new name: %S"
                 ',old ,(or removed-by "30 August 2024") ',new))
        (apply ',new args))))
 
 (org-node-obsolete-defun org-node-files
                          org-node-list-files)
-
-(org-node-obsolete-defun org-node-list-journal-files
-                         org-node-faster-journal-list-files)
-
-(org-node-obsolete-defun org-node-list-roam-daily-files
-                         org-node-faster-roam-list-dailies)
-
-(org-node-obsolete-defun org-node-list-roam-files
-                         org-node-faster-roam-list-files)
 
 (org-node-obsolete-defun org-node-rename-file-by-title-maybe
                          org-node-rename-file-by-title)
@@ -67,6 +58,23 @@ and REMOVED-BY when it may be removed."
 
 (org-node-obsolete-defun org-node--default-daily-goto
                          org-node--default-daily-try-goto)
+
+;;; Stuff expunged to fakeroam.el
+
+(defun org-node-faster-roam-list-files ()
+  (require 'org-node-fakeroam)
+  (message "Renames for the rename god.  Renamed `org-node-faster-roam-list-files' to `org-node-fakeroam-list-files'")
+  (org-node-fakeroam-list-files))
+
+(defun org-node-faster-roam-list-dailies ()
+  (require 'org-node-fakeroam)
+  (message "Renames for the rename god.  Renamed `org-node-faster-roam-list-dailies' to `org-node-fakeroam-list-dailies'")
+  (org-node-fakeroam-list-dailies))
+
+(defun org-node-faster-roam-daily-note-p ()
+  (require 'org-node-fakeroam)
+  (message "Renames for the rename god.  Renamed `org-node-faster-roam-daily-note-p' to `org-node-fakeroam-daily-note-p'")
+  (org-node-fakeroam-daily-note-p))
 
 (provide 'org-node-obsolete)
 

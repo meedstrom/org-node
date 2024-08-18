@@ -308,22 +308,19 @@ We support the builtin @citations, not (yet) org-ref &citations, since it slows 
 
 ** Tip: On very slow filesystems
 
-I hear that on Termux on Android, filesystem access can be so slow that it's a pain to cycle dailies with org-roam or org-journal. ([[https://github.com/meedstrom/org-node/issues/24#issuecomment-2278605819][11 seconds just to goto next daily]]!)
+I hear that on Termux on Android, filesystem access can be so slow that it's a pain to cycle dailies with org-roam. ([[https://github.com/meedstrom/org-node/issues/24#issuecomment-2278605819][11 seconds just to goto next daily]]!)
 
-Good news.  You can speed up their functions by making them just look up org-node tables.  One or more of these overrides may interest you:
+Good news.  You can speed up some functions by making them look up org-node tables:
 
 #+begin_src elisp
 (advice-add #'org-roam-list-files :override
-            #'org-node-faster-roam-list-files)
+            #'org-node-fakeroam-list-files)
 
 (advice-add #'org-roam-dailies--list-files :override
-            #'org-node-faster-roam-list-dailies)
+            #'org-node-fakeroam-list-dailies)
 
 (advice-add #'org-roam-dailies--daily-note-p :override
-            #'org-node-faster-roam-daily-note-p)
-
-(advice-add #'org-journal--list-files :override
-            #'org-node-faster-journal-list-files)
+            #'org-node-fakeroam-daily-note-p)
 #+end_src
 
 ** Tip: Word-wrap in the Roam buffer?

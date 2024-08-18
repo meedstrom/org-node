@@ -370,6 +370,49 @@ This includes all links and citations that touch NODE."
                             dest))
        (org-node-fakeroam--db-add-node node)))))
 
+
+
+;;;; Bonus advices
+;; REVIEW: Maybe use `file-truename' some places
+
+;; 1368ms to 3ms!
+(defun org-node-fakeroam-list-files ()
+  "Faster than `org-roam-list-files'."
+  (cl-loop with roam-dir = (abbreviate-file-name org-roam-directory)
+           for file in (org-node-list-files t)
+           when (string-prefix-p roam-dir file)
+           collect file))
+
+(defun org-node-fakeroam-list-dailies (&rest extra-files)
+  "Faster than `org-roam-dailies--list-files' on a slow fs.
+For argument EXTRA-FILES, see that function."
+  (let ((daily-dir (abbreviate-file-name
+                    (file-name-concat org-roam-directory
+                                      org-roam-dailies-directory))))
+    (append (cl-loop
+             for file in (org-node-list-files t)
+             when (and (string-prefix-p daily-dir file)
+                       (let ((file (file-name-nondirectory file)))
+                         (not (or (auto-save-file-name-p file)
+                                  (backup-file-name-p file)
+                                  (string-match "^\\." file)))))
+             collect file)
+            extra-files)))
+
+;; A bonus though it doesn't even need org-node
+(defun org-node-fakeroam-daily-note-p (&optional file)
+  "Faster than `org-roam-dailies--daily-note-p' on a slow fs.
+With optional argument FILE, check FILE instead of current
+buffer file."
+  ;; No `abbreviate-file-name' needed because filename does not come from
+  ;; org-node.
+  (let ((daily-dir (file-name-concat org-roam-directory
+                                     org-roam-dailies-directory))
+        (path (or file (buffer-file-name (buffer-base-buffer)))))
+    (unless (file-name-absolute-p path)
+      (error "Expected absolute filename but got: %s" path))
+    (string-prefix-p (downcase daily-dir) (downcase path))))
+
 (provide 'org-node-fakeroam)
 
 ;;; org-node-fakeroam.el ends here
