@@ -706,27 +706,24 @@ In broad strokes:
   "Arrange to scan FILES."
   (org-node--try-launch-scan (ensure-list files)))
 
-(defvar org-node--retry-timer (timer-create)
-  "For `org-node--try-launch-scan'.")
-(defvar org-node--known-files nil
-  "For `org-node--try-launch-scan'.")
-(defvar org-node--file-queue nil
-  "For `org-node--try-launch-scan'.")
-(defvar org-node--wait-start nil
-  "For `org-node--try-launch-scan'.")
-(defvar org-node--full-scan-requested nil
-  "For `org-node--try-launch-scan'.")
+(defvar org-node--retry-timer (timer-create))
+(defvar org-node--known-files nil)
+(defvar org-node--file-queue nil)
+(defvar org-node--wait-start nil)
+(defvar org-node--full-scan-requested nil)
 
 ;; TODO: Shorten.  How?  At the moment, we line up a specific file for scan
 ;; even if a "full" scan will happen or is happening, for (IIRC) reasons:
 ;;
-;; 1. The ongoing full scan may have already gone past the targeted file by the
-;;    time an order comes in to scan that file (unlikely on a reasonably fast
-;;    machine)
+;; 1. The ongoing full scan may have already gone past the targeted file at the
+;;    exact time an order comes in to scan that file, but not be done yet
+;;    (unlikely on a reasonably fast machine)
 ;; 2. Only a targeted scan will execute `org-node-rescan-hook', for good reason
 ;;
 ;; Hm, point 2 could be taken care of after full scan by comparing to
-;; `org-node--file<>mtime'
+;; `org-node--file<>mtime'.  And point 1 by just allowing the different scans
+;; to happen simultaneously.  There were more problems in the past, but now
+;; this safety magic is ready for gutting.
 (defun org-node--try-launch-scan (&optional files)
   "Launch processes to scan FILES, or wait if processes active.
 
@@ -762,6 +759,8 @@ If FILES is t, do a full reset of the cache."
             (when org-node--file-queue
               (setq must-retry t)))
         ;; Targeted scan of specific files
+        (unless org-node--file-queue
+          (error "`org-node-try-launch-scan' launched with no input"))
         (org-node--scan org-node--file-queue #'org-node--finalize-modified)
         (setq org-node--file-queue nil)))
     (when must-retry
@@ -926,6 +925,7 @@ function to update current tables."
             (let ((write-region-inhibit-fsync nil) ;; Default t in emacs30
                   (print-length nil))
               (insert (prin1-to-string (pop file-lists)))))
+          ;; TODO: Maybe prepend a "timeout 30"
           (push (make-process
                  :name (format "org-node-%d" i)
                  :noquery t

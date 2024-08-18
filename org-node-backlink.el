@@ -26,6 +26,7 @@
                       "Your config may have misspelled `org-node-backlink-mode' as `org-node-backlinks-mode'"))
     (apply #'org-node-backlink-mode args)))
 
+
 ;;;; Minor mode
 
 ;;;###autoload
@@ -307,7 +308,8 @@ purely deleted, it flags the preceding and succeeding char."
                   ;; later remove the backlink we're adding
                   (org-node--dirty-ensure-node-known)
                   (let ((org-node--imminent-recovery-msg
-                         "Org-node going to add a backlink to the target of the link you just inserted, but it's likely you will first get a prompt to recover an auto-save file, ready? "))
+                         (string-fill "Org-node going to add a backlink to the target of the link you just inserted, but it's likely you will first get a prompt to recover an auto-save file, ready? "
+                                      fill-column)))
                     (org-node--with-quick-file-buffer target-file
                       (org-node-backlink--add-at
                        id src-title src-id))))))))))))
