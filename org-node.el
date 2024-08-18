@@ -2146,8 +2146,10 @@ identifies the series to add to."
   (let* ((series (cdr (assoc key org-node--series-info)))
          (sortstr (funcall (plist-get series :prompter) series))
          (item (assoc sortstr (plist-get series :sorted-items))))
-    (when (or (null item)
-              (not (funcall (plist-get series :try-goto) item)))
+    (if item
+        (unless (funcall (plist-get series :try-goto) item)
+          (delete item (plist-get series :sorted-items))
+          (funcall (plist-get series :creator) sortstr))
       (funcall (plist-get series :creator) sortstr))))
 
 (defun org-node--series-goto-next (key)
@@ -2160,42 +2162,43 @@ If argument NEXT is non-nil, actually visit the next entry."
   (let* ((series (cdr (assoc key org-node--series-info)))
          (here (funcall (plist-get series :whereami)))
          (items (plist-get series :sorted-items))
-         (head nil))
-    ;; Find our location in the series
-    (unless (null here)
+         head
+         first-tail)
+    (when here
+      ;; Find our location in the series
       (cl-loop for item in items
                if (string> (car item) here)
                do (push item head)
-               else return t))
+               else return (setq first-tail item)))
     (when (or here
               (when (y-or-n-p
                      (format "Not in series \"%s\".  Jump to latest item in that series?"
                              (plist-get series :name)))
                 (setq head (take 1 items))
                 t))
-      (let* (;; Special case: say you create a daily but don't save the buffer
-             ;; (it's "nascent").  Then HERE is a sort-string that is not found
-             ;; in ITEMS yet.  Then navigating backwards would appear to
-             ;; jump two steps.
-             ;; TODO: Just add to the series when creating new things
-             ;;       and this should not be necessary.
-             (nascent-shift (if (member here (mapcar #'car items)) 1 0))
+      (let* (;; An old correction that may be redundant: say you create a thing
+             ;; that didn't get registered as a series item (it's "nascent" --
+             ;; new, unsaved), so that HERE is not found in ITEMS yet.  Then
+             ;; navigating backwards from HERE may result in apparently jumping
+             ;; two items back.  Correct for this.
+             (nascent-shift (if (equal here (car first-tail)) 1 0))
              (to-check (if next
                            head
                          (drop (+ (length head) nascent-shift) items))))
         ;; Usually this should return on the first try, but sometimes stale
         ;; items refer to something that has since been erased from disk, so
         ;; keep unregistering each item that TRY-GOTO failed to visit.
-        (cl-loop for item in to-check
-                 if (funcall (plist-get series :try-goto) item)
-                 return t
-                 else (delete item
-                              (plist-get (cdr (assoc key org-node--series-info))
-                                         :sorted-items))
-                 finally return
-                 (message "No %s item in series \"%s\""
-                          (if next "next" "previous")
-                          (plist-get series :name)))))))
+        (cl-loop
+         for item in to-check
+         if (funcall (plist-get series :try-goto) item)
+         return t
+         else do (delete item
+                         (plist-get (cdr (assoc key org-node--series-info))
+                                    :sorted-items))
+         finally return
+         (message "No %s item in series \"%s\""
+                  (if next "next" "previous")
+                  (plist-get series :name)))))))
 
 (defun org-node-series-capture-target ()
   "Experimental."
@@ -2240,17 +2243,19 @@ Also add a menu entry in `org-node-series-dispatch'."
      into items
      finally do
      (setf (alist-get (car spec) org-node--series-info nil nil #'equal)
-           (append (cl-loop for elt in (cdr spec)
-                            if (functionp elt)
-                            collect (org-node--ensure-compiled elt)
-                            else collect elt)
-                   (list :sorted-items
-                         ;; Using `string>' due to most recent dailies probably
-                         ;; being most relevant, thus cycling thru recent
-                         ;; dailies will have the best perf.
-                         (cl-sort items #'string> :key #'car)))))
-    (org-node--add-series-to-dispatch (car spec)
-                                      (plist-get (cdr spec) :name))))
+           ;; TODO what order for append/nconc produces less garbage?
+           (nconc (cl-loop for elt in (cdr spec)
+                           if (functionp elt)
+                           collect (org-node--ensure-compiled elt)
+                           else collect elt)
+                  (list :key (car spec)
+                        :sorted-items
+                        ;; Using `string>' due to most recent dailies probably
+                        ;; being most relevant, thus cycling thru recent
+                        ;; dailies will have the best perf.
+                        (cl-sort items #'string> :key #'car)))))
+    (org-node--add-series-to-dispatch
+     (car spec) (plist-get (cdr spec) :name))))
 
 (defvar org-node-current-series-key nil
   "Key of the series currently being browsed with the menu.")
