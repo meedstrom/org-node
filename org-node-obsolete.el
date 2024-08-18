@@ -1,11 +1,18 @@
-;;; org-node-obsolete.el --- Outta sight so I'm not tempted to clean them up -*- lexical-binding: t; -*-
+;;; org-node-obsolete.el --- Outta sight I'm not tempted to clean them up -*- lexical-binding: t; -*-
+
+(require 'seq)
+(require 'cl-lib)
 
 (defvar org-node-obsolete-names
-  '()
+  '(org-node-rescan-hook org-node-rescan-functions "30 September 2024")
   "Alist of deprecated symbol names and their new names.")
 
-(defun org-node-obsolete-warn ()
-  "Maybe print one-shot warnings, then become a no-op."
+(defun org-node-obsolete-warn-and-copy ()
+  "Maybe print one-shot warnings, then become a no-op.
+
+Warn if any old name in `org-node-obsolete-names' is bound.  Then
+copy the value in the old name so that the new name gets the same
+value."
   (while-let ((row (pop org-node-obsolete-names)))
     (seq-let (old new removed-by) row
       (unless removed-by
@@ -64,13 +71,14 @@ and REMOVED-BY when it may be removed."
 (defun org-node-faster-roam-list-files ()
   (require 'org-node-fakeroam)
   (message "Renames for the rename god.  Renamed `org-node-faster-roam-list-files' to `org-node-fakeroam-list-files'")
-  (org-node-fakeroam-list-files))
+  (when (fboundp 'org-node-fakeroam-list-files)
+    (org-node-fakeroam-list-files)))
 
 (defun org-node-faster-roam-list-dailies ()
   (require 'org-node-fakeroam)
   (message "Renames for the rename god.  Renamed `org-node-faster-roam-list-dailies' to `org-node-fakeroam-list-dailies'")
-  (cl-assert (fboundp 'org-node-fakeroam-list-dailies))
-  (org-node-fakeroam-list-dailies))
+  (when (fboundp 'org-node-fakeroam-list-dailies)
+    (org-node-fakeroam-list-dailies)))
 
 (defun org-node-faster-roam-daily-note-p ()
   (require 'org-node-fakeroam)

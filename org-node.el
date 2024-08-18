@@ -107,7 +107,7 @@
   "Support a zettelkasten of org-id files and subtrees."
   :group 'org)
 
-(defcustom org-node-rescan-hook nil
+(defcustom org-node-rescan-functions nil
   "Hook run after scanning specific files.
 It is not run after a full cache reset, only after a file is
 saved or renamed causing an incremental update to the cache.
@@ -651,7 +651,7 @@ SYNCHRONOUS t, unless SYNCHRONOUS is the symbol `must-async'."
     ;; run it as late as possible in case of late variable settings.  By
     ;; running it here, we've waited until the user runs a command.
     ;; (No interactive command passes `must-async'.)
-    (org-node-obsolete-warn))
+    (org-node-obsolete-warn-and-copy))
   (org-node--init-ids)
   (when (hash-table-empty-p org-nodes)
     (setq synchronous (if (eq synchronous 'must-async) nil t))
@@ -1569,7 +1569,7 @@ Each item looks like
      :creator FUNCTION)
 
 KEY uniquely identifies the series, and is the key to type after
-\\[org-node-series-menu] to select it.  It may not be \"j\",
+\\[org-node-series-dispatch] to select it.  It may not be \"j\",
 \"n\" or \"p\", these keys are reserved for Jump, Next and
 Previous actions.
 
@@ -1848,7 +1848,7 @@ With optional argument NEXT, actually visit the next entry."
 
 (defun org-node--build-series (spec)
   "From plist SPEC, populate `org-node--series-info'.
-Also add a menu entry in `org-node-series-menu'."
+Also add a menu entry in `org-node-series-dispatch'."
   (let ((classifier (org-node--ensure-compiled
                      (plist-get (cdr spec) :classifier)))
         (unique-sortstrs (make-hash-table :test #'equal)))
@@ -1871,28 +1871,18 @@ Also add a menu entry in `org-node-series-menu'."
                          ;; being most relevant, thus cycling thru recent
                          ;; dailies will have the best perf.
                          (cl-sort items #'string> :key #'car)))))
-    (org-node--add-series-to-menu (car spec) (plist-get (cdr spec) :name))))
-
-(defun org-node--add-series-to-menu (key name)
-  "Use KEY and NAME to add an infix command to the Transient."
-  (when (ignore-errors (transient-get-suffix 'org-node-series-menu key))
-    (transient-remove-suffix 'org-node-series-menu key))
-  (transient-append-suffix 'org-node-series-menu '(0 -1)
-    (list key name key))
-  (let ((old (car (slot-value (get 'org-node-series-menu 'transient--prefix)
-                              :incompatible))))
-    (setf (slot-value (get 'org-node-series-menu 'transient--prefix)
-                      :incompatible)
-          (list (seq-uniq (cons key old))))))
+    (org-node--add-series-to-dispatch (car spec)
+                                      (plist-get (cdr spec) :name))))
 
 (defvar org-node-current-series-key nil
   "Key of the series currently being browsed with the menu.")
 
-;; Haven't decided name
+;; Haven't settled on a name
 ;;;###autoload
-(defalias 'org-node-series-dispatch #'org-node-series-menu)
+(defalias 'org-node-series-menu #'org-node-series-dispatch)
 
-(transient-define-prefix org-node-series-menu ()
+;;;###autoload (autoload 'org-node-series-dispatch "org-node" nil t)
+(transient-define-prefix org-node-series-dispatch ()
   :incompatible '(("d"))
   ["Series"
    ("|" "Invisible" "Placeholder" :if-nil t)
@@ -1900,21 +1890,21 @@ Also add a menu entry in `org-node-series-menu'."
   ["Navigation"
    ("p" "Previous in series"
     (lambda (args)
-      (interactive (list (transient-args 'org-node-series-menu)))
+      (interactive (list (transient-args 'org-node-series-dispatch)))
       (if args
           (org-node--series-goto-previous (car args))
         (message "Choose series before navigating")))
     :transient t)
    ("n" "Next in series"
     (lambda (args)
-      (interactive (list (transient-args 'org-node-series-menu)))
+      (interactive (list (transient-args 'org-node-series-dispatch)))
       (if args
           (org-node--series-goto-next (car args))
         (message "Choose series before navigating")))
     :transient t)
    ("j" "Jump (or create)"
     (lambda (args)
-      (interactive (list (transient-args 'org-node-series-menu)))
+      (interactive (list (transient-args 'org-node-series-dispatch)))
       (if args
           (org-node--series-jump (car args))
         (message "Choose series before navigating"))))
@@ -1922,7 +1912,7 @@ Also add a menu entry in `org-node-series-menu'."
    ;;         use-case.
    ;; ("c" "Capture"
    ;;  (lambda (args)
-   ;;    (interactive (list (transient-args 'org-node-series-menu)))
+   ;;    (interactive (list (transient-args 'org-node-series-dispatch)))
    ;;    (if args
    ;;        (progn
    ;;          (setq org-node-current-series-key (car args))
@@ -1931,6 +1921,18 @@ Also add a menu entry in `org-node-series-menu'."
    ;;            (setq org-node-current-series-key nil)))
    ;;      (message "Choose series before navigating"))))
    ])
+
+(defun org-node--add-series-to-dispatch (key name)
+  "Use KEY and NAME to add a series to the Transient menu."
+  (when (ignore-errors (transient-get-suffix 'org-node-series-dispatch key))
+    (transient-remove-suffix 'org-node-series-dispatch key))
+  (transient-append-suffix 'org-node-series-dispatch '(0 -1)
+    (list key name key))
+  (let ((old (car (slot-value (get 'org-node-series-dispatch 'transient--prefix)
+                              :incompatible))))
+    (setf (slot-value (get 'org-node-series-dispatch 'transient--prefix)
+                      :incompatible)
+          (list (seq-uniq (cons key old))))))
 
 
 ;;;; Filename functions
