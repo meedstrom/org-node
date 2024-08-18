@@ -103,6 +103,7 @@ Can be quit midway through and resumed later.  With
     (let ((file-name-handler-alist nil))
       ;; Do 500 at a time, because Emacs cries about opening too many file
       ;; buffers in one loop... even though we close each one as we go
+      (garbage-collect) ;; Reap open file handles
       (dotimes (_ 500)
         (when-let ((file (pop org-node-backlink--files-to-fix)))
           (message "Adding/updating :BACKLINKS:... (you may quit and resume anytime) (%d) %s"
@@ -114,51 +115,48 @@ Can be quit midway through and resumed later.  With
         (run-with-timer 1 nil #'org-node-backlink-fix-all remove?))))
 
 (defun org-node-backlink--fix-whole-buffer (&optional remove?)
-  (save-excursion
-    (goto-char (point-min))
-    (let ((case-fold-search t))
-      (while (re-search-forward "^[[:space:]]*:id: " nil t)
-        (org-node-backlink--fix-subtree-here remove?)))))
+  "Update the :BACKLINKS: properties near each :ID: in buffer.
+If REMOVE? is non-nil, remove the properties."
+  (goto-char (point-min))
+  (let ((case-fold-search t))
+    (while (re-search-forward "^[[:space:]]*:id: " nil t)
+      (org-node-backlink--fix-subtree-here remove?))))
 
 (defun org-node-backlink--fix-subtree-here (&optional remove?)
-  "Assume point is at an :ID: line, after the \":ID:\" substring,
-then update the :BACKLINKS: property in this entry.  With arg
-REMOVE, remove it instead."
+  "At an :ID: line, update the adjacent :BACKLINKS: property.
+If REMOVE? is non-nil, remove it instead.
+
+Assume point is at an :ID: line, after the \":ID:\" substring."
   (if remove?
       (org-entry-delete nil "BACKLINKS")
-    ;; Um... I think this way of grabbing the ID is a holdover from when I was
-    ;; using fundamental-mode buffers?
+    ;; REVIEW: I think this way of grabbing the ID is a holdover from when I
+    ;; was using fundamental-mode buffers?
     (skip-chars-forward "[:space:]")
     (let* ((id (buffer-substring-no-properties
                 (point) (+ (point) (skip-chars-forward "^ \n"))))
            (node (gethash id org-node--id<>node)))
       (when node
-        ;; Make the full string to which the :BACKLINKS: property should be set
-        (let* ((combined
-                (thread-last
-                  (append (org-node-get-id-links node)
-                          (org-node-get-reflinks node))
-                  ;; Extract just the origin IDs
-                  (-map  #'org-node-link-origin)
-                  (-uniq)
-                  (-non-nil) ;; REVIEW: no nils anymore, I hope
-                  (-sort #'string-lessp)
-                  ;; At this point we have a sorted list of IDs of every node
-                  ;; that links to here.  (Yes, sorted UUIDs---nearly
-                  ;; senseless.)  Now format them pretty Org links.
-                  (--map (org-link-make-string
-                          (concat "id:" it)
-                          (org-node-get-title
-                           (or (gethash it org-node--id<>node)
-                               (error "ID in backlink tables not known to main org-nodes table: %s"
-                                      it)))))))
-               (links-string (string-join combined "  ")))
-          (if combined
+        (let* ((sorted-uuids (thread-last
+                               (nconc (org-node-get-id-links node)
+                                      (org-node-get-reflinks node))
+                               (-map #'org-node-link-origin)
+                               (-uniq)
+                               (-non-nil) ;; REVIEW: no nils anymore, I hope
+                               (-sort #'string-lessp)))
+               (links (cl-loop
+                       for origin in sorted-uuids
+                       collect (org-link-make-string
+                                (concat "id:" origin)
+                                (org-node-get-title
+                                 (or (gethash origin org-node--id<>node)
+                                     (error "ID in backlink tables not known to main org-nodes table: %s"
+                                            origin))))))
+               (links-string (string-join links "  ")))
+          (if links
               (unless (equal links-string (org-entry-get nil "BACKLINKS"))
                 (org-entry-put nil "BACKLINKS" links-string))
             (org-entry-delete nil "BACKLINKS")))))))
 
-;; FIXME: Only operates where text has been added, not deleted
 (defun org-node-backlink--fix-flagged-parts-of-buffer ()
   "Look for areas flagged by `org-node-backlink--flag-buffer-modification' and
 run `org-node-backlink--fix-subtree-here' at each affected
@@ -201,16 +199,17 @@ subtree.  For a huge file, this is much faster than using
                     (let ((id-here (org-entry-get nil "ID" t)))
                       (and id-here
                            (re-search-backward
-                            (concat "^[[:space:]]*:id: *"
+                            (concat "^[[:space:]]*:id: +"
                                     (regexp-quote id-here))
                             nil t)
-                           (re-search-forward ":id: *" (pos-eol))
+                           (re-search-forward ":id: +" (pos-eol))
                            (org-node-backlink--fix-subtree-here))))
                   ;; ...and if the change-area is massive, spanning multiple
                   ;; subtrees (like after a big yank), update each subtree
+                  ;; within
                   (while (and (< (point) end)
                               (re-search-forward
-                               "^[[:space:]]*:id: " end t))
+                               "^[[:space:]]*:id: +" end t))
                     (org-node-backlink--fix-subtree-here))
                   (remove-text-properties start end 'org-node-flag))
                 ;; This change-area dealt with, move on
@@ -293,28 +292,30 @@ purely deleted, it flags the preceding and succeeding char."
           (when (null file)
             (push id org-node-backlink--fails))
           (when (and id file)
-            (org-node-backlink--add-in-target-1 file id)))))))
-
-(defun org-node-backlink--add-in-target-1 (target-file target-id)
-  (let ((case-fold-search t)
-        (src-id (org-entry-get nil "ID" t)))
-    (when (and src-id (not (equal src-id target-id)))
-      (let ((src-title
-             (save-excursion
-               (without-restriction
-                 (re-search-backward (concat "^[ \t]*:id: +" src-id))
-                 (or (org-get-heading t t t t)
-                     (cadar (org-collect-keywords '("TITLE")))
-                     (file-name-nondirectory buffer-file-name))))))
-        ;; Ensure that `org-node-backlink--fix-flagged-parts-of-buffer' will
-        ;; not later remove the backlink we're adding
-        (org-node--dirty-ensure-node-known)
-        (let ((org-node--imminent-recovery-msg
-               "Org-node going to add a backlink to the target of the link you just inserted, but it's likely you will first get a prompt to recover an auto-save file, ready? "))
-          (org-node--with-quick-file-buffer target-file
-            (org-node-backlink--add-at target-id src-title src-id)))))))
+            (let ((case-fold-search t)
+                  (src-id (org-entry-get nil "ID" t)))
+              (when (and src-id (not (equal src-id id)))
+                (let ((src-title
+                       (save-excursion
+                         (without-restriction
+                           (re-search-backward (concat "^[ \t]*:id: +" src-id))
+                           (or (org-get-heading t t t t)
+                               (cadar (org-collect-keywords '("TITLE")))
+                               (file-name-nondirectory buffer-file-name))))))
+                  ;; Ensure that
+                  ;; `org-node-backlink--fix-flagged-parts-of-buffer' will not
+                  ;; later remove the backlink we're adding
+                  (org-node--dirty-ensure-node-known)
+                  (let ((org-node--imminent-recovery-msg
+                         "Org-node going to add a backlink to the target of the link you just inserted, but it's likely you will first get a prompt to recover an auto-save file, ready? "))
+                    (org-node--with-quick-file-buffer target-file
+                      (org-node-backlink--add-at
+                       id src-title src-id))))))))))))
 
 (defun org-node-backlink--add-at (target-id src-title src-id)
+  "Seek the :ID: property in buffer that matches TARGET-ID, then
+compose a link out of SRC-ID and SRC-TITLE and insert it in the
+nearby :BACKLINKS: property."
   (goto-char (point-min))
   (if (not (re-search-forward
             (concat "^[ \t]*:id: +" (regexp-quote target-id))
