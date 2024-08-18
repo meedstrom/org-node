@@ -72,10 +72,11 @@ and REMOVED-BY when it may be removed."
 
 (defun org-node--series-standard-creator (sortstr)
   "Create a node with SORTSTR as the title."
-  (require 'org-id)
   (declare (obsolete nil "2024-08-17"))
+  (require 'org-id)
   (display-warning 'org-node "Your series definition includes a function that will be removed on 30 August 2024: `org-node--series-standard-creator'")
-  (when (fboundp 'org-node--create)
+  (when (and (fboundp 'org-node--create)
+             (fboundp 'org-id-new))
     (org-node--create sortstr (org-id-new))))
 
 (add-hook 'org-node-insert-link-hook #'org-node--deprec-insert-link-hook -99)
