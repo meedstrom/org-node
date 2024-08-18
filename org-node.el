@@ -1178,16 +1178,15 @@ The reason for default t is better experience with
              fn
            (if (native-comp-available-p) (native-compile fn) (byte-compile fn))
            fn))
-        ((let ((lambda-hash (sxhash fn)))
-           (or (gethash lambda-hash org-node--compiled-lambdas)
-               (puthash lambda-hash (if (and (native-comp-available-p)
-                                             (not (eq 'closure (car-safe fn))))
-                                        (native-compile fn)
-                                      (byte-compile fn))
-                        org-node--compiled-lambdas))))))
+        ((gethash fn org-node--compiled-lambdas))
+        ((puthash fn (if (and (native-comp-available-p)
+                              (not (eq 'closure (car-safe fn))))
+                         (native-compile fn)
+                       (byte-compile fn))
+                  org-node--compiled-lambdas))))
 
-(defvar org-node--compiled-lambdas (make-hash-table)
-  "1:1 table mapping hashed lambdas with compiled versions.")
+(defvar org-node--compiled-lambdas (make-hash-table :test #'equal)
+  "1:1 table mapping lambda expressions to compiled bytecode.")
 
 
 ;;;; "Dirty" functions
@@ -1255,7 +1254,7 @@ candidates right away, without having to save the buffer.
 2. ensure that `org-node-backlink-mode' won\\='t autoclean backlinks
 to this node on account of it \"not existing yet\".  Actually,
 also necessary is `org-node--dirty-ensure-link-known' elsewhere."
-  (let ((id (org-entry-get nil "ID" t))
+  (let ((id (org-node-id-at-point))
         (case-fold-search t))
     (unless (gethash id org-node--id<>node)
       (save-excursion
