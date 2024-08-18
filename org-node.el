@@ -72,7 +72,7 @@
 
 ;; TODO: Support .org.gpg, .org.age
 
-;; TODO: Remove args from insert-link-hook
+;; TODO: Test perf with #'string-equal as test function on all tables
 
 (require 'cl-lib)
 (require 'seq)
@@ -164,7 +164,7 @@ files as `utf-8-unix'.
 
 Note that if your Org collection is old and has survived several
 system migrations, or some of it was generated via Pandoc
-conversion or downloaded, it's very possible that there's a mix
+conversion or downloaded, it\\='s very possible that there\\='s a mix
 of coding systems among them.  In that case, setting this
 variable may cause org-node to fail to scan some of them, or
 display their titles with strange glyphs."
@@ -177,9 +177,10 @@ display their titles with strange glyphs."
 Normally, `file-name-handler-alist' reacts specially to seeing
 some file names: TRAMP paths, compressed files or .org.gpg files.
 
-It's infamous for (somewhat) slowing down the access of very many
-files, since it is a series of regexps applied to every file name
-visited.  The smaller this list, the faster `org-node-reset'."
+It\\='s infamous for (somewhat) slowing down the access of very
+many files, since it is a series of regexps applied to every file
+name visited.  The smaller this list, the faster
+`org-node-reset'."
   :group 'org-node
   :type '(choice (const :tag "Keep all" t)
                  (set
@@ -236,12 +237,12 @@ Applied only by `org-node-new-file', `org-node-capture-target',
 `org-node-insert-heading', `org-node-nodeify-entry' and
 `org-node-extract-subtree'.
 
-NOT applied by `org-node-new-via-roam-capture' -- see org-roam's
+NOT applied by `org-node-new-via-roam-capture' -- see org-roam\\='s
 `org-roam-capture-new-node-hook' instead.
 
 A good function for this hook is `org-node-put-created', since
 the default `org-node-datestamp-format' is empty.  In the
-author's experience, recording the creation-date somewhere may
+author\\='s experience, recording the creation-date somewhere may
 prove useful later on, e.g. when publishing to a blog."
   :group 'org-node
   :type 'hook)
@@ -319,7 +320,7 @@ can match the prefix and suffix via `orderless-annotation',
 without need for this setting.)
 
 Another consequence is it lifts the uniqueness constraint on note
-titles: you'll be able to have two headings with the same name so
+titles: you\\='ll be able to have two headings with the same name so
 long as their prefix or suffix differ.
 
 After changing this setting, please run \\[org-node-reset]."
@@ -396,7 +397,7 @@ attaches the affixations in realtime.
 
 Regardless of which, all completions are guaranteed to be keys of
 `org-node--candidate<>node', but remember that it is possible for
-`completing-read' to exit with user-entered input that didn't
+`completing-read' to exit with user-entered input that didn\\='t
 match anything.
 
 Arguments STR, PRED and ACTION are handled behind the scenes,
@@ -806,8 +807,8 @@ that same function."
 
 (defun org-node--ensure-compiled-lib ()
   "Return path to freshly compiled version of org-node-parser.el.
-Recompile if needed, in case the user's package manager
-didn't do so already, or local changes have been made."
+Recompile if needed, in case the user\\='s package manager
+didn\\='t do so already, or local changes have been made."
   (let* ((file-name-handler-alist nil)
          ;; FIXME: When working on a checked-out repo, this will still just
          ;;        find elpaca/straight's clone.  So the developer has to paste
@@ -1110,7 +1111,7 @@ thousands of links on constrained devices.
 
 Fortunately it is rarely needed, since the insert-link advices of
 `org-node-cache-mode' will already record links added during
-normal usage!  What's left undone til idle:
+normal usage!  What\\='s left undone til idle:
 
 1. deleted links remain in the table, leading to undead backlinks
 2. :pos values can desync, which can affect the org-roam buffer
@@ -1252,7 +1253,7 @@ Not meant to be perfect, but good enough to:
 1. ensure that the node at point will show up among completion
 candidates right away, without having to save the buffer.
 
-2. ensure that `org-node-backlink-mode' won't autoclean backlinks
+2. ensure that `org-node-backlink-mode' won\\='t autoclean backlinks
 to this node on account of it \"not existing yet\".  Actually,
 also necessary is `org-node--dirty-ensure-link-known' elsewhere."
   (let ((id (org-entry-get nil "ID" t))
@@ -1319,7 +1320,7 @@ Override that function to configure timer behavior.")
   "Print time elapsed since `org-node--time-at-scan-begin'.
 Also report statistics about the nodes and links found.
 
-Currently, the printed message implies that all of org-node's
+Currently, the printed message implies that all of org-node\\='s
 data were collected within the time elapsed, so you should not
 run this function after only a partial scan, as the message would
 be misleading."
@@ -1380,7 +1381,7 @@ In detail:
 
 1. If a buffer was visiting FILE, reuse that buffer, else visit
    FILE in a new buffer, in which case ignore most of the Org
-   startup checks and don't ask about file-local variables.
+   startup checks and don\\='t ask about file-local variables.
 
 2. Temporarily `widen' the buffer, execute BODY, then restore
    point.
@@ -1472,14 +1473,14 @@ list of files that may or may not contain IDs."
 Return a list of all files under directory DIR, its
 sub-directories, sub-sub-directories and so on, with provisos:
 
-- Don't follow symlinks to other directories.
-- Don't enter directories that start with a dot.
-- Don't enter directories where some substring of the path
+- Don\\='t follow symlinks to other directories.
+- Don\\='t enter directories that start with a dot.
+- Don\\='t enter directories where some substring of the path
   matches one of EXCLUDES literally.
 - Collect only files that end in SUFFIX literally.
-- Don't collect any file where some substring of the path
+- Don\\='t collect any file where some substring of the path
   matches one of EXCLUDES literally.
-- Don't sort final results stably."
+- Don\\='t sort final results stably."
   (let (result)
     (dolist (file (file-name-all-completions "" dir))
       (if (directory-name-p file)
@@ -1602,7 +1603,7 @@ useful member may be (plist-get series :sorted-items).
 Function WHEREAMI is like PROMPTER in that it should return a
 sort-string.  However, it should do this without user
 interaction, and may return nil.  For example, if the user is not
-currently in a daily-note, the daily-notes' WHEREAMI should
+currently in a daily-note, the daily-notes\\=' WHEREAMI should
 return nil.  It receives no arguments.
 
 Function TRY-GOTO takes a single argument: one of the items
@@ -1699,7 +1700,7 @@ identifies the series to add to."
 (defun org-node--default-daily-classifier (node)
   "Classifier suitable for daily-notes in default Org-Roam style.
 
-If NODE's full file path involves a \"daily\" or \"dailies\"
+If NODE\\='s full file path involves a \"daily\" or \"dailies\"
 directory, then return a cons cell (BASENAME . FULL-PATH).
 
 BASENAME is the file name without directory or extension.
@@ -2062,7 +2063,7 @@ Built-in choices:
 (defun org-node-slugify-for-web (title)
   "From TITLE, make a string meant to look nice as URL component.
 
-A title like \"Löb's Theorem\" becomes \"lobs-theorem\".  Note
+A title like \"Löb\\='s Theorem\" becomes \"lobs-theorem\".  Note
 that while diacritical marks are stripped, it retains most
 symbols that belong to the Unicode alphabetic category,
 preserving for example kanji and Greek letters."
@@ -2246,7 +2247,7 @@ See `org-capture-templates' for more info about targets.
 
 In simple terms, let\\='s say you have configured
 `org-capture-templates' so it has a template that
-targets `(function org-node-capture-target)'.  Now here's a
+targets `(function org-node-capture-target)'.  Now here\\='s a
 possible workflow:
 
 1. Run org-capture
@@ -2355,7 +2356,7 @@ To behave like `org-roam-node-find' when creating new nodes, set
 (defun org-node-insert-link (&optional region-as-initial-input)
   "Insert a link to one of your ID nodes.
 
-To behave exactly like org-roam's `org-roam-node-insert',
+To behave exactly like org-roam\\='s `org-roam-node-insert',
 see `org-node-insert-link*' and its docstring.
 
 Optional argument REGION-AS-INITIAL-INPUT t means behave as
@@ -2382,7 +2383,7 @@ Optional argument REGION-AS-INITIAL-INPUT t means behave as
                       region-text
                     nil))
          (input (completing-read "Node: " #'org-node-collection
-                                 () () initial 'org-node-hist))
+                                 () () initial 'org-noden-hist))
          (node (gethash input org-node--candidate<>node))
          (id (if node (org-node-get-id node) (org-id-new)))
          (link-desc (or region-text
@@ -2413,7 +2414,7 @@ matches a node title.
 
 On the other hand if you always find yourself erasing the
 minibuffer before selecting some other node you had in mind, to
-which the region should be linkified, you'll prefer
+which the region should be linkified, you\\='ll prefer
 `org-node-insert-link'.
 
 The commands are the same, it is just a difference in
@@ -2514,10 +2515,10 @@ there was no ID, copies over all inherited tags, and runs
 
 Adding to that, see below for an example advice that copies any
 inherited \"CREATED\" property, if an ancestor has such a
-property.  It is subjective whether you'd want this behavior, but
+property.  It is subjective whether you\\='d want this behavior, but
 it can be desirable if you know the subtree had been part of the
-source file for ages so that you see the ancestor's creation-date
-as more \"truthful\" than today's date.
+source file for ages so that you see the ancestor\\='s creation-date
+as more \"truthful\" than today\\='s date.
 
 \(advice-add 'org-node-extract-subtree :around
             (defun my-inherit-creation-date (orig-fn &rest args)
@@ -2753,10 +2754,10 @@ Internal argument INTERACTIVE is automatically set."
 
 Search all files, or just FILES if non-nil, for ID-links where
 the link description has gotten out of sync from the
-destination's current title.
+destination\\='s current title.
 
 At each link, prompt for user consent, then auto-update the link
-so it matches the destination's current title."
+so it matches the destination\\='s current title."
   (interactive)
   (require 'ol)
   (require 'org-faces)
@@ -3148,7 +3149,7 @@ from ID links found in `org-node--dest<>links'."
 (defun org-node-list-reflinks ()
   "List all reflinks and their locations.
 
-Useful to see how many times you've inserted a link that is very
+Useful to see how many times you\\='ve inserted a link that is very
 similar to another link, but not identical, so that likely only
 one of them is associated with a ROAM_REFS."
   (interactive)
@@ -3307,7 +3308,7 @@ window."
   "Add VALUE to PROPERTY for node at point.
 
 If the current entry has no ID, operate on the closest ancestor
-with an ID.  If there's no ID anywhere, operate on the current
+with an ID.  If there\\='s no ID anywhere, operate on the current
 entry.
 
 Then behave like `org-entry-add-to-multivalued-property' but
@@ -3346,7 +3347,9 @@ Wrap the value in double-brackets if necessary."
 (defvar org-node--roam-settings nil)
 (define-minor-mode org-node-complete-at-point-mode
   "Use `org-node-complete-at-point' in all Org buffers.
-Also turn off Org-roam's equivalent, if active.
+
+Also turn off Org-roam\\='s equivalent, if active.  In that case,
+try to toggle it back on when this is turned off.
 
 -----"
   :global t
@@ -3426,6 +3429,7 @@ following the link normally.
 
 If already visiting that node, then follow the link normally."
   (when-let ((url (thing-at-point 'url)))
+    ;; Rarely more than one car
     (let* ((dest (car (org-node-parser--split-refs-field url)))
            (found (cl-loop for node being the hash-values of org-nodes
                            when (member dest (org-node-get-refs node))
@@ -3434,7 +3438,7 @@ If already visiting that node, then follow the link normally."
                ;; Check that point is not already in said ref node (if so,
                ;; better to fallback to default `org-open-at-point' logic)
                (not (and (derived-mode-p 'org-mode)
-                         (equal (org-entry-get nil "ID" t)
+                         (equal (org-node-id-at-point)
                                 (org-node-get-id found)))))
           (progn (org-node--goto found)
                  t)
