@@ -107,7 +107,7 @@
 
 
 ;;;; Faces
-  (defface org-node-dailies-calendar-note
+(defface org-node-dailies-calendar-note
   '((t :inherit (org-link) :underline nil))
   "Face for dates with a daily-note in the calendar."
   :group 'org-node-faces)
