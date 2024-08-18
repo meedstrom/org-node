@@ -24,7 +24,7 @@ value."
                      old removed-by new)
               (set new (symbol-value old)))
           (lwarn 'org-node :warning "Your config sets removed variable: %S" old)))
-      (when (where-is-internal old)
+      (when (and old (where-is-internal old))
         (if new
             (lwarn 'org-node :warning "Your config key-binds an old command name: %S.  Please use new name: %S"
                    old new)
