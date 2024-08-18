@@ -1,4 +1,4 @@
-;;; org-node.el --- Help link org-id entries together -*- lexical-binding: t; -*-
+;;; org-node.el --- Link org-id entries into a network -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2024 Martin Edström
 ;;
@@ -18,7 +18,7 @@
 ;; Author:           Martin Edström <meedstrom91@gmail.com>
 ;; Created:          2024-04-13
 ;; Keywords:         org, hypermedia
-;; Package-Requires: ((emacs "28.1") (compat "29.1.4.5") (dash "2.19.1") (transient "0.7.4"))
+;; Package-Requires: ((emacs "28.1") (compat "30") (dash "2.19.1") (transient "0.7.4"))
 ;; URL:              https://github.com/meedstrom/org-node
 
 ;;; Commentary:
@@ -342,7 +342,7 @@ prefix and suffix can be nil.  Title should be TITLE unmodified.
 
 NODE is an object which form you can observe in examples from
 \\[org-node-peek] and specified in type `org-node'
-\(C-h o org-node RET).
+\(type \\[describe-symbol] org-node RET).
 
 If a node has aliases, it is passed to this function again for
 every alias, in which case TITLE is actually one of the aliases."
@@ -380,7 +380,6 @@ For use as `org-node-affixation-fn'."
   (cl-loop for title in coll
            collect (gethash title org-node--title<>affixation-triplet)))
 
-;; TODO: Maybe use group-function for something
 ;; TODO: Assign a category 'org-node, then add an embark action to embark
 ;; TODO: Bind a custom exporter to `embark-export'
 (defun org-node-collection (str pred action)
@@ -500,7 +499,7 @@ can demonstrate the data format.  See also the type `org-node'.")
   "1:1 table mapping raw titles (and ROAM_ALIASES) to IDs.")
 
 (defvar org-node--ref<>id (make-hash-table :test #'equal)
-  "1:1 table mapping ROAM_REFS members to the adjacent ID.")
+  "1:1 table mapping ROAM_REFS members to the ID property near.")
 
 (defvar org-node--uri-path<>uri-type (make-hash-table :test #'equal)
   "1:1 table mapping //paths to types:.")
@@ -508,9 +507,11 @@ can demonstrate the data format.  See also the type `org-node'.")
 (defvar org-node--dest<>links (make-hash-table :test #'equal)
   "1:N table of links.
 
-The table keys are destination IDs, and the corresponding table
-value is a list of `org-node-link' records describing each link,
-with info such in as which ID-node link originates.")
+The table keys are destinations (uuids, uri paths or citekeys),
+and the corresponding table value is a list of `org-node-link'
+records describing each link to that destination, with info such
+as from which ID-node the link originates.  See
+`org-node-get-id-links' for more info.")
 
 (defvar org-node--file<>previews (make-hash-table :test #'equal)
   "1:N table mapping files to previews of backlink contexts.
@@ -827,30 +828,6 @@ didn't do so already, or local changes have been made."
         (let ((byte-compile-dest-file-function `(lambda (&rest _) ,elc-path)))
           (byte-compile-file lib))))
     (or native-path elc-path)))
-
-(defvar org-node--compiled-lambdas (make-hash-table)
-  "1:1 table mapping hashed lambdas with compiled versions.")
-
-(defun org-node--ensure-compiled (fn)
-  "Return FN as a compiled function.
-
-- If FN is a symbol with uncompiled function definition, compile it
-  and return the same symbol.
-- If FN is an anonymous lambda, compile it, cache the resulting
-  bytecode, and return that bytecode."
-  (cond ((compiled-function-p fn) fn)
-        ((symbolp fn)
-         (if (compiled-function-p (symbol-function fn))
-             fn
-           (if (native-comp-available-p) (native-compile fn) (byte-compile fn))
-           fn))
-        ((let ((lambda-hash (sxhash fn)))
-           (or (gethash lambda-hash org-node--compiled-lambdas)
-               (puthash lambda-hash (if (and (native-comp-available-p)
-                                             (not (eq 'closure (car-safe fn))))
-                                        (native-compile fn)
-                                      (byte-compile fn))
-                        org-node--compiled-lambdas))))))
 
 (defun org-node--scan (files finalizer)
   "Begin async scanning FILES for id-nodes and links.
@@ -1186,6 +1163,30 @@ The reason for default t is better experience with
             ;; Just title as candidate, to be affixated by `org-node-collection'
             (puthash title node org-node--candidate<>node)
             (puthash title affx org-node--title<>affixation-triplet)))))))
+
+(defun org-node--ensure-compiled (fn)
+  "Return FN as a compiled function.
+
+- If FN is a symbol with uncompiled function definition, compile it
+  and return the same symbol.
+- If FN is an anonymous lambda, compile it, cache the resulting
+  bytecode, and return that bytecode."
+  (cond ((compiled-function-p fn) fn)
+        ((symbolp fn)
+         (if (compiled-function-p (symbol-function fn))
+             fn
+           (if (native-comp-available-p) (native-compile fn) (byte-compile fn))
+           fn))
+        ((let ((lambda-hash (sxhash fn)))
+           (or (gethash lambda-hash org-node--compiled-lambdas)
+               (puthash lambda-hash (if (and (native-comp-available-p)
+                                             (not (eq 'closure (car-safe fn))))
+                                        (native-compile fn)
+                                      (byte-compile fn))
+                        org-node--compiled-lambdas))))))
+
+(defvar org-node--compiled-lambdas (make-hash-table)
+  "1:1 table mapping hashed lambdas with compiled versions.")
 
 
 ;;;; "Dirty" functions
