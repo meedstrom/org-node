@@ -1929,11 +1929,11 @@ type the name of a node that does not exist.  That enables this
 
 (defcustom org-node-series
   '(("d" :name "Dailies"
-     :classifier org-node--default-daily-classifier
-     :whereami org-node--default-daily-whereami
+     :classifier org-node--example-daily-classifier
+     :whereami org-node--example-daily-whereami
      :prompter (lambda (_series) (org-read-date))
-     :try-goto org-node--standard-series-try-goto-file
-     :creator org-node--default-daily-creator)
+     :try-goto org-node--example-try-goto-file
+     :creator org-node--example-daily-creator)
 
     ;; NOTE: Obviously, this series works best if you have
     ;;       `org-node-put-created' on `org-node-creation-hook'.  But it can be
@@ -1946,8 +1946,8 @@ type the name of a node that does not exist.  That enables this
                      (when (and timestamp (not (string-blank-p timestamp)))
                        (cons timestamp (org-node-get-id node)))))
      :whereami (lambda () (org-entry-get nil "CREATED" t))
-     :prompter org-node--standard-series-prompter
-     :try-goto org-node--standard-series-try-goto-id
+     :prompter org-node--example-prompter
+     :try-goto org-node--example-try-goto-id
      :creator (lambda (sortstr) (org-node--create sortstr (org-id-new) "a"))))
   "Alist describing each node series.
 
@@ -2014,7 +2014,7 @@ daily-note.  It receives a would-be sort-string as argument."
 (defvar org-node--series-info nil
   "Alist describing each node series, internal use.")
 
-(defun org-node--standard-series-try-goto-id (item)
+(defun org-node--example-try-goto-id (item)
   "Assume cdr of ITEM is an org-id and try to visit it."
   (let* ((id (cdr item))
          (node (gethash id org-nodes)))
@@ -2022,17 +2022,18 @@ daily-note.  It receives a would-be sort-string as argument."
       (org-node--goto node)
       t)))
 
-(defun org-node--standard-series-try-goto-file (item)
+(defun org-node--example-try-goto-file (item)
   "Assume cdr of ITEM is a filename and try to visit it."
-  (when (file-readable-p (cdr item))
+  (when (or (file-readable-p (cdr item))
+            (find-buffer-visiting (cdr item)))
     (find-file (cdr item))
     t))
 
-(defun org-node--standard-series-prompter (series)
+(defun org-node--example-prompter (series)
   "Prompt to go to any of the sort-strings in SERIES."
   (completing-read "Go to: " (plist-get series :sorted-items)))
 
-(defun org-node--default-daily-creator (sortstr)
+(defun org-node--example-daily-creator (sortstr)
   "Create a daily-note using SORTSTR as the date."
   (if (eq org-node-creation-fn 'org-node-new-via-roam-capture)
       ;; HACK: Assume this user wants to use their roam-dailies templates
@@ -2060,7 +2061,7 @@ daily-note.  It receives a would-be sort-string as argument."
           (org-node-slug-fn #'identity))
       (org-node--create sortstr (org-id-new) "d"))))
 
-(defun org-node--default-daily-classifier (node)
+(defun org-node--example-daily-classifier (node)
   "Classifier suitable for daily-notes in default Org-Roam style.
 
 If NODE\\='s full file path involves a \"daily\" or \"dailies\"
@@ -2073,7 +2074,7 @@ YYYY-MM-DD, but it does not verify."
     (when (string-match-p "/dail\\w+/" path)
       (cons (file-name-base path) path))))
 
-(defun org-node--default-daily-whereami ()
+(defun org-node--example-daily-whereami ()
   "Check the filename for a date and return it."
   (when-let ((buffer-file (buffer-file-name (buffer-base-buffer))))
     (let ((basename (file-name-base buffer-file)))

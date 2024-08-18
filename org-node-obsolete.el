@@ -35,9 +35,9 @@ value."
   "Define OLD as effectively an alias for NEW.
 Also, running OLD will emit a deprecation warning the first time.
 
-If INTERACTIVE, define it as an interactive function (but not
-autoloaded).  Optional string WHEN says when it was deprecated
-and REMOVED-BY when it may be removed."
+If INTERACTIVE, define it as an interactive function.  Optional
+string WHEN says when it was deprecated and REMOVED-BY when it
+may be removed."
   `(let (warned-once)
      (add-to-list 'org-node-obsolete-names '(,old ,new ,removed-by))
      (defun ,old (&rest args)
@@ -56,19 +56,37 @@ and REMOVED-BY when it may be removed."
                          org-node-rename-file-by-title)
 
 (org-node-obsolete-defun org-node--series-standard-goto
-                         org-node--standard-series-try-goto-id)
+                         org-node--example-try-goto-id)
 
 (org-node-obsolete-defun org-node--series-standard-try-goto
-                         org-node--standard-series-try-goto-id)
+                         org-node--example-try-goto-id)
+
+(org-node-obsolete-defun org-node--standard-series-try-goto-id
+                         org-node--example-try-goto-id)
 
 (org-node-obsolete-defun org-node--series-standard-prompter
-                         org-node--standard-series-prompter)
+                         org-node--example-prompter)
+
+(org-node-obsolete-defun org-node--standard-series-prompter
+                         org-node--example-prompter)
 
 (org-node-obsolete-defun org-node--default-daily-goto
-                         org-node--standard-series-try-goto-file)
+                         org-node--example-try-goto-file)
+
+(org-node-obsolete-defun org-node--standard-series-try-goto-file
+                         org-node--example-try-goto-file)
 
 (org-node-obsolete-defun org-node--default-daily-try-goto
-                         org-node--standard-series-try-goto-file)
+                         org-node--example-try-goto-file)
+
+(org-node-obsolete-defun org-node--default-daily-classifier
+                         org-node--example-daily-classifier)
+
+(org-node-obsolete-defun org-node--default-daily-whereami
+                         org-node--example-daily-whereami)
+
+(org-node-obsolete-defun org-node--default-daily-creator
+                         org-node--example-daily-creator)
 
 (defun org-node--series-standard-creator (sortstr)
   "Create a node with SORTSTR as the title."
