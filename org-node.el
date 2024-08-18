@@ -101,10 +101,6 @@
 (defvar org-roam-dailies-directory)
 (defvar org-super-links-backlink-into-drawer)
 
-;; calendar hooks (not sure where to put them)\(add-hook 'calendar-today-visible-hook #'org-node--dailies-calendar-mark-entries)
-(add-hook 'calendar-today-visible-hook #'org-node--dailies-calendar-mark-entries)
-(add-hook 'calendar-today-invisible-hook #'org-node--dailies-calendar-mark-entries)
-
 
 ;;;; Faces
 (defface org-node-dailies-calendar-note
@@ -604,7 +600,10 @@ When called from Lisp, peek on any hash table HT."
         (advice-add 'rename-file :after #'org-node--handle-rename)
         (advice-add 'delete-file :after #'org-node--handle-delete)
         (org-node-cache-ensure 'must-async t)
-        (org-node--maybe-adjust-idle-timer))
+        (org-node--maybe-adjust-idle-timer)
+        ;; calendar hooks (not sure where to put them)
+        (add-hook 'calendar-today-visible-hook #'org-node--dailies-calendar-mark-entries)
+        (add-hook 'calendar-today-invisible-hook #'org-node--dailies-calendar-mark-entries))
     (cancel-timer org-node--idle-timer)
     (remove-hook 'after-save-hook #'org-node--handle-save)
     (remove-hook 'org-node-creation-hook #'org-node--dirty-ensure-node-known)
@@ -612,7 +611,10 @@ When called from Lisp, peek on any hash table HT."
     (remove-hook 'org-roam-post-node-insert-hook #'org-node--dirty-ensure-link-known)
     (advice-remove 'org-insert-link #'org-node--dirty-ensure-link-known)
     (advice-remove 'rename-file #'org-node--handle-rename)
-    (advice-remove 'delete-file #'org-node--handle-delete)))
+    (advice-remove 'delete-file #'org-node--handle-delete)
+    ;; calendar hooks (not sure where to put them)
+    (remove-hook 'calendar-today-visible-hook #'org-node--dailies-calendar-mark-entries)
+    (remove-hook 'calendar-today-invisible-hook #'org-node--dailies-calendar-mark-entries)))
 
 (defun org-node--handle-rename (file newname &rest _)
   "Arrange to scan NEWNAME for nodes and links, and forget FILE."
