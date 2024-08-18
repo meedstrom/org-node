@@ -2060,29 +2060,6 @@ daily-note.  It receives a would-be sort-string as argument."
           (org-node-slug-fn #'identity))
       (org-node--create sortstr (org-id-new) "d"))))
 
-(defvar org-node-proposed-series-key nil
-  "Key that identifies the series about to be added to.
-Automatically set, should be nil most of the time.")
-
-(defun org-node--add-series-item ()
-  "Look at node near point to maybe add an item to a series.
-The value of `org-node-proposed-series-key', if non-nil,
-identifies the series to add to."
-  (when org-node-proposed-series-key
-    (let* ((series (cdr (assoc org-node-proposed-series-key
-                               org-node--series-info)))
-           (node-here (gethash (org-node-id-at-point) org-nodes))
-           (new-item (when node-here
-                       (funcall (plist-get series :classifier) node-here))))
-      (when new-item
-        (unless (member new-item (plist-get series :sorted-items))
-          (push new-item (plist-get series :sorted-items))
-          ;; Could be faster with `-insert-at' not much I think, given we'd have
-          ;; to figure out the position and the list is already well-sorted
-          (sort (plist-get series :sorted-items)
-                (lambda (item1 item2)
-                  (string> (car item1) (car item2)))))))))
-
 (defun org-node--default-daily-classifier (node)
   "Classifier suitable for daily-notes in default Org-Roam style.
 
@@ -2139,6 +2116,30 @@ format-constructs occur before these."
                   (substring instance idx-day (+ idx-day 2))))
       (cl-assert idx-%F)
       (substring instance idx-%F (+ idx-%F 10)))))
+
+(defvar org-node-proposed-series-key nil
+  "Key that identifies the series about to be added to.
+Automatically set, should be nil most of the time.")
+
+(defun org-node--add-series-item ()
+  "Look at node near point to maybe add an item to a series.
+The value of `org-node-proposed-series-key', if non-nil,
+identifies the series to add to."
+  (when org-node-proposed-series-key
+    (let* ((series (cdr (assoc org-node-proposed-series-key
+                               org-node--series-info)))
+           (node-here (gethash (org-node-id-at-point) org-nodes))
+           (new-item (when node-here
+                       (funcall (plist-get series :classifier) node-here))))
+      (when new-item
+        (unless (member new-item (plist-get series :sorted-items))
+          (push new-item (plist-get series :sorted-items))
+          ;; Could be faster with `-insert-at' but not much I think, given we'd
+          ;; have to figure out the position and the list is already
+          ;; well-sorted
+          (sort (plist-get series :sorted-items)
+                (lambda (item1 item2)
+                  (string> (car item1) (car item2)))))))))
 
 (defun org-node--series-jump (key)
   "Jump to an entry in series identified by KEY."
