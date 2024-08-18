@@ -30,14 +30,6 @@
 ;;;; Minor mode
 
 ;;;###autoload
-(define-globalized-minor-mode org-node-backlink-global-mode
-  org-node-backlink-mode
-  (lambda ()
-    (when (derived-mode-p 'org-mode)
-      (org-node-backlink-mode)))
-  :group 'org-node)
-
-;;;###autoload
 (define-minor-mode org-node-backlink-mode
   "Keep :BACKLINKS: properties updated.
 
@@ -67,6 +59,15 @@
                  #'org-node-backlink--flag-buffer-modification t)
     (remove-hook 'before-save-hook
                  #'org-node-backlink--fix-flagged-parts-of-buffer t)))
+
+;;;###autoload
+(define-globalized-minor-mode org-node-backlink-global-mode
+  org-node-backlink-mode
+  (lambda ()
+    (when (derived-mode-p 'org-mode)
+      (org-node-backlink-mode)))
+  :group 'org-node)
+
 
 
 ;;;; Validation of one buffer at a time
@@ -310,7 +311,7 @@ purely deleted, it flags the preceding and succeeding char."
                   (let ((org-node--imminent-recovery-msg
                          (string-fill "Org-node going to add a backlink to the target of the link you just inserted, but it's likely you will first get a prompt to recover an auto-save file, ready? "
                                       fill-column)))
-                    (org-node--with-quick-file-buffer target-file
+                    (org-node--with-quick-file-buffer file
                       (org-node-backlink--add-at
                        id src-title src-id))))))))))))
 
