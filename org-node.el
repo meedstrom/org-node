@@ -2182,27 +2182,20 @@ If argument NEXT is non-nil, actually visit the next entry."
              (nascent-shift (if (member here (mapcar #'car items)) 1 0))
              (to-check (if next
                            head
-                         (drop (+ (length head) nascent-shift) items)))
-             (target nil))
-        ;; Keep trying as long as TRY-GOTO fails, because an item could be
-        ;; referring to something that has since been deleted from disk, or a
-        ;; buffer region that has been erased.
-        (when (catch 'fail
-                (when (null to-check)
-                  (throw 'fail t))
-                (while (not target)
-                  (let ((item (car to-check)))
-                    (when (null item)
-                      (throw 'fail t))
-                    (pop to-check)
-                    (setq target (funcall (plist-get series :try-goto) item))
-                    (when (not target)
-                      (delete item
+                         (drop (+ (length head) nascent-shift) items))))
+        ;; Usually this should return on the first try, but sometimes stale
+        ;; items refer to something that has since been erased from disk, so
+        ;; keep unregistering each item that TRY-GOTO failed to visit.
+        (cl-loop for item in to-check
+                 if (funcall (plist-get series :try-goto) item)
+                 return t
+                 else (delete item
                               (plist-get (cdr (assoc key org-node--series-info))
-                                         :sorted-items))))))
-          (message "No %s item in series \"%s\""
-                   (if next "next" "previous")
-                   (plist-get series :name)))))))
+                                         :sorted-items))
+                 finally return
+                 (message "No %s item in series \"%s\""
+                          (if next "next" "previous")
+                          (plist-get series :name)))))))
 
 (defun org-node-series-capture-target ()
   "Experimental."
