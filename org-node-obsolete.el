@@ -69,6 +69,7 @@ and REMOVED-BY when it may be removed."
 (defun org-node-faster-roam-list-dailies ()
   (require 'org-node-fakeroam)
   (message "Renames for the rename god.  Renamed `org-node-faster-roam-list-dailies' to `org-node-fakeroam-list-dailies'")
+  (cl-assert (fboundp 'org-node-fakeroam-list-dailies))
   (org-node-fakeroam-list-dailies))
 
 (defun org-node-faster-roam-daily-note-p ()
