@@ -1856,7 +1856,7 @@ possible workflow:
 4b. If it was unknown, it will create a file-level node and then
     capture into there.
 
-Additionally, if you\\='ve set (setq org-node-creation-fn #'org-capture),
+Additionally, with (setq org-node-creation-fn #\\='org-capture),
 commands like `org-node-find' will outsource to org-capture when you
 type the name of a node that does not exist.  That enables this
 \"inverted\" workflow:
@@ -2460,7 +2460,7 @@ but adapt to the surrounding outline level.  I recommend
 adding keywords to the things to exclude:
 
 \(setq org-transclusion-exclude-elements
-      '(property-drawer comment keyword))"
+      \\='(property-drawer comment keyword))"
   (interactive nil org-mode)
   (unless (derived-mode-p 'org-mode)
     (error "Only works in org-mode buffers"))
@@ -2512,12 +2512,12 @@ there was no ID, copies over all inherited tags, and runs
 
 Adding to that, see below for an example advice that copies any
 inherited \"CREATED\" property, if an ancestor has such a
-property.  It is subjective whether you\\='d want this behavior, but
-it can be desirable if you know the subtree had been part of the
-source file for ages so that you see the ancestor\\='s creation-date
-as more \"truthful\" than today\\='s date.
+property.  It is subjective whether you\\='d want this behavior,
+but it can be desirable if you know the subtree had been part of
+the source file for ages so that you see the ancestor\\='s
+creation-date as more \"truthful\" than today\\='s date.
 
-\(advice-add 'org-node-extract-subtree :around
+\(advice-add \\='org-node-extract-subtree :around
             (defun my-inherit-creation-date (orig-fn &rest args)
                    (let ((parent-creation (org-entry-get nil \"CREATED\" t)))
                      (apply orig-fn args)
