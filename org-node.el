@@ -2027,7 +2027,7 @@ Built-in choices:
 ;; To be removed in 2025 when Debian bumps stable
 (defun org-node--strip-diacritics (input-string)
   "Strip diacritics from INPUT-STRING."
-  (if (<= 29 emacs-major-version)
+  (if (>= emacs-major-version 29)
       ;; Emacs 29+ solution
       (thread-last input-string
                    (string-glyph-decompose)
@@ -2052,7 +2052,7 @@ Built-in choices:
 ;; (org-node-slugify-for-web "Mañana Çedilla")
 ;; (org-node-slugify-for-web "How to convince me that 2 + 2 = 3")
 ;; (org-node-slugify-for-web "E. T. Jaynes")
-;; (org-node-slugify-for-web "Amnesic recentf, org-id-locations? Solution: Run kill-emacs-hook periodically.")
+;; (org-node-slugify-for-web "Amnesic recentf? Solution: Run kill-emacs-hook periodically.")
 ;; (org-node-slugify-for-web "Slimline/\"pizza box\" computer chassis")
 ;; (org-node-slugify-for-web "#emacs")
 ;; (org-node-slugify-for-web "칹え🐛")
