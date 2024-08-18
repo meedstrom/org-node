@@ -102,11 +102,23 @@
 (defvar org-super-links-backlink-into-drawer)
 
 
+;;;; Faces
+  (defface org-node-dailies-calendar-note
+  '((t :inherit (org-link) :underline nil))
+  "Face for dates with a daily-note in the calendar."
+  :group 'org-node-faces)
+
 ;;;; Options
 
 (defgroup org-node nil
   "Support a zettelkasten of org-id files and subtrees."
   :group 'org)
+
+(defcustom org-node-mark-calendar-days-with-notes t
+  "Whether or not to mark days in the calendar for whic
+a daily note is present."
+  :group 'org-node
+  :type boolean)
 
 (defcustom org-node-rescan-functions nil
   "Hook run after scanning specific files.
@@ -695,6 +707,28 @@ In broad strokes:
     (when (and (hash-table-empty-p org-id-locations)
                (null org-node-extra-id-dirs))
       (org-node--die "org-id-locations empty, try `org-id-update-id-locations' or `org-roam-update-org-id-locations'"))))
+
+;;;; Calendar integration
+(defun org-node--dailies-calendar-mark-entries ()
+  "Mark days in the calendar for which a daily-note is present."
+  (when org-node-mark-calendar-days-with-notes
+    (let* ((date-series (cdr (assoc "d" org-node--series-info)))
+           (dates-plist (plist-get date-series :sorted-items))
+           (dates (cl-loop for date-item in dates-plist
+                           collect (car date-item))))
+      ;; dates
+      (cl-loop for date in dates
+               do (let* ((mdy-list-date
+                          (cl-destructuring-bind (_ _ _ d m y _ _ _)
+                              (org-parse-time-string date)
+                            (list m d y))))
+                    (when (calendar-date-is-visible-p mdy-list-date)
+                      (calendar-mark-visible-date
+                       mdy-list-date
+                       'org-node-dailies-calendar-note)))))))
+
+(add-hook 'calendar-today-visible-hook #'org-node--dailies-calendar-mark-entries)
+(add-hook 'calendar-today-invisible-hook #'org-node--dailies-calendar-mark-entries)
 
 
 ;;;; Scanning
