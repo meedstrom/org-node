@@ -357,32 +357,27 @@ This includes all links and citations that touch NODE."
                                (vector id ref type)
                              ;; Ref is a @citekey
                              (vector id ref "cite")))))
-    ;; See `org-roam-db-insert-citation'
-    (dolist (cite (cl-loop for link in (org-node-get-reflinks node)
-                           when (null (org-node-link-type link))
-                           collect link))
-      (org-roam-db-query [:insert :into citations :values $v1]
-                         (vector (org-node-link-origin cite)
-                                 (org-node-link-dest cite)
-                                 (org-node-link-pos cite)
-                                 (org-node-link-properties cite))))
-    ;; See `org-roam-db-insert-link'
-    (dolist (link (append (org-node-get-id-links node)
-                          (org-node-get-reflinks node)))
+    (dolist (link (nconc (org-node-get-id-links node)
+                         (org-node-get-reflinks node)))
+      ;; See `org-roam-db-insert-link'
       ;; Don't add citations (type=nil), they go in a separate table
-      (when (org-node-link-type link)
-        (org-roam-db-query [:insert :into links :values $v1]
-                           (vector (org-node-link-pos link)
-                                   (org-node-link-origin link)
-                                   id
-                                   (org-node-link-type link)
+      (if (org-node-link-type link)
+          (org-roam-db-query [:insert :into links :values $v1]
+                             (vector (org-node-link-pos link)
+                                     (org-node-link-origin link)
+                                     id
+                                     (org-node-link-type link)
+                                     (org-node-link-properties link)))
+        ;; See `org-roam-db-insert-citation'
+        (org-roam-db-query [:insert :into citations :values $v1]
+                           (vector (org-node-link-origin link)
+                                   (org-node-link-dest link)
+                                   (org-node-link-pos link)
                                    (org-node-link-properties link)))))))
 
 
 ;;;; Bonus advices
-;; REVIEW: Maybe use `file-truename' some places
 
-;; 1368ms to 3ms!
 (defun org-node-fakeroam-list-files ()
   "Faster than `org-roam-list-files'."
   (cl-loop with roam-dir = (abbreviate-file-name org-roam-directory)
@@ -396,29 +391,29 @@ For argument EXTRA-FILES, see that function."
   (let ((daily-dir (abbreviate-file-name
                     (file-name-concat org-roam-directory
                                       org-roam-dailies-directory))))
-    (append (cl-loop
-             for file in (org-node-list-files t)
-             when (and (string-prefix-p daily-dir file)
-                       (let ((file (file-name-nondirectory file)))
-                         (not (or (auto-save-file-name-p file)
-                                  (backup-file-name-p file)
-                                  (string-match "^\\." file)))))
-             collect file)
-            extra-files)))
+    (nconc (cl-loop
+            for file in (org-node-list-files t)
+            when (string-prefix-p daily-dir file)
+            collect file)
+           extra-files)))
 
-;; A bonus though it doesn't even need org-node
 (defun org-node-fakeroam-daily-note-p (&optional file)
-  "Faster than `org-roam-dailies--daily-note-p' on a slow fs.
+  "Maybe faster than `org-roam-dailies--daily-note-p'.
 With optional argument FILE, check FILE instead of current
 buffer file."
   ;; No `abbreviate-file-name' needed because filename does not come from
   ;; org-node.
   (let ((daily-dir (file-name-concat org-roam-directory
-                                     org-roam-dailies-directory))
-        (path (or file (buffer-file-name (buffer-base-buffer)))))
-    (unless (file-name-absolute-p path)
-      (error "Expected absolute filename but got: %s" path))
-    (string-prefix-p (downcase daily-dir) (downcase path))))
+                                     org-roam-dailies-directory)))
+    (unless file
+      (setq file (buffer-file-name (buffer-base-buffer))))
+    (unless (file-name-absolute-p file)
+      (error "Expected absolute filename but got: %s" file))
+    (and (string-suffix-p "org" file)
+         (string-prefix-p (downcase (file-truename daily-dir))
+                          (downcase (file-truename file)))
+         (--none-p (string-search it file)
+                   org-node-extra-id-dirs-exclude))))
 
 (provide 'org-node-fakeroam)
 
