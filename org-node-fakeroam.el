@@ -30,6 +30,7 @@
 
 (require 'cl-lib)
 (require 'org-node)
+(require 'org-node-obsolete)
 (require 'ol)
 (if (require 'org-roam nil t)
     (require 'emacsql)
@@ -129,10 +130,16 @@ Run ORIG-FN with ARGS, while overriding
     (apply orig-fn args)))
 
 
-;;;; NoSQL method: fabricate knockoff roam backlinks
+;;;; JIT method
+;; Fabricate knockoff Roam backlinks in real time, so that a DB is not needed
+;; to display the Roam buffer
+
+(org-node-obsolete-defun org-node-fakeroam-nosql-mode
+                         org-node-fakeroam-jit-backlinks-mode
+                         t "2024-08-18" "2024-09-30")
 
 ;;;###autoload
-(define-minor-mode org-node-fakeroam-nosql-mode
+(define-minor-mode org-node-fakeroam-jit-backlinks-mode
   "Override org-roam backlink-getters to look up org-node tables.
 
 As a result, \\[org-roam-buffer-toggle] will function without
