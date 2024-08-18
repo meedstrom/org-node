@@ -122,7 +122,7 @@
   "Whether or not to mark days in the calendar for which
 a daily note is present."
   :group 'org-node
-  :type boolean)
+  :type 'boolean)
 
 (defcustom org-node-rescan-functions nil
   "Hook run after scanning specific files.
