@@ -148,11 +148,11 @@ having SQLite installed, and you can delete the org-roam.db.
 -----"
   :global t
   :group 'org-node
-  (if org-node-fakeroam-nosql-mode
+  (if org-node-fakeroam-jit-backlinks-mode
       (progn
         (org-node-fakeroam--precompile)
         (unless org-node-cache-mode
-          (message "`org-node-fakeroam-nosql-mode' will do nothing without `org-node-cache-mode'"))
+          (message "`org-node-fakeroam-jit-backlinks-mode' will do nothing without `org-node-cache-mode'"))
         (advice-add 'org-roam-backlinks-get :override
                     #'org-node-fakeroam--mk-backlinks)
         (advice-add 'org-roam-reflinks-get :override
