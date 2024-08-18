@@ -96,7 +96,6 @@
 (declare-function #'org-roam-node-slug "org-roam-node")
 (declare-function #'org-roam-dailies--capture "org-roam-dailies")
 (defvar org-roam-completion-everywhere)
-(defvar org-journal-encrypt-journal)
 (defvar org-roam-directory)
 (defvar org-roam-dailies-directory)
 (defvar org-super-links-backlink-into-drawer)
@@ -580,6 +579,7 @@ When called from Lisp, peek on any hash table HT."
       (progn
         (add-hook 'after-save-hook #'org-node--handle-save)
         (add-hook 'org-node-creation-hook #'org-node--dirty-ensure-node-known -50)
+        (add-hook 'org-node-creation-hook #'org-node--add-series-item 90)
         (add-hook 'org-node-insert-link-hook #'org-node--dirty-ensure-link-known -50)
         (add-hook 'org-roam-post-node-insert-hook #'org-node--dirty-ensure-link-known -50)
         (advice-add 'org-insert-link :after #'org-node--dirty-ensure-link-known)
@@ -1112,7 +1112,7 @@ Fortunately it is rarely needed, since the insert-link advices of
 normal usage!  What's left undone til idle:
 
 1. deleted links remain in the table, leading to undead backlinks
-2. :pos values can desync, which can affect org-roam-buffer
+2. :pos values can desync, which can affect the org-roam buffer
 
 The reason for default t is better experience with
 `org-node-backlink-mode'."
@@ -1812,7 +1812,6 @@ With optional argument NEXT, actually visit the next entry."
                           (when (not target)
                             (delete item (plist-get series :sorted-items))
                             ;; (setf (plist-get series :sorted-items))
-
                             ))
                       (throw 'fail t)))))
             (message "No %s item in series \"%s\""
@@ -1885,11 +1884,14 @@ Also add a menu entry in `org-node-series-menu'."
                       :incompatible)
           (list (seq-uniq (cons key old))))))
 
-;; Haven't decided name
-(defalias 'org-node-series-dispatch 'org-node-series-menu)
-
 (defvar org-node-current-series-key nil
-  "Placeholder.")
+  "Key of the series currently being browsed with the menu.")
+
+;; Haven't decided name
+;;;###autoload
+(defalias 'org-node-series-dispatch #'org-node-series-menu)
+
+;;;###autoload
 (transient-define-prefix org-node-series-menu ()
   :incompatible '(("d"))
   ["Series"
@@ -2152,14 +2154,15 @@ To visit a node after creating it, either let-bind
     (org-node--create TITLE ID)
     (org-node-cache-ensure t)
     (let ((node (gethash ID org-node--id<>node)))
-      (if node (org-node--goto node)))"
+      (if node (org-node--goto node)))
+
+Optional argument SERIES-KEY means use the resulting node to
+maybe grow the corresponding series."
   (setq org-node-proposed-title title)
   (setq org-node-proposed-id id)
   (setq org-node-proposed-series-key series-key)
-  (add-hook 'org-node-creation-hook #'org-node--add-series-item 90)
   (unwind-protect
       (funcall org-node-creation-fn)
-    (remove-hook 'org-node-creation-hook #'org-node--add-series-item)
     (setq org-node-proposed-title nil)
     (setq org-node-proposed-id nil)
     (setq org-node-proposed-series-key nil)))
@@ -2245,19 +2248,19 @@ In simple terms, let\\='s say you have configured
 targets `(function org-node-capture-target)'.  Now here's a
 possible workflow:
 
-1. Run M-x org-capture
+1. Run org-capture
 2. Select your template
 3. Type name of known or unknown node
 4a. If it was known, it will capture into that node.
-4b. If it was unknown, it will create a file-level node and then capture
-    into there.
+4b. If it was unknown, it will create a file-level node and then
+    capture into there.
 
 Additionally, if you\\='ve set (setq org-node-creation-fn #'org-capture),
 commands like `org-node-find' will outsource to org-capture when you
 type the name of a node that does not exist.  That enables this
 \"inverted\" workflow:
 
-1. Run M-x org-node-find
+1. Run `org-node-find'
 2. Type name of an unknown node
 3. Select your template
 4. Same as 4b earlier."
@@ -2745,8 +2748,11 @@ Internal argument INTERACTIVE is automatically set."
 
 ;;;###autoload
 (defun org-node-rewrite-links-ask (&optional files)
-  "Search all files for ID-links where the link description has
-gotten out of sync from the destination's current title.
+  "Update desynced link descriptions, interactively.
+
+Search all files, or just FILES if non-nil, for ID-links where
+the link description has gotten out of sync from the
+destination's current title.
 
 At each link, prompt for user consent, then auto-update the link
 so it matches the destination's current title."

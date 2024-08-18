@@ -16,7 +16,7 @@ I found org-roam too slow, so I made [[https://github.com/meedstrom/quickroam][q
 
 ** What's a "node"?
 
-My life can be divided into two periods "*before org-roam*" and "*after org-roam*".  I crossed a kind of gap once I got a good way to link between my notes.  It's strange to remember when I just relied on browsing subtrees and folders -- what an odd way to work!
+My life can be divided into two periods "*before org-roam*" and "*after org-roam*".  I crossed a kind of gap once I got a good way to link between my notes.  It's odd to remember when I just relied on browsing subtrees and folders -- what a strange way to work!
 
 I used to lose track of things I had written, under some forgotten heading in a forgotten file in a forgotten directory.  The org-roam method let me *find* and *build on* my own work, instead of [[https://en.wikipedia.org/wiki/Cryptomnesia][recreating my work]] all the time.
 
