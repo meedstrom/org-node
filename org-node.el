@@ -119,7 +119,7 @@
   :group 'org)
 
 (defcustom org-node-mark-calendar-days-with-notes t
-  "Whether or not to mark days in the calendar for whic
+  "Whether or not to mark days in the calendar for which
 a daily note is present."
   :group 'org-node
   :type boolean)
