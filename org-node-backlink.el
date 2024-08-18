@@ -68,7 +68,6 @@
       (org-node-backlink-mode)))
   :group 'org-node)
 
-
 
 ;;;; Validation of one buffer at a time
 

@@ -2156,56 +2156,53 @@ format-constructs occur before these."
 
 (defun org-node--series-goto-previous (key &optional next)
   "Visit the previous entry in series identified by KEY.
-With optional argument NEXT, actually visit the next entry."
-  (cl-symbol-macrolet ((series (cdr (assoc key org-node--series-info))))
-    (let* (;; (series (cdr (assoc key org-node--series-info)))
-           (here (funcall (plist-get series :whereami)))
-           (items (plist-get series :sorted-items))
-           (head nil))
-      (unless (null here)
-        (cl-loop for item in items
-                 if (string> (car item) here)
-                 do (push item head)
-                 else return t))
-      (when (or here
-                (when (y-or-n-p
-                       (format "Not in series \"%s\".  Jump to latest item in that series?"
-                               (plist-get series :name)))
-                  (setq head (take 1 items))
-                  t))
-        (let* (;; Special case: say you create a daily but don't save the buffer
-               ;; (it's \"nascent\").  Then HERE is a sort-string that is not a
-               ;; member of ITEMS at all.  Then navigating back would jump two
-               ;; steps.
-               ;; TODO: Just add to the series when creating the nascent node
-               (nascent-shift
-                (if (member here (mapcar #'car items)) 1 0))
-               (to-check (if next
-                             head
-                           (drop (+ (length head) nascent-shift) items)))
-               (target nil))
-          ;; Keep trying items as long as :try-goto fails, because an item
-          ;; could be referring to something that has since been deleted from
-          ;; disk.  This is also an opportunity to clean stale items.
-          (when
-              (catch 'fail
+If argument NEXT is non-nil, actually visit the next entry."
+  (let* ((series (cdr (assoc key org-node--series-info)))
+         (here (funcall (plist-get series :whereami)))
+         (items (plist-get series :sorted-items))
+         (head nil))
+    ;; Find our location in the series
+    (unless (null here)
+      (cl-loop for item in items
+               if (string> (car item) here)
+               do (push item head)
+               else return t))
+    (when (or here
+              (when (y-or-n-p
+                     (format "Not in series \"%s\".  Jump to latest item in that series?"
+                             (plist-get series :name)))
+                (setq head (take 1 items))
+                t))
+      (let* (;; Special case: say you create a daily but don't save the buffer
+             ;; (it's "nascent").  Then HERE is a sort-string that is not found
+             ;; in ITEMS yet.  Then navigating backwards would appear to
+             ;; jump two steps.
+             ;; TODO: Just add to the series when creating new things
+             ;;       and this should not be necessary.
+             (nascent-shift (if (member here (mapcar #'car items)) 1 0))
+             (to-check (if next
+                           head
+                         (drop (+ (length head) nascent-shift) items)))
+             (target nil))
+        ;; Keep trying as long as TRY-GOTO fails, because an item could be
+        ;; referring to something that has since been deleted from disk, or a
+        ;; buffer region that has been erased.
+        (when (catch 'fail
                 (when (null to-check)
                   (throw 'fail t))
                 (while (not target)
                   (let ((item (car to-check)))
-                    (if item
-                        (progn
-                          (pop to-check)
-                          (setq target (funcall (plist-get series :try-goto)
-                                                item))
-                          (when (not target)
-                            (delete item (plist-get series :sorted-items))
-                            ;; (setf (plist-get series :sorted-items))
-                            ))
-                      (throw 'fail t)))))
-            (message "No %s item in series \"%s\""
-                     (if next "next" "previous")
-                     (plist-get series :name))))))))
+                    (when (null item)
+                      (throw 'fail t))
+                    (pop to-check)
+                    (setq target (funcall (plist-get series :try-goto) item))
+                    (when (not target)
+                      (delete item
+                              (plist-get (cdr (assoc key org-node--series-info))
+                                         :sorted-items))))))
+          (message "No %s item in series \"%s\""
+                   (if next "next" "previous")
+                   (plist-get series :name)))))))
 
 (defun org-node-series-capture-target ()
   "Experimental."
