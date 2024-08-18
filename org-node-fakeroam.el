@@ -135,7 +135,7 @@ Run ORIG-FN with ARGS, while overriding
 
 (org-node-obsolete-defun org-node-fakeroam-nosql-mode
                          org-node-fakeroam-jit-backlinks-mode
-                         t "2024-08-18" "2024-09-30")
+                         nil "2024-08-18" "2024-09-30")
 
 ;;;###autoload
 (define-minor-mode org-node-fakeroam-jit-backlinks-mode
