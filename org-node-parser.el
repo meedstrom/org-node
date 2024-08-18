@@ -302,6 +302,17 @@ Arguments PLAIN-RE and MERGED-RE..."
 (defvar org-node-parser--result:problems nil)
 (defvar org-node-parser--curr-file nil)
 
+;; Compiler
+(defvar $plain-re)
+(defvar $merged-re)
+(defvar $assume-coding-system)
+(defvar $file-name-handler-alist)
+(defvar $file-todo-option-re)
+(defvar $global-todo-re)
+(defvar $backlink-drawer-re)
+(defvar $i)
+(defvar $files)
+
 (defun org-node-parser--collect-dangerously ()
   "Dangerous!  Overwrites the current buffer!
 
@@ -314,8 +325,8 @@ the findings to another temp file."
     (dolist (var (read (buffer-string)))
       (set (car var) (cdr var)))
     (erase-buffer)
-    ;; The variable `i' was set via the command line that launched this process
-    (insert-file-contents (org-node-parser--tmpfile "file-list-%d.eld" i)))
+    ;; The variable `$i' was set by the command line that launched this process
+    (insert-file-contents (org-node-parser--tmpfile "file-list-%d.eld" $i)))
   (setq $files (read (buffer-string)))
   (setq buffer-read-only t)
   (let ((case-fold-search t)
@@ -621,7 +632,7 @@ the findings to another temp file."
         (( t error )
          (push (list FILE (point) err) org-node-parser--result:problems))))
 
-    (with-temp-file (org-node-parser--tmpfile "results-%d.eld" i)
+    (with-temp-file (org-node-parser--tmpfile "results-%d.eld" $i)
       (let ((write-region-inhibit-fsync nil) ;; Default t in batch mode
             (print-length nil)
             (print-level nil))

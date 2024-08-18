@@ -72,8 +72,6 @@
 
 ;; TODO: Support .org.gpg, .org.age
 
-;; TODO: Test perf with #'string-equal as test function on all tables
-
 (require 'cl-lib)
 (require 'seq)
 (require 'subr-x)
@@ -86,16 +84,6 @@
 (require 'org-node-parser)
 (require 'org-node-obsolete)
 
-(declare-function #'org-element-property "org-element")
-(declare-function #'org-super-links-convert-link-to-super "org-super-links")
-(declare-function #'consult--grep "consult")
-(declare-function #'consult--grep-make-builder "consult")
-(declare-function #'wgrep-finish-edit "wgrep")
-(declare-function #'wgrep-change-to-wgrep-mode "wgrep")
-(declare-function #'org-roam-capture- "org-roam-capture")
-(declare-function #'org-roam-node-create "org-roam-node")
-(declare-function #'org-roam-node-slug "org-roam-node")
-(declare-function #'org-roam-dailies--capture "org-roam-dailies")
 (defvar org-roam-completion-everywhere)
 (defvar org-roam-directory)
 (defvar org-roam-dailies-directory)
@@ -830,6 +818,9 @@ didn\\='t do so already, or local changes have been made."
           (byte-compile-file lib))))
     (or native-path elc-path)))
 
+
+(defvar $i)
+(defvar org-node--debug nil)
 (defun org-node--scan (files finalizer)
   "Begin async scanning FILES for id-nodes and links.
 Other functions have similar docstrings, but this function
@@ -897,7 +888,7 @@ function to update current tables."
             (write-region (prin1-to-string files)
                           nil
                           (org-node-parser--tmpfile "file-list-0.eld")))
-          (setq i 0)
+          (setq $i 0)
           (setq org-node-parser--result:found-links nil)
           (setq org-node-parser--result:problems nil)
           (setq org-node-parser--result:paths-types nil)
@@ -943,7 +934,7 @@ function to update current tables."
                        ;; the filesizes and go back to default 800kB GC if
                        ;; we're dealing with more than like 1GB of org files.
                        "--eval" (format "(setq gc-cons-threshold %d)" gc-ultra)
-                       "--eval" (format "(setq i %d)" i)
+                       "--eval" (format "(setq $i %d)" i)
                        "--eval" (format "(setq temporary-file-directory \"%s\")"
                                         temporary-file-directory)
                        "--load" compiled-lib
@@ -967,11 +958,11 @@ to FINALIZER."
           (coding-system-for-read org-node-perf-assume-coding-system)
           (coding-system-for-write org-node-perf-assume-coding-system)
           (editorconfig
-           (if (advice-member-p #'editorconfig--advice-insert-file-contents
+           (if (advice-member-p 'editorconfig--advice-insert-file-contents
                                 #'insert-file-contents)
                (prog1 t
                  (advice-remove #'insert-file-contents
-                                #'editorconfig--advice-insert-file-contents))))
+                                'editorconfig--advice-insert-file-contents))))
           (result-sets nil))
       (unwind-protect
           (with-temp-buffer
@@ -996,7 +987,7 @@ to FINALIZER."
                   (push (read (buffer-string)) result-sets)))))
         (if editorconfig
             (advice-add #'insert-file-contents :around
-                        #'editorconfig--advice-insert-file-contents)))
+                        'editorconfig--advice-insert-file-contents)))
       (setq org-node--time-at-last-child-done
             (-last-item (sort (-map #'-last-item result-sets) #'time-less-p)))
       ;; Merge N result-sets into one result-set, to run FINALIZER once
@@ -1292,9 +1283,6 @@ also necessary is `org-node--dirty-ensure-link-known' elsewhere."
 
 
 ;;;; Scanning: Etc
-
-(defvar org-node--debug nil
-  "Whether to run in a way suitable for debugging.")
 
 ;; FIXME: Sure, it detects them, but won't run `org-node-rescan-hook' on them
 (defvar org-node--idle-timer (timer-create)
@@ -1691,9 +1679,11 @@ org-roam."
 
 (defun org-node-slugify-like-roam-actual (title)
   "Call on `org-roam-node-slug' to transform TITLE."
-  (if (require 'org-roam nil t)
-      (org-roam-node-slug (org-roam-node-create :title title))
-    (user-error "Install org-roam to use `org-node-slugify-like-roam-actual'")))
+  (or (and (require 'org-roam nil t)
+           (fboundp 'org-roam-node-slug)
+           (fboundp 'org-roam-node-create)
+           (org-roam-node-slug (org-roam-node-create :title title)))
+      (user-error "Install org-roam to use `org-node-slugify-like-roam-actual'")))
 
 
 ;;;; How to create new nodes
@@ -1824,6 +1814,7 @@ which it gets some necessary variables."
       (goto-char (point-max))
       (run-hooks 'org-node-creation-hook))))
 
+;;; TODO: Maybe move this to fakeroam.el
 (defun org-node-new-via-roam-capture ()
   "Call `org-roam-capture-' with predetermined arguments.
 Meant to be called indirectly as `org-node-creation-fn', at which
@@ -1832,12 +1823,14 @@ time some necessary variables are set."
           (null org-node-proposed-id))
       (message "`org-node-new-via-roam-capture' is meant to be called indirectly via `org-node--create'")
     (unless (require 'org-roam nil t)
-      (org-node--die "Didn't create node %s! Either install org-roam or %s"
-                     org-node-proposed-title
-                     "configure `org-node-creation-fn'"))
-    (org-roam-capture- :node (org-roam-node-create
-                              :title org-node-proposed-title
-                              :id    org-node-proposed-id))))
+      (user-error "Didn't create node %s! Either install org-roam or %s"
+                  org-node-proposed-title
+                  "configure `org-node-creation-fn'"))
+    (when (and (fboundp 'org-roam-capture-)
+               (fboundp 'org-roam-node-create))
+      (org-roam-capture- :node (org-roam-node-create
+                                :title org-node-proposed-title
+                                :id    org-node-proposed-id)))))
 
 (defun org-node-capture-target ()
   "Can be used as target in a capture template.
@@ -1923,7 +1916,6 @@ type the name of a node that does not exist.  That enables this
                   "\n#+title: " title
                   "\n"))
         (run-hooks 'org-node-creation-hook)))))
-
 
 
 ;;;; Series
@@ -2039,21 +2031,22 @@ daily-note.  It receives a would-be sort-string as argument."
   (if (eq org-node-creation-fn 'org-node-new-via-roam-capture)
       ;; HACK: Assume this user wants to use their roam-dailies templates
       ;; TODO: Somehow make `org-node-new-via-roam-capture' able to do this
-      (progn
-        (require 'org-roam-dailies)
-        (unwind-protect
-            (progn
-              (setq org-node-proposed-series-key "d")
-              (add-hook 'org-roam-capture-new-node-hook
-                        #'org-node--add-series-item)
-              (org-roam-dailies--capture
-               (encode-time
-                (parse-time-string
-                 (concat sortstr (format-time-string " %H:%M:%S %z"))))
-               t))
-          (setq org-node-proposed-series-key nil)
-          (remove-hook 'org-roam-capture-new-node-hook
-                       #'org-node--add-series-item)))
+      (if (not (require 'org-roam-dailies nil t))
+          (user-error "Install org-roam or edit `org-node-series' ")
+        (when (fboundp 'org-roam-dailies--capture)
+          (unwind-protect
+              (progn
+                (setq org-node-proposed-series-key "d")
+                (add-hook 'org-roam-capture-new-node-hook
+                          #'org-node--add-series-item)
+                (org-roam-dailies--capture
+                 (encode-time
+                  (parse-time-string
+                   (concat sortstr (format-time-string " %H:%M:%S %z"))))
+                 t))
+            (setq org-node-proposed-series-key nil)
+            (remove-hook 'org-roam-capture-new-node-hook
+                         #'org-node--add-series-item))))
     (let ((org-node-ask-directory
            (if (require 'org-roam-dailies nil t)
                (file-name-concat org-roam-directory org-roam-dailies-directory)
@@ -2313,6 +2306,7 @@ Also add a menu entry in `org-node-series-dispatch'."
     (transient-remove-suffix 'org-node-series-dispatch key))
   (transient-append-suffix 'org-node-series-dispatch '(0 -1)
     (list key name key))
+  ;; Make the series switches mutually exclusive
   (let ((old (car (slot-value (get 'org-node-series-dispatch 'transient--prefix)
                               :incompatible))))
     (setf (slot-value (get 'org-node-series-dispatch 'transient--prefix)
@@ -2816,44 +2810,46 @@ open a wgrep buffer of the search hits, and start an interactive
 search-replace that updates the links.  After the user consents
 to replacing all the links, finally rename the asset file itself."
   (interactive)
-  (unless (fboundp 'wgrep-change-to-wgrep-mode)
+  (unless (require 'wgrep nil t)
     (user-error "This command requires the wgrep package"))
-  (require 'wgrep)
-  (let ((root (car (org-node--root-dirs (org-node-list-files))))
-        (default-directory default-directory))
-    (or (equal default-directory root)
-        (if (y-or-n-p (format "Go to folder \"%s\"?" root))
-            (setq default-directory root)
-          (setq default-directory
-                (read-directory-name
-                 "Directory with Org notes to operate on: "))))
-    (when-let ((bufs (--filter (string-search "*grep*" (buffer-name it))
-                               (buffer-list))))
-      (when (yes-or-no-p "Kill other *grep* buffers to be sure this works?")
-        (mapc #'kill-buffer bufs)))
-    (let* ((filename (file-relative-name (read-file-name "File to rename: ")))
-           (new (read-string "New name: " filename)))
-      (mkdir (file-name-directory new) t)
-      (unless (file-writable-p new)
-        (error "New path wouldn't be writable"))
-      (rgrep (regexp-quote filename) "*.org")
-      ;; HACK Doesn't work right away, so wait a sec, then it works
-      (run-with-timer
-       1 nil
-       (lambda ()
-         (pop-to-buffer (--find (string-search "*grep*" (buffer-name it))
-                                (buffer-list)))
-         (wgrep-change-to-wgrep-mode)
-         (goto-char (point-min))
-         ;; Interactive replaces
-         (query-replace filename new)
-         ;; NOTE: If the user quits the replaces with C-g, the following code
-         ;;       never runs, which is good.
-         (when (buffer-modified-p)
-           (wgrep-finish-edit)
-           (rename-file filename new)
-           (message "File renamed from %s to %s" filename new))))
-      (message "Waiting for rgrep to populate buffer..."))))
+  (when (and (fboundp 'wgrep-change-to-wgrep-mode)
+             (fboundp 'wgrep-finish-edit))
+    ;; (user-error "This command requires the wgrep package")
+    (let ((root (car (org-node--root-dirs (org-node-list-files))))
+          (default-directory default-directory))
+      (or (equal default-directory root)
+          (if (y-or-n-p (format "Go to folder \"%s\"?" root))
+              (setq default-directory root)
+            (setq default-directory
+                  (read-directory-name
+                   "Directory with Org notes to operate on: "))))
+      (when-let ((bufs (--filter (string-search "*grep*" (buffer-name it))
+                                 (buffer-list))))
+        (when (yes-or-no-p "Kill other *grep* buffers to be sure this works?")
+          (mapc #'kill-buffer bufs)))
+      (let* ((filename (file-relative-name (read-file-name "File to rename: ")))
+             (new (read-string "New name: " filename)))
+        (mkdir (file-name-directory new) t)
+        (unless (file-writable-p new)
+          (error "New path wouldn't be writable"))
+        (rgrep (regexp-quote filename) "*.org")
+        ;; HACK Doesn't work right away, so wait a sec, then it works
+        (run-with-timer
+         1 nil
+         (lambda ()
+           (pop-to-buffer (--find (string-search "*grep*" (buffer-name it))
+                                  (buffer-list)))
+           (wgrep-change-to-wgrep-mode)
+           (goto-char (point-min))
+           ;; Interactive replaces
+           (query-replace filename new)
+           ;; NOTE: If the user quits the replaces with C-g, the following code
+           ;;       never runs, which is good.
+           (when (buffer-modified-p)
+             (wgrep-finish-edit)
+             (rename-file filename new)
+             (message "File renamed from %s to %s" filename new))))
+        (message "Waiting for rgrep to populate buffer...")))))
 
 ;;;###autoload
 (defun org-node-insert-heading ()
@@ -2926,14 +2922,15 @@ In case of unsolvable problems, how to wipe org-id-locations:
 (defun org-node-grep ()
   "Grep across all files known to org-node."
   (interactive)
-  (unless (fboundp #'consult--grep)
+  (unless (require 'consult nil t)
     (user-error "This command requires the consult package"))
-  (require 'consult)
-  (org-node--init-ids)
-  (consult--grep "Grep across all files known to org-node"
-                 #'consult--grep-make-builder
-                 (org-node-list-files)
-                 nil))
+  (when (and (fboundp 'consult--grep)
+             (fboundp 'consult--grep-make-builder))
+    (org-node--init-ids)
+    (consult--grep "Grep across all files known to org-node"
+                   #'consult--grep-make-builder
+                   (org-node-list-files)
+                   nil)))
 
 (defvar org-node--linted nil
   "List of files linted so far.")
@@ -3411,7 +3408,8 @@ Designed for `completion-at-point-functions', which see."
 (defun org-node-convert-link-to-super (&rest _)
   "Drop input and call `org-super-links-convert-link-to-super'."
   (require 'org-super-links)
-  (org-super-links-convert-link-to-super nil))
+  (when (fboundp 'org-super-links-convert-link-to-super)
+    (org-super-links-convert-link-to-super nil)))
 
 (defun org-node-try-visit-ref-node ()
   "Designed for `org-open-at-point-functions'.
