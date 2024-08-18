@@ -74,7 +74,8 @@ and REMOVED-BY when it may be removed."
 (defun org-node-faster-roam-daily-note-p ()
   (require 'org-node-fakeroam)
   (message "Renames for the rename god.  Renamed `org-node-faster-roam-daily-note-p' to `org-node-fakeroam-daily-note-p'")
-  (org-node-fakeroam-daily-note-p))
+  (when (fboundp 'org-node-fakeroam-daily-note-p)
+    (org-node-fakeroam-daily-note-p)))
 
 (provide 'org-node-obsolete)
 
