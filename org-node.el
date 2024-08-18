@@ -100,8 +100,6 @@
 (defvar org-roam-dailies-directory)
 (defvar org-super-links-backlink-into-drawer)
 
-(define-hash-table-test 'org-node--ht-string= #'string-equal #'sxhash-equal)
-
 
 ;;;; Options
 
@@ -374,7 +372,7 @@ For use as `org-node-affixation-fn'."
           nil)
         nil))
 
-(defvar org-node--title<>affixation-triplet (make-hash-table :test #'org-node--ht-string=)
+(defvar org-node--title<>affixation-triplet (make-hash-table :test #'equal)
   "1:1 table mapping titles or aliases to affixation triplets.")
 
 (defun org-node--affixate-collection (coll)
@@ -489,24 +487,24 @@ or you can visit the homepage:
 
 (defvaralias 'org-nodes 'org-node--id<>node)
 
-(defvar org-node--id<>node (make-hash-table :test #'org-node--ht-string=)
+(defvar org-node--id<>node (make-hash-table :test #'equal)
   "1:1 table mapping IDs to nodes.
 To peek on the contents, try \\[org-node-peek] a few times, which
 can demonstrate the data format.  See also the type `org-node'.")
 
-(defvar org-node--candidate<>node (make-hash-table :test #'org-node--ht-string=)
+(defvar org-node--candidate<>node (make-hash-table :test #'equal)
   "1:1 table mapping completion candidates to nodes.")
 
-(defvar org-node--title<>id (make-hash-table :test #'org-node--ht-string=)
+(defvar org-node--title<>id (make-hash-table :test #'equal)
   "1:1 table mapping raw titles (and ROAM_ALIASES) to IDs.")
 
-(defvar org-node--ref<>id (make-hash-table :test #'org-node--ht-string=)
+(defvar org-node--ref<>id (make-hash-table :test #'equal)
   "1:1 table mapping ROAM_REFS members to the ID property near.")
 
-(defvar org-node--uri-path<>uri-type (make-hash-table :test #'org-node--ht-string=)
+(defvar org-node--uri-path<>uri-type (make-hash-table :test #'equal)
   "1:1 table mapping //paths to types:.")
 
-(defvar org-node--dest<>links (make-hash-table :test #'org-node--ht-string=)
+(defvar org-node--dest<>links (make-hash-table :test #'equal)
   "1:N table of links.
 
 The table keys are destinations (uuids, uri paths or citekeys),
@@ -515,11 +513,11 @@ records describing each link to that destination, with info such
 as from which ID-node the link originates.  See
 `org-node-get-id-links' for more info.")
 
-(defvar org-node--file<>previews (make-hash-table :test #'org-node--ht-string=)
+(defvar org-node--file<>previews (make-hash-table :test #'equal)
   "1:N table mapping files to previews of backlink contexts.
 For use by `org-node-fakeroam--accelerate-get-contents'.")
 
-(defvar org-node--file<>mtime (make-hash-table :test #'org-node--ht-string=)
+(defvar org-node--file<>mtime (make-hash-table :test #'equal)
   "1:1 table mapping files to their last-modification times.")
 
 (defun org-node-get-id-links (node)
@@ -2170,8 +2168,9 @@ If argument NEXT is non-nil, actually visit the next entry."
                do (push item head)
                else return t))
     (when (or here
-              (when (y-or-n-p (format "Not in series \"%s\".  Jump to latest item in that series?"
-                                      (plist-get series :name)))
+              (when (y-or-n-p
+                     (format "Not in series \"%s\".  Jump to latest item in that series?"
+                             (plist-get series :name)))
                 (setq head (take 1 items))
                 t))
       (let* (;; Special case: say you create a daily but don't save the buffer
@@ -2237,7 +2236,7 @@ If argument NEXT is non-nil, actually visit the next entry."
 Also add a menu entry in `org-node-series-dispatch'."
   (let ((classifier (org-node--ensure-compiled
                      (plist-get (cdr spec) :classifier)))
-        (unique-sortstrs (make-hash-table :test #'org-node--ht-string=)))
+        (unique-sortstrs (make-hash-table :test #'equal)))
     (cl-loop
      for node being the hash-values of org-node--id<>node
      as item = (funcall classifier node)
