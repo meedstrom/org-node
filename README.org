@@ -65,8 +65,8 @@ A comparison of three similar systems, which permit relying on org-id and don't 
 | Some query-able cache          | EmacSQL  | hash tables        | --                   |
 | Async cache rebuild            | --       | yes                | not applicable       |
 | *Time to cache my 3000 nodes*    | *2m 48s*   | *0m 02s*             | not applicable       |
-| *Time to save file w/ 400 nodes* | *5--10s*   | *<0.05s*             | ?                    |
-| *Time to open minibuffer*        | *1--3s*    | *<0.05s*             | not applicable       |
+| *Time to save file w/ 400 nodes* | *5--10s*   | *instant*            | ?                    |
+| *Time to open minibuffer*        | *1--3s*    | *instant*            | not applicable       |
 
 * Setup
 
@@ -221,7 +221,7 @@ With that done, you can optionally tell the everyday commands =org-node-find= & 
 Do you already know about "daily-notes"?  Then get started with this command:
 
 #+begin_src elisp
-(keymap-set global-map "M-s M-s" #'org-node-series-dispatch)
+(keymap-set global-map "M-s s" #'org-node-series-menu)
 #+end_src
 
 It's easiest to explain series if we use "daily-notes" (or "dailies") as an example of a series.

@@ -29,6 +29,14 @@
 ;;;; Minor mode
 
 ;;;###autoload
+(define-globalized-minor-mode org-node-backlink-global-mode
+  org-node-backlink-mode
+  (lambda ()
+    (when (derived-mode-p 'org-mode)
+      (org-node-backlink-mode)))
+  :group 'org-node)
+
+;;;###autoload
 (define-minor-mode org-node-backlink-mode
   "Keep :BACKLINKS: properties updated.
 
@@ -58,14 +66,6 @@
                  #'org-node-backlink--flag-buffer-modification t)
     (remove-hook 'before-save-hook
                  #'org-node-backlink--fix-flagged-parts-of-buffer t)))
-
-;;;###autoload
-(define-globalized-minor-mode org-node-backlink-global-mode
-  org-node-backlink-mode
-  (lambda ()
-    (when (derived-mode-p 'org-mode)
-      (org-node-backlink-mode)))
-  :group 'org-node)
 
 
 ;;;; Validation of one buffer at a time
