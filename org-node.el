@@ -81,6 +81,7 @@
 (require 'compat)
 (require 'org)
 (require 'org-id)
+(require 'org-element)
 (require 'org-node-parser)
 (require 'org-node-obsolete)
 
@@ -224,8 +225,7 @@ directory named \"archive\".
 (defcustom org-node-insert-link-hook '()
   "Hook run after inserting a link to an Org-ID node.
 
-Called with two arguments: the ID and the link description, with
-point in the new link."
+Called with point in the new link."
   :group 'org-node
   :type 'hook)
 
@@ -1227,7 +1227,6 @@ thorough cleanup."
 If optional argument ID is non-nil, do not check the link at
 point but assume it is a link to ID."
   (when (derived-mode-p 'org-mode)
-    (require 'org-element)
     (org-node--init-ids)
     (when-let ((origin (org-node-id-at-point))
                (dest (if (gethash id org-id-locations)
@@ -2392,7 +2391,7 @@ Optional argument REGION-AS-INITIAL-INPUT t means behave as
       (when region-text
         (delete-region beg end))
       (insert (org-link-make-string (concat "id:" id) link-desc))
-      (run-hook-with-args 'org-node-insert-link-hook id link-desc))
+      (run-hook 'org-node-insert-link-hook))
     ;; TODO: Delete the link if a node was not created
     (unless node
       (org-node--create input id))))
@@ -2496,7 +2495,7 @@ adding keywords to the things to exclude:
       ;; break things.
       (goto-char (marker-position m1))
       (set-marker m1 nil)
-      (run-hook-with-args 'org-node-insert-link-hook id title))))
+      (run-hook 'org-node-insert-link-hook))))
 
 ;;;###autoload
 (defun org-node-extract-subtree ()
