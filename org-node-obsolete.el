@@ -1,12 +1,7 @@
 ;;; org-node-obsolete.el --- Outta sight so I'm not tempted to clean them up -*- lexical-binding: t; -*-
 
 (defvar org-node-obsolete-names
-  '((org-node-eagerly-update-link-tables  org-node-perf-eagerly-update-link-tables)
-    (org-nodeify-entry                    org-node-nodeify-entry)
-    (org-node-random                      org-node-visit-random)
-    (org-node-slugify-as-url              org-node-slugify-for-web)
-    (org-node-new-by-roam-capture         org-node-new-via-roam-capture)
-    (org-node-filename-fn))
+  '()
   "Alist of deprecated symbol names and their new names.")
 
 (defun org-node-obsolete-warn ()
@@ -14,17 +9,17 @@
   (while-let ((row (pop org-node-obsolete-names)))
     (seq-let (old new removed-by) row
       (unless removed-by
-        (setq removed-by "10 August 2024"))
+        (setq removed-by "30 August 2024"))
       (when (boundp old)
         (if new
             (progn
-              (lwarn 'org-node :warning "Your config sets old variable: %S, will be removed by %s.  New name: %S"
+              (lwarn 'org-node :warning "Your config sets old variable: %S, will be REMOVED by %s.  Please use new name: %S"
                      old removed-by new)
               (set new (symbol-value old)))
           (lwarn 'org-node :warning "Your config sets removed variable: %S" old)))
       (when (where-is-internal old)
         (if new
-            (lwarn 'org-node :warning "Your config key-binds an old command name: %S.  Current name: %S"
+            (lwarn 'org-node :warning "Your config key-binds an old command name: %S.  Please use new name: %S"
                    old new)
           (lwarn 'org-node :warning "Your config key-binds a removed command: %S"
                  old))))))
