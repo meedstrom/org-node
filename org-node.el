@@ -1893,7 +1893,6 @@ Also add a menu entry in `org-node-series-menu'."
 ;;;###autoload
 (defalias 'org-node-series-dispatch #'org-node-series-menu)
 
-;;;###autoload
 (transient-define-prefix org-node-series-menu ()
   :incompatible '(("d"))
   ["Series"
