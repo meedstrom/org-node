@@ -56,10 +56,26 @@ and REMOVED-BY when it may be removed."
                          org-node-rename-file-by-title)
 
 (org-node-obsolete-defun org-node--series-standard-goto
-                         org-node--series-standard-try-goto)
+                         org-node--standard-series-try-goto-id)
+
+(org-node-obsolete-defun org-node--series-standard-try-goto
+                         org-node--standard-series-try-goto-id)
+
+(org-node-obsolete-defun org-node--series-standard-prompter
+                         org-node--standard-series-prompter)
 
 (org-node-obsolete-defun org-node--default-daily-goto
-                         org-node--default-daily-try-goto)
+                         org-node--standard-series-try-goto-file)
+
+(org-node-obsolete-defun org-node--default-daily-try-goto
+                         org-node--standard-series-try-goto-file)
+
+(defun org-node--series-standard-creator (sortstr)
+  "Create a node with SORTSTR as the title."
+  (declare (obsolete nil "2024-08-17"))
+  (display-warning 'org-node "Your series definition includes a function that will be removed on 30 August 2024: `org-node--series-standard-creator'")
+  (when (fboundp 'org-node--create)
+    (org-node--create sortstr (org-id-new))))
 
 (add-hook 'org-node-insert-link-hook #'org-node--deprec-insert-link-hook -99)
 (defun org-node--deprec-insert-link-hook (&rest args)
