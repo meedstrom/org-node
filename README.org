@@ -147,13 +147,13 @@ Another bonus: if the Roam backlinks buffer is sometimes slow, the minor mode =(
 *** *Option 1C*
 *Cut out the DB altogether.*
 
-No more battling SQLite!  Type =M-x org-node-fakeroam-nosql-mode=, then see what populates your Roam buffer henceforth.  Hopefully you see the same links as before.
+No more battling SQLite!  Type =M-x org-node-fakeroam-jit-backlinks-mode=, then see what populates your Roam buffer henceforth.  Hopefully you see the same links as before.
 
 If you're happy with the result, you can disable =org-roam-db-autosync-mode= entirely in favour of the slimmer =M-x org-node-fakeroam-redisplay-mode=.  As an init snippet:
 
 #+begin_src elisp
 (org-roam-db-autosync-mode 0)
-(org-node-fakeroam-nosql-mode)
+(org-node-fakeroam-jit-backlinks-mode)
 (org-node-fakeroam-redisplay-mode)
 #+end_src
 
@@ -221,7 +221,7 @@ With that done, you can optionally tell the everyday commands =org-node-find= & 
 Do you already know about "daily-notes"?  Then get started with this command:
 
 #+begin_src elisp
-(keymap-set global-map "M-s s" #'org-node-series-menu)
+(keymap-set global-map "M-s s" #'org-node-series-dispatch)
 #+end_src
 
 It's easiest to explain series if we use "daily-notes" (or "dailies") as an example of a series.
