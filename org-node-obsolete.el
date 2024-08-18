@@ -54,6 +54,11 @@ and REMOVED-BY when it may be removed."
 (org-node-obsolete-defun org-node--default-daily-goto
                          org-node--default-daily-try-goto)
 
+(add-hook 'org-node-insert-link-hook #'org-node--deprec-insert-link-hook -99)
+(defun org-node--deprec-insert-link-hook (&rest args)
+  (when args
+    (display-warning 'org-node "Hook `org-node-insert-link-hook' has changed, now passes no arguments")))
+
 ;;; Stuff expunged to fakeroam.el
 
 (defun org-node-faster-roam-list-files ()
