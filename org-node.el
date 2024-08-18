@@ -101,6 +101,10 @@
 (defvar org-roam-dailies-directory)
 (defvar org-super-links-backlink-into-drawer)
 
+;; calendar hooks (not sure where to put them)\(add-hook 'calendar-today-visible-hook #'org-node--dailies-calendar-mark-entries)
+(add-hook 'calendar-today-visible-hook #'org-node--dailies-calendar-mark-entries)
+(add-hook 'calendar-today-invisible-hook #'org-node--dailies-calendar-mark-entries)
+
 
 ;;;; Faces
   (defface org-node-dailies-calendar-note
@@ -726,9 +730,6 @@ In broad strokes:
                       (calendar-mark-visible-date
                        mdy-list-date
                        'org-node-dailies-calendar-note)))))))
-
-(add-hook 'calendar-today-visible-hook #'org-node--dailies-calendar-mark-entries)
-(add-hook 'calendar-today-invisible-hook #'org-node--dailies-calendar-mark-entries)
 
 
 ;;;; Scanning
