@@ -2394,7 +2394,7 @@ Optional argument REGION-AS-INITIAL-INPUT t means behave as
       (when region-text
         (delete-region beg end))
       (insert (org-link-make-string (concat "id:" id) link-desc))
-      (run-hook 'org-node-insert-link-hook))
+      (run-hooks 'org-node-insert-link-hook))
     ;; TODO: Delete the link if a node was not created
     (unless node
       (org-node--create input id))))
@@ -2498,7 +2498,7 @@ adding keywords to the things to exclude:
       ;; break things.
       (goto-char (marker-position m1))
       (set-marker m1 nil)
-      (run-hook 'org-node-insert-link-hook))))
+      (run-hooks 'org-node-insert-link-hook))))
 
 ;;;###autoload
 (defun org-node-extract-subtree ()
