@@ -2073,6 +2073,16 @@ YYYY-MM-DD, but it does not verify."
     (when (string-match-p "/dail\\w+/" path)
       (cons (file-name-base path) path))))
 
+(defcustom org-node-series-that-marks-calendar "d"
+  "Key for the series that should mark days in the calendar.
+This is used by `org-node-mark-days' to mark dates of interest in
+the `org-read-date' calendar popup.  A typical use is showing
+which days have a daily journal entry.
+
+The sort-strings in this series should be correctly parseable by
+`parse-time-string'."
+  :type 'key)
+
 (defun org-node--example-daily-prompter (series)
   "Prompt for a date, return it in YYYY-MM-DD form."
   (let ((already (member #'org-node-mark-days calendar-today-visible-hook)))
@@ -2087,16 +2097,6 @@ YYYY-MM-DD, but it does not verify."
 (defface org-node-calendar-marked
   '((t :inherit (org-link) :underline nil))
   "Face used by `org-node-mark-days'.")
-
-(defcustom org-node-series-that-marks-calendar "d"
-  "Key for the series that should mark days in the calendar.
-This is used by `org-node-mark-days' to mark dates of interest in
-the `org-read-date' calendar popup.  A typical use is showing
-which days have a daily journal entry.
-
-The sort-strings in this series should be correctly parseable by
-`parse-time-string'."
-  :type 'key)
 
 (defun org-node-mark-days ()
   "Mark days in the calendar popup.

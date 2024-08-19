@@ -237,7 +237,7 @@ Thus, fundamentally, any "journal" or "dailies" software are just operating on a
 
 You could have series about, let's say, historical events, Star Trek episodes, your school curriculum...
 
-Define more series in the variable =org-node-series=.
+Define more series in the variable =org-node-series-defs=.
 
 Already included is a definition that approximates the org-roam-dailies defaults, but I encourage you to override it to suit your tastes.
 
