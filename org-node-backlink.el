@@ -15,6 +15,16 @@
 ;; For a full copy of the GNU General Public License
 ;; see <http://www.gnu.org/licenses/>.
 
+;;; Commentary:
+
+;; Advices and hooks that efficiently make sure that the Org property drawers
+;; that should have :BACKLINKS: properties have them and are up to date.
+
+;;; Code:
+
+;; TODO: Wrap each backlink in quotes, it's safer
+;; TODO: Reuse much of this logic to make org-super-links drawers
+
 (require 'org-node)
 (require 'cl-lib)
 
@@ -153,10 +163,14 @@ If REMOVE? is non-nil, remove it instead."
           (org-entry-delete nil "BACKLINKS"))))))
 
 (defun org-node-backlink--fix-flagged-parts-of-buffer ()
-  "Look for areas flagged by `org-node-backlink--flag-buffer-modification' and
-run `org-node-backlink--fix-entry-here' at each affected
-subtree.  For a huge file, this is much faster than using
-`org-node-backlink--fix-whole-buffer'."
+  "Fix backlinks around parts of buffer that have been modified.
+
+Look for areas flagged by
+`org-node-backlink--flag-buffer-modification' and run
+`org-node-backlink--fix-entry-here' at each affected heading.
+For a huge file, this is much faster than using
+`org-node-backlink--fix-whole-buffer' -- imagine a thousand
+headings but you have only done work under one of them."
   (unless (derived-mode-p 'org-mode)
     (error "Backlink function called in non-Org buffer"))
   (when org-node-backlink-mode
@@ -309,9 +323,10 @@ purely deleted, it flags the preceding and succeeding char."
                        id src-title src-id))))))))))))
 
 (defun org-node-backlink--add-at (target-id src-title src-id)
-  "Seek the :ID: property in buffer that matches TARGET-ID, then
-compose a link out of SRC-ID and SRC-TITLE and insert it in the
-nearby :BACKLINKS: property."
+  "Add a backlink at TARGET-ID.
+Seek the :ID: property in buffer that matches TARGET-ID, then
+compose a link string out of SRC-ID and SRC-TITLE and insert it
+in the nearby :BACKLINKS: property."
   (goto-char (point-min))
   (if (not (re-search-forward
             (concat "^[ \t]*:id: +" (regexp-quote target-id))

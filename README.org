@@ -70,13 +70,25 @@ A comparison of three similar systems, which permit relying on org-id and don't 
 
 * Setup
 
-Add an init snippet like this (assuming [[https://github.com/radian-software/straight.el][straight.el]]):
+This package is on its way to MELPA, but for now, use [[https://github.com/radian-software/straight.el][straight.el]] or similar and add an init snippet like this:
 
 #+begin_src elisp
 (use-package org-node
-  :straight (org-node :type git :host github :repo "meedstrom/org-node")
+  :straight (org-node :type git :host github :repo "meedstrom/org-node"
+                      :files (:defaults (:exclude "org-node-fakeroam.el")))
   :after org
   :config (org-node-cache-mode))
+#+end_src
+
+If you are an org-roam user, you'll want this too:
+
+#+begin_src elisp
+(use-package org-node-fakeroam
+  :straight (org-node-fakeroam
+             :type git :host github :repo "meedstrom/org-node"
+             :files ("org-node-fakeroam.el"))
+  :after org-node
+  :requires org-node)
 #+end_src
 
 ** Quick start

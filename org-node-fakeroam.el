@@ -19,7 +19,7 @@
 ;; Created:          2024-04-13
 ;; Version:          0.6.0.50-git
 ;; Keywords:         org, hypermedia
-;; Package-Requires: ((emacs "28.1") (org-node "0.5") (org-roam "2.2.2") (emacsql "4.0.0") (compat "29.1.4.5"))
+;; Package-Requires: ((emacs "28.1") (compat "30") (org-node "0.6.0.50-git") (org-roam "2.2.2") (emacsql "4.0.0"))
 ;; URL:              https://github.com/meedstrom/org-node
 
 ;;; Commentary:
@@ -36,7 +36,7 @@
     (require 'emacsql)
   (user-error "Install org-roam to use org-node-fakeroam library"))
 
-(defun org-node-fakeroam--precompile ()
+(defun org-node-fakeroam--check-compile ()
   "Compile all fakeroam functions.
 
 This is transitional.  Org-node used to be a single package which
@@ -52,7 +52,12 @@ that org-roam is available."
                   org-node-fakeroam--mk-backlinks
                   org-node-fakeroam--mk-reflinks
                   org-node-fakeroam--db-update-files
-                  org-node-fakeroam--db-add-node))
+                  org-node-fakeroam--db-add-file-level-data
+                  org-node-fakeroam--db-add-node
+                  org-node-fakeroam-db-rebuild
+                  org-node-fakeroam-list-files
+                  org-node-fakeroam-list-dailies
+                  org-node-fakeroam-daily-note-p))
       (unless (compiled-function-p (symbol-function fn))
         (byte-compile fn)))))
 
@@ -73,7 +78,7 @@ previews.  This is done thru
   :group 'org-node
   (if org-node-fakeroam-redisplay-mode
       (progn
-        (org-node-fakeroam--precompile)
+        (org-node-fakeroam--check-compile)
         (unless org-node-cache-mode
           (message "`org-node-fakeroam-redisplay-mode' may show stale previews without `org-node-cache-mode' enabled"))
         (when (boundp 'savehist-additional-variables)
@@ -134,9 +139,9 @@ Run ORIG-FN with ARGS, while overriding
 ;; Fabricate knockoff Roam backlinks in real time, so that a DB is not needed
 ;; to display the Roam buffer
 
-(org-node-changes-defun org-node-fakeroam-nosql-mode
-                        org-node-fakeroam-jit-backlinks-mode
-                        nil "2024-08-18" "2024-09-30")
+(org-node-changes--def-whiny-alias org-node-fakeroam-nosql-mode
+                                   org-node-fakeroam-jit-backlinks-mode
+                                   nil "2024-08-18" "2024-09-30")
 
 ;;;###autoload
 (define-minor-mode org-node-fakeroam-jit-backlinks-mode
@@ -150,7 +155,7 @@ having SQLite installed, and you can delete the org-roam.db.
   :group 'org-node
   (if org-node-fakeroam-jit-backlinks-mode
       (progn
-        (org-node-fakeroam--precompile)
+        (org-node-fakeroam--check-compile)
         (unless org-node-cache-mode
           (message "`org-node-fakeroam-jit-backlinks-mode' will do nothing without `org-node-cache-mode'"))
         (advice-add 'org-roam-backlinks-get :override
@@ -234,7 +239,7 @@ Designed to override `org-roam-reflinks-get'."
   :group 'org-node
   (if org-node-fakeroam-db-feed-mode
       (progn
-        (org-node-fakeroam--precompile)
+        (org-node-fakeroam--check-compile)
         (unless org-node-cache-mode
           (message "`org-node-fakeroam-db-feed-mode' will do nothing without `org-node-cache-mode'"))
         (add-hook 'org-node-rescan-hook #'org-node-fakeroam--db-update-files))
@@ -280,22 +285,23 @@ Designed to override `org-roam-reflinks-get'."
   (emacsql-with-transaction (org-roam-db)
     (let ((ctr 0)
           (max (hash-table-count org-nodes))
-          (file-level-data-already-added nil))
+          (already (make-hash-table :test #'equal)))
       (cl-loop for node being the hash-values of org-nodes
                as file = (org-node-get-file-path node)
-               do (when (= 0 (% (cl-incf ctr)
-                                (cond ((> ctr 200) 100)
-                                      ((> ctr 20) 10)
-                                      (t 1))))
-                    (message "Inserting into %s... %d/%d"
-                             org-roam-db-location ctr max))
-               (unless (member file file-level-data-already-added)
-                 (push file file-level-data-already-added)
+               do (if (= 0 (% (cl-incf ctr)
+                              (cond ((> ctr 200) 100)
+                                    ((> ctr 20) 10)
+                                    (t 1))))
+                      (message "Inserting into %s... %d/%d"
+                               org-roam-db-location ctr max))
+               (unless (gethash file already)
+                 (puthash file t already)
                  (org-node-fakeroam--db-add-file-level-data node))
                (org-node-fakeroam--db-add-node node)))))
 
-;; REVIEW: I don't like that this accesses actual files on disk
-;;         when nothing else does
+;; REVIEW: I don't like that this accesses actual files on disk when nothing
+;;         else does.  Maybe the async parser can collect the whole vector that
+;;         this needs, ahead of time.
 (defun org-node-fakeroam--db-add-file-level-data (node)
   "Send to the database the metadata for the file where NODE is."
   (let* ((file (org-node-get-file-path node))
@@ -311,8 +317,7 @@ Designed to override `org-roam-reflinks-get'."
 (defun org-node-fakeroam--db-add-node (node)
   "Send to the SQLite database all we know about NODE.
 This includes all links and citations that touch NODE."
-  ;; PERF: less garbage compared to let reduces exectime 25% here
-  (cl-symbol-macrolet
+  (cl-symbol-macrolet  ;; PERF: Make less garbage compared to `let'
       ((id         (org-node-get-id node))
        (file-path  (org-node-get-file-path node))
        (tags       (org-node-get-tags node))  ;; NOTE: no inherits!
@@ -419,8 +424,8 @@ buffer file."
     (and (string-suffix-p "org" file)
          (string-prefix-p (downcase (file-truename daily-dir))
                           (downcase (file-truename file)))
-         (--none-p (string-search it file)
-                   org-node-extra-id-dirs-exclude))))
+         (not (cl-loop for exclude in org-node-extra-id-dirs-exclude
+                       when (string-search exclude file) return t)))))
 
 (provide 'org-node-fakeroam)
 
