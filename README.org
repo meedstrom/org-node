@@ -121,8 +121,11 @@ Either run =M-x org-roam-update-org-id-locations=, or edit the following setting
 
 With that done, try out the commands we went over in [[https://github.com/meedstrom/org-node?tab=readme-ov-file#quick-start][Quick start]].  There's more under [[https://github.com/meedstrom/org-node?tab=readme-ov-file#toolbox][Toolbox]].  Enjoy!
 
+* Backlinks
+Backlinks are the butter on the bread of your notes.  If you've ever seen a "What links here" section on some webpage, that's exactly what it is.  That's what we want to see, all the time.  The below sections outline two general ways to do so.
+
 ** Backlink solution 1: borrow org-roam's backlink buffer
-Backlinks are bread and butter.  As a Roam user, you can just keep using =M-x org-roam-buffer-toggle=, but you get some new ways to keep its data fresh, circumventing Roam's autosync mode.
+As a Roam user, you can just keep using =M-x org-roam-buffer-toggle=, but you get some new ways to keep its data fresh, circumventing Roam's autosync mode.
 
 *** Option 1A
 *Let org-roam manage its own DB.*
