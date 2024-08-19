@@ -111,8 +111,8 @@ Called with one argument: a list of files re-scanned."
 If nil, write a #+TITLE and a file-level property-drawer instead.
 In other words:
 
-- if nil, use outline level 0
-- if t, use outline level 1
+- if nil, make file with no heading (outline level 0)
+- if t, make file with heading (outline level 1)
 
 This affects the behavior of `org-node-new-file',
 `org-node-extract-subtree', and `org-node-capture-target'.
@@ -286,10 +286,10 @@ or # or .bak since `org-node-list-files' only considers files
 that end in precisely \".org\" anyway.
 
 You can eke out a performance boost by excluding directories with
-a humongous amount of files, such as \"node_modules\", even if
-they contain no Org files.  However, directories that start with
-a period are always ignored, so no need to specify
-e.g. \"~/.local/\" or \"/.git/\" for that reason."
+a humongous amount of files, such as the infamous
+\"node_modules\", even if they contain no Org files.  However,
+directories that start with a period are always ignored, so no
+need to specify e.g. \"~/.local/\" or \"/.git/\" for that reason."
   :group 'org-node
   :type '(repeat string))
 
@@ -1027,8 +1027,8 @@ to FINALIZER."
     (dolist (node nodes)
       (org-node--record-node node))
     ;; (org-id-locations-save) ;; 10% of exec time on my machine
-    (dolist (spec org-node-series)
-      (org-node--build-series spec))
+    (dolist (def org-node-series-defs)
+      (org-node--build-series def))
     (setq org-node--time-elapsed
           ;; For reproducible profiling: don't count time spent on
           ;; other sentinels, timers or I/O in between these periods
@@ -1926,7 +1926,7 @@ type the name of a node that does not exist.  That enables this
 
 ;;;; Series
 
-(defcustom org-node-series
+(defcustom org-node-series-defs
   '(("d" :name "Dailies"
      :classifier org-node--example-daily-classifier
      :whereami org-node--example-daily-whereami
@@ -1948,7 +1948,7 @@ type the name of a node that does not exist.  That enables this
      :prompter org-node--example-prompter
      :try-goto org-node--example-try-goto-id
      :creator (lambda (sortstr) (org-node--create sortstr (org-id-new) "a"))))
-  "Alist describing each node series.
+  "Alist defining each node series.
 
 Each item looks like
 
@@ -2010,7 +2010,7 @@ daily-note exists for that date, CREATOR is called to create that
 daily-note.  It receives a would-be sort-string as argument."
   :type 'alist)
 
-(defvar org-node--series-info nil
+(defvar org-node--series nil
   "Alist describing each node series, internal use.")
 
 (defun org-node--example-try-goto-id (item)
@@ -2038,7 +2038,7 @@ daily-note.  It receives a would-be sort-string as argument."
       ;; HACK: Assume this user wants to use their roam-dailies templates
       ;; TODO: Somehow make `org-node-new-via-roam-capture' able to do this
       (if (not (require 'org-roam-dailies nil t))
-          (user-error "Install org-roam or edit `org-node-series' ")
+          (user-error "Install org-roam or edit `org-node-series-defs' ")
         (when (fboundp 'org-roam-dailies--capture)
           (unwind-protect
               (progn
@@ -2109,7 +2109,7 @@ May be added to the hooks `calendar-today-invisible-hook' and
 dates any time the calendar popup is shown."
   (when org-node-series-that-marks-calendar
     (let* ((series (cdr (assoc org-node-series-that-marks-calendar
-                               org-node--series-info)))
+                               org-node--series)))
            (dates (mapcar #'car (plist-get series :sorted-items)))
            mdy)
       (dolist (date dates)
@@ -2173,7 +2173,7 @@ variable that need not stay nil, see
 Only do something if `org-node-proposed-series-key' is non-nil."
   (when org-node-proposed-series-key
     (let* ((series (cdr (assoc org-node-proposed-series-key
-                               org-node--series-info)))
+                               org-node--series)))
            (node-here (gethash (org-node-id-at-point) org-nodes))
            (new-item (when node-here
                        (funcall (plist-get series :classifier) node-here))))
@@ -2189,7 +2189,7 @@ Only do something if `org-node-proposed-series-key' is non-nil."
 
 (defun org-node--series-jump (key)
   "Jump to an entry in series identified by KEY."
-  (let* ((series (cdr (assoc key org-node--series-info)))
+  (let* ((series (cdr (assoc key org-node--series)))
          (sortstr (funcall (plist-get series :prompter) series))
          (item (assoc sortstr (plist-get series :sorted-items))))
     (if item
@@ -2205,7 +2205,7 @@ Only do something if `org-node-proposed-series-key' is non-nil."
 (defun org-node--series-goto-previous (key &optional next)
   "Visit the previous entry in series identified by KEY.
 If argument NEXT is non-nil, actually visit the next entry."
-  (let* ((series (cdr (assoc key org-node--series-info)))
+  (let* ((series (cdr (assoc key org-node--series)))
          (here (funcall (plist-get series :whereami)))
          (items (plist-get series :sorted-items))
          head
@@ -2248,9 +2248,9 @@ If argument NEXT is non-nil, actually visit the next entry."
   "Experimental."
   (org-node-cache-ensure)
   (let ((key (or org-node-current-series-key
-                 (let* ((valid-keys (mapcar #'car org-node-series))
+                 (let* ((valid-keys (mapcar #'car org-node-series-defs))
                         (elaborations
-                         (cl-loop for series in org-node-series
+                         (cl-loop for series in org-node-series-defs
                                   concat
                                   (format " %s(%s)"
                                           (car series)
@@ -2262,7 +2262,7 @@ If argument NEXT is non-nil, actually visit the next entry."
                                 (mapcar #'string-to-char valid-keys))))
                    (char-to-string input)))))
     ;; Almost identical to `org-node--series-jump'
-    (let* ((series (cdr (assoc key org-node--series-info)))
+    (let* ((series (cdr (assoc key org-node--series)))
            (sortstr (or org-node-proposed-title
                         (funcall (plist-get series :prompter) series)))
            (item (assoc sortstr (plist-get series :sorted-items))))
@@ -2271,11 +2271,11 @@ If argument NEXT is non-nil, actually visit the next entry."
         ;; TODO: Move point after creation to most appropriate place
         (funcall (plist-get series :creator) sortstr)))))
 
-(defun org-node--build-series (spec)
-  "From plist SPEC, populate `org-node--series-info'.
+(defun org-node--build-series (def)
+  "From plist DEF, populate `org-node--series'.
 Also add a menu entry in `org-node-series-dispatch'."
   (let ((classifier (org-node--ensure-compiled
-                     (plist-get (cdr spec) :classifier)))
+                     (plist-get (cdr def) :classifier)))
         (unique-sortstrs (make-hash-table :test #'equal)))
     (cl-loop
      for node being the hash-values of org-node--id<>node
@@ -2286,19 +2286,18 @@ Also add a menu entry in `org-node-series-dispatch'."
                item)
      into items
      finally do
-     (setf (alist-get (car spec) org-node--series-info nil nil #'equal)
-           (nconc (cl-loop for elt in (cdr spec)
+     (setf (alist-get (car def) org-node--series nil nil #'equal)
+           (nconc (cl-loop for elt in (cdr def)
                            if (functionp elt)
                            collect (org-node--ensure-compiled elt)
                            else collect elt)
-                  (list :key (car spec)
+                  (list :key (car def)
                         :sorted-items
                         ;; Using `string>' due to most recent dailies probably
                         ;; being most relevant, thus cycling thru recent
                         ;; dailies will have the best perf.
                         (cl-sort items #'string> :key #'car)))))
-    (org-node--add-series-to-dispatch
-     (car spec) (plist-get (cdr spec) :name))))
+    (org-node--add-series-to-dispatch (car def) (plist-get (cdr def) :name))))
 
 (defvar org-node-current-series-key nil
   "Key of the series currently being browsed with the menu.")
@@ -2681,8 +2680,7 @@ To add exceptions, see `org-node-renames-exclude'."
 For use by `org-node-rename-file-by-title'.
 
 Only applied to files under `org-node-renames-allowed-dirs'.  If
-a file is not there, it is not considered in any case and there
-is no need to match it here."
+a file is not there, it is not considered in any case."
   :type 'string)
 
 ;;;###autoload

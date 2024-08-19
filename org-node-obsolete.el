@@ -4,7 +4,8 @@
 (require 'cl-lib)
 
 (defvar org-node-obsolete-names
-  '((org-node-rescan-hook org-node-rescan-functions "30 September 2024"))
+  '((org-node-rescan-hook org-node-rescan-functions "30 September 2024")
+    (org-node-series org-node-series-defs "15 September 2024"))
   "Alist of deprecated symbol names and their new names.")
 
 (defun org-node-obsolete-warn-and-copy ()
@@ -121,6 +122,10 @@ may be removed."
   (message "Renames for the rename god.  Renamed `org-node-faster-roam-daily-note-p' to `org-node-fakeroam-daily-note-p'")
   (when (fboundp 'org-node-fakeroam-daily-note-p)
     (org-node-fakeroam-daily-note-p)))
+
+;; TODO: Will probs rename to just `org-node-series' in Oct,
+;;       the old meaning of that name needs time to expire
+(defvaralias 'org-node--series-info 'org-node--series)
 
 (provide 'org-node-obsolete)
 
