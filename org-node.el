@@ -2096,7 +2096,7 @@ The sort-strings in this series should be correctly parseable by
           (remove-hook 'calendar-today-visible-hook #'org-node-mark-days))))))
 
 (defface org-node-calendar-marked
-  '((t :inherit (org-link) :underline nil))
+  '((t :inherit (diary) :underline nil))
   "Face used by `org-node-mark-days'.")
 
 (defun org-node-mark-days ()
