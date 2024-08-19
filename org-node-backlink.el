@@ -82,7 +82,7 @@
 
 ;;;###autoload
 (defun org-node-backlink-fix-all (&optional remove?)
-  "Add :BACKLINKS: property to all nodes known to `org-id-locations'.
+  "Add :BACKLINKS: property to all known nodes.
 Optional argument REMOVE? t means remove them instead, the same
 as the user command \\[org-node-backlink-regret].
 
@@ -96,11 +96,12 @@ Can be quit midway through and resumed later.  With
     (setq org-node-backlink--files-to-fix
           (-uniq (hash-table-values org-id-locations))))
   (when (or (not (= 0 org-node-backlink--fix-ctr)) ;; resume interrupted
-            (and
-             (y-or-n-p (format "Edit the %d files found in `org-id-locations'?"
-                               (length org-node-backlink--files-to-fix)))
-             (y-or-n-p (string-fill "You understand that this may trigger your auto git-commit systems and similar because many files are about to be edited and saved?"
-                                    fill-column))))
+            (and (y-or-n-p
+                  (format "Edit the %d files found in `org-id-locations'?"
+                          (length org-node-backlink--files-to-fix)))
+                 (y-or-n-p
+                  (string-fill "You understand that this may trigger your auto git-commit systems and similar because many files are about to be edited and saved?"
+                               fill-column))))
     (let ((file-name-handler-alist nil))
       ;; Do 500 at a time, because Emacs cries about opening too many file
       ;; buffers in one loop... even though we close each one as we go
@@ -116,51 +117,44 @@ Can be quit midway through and resumed later.  With
         (run-with-timer 1 nil #'org-node-backlink-fix-all remove?))))
 
 (defun org-node-backlink--fix-whole-buffer (&optional remove?)
-  "Update the :BACKLINKS: properties near each :ID: in buffer.
-If REMOVE? is non-nil, remove the properties."
+  "Update :BACKLINKS: property for all nodes in buffer.
+If REMOVE? is non-nil, remove the property."
   (goto-char (point-min))
   (let ((case-fold-search t))
     (while (re-search-forward "^[[:space:]]*:id: " nil t)
-      (org-node-backlink--fix-subtree-here remove?))))
+      (org-node-backlink--fix-entry-here remove?))))
 
-(defun org-node-backlink--fix-subtree-here (&optional remove?)
-  "At an :ID: line, update the adjacent :BACKLINKS: property.
-If REMOVE? is non-nil, remove it instead.
-
-Assume point is at an :ID: line, after the \":ID:\" substring."
+(defun org-node-backlink--fix-entry-here (&optional remove?)
+  "Update the :BACKLINKS: property in the current entry.
+If REMOVE? is non-nil, remove it instead."
   (if remove?
       (org-entry-delete nil "BACKLINKS")
-    ;; REVIEW: I think this way of grabbing the ID is a holdover from when I
-    ;; was using fundamental-mode buffers?
-    (skip-chars-forward "[:space:]")
-    (let* ((id (buffer-substring-no-properties
-                (point) (+ (point) (skip-chars-forward "^ \n"))))
-           (node (gethash id org-node--id<>node)))
-      (when node
-        (let* ((sorted-uuids (thread-last
-                               (nconc (org-node-get-id-links node)
-                                      (org-node-get-reflinks node))
-                               (-map #'org-node-link-origin)
-                               (-uniq)
-                               (-non-nil) ;; REVIEW: no nils anymore, I hope
-                               (-sort #'string-lessp)))
-               (links (cl-loop
-                       for origin in sorted-uuids
-                       collect (org-link-make-string
-                                (concat "id:" origin)
-                                (org-node-get-title
-                                 (or (gethash origin org-node--id<>node)
-                                     (error "ID in backlink tables not known to main org-nodes table: %s"
-                                            origin))))))
-               (links-string (string-join links "  ")))
-          (if links
-              (unless (equal links-string (org-entry-get nil "BACKLINKS"))
-                (org-entry-put nil "BACKLINKS" links-string))
-            (org-entry-delete nil "BACKLINKS")))))))
+    (when-let* ((id (org-node-id-at-point))
+                (node (gethash id org-node--id<>node)))
+      (let* ((sorted-uuids (thread-last
+                             (append (org-node-get-id-links node)
+                                     (org-node-get-reflinks node))
+                             (-map #'org-node-link-origin)
+                             (-uniq)
+                             (-non-nil) ;; REVIEW: no nils anymore, I hope
+                             (-sort #'string-lessp)))
+             (links (cl-loop
+                     for origin in sorted-uuids
+                     collect (org-link-make-string
+                              (concat "id:" origin)
+                              (org-node-get-title
+                               (or (gethash origin org-node--id<>node)
+                                   (error "ID in backlink tables not known to main org-nodes table: %s"
+                                          origin))))))
+             (links-string (string-join links "  ")))
+        (if links
+            (unless (equal links-string (org-entry-get nil "BACKLINKS"))
+              (org-entry-put nil "BACKLINKS" links-string))
+          (org-entry-delete nil "BACKLINKS"))))))
 
 (defun org-node-backlink--fix-flagged-parts-of-buffer ()
   "Look for areas flagged by `org-node-backlink--flag-buffer-modification' and
-run `org-node-backlink--fix-subtree-here' at each affected
+run `org-node-backlink--fix-entry-here' at each affected
 subtree.  For a huge file, this is much faster than using
 `org-node-backlink--fix-whole-buffer'."
   (unless (derived-mode-p 'org-mode)
@@ -204,14 +198,14 @@ subtree.  For a huge file, this is much faster than using
                                     (regexp-quote id-here))
                             nil t)
                            (re-search-forward ":id: +" (pos-eol))
-                           (org-node-backlink--fix-subtree-here))))
+                           (org-node-backlink--fix-entry-here))))
                   ;; ...and if the change-area is massive, spanning multiple
                   ;; subtrees (like after a big yank), update each subtree
                   ;; within
                   (while (and (< (point) end)
                               (re-search-forward
                                "^[[:space:]]*:id: +" end t))
-                    (org-node-backlink--fix-subtree-here))
+                    (org-node-backlink--fix-entry-here))
                   (remove-text-properties start end 'org-node-flag))
                 ;; This change-area dealt with, move on
                 (set-marker start (marker-position end)))
