@@ -108,6 +108,12 @@ a daily note is present."
   :group 'org-node
   :type 'boolean)
 
+(defcustom org-node-ensure-gregorian-validity nil
+  "Whether or not to be careful that org-node dailies
+are valid Gregorian dates."
+  :group 'org-node
+  :type 'boolean)
+
 (defcustom org-node-rescan-functions nil
   "Hook run after scanning specific files.
 It is not run after a full cache reset, only after a file is
@@ -2109,18 +2115,45 @@ YYYY-MM-DD, but it does not verify."
   "Check the filename for a date and return it."
   (when-let ((buffer-file (buffer-file-name (buffer-base-buffer))))
     (let ((basename (file-name-base buffer-file)))
-      (when (or (string-match-p
-                 (rx bol (= 4 digit) "-" (= 2 digit) "-" (= 2 digit) eol)
-                 basename)
-                ;; Even in a non-daily file, pretend it is a daily if possible,
-                ;; to allow entering the series at a more relevant date
-                (and (not (string-blank-p org-node-datestamp-format))
-                     (string-match (org-node--make-regexp-for-time-format
-                                    org-node-datestamp-format)
-                                   basename)
-                     (org-node--extract-ymd (match-string 0 basename)
-                                            org-node-datestamp-format)))
-        basename))))
+      (if (string-match-p
+           (rx bol (= 4 digit) "-" (= 2 digit) "-" (= 2 digit) eol)
+           basename)
+          (if ;; it matches basic YYYY-MM-DD format,
+              ;; then, if Gregorian date checking is on,
+              (and org-node-ensure-gregorian-validity
+                   ;; trust, but verify
+                   (not (org-node--verify-gregorian basename)))
+              nil
+            basename)
+        
+        ;; But...even if it doesn't match, maybe contains a valid Org date, so:
+        ;; then, even in a non-daily file, pretend it is a daily if possible,
+        ;; to allow entering the series at a more relevant date:
+        (if (and
+             ;; it's not empty
+             (not (string-blank-p org-node-datestamp-format))
+             ;; and it matches the basic format of an Org Node datestamp
+             (string-match (org-node--make-regexp-for-time-format
+                            org-node-datestamp-format)
+                           basename))
+            ;; then, try to extract the date and return it
+            (let ((org-extract 
+                   (org-node--extract-ymd (match-string 0 basename)
+                                          org-node-datestamp-format)))
+              ;; (NOTE: the above will error if the filename is something like
+              ;;       `2015-02-05-words.org')
+              
+              (if (or ;; If either Gregorian check is not on
+                   (not org-node-ensure-gregorian-validity)
+                   ;; or it passes.
+                   (org-node--verify-gregorian org-extract))
+                  ;; return "YYYY-MM-DD" if good or unchecked:
+                  org-extract)))))))
+
+(defun org-node--verify-gregorian (date)
+  "Verify that date is a valid Gregorian date."
+  (calendar-date-is-valid-p
+   (org-date-to-gregorian date)))
 
 ;; TODO: Handle %s, %V, %y...  is there a library?
 (defun org-node--extract-ymd (instance time-format)
