@@ -2077,10 +2077,10 @@ YYYY-MM-DD, but it does not verify."
   "Prompt for a date, return it in YYYY-MM-DD form."
   (add-hook 'calendar-today-invisible-hook #'org-node-mark-days)
   (add-hook 'calendar-today-visible-hook #'org-node-mark-days)
-  (setq org-node-series-that-marks-calendar (plist-get series :key))
-  (unwind-protect (org-read-date)
-    (remove-hook 'calendar-today-invisible-hook #'org-node-mark-days)
-    (remove-hook 'calendar-today-visible-hook #'org-node-mark-days)))
+  (let ((org-node-series-that-marks-calendar (plist-get series :key)))
+    (unwind-protect (org-read-date)
+      (remove-hook 'calendar-today-invisible-hook #'org-node-mark-days)
+      (remove-hook 'calendar-today-visible-hook #'org-node-mark-days))))
 
 (defface org-node-calendar-marked
   '((t :inherit (org-link) :underline nil))
