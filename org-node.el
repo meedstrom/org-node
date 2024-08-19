@@ -80,6 +80,7 @@
 (require 'compat)
 (require 'org)
 (require 'org-id)
+(require 'org-macs)
 (require 'org-element)
 (require 'org-node-parser)
 (require 'org-node-obsolete)
@@ -90,23 +91,11 @@
 (defvar org-super-links-backlink-into-drawer)
 
 
-;;;; Faces
-(defface org-node-dailies-calendar-note
-  '((t :inherit (org-link) :underline nil))
-  "Face for dates with a daily-note in the calendar."
-  :group 'org-node-faces)
-
 ;;;; Options
 
 (defgroup org-node nil
   "Support a zettelkasten of org-id files and subtrees."
   :group 'org)
-
-(defcustom org-node-mark-calendar-days-with-notes t
-  "Whether or not to mark days in the calendar for which
-a daily note is present."
-  :group 'org-node
-  :type 'boolean)
 
 (defcustom org-node-rescan-functions nil
   "Hook run after scanning specific files.
@@ -1484,27 +1473,27 @@ list of files that may or may not contain IDs."
       (hash-table-keys org-node--file<>mtime)
     (-union ;; 10x faster than `seq-union': 2000ms -> 200ms
      (hash-table-values org-id-locations)
-     (let ((file-name-handler-alist nil)) ;; 200ms -> 70ms
-       (cl-loop
-        for dir in org-node-extra-id-dirs
-        ;; Abbreviating file names because org-id does too
-        append (org-node--abbreviate-all-file-names ;; 35ms -> 7ms
-                (org-node--directory-files-recursively ;; 70ms -> 35ms
+     (let ((file-name-handler-alist nil)) ;; 3x: 200ms -> 70ms
+       ;; Abbreviating file names because org-id does too
+       (org-node--abbreviate-file-names ;; 5x: 70ms -> 14ms
+        (cl-loop
+         for dir in org-node-extra-id-dirs
+         append (org-node--directory-files-recursively ;; 2x: 14ms -> 7ms
                  dir "org" org-node-extra-id-dirs-exclude)))))))
 
 (defun org-node--directory-files-recursively (dir suffix excludes)
-  "Dumber but faster version of `directory-files-recursively'.
+  "Faster, purpose-made variant of `directory-files-recursively'.
 Return a list of all files under directory DIR, its
 sub-directories, sub-sub-directories and so on, with provisos:
 
 - Don\\='t follow symlinks to other directories.
 - Don\\='t enter directories that start with a dot.
 - Don\\='t enter directories where some substring of the path
-  matches one of EXCLUDES literally.
-- Collect only files that end in SUFFIX literally.
+  matches one of strings EXCLUDES literally.
 - Don\\='t collect any file where some substring of the path
-  matches one of EXCLUDES literally.
-- Don\\='t sort final results stably."
+  matches one of strings EXCLUDES literally.
+- Collect only files that end in SUFFIX literally.
+- Don\\='t sort final results in any particular order."
   (let (result)
     (dolist (file (file-name-all-completions "" dir))
       (if (directory-name-p file)
@@ -1525,7 +1514,7 @@ sub-directories, sub-sub-directories and so on, with provisos:
 	      (push full-file result))))))
     result))
 
-(defun org-node--abbreviate-all-file-names (paths)
+(defun org-node--abbreviate-file-names (paths)
   "Abbreviate all file paths in list PATHS.
 Much faster than calling `abbreviate-file-name' once for each
 item in a loop."
@@ -1540,7 +1529,7 @@ item in a loop."
                             ;; Turn $HOME into ~
                             (if (and (string-match homedir-re path)
                                      (setq mb1 (match-beginning 1))
-                                     ;; If homedir is just /, don't change it
+                                     ;; If $HOME is just /, don't change it
                                      (not (and (= (match-end 0) 1)
                                                (= (aref path 0) ?/))))
                                 (concat "~" (substring path mb1))
@@ -1969,12 +1958,12 @@ type the name of a node that does not exist.  That enables this
     ;;       `org-node-put-created' on `org-node-creation-hook'.  But it can be
     ;;       easily modified to look at the datestamp in the filename instead.
     ("a" :name "All ID-nodes by chronological order"
-     :classifier (lambda (node)
-                   (let* ((timestamp
-                           (cdr (assoc "CREATED"
-                                       (org-node-get-properties node)))))
-                     (when (and timestamp (not (string-blank-p timestamp)))
-                       (cons timestamp (org-node-get-id node)))))
+     :classifier
+     (lambda (node)
+       (let* ((timestamp
+               (cdr (assoc "CREATED" (org-node-get-properties node)))))
+         (when (and timestamp (not (string-blank-p timestamp)))
+           (cons timestamp (org-node-get-id node)))))
      :whereami (lambda () (org-entry-get nil "CREATED" t))
      :prompter org-node--example-prompter
      :try-goto org-node--example-try-goto-id
@@ -2151,12 +2140,13 @@ format-constructs occur before these."
 
 (defvar org-node-proposed-series-key nil
   "Key that identifies the series about to be added to.
-Automatically set, should be nil most of the time.")
+Automatically set, should be nil most of the time.  For a
+variable that need not stay nil, see
+`org-node-current-series-key'.")
 
 (defun org-node--add-series-item ()
   "Look at node near point to maybe add an item to a series.
-The value of `org-node-proposed-series-key', if non-nil,
-identifies the series to add to."
+Only do something if `org-node-proposed-series-key' is non-nil."
   (when org-node-proposed-series-key
     (let* ((series (cdr (assoc org-node-proposed-series-key
                                org-node--series-info)))
@@ -2218,15 +2208,13 @@ If argument NEXT is non-nil, actually visit the next entry."
                            head
                          (drop (+ (length head) nascent-shift) items))))
         ;; Usually this should return on the first try, but sometimes stale
-        ;; items refer to something that has since been erased from disk, so
-        ;; keep unregistering each item that TRY-GOTO failed to visit.
+        ;; items refer to something that has been erased from disk, so
+        ;; deregister each item that TRY-GOTO failed to visit and try again.
         (cl-loop
          for item in to-check
          if (funcall (plist-get series :try-goto) item)
          return t
-         else do (delete item
-                         (plist-get (cdr (assoc key org-node--series-info))
-                                    :sorted-items))
+         else do (delete item (plist-get series :sorted-items))
          finally return
          (message "No %s item in series \"%s\""
                   (if next "next" "previous")
@@ -2275,7 +2263,6 @@ Also add a menu entry in `org-node-series-dispatch'."
      into items
      finally do
      (setf (alist-get (car spec) org-node--series-info nil nil #'equal)
-           ;; TODO what order for append/nconc produces less garbage?
            (nconc (cl-loop for elt in (cdr spec)
                            if (functionp elt)
                            collect (org-node--ensure-compiled elt)
@@ -2442,16 +2429,7 @@ which the region should be linkified, you\\='ll prefer
 `org-node-insert-link'.
 
 The commands are the same, it is just a difference in
-initial input.
-
-On the topic of Org-roam emulation, bonus tips:
-
-- To behave like Org-roam on node creation, set
-  `org-node-creation-fn' to `org-node-new-via-roam-capture'.
-
-- If you still find the behavior different, perhaps you had
-  something in `org-roam-post-node-insert-hook'.  Configure
-  `org-node-insert-link-hook' the same way."
+initial input."
   (interactive nil org-mode)
   (org-node-insert-link t))
 
