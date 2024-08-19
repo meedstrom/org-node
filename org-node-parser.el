@@ -15,8 +15,16 @@
 ;; For a full copy of the GNU General Public License
 ;; see <http://www.gnu.org/licenses/>.
 
+;;; Commentary:
+
+;; This file is worker code meant for child processes.  It should be designed
+;; to compile as quickly as possible, and the compiled artifact should load no
+;; other libraries.
+
+;;; Code:
+
 (eval-when-compile
-  (require 'cl-macs)
+  (require 'cl-lib)
   (require 'subr-x))
 
 (defun org-node-parser--tmpfile (&optional basename &rest args)
@@ -160,7 +168,7 @@ What this means?  See org-node-test.el."
                               (substring link? (match-end 0)))))
                    ;; Remember the uri: prefix for pretty completions
                    (push (cons path (match-string 1 link?))
-                         org-node-parser--result:paths-types)
+                         org-node-parser--result/paths-types)
                    ;; .. but the actual ref is just the //path
                    path))))))
 
@@ -225,14 +233,14 @@ Arguments PLAIN-RE and MERGED-RE..."
           ;;                       link-type
           ;;                       (substring citekey 1) ;; Drop &
           ;;                       (list :outline olp-with-self))
-          ;;               org-node-parser--result:found-links)))
+          ;;               org-node-parser--result/found-links)))
           (push (record 'org-node-link
                         id-here
                         (point)
                         link-type
                         (string-replace "%20" " " path) ;; sane?
                         (list :outline olp-with-self))
-                org-node-parser--result:found-links))))
+                org-node-parser--result/found-links))))
 
     ;; Start over and look for Org 9.5 @citekeys
     (goto-char beg)
@@ -258,15 +266,16 @@ Arguments PLAIN-RE and MERGED-RE..."
                               nil
                               (substring (match-string 0) 1) ;; drop @
                               (list :outline olp-with-self))
-                      org-node-parser--result:found-links)))
+                      org-node-parser--result/found-links)))
           (push (list org-node-parser--curr-file (point)
                       "No closing [cite: bracket")
-                org-node-parser--result:problems)))))
+                org-node-parser--result/problems)))))
   (goto-char (or end (point-max))))
 
 (defun org-node-parser--collect-properties (beg end)
-  "Assuming BEG and END delimit the region in between
-:PROPERTIES:...:END:, collect the properties into an alist."
+  "Collect Org properties between BEG and END into an alist.
+Assumes BEG and END delimit the region in between
+a :PROPERTIES: and :END: string."
   (catch 'break
     (let (result)
       (goto-char beg)
@@ -275,7 +284,7 @@ Arguments PLAIN-RE and MERGED-RE..."
         (unless (looking-at-p ":")
           (push (list org-node-parser--curr-file (point)
                       "Possibly malformed property drawer")
-                org-node-parser--result:problems)
+                org-node-parser--result/problems)
           (throw 'break nil))
         (forward-char)
         (push (cons (upcase
@@ -285,7 +294,7 @@ Arguments PLAIN-RE and MERGED-RE..."
                               (progn
                                 (push (list org-node-parser--curr-file (point)
                                             "Possibly malformed property drawer")
-                                      org-node-parser--result:problems)
+                                      org-node-parser--result/problems)
                                 (throw 'break nil))))))
                     (string-trim
                      (buffer-substring
@@ -297,12 +306,12 @@ Arguments PLAIN-RE and MERGED-RE..."
 
 ;;; Main
 
-(defvar org-node-parser--result:paths-types nil)
-(defvar org-node-parser--result:found-links nil)
-(defvar org-node-parser--result:problems nil)
+(defvar org-node-parser--result/paths-types nil)
+(defvar org-node-parser--result/found-links nil)
+(defvar org-node-parser--result/problems nil)
 (defvar org-node-parser--curr-file nil)
 
-;; Compiler
+;; Tell compiler these aren't free variables
 (defvar $plain-re)
 (defvar $merged-re)
 (defvar $assume-coding-system)
@@ -314,12 +323,13 @@ Arguments PLAIN-RE and MERGED-RE..."
 (defvar $files)
 
 (defun org-node-parser--collect-dangerously ()
-  "Dangerous!  Overwrites the current buffer!
+  "Dangerous!
+Overwrites the current buffer!
 
-Taking info from the temp files prepared by
-`org-node-cache--scan', such as a file list, look for ID-nodes
-and links in all Org files given in the file list, and write
-the findings to another temp file."
+Taking info from the temp files prepared by `org-node--scan',
+which includes info such as a list of Org files, visit all those
+files to look for ID-nodes and links, then finish by writing the
+findings to another temp file."
   (let ((file-name-handler-alist nil))
     (insert-file-contents (org-node-parser--tmpfile "work-variables.eld"))
     (dolist (var (read (buffer-string)))
@@ -330,9 +340,9 @@ the findings to another temp file."
   (setq $files (read (buffer-string)))
   (setq buffer-read-only t)
   (let ((case-fold-search t)
-        result:missing-files
-        result:found-nodes
-        result:mtimes
+        result/missing-files
+        result/found-nodes
+        result/mtimes
         ;; Perf
         (file-name-handler-alist $file-name-handler-alist)
         (coding-system-for-read $assume-coding-system)
@@ -352,11 +362,11 @@ the findings to another temp file."
               ;; We got here because user deleted a file in a way that we
               ;; didn't notice.  If it was actually a rename file-done outside
               ;; Emacs, the new name will get picked up on next reset.
-              (push FILE result:missing-files)
+              (push FILE result/missing-files)
               (throw 'file-done t))
             (push (cons FILE (file-attribute-modification-time
                               (file-attributes FILE)))
-                  result:mtimes)
+                  result/mtimes)
             (setq org-node-parser--curr-file FILE)
             ;; NOTE: Don't use `insert-file-contents-literally'.  It gives
             ;;       wrong values to HEADING-POS when there is any Unicode in
@@ -476,7 +486,7 @@ the findings to another temp file."
                          FILE-TAGS
                          FILE-TITLE-OR-BASENAME ;; Title mandatory
                          nil)
-                 result:found-nodes))
+                 result/found-nodes))
               (goto-char (point-max))
               ;; We should now be at the first heading
               (widen))
@@ -592,7 +602,7 @@ the findings to another temp file."
                            TAGS
                            TITLE
                            TODO-STATE)
-                   result:found-nodes))
+                   result/found-nodes))
                 ;; Heading recorded, now collect links in the entry body!
                 (setq ID-HERE (or ID
                                   (org-node-parser--pos->parent-id
@@ -607,7 +617,7 @@ the findings to another temp file."
                     (unless (setq DRAWER-END (search-forward ":end:" nil t))
                       (push (list FILE (point)
                                   "Couldn't find matching :END: drawer")
-                            org-node-parser--result:problems)
+                            org-node-parser--result/problems)
                       (throw 'entry-done t))
                   ;; Danger, Robinson
                   (setq DRAWER-END nil))
@@ -630,23 +640,22 @@ the findings to another temp file."
         ;; Don't crash the process when there is an error signal,
         ;; report it and continue to the next file
         (( t error )
-         (push (list FILE (point) err) org-node-parser--result:problems))))
+         (push (list FILE (point) err) org-node-parser--result/problems))))
 
     (with-temp-file (org-node-parser--tmpfile "results-%d.eld" $i)
       (let ((write-region-inhibit-fsync nil) ;; Default t in batch mode
             (print-length nil)
             (print-level nil))
         (insert
-         (prin1-to-string (list result:missing-files
-                                result:mtimes
-                                result:found-nodes
-                                org-node-parser--result:paths-types
-                                org-node-parser--result:found-links
-                                org-node-parser--result:problems
+         (prin1-to-string (list result/missing-files
+                                result/mtimes
+                                result/found-nodes
+                                org-node-parser--result/paths-types
+                                org-node-parser--result/found-links
+                                org-node-parser--result/problems
                                 (current-time)))))))
   ;; TODO: Does emacs in batch mode garbage-collect at the end? I guess not but
-  ;;       if it does then maybe exec a kill -9 on itself here.  That may mess
-  ;;       with the sentinel but...
+  ;;       if it does then maybe exec a kill -9 on itself here.
   )
 
 (provide 'org-node-parser)

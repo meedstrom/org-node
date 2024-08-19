@@ -644,6 +644,8 @@ SYNCHRONOUS t, unless SYNCHRONOUS is the symbol `must-async'."
   (when (hash-table-empty-p org-nodes)
     (setq synchronous (if (eq synchronous 'must-async) nil t))
     (setq force t))
+  ;; (when (not org-node-cache-mode)
+  ;;   (setq force t))
   (when force
     ;; Launch the async processes
     (org-node--scan-all))
@@ -668,7 +670,8 @@ SYNCHRONOUS t, unless SYNCHRONOUS is the symbol `must-async'."
 In broad strokes:
 - Run `org-id-locations-load' if needed.
 - Ensure `org-id-locations' is a hash table and not an alist.
-- Warn if `org-id-locations' is still empty after this."
+- Throw error if `org-id-locations' is still empty after this,
+  unless `org-node-extra-id-dirs' has members."
   (require 'org-id)
   (when (not org-id-track-globally)
     (user-error "Org-node requires `org-id-track-globally'"))
@@ -681,12 +684,8 @@ In broad strokes:
     (org-id-locations-load)
     (when (and (hash-table-empty-p org-id-locations)
                (null org-node-extra-id-dirs))
-      (org-node--die "org-id-locations empty, try `org-id-update-id-locations' or `org-roam-update-org-id-locations'"))))
-
-
-;;;; Calendar integration
-
-
+      (org-node--die
+       "org-id-locations empty, try `org-id-update-id-locations' or `org-roam-update-org-id-locations'"))))
 
 
 ;;;; Scanning
@@ -893,9 +892,9 @@ function to update current tables."
                           nil
                           (org-node-parser--tmpfile "file-list-0.eld")))
           (setq $i 0)
-          (setq org-node-parser--result:found-links nil)
-          (setq org-node-parser--result:problems nil)
-          (setq org-node-parser--result:paths-types nil)
+          (setq org-node-parser--result/found-links nil)
+          (setq org-node-parser--result/problems nil)
+          (setq org-node-parser--result/paths-types nil)
           (when (bound-and-true-p editorconfig-mode)
             (message "Maybe disable editorconfig-mode while debugging"))
           (setq org-node--first-init nil)
@@ -2046,7 +2045,7 @@ daily-note.  It receives a would-be sort-string as argument."
                 (org-roam-dailies--capture
                  (encode-time
                   (parse-time-string
-                   (concat sortstr (format-time-string " %H:%M:%S %z"))))
+                   (concat sortstr (format-time-string " %T %z"))))
                  t))
             (setq org-node-proposed-series-key nil)
             (remove-hook 'org-roam-capture-new-node-hook
@@ -2353,9 +2352,9 @@ Also add a menu entry in `org-node-series-dispatch'."
     (list key name key))
   ;; Make the series switches mutually exclusive
   (let ((old (car (slot-value (get 'org-node-series-dispatch 'transient--prefix)
-                              :incompatible))))
+                              'incompatible))))
     (setf (slot-value (get 'org-node-series-dispatch 'transient--prefix)
-                      :incompatible)
+                      'incompatible)
           (list (seq-uniq (cons key old))))))
 
 
