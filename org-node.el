@@ -576,10 +576,7 @@ When called from Lisp, peek on any hash table HT."
         (advice-add 'rename-file :after #'org-node--handle-rename)
         (advice-add 'delete-file :after #'org-node--handle-delete)
         (org-node-cache-ensure 'must-async t)
-        (org-node--maybe-adjust-idle-timer)
-        ;; calendar hooks (not sure where to put them)
-        (add-hook 'calendar-today-visible-hook #'org-node--dailies-calendar-mark-entries)
-        (add-hook 'calendar-today-invisible-hook #'org-node--dailies-calendar-mark-entries))
+        (org-node--maybe-adjust-idle-timer))
     (cancel-timer org-node--idle-timer)
     (remove-hook 'after-save-hook #'org-node--handle-save)
     (remove-hook 'org-node-creation-hook #'org-node--dirty-ensure-node-known)
@@ -587,10 +584,7 @@ When called from Lisp, peek on any hash table HT."
     (remove-hook 'org-roam-post-node-insert-hook #'org-node--dirty-ensure-link-known)
     (advice-remove 'org-insert-link #'org-node--dirty-ensure-link-known)
     (advice-remove 'rename-file #'org-node--handle-rename)
-    (advice-remove 'delete-file #'org-node--handle-delete)
-    ;; calendar hooks (not sure where to put them)
-    (remove-hook 'calendar-today-visible-hook #'org-node--dailies-calendar-mark-entries)
-    (remove-hook 'calendar-today-invisible-hook #'org-node--dailies-calendar-mark-entries)))
+    (advice-remove 'delete-file #'org-node--handle-delete)))
 
 (defun org-node--handle-rename (file newname &rest _)
   "Arrange to scan NEWNAME for nodes and links, and forget FILE."
@@ -689,25 +683,11 @@ In broad strokes:
     (when (and (hash-table-empty-p org-id-locations)
                (null org-node-extra-id-dirs))
       (org-node--die "org-id-locations empty, try `org-id-update-id-locations' or `org-roam-update-org-id-locations'"))))
+
 
 ;;;; Calendar integration
-(defun org-node--dailies-calendar-mark-entries ()
-  "Mark days in the calendar for which a daily-note is present."
-  (when org-node-mark-calendar-days-with-notes
-    (let* ((date-series (cdr (assoc "d" org-node--series-info)))
-           (dates-plist (plist-get date-series :sorted-items))
-           (dates (cl-loop for date-item in dates-plist
-                           collect (car date-item))))
-      ;; dates
-      (cl-loop for date in dates
-               do (let* ((mdy-list-date
-                          (cl-destructuring-bind (_ _ _ d m y _ _ _)
-                              (org-parse-time-string date)
-                            (list m d y))))
-                    (when (calendar-date-is-visible-p mdy-list-date)
-                      (calendar-mark-visible-date
-                       mdy-list-date
-                       'org-node-dailies-calendar-note)))))))
+
+
 
 
 ;;;; Scanning
@@ -1949,7 +1929,7 @@ type the name of a node that does not exist.  That enables this
   '(("d" :name "Dailies"
      :classifier org-node--example-daily-classifier
      :whereami org-node--example-daily-whereami
-     :prompter (lambda (_series) (org-read-date))
+     :prompter org-node--example-daily-prompter
      :try-goto org-node--example-try-goto-file
      :creator org-node--example-daily-creator)
 
@@ -2092,6 +2072,48 @@ YYYY-MM-DD, but it does not verify."
   (let ((path (org-node-get-file-path node)))
     (when (string-match-p "/dail\\w+/" path)
       (cons (file-name-base path) path))))
+
+(defun org-node--example-daily-prompter (series)
+  "Prompt for a date, return it in YYYY-MM-DD form."
+  (add-hook 'calendar-today-invisible-hook #'org-node-mark-days)
+  (add-hook 'calendar-today-visible-hook #'org-node-mark-days)
+  (setq org-node-series-that-marks-calendar (plist-get series :key))
+  (unwind-protect (org-read-date)
+    (remove-hook 'calendar-today-invisible-hook #'org-node-mark-days)
+    (remove-hook 'calendar-today-visible-hook #'org-node-mark-days)))
+
+(defface org-node-calendar-marked
+  '((t :inherit (org-link) :underline nil))
+  "Face used by `org-node-mark-days'.")
+
+(defcustom org-node-series-that-marks-calendar "d"
+  "Key for the series that should mark days in the calendar.
+This is used by `org-node-mark-days' to mark dates of interest in
+the `org-read-date' calendar popup.  A typical use is showing
+which days have a daily journal entry.
+
+The sort-strings in this series should be correctly parseable by
+`parse-time-string'."
+  :type 'key)
+
+(defun org-node-mark-days ()
+  "Mark days in the calendar popup.
+The user option `org-node-series-that-marks-calendar' controls
+which dates to mark.
+
+May be added to the hooks `calendar-today-invisible-hook' and
+`calendar-today-visible-hook' in order to always mark these
+dates any time the calendar popup is shown."
+  (when org-node-series-that-marks-calendar
+    (let* ((series (cdr (assoc org-node-series-that-marks-calendar
+                               org-node--series-info)))
+           (dates (mapcar #'car (plist-get series :sorted-items)))
+           mdy)
+      (dolist (date dates)
+        (setq mdy (seq-let (_ _ _ d m y _ _ _) (org-parse-time-string date)
+                    (list m d y)))
+        (when (calendar-date-is-visible-p mdy)
+          (calendar-mark-visible-date mdy 'org-node-calendar-marked))))))
 
 (defun org-node--example-daily-whereami ()
   "Check the filename for a date and return it."
