@@ -29,7 +29,7 @@
 
 (require 'cl-lib)
 (require 'org-node)
-(require 'org-node-obsolete)
+(require 'org-node-changes)
 (require 'ol)
 (if (require 'org-roam nil t)
     (require 'emacsql)
@@ -133,9 +133,9 @@ Run ORIG-FN with ARGS, while overriding
 ;; Fabricate knockoff Roam backlinks in real time, so that a DB is not needed
 ;; to display the Roam buffer
 
-(org-node-obsolete-defun org-node-fakeroam-nosql-mode
-                         org-node-fakeroam-jit-backlinks-mode
-                         nil "2024-08-18" "2024-09-30")
+(org-node-changes-defun org-node-fakeroam-nosql-mode
+                        org-node-fakeroam-jit-backlinks-mode
+                        nil "2024-08-18" "2024-09-30")
 
 ;;;###autoload
 (define-minor-mode org-node-fakeroam-jit-backlinks-mode
