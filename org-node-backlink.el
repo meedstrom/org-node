@@ -1,4 +1,4 @@
-;;; org-node-backlink.el -*- lexical-binding: t; -*-
+;;; org-node-backlink.el --- Manage :BACKLINKS: properties -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2024 Martin Edström
 ;;

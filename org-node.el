@@ -83,7 +83,7 @@
 (require 'org-macs)
 (require 'org-element)
 (require 'org-node-parser)
-(require 'org-node-obsolete)
+(require 'org-node-changes)
 
 (defvar org-roam-completion-everywhere)
 (defvar org-roam-directory)
@@ -640,8 +640,7 @@ SYNCHRONOUS t, unless SYNCHRONOUS is the symbol `must-async'."
     ;; The warn-function becomes a no-op after the first run, so gotta
     ;; run it as late as possible in case of late variable settings.  By
     ;; running it here, we've waited until the user runs a command.
-    ;; (No interactive command passes `must-async'.)
-    (org-node-obsolete-warn-and-copy))
+    (org-node-changes--warn-and-copy))
   (org-node--init-ids)
   (when (hash-table-empty-p org-nodes)
     (setq synchronous (if (eq synchronous 'must-async) nil t))
