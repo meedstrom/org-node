@@ -2951,13 +2951,21 @@ In case of unsolvable problems, how to wipe org-id-locations:
   (interactive)
   (unless (require 'consult nil t)
     (user-error "This command requires the consult package"))
+  (org-node--init-ids)
   (when (and (fboundp 'consult--grep)
-             (fboundp 'consult--grep-make-builder))
-    (org-node--init-ids)
-    (consult--grep "Grep across all files known to org-node"
-                   #'consult--grep-make-builder
-                   (org-node-list-files)
-                   nil)))
+             (fboundp 'consult--grep-make-builder)
+             (fboundp 'consult--ripgrep-make-builder))
+    (let ((consult-ripgrep-args (concat consult-ripgrep-args " --type=org")))
+      (if (executable-find "rg")
+          (consult--grep "Ripgrep in all known Org files: "
+                         #'consult--ripgrep-make-builder
+                         (org-node--root-dirs (org-node-list-files t))
+                         nil)
+        ;; Old, much slower
+        (consult--grep "Grep in all known Org files: "
+                       #'consult--grep-make-builder
+                       (org-node-list-files)
+                       nil)))))
 
 (defvar org-node--linted nil
   "List of files linted so far.")
