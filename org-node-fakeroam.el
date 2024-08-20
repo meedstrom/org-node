@@ -61,6 +61,13 @@ that org-roam is available."
       (unless (compiled-function-p (symbol-function fn))
         (byte-compile fn)))))
 
+(defcustom org-node-fakeroam-redisplay-mode-no-follow-only-accelerate nil
+  "If non-nil, don't actually autosync the *org-roam* buffer based on
+buffer changes, i.e., don't actually follow/autosync, but apply
+the fakeroam-redisplay-mode bonus accelerations."
+  :group 'org-node
+  :type 'boolean)
+
 ;;;###autoload
 (define-minor-mode org-node-fakeroam-redisplay-mode
   "Make the Roam buffer react when point moves in any Org buffer.
@@ -88,20 +95,22 @@ previews.  This is done thru
                     #'org-node-fakeroam--accelerate-get-contents)
         (advice-add #'org-roam-node-insert-section :around
                     #'org-node-fakeroam--run-without-fontifying)
-        (add-hook 'org-mode-hook #'org-roam-buffer--setup-redisplay-h)
-        (dolist (buf (org-buffer-list))
-          (with-current-buffer buf
-            (add-hook 'post-command-hook #'org-roam-buffer--redisplay-h nil t))))
+        (when org-node-fakeroam-redisplay-mode-no-follow-only-accelerate
+          (add-hook 'org-mode-hook #'org-roam-buffer--setup-redisplay-h)
+          (dolist (buf (org-buffer-list))
+            (with-current-buffer buf
+              (add-hook 'post-command-hook #'org-roam-buffer--redisplay-h nil t)))))
 
     (advice-remove #'org-roam-preview-get-contents
                    #'org-node-fakeroam--accelerate-get-contents)
     (advice-remove #'org-roam-node-insert-section
                    #'org-node-fakeroam--run-without-fontifying)
-    (remove-hook 'org-mode-hook #'org-roam-buffer--setup-redisplay-h)
-    (unless org-roam-db-autosync-mode
-      (dolist (buf (org-buffer-list))
-        (with-current-buffer buf
-          (remove-hook 'post-command-hook #'org-roam-buffer--redisplay-h t))))))
+    (when org-node-fakeroam-redisplay-mode-no-follow-only-accelerate
+      (remove-hook 'org-mode-hook #'org-roam-buffer--setup-redisplay-h)
+      (unless org-roam-db-autosync-mode
+        (dolist (buf (org-buffer-list))
+          (with-current-buffer buf
+            (remove-hook 'post-command-hook #'org-roam-buffer--redisplay-h t)))))))
 
 (defun org-node-fakeroam--accelerate-get-contents (orig-fn file pt)
   "Designed as around-advice for `org-roam-preview-get-contents'.
