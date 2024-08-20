@@ -241,8 +241,11 @@ Designed to override `org-roam-reflinks-get'."
         (org-node-fakeroam--check-compile)
         (unless org-node-cache-mode
           (message "`org-node-fakeroam-db-feed-mode' will do nothing without `org-node-cache-mode'"))
-        (add-hook 'org-node-rescan-hook #'org-node-fakeroam--db-update-files))
-    (remove-hook 'org-node-rescan-hook #'org-node-fakeroam--db-update-files)))
+        (add-hook 'org-node-rescan-hook #'org-node-fakeroam--db-update-files)
+        (add-hook 'kill-emacs-hook #'org-roam-db--close-all))
+    (remove-hook 'org-node-rescan-hook #'org-node-fakeroam--db-update-files)
+    (unless org-roam-db-autosync-mode
+      (remove-hook 'kill-emacs-hook #'org-roam-db--close-all))))
 
 ;; Purpose-focused alternative to `org-node-fakeroam-db-rebuild'
 ;; because that is not instant.
@@ -402,11 +405,11 @@ For argument EXTRA-FILES, see that function."
   (let ((daily-dir (abbreviate-file-name
                     (file-name-concat org-roam-directory
                                       org-roam-dailies-directory))))
-    (nconc (cl-loop
-            for file in (org-node-list-files t)
-            when (string-prefix-p daily-dir file)
-            collect file)
-           extra-files)))
+    (append extra-files
+            (cl-loop
+             for file in (org-node-list-files t)
+             when (string-prefix-p daily-dir file)
+             collect file))))
 
 (defun org-node-fakeroam-daily-note-p (&optional file)
   "Maybe faster than `org-roam-dailies--daily-note-p'.
@@ -425,6 +428,18 @@ buffer file."
                           (downcase (file-truename file)))
          (not (cl-loop for exclude in org-node-extra-id-dirs-exclude
                        when (string-search exclude file) return t)))))
+
+;; TODO: Somehow make `org-node-new-via-roam-capture' able to do this?
+;;;###autoload
+(defun org-node-fakeroam-daily-creator (sortstr)
+  (require 'org-roam-dailies)
+  (add-hook 'org-roam-capture-new-node-hook #'org-node--add-series-item)
+  (unwind-protect
+      (org-roam-dailies--capture
+       (encode-time
+        (parse-time-string (concat sortstr (format-time-string " %T %z"))))
+       t)
+    (remove-hook 'org-roam-capture-new-node-hook #'org-node--add-series-item)))
 
 (provide 'org-node-fakeroam)
 
