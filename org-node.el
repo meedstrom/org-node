@@ -2034,20 +2034,22 @@ daily-note.  It receives a would-be sort-string as argument."
 ;;       also the TODO at `org-node-fakeroam-daily-creator'.
 (defun org-node--example-daily-creator (sortstr)
   "Create a daily-note using SORTSTR as the date."
-  (setq org-node-proposed-series-key "d")
-  (unwind-protect
-      (if (and (eq org-node-creation-fn 'org-node-new-via-roam-capture)
-               (fboundp 'org-node-fakeroam-daily-creator))
-          ;; Assume this user wants to use their roam-dailies templates
-          (org-node-fakeroam-daily-creator sortstr)
-        (let ((org-node-ask-directory
-               (if (require 'org-roam-dailies nil t)
-                   (file-name-concat org-roam-directory org-roam-dailies-directory)
-                 (file-name-as-directory (file-name-concat org-directory "daily"))))
-              (org-node-datestamp-format "")
-              (org-node-slug-fn #'identity))
-          (org-node--create sortstr (org-id-new) "d")))
-    (setq org-node-proposed-series-key nil)))
+  (if (and (eq org-node-creation-fn 'org-node-new-via-roam-capture)
+           (fboundp 'org-node-fakeroam-daily-creator))
+      ;; Assume this user wants to use their roam-dailies templates
+      (progn
+        (setq org-node-proposed-series-key "d")
+        (unwind-protect
+            (org-node-fakeroam-daily-creator sortstr)
+          (setq org-node-proposed-series-key nil)))
+    (let ((org-node-ask-directory
+           ;; Even not using the template, the
+           (if (require 'org-roam-dailies nil t)
+               (file-name-concat org-roam-directory org-roam-dailies-directory)
+             (file-name-as-directory (file-name-concat org-directory "daily"))))
+          (org-node-datestamp-format "")
+          (org-node-slug-fn #'identity))
+      (org-node--create sortstr (org-id-new) "d"))))
 
 (defun org-node--example-daily-classifier (node)
   "Classifier suitable for daily-notes in default Org-Roam style.
