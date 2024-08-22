@@ -88,17 +88,17 @@ See also `org-node-fakeroam-fast-render-mode'.
         (with-current-buffer buf
           (remove-hook 'post-command-hook #'org-roam-buffer--redisplay-h t))))))
 
+;; TODO: Use org-persist
 (define-minor-mode org-node-fakeroam-fast-render-mode
   "Advise the Roam buffer to be faster.
 
-Make the buffer build faster by nullifying certain Org options
-inside the context previews.
+1. Make the buffer build faster by nullifying certain Org options
+   inside the context previews.
 
-Cache the previews so that there is less or no lag the next time
-the same nodes are visited.
+2. Cache the previews, so that there is less or no lag the next
+   time the same nodes are visited.
 
-Additionally, save this cache to disk if `savehist-mode' is
-enabled.
+3. Save this cache to disk if `savehist-mode' is enabled.
 
 -----"
   :global t
@@ -148,6 +148,21 @@ Run ORIG-FN with ARGS, while overriding
 `org-roam-fontify-like-in-org-mode' so it does nothing."
   (cl-letf (((symbol-function 'org-roam-fontify-like-in-org-mode) #'identity))
     (apply orig-fn args)))
+
+;; Just an useful command
+(defun org-node-fakeroam-show-roam-buffer ()
+  "Display an org-roam buffer or refresh an already visible one.
+To reiterate: if it was not visible, only bring it up for
+display, do NOT also refresh it.  Leave that for the second time
+the user invokes the command."
+  (interactive nil org-mode org-roam-mode)
+  (if (derived-mode-p 'org-roam-mode)
+      (org-roam-buffer-refresh)
+    (pcase (org-roam-buffer--visibility)
+      ('visible (and (derived-mode-p 'org-mode)
+                     (org-roam-buffer-persistent-redisplay)))
+      ((or 'exists 'none)
+       (display-buffer (get-buffer-create org-roam-buffer))))))
 
 
 ;;;; JIT method
@@ -451,6 +466,9 @@ buffer file."
                           (downcase (file-truename file)))
          (not (cl-loop for exclude in org-node-extra-id-dirs-exclude
                        when (string-search exclude file) return t)))))
+
+
+;;;; Series-related
 
 ;; TODO: Somehow make `org-node-new-via-roam-capture' able to do this?
 ;;;###autoload
