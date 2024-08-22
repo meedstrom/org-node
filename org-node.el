@@ -81,8 +81,6 @@
 ;; TODO: Let series dispatch have another "level" for nav keys after selecting
 ;;       the series, so "j" "n" "p" are available
 
-;; TODO: Capture into series
-
 (require 'cl-lib)
 (require 'seq)
 (require 'subr-x)
@@ -476,7 +474,7 @@ or you can visit the homepage:
   (todo       nil :read-only t :type string :documentation
               "Returns node's TODO state."))
 
-;; It's safe to alias the accessor, because they are all read only
+;; It's safe to alias an accessor, because they are all read only
 (defalias 'org-node-get-props 'org-node-get-properties)
 
 (cl-defstruct (org-node-link (:constructor org-node-link--make-obj)
@@ -1445,7 +1443,8 @@ errors are very easy to miss.
 
 Arguments FORMAT-STRING and ARGS as in `format-message'."
   (let ((err-string (apply #'format-message format-string args)))
-    (display-warning 'org-node err-string :error)
+    (unless debug-on-error
+      (display-warning 'org-node err-string :error))
     (error "%s" err-string)))
 
 (defun org-node--consent-to-bothersome-modes-for-mass-edit ()
@@ -2118,21 +2117,23 @@ daily-note.  It receives a would-be sort-string as argument."
   :type 'alist)
 
 (defun org-node-helper/try-goto-id (id)
-  "Assume cdr of ITEM is an org-id and try to visit it."
+  "Try to visit org-id ID, returning non-nil on success."
   (let ((node (gethash id org-node--id<>node)))
     (when node
       (org-node--goto node)
       t)))
 
 (defun org-node-helper/try-visit-file (file)
-  "Assume cdr of ITEM is a filename and try to visit it."
+  "Visit FILE if it exists or if a buffer exists on that file.
+Return non-nil on success."
   (when (or (file-readable-p file)
             (find-buffer-visiting file))
     (find-file file)
     t))
 
 (defun org-node-helper/filename->ymd (path)
-  "Check the filename for a date and return it."
+  "Check the filename PATH for a date and return it.
+On failing to coerce a date, return nil."
   (when path
     (let ((clipped-name (file-name-base path)))
       (if (string-match
@@ -3641,6 +3642,7 @@ item using file name base as sort string."
 
 (defun org-node--example-try-goto-file (item)
   "Assume cdr of ITEM is a filename and try to visit it."
+  (declare (obsolete nil "2024-08-21"))
   (when (or (file-readable-p (cdr item))
             (find-buffer-visiting (cdr item)))
     (find-file (cdr item))
@@ -3648,6 +3650,7 @@ item using file name base as sort string."
 
 (defun org-node--example-try-goto-id (item)
   "Assume cdr of ITEM is an org-id and try to visit it."
+  (declare (obsolete nil "2024-08-21"))
   (let* ((id (cdr item))
          (node (gethash id org-nodes)))
     (when node
@@ -3656,6 +3659,7 @@ item using file name base as sort string."
 
 (defun org-node--example-daily-whereami ()
   "Check the filename for a date and return it."
+  (declare (obsolete nil "2024-08-21"))
   (when-let* ((path (buffer-file-name (buffer-base-buffer)))
               (clipped-name (file-name-base path)))
     (if (string-match-p
@@ -3668,31 +3672,16 @@ item using file name base as sort string."
         (org-node-extract-ymd stamp org-node-datestamp-format)))))
 
 (defun org-node--example-daily-prompter (series &rest _)
-  "Prompt for a date, return it in YYYY-MM-DD form."
+  "Prompt for a date, return it in YYYY-MM-DD form.
+Argument SERIES is the series that called this."
+  (declare (obsolete nil "2024-08-21"))
   (let ((org-node-series-that-marks-calendar (plist-get series :key)))
     (org-read-date)))
 
 (defun org-node--example-prompter (series)
   "Prompt to go to any of the sort-strings in SERIES."
+  (declare (obsolete nil "2024-08-21"))
   (completing-read "Go to: " (plist-get series :sorted-items)))
-
-(defun org-node--example-create (sortstr key)
-  "Create a daily-note using SORTSTR as the date."
-  (let ((org-node-datestamp-format "")
-        (org-node-slug-fn #'identity))
-    (org-node-create sortstr (org-id-new) key)))
-
-
-(defun org-node--example-daily-classify-by-filename (node)
-  "Classifier suitable for daily-notes in default Org-Roam style.
-
-."
-  (let* ((path (org-node-get-file-path node))
-         (base (file-name-base path)))
-    (when (string-match-p
-           (rx bol (= 4 digit) "-" (= 2 digit) "-" (= 2 digit) eol)
-           base)
-      (cons base path))))
 
 (provide 'org-node)
 
