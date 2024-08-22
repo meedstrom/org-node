@@ -155,9 +155,9 @@ If you didn't have laggy saves, this is fine.  In other words, keep variable =or
 
 Unfortunately, it is still a bit slow when I save a file with 400 nodes.  All down to EmacSQL -- if someone could help optimize how we call EmacSQL, that'd be much appreciated.  Until then, I recommend Option 1C.
 
-Bonus: if you often have reason to full-reset the DB, there is a faster command than =C-u M-x org-roam-db-sync=!  Try =M-x org-node-fakeroam-db-rebuild=.  It does not require the aforementioned mode.
+Bonus 1: if you often have reason to full-reset the DB, there is a faster command than =C-u M-x org-roam-db-sync=!  Try =M-x org-node-fakeroam-db-rebuild=. Takes me 6 seconds instead of 179 seconds.
 
-Another bonus: if the Roam backlinks buffer is sometimes slow, the minor mode =(org-node-fakeroam-redisplay-mode)= should speed it up.
+Bonus 2: if the Roam backlinks buffer is sometimes slow, the minor mode =M-x org-node-fakeroam-fast-render-mode= should speed it up.
 
 *** *Option 1C*
 *Cut out the DB altogether.*
@@ -168,8 +168,9 @@ If you're happy with the result, you can disable =org-roam-db-autosync-mode= ent
 
 #+begin_src elisp
 (org-roam-db-autosync-mode 0)
-(org-node-fakeroam-jit-backlinks-mode)
-(org-node-fakeroam-redisplay-mode)
+(org-node-fakeroam-jit-backlinks-mode) ;; no use sqlite to build buffer
+(org-node-fakeroam-fast-render-mode) ;; build the buffer fast
+(org-node-fakeroam-redisplay-mode) ;; always show backlinks relevant to point
 #+end_src
 
 ** Backlink solution 2: print inside the file
