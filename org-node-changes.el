@@ -48,7 +48,7 @@
 Warn if any old name in `org-node-changes--new-names' is bound.  Then
 copy the value in the old name so that the new name gets the same
 value."
-  ;; Don't add hooks at top level---melpazoid complains
+  ;; Don't add hooks at top level, -melpazoid complains
   (add-hook 'org-node-insert-link-hook
             #'org-node-changes--insert-link-hook-new-args
             -99)
@@ -95,6 +95,17 @@ hardcoded strings."
 (org-node-changes--def-whiny-alias org-node-rename-file-by-title-maybe
                                    org-node-rename-file-by-title)
 
+(org-node-changes--def-whiny-alias org-node-faster-roam-list-files
+                                   org-node-fakeroam-list-files)
+
+(org-node-changes--def-whiny-alias org-node-faster-roam-list-dailies
+                                   org-node-fakeroam-list-dailies)
+
+(org-node-changes--def-whiny-alias org-node-faster-roam-daily-note-p
+                                   org-node-fakeroam-daily-note-p)
+
+;; Many of these existed briefly, 0-2 days 2024-08-19
+
 (org-node-changes--def-whiny-alias org-node--series-standard-goto
                                    org-node--example-try-goto-id)
 
@@ -128,55 +139,32 @@ hardcoded strings."
 (org-node-changes--def-whiny-alias org-node--default-daily-creator
                                    org-node--example-daily-creator)
 
-(org-node-changes--def-whiny-alias org-node-faster-roam-list-files
-                                   org-node-fakeroam-list-files)
+;; Polite aliases for now
 
-(org-node-changes--def-whiny-alias org-node-faster-roam-list-dailies
-                                   org-node-fakeroam-list-dailies)
+(define-obsolete-function-alias
+  'org-node--extract-ymd 'org-node-extract-ymd  "2024-08-21")
 
-(org-node-changes--def-whiny-alias org-node-faster-roam-daily-note-p
-                                   org-node-fakeroam-daily-note-p)
+;; (define-obsolete-function-alias
+;;   "2024-08-21")
 
-(defun org-node--series-standard-creator (sortstr)
-  "Create a node with SORTSTR as the title."
-  (declare (obsolete nil "2024-08-17"))
-  (require 'org-id)
-  (display-warning 'org-node "Your series definition includes a function that will be REMOVED on 30 August 2024: `org-node--series-standard-creator'")
-  (when (and (fboundp 'org-node--create)
-             (fboundp 'org-id-new))
-    (org-node--create sortstr (org-id-new))))
+;; (define-obsolete-function-alias
+;;   "2024-08-21")
 
+(define-obsolete-function-alias
+  'org-node--create 'org-node-create "2024-08-21")
 
-;; TODO: Will probs rename to just `org-node-series' in Oct,
-;;       the old meaning of that name needs time to expire
-(defvaralias 'org-node--series-info 'org-node--series)
+;;;###autoload
+(define-obsolete-function-alias
+  'org-node-series-menu 'org-node-series-dispatch "2024-08-21")
 
-
-;;; User stuff expunged to fakeroam.el
+;; Variables
 
-;; Must define aliases "manually" aliases since the main package cannot depend
-;; on fakeroam.el
+;; TODO: Rename to just `org-node-series' in Oct
+(define-obsolete-variable-alias
+  'org-node--series-info 'org-node--series "2024-08-21")
 
-;; (defun org-node-faster-roam-list-files ()
-;;   "Effective alias for 'org-node-fakeroam-list-files'."
-;;   (require 'org-node-fakeroam)
-;;   (message "Renames for the rename god.  Renamed `org-node-faster-roam-list-files' to `org-node-fakeroam-list-files'")
-;;   (when (fboundp 'org-node-fakeroam-list-files)
-;;     (org-node-fakeroam-list-files)))
-
-;; (defun org-node-faster-roam-list-dailies ()
-;;   "Effective alias for 'org-node-fakeroam-list-dailies'."
-;;   (require 'org-node-fakeroam)
-;;   (message "Renames for the rename god.  Renamed `org-node-faster-roam-list-dailies' to `org-node-fakeroam-list-dailies'")
-;;   (when (fboundp 'org-node-fakeroam-list-dailies)
-;;     (org-node-fakeroam-list-dailies)))
-
-;; (defun org-node-faster-roam-daily-note-p ()
-;;   "Effective alias for 'org-node-fakeroam-daily-note-p'."
-;;   (require 'org-node-fakeroam)
-;;   (message "Renames for the rename god.  Renamed `org-node-faster-roam-daily-note-p' to `org-node-fakeroam-daily-note-p'")
-;;   (when (fboundp 'org-node-fakeroam-daily-note-p)
-;;     (org-node-fakeroam-daily-note-p)))
+(define-obsolete-variable-alias
+  'org-node-mark-days 'org-node--mark-days "2024-08-21")
 
 (provide 'org-node-changes)
 

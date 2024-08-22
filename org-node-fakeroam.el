@@ -56,16 +56,10 @@ that org-roam is available."
                   org-node-fakeroam-db-rebuild
                   org-node-fakeroam-list-files
                   org-node-fakeroam-list-dailies
-                  org-node-fakeroam-daily-note-p))
+                  org-node-fakeroam-daily-note-p
+                  org-node-fakeroam-daily-creator))
       (unless (compiled-function-p (symbol-function fn))
         (byte-compile fn)))))
-
-(defcustom org-node-fakeroam-redisplay-mode-no-follow-only-accelerate nil
-  "If non-nil, don't actually autosync the *org-roam* buffer based on
-buffer changes, i.e., don't actually follow/autosync, but apply
-the fakeroam-redisplay-mode bonus accelerations."
-  :group 'org-node
-  :type 'boolean)
 
 ;;;###autoload
 (define-minor-mode org-node-fakeroam-redisplay-mode
@@ -74,10 +68,7 @@ the fakeroam-redisplay-mode bonus accelerations."
 Normally, `org-roam-db-autosync-mode' sets this up for you - this
 mode exists for people who prefer to turn that off.
 
-As a bonus, advise the Roam buffer to open faster, by nullifying
-certain Org options inside the context previews, and caching the
-previews.  This is done thru
-`org-node-fakeroam--accelerate-get-contents', which see.
+See also `org-node-fakeroam-fast-render-mode'.
 
 -----"
   :global t
@@ -87,29 +78,45 @@ previews.  This is done thru
         (org-node-fakeroam--check-compile)
         (unless org-node-cache-mode
           (message "`org-node-fakeroam-redisplay-mode' may show stale previews without `org-node-cache-mode' enabled"))
+        (add-hook 'org-mode-hook #'org-roam-buffer--setup-redisplay-h)
+        (dolist (buf (org-buffer-list))
+          (with-current-buffer buf
+            (add-hook 'post-command-hook #'org-roam-buffer--redisplay-h nil t))))
+    (remove-hook 'org-mode-hook #'org-roam-buffer--setup-redisplay-h)
+    (unless org-roam-db-autosync-mode
+      (dolist (buf (org-buffer-list))
+        (with-current-buffer buf
+          (remove-hook 'post-command-hook #'org-roam-buffer--redisplay-h t))))))
+
+(define-minor-mode org-node-fakeroam-fast-render-mode
+  "Advise the Roam buffer to be faster.
+
+Make the buffer build faster by nullifying certain Org options
+inside the context previews.
+
+Cache the previews so that there is less or no lag the next time
+the same nodes are visited.
+
+Additionally, save this cache to disk if `savehist-mode' is
+enabled.
+
+-----"
+  :global t
+  :group 'org-node
+  (if org-node-fakeroam-fast-render-mode
+      (progn
+        (org-node-fakeroam--check-compile)
         (when (boundp 'savehist-additional-variables)
           (add-to-list 'savehist-additional-variables 'org-node--file<>previews)
           (add-to-list 'savehist-additional-variables 'org-node--file<>mtime))
         (advice-add #'org-roam-preview-get-contents :around
                     #'org-node-fakeroam--accelerate-get-contents)
         (advice-add #'org-roam-node-insert-section :around
-                    #'org-node-fakeroam--run-without-fontifying)
-        (when org-node-fakeroam-redisplay-mode-no-follow-only-accelerate
-          (add-hook 'org-mode-hook #'org-roam-buffer--setup-redisplay-h)
-          (dolist (buf (org-buffer-list))
-            (with-current-buffer buf
-              (add-hook 'post-command-hook #'org-roam-buffer--redisplay-h nil t)))))
-
+                    #'org-node-fakeroam--run-without-fontifying))
     (advice-remove #'org-roam-preview-get-contents
                    #'org-node-fakeroam--accelerate-get-contents)
     (advice-remove #'org-roam-node-insert-section
-                   #'org-node-fakeroam--run-without-fontifying)
-    (when org-node-fakeroam-redisplay-mode-no-follow-only-accelerate
-      (remove-hook 'org-mode-hook #'org-roam-buffer--setup-redisplay-h)
-      (unless org-roam-db-autosync-mode
-        (dolist (buf (org-buffer-list))
-          (with-current-buffer buf
-            (remove-hook 'post-command-hook #'org-roam-buffer--redisplay-h t)))))))
+                   #'org-node-fakeroam--run-without-fontifying)))
 
 (defun org-node-fakeroam--accelerate-get-contents (orig-fn file pt)
   "Designed as around-advice for `org-roam-preview-get-contents'.
@@ -126,13 +133,13 @@ Argument ORIG-FN is presumably `org-roam-preview-get-contents',
 which see for FILE and PT."
   (if-let ((cached (alist-get pt (gethash file org-node--file<>previews))))
       cached
-    ;; NOTE: We cannot use `org-roam-fontify-like-in-org-mode'
-    ;;       since it is temporarily overridden by
-    ;;       `org-node-fakeroam--run-without-fontifying'
-    ;;       at the time this runs.  But that's OK; it looks outdated.
     (setf (alist-get pt (gethash file org-node--file<>previews))
           (let ((org-inhibit-startup t))
             (delay-mode-hooks
+              ;; NOTE: We cannot use `org-roam-fontify-like-in-org-mode' since
+              ;;       it is temporarily overridden by
+              ;;       `org-node-fakeroam--run-without-fontifying' at the time
+              ;;       this runs.  But that's OK; it looks outdated.
               (org-fontify-like-in-org-mode (funcall orig-fn file pt)))))))
 
 (defun org-node-fakeroam--run-without-fontifying (orig-fn &rest args)
@@ -156,7 +163,8 @@ Run ORIG-FN with ARGS, while overriding
   "Override org-roam backlink-getters to look up org-node tables.
 
 As a result, \\[org-roam-buffer-toggle] will function without
-having SQLite installed, and you can delete the org-roam.db.
+having SQLite installed, and you can delete org-roam.db if you do
+not need it for other things.
 
 -----"
   :global t
@@ -165,7 +173,7 @@ having SQLite installed, and you can delete the org-roam.db.
       (progn
         (org-node-fakeroam--check-compile)
         (unless org-node-cache-mode
-          (message "`org-node-fakeroam-jit-backlinks-mode' will do nothing without `org-node-cache-mode'"))
+          (message "`org-node-fakeroam-jit-backlinks-mode' will do poorly without `org-node-cache-mode'"))
         (advice-add 'org-roam-backlinks-get :override
                     #'org-node-fakeroam--mk-backlinks)
         (advice-add 'org-roam-reflinks-get :override
@@ -174,7 +182,7 @@ having SQLite installed, and you can delete the org-roam.db.
     (advice-remove 'org-roam-reflinks-get #'org-node-fakeroam--mk-reflinks)))
 
 (defun org-node-fakeroam--mk-node (node)
-  "Make an org-roam-node object from org-node NODE."
+  "Make an org-roam-node object from org-node object NODE."
   (org-roam-node-create
    :file (org-node-get-file-path node)
    :id (org-node-get-id node)
@@ -201,20 +209,18 @@ having SQLite installed, and you can delete the org-roam.db.
 (defun org-node-fakeroam--mk-backlinks (target-roam-node &rest _)
   "Make org-roam-backlink objects pointing to TARGET-ROAM-NODE.
 Designed to override `org-roam-backlinks-get'."
-  (let ((target-id (org-roam-node-id target-roam-node)))
-    (if (not target-id)
-        (error "org-node-fakeroam: Going to get backlinks, but given nil id")
-      (let ((links (gethash target-id org-node--dest<>links)))
-        (cl-loop
-         for link in links
-         as src-id = (org-node-link-origin link)
-         as src-node = (gethash src-id org-node--id<>node)
-         when src-node
-         collect (org-roam-backlink-create
-                  :target-node target-roam-node
-                  :source-node (org-node-fakeroam--mk-node src-node)
-                  :point (org-node-link-pos link)
-                  :properties (org-node-link-properties link)))))))
+  (let* ((target-id (org-roam-node-id target-roam-node))
+         (links (gethash target-id org-node--dest<>links)))
+    (cl-loop
+     for link in links
+     as src-id = (org-node-link-origin link)
+     as src-node = (gethash src-id org-node--id<>node)
+     when src-node
+     collect (org-roam-backlink-create
+              :target-node target-roam-node
+              :source-node (org-node-fakeroam--mk-node src-node)
+              :point (org-node-link-pos link)
+              :properties (org-node-link-properties link)))))
 
 (defun org-node-fakeroam--mk-reflinks (target-roam-node &rest _)
   "Make org-roam-reflink objects pointing to TARGET-ROAM-NODE.
@@ -252,6 +258,7 @@ Designed to override `org-roam-reflinks-get'."
           (message "`org-node-fakeroam-db-feed-mode' will do nothing without `org-node-cache-mode'"))
         (add-hook 'org-node-rescan-hook #'org-node-fakeroam--db-update-files)
         (add-hook 'kill-emacs-hook #'org-roam-db--close-all))
+
     (remove-hook 'org-node-rescan-hook #'org-node-fakeroam--db-update-files)
     (unless org-roam-db-autosync-mode
       (remove-hook 'kill-emacs-hook #'org-roam-db--close-all))))
@@ -260,20 +267,21 @@ Designed to override `org-roam-reflinks-get'."
 ;; because that is not instant.
 ;; FIXME: Still too damn slow on a file with 400 nodes.  Profiler says most of
 ;;        it is in EmacSQL, maybe some SQL PRAGMA settings would fix?
+;;        Or collect all data for one mega `emacsql' call?
 (defun org-node-fakeroam--db-update-files (files)
   "Update the Roam DB about nodes and links involving FILES."
   (emacsql-with-transaction (org-roam-db)
     (dolist (file files)
       (org-roam-db-query [:delete :from files :where (= file $s1)]
                          file))
-    (let (file-level-data-already-added)
+    (let (already)
       (cl-loop
        for node being the hash-values of org-nodes
        as file = (org-node-get-file-path node)
        when (member file files)
        do
-       (unless (member file file-level-data-already-added)
-         (push file file-level-data-already-added)
+       (unless (member file already)
+         (push file already)
          (org-node-fakeroam--db-add-file-level-data node))
        ;; Clear backlinks to prevent duplicates
        (dolist (dest (cons (org-node-get-id node)
@@ -438,17 +446,73 @@ buffer file."
          (not (cl-loop for exclude in org-node-extra-id-dirs-exclude
                        when (string-search exclude file) return t)))))
 
+
 ;; TODO: Somehow make `org-node-new-via-roam-capture' able to do this?
 ;;;###autoload
+(defun org-node-fakeroam-daily-create (ymd series-key &optional goto keys)
+  "Create a daily-note, for a day implied by YMD.
+YMD must be a time string in YYYY-MM-DD form.
+
+SERIES-KEY is the Org-node series that cor  TODO: just pass the series as a whole??
+
+KEYS correspond to the capture template you wish to go to."
+  (require 'org-roam-dailies)
+  (add-hook 'org-roam-capture-new-node-hook #'org-node--add-series-item)
+  (setq org-node-proposed-series-key series-key)
+  (unwind-protect
+      (org-roam-dailies--capture
+       (encode-time
+        (parse-time-string (concat ymd (format-time-string " %T %z"))))
+       goto keys)
+    (remove-hook 'org-roam-capture-new-node-hook #'org-node--add-series-item)
+    (setq org-node-proposed-series-key nil)))
+
+;; DEPRECATED
 (defun org-node-fakeroam-daily-creator (sortstr)
+  "Create a daily-note, for a day implied by SORTSTR."
   (require 'org-roam-dailies)
   (add-hook 'org-roam-capture-new-node-hook #'org-node--add-series-item)
   (unwind-protect
       (org-roam-dailies--capture
        (encode-time
         (parse-time-string (concat sortstr (format-time-string " %T %z"))))
-       t)
+       goto keys)
     (remove-hook 'org-roam-capture-new-node-hook #'org-node--add-series-item)))
+
+(add-hook 'org-node-before-update-tables-hook
+          (defun org-node--cache-roam-dirs ()
+            "Cache some variables."
+            (setq org-node-fakeroam-dir
+                  (org-node-abbrev-file-names
+                   (file-truename org-roam-directory)))
+            (when (boundp 'org-roam-dailies-directory)
+              (setq org-node-fakeroam-daily-dir
+                    (org-node-abbrev-file-names
+                     (file-truename
+                      (file-name-concat org-roam-directory
+                                        org-roam-dailies-directory)))))))
+
+(defvar org-node-fakeroam-dir nil
+  "Cached value of `org-roam-directory' transformed for org-node.
+This path should be directly comparable to the paths saved in
+org-node objects, which lets you skip using `file-truename' to
+compare paths.
+
+See also `org-node-fakeroam-daily-dir'.")
+
+(defvar org-node-fakeroam-daily-dir nil
+  "Cached value for Roam's dailies dir transformed for org-node.
+This path should be directly comparable to the paths saved in
+org-node objects, which lets you skip using `file-truename' to
+compare paths.
+
+Rationale: The original `org-roam-dailies-directory' was a
+relative path, which incurred verbosity penalties in all code
+that used it (and performance penalties when `expand-file-name'
+was used instead of `file-name-concat').  Even more verbosity is
+added on top for org-node, which needs to use
+`org-node-abbrev-file-names'.  Thus this variable provides an
+easy shorthand.")
 
 (provide 'org-node-fakeroam)
 
