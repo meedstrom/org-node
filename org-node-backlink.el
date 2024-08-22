@@ -150,12 +150,15 @@ If REMOVE? is non-nil, remove it instead."
                              (-sort #'string-lessp)))
              (links (cl-loop
                      for origin in sorted-uuids
-                     collect (org-link-make-string
+                     collect
+                     (concat "\""
+                             (org-link-make-string
                               (concat "id:" origin)
                               (org-node-get-title
                                (or (gethash origin org-node--id<>node)
                                    (error "ID in backlink tables not known to main org-nodes table: %s"
-                                          origin))))))
+                                          origin))))
+                             "\"")))
              (links-string (string-join links "  ")))
         (if links
             (unless (equal links-string (org-entry-get nil "BACKLINKS"))
@@ -347,9 +350,10 @@ in the nearby :BACKLINKS: property."
           ;; but we cannot use it since the link descriptions may contain
           ;; spaces.
           (let ((links (split-string (replace-regexp-in-string
-                                      "]][[:space:]]+\\[\\["
+                                      "]][\s\t\"]+\\[\\["
                                       "]]\f[["
-                                      (string-trim current-backlinks-value))
+                                      (string-trim current-backlinks-value
+                                                   "[\s\t\"]+" "[\s\t\"]+"))
                                      "\f")))
             (dolist (dup (--filter (string-search src-id it) links))
               (setq links (remove dup links)))
@@ -360,8 +364,10 @@ in the nearby :BACKLINKS: property."
             ;; every time a node is linked that already has the backlink
             (sort links #'string-lessp)
             ;; Two spaces between links help them look distinct
-            (setq new-value (string-join links "  ")))
-        (setq new-value src-link))
+            (setq new-value (string-join
+                             (--map (concat "\"" it "\"") links)
+                             "  ")))
+        (setq new-value (concat "\"" src-link "\"")))
       (unless (equal current-backlinks-value new-value)
         (let ((after-change-functions
                (remq 'org-node-backlink--flag-buffer-modification
