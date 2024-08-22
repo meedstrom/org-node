@@ -983,9 +983,9 @@ to FINALIZER."
           ;; TODO: General way to inhibit advices on `'insert-file-contents'?
           (editorconfig
            (if (advice-member-p 'editorconfig--advice-insert-file-contents
-                                'insert-file-contents)
+                                #'insert-file-contents)
                (prog1 t
-                 (advice-remove 'insert-file-contents
+                 (advice-remove #'insert-file-contents
                                 'editorconfig--advice-insert-file-contents))))
           (result-sets nil))
       (unwind-protect
@@ -1010,7 +1010,7 @@ to FINALIZER."
                   (insert-file-contents results-file)
                   (push (read (buffer-string)) result-sets)))))
         (if editorconfig
-            (advice-add 'insert-file-contents :around
+            (advice-add #'insert-file-contents :around
                         'editorconfig--advice-insert-file-contents)))
       (run-hooks 'org-node-before-update-tables-hook)
       (setq org-node--time-at-last-child-done

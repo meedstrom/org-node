@@ -25,7 +25,7 @@ jobs:
       env:
         LOCAL_REPO: ${{ github.workspace }}
         # RECIPE is your recipe as written for MELPA:
-        RECIPE: (org-node :repo "meedstrom/org-node" :fetcher github)
+        RECIPE: (org-node :repo "meedstrom/org-node" :fetcher github :files (:defaults (:exclude "org-node-fakeroam.el")))
         # set this to false (or remove it) if the package isn't on MELPA:
         EXIST_OK: false
       run: echo $GITHUB_REF && make -C ~/melpazoid

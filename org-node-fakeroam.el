@@ -35,6 +35,7 @@
     (require 'emacsql)
   (message "Install org-roam to use org-node-fakeroam library"))
 
+;; TODO: Remove after most users have switched to the Melpa recipes
 (defun org-node-fakeroam--check-compile ()
   "Compile all fakeroam functions if not compiled.
 
@@ -44,7 +45,6 @@ defer compiling org-node-fakeroam.el until runtime after ensuring
 that org-roam is available."
   (if (not (require 'org-roam nil t))
       (user-error "Install org-roam to use org-node-fakeroam library")
-    (require 'emacsql)
     ;; NOTE: Do not native-compile, it would be a slow init every time
     (mapc #'byte-compile
           '(org-node-fakeroam--run-without-fontifying
@@ -73,22 +73,24 @@ See also `org-node-fakeroam-fast-render-mode'.
 -----"
   :global t
   :group 'org-node
-  (if org-node-fakeroam-redisplay-mode
-      (progn
-        (org-node-fakeroam--check-compile)
-        (unless org-node-cache-mode
-          (message "`org-node-fakeroam-redisplay-mode' may show stale previews without `org-node-cache-mode' enabled"))
-        (add-hook 'org-mode-hook #'org-roam-buffer--setup-redisplay-h)
-        (dolist (buf (org-buffer-list))
+  (when (require 'org-roam nil t)
+    (if org-node-fakeroam-redisplay-mode
+        (progn
+          (org-node-fakeroam--check-compile)
+          (unless org-node-cache-mode
+            (message "`org-node-fakeroam-redisplay-mode' may show stale previews without `org-node-cache-mode' enabled"))
+          (add-hook 'org-mode-hook #'org-roam-buffer--setup-redisplay-h)
+          (dolist (buf (org-buffer-list 'files t))
+            (with-current-buffer buf
+              (add-hook 'post-command-hook #'org-roam-buffer--redisplay-h nil t))))
+      (remove-hook 'org-mode-hook #'org-roam-buffer--setup-redisplay-h)
+      (unless org-roam-db-autosync-mode
+        (dolist (buf (org-buffer-list 'files t))
           (with-current-buffer buf
-            (add-hook 'post-command-hook #'org-roam-buffer--redisplay-h nil t))))
-    (remove-hook 'org-mode-hook #'org-roam-buffer--setup-redisplay-h)
-    (unless org-roam-db-autosync-mode
-      (dolist (buf (org-buffer-list))
-        (with-current-buffer buf
-          (remove-hook 'post-command-hook #'org-roam-buffer--redisplay-h t))))))
+            (remove-hook 'post-command-hook #'org-roam-buffer--redisplay-h t)))))))
 
-;; TODO: Use org-persist
+;; TODO: Use org-persist, not savehist
+;;;###autoload
 (define-minor-mode org-node-fakeroam-fast-render-mode
   "Advise the Roam buffer to be faster.
 
@@ -103,20 +105,21 @@ See also `org-node-fakeroam-fast-render-mode'.
 -----"
   :global t
   :group 'org-node
-  (if org-node-fakeroam-fast-render-mode
-      (progn
-        (org-node-fakeroam--check-compile)
-        (when (boundp 'savehist-additional-variables)
-          (add-to-list 'savehist-additional-variables 'org-node--file<>previews)
-          (add-to-list 'savehist-additional-variables 'org-node--file<>mtime))
-        (advice-add #'org-roam-preview-get-contents :around
-                    #'org-node-fakeroam--accelerate-get-contents)
-        (advice-add #'org-roam-node-insert-section :around
-                    #'org-node-fakeroam--run-without-fontifying))
-    (advice-remove #'org-roam-preview-get-contents
-                   #'org-node-fakeroam--accelerate-get-contents)
-    (advice-remove #'org-roam-node-insert-section
-                   #'org-node-fakeroam--run-without-fontifying)))
+  (when (require 'org-roam nil t)
+    (if org-node-fakeroam-fast-render-mode
+        (progn
+          (org-node-fakeroam--check-compile)
+          (when (boundp 'savehist-additional-variables)
+            (add-to-list 'savehist-additional-variables 'org-node--file<>previews)
+            (add-to-list 'savehist-additional-variables 'org-node--file<>mtime))
+          (advice-add #'org-roam-preview-get-contents :around
+                      #'org-node-fakeroam--accelerate-get-contents)
+          (advice-add #'org-roam-node-insert-section :around
+                      #'org-node-fakeroam--run-without-fontifying))
+      (advice-remove #'org-roam-preview-get-contents
+                     #'org-node-fakeroam--accelerate-get-contents)
+      (advice-remove #'org-roam-node-insert-section
+                     #'org-node-fakeroam--run-without-fontifying))))
 
 (defun org-node-fakeroam--accelerate-get-contents (orig-fn file pt)
   "Designed as around-advice for `org-roam-preview-get-contents'.
@@ -146,8 +149,9 @@ which see for FILE and PT."
   "Intended as around-advice for `org-roam-node-insert-section'.
 Run ORIG-FN with ARGS, while overriding
 `org-roam-fontify-like-in-org-mode' so it does nothing."
-  (cl-letf (((symbol-function 'org-roam-fontify-like-in-org-mode) #'identity))
-    (apply orig-fn args)))
+  (when (require 'org-roam nil t)
+    (cl-letf (((symbol-function 'org-roam-fontify-like-in-org-mode) #'identity))
+      (apply orig-fn args))))
 
 ;; Just an useful command
 (defun org-node-fakeroam-show-roam-buffer ()
@@ -156,13 +160,14 @@ To reiterate: if it was not visible, only bring it up for
 display, do NOT also refresh it.  Leave that for the second time
 the user invokes the command."
   (interactive nil org-mode org-roam-mode)
-  (if (derived-mode-p 'org-roam-mode)
-      (org-roam-buffer-refresh)
-    (pcase (org-roam-buffer--visibility)
-      ('visible (and (derived-mode-p 'org-mode)
-                     (org-roam-buffer-persistent-redisplay)))
-      ((or 'exists 'none)
-       (display-buffer (get-buffer-create org-roam-buffer))))))
+  (when (require 'org-roam nil t)
+    (if (derived-mode-p 'org-roam-mode)
+        (org-roam-buffer-refresh)
+      (pcase (org-roam-buffer--visibility)
+        ('visible (and (derived-mode-p 'org-mode)
+                       (org-roam-buffer-persistent-redisplay)))
+        ((or 'exists 'none)
+         (display-buffer (get-buffer-create org-roam-buffer)))))))
 
 
 ;;;; JIT method
@@ -184,77 +189,81 @@ not need it for other things.
 -----"
   :global t
   :group 'org-node
-  (if org-node-fakeroam-jit-backlinks-mode
-      (progn
-        (org-node-fakeroam--check-compile)
-        (unless org-node-cache-mode
-          (message "`org-node-fakeroam-jit-backlinks-mode' will do poorly without `org-node-cache-mode'"))
-        (advice-add 'org-roam-backlinks-get :override
-                    #'org-node-fakeroam--mk-backlinks)
-        (advice-add 'org-roam-reflinks-get :override
-                    #'org-node-fakeroam--mk-reflinks))
-    (advice-remove 'org-roam-backlinks-get #'org-node-fakeroam--mk-backlinks)
-    (advice-remove 'org-roam-reflinks-get #'org-node-fakeroam--mk-reflinks)))
+  (when (require 'org-roam nil t)
+    (if org-node-fakeroam-jit-backlinks-mode
+        (progn
+          (org-node-fakeroam--check-compile)
+          (unless org-node-cache-mode
+            (message "`org-node-fakeroam-jit-backlinks-mode' will do poorly without `org-node-cache-mode'"))
+          (advice-add 'org-roam-backlinks-get :override
+                      #'org-node-fakeroam--mk-backlinks)
+          (advice-add 'org-roam-reflinks-get :override
+                      #'org-node-fakeroam--mk-reflinks))
+      (advice-remove 'org-roam-backlinks-get #'org-node-fakeroam--mk-backlinks)
+      (advice-remove 'org-roam-reflinks-get #'org-node-fakeroam--mk-reflinks))))
 
 (defun org-node-fakeroam--mk-node (node)
   "Make an org-roam-node object from org-node object NODE."
-  (org-roam-node-create
-   :file (org-node-get-file-path node)
-   :id (org-node-get-id node)
-   :olp (org-node-get-olp node)
-   :scheduled (when-let ((scheduled (org-node-get-scheduled node)))
-                (format-time-string
-                 "%FT%T%z"
-                 (encode-time (org-parse-time-string scheduled))))
-   :deadline (when-let ((deadline (org-node-get-deadline node)))
-               (format-time-string
-                "%FT%T%z"
-                (encode-time (org-parse-time-string deadline))))
-   :level (org-node-get-level node)
-   :title (org-node-get-title node)
-   :file-title (org-node-get-file-title node)
-   :tags (org-node-get-tags node)
-   :aliases (org-node-get-aliases node)
-   :todo (org-node-get-todo node)
-   :refs (org-node-get-refs node)
-   :point (org-node-get-pos node)
-   :priority (org-node-get-priority node)
-   :properties (org-node-get-properties node)))
+  (when (require 'org-roam nil t)
+    (org-roam-node-create
+     :file (org-node-get-file-path node)
+     :id (org-node-get-id node)
+     :olp (org-node-get-olp node)
+     :scheduled (when-let ((scheduled (org-node-get-scheduled node)))
+                  (format-time-string
+                   "%FT%T%z"
+                   (encode-time (org-parse-time-string scheduled))))
+     :deadline (when-let ((deadline (org-node-get-deadline node)))
+                 (format-time-string
+                  "%FT%T%z"
+                  (encode-time (org-parse-time-string deadline))))
+     :level (org-node-get-level node)
+     :title (org-node-get-title node)
+     :file-title (org-node-get-file-title node)
+     :tags (org-node-get-tags node)
+     :aliases (org-node-get-aliases node)
+     :todo (org-node-get-todo node)
+     :refs (org-node-get-refs node)
+     :point (org-node-get-pos node)
+     :priority (org-node-get-priority node)
+     :properties (org-node-get-properties node))))
 
 (defun org-node-fakeroam--mk-backlinks (target-roam-node &rest _)
   "Make org-roam-backlink objects pointing to TARGET-ROAM-NODE.
 Designed to override `org-roam-backlinks-get'."
-  (let* ((target-id (org-roam-node-id target-roam-node))
-         (links (gethash target-id org-node--dest<>links)))
-    (cl-loop
-     for link in links
-     as src-id = (org-node-link-origin link)
-     as src-node = (gethash src-id org-node--id<>node)
-     when src-node
-     collect (org-roam-backlink-create
-              :target-node target-roam-node
-              :source-node (org-node-fakeroam--mk-node src-node)
-              :point (org-node-link-pos link)
-              :properties (org-node-link-properties link)))))
+  (when (require 'org-roam nil t)
+    (let* ((target-id (org-roam-node-id target-roam-node))
+           (links (gethash target-id org-node--dest<>links)))
+      (cl-loop
+       for link in links
+       as src-id = (org-node-link-origin link)
+       as src-node = (gethash src-id org-node--id<>node)
+       when src-node
+       collect (org-roam-backlink-create
+                :target-node target-roam-node
+                :source-node (org-node-fakeroam--mk-node src-node)
+                :point (org-node-link-pos link)
+                :properties (org-node-link-properties link))))))
 
 (defun org-node-fakeroam--mk-reflinks (target-roam-node &rest _)
   "Make org-roam-reflink objects pointing to TARGET-ROAM-NODE.
 Designed to override `org-roam-reflinks-get'."
-  (let* ((target-id (org-roam-node-id target-roam-node))
-         (node (gethash target-id org-node--id<>node)))
-    (when node
-      (cl-loop
-       for ref in (org-node-get-refs node)
-       append (cl-loop
-               for link in (gethash ref org-node--dest<>links)
-               as src-id = (org-node-link-origin link)
-               as src-node = (gethash src-id org-node--id<>node)
-               when src-node
-               collect (org-roam-reflink-create
-                        :ref (org-node-link-dest link)
-                        :source-node (org-node-fakeroam--mk-node src-node)
-                        :point (org-node-link-pos link)
-                        :properties (org-node-link-properties link)))))))
+  (when (require 'org-roam nil t)
+    (let* ((target-id (org-roam-node-id target-roam-node))
+           (node (gethash target-id org-node--id<>node)))
+      (when node
+        (cl-loop
+         for ref in (org-node-get-refs node)
+         append (cl-loop
+                 for link in (gethash ref org-node--dest<>links)
+                 as src-id = (org-node-link-origin link)
+                 as src-node = (gethash src-id org-node--id<>node)
+                 when src-node
+                 collect (org-roam-reflink-create
+                          :ref (org-node-link-dest link)
+                          :source-node (org-node-fakeroam--mk-node src-node)
+                          :point (org-node-link-pos link)
+                          :properties (org-node-link-properties link))))))))
 
 
 ;;;; Feed method: supply data to Roam's DB
@@ -292,142 +301,146 @@ Designed to override `org-roam-reflinks-get'."
 ;;        Or collect all data for one mega `emacsql' call?
 (defun org-node-fakeroam--db-update-files (files)
   "Update the Roam DB about nodes and links involving FILES."
-  (emacsql-with-transaction (org-roam-db)
-    (dolist (file files)
-      (org-roam-db-query [:delete :from files :where (= file $s1)]
-                         file))
-    (let (already)
-      (cl-loop
-       for node being the hash-values of org-nodes
-       as file = (org-node-get-file-path node)
-       when (member file files)
-       do
-       (unless (member file already)
-         (push file already)
-         (org-node-fakeroam--db-add-file-level-data node))
-       ;; Clear backlinks to prevent duplicates
-       (dolist (dest (cons (org-node-get-id node)
-                           (org-node-get-refs node)))
-         (org-roam-db-query [:delete :from links :where (= dest $s1)]
-                            dest))
-       (org-node-fakeroam--db-add-node node)))))
+  (when (require 'org-roam nil t)
+    (emacsql-with-transaction (org-roam-db)
+      (dolist (file files)
+        (org-roam-db-query [:delete :from files :where (= file $s1)]
+                           file))
+      (let (already)
+        (cl-loop
+         for node being the hash-values of org-nodes
+         as file = (org-node-get-file-path node)
+         when (member file files)
+         do
+         (unless (member file already)
+           (push file already)
+           (org-node-fakeroam--db-add-file-level-data node))
+         ;; Clear backlinks to prevent duplicates
+         (dolist (dest (cons (org-node-get-id node)
+                             (org-node-get-refs node)))
+           (org-roam-db-query [:delete :from links :where (= dest $s1)]
+                              dest))
+         (org-node-fakeroam--db-add-node node))))))
 
 ;; TODO: Was hoping to just run this on every save.  Is SQLite really so slow
 ;;       to accept 0-2 MB of data?  Must be some way to make it instant, else
 ;;       how do people work with petabytes?
 (defun org-node-fakeroam-db-rebuild ()
   "Wipe the Roam DB and rebuild."
-  (interactive)
-  (org-node-cache-ensure)
-  (org-roam-db--close)
-  (delete-file org-roam-db-location)
-  (emacsql-with-transaction (org-roam-db)
-    (let ((ctr 0)
-          (max (hash-table-count org-nodes))
-          (already (make-hash-table :test #'equal)))
-      (cl-loop for node being the hash-values of org-nodes
-               as file = (org-node-get-file-path node)
-               do (if (= 0 (% (cl-incf ctr)
-                              (cond ((> ctr 200) 100)
-                                    ((> ctr 20) 10)
-                                    (t 1))))
-                      (message "Inserting into %s... %d/%d"
-                               org-roam-db-location ctr max))
-               (unless (gethash file already)
-                 (puthash file t already)
-                 (org-node-fakeroam--db-add-file-level-data node))
-               (org-node-fakeroam--db-add-node node)))))
+  (when (require 'org-roam nil t)
+    (interactive)
+    (org-node-cache-ensure)
+    (org-roam-db--close)
+    (delete-file org-roam-db-location)
+    (emacsql-with-transaction (org-roam-db)
+      (let ((ctr 0)
+            (max (hash-table-count org-nodes))
+            (already (make-hash-table :test #'equal)))
+        (cl-loop for node being the hash-values of org-nodes
+                 as file = (org-node-get-file-path node)
+                 do (if (= 0 (% (cl-incf ctr)
+                                (cond ((> ctr 200) 100)
+                                      ((> ctr 20) 10)
+                                      (t 1))))
+                        (message "Inserting into %s... %d/%d"
+                                 org-roam-db-location ctr max))
+                 (unless (gethash file already)
+                   (puthash file t already)
+                   (org-node-fakeroam--db-add-file-level-data node))
+                 (org-node-fakeroam--db-add-node node))))))
 
 ;; REVIEW: I don't like that this accesses actual files on disk when nothing
 ;;         else does.  Maybe the async parser can collect the whole vector that
 ;;         this needs, ahead of time.
 (defun org-node-fakeroam--db-add-file-level-data (node)
   "Send to the database the metadata for the file where NODE is."
-  (let* ((file (org-node-get-file-path node))
-         (attr (ignore-errors (file-attributes file))))
-    ;; See `org-roam-db-insert-file'
-    (org-roam-db-query [:insert :into files :values $v1]
-                       (vector file
-                               (org-node-get-file-title node)
-                               nil
-                               ;; Costs a lot of time
-                               ;; (ignore-errors (org-roam-db--file-hash file))
-                               (file-attribute-access-time attr)
-                               (file-attribute-modification-time attr)))))
+  (when (require 'org-roam nil t)
+    (let* ((file (org-node-get-file-path node))
+           (attr (ignore-errors (file-attributes file))))
+      ;; See `org-roam-db-insert-file'
+      (org-roam-db-query [:insert :into files :values $v1]
+                         (vector file
+                                 (org-node-get-file-title node)
+                                 nil
+                                 ;; Costs a lot of time
+                                 ;; (ignore-errors (org-roam-db--file-hash file))
+                                 (file-attribute-access-time attr)
+                                 (file-attribute-modification-time attr))))))
 
 (defun org-node-fakeroam--db-add-node (node)
   "Send to the SQLite database all we know about NODE.
 This includes all links and citations that touch NODE."
-  ;; PERF: Produce less garbage compared to `let'.  ~20% faster!
-  (cl-symbol-macrolet
-      ((id         (org-node-get-id node))
-       (file-path  (org-node-get-file-path node))
-       (tags       (org-node-get-tags node))  ;; NOTE: no inherits!
-       (aliases    (org-node-get-aliases node))
-       (roam-refs  (org-node-get-refs node))
-       (title      (org-node-get-title node))
-       (properties (org-node-get-properties node)) ;; NOTE: no inherits!
-       (level      (org-node-get-level node))
-       (todo       (org-node-get-todo node))
-       (scheduled  (org-node-get-scheduled node))
-       (deadline   (org-node-get-deadline node))
-       (olp        (org-node-get-olp node))
-       (priority   (org-node-get-priority node))
-       (pos        (org-node-get-pos node)))
-    ;; See `org-roam-db-insert-aliases'
-    (when aliases
-      (org-roam-db-query [:insert :into aliases :values $v1]
-                         (cl-loop for alias in aliases
-                                  collect (vector id alias))))
-    ;; See `org-roam-db-insert-tags'
-    (when tags
-      (org-roam-db-query [:insert :into tags :values $v1]
-                         (cl-loop for tag in tags
-                                  collect (vector id tag))))
-    ;; See `org-roam-db-insert-file-node' and `org-roam-db-insert-node-data'
-    (org-roam-db-query
-     [:insert :into nodes :values $v1]
-     (vector id
-             file-path
-             level
-             pos
-             todo
-             priority
-             (when scheduled (format-time-string
-                              "%FT%T%z"
-                              (encode-time (org-parse-time-string scheduled))))
-             (when deadline (format-time-string
-                             "%FT%T%z"
-                             (encode-time (org-parse-time-string deadline))))
-             title
-             properties
-             olp))
-    ;; See `org-roam-db-insert-refs'
-    (dolist (ref roam-refs)
-      (let ((type (gethash ref org-node--uri-path<>uri-type)))
-        (org-roam-db-query [:insert :into refs :values $v1]
-                           (if type
-                               ;; Ref is //www.gnu.org or some such
-                               (vector id ref type)
-                             ;; Ref is a @citekey
-                             (vector id ref "cite")))))
-    (dolist (link (nconc (org-node-get-id-links node)
-                         (org-node-get-reflinks node)))
-      ;; See `org-roam-db-insert-link'
-      ;; Don't add citations (type=nil), they go in a separate table
-      (if (org-node-link-type link)
-          (org-roam-db-query [:insert :into links :values $v1]
-                             (vector (org-node-link-pos link)
-                                     (org-node-link-origin link)
-                                     id
-                                     (org-node-link-type link)
-                                     (org-node-link-properties link)))
-        ;; See `org-roam-db-insert-citation'
-        (org-roam-db-query [:insert :into citations :values $v1]
-                           (vector (org-node-link-origin link)
-                                   (org-node-link-dest link)
-                                   (org-node-link-pos link)
-                                   (org-node-link-properties link)))))))
+  (when (require 'org-roam nil t)
+    ;; PERF: Produce less garbage compared to `let'.  ~20% faster!
+    (cl-symbol-macrolet
+        ((id         (org-node-get-id node))
+         (file-path  (org-node-get-file-path node))
+         (tags       (org-node-get-tags node))  ;; NOTE: no inherits!
+         (aliases    (org-node-get-aliases node))
+         (roam-refs  (org-node-get-refs node))
+         (title      (org-node-get-title node))
+         (properties (org-node-get-properties node)) ;; NOTE: no inherits!
+         (level      (org-node-get-level node))
+         (todo       (org-node-get-todo node))
+         (scheduled  (org-node-get-scheduled node))
+         (deadline   (org-node-get-deadline node))
+         (olp        (org-node-get-olp node))
+         (priority   (org-node-get-priority node))
+         (pos        (org-node-get-pos node)))
+      ;; See `org-roam-db-insert-aliases'
+      (when aliases
+        (org-roam-db-query [:insert :into aliases :values $v1]
+                           (cl-loop for alias in aliases
+                                    collect (vector id alias))))
+      ;; See `org-roam-db-insert-tags'
+      (when tags
+        (org-roam-db-query [:insert :into tags :values $v1]
+                           (cl-loop for tag in tags
+                                    collect (vector id tag))))
+      ;; See `org-roam-db-insert-file-node' and `org-roam-db-insert-node-data'
+      (org-roam-db-query
+       [:insert :into nodes :values $v1]
+       (vector id
+               file-path
+               level
+               pos
+               todo
+               priority
+               (when scheduled (format-time-string
+                                "%FT%T%z"
+                                (encode-time (org-parse-time-string scheduled))))
+               (when deadline (format-time-string
+                               "%FT%T%z"
+                               (encode-time (org-parse-time-string deadline))))
+               title
+               properties
+               olp))
+      ;; See `org-roam-db-insert-refs'
+      (dolist (ref roam-refs)
+        (let ((type (gethash ref org-node--uri-path<>uri-type)))
+          (org-roam-db-query [:insert :into refs :values $v1]
+                             (if type
+                                 ;; Ref is //www.gnu.org or some such
+                                 (vector id ref type)
+                               ;; Ref is a @citekey
+                               (vector id ref "cite")))))
+      (dolist (link (nconc (org-node-get-id-links node)
+                           (org-node-get-reflinks node)))
+        ;; See `org-roam-db-insert-link'
+        ;; Don't add citations (type=nil), they go in a separate table
+        (if (org-node-link-type link)
+            (org-roam-db-query [:insert :into links :values $v1]
+                               (vector (org-node-link-pos link)
+                                       (org-node-link-origin link)
+                                       id
+                                       (org-node-link-type link)
+                                       (org-node-link-properties link)))
+          ;; See `org-roam-db-insert-citation'
+          (org-roam-db-query [:insert :into citations :values $v1]
+                             (vector (org-node-link-origin link)
+                                     (org-node-link-dest link)
+                                     (org-node-link-pos link)
+                                     (org-node-link-properties link))))))))
 
 
 ;;;; Bonus advices
@@ -453,8 +466,8 @@ For argument EXTRA-FILES, see that function."
   "May be faster than `org-roam-dailies--daily-note-p'.
 With optional argument FILE, check FILE instead of current
 buffer file."
-  ;; No `abbreviate-file-name' needed because filename does not come from
-  ;; org-node.
+  ;; No `abbreviate-file-name' needed, because filename does not come from
+  ;; org-node
   (let ((daily-dir (file-name-concat org-roam-directory
                                      org-roam-dailies-directory)))
     (unless file
@@ -516,15 +529,16 @@ this variable provides an easy shorthand.")
 (defun org-node-fakeroam--cache-roam-dirs ()
   "Cache some variables.
 See docstring of `org-node-fakeroam-daily-dir'."
-  (setq org-node-fakeroam-dir
-        (org-node-abbrev-file-names
-         (file-truename org-roam-directory)))
-  (when (boundp 'org-roam-dailies-directory)
-    (setq org-node-fakeroam-daily-dir
+  (when (require 'org-roam nil t)
+    (setq org-node-fakeroam-dir
           (org-node-abbrev-file-names
-           (file-truename
-            (file-name-concat org-roam-directory
-                              org-roam-dailies-directory))))))
+           (file-truename org-roam-directory)))
+    (when (boundp 'org-roam-dailies-directory)
+      (setq org-node-fakeroam-daily-dir
+            (org-node-abbrev-file-names
+             (file-truename
+              (file-name-concat org-roam-directory
+                                org-roam-dailies-directory)))))))
 
 (org-node-fakeroam--cache-roam-dirs)
 (add-hook 'org-node-before-update-tables-hook
