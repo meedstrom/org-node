@@ -358,10 +358,14 @@ findings to another temp file."
     (dolist (FILE $files)
       (condition-case err
           (catch 'file-done
-            (unless (file-exists-p FILE)
-              ;; We got here because user deleted a file in a way that we
-              ;; didn't notice.  If it was actually a rename file-done outside
-              ;; Emacs, the new name will get picked up on next reset.
+            (when (or (not (file-readable-p FILE))
+                      (file-symlink-p FILE))
+              ;; If FILE does not exist (not readable), user probably deleted
+              ;; or renamed a file.  If it was a rename, hopefully the new name
+              ;; is also in file list.
+              ;; And symlinks... who does symlinks?  Skip for two reasons:
+              ;; - Causes duplicates if the true file is also in the file list.
+              ;; - For performance, the codebase rarely uses `file-truename'.
               (push FILE result/missing-files)
               (throw 'file-done t))
             (push (cons FILE (file-attribute-modification-time
