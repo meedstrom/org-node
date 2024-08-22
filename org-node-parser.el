@@ -341,6 +341,7 @@ findings to another temp file."
         result/missing-files
         result/found-nodes
         result/mtimes
+        ;; result/roam-db-file-data-vectors
         ;; Perf
         (file-name-handler-alist $file-name-handler-alist)
         (coding-system-for-read $assume-coding-system)
@@ -349,7 +350,7 @@ findings to another temp file."
         ;; garbage.  Not sure how elisp works... but profiling shows a speedup
         HEADING-POS HERE FAR END OUTLINE-DATA OLP-WITH-SELF ID-HERE
         DRAWER-BEG DRAWER-END
-        TITLE FILE-TITLE FILE-TITLE-OR-BASENAME
+        TITLE FILE-TITLE FILE-TITLE-OR-BASENAME FILE-ATTRS
         TODO-STATE TODO-RE FILE-TODO-SETTINGS
         TAGS FILE-TAGS ID FILE-ID SCHED DEADLINE OLP PRIORITY LEVEL PROPS)
 
@@ -361,13 +362,13 @@ findings to another temp file."
               ;; If FILE does not exist (not readable), user probably deleted
               ;; or renamed a file.  If it was a rename, hopefully the new name
               ;; is also in file list.
-              ;; And symlinks... who does symlinks?  Skip for two reasons:
+              ;; And symlinks... (who does symlinks?)  Skip for two reasons:
               ;; - Causes duplicates if the true file is also in the file list.
               ;; - For performance, the codebase rarely uses `file-truename'.
               (push FILE result/missing-files)
               (throw 'file-done t))
-            (push (cons FILE (file-attribute-modification-time
-                              (file-attributes FILE)))
+            (setq FILE-ATTRS (file-attributes FILE))
+            (push (cons FILE (file-attribute-modification-time FILE-ATTRS))
                   result/mtimes)
             (setq org-node-parser--curr-file FILE)
             ;; NOTE: Don't use `insert-file-contents-literally'.  It gives
@@ -493,6 +494,14 @@ findings to another temp file."
               (goto-char (point-max))
               ;; We should now be at the first heading
               (widen))
+
+            ;; ;; For `org-node-fakeroam-db-feed-mode'
+            ;; ;; Adds 30% scan time, so not doing this
+            ;; (push (vector FILE FILE-TITLE
+            ;;               (secure-hash 'sha1 (current-buffer))
+            ;;               (file-attribute-access-time FILE-ATTRS)
+            ;;               (file-attribute-modification-time FILE-ATTRS))
+            ;;       result/roam-db-file-data-vectors)
 
             ;; Loop over the file's headings
             (while (not (eobp))
@@ -654,6 +663,7 @@ findings to another temp file."
          (prin1-to-string (list result/missing-files
                                 result/mtimes
                                 result/found-nodes
+                                ;; result/roam-db-file-data-vectors
                                 org-node-parser--result/paths-types
                                 org-node-parser--result/found-links
                                 org-node-parser--result/problems

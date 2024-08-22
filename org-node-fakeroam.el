@@ -33,10 +33,10 @@
 (require 'ol)
 (if (require 'org-roam nil t)
     (require 'emacsql)
-  (user-error "Install org-roam to use org-node-fakeroam library"))
+  (message "Install org-roam to use org-node-fakeroam library"))
 
 (defun org-node-fakeroam--check-compile ()
-  "Compile all fakeroam functions.
+  "Compile all fakeroam functions if not compiled.
 
 This is transitional.  Org-node used to be a single package which
 did not depend explicitly on org-roam, which meant it had to
@@ -45,21 +45,21 @@ that org-roam is available."
   (if (not (require 'org-roam nil t))
       (user-error "Install org-roam to use org-node-fakeroam library")
     (require 'emacsql)
-    (dolist (fn '(org-node-fakeroam--run-without-fontifying
-                  org-node-fakeroam--accelerate-get-contents
-                  org-node-fakeroam--mk-node
-                  org-node-fakeroam--mk-backlinks
-                  org-node-fakeroam--mk-reflinks
-                  org-node-fakeroam--db-update-files
-                  org-node-fakeroam--db-add-file-level-data
-                  org-node-fakeroam--db-add-node
-                  org-node-fakeroam-db-rebuild
-                  org-node-fakeroam-list-files
-                  org-node-fakeroam-list-dailies
-                  org-node-fakeroam-daily-note-p
-                  org-node-fakeroam-daily-creator))
-      (unless (compiled-function-p (symbol-function fn))
-        (byte-compile fn)))))
+    ;; NOTE: Do not native-compile, it would be a slow init every time
+    (mapc #'byte-compile
+          '(org-node-fakeroam--run-without-fontifying
+            org-node-fakeroam--accelerate-get-contents
+            org-node-fakeroam--mk-node
+            org-node-fakeroam--mk-backlinks
+            org-node-fakeroam--mk-reflinks
+            org-node-fakeroam--db-update-files
+            org-node-fakeroam--db-add-file-level-data
+            org-node-fakeroam--db-add-node
+            org-node-fakeroam-db-rebuild
+            org-node-fakeroam-list-files
+            org-node-fakeroam-list-dailies
+            org-node-fakeroam-daily-note-p
+            org-node-fakeroam-daily-creator))))
 
 ;;;###autoload
 (define-minor-mode org-node-fakeroam-redisplay-mode
@@ -244,6 +244,13 @@ Designed to override `org-roam-reflinks-get'."
 
 ;;;; Feed method: supply data to Roam's DB
 
+;; (benchmark-call #'org-node-fakeroam-db-rebuild)
+;; => (6.598225708 8 1.6199558970000005)
+;; (benchmark-run (org-node-fakeroam-db-rebuild))
+;; => (13.048531745 8 2.3832248650000025)
+;; (benchmark-run (org-roam-db-sync 'force))
+;; => (179.921311207 147 37.955398732)
+
 ;;;###autoload
 (define-minor-mode org-node-fakeroam-db-feed-mode
   "Supply data to the org-roam SQLite database on save.
@@ -297,8 +304,6 @@ Designed to override `org-roam-reflinks-get'."
   "Wipe the Roam DB and rebuild."
   (interactive)
   (org-node-cache-ensure)
-  (org-roam-db)
-  (org-roam-db-clear-all)
   (org-roam-db--close)
   (delete-file org-roam-db-location)
   (emacsql-with-transaction (org-roam-db)
@@ -329,14 +334,17 @@ Designed to override `org-roam-reflinks-get'."
     (org-roam-db-query [:insert :into files :values $v1]
                        (vector file
                                (org-node-get-file-title node)
-                               (ignore-errors (org-roam-db--file-hash file))
+                               nil
+                               ;; Costs a lot of time
+                               ;; (ignore-errors (org-roam-db--file-hash file))
                                (file-attribute-access-time attr)
                                (file-attribute-modification-time attr)))))
 
 (defun org-node-fakeroam--db-add-node (node)
   "Send to the SQLite database all we know about NODE.
 This includes all links and citations that touch NODE."
-  (cl-symbol-macrolet  ;; PERF: Make less garbage compared to `let'
+  ;; PERF: Produce less garbage compared to `let'.  ~20% faster!
+  (cl-symbol-macrolet
       ((id         (org-node-get-id node))
        (file-path  (org-node-get-file-path node))
        (tags       (org-node-get-tags node))  ;; NOTE: no inherits!
@@ -411,25 +419,23 @@ This includes all links and citations that touch NODE."
 
 (defun org-node-fakeroam-list-files ()
   "Faster than `org-roam-list-files'."
-  (cl-loop with roam-dir = (abbreviate-file-name org-roam-directory)
-           for file in (org-node-list-files t)
-           when (string-prefix-p roam-dir file)
+  (cl-loop for file in (org-node-list-files t)
+           when (string-prefix-p org-node-fakeroam-roam-dir file)
            collect file))
 
 (defun org-node-fakeroam-list-dailies (&rest extra-files)
   "Faster than `org-roam-dailies--list-files' on a slow fs.
 For argument EXTRA-FILES, see that function."
-  (let ((daily-dir (abbreviate-file-name
-                    (file-name-concat org-roam-directory
-                                      org-roam-dailies-directory))))
-    (append extra-files
-            (cl-loop
-             for file in (org-node-list-files t)
-             when (string-prefix-p daily-dir file)
-             collect file))))
+  (require 'org-roam-dailies)
+  (append extra-files
+          (cl-loop
+           for file in (org-node-list-files t)
+           when (string-prefix-p org-node-fakeroam-daily-dir file)
+           collect file)))
 
+;; TODO: Make it more solid
 (defun org-node-fakeroam-daily-note-p (&optional file)
-  "Maybe faster than `org-roam-dailies--daily-note-p'.
+  "May be faster than `org-roam-dailies--daily-note-p'.
 With optional argument FILE, check FILE instead of current
 buffer file."
   ;; No `abbreviate-file-name' needed because filename does not come from
@@ -440,12 +446,11 @@ buffer file."
       (setq file (buffer-file-name (buffer-base-buffer))))
     (unless (file-name-absolute-p file)
       (error "Expected absolute filename but got: %s" file))
-    (and (string-suffix-p "org" file)
+    (and (string-suffix-p ".org" file)
          (string-prefix-p (downcase (file-truename daily-dir))
                           (downcase (file-truename file)))
          (not (cl-loop for exclude in org-node-extra-id-dirs-exclude
                        when (string-search exclude file) return t)))))
-
 
 ;; TODO: Somehow make `org-node-new-via-roam-capture' able to do this?
 ;;;###autoload
@@ -467,31 +472,6 @@ KEYS correspond to the capture template you wish to go to."
     (remove-hook 'org-roam-capture-new-node-hook #'org-node--add-series-item)
     (setq org-node-proposed-series-key nil)))
 
-;; DEPRECATED
-(defun org-node-fakeroam-daily-creator (sortstr)
-  "Create a daily-note, for a day implied by SORTSTR."
-  (require 'org-roam-dailies)
-  (add-hook 'org-roam-capture-new-node-hook #'org-node--add-series-item)
-  (unwind-protect
-      (org-roam-dailies--capture
-       (encode-time
-        (parse-time-string (concat sortstr (format-time-string " %T %z"))))
-       goto keys)
-    (remove-hook 'org-roam-capture-new-node-hook #'org-node--add-series-item)))
-
-(add-hook 'org-node-before-update-tables-hook
-          (defun org-node--cache-roam-dirs ()
-            "Cache some variables."
-            (setq org-node-fakeroam-dir
-                  (org-node-abbrev-file-names
-                   (file-truename org-roam-directory)))
-            (when (boundp 'org-roam-dailies-directory)
-              (setq org-node-fakeroam-daily-dir
-                    (org-node-abbrev-file-names
-                     (file-truename
-                      (file-name-concat org-roam-directory
-                                        org-roam-dailies-directory)))))))
-
 (defvar org-node-fakeroam-dir nil
   "Cached value of `org-roam-directory' transformed for org-node.
 This path should be directly comparable to the paths saved in
@@ -508,11 +488,32 @@ compare paths.
 
 Rationale: The original `org-roam-dailies-directory' was a
 relative path, which incurred verbosity penalties in all code
-that used it (and performance penalties when `expand-file-name'
-was used instead of `file-name-concat').  Even more verbosity is
-added on top for org-node, which needs to use
-`org-node-abbrev-file-names'.  Thus this variable provides an
-easy shorthand.")
+that used it (plus practically a major performance penalty since
+`expand-file-name' was often used instead of `file-name-concat').
+
+Even more verbosity is added on top for org-node, which needs to
+process the path through `org-node-abbrev-file-names'.  Thus
+this variable provides an easy shorthand.")
+
+(defun org-node-fakeroam--cache-roam-dirs ()
+  "Cache some variables.
+See docstring of `org-node-fakeroam-daily-dir'."
+  (setq org-node-fakeroam-dir
+        (org-node-abbrev-file-names
+         (file-truename org-roam-directory)))
+  (when (boundp 'org-roam-dailies-directory)
+    (setq org-node-fakeroam-daily-dir
+          (org-node-abbrev-file-names
+           (file-truename
+            (file-name-concat org-roam-directory
+                              org-roam-dailies-directory))))))
+
+(org-node-fakeroam--cache-roam-dirs)
+(add-hook 'org-node-before-update-tables-hook
+          #'org-node-fakeroam--cache-roam-dirs)
+
+;; Seems like unhygienic packaging?
+;; (eval-after-load 'org-roam-dailies #'org-node-fakeroam--cache-roam-dirs)
 
 (provide 'org-node-fakeroam)
 
