@@ -18,8 +18,8 @@
 ;;; Commentary:
 
 ;; This file is worker code meant for child processes.  It should be designed
-;; to compile as quickly as possible, and the compiled artifact should load no
-;; other libraries.
+;; to compile quickly, and the compiled artifact should load no libraries at
+;; runtime.
 
 ;;; Code:
 
@@ -119,7 +119,9 @@ in one of the elements."
 
 (defun org-node-parser--org-link-display-format (s)
   "Copy of `org-link-display-format'.
-Format string S for display."
+Format string S for display - this means replace every link in S
+with only their description.  A perhaps surprising application is
+formatting node titles that may have links in them."
   (save-match-data
     (replace-regexp-in-string
      ;; The regexp is `org-link-bracket-re'
@@ -171,10 +173,6 @@ What this means?  See org-node-test.el."
                          org-node-parser--result/paths-types)
                    ;; .. but the actual ref is just the //path
                    path))))))
-
-;; (defconst org-node-parser--citation-key-re
-;;   "@\\([!#-+./:<>-@^-`{-~[:word:]-]+\\)"
-;;   "Copy of `org-element-citation-key-re'.")
 
 ;; (defconst org-node-parser--org-ref-type-re
 ;;   (regexp-opt
@@ -462,8 +460,9 @@ findings to another temp file."
                 (goto-char HERE)
                 (org-node-parser--collect-links-until
                  END FILE-ID nil $plain-re $merged-re)
-                ;; NOTE: A plist would be more readable than a record, but I
-                ;; profiled it using:
+
+                ;; NOTE: A plist would be more readable than a record, but then
+                ;; main Emacs has more work to do.  Profiled using:
                 ;; (benchmark-run 10 (setq org-node--done-ctr 6) (org-node--handle-finished-job 7 #'org-node--finalize-full))
                 ;; Result when finalizer passes plists to `org-node--make-obj':
                 ;; (8.152532984 15 4.110698459000105)
@@ -607,6 +606,7 @@ findings to another temp file."
                            TITLE
                            TODO-STATE)
                    result/found-nodes))
+
                 ;; Heading recorded, now collect links in the entry body!
                 (setq ID-HERE (or ID
                                   (org-node-parser--pos->parent-id
@@ -659,7 +659,7 @@ findings to another temp file."
                                 org-node-parser--result/problems
                                 (current-time)))))))
   ;; TODO: Does emacs in batch mode garbage-collect at the end? I guess not but
-  ;;       if it does then maybe exec a kill -9 on itself here.
+  ;;       if it does then maybe exec a kill -9 on itself here to prevent it.
   )
 
 (provide 'org-node-parser)

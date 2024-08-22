@@ -60,6 +60,12 @@
 ;; TODO: A workflow to allow pseudo-untitled (numeric-titled) nodes
 ;;       - Need a bunch of commands for that, like select node by fulltext
 ;;         search
+;;         - Already `org-node-grep' is an equivalent to `org-node-find', so
+;;           "just" need an equivalent to `org-node-insert-link'.
+;;           Basically, capture, refile, and insert-link would all use the same
+;;           mechanism for identifying a node by a grep result.
+
+;; TODO: org-node-refile
 
 ;; TODO: If a roam-ref exists like //www.website.com, allow counting
 ;;       //www.website.com?key=val&key2=val2#hash as a reflink to the same,
@@ -67,9 +73,15 @@
 ;;       Would have to wait until all nodes registered, then do some sort of
 ;;       `string-prefix-p' filtering...
 
-;; TODO: org-node-refile
-
 ;; TODO: Support .org.gpg, .org.age
+
+;; TODO: A series that allows >1 dailies per day, disambiguating only by
+;;       directory
+
+;; TODO: Let series dispatch have another "level" for nav keys after selecting
+;;       the series, so "j" "n" "p" are available
+
+;; TODO: Capture into series
 
 (require 'cl-lib)
 (require 'seq)
@@ -84,10 +96,11 @@
 (require 'org-node-parser)
 (require 'org-node-changes)
 
-(defvar org-roam-completion-everywhere)
+;; Not unused lexical vars
 (defvar org-roam-directory)
 (defvar org-roam-dailies-directory)
-(defvar org-super-links-backlink-into-drawer)
+(defvar consult-ripgrep-args)
+(defvar $i)
 
 
 ;;;; Options
@@ -795,6 +808,8 @@ that same function."
                    (buffer-string)))))))
        1))
 
+;; TODO: Native-comp takes a long time.  Maybe launch a `native-compile-async'
+;;       then compile and return only an .elc for the first use.
 (defun org-node--ensure-compiled-lib ()
   "Return path to freshly compiled version of org-node-parser.el.
 Recompile if needed, in case the user\\='s package manager
@@ -821,8 +836,6 @@ didn\\='t do so already, or local changes have been made."
           (byte-compile-file lib))))
     (or native-path elc-path)))
 
-
-(defvar $i)
 (defvar org-node--debug nil)
 (defun org-node--scan (files finalizer)
   "Begin async scanning FILES for id-nodes and links.
@@ -885,13 +898,12 @@ function to update current tables."
     (if org-node--debug
         ;; Special case for debugging; run single-threaded so we can step
         ;; through the org-node-parser.el functions with edebug
-        (progn
+        (let (($i 0))
           (delete-file (org-node-parser--tmpfile "results-0.eld"))
           (let ((print-length nil))
             (write-region (prin1-to-string files)
                           nil
                           (org-node-parser--tmpfile "file-list-0.eld")))
-          (setq $i 0)
           (setq org-node-parser--result/found-links nil)
           (setq org-node-parser--result/problems nil)
           (setq org-node-parser--result/paths-types nil)
@@ -914,6 +926,8 @@ function to update current tables."
              (n-jobs (length file-lists))
              (gc-ultra (let ((default-directory invocation-directory))
                          (/ (* 1000 (car (memory-info))) n-jobs))))
+        (when (< gc-ultra (* 50 1000 1000))
+          (setq gc-ultra (car (get 'gc-cons-threshold 'standard-value))))
         (dotimes (i n-jobs)
           (delete-file (org-node-parser--tmpfile "results-%d.eld" i))
           (with-temp-file (org-node-parser--tmpfile "file-list-%d.eld" i)
@@ -960,11 +974,12 @@ to FINALIZER."
     (let ((file-name-handler-alist nil)
           (coding-system-for-read org-node-perf-assume-coding-system)
           (coding-system-for-write org-node-perf-assume-coding-system)
+          ;; TODO: General way to inhibit advices on `'insert-file-contents'?
           (editorconfig
            (if (advice-member-p 'editorconfig--advice-insert-file-contents
-                                #'insert-file-contents)
+                                'insert-file-contents)
                (prog1 t
-                 (advice-remove #'insert-file-contents
+                 (advice-remove 'insert-file-contents
                                 'editorconfig--advice-insert-file-contents))))
           (result-sets nil))
       (unwind-protect
