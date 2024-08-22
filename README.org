@@ -186,6 +186,8 @@ Then start using the minor mode =org-node-backlink-mode=, which keeps these prop
 (add-hook 'org-mode-hook #'org-node-backlink-mode)
 #+end_src
 
+NOTE:  I hadn't even realized this, but people who /don't/ use visual-line-mode may not find this solution very scalable, since Org properties must stay on one line.  This marks the second time I distribute software that assumes visual-line-mode :-)
+
 *** *Option 2B*
 *Let [[https://github.com/toshism/org-super-links][org-super-links]] manage a :BACKLINKS:...:END: drawer under all nodes.*
 
@@ -319,7 +321,9 @@ While a big selling point of IDs is that you avoid depending on filenames, it's 
 #+end_src
 
 ** Limitation: org-ref
-We support the builtin @citations, not (yet) org-ref &citations, since it slows down my scan about 50% if I amend =org-link-plain-re= to match them.  You can still find nodes with e.g. =:ROAM_REFS: &citekey=, just not see backlinks.
+We support the builtin @citations, not (yet) org-ref &citations, since it slows down my scan about 50% if I amend =org-link-plain-re= to match them.  There's a commented-out block of code in the file org-node-parser.el if you feel like getting your elbows dirty.
+
+You can still find nodes with e.g. =:ROAM_REFS: &citekey=, just not see backlinks.
 
 ** Tip: On very slow filesystems
 
@@ -364,6 +368,10 @@ Basic commands:
   - (Trivial) Give an ID to the subtree at point, and run the hook =org-node-creation-hook=
 - =org-node-insert-heading=
   - (Trivial) Shortcut for =org-insert-heading= + =org-node-nodeify-entry=
+- =org-node-grep=
+  - (Requires [[https://github.com/minad/consult][consult]]) Grep across all known Org files.
+    - Very useful combined with [[https://github.com/oantolin/embark][embark]]-export & [[wgrep][wgrep]], to search-and-replace a given string everywhere in every directory, for example to rename a tag everywhere.
+    - This will use ripgrep if installed, otherwise it is very slow.
 
 Rarer commands:
 
@@ -380,8 +388,6 @@ Rarer commands:
     - Works as an after-save-hook!  Does nothing until you configure =org-node-renames-allowed-dirs=.
 - =org-node-backlink-fix-all=
   - Update =BACKLINKS= property in all nodes
-- =org-node-grep=
-  - (Requires [[https://github.com/minad/consult][consult]]) Grep across all known Org files.  Very useful combined with [[https://github.com/oantolin/embark][embark]]-export & [[wgrep][wgrep]], to search-and-replace a given string everywhere in every directory, for example to rename a tag everywhere.
 - =org-node-list-feedback-arcs=
   - (Requires GNU R) Explore [[https://en.wikipedia.org/wiki/Feedback_arc_set][feedback arcs]] in your ID link network.  Can be a nice [[https://edstrom.dev/zvjjm/slipbox-workflow#ttqyc][occasional QA routine]].
 - =org-node-rename-asset-and-rewrite-links=
