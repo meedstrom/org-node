@@ -123,9 +123,17 @@ If you've struggled in the past with big files taking a long time to save, consi
 (setq org-roam-link-auto-replace nil) ;; don't look for "roam:" links on save
 #+end_src
 
-Finally, make sure the underlying org-id knows about the files org-roam knows (you'd think it would, but that isn't a given!).
+And if the backlinks buffer is laggy:
 
-Either run =M-x org-roam-update-org-id-locations=, or edit the following setting so it includes your =org-roam-directory=.  Supposing that is "~/org/", set this:
+#+begin_src elisp
+(org-node-fakeroam-fast-render-mode) ;; build the Roam buffer faster
+#+end_src
+
+Finally, make sure the underlying org-id knows about the files org-roam knows.  You'd think it would, but that isn't a given!  Do either one of these:
+
+1. Run =M-x org-roam-update-org-id-locations=, then =M-: (org-id-locations-save)=
+
+2. Edit the following setting so it includes your =org-roam-directory=.  Supposing that is "~/org/", set this:
 
 #+begin_src elisp
 (setq org-node-extra-id-dirs '("~/org/"))
@@ -143,8 +151,6 @@ As a Roam user, you can just keep using =M-x org-roam-buffer-toggle=, but you ge
 *Let org-roam manage its own DB.*
 
 If you didn't have laggy saves, this is fine.  In other words, keep variable =org-roam-db-update-on-save= at t.
-
-Bonus: if you find the backlinks buffer laggy, the minor mode =M-x org-node-fakeroam-fast-render-mode= should speed it up.
 
 *** *Option 1B*
 *Tell org-node to write to the org-roam DB.*
