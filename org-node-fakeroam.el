@@ -29,7 +29,6 @@
 
 (require 'cl-lib)
 (require 'ol)
-(require 'org-persist)
 (require 'org-node)
 (require 'org-node-changes)
 (if (require 'org-roam nil t)
@@ -113,6 +112,10 @@ See also `org-node-fakeroam-fast-render-mode'.
           (when (boundp 'savehist-additional-variables)
             (delete 'org-node--file<>previews savehist-additional-variables)
             (delete 'org-node--file<>mtime savehist-additional-variables))
+          ;; Relying only on `kill-emacs-hook' is always a mistake
+          (run-with-idle-timer 60 t (lambda ()
+                                      (persist-save 'org-node--file<>previews)
+                                      (persist-save 'org-node--file<>mtime)))
           (advice-add #'org-roam-preview-get-contents :around
                       #'org-node-fakeroam--accelerate-get-contents)
           (advice-add #'org-roam-node-insert-section :around
@@ -269,13 +272,6 @@ Designed to override `org-roam-reflinks-get'."
 
 ;;;; Feed method: supply data to Roam's DB
 
-;; (benchmark-call #'org-node-fakeroam-db-rebuild)
-;; => (6.598225708 8 1.6199558970000005)
-;; (benchmark-run (org-node-fakeroam-db-rebuild))
-;; => (13.048531745 8 2.3832248650000025)
-;; (benchmark-run (org-roam-db-sync 'force))
-;; => (179.921311207 147 37.955398732)
-
 ;;;###autoload
 (define-minor-mode org-node-fakeroam-db-feed-mode
   "Supply data to the org-roam SQLite database on save.
@@ -324,8 +320,11 @@ Designed to override `org-roam-reflinks-get'."
          (org-node-fakeroam--db-add-node node))))))
 
 ;; TODO: Was hoping to just run this on every save.  Is SQLite really so slow
-;;       to accept 0-2 MB of data?  Must be some way to make it instant, else
-;;       how do people work with petabytes?
+;;       to accept 0-2 MB of data?  Must be some way to make it instant.
+;; (benchmark-run (org-node-fakeroam-db-rebuild))
+;; => (13.048531745 8 2.3832248650000025)
+;; (benchmark-run (org-roam-db-sync 'force))
+;; => (179.921311207 147 37.955398732)
 (defun org-node-fakeroam-db-rebuild ()
   "Wipe the Roam DB and rebuild."
   (when (require 'org-roam nil t)
@@ -362,9 +361,9 @@ Designed to override `org-roam-reflinks-get'."
       (org-roam-db-query [:insert :into files :values $v1]
                          (vector file
                                  (org-node-get-file-title node)
-                                 nil
-                                 ;; Costs a lot of time
+                                 ;; HACK: Costs a lot of time, pass a nil hash
                                  ;; (ignore-errors (org-roam-db--file-hash file))
+                                 nil
                                  (file-attribute-access-time attr)
                                  (file-attribute-modification-time attr))))))
 

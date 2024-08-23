@@ -674,7 +674,7 @@ SYNCHRONOUS t, unless SYNCHRONOUS is the symbol `must-async'."
     (when (seq-some #'process-live-p org-node--processes)
       (if org-node-cache-mode
           (message "org-node first-time caching...")
-        (message "org-node caching... (Hint: Turn on org-node-cache-mode)")))
+        (message "org-node caching... (Hint: Avoid this hang by enabling org-node-cache-mode at some point before use)")))
     (mapc #'accept-process-output org-node--processes)
     ;; Just in case... see docstring of `org-node-create'.
     ;; Not super happy about this edge-case, it's a wart of the current design
