@@ -2039,7 +2039,7 @@ KEY, NAME and CAPTURE explained in `org-node-series-defs'."
      :capture "n"
      :classifier (lambda (node)
                    (let ((time (cdr (assoc "CREATED" (org-node-get-props node)))))
-                     (when (and time (not (string-blank-p timestamp)))
+                     (when (and time (not (string-blank-p time)))
                        (cons time (org-node-get-id node)))))
      :whereami (lambda ()
                  (let ((time (org-entry-get nil "CREATED" t)))
