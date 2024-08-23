@@ -28,9 +28,10 @@
 ;;; Code:
 
 (require 'cl-lib)
+(require 'ol)
+(require 'org-persist)
 (require 'org-node)
 (require 'org-node-changes)
-(require 'ol)
 (if (require 'org-roam nil t)
     (require 'emacsql)
   (message "Install org-roam to use org-node-fakeroam library"))
@@ -446,9 +447,7 @@ This includes all links and citations that touch NODE."
 ;;;; Bonus advices
 
 ;; (benchmark-call (byte-compile #'org-roam-list-files))
-;; => (1.381868272 1 0.14996786500000026)
 ;; (benchmark-call (byte-compile #'org-node-fakeroam-list-files))
-;; => (0.0010883549999999998 0 0.0)
 (defun org-node-fakeroam-list-files ()
   "Faster than `org-roam-list-files'."
   (cl-loop for file in (org-node-list-files t)
@@ -456,14 +455,11 @@ This includes all links and citations that touch NODE."
            collect file))
 
 ;; (benchmark-call (byte-compile #'org-roam-dailies--list-files) 10)
-;; => (0.010178246 0 0.0)
 ;; (benchmark-call (byte-compile #'org-node-fakeroam-list-dailies) 10)
-;; => (0.010178246 0 0.0)
 (defun org-node-fakeroam-list-dailies (&rest extra-files)
   "Faster than `org-roam-dailies--list-files' on a slow fs.
-Makes little difference if you do not have a filesystem that
-causes performance issues.  For argument EXTRA-FILES, see that
-function."
+Makes little difference if your filesystem is not the bottleneck.
+For argument EXTRA-FILES, see that function."
   (require 'org-roam-dailies)
   (append extra-files
           (cl-loop
@@ -471,24 +467,20 @@ function."
            when (string-prefix-p org-node-fakeroam-daily-dir file)
            collect file)))
 
-;; TODO: Make it more solid
+;; (benchmark-call (byte-compile #'org-roam-dailies--daily-note-p) 100)
+;; (benchmark-call (byte-compile #'org-node-fakeroam-daily-note-p) 100)
 (defun org-node-fakeroam-daily-note-p (&optional file)
-  "May be faster than `org-roam-dailies--daily-note-p'.
-With optional argument FILE, check FILE instead of current
-buffer file."
-  ;; No `abbreviate-file-name' needed, because filename does not come from
-  ;; org-node
-  (let ((daily-dir (file-name-concat org-roam-directory
-                                     org-roam-dailies-directory)))
-    (unless file
-      (setq file (buffer-file-name (buffer-base-buffer))))
-    (unless (file-name-absolute-p file)
-      (error "Expected absolute filename but got: %s" file))
-    (and (string-suffix-p ".org" file)
-         (string-prefix-p (downcase (file-truename daily-dir))
-                          (downcase (file-truename file)))
-         (not (cl-loop for exclude in org-node-extra-id-dirs-exclude
-                       when (string-search exclude file) return t)))))
+  "Faster than `org-roam-dailies--daily-note-p' on a slow fs.
+Makes little difference if your filesystem is not the bottleneck.
+For argument FILE, see that function."
+  (setq file (org-node-abbrev-file-names
+              (file-truename (or file
+                                 (buffer-file-name (buffer-base-buffer))))))
+  (and (string-suffix-p ".org" file)
+       (string-prefix-p (downcase org-node-fakeroam-daily-dir)
+                        (downcase file))
+       (not (cl-loop for exclude in org-node-extra-id-dirs-exclude
+                     when (string-search exclude file) return t))))
 
 
 ;;;; Series-related
@@ -499,9 +491,11 @@ buffer file."
   "Create a daily-note, for a day implied by YMD.
 YMD must be a time string in YYYY-MM-DD form.
 
-SERIES-KEY is the Org-node series that cor  TODO: just pass the series as a whole??
+SERIES-KEY is the key that corresponds to the member of
+`org-node-series-defs' that should grow after the capture is
+done.
 
-KEYS correspond to the capture template you wish to go to."
+GOTO and KEYS are like in `org-roam-dailies--capture'."
   (require 'org-roam-dailies)
   (add-hook 'org-roam-capture-new-node-hook #'org-node--add-series-item)
   (setq org-node-proposed-series-key series-key)

@@ -247,7 +247,7 @@ Do you already know about "daily-notes"?  Then get started with this command:
 (keymap-set global-map "M-s s" #'org-node-series-dispatch)
 #+end_src
 
-and configure =org-node-series-defs= if needed.
+and configure =org-node-series-defs= if needed.  See [[https://github.com/meedstrom/org-node/wiki/Configuring-series][wiki]].
 
 It's easiest to explain series if we use "daily-notes" (or "dailies") as an example of a series.
 

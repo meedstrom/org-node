@@ -586,8 +586,8 @@ When called from Lisp, peek on any hash table HT."
         (add-hook 'org-node-creation-hook #'org-node--add-series-item 90)
         (add-hook 'org-node-insert-link-hook #'org-node--dirty-ensure-link-known -50)
         (add-hook 'org-roam-post-node-insert-hook #'org-node--dirty-ensure-link-known -50)
-        (add-hook 'calendar-today-invisible-hook #'org-node--mark-days)
-        (add-hook 'calendar-today-visible-hook #'org-node--mark-days)
+        (add-hook 'calendar-today-invisible-hook #'org-node--mark-days 5)
+        (add-hook 'calendar-today-visible-hook #'org-node--mark-days 5)
         (advice-add 'org-insert-link :after #'org-node--dirty-ensure-link-known)
         (advice-add 'rename-file :after #'org-node--handle-rename)
         (advice-add 'delete-file :after #'org-node--handle-delete)
@@ -1464,27 +1464,49 @@ operation."
            return nil
            finally return t))
 
-;; Dear `org-roam-list-files', you take 1368ms.  This takes 7.
-;; (progn (byte-compile #'org-roam-list-files) (garbage-collect) (benchmark-call #'org-roam-list-files))
-;; (progn (byte-compile #'org-node-list-files) (garbage-collect) (benchmark-call #'org-node-list-files))
-(defun org-node-list-files (&optional instant)
+;; (benchmark-call (byte-compile #'org-node-list-files))
+;; => (0.009714744 0 0.0)
+;; (benchmark-call (byte-compile #'org-roam-list-files))
+;; => (1.488666741 1 0.23508516499999388)
+(defun org-node-list-files (&optional instant interactive)
   "List files in `org-id-locations' or `org-node-extra-id-dirs'.
 With optional argument INSTANT t, return files already known to
 contain IDs instead of calculating a new \(often somewhat longer)
-list of files that may or may not contain IDs."
-  (if instant
-      (hash-table-keys org-node--file<>mtime)
-    (-union ;; Faster than `seq-union' by 10x: 2000ms -> 200ms
-     (hash-table-values org-id-locations)
-     (let ((file-name-handler-alist nil)) ;; 3x: 200ms -> 70ms
-       ;; Abbreviating file names because org-id does too
-       (org-node-abbrev-file-names ;; 5x: 70ms -> 14ms
-        (cl-loop
-         for dir in org-node-extra-id-dirs
-         append (org-node--directory-files-recursively ;; 2x: 14ms -> 7ms
-                 (file-truename dir) "org" org-node-extra-id-dirs-exclude)))))))
+list of files that may or may not contain IDs.
 
-(defun org-node--directory-files-recursively (dir suffix excludes)
+When called interactively \(INTERACTIVE is non-nil), list the
+files in a new buffer."
+  (interactive "i\np")
+  (if interactive
+      (progn
+        (pop-to-buffer (get-buffer-create "*org-node files*"))
+        (let ((files (org-node-list-files)))a
+             (setq buffer-read-only nil)
+             (erase-buffer)
+             (insert (format "Found %d Org files\n" (length files)))
+             (dolist (file (sort files #'string<))
+               (insert-text-button file
+                                   'face 'link
+                                   'action `(lambda (_button)
+                                              (find-file ,file))
+                                   'follow-link t)
+               (newline))
+             (goto-char (point-min))
+             (setq buffer-read-only t)))
+    (if instant
+        (hash-table-keys org-node--file<>mtime)
+      (-union ;; Faster than `seq-union' by 10x: 2000ms -> 200ms
+       (hash-table-values org-id-locations)
+       (let ((file-name-handler-alist nil)) ;; 3x: 200ms -> 70ms
+         ;; Abbreviating file names because org-id does too
+         (org-node-abbrev-file-names ;; 5x: 70ms -> 14ms
+          (cl-loop for dir in org-node-extra-id-dirs
+                   append (org-node--dir-files-recursively ;; 2x: 14ms -> 7ms
+                           (file-truename dir)
+                           "org"
+                           org-node-extra-id-dirs-exclude))))))))
+
+(defun org-node--dir-files-recursively (dir suffix excludes)
   "Faster, purpose-made variant of `directory-files-recursively'.
 Return a list of all files under directory DIR, its
 sub-directories, sub-sub-directories and so on, with provisos:
@@ -1507,7 +1529,7 @@ sub-directories, sub-sub-directories and so on, with provisos:
                                       return t)
                              (file-symlink-p (directory-file-name full-file))))
 	        (setq result (nconc result
-                                    (org-node--directory-files-recursively
+                                    (org-node--dir-files-recursively
 			             full-file suffix excludes))))))
 	(when (string-suffix-p suffix file)
           (let ((full-file (file-name-concat dir file)))
@@ -1773,8 +1795,15 @@ org-roam."
             (org-node--scan-all))))
     (error "`org-node--goto' received a nil argument")))
 
+;; TODO: "Create" sounds unspecific, rename to "New node"?
 (defun org-node-create (title id &optional series-key)
   "Call `org-node-creation-fn' with necessary variables set.
+
+TITLE will be title of node, ID will be id of node \(use
+`org-id-new' if you don\\='t know\).
+
+Optional argument SERIES-KEY means use the resulting node to
+maybe grow the corresponding series.
 
 When calling from Lisp, you should not assume anything about
 which buffer will be current afterwards, since it depends on
@@ -1785,10 +1814,7 @@ To visit a node after creating it, either let-bind
     (org-node-create TITLE ID)
     (org-node-cache-ensure t)
     (let ((node (gethash ID org-node--id<>node)))
-      (if node (org-node--goto node)))
-
-Optional argument SERIES-KEY means use the resulting node to
-maybe grow the corresponding series."
+      (if node (org-node--goto node)))"
   (setq org-node-proposed-title title)
   (setq org-node-proposed-id id)
   (setq org-node-proposed-series-key series-key)
@@ -3682,6 +3708,8 @@ Argument SERIES is the series that called this."
   "Prompt to go to any of the sort-strings in SERIES."
   (declare (obsolete nil "2024-08-21"))
   (completing-read "Go to: " (plist-get series :sorted-items)))
+
+
 
 (provide 'org-node)
 
