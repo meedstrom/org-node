@@ -445,15 +445,25 @@ This includes all links and citations that touch NODE."
 
 ;;;; Bonus advices
 
+;; (benchmark-call (byte-compile #'org-roam-list-files))
+;; => (1.381868272 1 0.14996786500000026)
+;; (benchmark-call (byte-compile #'org-node-fakeroam-list-files))
+;; => (0.0010883549999999998 0 0.0)
 (defun org-node-fakeroam-list-files ()
   "Faster than `org-roam-list-files'."
   (cl-loop for file in (org-node-list-files t)
-           when (string-prefix-p org-node-fakeroam-roam-dir file)
+           when (string-prefix-p org-node-fakeroam-dir file)
            collect file))
 
+;; (benchmark-call (byte-compile #'org-roam-dailies--list-files) 10)
+;; => (0.010178246 0 0.0)
+;; (benchmark-call (byte-compile #'org-node-fakeroam-list-dailies) 10)
+;; => (0.010178246 0 0.0)
 (defun org-node-fakeroam-list-dailies (&rest extra-files)
   "Faster than `org-roam-dailies--list-files' on a slow fs.
-For argument EXTRA-FILES, see that function."
+Makes little difference if you do not have a filesystem that
+causes performance issues.  For argument EXTRA-FILES, see that
+function."
   (require 'org-roam-dailies)
   (append extra-files
           (cl-loop
