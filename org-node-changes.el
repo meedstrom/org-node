@@ -147,11 +147,11 @@ hardcoded strings."
 (define-obsolete-function-alias
   'org-node--create #'org-node-create "2024-08-21")
 
-(define-obsolete-variable-alias
-  'org-node-creation-fn 'org-node-new-node-fn "2024-08-22")
+;; (define-obsolete-variable-alias
+;;   'org-node-creation-fn 'org-node-new-node-fn "2024-08-22")
 
-(define-obsolete-variable-alias
-  'org-node-creation-hook 'org-node-new-node-hook "2024-08-22")
+;; (define-obsolete-variable-alias
+;;   'org-node-creation-hook 'org-node-new-node-hook "2024-08-22")
 
 ;; (define-obsolete-function-alias
 ;;   'org-node-create #'org-node-new-node "2024-08-22")
