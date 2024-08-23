@@ -48,7 +48,7 @@
 Warn if any old name in `org-node-changes--new-names' is bound.  Then
 copy the value in the old name so that the new name gets the same
 value."
-  ;; Don't add hooks at top level, -melpazoid complains
+  ;; Extra
   (add-hook 'org-node-insert-link-hook
             #'org-node-changes--insert-link-hook-new-args
             -99)
@@ -104,7 +104,7 @@ hardcoded strings."
 (org-node-changes--def-whiny-alias org-node-faster-roam-daily-note-p
                                    org-node-fakeroam-daily-note-p)
 
-;; Many of these existed briefly, 0-2 days 2024-08-19
+;; Many of these existed only briefly, 0-3 days 2024-08-19
 
 (org-node-changes--def-whiny-alias org-node--series-standard-goto
                                    org-node--example-try-goto-id)
@@ -139,27 +139,20 @@ hardcoded strings."
 (org-node-changes--def-whiny-alias org-node--default-daily-creator
                                    org-node--example-daily-creator)
 
-;; Polite aliases for now
+;; Polite aliases for now, upgrade to whiny later
 
 (define-obsolete-function-alias
-  'org-node--extract-ymd 'org-node-extract-ymd  "2024-08-21")
-
-;; (define-obsolete-function-alias
-;;   "2024-08-21")
-
-;; (define-obsolete-function-alias
-;;   "2024-08-21")
+  'org-node--extract-ymd #'org-node-extract-ymd  "2024-08-21")
 
 (define-obsolete-function-alias
-  'org-node--create 'org-node-create "2024-08-21")
+  'org-node--create #'org-node-create "2024-08-21")
 
 ;;;###autoload
 (define-obsolete-function-alias
-  'org-node-series-menu 'org-node-series-dispatch "2024-08-21")
+  'org-node-series-menu #'org-node-series-dispatch "2024-08-21")
 
 ;; Variables
 
-;; TODO: Rename to just `org-node-series' in Oct
 (define-obsolete-variable-alias
   'org-node--series-info 'org-node--series "2024-08-21")
 

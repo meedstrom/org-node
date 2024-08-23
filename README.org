@@ -247,6 +247,8 @@ Do you already know about "daily-notes"?  Then get started with this command:
 (keymap-set global-map "M-s s" #'org-node-series-dispatch)
 #+end_src
 
+and configure =org-node-series-defs= if needed.
+
 It's easiest to explain series if we use "daily-notes" (or "dailies") as an example of a series.
 
 A daily-note is the same idea as an [[https://github.com/bastibe/org-journal][org-journal]] entry: a file/entry where the title is just today's date.

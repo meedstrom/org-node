@@ -287,10 +287,10 @@ Designed to override `org-roam-reflinks-get'."
         (org-node-fakeroam--check-compile)
         (unless org-node-cache-mode
           (message "`org-node-fakeroam-db-feed-mode' will do nothing without `org-node-cache-mode'"))
-        (add-hook 'org-node-rescan-hook #'org-node-fakeroam--db-update-files)
+        (add-hook 'org-node-rescan-functions #'org-node-fakeroam--db-update-files)
         (add-hook 'kill-emacs-hook #'org-roam-db--close-all))
 
-    (remove-hook 'org-node-rescan-hook #'org-node-fakeroam--db-update-files)
+    (remove-hook 'org-node-rescan-functions #'org-node-fakeroam--db-update-files)
     (unless org-roam-db-autosync-mode
       (remove-hook 'kill-emacs-hook #'org-roam-db--close-all))))
 
