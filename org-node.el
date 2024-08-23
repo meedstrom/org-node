@@ -18,7 +18,7 @@
 ;; Author:           Martin Edström <meedstrom91@gmail.com>
 ;; Created:          2024-04-13
 ;; Keywords:         org, hypermedia
-;; Package-Requires: ((emacs "28.1") (compat "30") (dash "2.19.1") (transient "0.7.4"))
+;; Package-Requires: ((emacs "28.1") (compat "30") (dash "2.19.1") (transient "0.7.4") (persist "0.6.1"))
 ;; URL:              https://github.com/meedstrom/org-node
 
 ;;; Commentary:
@@ -82,11 +82,12 @@
 ;;       the series, so "j" "n" "p" are available
 
 (require 'cl-lib)
-(require 'seq)
 (require 'subr-x)
+(require 'seq)
 (require 'transient)
-(require 'dash)
+(require 'persist)
 (require 'compat)
+(require 'dash)
 (require 'org)
 (require 'org-id)
 (require 'org-macs)
@@ -516,11 +517,11 @@ records describing each link to that destination, with info such
 as from which ID-node the link originates.  See
 `org-node-get-id-links' for more info.")
 
-(defvar org-node--file<>previews (make-hash-table :test #'equal)
+(persist-defvar org-node--file<>previews (make-hash-table :test #'equal)
   "1:N table mapping files to previews of backlink contexts.
 For use by `org-node-fakeroam--accelerate-get-contents'.")
 
-(defvar org-node--file<>mtime (make-hash-table :test #'equal)
+(persist-defvar org-node--file<>mtime (make-hash-table :test #'equal)
   "1:1 table mapping files to their last-modification times.")
 
 (defun org-node-get-id-links (node)
@@ -3708,8 +3709,6 @@ Argument SERIES is the series that called this."
   "Prompt to go to any of the sort-strings in SERIES."
   (declare (obsolete nil "2024-08-21"))
   (completing-read "Go to: " (plist-get series :sorted-items)))
-
-
 
 (provide 'org-node)
 

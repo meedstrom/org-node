@@ -90,7 +90,6 @@ See also `org-node-fakeroam-fast-render-mode'.
           (with-current-buffer buf
             (remove-hook 'post-command-hook #'org-roam-buffer--redisplay-h t)))))))
 
-;; TODO: Use org-persist, not savehist
 ;;;###autoload
 (define-minor-mode org-node-fakeroam-fast-render-mode
   "Advise the Roam buffer to be faster.
@@ -101,7 +100,7 @@ See also `org-node-fakeroam-fast-render-mode'.
 2. Cache the previews, so that there is less or no lag the next
    time the same nodes are visited.
 
-3. Save this cache to disk if `savehist-mode' is enabled.
+3. Persist this cache on disk.
 
 -----"
   :global t
@@ -110,9 +109,10 @@ See also `org-node-fakeroam-fast-render-mode'.
     (if org-node-fakeroam-fast-render-mode
         (progn
           (org-node-fakeroam--check-compile)
+          ;; Undo a thing done by old versions of this package
           (when (boundp 'savehist-additional-variables)
-            (add-to-list 'savehist-additional-variables 'org-node--file<>previews)
-            (add-to-list 'savehist-additional-variables 'org-node--file<>mtime))
+            (delete 'org-node--file<>previews savehist-additional-variables)
+            (delete 'org-node--file<>mtime savehist-additional-variables))
           (advice-add #'org-roam-preview-get-contents :around
                       #'org-node-fakeroam--accelerate-get-contents)
           (advice-add #'org-roam-node-insert-section :around
