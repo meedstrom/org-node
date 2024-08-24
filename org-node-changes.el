@@ -41,14 +41,6 @@
 Warn if any old name in `org-node-changes--new-names' is bound.  Then
 copy the value in the old name so that the new name gets the same
 value."
-  ;; Bonus: a hook changed, warn if used in old way
-  (cl-loop
-   for fn in org-node-insert-link-hook
-   when (and (help-function-arglist fn)
-             (not (member (car (help-function-arglist fn))
-                          '(&optional &rest &body))))
-   return (display-warning
-           'org-node "Hook `org-node-insert-link-hook' has changed, now passes no arguments"))
   (while-let ((row (pop org-node-changes--new-names)))
     (seq-let (old new removed-by) row
       (unless removed-by
@@ -65,7 +57,17 @@ value."
             (lwarn 'org-node :warning "Your initfiles key-bind an old command name: %S.  Please use new name: %S"
                    old new)
           (lwarn 'org-node :warning "Your initfiles key-bind a removed command: %S"
-                 old))))))
+                 old)))))
+  ;; Bonus: a hook changed, warn if used in old way
+  ;; FIXME: Leads to (wrong-type-argument listp t).
+  ;; (cl-loop
+  ;;  for fn in org-node-insert-link-hook
+  ;;  when (and (help-function-arglist fn)
+  ;;            (not (member (car (help-function-arglist fn))
+  ;;                         '(&optional &rest &body))))
+  ;;  return (display-warning
+  ;;          'org-node "Hook `org-node-insert-link-hook' has changed, now passes no arguments"))
+  )
 
 (defmacro org-node-changes--def-whiny-alias (old new &optional interactive when removed-by)
   "Define OLD as effectively an alias for NEW.
