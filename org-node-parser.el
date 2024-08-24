@@ -270,41 +270,31 @@ Arguments PLAIN-RE and MERGED-RE..."
                               (substring (match-string 0) 1) ;; drop @
                               (list :outline olp-with-self))
                       org-node-parser--result-found-links)))
-          (push (list org-node-parser--curr-file (point)
-                      "No closing [cite: bracket")
-                org-node-parser--result-problems)))))
+          (error "No closing [cite: bracket")))))
   (goto-char (or end (point-max))))
 
 (defun org-node-parser--collect-properties (beg end)
   "Collect Org properties between BEG and END into an alist.
 Assumes BEG and END delimit the region in between
 a :PROPERTIES: and :END: string."
-  (catch 'break
-    (let (result)
-      (goto-char beg)
-      (while (not (>= (point) end))
-        (skip-chars-forward "[:space:]")
-        (unless (looking-at-p ":")
-          (push (list org-node-parser--curr-file (point)
-                      "Possibly malformed property drawer")
-                org-node-parser--result-problems)
-          (throw 'break nil))
-        (forward-char)
-        (push (cons (upcase
-                     (buffer-substring
-                      (point)
-                      (1- (or (search-forward ":" (pos-eol) t)
-                              (progn
-                                (push (list org-node-parser--curr-file (point)
-                                            "Possibly malformed property drawer")
-                                      org-node-parser--result-problems)
-                                (throw 'break nil))))))
-                    (string-trim
-                     (buffer-substring
-                      (point) (pos-eol))))
-              result)
-        (forward-line 1))
-      result)))
+  (let (result)
+    (goto-char beg)
+    (while (not (>= (point) end))
+      (skip-chars-forward "[:space:]")
+      (unless (looking-at-p ":")
+        (error "Possibly malformed property drawer"))
+      (forward-char)
+      (push (cons (upcase
+                   (buffer-substring
+                    (point)
+                    (1- (or (search-forward ":" (pos-eol) t)
+                            (error "Possibly malformed property drawer")))))
+                  (string-trim
+                   (buffer-substring
+                    (point) (pos-eol))))
+            result)
+      (forward-line 1))
+    result))
 
 
 ;;; Main
@@ -312,7 +302,6 @@ a :PROPERTIES: and :END: string."
 (defvar org-node-parser--result-paths-types nil)
 (defvar org-node-parser--result-found-links nil)
 (defvar org-node-parser--result-problems nil)
-(defvar org-node-parser--curr-file nil)
 
 ;; Tell compiler these aren't free variables
 (defvar $plain-re)
@@ -375,7 +364,6 @@ findings to another temp file."
             (setq FILE-ATTRS (file-attributes FILE))
             (push (cons FILE (file-attribute-modification-time FILE-ATTRS))
                   result/mtimes)
-            (setq org-node-parser--curr-file FILE)
             ;; NOTE: Don't use `insert-file-contents-literally'.  It gives
             ;;       wrong values to HEADING-POS when there is any Unicode in
             ;;       the file.  Just overriding `coding-system-for-read' and
@@ -674,7 +662,7 @@ findings to another temp file."
                                 org-node-parser--result-problems
                                 (current-time)))))))
   ;; TODO: Does emacs in batch mode garbage-collect at the end? I guess not but
-  ;;       if it does then maybe exec a kill -9 on itself here to prevent it.
+  ;;       if it does then maybe exec a kill -9 on itself here to skip it.
   )
 
 (provide 'org-node-parser)
