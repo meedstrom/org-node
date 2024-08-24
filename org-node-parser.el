@@ -63,11 +63,6 @@ keywords within."
       (setq list (cdr list)))
     i))
 
-(defun org-node-parser--memq-car (key alist)
-  (while (and alist (not (eq key (caar alist))))
-    (setq alist (cdr alist)))
-  alist)
-
 ;; TODO: Merge with `org-node-parser--pos->olp'
 (defun org-node-parser--pos->parent-id (oldata pos file-id)
   "Return ID of the closest ancestor heading that has an ID.
