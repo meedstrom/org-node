@@ -156,10 +156,11 @@ If REMOVE? is non-nil, remove it instead."
                               (concat "id:" origin)
                               (org-node-get-title
                                (or (gethash origin org-node--id<>node)
+                                   ;; TODO: just launch a reset
                                    (error "ID in backlink tables not known to main org-nodes table: %s"
                                           origin))))
                              "\"")))
-             (links-string (string-join links "  ")))
+             (links-string (string-join links " ")))
         (if links
             (unless (equal links-string (org-entry-get nil "BACKLINKS"))
               (org-entry-put nil "BACKLINKS" links-string))
@@ -363,10 +364,9 @@ in the nearby :BACKLINKS: property."
             ;; Enforce deterministic order to prevent unnecessarily reordering
             ;; every time a node is linked that already has the backlink
             (sort links #'string-lessp)
-            ;; Two spaces between links help them look distinct
             (setq new-value (string-join
                              (--map (concat "\"" it "\"") links)
-                             "  ")))
+                             " ")))
         (setq new-value (concat "\"" src-link "\"")))
       (unless (equal current-backlinks-value new-value)
         (let ((after-change-functions
