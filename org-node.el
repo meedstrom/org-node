@@ -1481,19 +1481,19 @@ files in a new buffer."
   (if interactive
       (progn
         (pop-to-buffer (get-buffer-create "*org-node files*"))
-        (let ((files (org-node-list-files)))a
-             (setq buffer-read-only nil)
-             (erase-buffer)
-             (insert (format "Found %d Org files\n" (length files)))
-             (dolist (file (sort files #'string<))
-               (insert-text-button file
-                                   'face 'link
-                                   'action `(lambda (_button)
-                                              (find-file ,file))
-                                   'follow-link t)
-               (newline))
-             (goto-char (point-min))
-             (setq buffer-read-only t)))
+        (let ((files (org-node-list-files)))
+          (setq buffer-read-only nil)
+          (erase-buffer)
+          (insert (format "Found %d Org files\n" (length files)))
+          (dolist (file (sort files #'string<))
+            (insert-text-button file
+                                'face 'link
+                                'action `(lambda (_button)
+                                           (find-file ,file))
+                                'follow-link t)
+            (newline))
+          (goto-char (point-min))
+          (setq buffer-read-only t)))
     (if instant
         (hash-table-keys org-node--file<>mtime)
       (-union ;; Faster than `seq-union' by 10x: 2000ms -> 200ms
