@@ -70,7 +70,7 @@ Extra argument FILE-ID is the file-level id, used as a fallback
 if no ancestor heading has an ID.  It can be nil."
   (let (;; Drop all the data about positions below HEADING-POS
         (data-until-pos
-         (nthcdr (org-node-parser--elem-index (assoc pos oldata) oldata)
+         (nthcdr (org-node-parser--elem-index (assq pos oldata) oldata)
                  oldata)))
     (let ((previous-level (nth 2 (car data-until-pos))))
       ;; Work backwards towards the top of the file
@@ -102,7 +102,7 @@ order, such that the last heading in the file is represented in
 the first element.  An exact match for POS must also be included
 in one of the elements."
   (let* (olp
-         (pos-data (or (assoc pos oldata)
+         (pos-data (or (assq pos oldata)
                        (error "Broken algo: HEADING-POS %s not found in OLDATA %s"
                               pos oldata)))
          ;; Drop all the data about positions below HEADING-POS (using `nthcdr'

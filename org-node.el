@@ -3045,7 +3045,7 @@ elapsed.")
 (defun org-node-reset ()
   "Wipe and rebuild the cache."
   (interactive)
-  (push #'org-node--print-elapsed org-node--temp-extra-fns)
+  (cl-pushnew #'org-node--print-elapsed org-node--temp-extra-fns)
   (org-node-cache-ensure nil t))
 
 ;;;###autoload
@@ -3507,15 +3507,21 @@ Wrap the value in double-brackets if necessary."
                         "]]")))
     (org-node--add-to-property-keep-space "ROAM_REFS" ref)))
 
-;; TODO: add org-tag-alist
 (defun org-node-tag-add (tag-or-tags)
   "Add TAG-OR-TAGS to the entry at point."
-  (interactive (list (completing-read-multiple
-                      "Tag: "
-                      (seq-uniq
-                       (cl-loop for node being the hash-values of org-nodes
-                                append (org-node-get-tags node)))))
-               org-mode)
+  (interactive
+   (list (completing-read-multiple
+          "Tag: "
+          (cl-union
+           (cl-loop for node being the hash-values of org-nodes
+                    append (org-node-get-tags node))
+           (cl-remove-if #'keywordp
+                         (mapcar #'car (append
+                                        ;; 200ms in big file w/o org elem cache
+                                        ;; (org-get-buffer-tags)
+                                        org-tag-persistent-alist
+                                        org-tag-alist))))))
+   org-mode)
   (if (= (org-outline-level) 0)
       (let* ((tags (cl-loop
                     for raw in (cdar (org-collect-keywords '("FILETAGS")))

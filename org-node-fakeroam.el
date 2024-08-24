@@ -158,21 +158,29 @@ Run ORIG-FN with ARGS, while overriding
     (cl-letf (((symbol-function 'org-roam-fontify-like-in-org-mode) #'identity))
       (apply orig-fn args))))
 
-;; Just an useful command
+;; Just a bonus command
 (defun org-node-fakeroam-show-roam-buffer ()
   "Display an org-roam buffer or refresh an already visible one.
+
 To reiterate: if it was not visible, only bring it up for
 display, do NOT also refresh it.  Leave that for the second time
-the user invokes the command."
-  (interactive nil org-mode org-roam-mode)
+the user invokes the command.  Or let the mode
+`org-node-fakeroam-redisplay-mode' refresh it."
+  (interactive)
   (when (require 'org-roam nil t)
     (if (derived-mode-p 'org-roam-mode)
         (org-roam-buffer-refresh)
       (pcase (org-roam-buffer--visibility)
-        ('visible (and (derived-mode-p 'org-mode)
-                       (org-roam-buffer-persistent-redisplay)))
-        ((or 'exists 'none)
-         (display-buffer (get-buffer-create org-roam-buffer)))))))
+        ('visible (if (derived-mode-p 'org-mode)
+                      (org-roam-buffer-persistent-redisplay)
+                    (with-current-buffer org-roam-buffer
+                      (org-roam-buffer-refresh))))
+        ('none (when (derived-mode-p 'org-mode)
+                 (display-buffer (get-buffer-create org-roam-buffer))
+                 (org-roam-buffer-persistent-redisplay)))
+        ('exists (let ((display-buffer-overriding-action
+                        '(display-buffer-use-some-window)))
+                   (display-buffer org-roam-buffer)))))))
 
 
 ;;;; JIT method
