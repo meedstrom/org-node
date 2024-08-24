@@ -930,9 +930,9 @@ function to update current tables."
             (write-region (prin1-to-string files)
                           nil
                           (org-node-parser--tmpfile "file-list-0.eld")))
-          (setq org-node-parser--result/found-links nil)
-          (setq org-node-parser--result/problems nil)
-          (setq org-node-parser--result/paths-types nil)
+          (setq org-node-parser--result-found-links nil)
+          (setq org-node-parser--result-problems nil)
+          (setq org-node-parser--result-paths-types nil)
           (when (bound-and-true-p editorconfig-mode)
             (message "Maybe disable editorconfig-mode while debugging"))
           (setq org-node--first-init nil)
