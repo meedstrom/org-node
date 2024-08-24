@@ -3648,12 +3648,13 @@ heading, else the file-level node, whichever has an ID first."
   "Create a daily-note using SORTSTR as the date."
   (declare (obsolete nil "2024-08-21"))
   (if (and (eq org-node-creation-fn 'org-node-new-via-roam-capture)
-           (fboundp 'org-node-fakeroam-daily-creator))
+           (fboundp 'org-node-fakeroam-daily-create))
       ;; Assume this user wants to use their roam-dailies templates
       (progn
         (setq org-node-proposed-series-key "d")
         (unwind-protect
-            (org-node-fakeroam-daily-creator sortstr)
+            (org-node-fakeroam-daily-create sortstr
+                                            org-node-proposed-series-key)
           (setq org-node-proposed-series-key nil)))
     (let ((org-node-ask-directory
            (if (require 'org-roam-dailies nil t)

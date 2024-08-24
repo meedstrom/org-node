@@ -59,7 +59,7 @@ that org-roam is available."
             org-node-fakeroam-list-files
             org-node-fakeroam-list-dailies
             org-node-fakeroam-daily-note-p
-            org-node-fakeroam-daily-creator))))
+            org-node-fakeroam-daily-create))))
 
 ;;;###autoload
 (define-minor-mode org-node-fakeroam-redisplay-mode
@@ -505,6 +505,13 @@ GOTO and KEYS are like in `org-roam-dailies--capture'."
        goto keys)
     (remove-hook 'org-roam-capture-new-node-hook #'org-node--add-series-item)
     (setq org-node-proposed-series-key nil)))
+
+;; DEPRECATED
+;;;###autoload
+(defun org-node-fakeroam-daily-creator (sortstr)
+  "Create a daily-note, for a day implied by SORTSTR."
+  (declare (obsolete nil "2024-08-21"))
+  (org-node-fakeroam-daily-create sortstr "d" t))
 
 (defvar org-node-fakeroam-dir nil
   "Cached value of `org-roam-directory' transformed for org-node.
