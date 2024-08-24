@@ -2020,7 +2020,7 @@ to false positives, if you have been changing formats over time."
              name)
         (match-string 0 name)))))
 
-(defun org-node-helper/mk-series-with-tag-sorted-by-property
+(defun org-node-mk-series-on-tag-sorted-by-property
     (key name tag prop &optional capture)
   "Quick-define a series filtered by TAG sorted by property PROP.
 This would be a series of ID-nodes, not files.
@@ -2045,7 +2045,7 @@ KEY, NAME and CAPTURE explained in `org-node-series-defs'."
                 (let ((series (cdr (assoc key org-node--series))))
                   (completing-read "Go to: " (plist-get series :sorted-items))))
     :try-goto (lambda (item)
-                (org-node-helper/try-goto-id (cdr item)))
+                (org-node-helper-try-goto-id (cdr item)))
     :creator (lambda (sortstr key)
                (let ((adder (lambda () (org-node-tag-add ,tag))))
                  (add-hook 'org-node-creation-hook adder)
@@ -2057,6 +2057,67 @@ KEY, NAME and CAPTURE explained in `org-node-series-defs'."
   (or (bound-and-true-p org-node-fakeroam-daily-dir)
       (file-name-concat org-directory "daily/")))
 
+(defun org-node-helper-try-goto-id (id)
+  "Try to visit org-id ID, returning non-nil on success."
+  (let ((node (gethash id org-node--id<>node)))
+    (when node
+      (org-node--goto node)
+      t)))
+
+(defun org-node-helper-try-visit-file (file)
+  "Visit FILE if it exists or if a buffer exists on that file.
+Return non-nil on success."
+  (when (or (file-readable-p file)
+            (find-buffer-visiting file))
+    (find-file file)
+    t))
+
+(defun org-node-helper-filename->ymd (path)
+  "Check the filename PATH for a date and return it.
+On failing to coerce a date, return nil."
+  (when path
+    (let ((clipped-name (file-name-base path)))
+      (if (string-match
+           (rx bol (= 4 digit) "-" (= 2 digit) "-" (= 2 digit))
+           clipped-name)
+          (match-string 0 clipped-name)
+        ;; Even in a non-daily file, pretend it is a daily if possible,
+        ;; to allow entering the series at a more relevant date
+        (when-let ((stamp (org-node-extract-file-name-datestamp path)))
+          (org-node-extract-ymd stamp org-node-datestamp-format))))))
+
+;; TODO: Handle %s, %V, %y...  is there a library?
+(defun org-node-extract-ymd (instance time-format)
+  "Try to extract a YYYY-MM-DD date out of string INSTANCE.
+Assume INSTANCE is a string produced by TIME-FORMAT, e.g. if
+TIME-FORMAT is %Y%m%dT%H%M%SZ then a possible INSTANCE is
+20240814T123307Z.  In that case, return 2024-08-14.
+
+Will throw an error if TIME-FORMAT does not include either %F or
+all three of %Y, %m and %d.  May return odd results if other
+format-constructs occur before these."
+  (let ((verify-re (org-node--make-regexp-for-time-format time-format)))
+    (when (string-match-p verify-re instance)
+      (let ((case-fold-search nil))
+        (let ((idx-year (string-search "%Y" time-format))
+              (idx-month (string-search "%m" time-format))
+              (idx-day (string-search "%d" time-format))
+              (idx-%F (string-search "%F" time-format)))
+          (if (-none-p #'null (list idx-year idx-month idx-day))
+              (progn
+                (if (> idx-month idx-year) (cl-incf idx-month 2))
+                (if (> idx-day idx-year) (cl-incf idx-day 2))
+                (concat (substring instance idx-year (+ idx-year 4))
+                        "-"
+                        (substring instance idx-month (+ idx-month 2))
+                        "-"
+                        (substring instance idx-day (+ idx-day 2))))
+            (cl-assert idx-%F)
+            (substring instance idx-%F (+ idx-%F 10))))))))
+
+
+;;;; Series plumbing
+
 (defcustom org-node-series-defs
   (list
    '("d" :name "Daily-files"
@@ -2064,16 +2125,16 @@ KEY, NAME and CAPTURE explained in `org-node-series-defs'."
      :classifier (lambda (node)
                    (let ((path (org-node-get-file-path node)))
                      (when (string-search (org-node--guess-daily-dir) path)
-                       (let ((ymd (org-node-helper/filename->ymd path)))
+                       (let ((ymd (org-node-helper-filename->ymd path)))
                          (when ymd
                            (cons ymd path))))))
      :whereami (lambda ()
-                 (org-node-helper/filename->ymd buffer-file-name))
+                 (org-node-helper-filename->ymd buffer-file-name))
      :prompter (lambda (key)
                  (let ((org-node-series-that-marks-calendar key))
                    (org-read-date)))
      :try-goto (lambda (item)
-                 (org-node-helper/try-visit-file (cdr item)))
+                 (org-node-helper-try-visit-file (cdr item)))
      :creator (lambda (sortstr key)
                 (let ((org-node-datestamp-format "")
                       (org-node-ask-directory (org-node--guess-daily-dir)))
@@ -2095,7 +2156,7 @@ KEY, NAME and CAPTURE explained in `org-node-series-defs'."
                  (let ((series (cdr (assoc key org-node--series))))
                    (completing-read "Go to: " (plist-get series :sorted-items))))
      :try-goto (lambda (item)
-                 (when (org-node-helper/try-goto-id (cdr item))
+                 (when (org-node-helper-try-goto-id (cdr item))
                    t))
      :creator (lambda (sortstr key)
                 (org-node-create sortstr (org-id-new) key))))
@@ -2162,67 +2223,6 @@ example, if the user picked a date from `org-read-date' but no
 daily-note exists for that date, CREATOR is called to create that
 daily-note.  It receives a would-be sort-string as argument."
   :type 'alist)
-
-(defun org-node-helper/try-goto-id (id)
-  "Try to visit org-id ID, returning non-nil on success."
-  (let ((node (gethash id org-node--id<>node)))
-    (when node
-      (org-node--goto node)
-      t)))
-
-(defun org-node-helper/try-visit-file (file)
-  "Visit FILE if it exists or if a buffer exists on that file.
-Return non-nil on success."
-  (when (or (file-readable-p file)
-            (find-buffer-visiting file))
-    (find-file file)
-    t))
-
-(defun org-node-helper/filename->ymd (path)
-  "Check the filename PATH for a date and return it.
-On failing to coerce a date, return nil."
-  (when path
-    (let ((clipped-name (file-name-base path)))
-      (if (string-match
-           (rx bol (= 4 digit) "-" (= 2 digit) "-" (= 2 digit))
-           clipped-name)
-          (match-string 0 clipped-name)
-        ;; Even in a non-daily file, pretend it is a daily if possible,
-        ;; to allow entering the series at a more relevant date
-        (when-let ((stamp (org-node-extract-file-name-datestamp path)))
-          (org-node-extract-ymd stamp org-node-datestamp-format))))))
-
-;; TODO: Handle %s, %V, %y...  is there a library?
-(defun org-node-extract-ymd (instance time-format)
-  "Try to extract a YYYY-MM-DD date out of string INSTANCE.
-Assume INSTANCE is a string produced by TIME-FORMAT, e.g. if
-TIME-FORMAT is %Y%m%dT%H%M%SZ then a possible INSTANCE is
-20240814T123307Z.  In that case, return 2024-08-14.
-
-Will throw an error if TIME-FORMAT does not include either %F or
-all three of %Y, %m and %d.  May return odd results if other
-format-constructs occur before these."
-  (let ((verify-re (org-node--make-regexp-for-time-format time-format)))
-    (when (string-match-p verify-re instance)
-      (let ((case-fold-search nil))
-        (let ((idx-year (string-search "%Y" time-format))
-              (idx-month (string-search "%m" time-format))
-              (idx-day (string-search "%d" time-format))
-              (idx-%F (string-search "%F" time-format)))
-          (if (-none-p #'null (list idx-year idx-month idx-day))
-              (progn
-                (if (> idx-month idx-year) (cl-incf idx-month 2))
-                (if (> idx-day idx-year) (cl-incf idx-day 2))
-                (concat (substring instance idx-year (+ idx-year 4))
-                        "-"
-                        (substring instance idx-month (+ idx-month 2))
-                        "-"
-                        (substring instance idx-day (+ idx-day 2))))
-            (cl-assert idx-%F)
-            (substring instance idx-%F (+ idx-%F 10))))))))
-
-
-;;;; Series plumbing
 
 (defvar org-node--series nil
   "Alist describing each node series, internal use.")

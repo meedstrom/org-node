@@ -54,14 +54,21 @@ keywords within."
                (split-string)
                (regexp-opt)))
 
+;; TODO: Actually return the cdr, not the index...
 (defun org-node-parser--elem-index (elem list)
   "Return first index of ELEM in LIST."
   (let ((i 0))
-    (while (and list (not (equal elem (car-safe list))))
+    (while (and list (not (equal elem (car list))))
       (setq i (1+ i))
       (setq list (cdr list)))
     i))
 
+(defun org-node-parser--memq-car (key alist)
+  (while (and alist (not (eq key (caar alist))))
+    (setq alist (cdr alist)))
+  alist)
+
+;; TODO: Merge with `org-node-parser--pos->olp'
 (defun org-node-parser--pos->parent-id (oldata pos file-id)
   "Return ID of the closest ancestor heading that has an ID.
 See `org-node-parser--pos->olp' for explanation of OLDATA and POS.
@@ -175,7 +182,7 @@ What this means?  See org-node-test.el."
                               (substring link? (match-end 0)))))
                    ;; Remember the uri: prefix for pretty completions
                    (push (cons path (match-string 1 link?))
-                         org-node-parser--result/paths-types)
+                         org-node-parser--result-paths-types)
                    ;; .. but the actual ref is just the //path
                    path))))))
 
@@ -236,14 +243,14 @@ Arguments PLAIN-RE and MERGED-RE..."
           ;;                       link-type
           ;;                       (substring citekey 1) ;; Drop &
           ;;                       (list :outline olp-with-self))
-          ;;               org-node-parser--result/found-links)))
+          ;;               org-node-parser--result-found-links)))
           (push (record 'org-node-link
                         id-here
                         (point)
                         link-type
                         (string-replace "%20" " " path) ;; sane?
                         (list :outline olp-with-self))
-                org-node-parser--result/found-links))))
+                org-node-parser--result-found-links))))
 
     ;; Start over and look for Org 9.5 @citekeys
     (goto-char beg)
@@ -269,10 +276,10 @@ Arguments PLAIN-RE and MERGED-RE..."
                               nil
                               (substring (match-string 0) 1) ;; drop @
                               (list :outline olp-with-self))
-                      org-node-parser--result/found-links)))
+                      org-node-parser--result-found-links)))
           (push (list org-node-parser--curr-file (point)
                       "No closing [cite: bracket")
-                org-node-parser--result/problems)))))
+                org-node-parser--result-problems)))))
   (goto-char (or end (point-max))))
 
 (defun org-node-parser--collect-properties (beg end)
@@ -287,7 +294,7 @@ a :PROPERTIES: and :END: string."
         (unless (looking-at-p ":")
           (push (list org-node-parser--curr-file (point)
                       "Possibly malformed property drawer")
-                org-node-parser--result/problems)
+                org-node-parser--result-problems)
           (throw 'break nil))
         (forward-char)
         (push (cons (upcase
@@ -297,7 +304,7 @@ a :PROPERTIES: and :END: string."
                               (progn
                                 (push (list org-node-parser--curr-file (point)
                                             "Possibly malformed property drawer")
-                                      org-node-parser--result/problems)
+                                      org-node-parser--result-problems)
                                 (throw 'break nil))))))
                     (string-trim
                      (buffer-substring
@@ -309,9 +316,9 @@ a :PROPERTIES: and :END: string."
 
 ;;; Main
 
-(defvar org-node-parser--result/paths-types nil)
-(defvar org-node-parser--result/found-links nil)
-(defvar org-node-parser--result/problems nil)
+(defvar org-node-parser--result-paths-types nil)
+(defvar org-node-parser--result-found-links nil)
+(defvar org-node-parser--result-problems nil)
 (defvar org-node-parser--curr-file nil)
 
 ;; Tell compiler these aren't free variables
@@ -635,7 +642,7 @@ findings to another temp file."
                     (unless (setq DRAWER-END (search-forward ":end:" nil t))
                       (push (list FILE (point)
                                   "Couldn't find matching :END: drawer")
-                            org-node-parser--result/problems)
+                            org-node-parser--result-problems)
                       (throw 'entry-done t))
                   ;; Danger, Robinson
                   (setq DRAWER-END nil))
@@ -658,7 +665,7 @@ findings to another temp file."
         ;; Don't crash the process when there is an error signal,
         ;; report it and continue to the next file
         (( t error )
-         (push (list FILE (point) err) org-node-parser--result/problems))))
+         (push (list FILE (point) err) org-node-parser--result-problems))))
 
     (with-temp-file (org-node-parser--tmpfile "results-%d.eld" $i)
       (let ((write-region-inhibit-fsync nil) ;; Default t in batch mode
@@ -669,9 +676,9 @@ findings to another temp file."
                                 result/mtimes
                                 result/found-nodes
                                 ;; result/roam-db-file-data-vectors
-                                org-node-parser--result/paths-types
-                                org-node-parser--result/found-links
-                                org-node-parser--result/problems
+                                org-node-parser--result-paths-types
+                                org-node-parser--result-found-links
+                                org-node-parser--result-problems
                                 (current-time)))))))
   ;; TODO: Does emacs in batch mode garbage-collect at the end? I guess not but
   ;;       if it does then maybe exec a kill -9 on itself here to prevent it.

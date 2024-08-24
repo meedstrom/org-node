@@ -167,6 +167,15 @@ hardcoded strings."
 (define-obsolete-variable-alias
   'org-node-mark-days 'org-node--mark-days "2024-08-21")
 
+(define-obsolete-function-alias
+  'org-node-helper/try-goto-id #''org-node-helper-try-goto-id "2024-08-24")
+
+(define-obsolete-function-alias
+  'org-node-helper/try-visit-file #'org-node-helper-try-visit-file "2024-08-24")
+
+(define-obsolete-function-alias
+  'org-node-helper/filename->ymd #'org-node-helper-filename->ymd   "2024-08-24")
+
 (provide 'org-node-changes)
 
 ;;; org-node-changes.el ends here
