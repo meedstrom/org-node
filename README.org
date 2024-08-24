@@ -12,7 +12,7 @@ I found org-roam too slow, so I made [[https://github.com/meedstrom/quickroam][q
 
 - *If you were not using org-roam*, maybe think of it as somewhat like [[https://github.com/alphapapa/org-recent-headings][org-recent-headings]] beefed-up to the extent that you won't need other methods of browsing.
 
-  If you were the sort of person to prefer ID-links over file links or any other type of link, you're in the right place!  Now you can rely on IDs, and---if you want---forget about filenames, directories and subtree hierarchies.  As long as you've assigned an ID to a heading, you can find it later.
+  If you were the sort of person to prefer ID-links over file links or any other type of link, you're in the right place!  Now you can rely on IDs, and---if you want---stop worrying about filenames, directories and subtree hierarchies.  As long as you've assigned an ID to a heading, you can find it later.
 
 ** What's a "node"?
 
@@ -32,7 +32,7 @@ Once a subtree has an ID you can link to, it's a "node" because it has joined th
 
 ** Features
 
-A comparison of three similar systems, which permit relying on org-id and don't lock you into the all-too-common "one-note-per-file" concept.
+A comparison of three similar systems, which permit relying on org-id and don't lock you into the all-too-seductive concept of "one-note-per-file".
 
 | Feature                        | [[https://github.com/org-roam/org-roam][org-roam]] | org-node           | [[https://github.com/toshism/org-super-links][org-super-links]]      |
 |--------------------------------+----------+--------------------+----------------------|
@@ -129,9 +129,9 @@ And if the backlinks buffer is laggy:
 (org-node-fakeroam-fast-render-mode) ;; build the Roam buffer faster
 #+end_src
 
-Finally, make sure the underlying org-id knows about the files org-roam knows.  You'd think it would, but that isn't a given!  Do either one of these:
+Finally, make sure the underlying org-id knows about the files org-roam knows.  You'd think it would, but that isn't a given!  Do either of these:
 
-1. Run =M-x org-roam-update-org-id-locations=, then =M-: (org-id-locations-save)=
+1. Run =M-x org-roam-update-org-id-locations= after every Emacs restart
 
 2. Edit the following setting so it includes your =org-roam-directory=.  Supposing that is "~/org/", set this:
 
@@ -142,7 +142,7 @@ Finally, make sure the underlying org-id knows about the files org-roam knows.  
 With that done, try out the commands we went over in [[https://github.com/meedstrom/org-node?tab=readme-ov-file#quick-start][Quick start]].  There's more under [[https://github.com/meedstrom/org-node?tab=readme-ov-file#toolbox][Toolbox]].  Enjoy!
 
 * Backlinks
-Backlinks are the butter on the bread of your notes.  If you've ever seen a "What links here" section on some webpage, that's exactly what it is.  That's what we want to see, all the time.  The below sections outline two general ways to do so.
+Backlinks are the butter on the bread of your notes.  If you've ever seen a "What links here" section on some webpage, that's exactly what it is.  Imagine seeing that, all the time.  The below sections outline two general ways to do so.
 
 ** Backlink solution 1: borrow org-roam's backlink buffer
 As a Roam user, you can just keep using =M-x org-roam-buffer-toggle=, but you get some new ways to keep its data fresh, circumventing Roam's autosync mode.
@@ -160,9 +160,14 @@ If you didn't have laggy saves, this is fine.  In other words, keep variable =or
 (org-node-fakeroam-db-feed-mode)
 #+end_src
 
-Unfortunately, it is still a bit slow when I save a file with 400 nodes.  All down to EmacSQL -- if someone could help optimize how we call EmacSQL, that'd be much appreciated.  Until then, I recommend Option 1C.
+Unfortunately, it is still a bit slow when I save a file with 400 nodes.  Maybe 100x faster than org-roam, but still a noticeable delay.  It appears to be all down to EmacSQL -- if someone could help optimize how we call EmacSQL, that'd be much appreciated.  Until then, I recommend Option 1C.
 
-Bonus: if you often have reason to full-reset the DB, there is a faster command than =C-u M-x org-roam-db-sync=!  Try =M-x org-node-fakeroam-db-rebuild=.  Takes me 6 seconds instead of 179.  Doesn't require aforementioned mode.
+Related: if you often have reason to full-reset the DB, there is a faster command than =C-u M-x org-roam-db-sync=!  Try =M-x org-node-fakeroam-db-rebuild=.  Benchmark:
+
+- =C-u M-x org-roam-db-sync=! 179 seconds
+- =M-x org-node-fakeroam-db-rebuild=: 6 seconds
+
+This is also a matter where I request help, since 6 seconds seems about a thousand times slower than it needs to be.  I envision running it on every save -- that's obviously not possible yet.
 
 *** *Option 1C*
 *Cut out the DB altogether.*
@@ -241,7 +246,7 @@ With that done, you can optionally configure the everyday commands =org-node-fin
 #+end_src
 
 ** Node series
-Do you already know about "daily-notes"?  Then get started with this command:
+Do you already know about "daily-notes"?  Then get started with a keybinding such as:
 
 #+begin_src elisp
 (keymap-set global-map "M-s s" #'org-node-series-dispatch)
@@ -249,13 +254,14 @@ Do you already know about "daily-notes"?  Then get started with this command:
 
 and configure =org-node-series-defs= if needed.  See [[https://github.com/meedstrom/org-node/wiki/Configuring-series][wiki]].
 
+*** What are series?
 It's easiest to explain series if we use "daily-notes" (or "dailies") as an example of a series.
 
-A daily-note is the same idea as an [[https://github.com/bastibe/org-journal][org-journal]] entry: a file/entry where the title is just today's date.
+Roam's idea of a "daily-note" is the same as an [[https://github.com/bastibe/org-journal][org-journal]] entry: a file/entry where the title is just today's date.
 
 You don't need software for that basic idea, only to make it extra convenient to navigate them and jump back and forth in the series.
 
-Thus, fundamentally, any "journal" or "dailies" software are just operating on a sorted series.  I was resisting having to implement an equivalent to the Org-roam option =org-roam-dailies-directory=, so I ended up generalizing the concept and it's really powerful!
+Thus, fundamentally, any "journal" or "dailies" software are just operating on a sorted series to navigate through.  I was resisting having to implement an equivalent to the Org-roam option =org-roam-dailies-directory=, so I ended up generalizing the concept and it's really powerful!
 
 You could have series about, let's say, historical events, Star Trek episodes, your school curriculum...
 
@@ -286,10 +292,9 @@ It's not for everyone, but there is the option:
 #+end_src
 
 ** Let org-open-at-point detect refs
+Say there's a link to a web URL, and you've forgotten you also have a node listing that exact URL in its =ROAM_REFS= property.
 
-Say there's a link to a web URL, and you've forgot you also have a node listing that exact URL in its =ROAM_REFS= property.
-
-Wouldn't it be nice if, clicking on that link, you automatically visit that node instead of being sent to the web?  Here you go:
+Wouldn't it be nice if, clicking on that link, you automatically visit that node first instead of being sent to the web?  Here you go:
 
 #+begin_src elisp
 (add-hook 'org-open-at-point-functions
@@ -299,18 +304,22 @@ Wouldn't it be nice if, clicking on that link, you automatically visit that node
 ** Limitation: TRAMP
 Working over TRAMP is untested, but I suspect it won't work.  Org-node tries to be very fast, often nulling =file-name-handler-alist=, which TRAMP needs.
 
-The best way to change this is to [[https://github.com/meedstrom/org-node/issues][file an issue]] if you care :-)
+The best way to change this is to [[https://github.com/meedstrom/org-node/issues][file an issue]] to show you care :-)
 
 ** Limitation: unique titles
 If two ID-nodes exist with the same title, one of them disappears from minibuffer completions.
 
 That's just the nature of completion.  Other packages such as Roam have the same limitation.  Much can be said for embracing the uniqueness constraint, and org-node will print messages telling you about title collisions.
 
-Anyway... there's a workaround.  Assuming you leave =org-node-affixation-fn= at its default setting, just set =org-node-alter-candidates= to t.
+Anyway... there's a workaround.  Assuming you leave =org-node-affixation-fn= at its default setting, just add to initfiles:
 
-This lets you match against the node outline path and not only the title, which resolves most conflicts given that the most likely source of conflict is subheadings in disparate files, named the same.  [[https://fosstodon.org/@nickanderson/112249581810196258][Some people]] make this trick part of their workflow.
+#+begin_src elisp
+(setq org-node-alter-candidates t)
+#+end_src
 
-NB: this workaround won't help the in-buffer completions provided by =org-node-complete-at-point-mode=, but with some luck you won't notice.
+This lets you match against the node outline path and not only the title, which resolves most conflicts given that the most likely source of conflict is subheadings in disparate files, that happen to be named the same.  [[https://fosstodon.org/@nickanderson/112249581810196258][Some people]] make this trick part of their workflow.
+
+NB: this workaround won't help the in-buffer completions provided by =org-node-complete-at-point-mode=, but with a light peppering of luck this isn't something you'll ever have to notice.  (Work on Issue 38 for principled fix)
 
 ** Limitation: excluding notes
 The option =org-node-filter-fn= works well for excluding TODO items that happen to have an ID, and excluding org-drill items and that sort of thing, but beyond that, it has limited utility because unlike org-roam, *child ID nodes of an excluded node are not excluded!*
@@ -335,9 +344,9 @@ You can still find nodes with e.g. =:ROAM_REFS: &citekey=, just not see backlink
 
 ** Tip: On very slow filesystems
 
-I hear that on Termux on Android, filesystem access can be so slow that it's a pain to cycle dailies with org-roam. ([[https://github.com/meedstrom/org-node/issues/24#issuecomment-2278605819][11 seconds just to goto next daily]]!)
+I hear that on Termux on Android, filesystem access can be so slow that it's a pain to cycle dailies with org-roam ([[https://github.com/meedstrom/org-node/issues/24#issuecomment-2278605819][11 seconds just to goto next daily]]!).  A Redditor also said Apple NFS is not ideal for Emacs.
 
-Good news.  You can speed up some functions by making them look up org-node tables:
+Good news.  You can speed up some functions by making them look up org-node tables and avoid the filesystem:
 
 #+begin_src elisp
 (advice-add #'org-roam-list-files :override
@@ -378,11 +387,11 @@ Basic commands:
   - (Trivial) Shortcut for =org-insert-heading= + =org-node-nodeify-entry=
 - =org-node-grep=
   - (Requires [[https://github.com/minad/consult][consult]]) Grep across all known Org files.
-    - Very useful combined with [[https://github.com/oantolin/embark][embark]]-export & [[wgrep][wgrep]], to search-and-replace a given string everywhere in every directory, for example to rename a tag everywhere.
+    - Very useful combined with [[https://github.com/oantolin/embark][embark]]-export & [[wgrep][wgrep]], to search-and-replace a given string everywhere in every directory, for example to rename a tag once and for all.
     - This will use ripgrep if installed, otherwise it is very slow.
 - =org-node-fakeroam-show-roam-buffer=
-  - A different way to invoke the Roam buffer.  Display the buffer /or/ refresh it if it was already visible.  And a plot twist, if it was not visible, do not refresh until invoking it again.
-    - Useful if you have disabled the automatic redisplay, because then the command =org-roam-buffer-toggle= is way too clumsy.
+  - A different way to invoke the Roam buffer: display the buffer /or/ refresh it if it was already visible.  And a plot twist, if it was not visible, do not refresh until the second invocation.
+    - Useful if you have disabled the automatic redisplay, because the Roam command =org-roam-buffer-toggle= is not meant for that.
 
 Rarer commands:
 

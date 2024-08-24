@@ -23,6 +23,8 @@
 
 ;;; Code:
 
+;; TODO: Maybe use `dump-emacs-portable'
+
 (eval-when-compile
   (require 'cl-lib)
   (require 'subr-x))
@@ -40,6 +42,9 @@ OS and variable `temporary-file-directory'."
 
 (defun org-node-parser--make-todo-regexp (keywords-string)
   "Build a regexp from KEYWORDS-STRING.
+KEYWORDS-STRING is expected to be the sort of thing you see after
+a #+todo: or #+seq_todo: or #+typ_todo: keyword in an Org file.
+
 The resulting regexp should be able to match any of the TODO
 keywords within."
   (thread-last keywords-string
