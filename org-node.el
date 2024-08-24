@@ -685,6 +685,12 @@ SYNCHRONOUS t, unless SYNCHRONOUS is the symbol `must-async'."
       (funcall (timer--function org-node--retry-timer))
       (mapc #'accept-process-output org-node--processes))))
 
+;; FIXME:
+;; A heisenbug lurks in org-id.  (stackexchange link)
+;; Backtrace will show this, which makes no sense -- CLEARLY called on a list:
+;;     Debugger entered--Lisp error: (wrong-type-argument listp #<hash-table equal 3142/5277) 0x190d581ba129>
+;;       org-id-alist-to-hash((("/home/kept/roam/semantic-tabs-in-2024.org" "f21c984c-13f3-428c-8223-0dc1a2a694df") ("/home/kept/roam/semicolons-make-javascript-h..." "b40a0757-bff4-4188-b212-e17e3fc54e13") ...))
+;;       org-node--init-ids()
 (defun org-node--init-ids ()
   "Ensure that org-id is ready for use.
 
@@ -692,21 +698,33 @@ In broad strokes:
 - Run `org-id-locations-load' if needed.
 - Ensure `org-id-locations' is a hash table and not an alist.
 - Throw error if `org-id-locations' is still empty after this,
-  unless `org-node-extra-id-dirs' has members."
+  unless `org-node-extra-id-dirs' has members.
+- Wipe `org-id-locations' if it appears afflicted by
+  Schrödinger's org-id, a bug that makes the symbol value an
+  indeterminate superposition of one of two possible values \(a
+  hash table or an alist) depending on which code accesses it,
+  and tell the user to rebuild the value, since even org-id\\='s
+  internal functions are unable to work with it."
   (require 'org-id)
   (when (not org-id-track-globally)
     (user-error "Org-node requires `org-id-track-globally'"))
   (when (null org-id-locations)
     (when (file-exists-p org-id-locations-file)
-      (org-id-locations-load)))
+      (ignore-errors (org-id-locations-load))))
   (when (listp org-id-locations)
-    (setq org-id-locations (org-id-alist-to-hash org-id-locations)))
-  (when (hash-table-empty-p org-id-locations)
-    (org-id-locations-load)
-    (when (and (hash-table-empty-p org-id-locations)
-               (null org-node-extra-id-dirs))
-      (org-node--die
-       "org-id-locations empty, try `org-id-update-id-locations' or `org-roam-update-org-id-locations'"))))
+    (ignore-errors
+      (setq org-id-locations (org-id-alist-to-hash org-id-locations))))
+  (when (listp org-id-locations)
+    (setq org-id-locations nil)
+    (org-node--die
+     "Found org-id heisenbug!  Wiped org-id-locations, try `org-id-update-id-locations' or `org-roam-update-org-id-locations'"))
+  (when (hash-table-p org-id-locations)
+    (when (hash-table-empty-p org-id-locations)
+      (org-id-locations-load)
+      (when (and (hash-table-empty-p org-id-locations)
+                 (null org-node-extra-id-dirs))
+        (org-node--die
+         "org-id-locations empty, try `org-id-update-id-locations' or `org-roam-update-org-id-locations'")))))
 
 
 ;;;; Scanning
