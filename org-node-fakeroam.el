@@ -327,8 +327,8 @@ Designed to override `org-roam-reflinks-get'."
 ;; => (179.921311207 147 37.955398732)
 (defun org-node-fakeroam-db-rebuild ()
   "Wipe the Roam DB and rebuild."
+  (interactive)
   (when (require 'org-roam nil t)
-    (interactive)
     (org-node-cache-ensure)
     (org-roam-db--close)
     (delete-file org-roam-db-location)
