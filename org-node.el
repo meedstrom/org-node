@@ -3069,17 +3069,19 @@ In case of unsolvable problems, how to wipe org-id-locations:
              (fboundp 'consult--grep-make-builder)
              (fboundp 'consult--ripgrep-make-builder)
              (boundp 'consult-ripgrep-args))
-    (let ((consult-ripgrep-args (concat consult-ripgrep-args " --type=org")))
-      (if (executable-find "rg")
-          (consult--grep "Ripgrep in all known Org files: "
-                         #'consult--ripgrep-make-builder
-                         (org-node--root-dirs (org-node-list-files t))
-                         nil)
-        ;; Old, much slower
-        (consult--grep "Grep in all known Org files: "
-                       #'consult--grep-make-builder
-                       (org-node-list-files)
-                       nil)))))
+    (cl-letf (((symbol-function #'file-relative-name)
+               (lambda (name &optional _dir) name)))
+      (let ((consult-ripgrep-args (concat consult-ripgrep-args " --type=org")))
+        (if (executable-find "rg")
+            (consult--grep "Ripgrep in all known Org files: "
+                           #'consult--ripgrep-make-builder
+                           (org-node--root-dirs (org-node-list-files t))
+                           nil)
+          ;; Much slower, no --type=org means must target files and not dirs
+          (consult--grep "Grep in all known Org files: "
+                         #'consult--grep-make-builder
+                         (org-node-list-files)
+                         nil))))))
 
 (defvar org-node--linted nil
   "List of files linted so far.")
