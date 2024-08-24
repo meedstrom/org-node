@@ -2382,6 +2382,41 @@ Also add a corresponding entry to `org-node-series-dispatch'."
                       'incompatible)
           (list (seq-uniq (cons key old))))))
 
+;; These suffixes just exist due to a linter complaint, could
+;; have been lambdas
+
+(transient-define-suffix org-node--series-goto-previous* (args)
+  (interactive (list (transient-args 'org-node-series-dispatch)))
+  (if args
+      (org-node--series-goto-previous (car args))
+    (message "Choose series before navigating")))
+
+(transient-define-suffix org-node--series-goto-next* (args)
+  (interactive (list (transient-args 'org-node-series-dispatch)))
+  (if args
+      (org-node--series-goto-next (car args))
+    (message "Choose series before navigating")))
+
+(transient-define-suffix org-node--series-jump* (args)
+  (interactive (list (transient-args 'org-node-series-dispatch)))
+  (if args
+      (org-node--series-jump (car args))
+    (message "Choose series before navigating")))
+
+(transient-define-suffix org-node--series-capture (args)
+  (interactive (list (transient-args 'org-node-series-dispatch)))
+  (if args
+      (progn (setq org-node-current-series-key (car args))
+             (unwind-protect
+                 (let* ((series (cdr (assoc (car args) org-node--series)))
+                        (capture-keys (plist-get series :capture)))
+                   (if capture-keys
+                       (org-capture nil capture-keys)
+                     (message "No capture template for series %s"
+                              (plist-get series :name))))
+               (setq org-node-current-series-key nil)))
+    (message "Choose series before navigating")))
+
 ;;;###autoload (autoload 'org-node-series-dispatch "org-node" nil t)
 (transient-define-prefix org-node-series-dispatch ()
   :incompatible '(("d"))
@@ -2389,41 +2424,10 @@ Also add a corresponding entry to `org-node-series-dispatch'."
    ("|" "Invisible" "Placeholder" :if-nil t)
    ("d" "Dailies" "d")]
   ["Navigation"
-   ("p" "Previous in series"
-    (lambda (args)
-      (interactive (list (transient-args 'org-node-series-dispatch)))
-      (if args
-          (org-node--series-goto-previous (car args))
-        (message "Choose series before navigating")))
-    :transient t)
-   ("n" "Next in series"
-    (lambda (args)
-      (interactive (list (transient-args 'org-node-series-dispatch)))
-      (if args
-          (org-node--series-goto-next (car args))
-        (message "Choose series before navigating")))
-    :transient t)
-   ("j" "Jump (or create)"
-    (lambda (args)
-      (interactive (list (transient-args 'org-node-series-dispatch)))
-      (if args
-          (org-node--series-jump (car args))
-        (message "Choose series before navigating"))))
-   ("c" "Capture into"
-    (lambda (args)
-      (interactive (list (transient-args 'org-node-series-dispatch)))
-      (if args
-          (progn
-            (setq org-node-current-series-key (car args))
-            (unwind-protect
-                (let* ((series (cdr (assoc (car args) org-node--series)))
-                       (capture-keys (plist-get series :capture)))
-                  (if capture-keys
-                      (org-capture nil capture-keys)
-                    (message "No capture template for series %s"
-                             (plist-get series :name))))
-              (setq org-node-current-series-key nil)))
-        (message "Choose series before navigating"))))])
+   ("p" "Previous in series" org-node--series-goto-previous* :transient t)
+   ("n" "Next in series" org-node--series-goto-next* :transient t)
+   ("j" "Jump (or create)" org-node--series-jump*)
+   ("c" "Capture into" org-node--series-capture)])
 
 (defcustom org-node-series-that-marks-calendar nil
   "Key for the series that should mark days in the calendar.

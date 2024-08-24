@@ -70,12 +70,15 @@
     (remove-hook 'before-save-hook
                  #'org-node-backlink--fix-flagged-parts-of-buffer t)))
 
+(defun org-node-backlink--enable ()
+  "Enable `org-node-backlink-mode' if buffer is Org-mode."
+  (when (derived-mode-p 'org-mode)
+    (org-node-backlink-mode)))
+
 ;;;###autoload
 (define-globalized-minor-mode org-node-backlink-global-mode
   org-node-backlink-mode
-  (lambda ()
-    (when (derived-mode-p 'org-mode)
-      (org-node-backlink-mode)))
+  org-node-backlink--enable
   :group 'org-node)
 
 
