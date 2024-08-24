@@ -45,21 +45,22 @@ defer compiling org-node-fakeroam.el until runtime after ensuring
 that org-roam is available."
   (if (not (require 'org-roam nil t))
       (user-error "Install org-roam to use org-node-fakeroam library")
-    ;; NOTE: Do not native-compile, it would be a slow init every time
-    (mapc #'byte-compile
-          '(org-node-fakeroam--run-without-fontifying
-            org-node-fakeroam--accelerate-get-contents
-            org-node-fakeroam--mk-node
-            org-node-fakeroam--mk-backlinks
-            org-node-fakeroam--mk-reflinks
-            org-node-fakeroam--db-update-files
-            org-node-fakeroam--db-add-file-level-data
-            org-node-fakeroam--db-add-node
-            org-node-fakeroam-db-rebuild
-            org-node-fakeroam-list-files
-            org-node-fakeroam-list-dailies
-            org-node-fakeroam-daily-note-p
-            org-node-fakeroam-daily-create))))
+    (dolist (fn '(org-node-fakeroam--run-without-fontifying
+                  org-node-fakeroam--accelerate-get-contents
+                  org-node-fakeroam--mk-node
+                  org-node-fakeroam--mk-backlinks
+                  org-node-fakeroam--mk-reflinks
+                  org-node-fakeroam--db-update-files
+                  org-node-fakeroam--db-add-file-level-data
+                  org-node-fakeroam--db-add-node
+                  org-node-fakeroam-db-rebuild
+                  org-node-fakeroam-list-files
+                  org-node-fakeroam-list-dailies
+                  org-node-fakeroam-daily-note-p
+                  org-node-fakeroam-daily-create))
+      (unless (compiled-function-p (symbol-function fn))
+        ;; NOTE: Do not native-compile, it would be a slow init every time
+        (byte-compile fn)))))
 
 ;;;###autoload
 (define-minor-mode org-node-fakeroam-redisplay-mode
