@@ -176,6 +176,10 @@ hardcoded strings."
 (define-obsolete-function-alias
   'org-node-helper/filename->ymd #'org-node-helper-filename->ymd   "2024-08-24")
 
+(define-obsolete-function-alias
+  'org-node-helper/mk-series-with-tag-sorted-by-property
+  #'org-node-mk-series-on-tag-sorted-by-property "2024-08-24")
+
 (provide 'org-node-changes)
 
 ;;; org-node-changes.el ends here
