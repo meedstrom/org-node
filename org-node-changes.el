@@ -41,7 +41,7 @@
 Warn if any old name in `org-node-changes--new-names' is bound.  Then
 copy the value in the old name so that the new name gets the same
 value."
-  ;; Bonus: a hook changed
+  ;; Bonus: a hook changed, warn if used in old way
   (cl-loop
    for fn in org-node-insert-link-hook
    when (and (help-function-arglist fn)
