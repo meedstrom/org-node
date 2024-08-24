@@ -2745,8 +2745,7 @@ out, with any year, month or day."
                               "[[:digit:]]+" "[[:digit:]]+"
                               (replace-regexp-in-string
                                "[[:alpha:]]+" "[[:alpha:]]+"
-                               example t)))
-                            "$"))))))
+                               example t)))))))))
   (cdr org-node--make-regexp-for-time-format))
 ;; (memoize #'org-node--make-regexp-for-time-format nil)
 
