@@ -35,23 +35,20 @@
     (org-node-series org-node-series-defs "15 September 2024"))
   "Alist of deprecated symbol names and their new names.")
 
-(defun org-node-changes--insert-link-hook-new-args (&rest args)
-  (remove-hook 'org-node-insert-link-hook
-               #'org-node-changes--insert-link-hook-new-args)
-  (when args
-    (display-warning
-     'org-node "Hook `org-node-insert-link-hook' has changed, now passes no arguments")))
-
 (defun org-node-changes--warn-and-copy ()
   "Maybe print one-shot warnings, then become a no-op.
 
 Warn if any old name in `org-node-changes--new-names' is bound.  Then
 copy the value in the old name so that the new name gets the same
 value."
-  ;; Extra
-  (add-hook 'org-node-insert-link-hook
-            #'org-node-changes--insert-link-hook-new-args
-            -99)
+  ;; Bonus: a hook changed
+  (cl-loop
+   for fn in org-node-insert-link-hook
+   when (and (help-function-arglist fn)
+             (not (member (car (help-function-arglist fn))
+                          '(&optional &rest &body))))
+   return (display-warning
+           'org-node "Hook `org-node-insert-link-hook' has changed, now passes no arguments"))
   (while-let ((row (pop org-node-changes--new-names)))
     (seq-let (old new removed-by) row
       (unless removed-by
