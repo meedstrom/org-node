@@ -23,7 +23,9 @@
 
 ;;; Code:
 
-;; TODO: Maybe use `dump-emacs-portable'
+;; TODO: Maybe use `dump-emacs-portable' to dump an image of a running emacs
+;;       with this library loaded, so we can skip the time it takes to load the
+;;       library.
 
 (eval-when-compile
   (require 'cl-lib)
@@ -54,16 +56,20 @@ keywords within."
                (split-string)
                (regexp-opt)))
 
-;; TODO: Actually return the cdr, not the index...
-(defun org-node-parser--elem-index (elem list)
-  "Return first index of ELEM in LIST."
-  (let ((i 0))
-    (while (and list (not (equal elem (car list))))
-      (setq i (1+ i))
-      (setq list (cdr list)))
-    i))
+(defun org-node-parser--memq-car (key alist)
+  "Like `memq', but check the `car' of each member.
+In other words, recurse into the `cdr' of ALIST until the `caar'
+is `eq' to KEY.  This may sound like `assq', but `assq' returns
+only one item, while this returns the entire remainder of ALIST."
+  (while (and alist (not (eq key (caar alist))))
+    (setq alist (cdr alist)))
+  (or alist
+      ;; (We have the luxury of hard-coding a specific error message since
+      ;; this function is only used for one purpose)
+      (error "Broken algo: HEADING-POS %s not found in OLDATA %s"
+             key alist)))
 
-;; TODO: Merge with `org-node-parser--pos->olp'
+;; TODO: Merge with `org-node-parser--pos->olp'?
 (defun org-node-parser--pos->parent-id (oldata pos file-id)
   "Return ID of the closest ancestor heading that has an ID.
 See `org-node-parser--pos->olp' for explanation of OLDATA and POS.
@@ -71,9 +77,7 @@ See `org-node-parser--pos->olp' for explanation of OLDATA and POS.
 Extra argument FILE-ID is the file-level id, used as a fallback
 if no ancestor heading has an ID.  It can be nil."
   (let (;; Drop all the data about positions below HEADING-POS
-        (data-until-pos
-         (nthcdr (org-node-parser--elem-index (assq pos oldata) oldata)
-                 oldata)))
+        (data-until-pos (org-node-parser--memq-car pos oldata)))
     (let ((previous-level (nth 2 (car data-until-pos))))
       ;; Work backwards towards the top of the file
       (cl-loop for row in data-until-pos
@@ -104,17 +108,11 @@ order, such that the last heading in the file is represented in
 the first element.  An exact match for POS must also be included
 in one of the elements."
   (let* (olp
-         (pos-data (or (assq pos oldata)
-                       (error "Broken algo: HEADING-POS %s not found in OLDATA %s"
-                              pos oldata)))
-         ;; Drop all the data about positions below HEADING-POS (using `nthcdr'
-         ;; because oldata is in reverse order)
-         ;; TODO: Is it faster to do (ntake (nreverse ...))?
-         (data-until-pos (nthcdr (org-node-parser--elem-index pos-data oldata)
-                                 oldata)))
+         ;; Drop all the data about positions below HEADING-POS
+         (data-until-pos (org-node-parser--memq-car pos oldata)))
     (let ((previous-level (caddr (car data-until-pos))))
       ;; Work backwards towards the top of the file
-      ;; NOTE: Profiled dolist and catch-while-throw too, `cl-loop' wins at perf
+      ;; NOTE: Profiled dolist and while-catch pattern, `cl-loop' wins at perf
       (cl-loop for row in data-until-pos
                when (> previous-level (caddr row))
                do (setq previous-level (caddr row))
