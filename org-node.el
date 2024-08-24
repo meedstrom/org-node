@@ -2827,8 +2827,8 @@ Internal argument INTERACTIVE is automatically set."
                                 (format-time-string org-node-datestamp-format)))
                (new-name (concat
                           date-prefix (funcall org-node-slug-fn title) ".org"))
-               (new-path (file-name-concat (file-name-directory path) new-name))
-               (visible-window (get-buffer-window buf)))
+               (new-path (file-name-concat (file-name-directory path) new-name)))
+
           (cond
            ((equal path new-path)
             (when interactive
@@ -2854,15 +2854,25 @@ Internal argument INTERACTIVE is automatically set."
                             new-path))))
            ((or (not interactive)
                 (y-or-n-p (format "Rename file %s to %s?" name new-name)))
-            ;; Kill buffer before renaming, because it will not
-            ;; follow the rename
-            (kill-buffer buf)
-            (rename-file path new-path)
-            (let ((new-buf (find-file-noselect new-path)))
-              ;; Don't let remaining save-hooks operate on some random buffer!
-              (set-buffer new-buf)
-              (when visible-window
-                (set-window-buffer visible-window new-buf)))
+            (let* ((pt (point))
+                   (visible-window (get-buffer-window buf))
+                   (window-start (window-start visible-window)))
+              ;; Kill buffer before renaming, because it will not
+              ;; follow the rename
+              (kill-buffer buf)
+              (rename-file path new-path)
+              (let ((new-buf (find-file-noselect new-path)))
+                ;; Don't let remaining hooks operate on some random buffer
+                (set-buffer new-buf)
+                ;; Helpfully go back to where point was
+                (when visible-window
+                  (set-window-buffer-start-and-point
+                   visible-window new-buf window-start pt))
+                (with-current-buffer new-buf
+                  (goto-char pt)
+                  (if (org-at-heading-p)
+                      (org-show-entry)
+                    (org-show-context)))))
             (message "File %s renamed to %s" name new-name)))))))))
 
 ;;;###autoload
