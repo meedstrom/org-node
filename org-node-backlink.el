@@ -141,7 +141,7 @@ If REMOVE? is non-nil, remove the property."
 If REMOVE? is non-nil, remove it instead."
   (if remove?
       (org-entry-delete nil "BACKLINKS")
-    (when-let* ((id (org-node-id-at-point))
+    (when-let* ((id (org-entry-get nil "ID"))
                 (node (gethash id org-node--id<>node)))
       (catch 'break
         (let* ((sorted-uuids (thread-last
@@ -253,7 +253,7 @@ purely deleted, it flags the preceding and succeeding char."
   (when org-node-backlink-mode
     (with-silent-modifications
       (if (= beg end)
-          (put-text-property (max (1- beg) 1)
+          (put-text-property (max (1- beg) (point-min))
                              (min (1+ end) (point-max))
                              'org-node-flag t)
         (put-text-property beg end 'org-node-flag t)))))
