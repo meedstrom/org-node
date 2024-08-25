@@ -115,7 +115,8 @@
 Not run after a full cache reset, only after e.g. a file is
 saved or renamed causing an incremental update to the cache.
 
-Called with one argument: the list of files re-scanned."
+Called with one argument: the list of files re-scanned.  It may
+include deleted files."
   :group 'org-node
   :type 'hook)
 
@@ -743,23 +744,14 @@ In broad strokes:
 (defvar org-node--wait-start nil)
 (defvar org-node--full-scan-requested nil)
 
-;; REVIEW: It used to be a safety feature to only allow one scan at a time, but
-;; it's no longer needed.  The only blocker to simplifying this is that
-;; `org-node-rescan-functions' must be reliable.  And I do not think the
-;; solution is to let the finalize-full compare mtimes and run it, because of
-;; the risk that it's a very large list of files.
-;; Perhaps I can simplify by just removing that hook and making db-feed-mode work in a different, hardcoded way.
-;; Speaking of which, that thing does not handle deleted files!
-
-;; Remove this function by simply allowing multiple simultaneous scans.
-;;         However, a bunch of code needs rewrite before
-;;       we can remove this.
+;; I'd like to remove this code, but complexity arises elsewhere if I do.
+;; This makes things easy to reason about.
 (defun org-node--try-launch-scan (&optional files)
   "Launch processes to scan FILES, or wait if processes active.
 
-This ensures that multiple calls occurring in a short time \(like when
-multiple files are being renamed) will be handled
-eventually and not dropped.
+This ensures that multiple calls occurring in a short time \(like
+when multiple files are being renamed) will be handled eventually
+and not dropped, making `org-node-rescan-functions' trustworthy.
 
 If FILES is t, do a full reset of the cache."
   (if (eq t files)
@@ -1048,20 +1040,20 @@ to FINALIZER."
   (clrhash org-node--title<>id)
   (clrhash org-node--ref<>id)
   (setq org-node--collisions nil) ;; To be populated by `org-node--record-node'
-  (seq-let (missing-files file<>mtime nodes path<>type links problems) results
+  (seq-let (missing-files found.mtime nodes path.type links problems) results
     (org-node--forget-id-locations missing-files)
     (dolist (file missing-files)
       (remhash file org-node--file<>mtime))
-    (dolist (pair file<>mtime)
-      ;; Expire stale data for `org-node-fakeroam--accelerate-get-contents'
-      (unless (equal (cdr pair)
-                     (gethash (car pair) org-node--file<>mtime))
-        (puthash (car pair) (cdr pair) org-node--file<>mtime)
-        (remhash (car pair) org-node--file<>previews)))
     (dolist (link links)
       (push link (gethash (org-node-link-dest link) org-node--dest<>links)))
-    (dolist (pair path<>type)
+    (dolist (pair path.type)
       (puthash (car pair) (cdr pair) org-node--uri-path<>uri-type))
+    (cl-loop for (path . type) in path.type
+             do (puthash path type org-node--uri-path<>uri-type))
+    (cl-loop for (file . mtime) in found.mtime
+             do (unless (equal mtime (gethash file org-node--file<>mtime))
+                  (puthash file mtime org-node--file<>mtime)
+                  (remhash file org-node--file<>previews)))
     (dolist (node nodes)
       (org-node--record-node node))
     ;; (org-id-locations-save) ;; 10% of exec time on my machine
@@ -1088,8 +1080,8 @@ to FINALIZER."
 
 (defun org-node--finalize-modified (results)
   "Use RESULTS to update tables."
-  (seq-let (missing-files file<>mtime nodes path<>type links problems) results
-    (let ((found-files (mapcar #'car file<>mtime)))
+  (seq-let (missing-files found.mtime nodes path.type links problems) results
+    (let ((found-files (mapcar #'car found.mtime)))
       (org-node--forget-id-locations missing-files)
       (dolist (file missing-files)
         (remhash file org-node--file<>mtime))
@@ -1120,14 +1112,12 @@ to FINALIZER."
         ;; re-scanned nodes, it's safe to add them (again).
         (dolist (link links)
           (push link (gethash (org-node-link-dest link) org-node--dest<>links))))
-      (dolist (pair file<>mtime)
-        ;; Expire stale data for `org-node-fakeroam--accelerate-get-contents'
-        (unless (equal (cdr pair)
-                       (gethash (car pair) org-node--file<>mtime))
-          (remhash (car pair) org-node--file<>previews)
-          (puthash (car pair) (cdr pair) org-node--file<>mtime)))
-      (dolist (pair path<>type)
-        (puthash (car pair) (cdr pair) org-node--uri-path<>uri-type))
+      (cl-loop for (path . type) in path.type
+               do (puthash path type org-node--uri-path<>uri-type))
+      (cl-loop for (file . mtime) in found.mtime
+               do (unless (equal mtime (gethash file org-node--file<>mtime))
+                    (puthash file mtime org-node--file<>mtime)
+                    (remhash file org-node--file<>previews)))
       (dolist (node nodes)
         (org-node--record-node node))
       (dolist (pbm problems)
@@ -1135,7 +1125,7 @@ to FINALIZER."
       (when problems
         (message "org-node found issues, see M-x org-node-list-scan-problems"))
       (run-hook-with-args 'org-node-rescan-functions
-                          (nconc found-files missing-files)))))
+                          (append missing-files found-files)))))
 
 (defcustom org-node-perf-eagerly-update-link-tables t
   "Update backlink tables on every save.
