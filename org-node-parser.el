@@ -24,8 +24,8 @@
 ;;; Code:
 
 ;; TODO: Maybe use `dump-emacs-portable' to dump an image of a running emacs
-;;       with this library loaded, so we can skip the time it takes to load the
-;;       library.
+;;       with this library loaded, so each new subprocess can start there and
+;;       skip the time it takes to load the library.
 
 (eval-when-compile
   (require 'cl-lib)
@@ -60,7 +60,7 @@ keywords within."
   "Like `memq', but check the `car' of each member.
 In other words, recurse into the `cdr' of ALIST until the `caar'
 is `eq' to KEY.  This may sound like `assq', but `assq' returns
-only one item, while this returns the entire remainder of ALIST."
+only one item, while this returns the entire tail of ALIST."
   (while (and alist (not (eq key (caar alist))))
     (setq alist (cdr alist)))
   (or alist

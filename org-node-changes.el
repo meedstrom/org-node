@@ -63,7 +63,7 @@ value."
   ;; (cl-loop
   ;;  for fn in org-node-insert-link-hook
   ;;  when (and (help-function-arglist fn)
-  ;;            (not (member (car (help-function-arglist fn))
+  ;;            (not (member (car-safe (help-function-arglist fn))
   ;;                         '(&optional &rest &body))))
   ;;  return (display-warning
   ;;          'org-node "Hook `org-node-insert-link-hook' has changed, now passes no arguments"))

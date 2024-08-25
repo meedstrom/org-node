@@ -55,9 +55,8 @@
                   #'org-node-backlink--flag-buffer-modification nil t)
         (add-hook 'before-save-hook
                   #'org-node-backlink--fix-flagged-parts-of-buffer nil t)
-        ;; We won't clean up this advice when the mode is turned off, because
-        ;; it's a buffer-local mode and advices cannot be buffer-local, but
-        ;; it's OK because it's made to no-op where the mode is inactive.
+        ;; Advices cannot be buffer-local, so we leave this advice on even
+        ;; after the mode is disabled.  It no-ops where the mode is inactive.
         (advice-add 'org-insert-link :after
                     #'org-node-backlink--add-in-target)
         (org-node-cache-ensure 'must-async))

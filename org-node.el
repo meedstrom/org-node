@@ -85,6 +85,7 @@
 (require 'subr-x)
 (require 'seq)
 (require 'transient)
+(require 'find-func)
 (require 'bytecomp)
 (require 'persist)
 (require 'compat)
@@ -937,7 +938,6 @@ function to update current tables."
             (message "Maybe disable editorconfig-mode while debugging"))
           (setq org-node--first-init nil)
           (load-file compiled-lib)
-          (garbage-collect)
           (setq org-node--time-at-scan-begin (current-time))
           (with-current-buffer (get-buffer-create "*org-node debug*")
             (when (eq 'show org-node--debug)
@@ -952,6 +952,9 @@ function to update current tables."
              (n-jobs (length file-lists))
              (gc-ultra (let ((default-directory invocation-directory))
                          (/ (* 1000 (car (memory-info))) n-jobs))))
+        ;; TODO: Maybe also go back to default 800kB GC if we're dealing with
+        ;;       more than ~1GB of org files. (Someone pandocs SciHub into org
+        ;;       for fun?)
         (when (< gc-ultra (* 50 1000 1000))
           (setq gc-ultra (car (get 'gc-cons-threshold 'standard-value))))
         (dotimes (i n-jobs)
@@ -967,15 +970,10 @@ function to update current tables."
                  :stderr (get-buffer-create org-node--stderr-name)
                  :command
                  ;; Ensure the children run the same binary executable as
-                 ;; this Emacs, so the compiled-lib fits
+                 ;; current Emacs, so the compiled-lib fits
                  (list (file-name-concat invocation-directory invocation-name)
                        "--quick"
                        "--batch"
-                       ;; TODO: This assumes the threshold will never be hit,
-                       ;; but maybe someone does something crazy like pandoc
-                       ;; the entirety of SciHub into .org for fun?  Maybe sum
-                       ;; the filesizes and go back to default 800kB GC if
-                       ;; we're dealing with more than like 1GB of org files.
                        "--eval" (format "(setq gc-cons-threshold %d)" gc-ultra)
                        "--eval" (format "(setq $i %d)" i)
                        "--eval" (format "(setq temporary-file-directory \"%s\")"
@@ -1032,9 +1030,9 @@ to FINALIZER."
         (if editorconfig
             (advice-add #'insert-file-contents :around
                         'editorconfig--advice-insert-file-contents)))
-      (run-hooks 'org-node-before-update-tables-hook)
       (setq org-node--time-at-last-child-done
             (-last-item (sort (-map #'-last-item result-sets) #'time-less-p)))
+      (run-hooks 'org-node-before-update-tables-hook)
       ;; Merge N result-sets into one result-set, to run FINALIZER once
       (funcall finalizer (--reduce (-zip-with #'nconc it acc) result-sets)))))
 
@@ -1060,8 +1058,8 @@ to FINALIZER."
       ;; Expire stale data for `org-node-fakeroam--accelerate-get-contents'
       (unless (equal (cdr pair)
                      (gethash (car pair) org-node--file<>mtime))
-        (remhash (car pair) org-node--file<>previews)
-        (puthash (car pair) (cdr pair) org-node--file<>mtime)))
+        (puthash (car pair) (cdr pair) org-node--file<>mtime)
+        (remhash (car pair) org-node--file<>previews)))
     (dolist (link links)
       (push link (gethash (org-node-link-dest link) org-node--dest<>links)))
     (dolist (pair path<>type)
@@ -1069,6 +1067,7 @@ to FINALIZER."
     (dolist (node nodes)
       (org-node--record-node node))
     ;; (org-id-locations-save) ;; 10% of exec time on my machine
+    (setq org-node--series nil)
     (dolist (def org-node-series-defs)
       (org-node--build-series def))
     (setq org-node--time-elapsed
@@ -2354,10 +2353,16 @@ Also add a corresponding entry to `org-node-series-dispatch'."
      into items
      finally do
      (setf (alist-get (car def) org-node--series nil nil #'equal)
-           (nconc (cl-loop for elt in (cdr def)
-                           if (functionp elt)
-                           collect (org-node--ensure-compiled elt)
-                           else collect elt)
+           (nconc (if org-node--first-init
+                      ;; Faster first-time caching
+                      (cl-loop for elt in (cdr def)
+                               if (functionp elt)
+                               collect (byte-compile elt)
+                               else collect elt)
+                    (cl-loop for elt in (cdr def)
+                             if (functionp elt)
+                             collect (org-node--ensure-compiled elt)
+                             else collect elt))
                   (list :key (car def)
                         :sorted-items
                         ;; Using `string>' due to most recent dailies probably
