@@ -143,30 +143,33 @@ If REMOVE? is non-nil, remove it instead."
       (org-entry-delete nil "BACKLINKS")
     (when-let* ((id (org-node-id-at-point))
                 (node (gethash id org-node--id<>node)))
-      (let* ((sorted-uuids (thread-last
-                             (append (org-node-get-id-links node)
-                                     (org-node-get-reflinks node))
-                             (-map #'org-node-link-origin)
-                             (-uniq)
-                             (-non-nil) ;; REVIEW: no nils anymore, I hope
-                             (-sort #'string-lessp)))
-             (links (cl-loop
-                     for origin in sorted-uuids
-                     collect
-                     (concat "\""
-                             (org-link-make-string
-                              (concat "id:" origin)
-                              (org-node-get-title
-                               (or (gethash origin org-node--id<>node)
-                                   ;; TODO: just launch a reset
-                                   (error "ID in backlink tables not known to main org-nodes table: %s"
-                                          origin))))
-                             "\"")))
-             (links-string (string-join links " ")))
-        (if links
-            (unless (equal links-string (org-entry-get nil "BACKLINKS"))
-              (org-entry-put nil "BACKLINKS" links-string))
-          (org-entry-delete nil "BACKLINKS"))))))
+      (catch 'break
+        (let* ((sorted-uuids (thread-last
+                               (append (org-node-get-id-links node)
+                                       (org-node-get-reflinks node))
+                               (-map #'org-node-link-origin)
+                               (-uniq)
+                               (-non-nil) ;; REVIEW: no nils anymore, I hope
+                               (-sort #'string-lessp)))
+               (links (cl-loop
+                       for origin in sorted-uuids
+                       as origin-node = (gethash origin org-node--id<>node)
+                       if origin-node
+                       collect (org-link-make-string
+                                (concat "id:" origin)
+                                (org-node-get-title origin-node))
+                       else do
+                       (message "Backlink tables mention an ID not in `org-nodes' table, resetting...")
+                       (push (lambda ()
+                               (message "Backlink tables mention an ID not in `org-nodes' table, resetting... done"))
+                             org-node--temp-extra-fns)
+                       (org-node--scan-all)
+                       (throw 'break t)))
+               (links-string (string-join links "  ")))
+          (if links
+              (unless (equal links-string (org-entry-get nil "BACKLINKS"))
+                (org-entry-put nil "BACKLINKS" links-string))
+            (org-entry-delete nil "BACKLINKS")))))))
 
 (defun org-node-backlink--fix-flagged-parts-of-buffer ()
   "Fix backlinks around parts of buffer that have been modified.
@@ -330,9 +333,9 @@ purely deleted, it flags the preceding and succeeding char."
 
 (defun org-node-backlink--add-at (target-id src-title src-id)
   "Add a backlink at TARGET-ID.
-Seek the :ID: property in buffer that matches TARGET-ID, then
-compose a link string out of SRC-ID and SRC-TITLE and insert it
-in the nearby :BACKLINKS: property."
+Seek the :ID: property in current buffer that matches TARGET-ID,
+then compose a link string out of SRC-ID and SRC-TITLE and insert
+it in the nearby :BACKLINKS: property."
   (goto-char (point-min))
   (if (not (re-search-forward
             (concat "^[ \t]*:id: +" (regexp-quote target-id))
@@ -347,16 +350,21 @@ in the nearby :BACKLINKS: property."
     (let ((current-backlinks-value (org-entry-get nil "BACKLINKS"))
           (src-link (org-link-make-string (concat "id:" src-id) src-title))
           new-value)
+      (and current-backlinks-value
+           (string-search "\f" current-backlinks-value)
+           (error "Form-feed character in BACKLINKS property near %d in %s"
+                  (point) buffer-file-name))
       (if current-backlinks-value
           ;; Build a temp list to check we don't add the same link twice.
           ;; There is an Org builtin `org-entry-add-to-multivalued-property',
           ;; but we cannot use it since the link descriptions may contain
-          ;; spaces.
+          ;; spaces.  Further, they may contain quotes(!), so we cannot use
+          ;; `split-string-and-unquote', thus this technique.  That's why we do
+          ;; not bother to wrap the links in quotes.
           (let ((links (split-string (replace-regexp-in-string
-                                      "]][\s\t\"]+\\[\\["
+                                      "]][\s\t]+\\[\\["
                                       "]]\f[["
-                                      (string-trim current-backlinks-value
-                                                   "[\s\t\"]+" "[\s\t\"]+"))
+                                      (string-trim current-backlinks-value))
                                      "\f")))
             (dolist (dup (--filter (string-search src-id it) links))
               (setq links (remove dup links)))
@@ -366,10 +374,8 @@ in the nearby :BACKLINKS: property."
             ;; Enforce deterministic order to prevent unnecessarily reordering
             ;; every time a node is linked that already has the backlink
             (sort links #'string-lessp)
-            (setq new-value (string-join
-                             (--map (concat "\"" it "\"") links)
-                             " ")))
-        (setq new-value (concat "\"" src-link "\"")))
+            (setq new-value (string-join links "  ")))
+        (setq new-value src-link))
       (unless (equal current-backlinks-value new-value)
         (let ((after-change-functions
                (remq 'org-node-backlink--flag-buffer-modification
