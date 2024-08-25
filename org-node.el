@@ -1050,6 +1050,12 @@ to FINALIZER."
     (org-node--forget-id-locations missing-files)
     (dolist (file missing-files)
       (remhash file org-node--file<>mtime))
+    (dolist (pair file<>mtime)
+      ;; Expire stale data for `org-node-fakeroam--accelerate-get-contents'
+      (unless (equal (cdr pair)
+                     (gethash (car pair) org-node--file<>mtime))
+        (puthash (car pair) (cdr pair) org-node--file<>mtime)
+        (remhash (car pair) org-node--file<>previews)))
     (dolist (link links)
       (push link (gethash (org-node-link-dest link) org-node--dest<>links)))
     (dolist (pair path<>type)
@@ -1057,16 +1063,6 @@ to FINALIZER."
     (dolist (node nodes)
       (org-node--record-node node))
     ;; (org-id-locations-save) ;; 10% of exec time on my machine
-    (cl-loop
-     for (file . mtime) in file<>mtime
-     unless (equal mtime (gethash file org-node--file<>mtime))
-     do
-     (puthash file mtime org-node--file<>mtime)
-     (remhash file org-node--file<>previews)
-     and collect file into changed
-     finally do
-     (unless org-node--first-init
-       (run-hook-with-args 'org-node-rescan-functions changed)))
     (setq org-node--series nil)
     (dolist (def org-node-series-defs)
       (org-node--build-series def))
@@ -1123,6 +1119,7 @@ to FINALIZER."
         (dolist (link links)
           (push link (gethash (org-node-link-dest link) org-node--dest<>links))))
       (dolist (pair file<>mtime)
+        ;; Expire stale data for `org-node-fakeroam--accelerate-get-contents'
         (unless (equal (cdr pair)
                        (gethash (car pair) org-node--file<>mtime))
           (remhash (car pair) org-node--file<>previews)
