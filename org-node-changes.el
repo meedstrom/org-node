@@ -59,15 +59,13 @@ value."
           (lwarn 'org-node :warning "Your initfiles key-bind a removed command: %S"
                  old)))))
   ;; Bonus: a hook changed, warn if used in old way
-  ;; FIXME: Leads to (wrong-type-argument listp t).
-  ;; (cl-loop
-  ;;  for fn in org-node-insert-link-hook
-  ;;  when (and (help-function-arglist fn)
-  ;;            (not (member (car-safe (help-function-arglist fn))
-  ;;                         '(&optional &rest &body))))
-  ;;  return (display-warning
-  ;;          'org-node "Hook `org-node-insert-link-hook' has changed, now passes no arguments"))
-  )
+  (cl-loop
+   for fn in org-node-insert-link-hook
+   when (and (help-function-arglist fn)
+             (not (member (car-safe (help-function-arglist fn))
+                          '(&optional &rest &body))))
+   return (display-warning
+           'org-node "Hook `org-node-insert-link-hook' has changed, now passes no arguments")))
 
 (defmacro org-node-changes--def-whiny-alias (old new &optional interactive when removed-by)
   "Define OLD as effectively an alias for NEW.
@@ -159,14 +157,6 @@ hardcoded strings."
 (define-obsolete-function-alias
   'org-node-series-menu #'org-node-series-dispatch "2024-08-21")
 
-;; Variables
-
-(define-obsolete-variable-alias
-  'org-node--series-info 'org-node--series "2024-08-21")
-
-(define-obsolete-variable-alias
-  'org-node-mark-days 'org-node--mark-days "2024-08-21")
-
 (define-obsolete-function-alias
   'org-node-helper/try-goto-id #''org-node-helper-try-goto-id "2024-08-24")
 
@@ -179,6 +169,14 @@ hardcoded strings."
 (define-obsolete-function-alias
   'org-node-helper/mk-series-with-tag-sorted-by-property
   #'org-node-mk-series-on-tag-sorted-by-property "2024-08-24")
+
+;; Variables
+
+(define-obsolete-variable-alias
+  'org-node--series-info 'org-node--series "2024-08-21")
+
+(define-obsolete-variable-alias
+  'org-node-mark-days 'org-node--mark-days "2024-08-21")
 
 (provide 'org-node-changes)
 

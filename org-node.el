@@ -609,10 +609,10 @@ When called from Lisp, peek on any hash table HT."
     (advice-remove 'rename-file #'org-node--handle-rename)
     (advice-remove 'delete-file #'org-node--handle-delete)))
 
-(defun org-node--handle-rename (file newname &rest _)
+(defun org-node--handle-rename (oldname newname &rest _)
   "Arrange to scan NEWNAME for nodes and links, and forget FILE."
-  (when (member (file-name-extension file) '("org" "org_archive"))
-    (org-node--scan-targeted (list file newname))))
+  (when (member (file-name-extension oldname) '("org" "org_archive"))
+    (org-node--scan-targeted (list oldname newname))))
 
 (defun org-node--handle-delete (file &rest _)
   "Arrange to forget nodes and links in FILE."
@@ -621,9 +621,8 @@ When called from Lisp, peek on any hash table HT."
 
 (defun org-node--handle-save ()
   "Arrange to re-scan nodes and links in current buffer."
-  (let ((file buffer-file-name))
-    (when (member (file-name-extension file) '("org" "org_archive"))
-      (org-node--scan-targeted file))))
+  (when (member (file-name-extension buffer-file-name) '("org" "org_archive"))
+    (org-node--scan-targeted buffer-file-name)))
 
 (defun org-node--maybe-adjust-idle-timer ()
   "Adjust `org-node--idle-timer' based on duration of last scan.
@@ -737,7 +736,8 @@ In broad strokes:
 
 (defun org-node--scan-targeted (files)
   "Arrange to scan FILES."
-  (org-node--try-launch-scan (ensure-list files)))
+  (when files
+    (org-node--try-launch-scan (ensure-list files))))
 
 (defvar org-node--retry-timer (timer-create))
 (defvar org-node--file-queue nil)
@@ -768,7 +768,8 @@ If FILES is t, do a full reset of the cache."
               ;; Timeout subprocess stuck in some infinite loop
               (progn
                 (setq org-node--wait-start nil)
-                (message "org-node: processes worked longer than 30 sec, killing")
+                (message
+                 "org-node: processes worked longer than 30 sec, killing")
                 (while-let ((old-process (pop org-node--processes)))
                   (delete-process old-process)))
             (setq must-retry t)))
@@ -781,9 +782,9 @@ If FILES is t, do a full reset of the cache."
             (when org-node--file-queue
               (setq must-retry t)))
         ;; Targeted scan of specific files
-        (unless org-node--file-queue
-          (error "`org-node-try-launch-scan' launched with no input"))
-        (org-node--scan org-node--file-queue #'org-node--finalize-modified)
+        (if org-node--file-queue
+            (org-node--scan org-node--file-queue #'org-node--finalize-modified)
+          (message "`org-node-try-launch-scan' launched with no input"))
         (setq org-node--file-queue nil)))
     (when must-retry
       (cancel-timer org-node--retry-timer)
@@ -860,8 +861,9 @@ When finished, pass a list of scan results to the FINALIZER
 function to update current tables."
   (when (= 0 org-node-perf-max-jobs)
     (setq org-node-perf-max-jobs (org-node--count-logical-cores)))
-  ;; FIXME: When working on a checked-out repo, the developer has to paste
-  ;;        in the checked-out library path here.
+  ;; FIXME: When working on a checked-out repo, the developer has to paste the
+  ;;        checked-out library path here.  Without a full path, it just looks
+  ;;        in load-path.
   (let ((compiled-lib (org-node--ensure-compiled-lib "org-node-parser"))
         (file-name-handler-alist nil)
         (coding-system-for-read org-node-perf-assume-coding-system)
@@ -913,17 +915,17 @@ function to update current tables."
     (if org-node--debug
         ;; Special case for debugging; run single-threaded so we can step
         ;; through the org-node-parser.el functions with edebug
-        (let (($i 0))
-          (delete-file (org-node-parser--tmpfile "results-0.eld"))
-          (let ((print-length nil))
-            (write-region (prin1-to-string files)
-                          nil
-                          (org-node-parser--tmpfile "file-list-0.eld")))
+        (let (($i 0)
+              (write-region-inhibit-fsync nil)
+              (print-length nil))
+          (write-region (prin1-to-string files)
+                        nil
+                        (org-node-parser--tmpfile "file-list-0.eld")
+                        nil
+                        'quiet)
           (setq org-node-parser--result-found-links nil)
           (setq org-node-parser--result-problems nil)
           (setq org-node-parser--result-paths-types nil)
-          (when (bound-and-true-p editorconfig-mode)
-            (message "Maybe disable editorconfig-mode while debugging"))
           (setq org-node--first-init nil)
           (load-file compiled-lib)
           (setq org-node--time-at-scan-begin (current-time))
@@ -935,24 +937,17 @@ function to update current tables."
             (org-node--handle-finished-job 1 finalizer)))
 
       ;; If not debugging, split the work over many child processes
-      (let* ((file-lists
-              (org-node--split-into-n-sublists files org-node-perf-max-jobs))
+      (let* ((file-lists (org-node--split-into-n-sublists
+                          files org-node-perf-max-jobs))
              (n-jobs (length file-lists))
-             (gc-ultra (let* ((default-directory invocation-directory)
-                              (ram (car (memory-info))))
-                         (or (and ram (/ (* 1000 ram) n-jobs))
-                             (* 500 1000 1000)))))
-        ;; TODO: Maybe also go back to default 800kB GC if we're dealing with
-        ;;       more than ~1GB of org files. (Someone pandocs SciHub into org
-        ;;       for fun?)
-        (when (< gc-ultra (* 50 1000 1000))
-          (setq gc-ultra (car (get 'gc-cons-threshold 'standard-value))))
+             (write-region-inhibit-fsync nil) ;; Default t in emacs30
+             (print-length nil))
         (dotimes (i n-jobs)
-          (delete-file (org-node-parser--tmpfile "results-%d.eld" i))
-          (with-temp-file (org-node-parser--tmpfile "file-list-%d.eld" i)
-            (let ((write-region-inhibit-fsync nil) ;; Default t in emacs30
-                  (print-length nil))
-              (insert (prin1-to-string (pop file-lists)))))
+          (write-region (prin1-to-string (pop file-lists))
+                        nil
+                        (org-node-parser--tmpfile "file-list-%d.eld" i)
+                        nil
+                        'quiet)
           ;; TODO: Maybe prepend a "timeout 30"
           (push (make-process
                  :name (format "org-node-%d" i)
@@ -964,8 +959,9 @@ function to update current tables."
                  (list (file-name-concat invocation-directory invocation-name)
                        "--quick"
                        "--batch"
-                       "--eval" (format "(setq gc-cons-threshold %d)" gc-ultra)
                        "--eval" (format "(setq $i %d)" i)
+                       "--eval" (format "(setq gc-cons-threshold %d)"
+                                        (* 1000 1000 1000))
                        "--eval" (format "(setq temporary-file-directory \"%s\")"
                                         temporary-file-directory)
                        "--load" compiled-lib
@@ -1046,8 +1042,6 @@ to FINALIZER."
       (remhash file org-node--file<>mtime))
     (dolist (link links)
       (push link (gethash (org-node-link-dest link) org-node--dest<>links)))
-    (dolist (pair path.type)
-      (puthash (car pair) (cdr pair) org-node--uri-path<>uri-type))
     (cl-loop for (path . type) in path.type
              do (puthash path type org-node--uri-path<>uri-type))
     (cl-loop for (file . mtime) in found.mtime
@@ -2043,6 +2037,7 @@ KEY, NAME and CAPTURE explained in `org-node-series-defs'."
 (defun org-node--guess-daily-dir ()
   "Do not rely on this."
   (or (bound-and-true-p org-node-fakeroam-daily-dir)
+      (bound-and-true-p org-journal-dir)
       (file-name-concat org-directory "daily/")))
 
 (defun org-node-helper-try-goto-id (id)
@@ -2291,10 +2286,21 @@ If argument NEXT is non-nil, actually visit the next entry."
          for item in to-check
          if (funcall (plist-get series :try-goto) item)
          return t
-         else do (delete item (plist-get series :sorted-items))
+         else do (delete item items)
          finally return (message "No %s item in series \"%s\""
                                  (if next "next" "previous")
                                  (plist-get series :name)))))))
+
+(defun org-node-series-goto (key sortstr)
+  "Visit an entry in series identified by KEY.
+The entry to visit has sort-string SORTSTR.  Create if it does
+not exist."
+  (let* ((series (cdr (assoc key org-node--series)))
+         (item (assoc sortstr (plist-get series :sorted-items))))
+    (when (or (null item)
+              (or (funcall (plist-get series :try-goto) item)
+                  (ignore (delete item (plist-get series :sorted-items)))))
+      (funcall (plist-get series :creator) sortstr key))))
 
 (defun org-node-series-capture-target ()
   "Experimental."
@@ -3670,9 +3676,17 @@ heading, else the file-level node, whichever has an ID first."
 
 ;;;; Obsolete series functions (for :version 1)
 
+(defvar org-node--obsolete-series-warned nil)
+(defun org-node--obsolete-series-warn ()
+  (unless org-node--obsolete-series-warned
+    (setq org-node--obsolete-series-warned t)
+    (display-warning 'org-node
+                     "Your initfiles use an old version of series definitions (still works), see wiki when you can \nhttps://github.com/meedstrom/org-node/wiki")))
+
 (defun org-node--example-daily-creator (sortstr &rest _)
   "Create a daily-note using SORTSTR as the date."
   (declare (obsolete nil "2024-08-21"))
+  (org-node--obsolete-series-warn)
   (if (and (eq org-node-creation-fn 'org-node-new-via-roam-capture)
            (fboundp 'org-node-fakeroam-daily-create))
       ;; Assume this user wants to use their roam-dailies templates
@@ -3693,7 +3707,7 @@ heading, else the file-level node, whichever has an ID first."
 (defun org-node--series-standard-creator (sortstr &rest _)
   "Create a node with SORTSTR as the title."
   (declare (obsolete nil "2024-08-17"))
-  (display-warning 'org-node "Your series definition includes a function that will be REMOVED on 30 August 2024: `org-node--series-standard-creator'")
+  (org-node--obsolete-series-warn)
   (org-node-create sortstr (org-id-new)))
 
 (defun org-node--example-daily-classifier (node)
@@ -3701,6 +3715,7 @@ heading, else the file-level node, whichever has an ID first."
 If NODE is in a \"daily\" or \"dailies\" directory, return an
 item using file name base as sort string."
   (declare (obsolete nil "2024-08-21"))
+  (org-node--obsolete-series-warn)
   (let ((path (org-node-get-file-path node)))
     (when (string-match-p "dail\\w+/" path)
       (cons (file-name-base path) path))))
@@ -3708,6 +3723,7 @@ item using file name base as sort string."
 (defun org-node--example-try-goto-file (item)
   "Assume cdr of ITEM is a filename and try to visit it."
   (declare (obsolete nil "2024-08-21"))
+  (org-node--obsolete-series-warn)
   (when (or (file-readable-p (cdr item))
             (find-buffer-visiting (cdr item)))
     (find-file (cdr item))
@@ -3716,6 +3732,7 @@ item using file name base as sort string."
 (defun org-node--example-try-goto-id (item)
   "Assume cdr of ITEM is an org-id and try to visit it."
   (declare (obsolete nil "2024-08-21"))
+  (org-node--obsolete-series-warn)
   (let* ((id (cdr item))
          (node (gethash id org-nodes)))
     (when node
@@ -3725,6 +3742,7 @@ item using file name base as sort string."
 (defun org-node--example-daily-whereami ()
   "Check the filename for a date and return it."
   (declare (obsolete nil "2024-08-21"))
+  (org-node--obsolete-series-warn)
   (when-let* ((path (buffer-file-name (buffer-base-buffer)))
               (clipped-name (file-name-base path)))
     (if (string-match-p
@@ -3740,12 +3758,14 @@ item using file name base as sort string."
   "Prompt for a date, return it in YYYY-MM-DD form.
 Argument SERIES is the series that called this."
   (declare (obsolete nil "2024-08-21"))
+  (org-node--obsolete-series-warn)
   (let ((org-node-series-that-marks-calendar (plist-get series :key)))
     (org-read-date)))
 
 (defun org-node--example-prompter (series)
   "Prompt to go to any of the sort-strings in SERIES."
   (declare (obsolete nil "2024-08-21"))
+  (org-node--obsolete-series-warn)
   (completing-read "Go to: " (plist-get series :sorted-items)))
 
 (provide 'org-node)
