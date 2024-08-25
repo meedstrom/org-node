@@ -165,7 +165,7 @@ If REMOVE? is non-nil, remove it instead."
                              org-node--temp-extra-fns)
                        (org-node--scan-all)
                        (throw 'break t)))
-               (links-string (string-join links "  ")))
+               (links-string (string-join links "   ")))
           (if links
               (unless (equal links-string (org-entry-get nil "BACKLINKS"))
                 (org-entry-put nil "BACKLINKS" links-string))
@@ -201,7 +201,6 @@ headings but you have only done work under one of them."
                   (end (make-marker))
                   (case-fold-search t)
                   prop)
-              ;; (goto-char start)
               (while (< start (point-max))
                 (setq prop (get-text-property start 'org-node-flag))
                 (set-marker end (or (text-property-not-all
@@ -220,7 +219,6 @@ headings but you have only done work under one of them."
                             (concat "^[[:space:]]*:id: +"
                                     (regexp-quote id-here))
                             nil t)
-                           (re-search-forward ":id: +" (pos-eol))
                            (org-node-backlink--fix-entry-here))))
                   ;; ...and if the change-area is massive, spanning multiple
                   ;; subtrees (like after a big yank), update each subtree
@@ -353,14 +351,14 @@ it in the nearby :BACKLINKS: property."
       (and current-backlinks-value
            (string-search "\f" current-backlinks-value)
            (error "Form-feed character in BACKLINKS property near %d in %s"
-                  (point) buffer-file-name))
+                  (point) (buffer-name)))
       (if current-backlinks-value
           ;; Build a temp list to check we don't add the same link twice.
           ;; There is an Org builtin `org-entry-add-to-multivalued-property',
           ;; but we cannot use it since the link descriptions may contain
           ;; spaces.  Further, they may contain quotes(!), so we cannot use
-          ;; `split-string-and-unquote', thus this technique.  That's why we do
-          ;; not bother to wrap the links in quotes.
+          ;; `split-string-and-unquote'.  That's why we do not bother to wrap
+          ;; the links in quotes.
           (let ((links (split-string (replace-regexp-in-string
                                       "]][\s\t]+\\[\\["
                                       "]]\f[["
@@ -374,7 +372,7 @@ it in the nearby :BACKLINKS: property."
             ;; Enforce deterministic order to prevent unnecessarily reordering
             ;; every time a node is linked that already has the backlink
             (sort links #'string-lessp)
-            (setq new-value (string-join links "  ")))
+            (setq new-value (string-join links "   ")))
         (setq new-value src-link))
       (unless (equal current-backlinks-value new-value)
         (let ((after-change-functions

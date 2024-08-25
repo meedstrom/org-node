@@ -689,11 +689,12 @@ SYNCHRONOUS t, unless SYNCHRONOUS is the symbol `must-async'."
       (mapc #'accept-process-output org-node--processes))))
 
 ;; FIXME:
-;; A heisenbug lurks in org-id.  (stackexchange link)
+;; A heisenbug lurks in org-id.  https://emacs.stackexchange.com/questions/81794/
 ;; Backtrace will show this, which makes no sense -- CLEARLY called on a list:
 ;;     Debugger entered--Lisp error: (wrong-type-argument listp #<hash-table equal 3142/5277) 0x190d581ba129>
 ;;       org-id-alist-to-hash((("/home/kept/roam/semantic-tabs-in-2024.org" "f21c984c-13f3-428c-8223-0dc1a2a694df") ("/home/kept/roam/semicolons-make-javascript-h..." "b40a0757-bff4-4188-b212-e17e3fc54e13") ...))
 ;;       org-node--init-ids()
+;;       ...
 (defun org-node--init-ids ()
   "Ensure that org-id is ready for use.
 
@@ -707,7 +708,7 @@ In broad strokes:
   indeterminate superposition of one of two possible values \(a
   hash table or an alist) depending on which code accesses it,
   and tell the user to rebuild the value, since even org-id\\='s
-  internal functions are unable to work with it."
+  internal functions are unable to fix it."
   (require 'org-id)
   (when (not org-id-track-globally)
     (user-error "Org-node requires `org-id-track-globally'"))
@@ -720,7 +721,7 @@ In broad strokes:
   (when (listp org-id-locations)
     (setq org-id-locations nil)
     (org-node--die
-     "Found org-id heisenbug!  Wiped org-id-locations, try `org-id-update-id-locations' or `org-roam-update-org-id-locations'"))
+     "Found org-id heisenbug!  Wiped org-id-locations, repair with `org-node-reset' or `org-roam-update-org-id-locations'"))
   (when (hash-table-p org-id-locations)
     (when (hash-table-empty-p org-id-locations)
       (org-id-locations-load)
@@ -795,8 +796,10 @@ If FILES is t, do a full reset of the cache."
 
 (defvar org-node--processes nil
   "List of subprocesses.")
+
 (defvar org-node--done-ctr 0
   "Count of finished subprocesses.")
+
 (defvar org-node--stderr-name " *org-node*"
   "Name of buffer for the subprocesses shared stderr.")
 
@@ -822,10 +825,11 @@ that same function."
                (shell-command-to-string "sysctl -n hw.logicalcpu_max"))
               ;; No idea if this works
               ((or 'cygwin 'windows-nt 'ms-dos)
-               (ignore-errors
-                 (with-temp-buffer
-                   (call-process "echo" nil t nil "%NUMBER_OF_PROCESSORS%")
-                   (buffer-string)))))))
+               (or (ignore-errors
+                     (with-temp-buffer
+                       (call-process "echo" nil t nil "%NUMBER_OF_PROCESSORS%")
+                       (buffer-string)))
+                   "1")))))
        1))
 
 (defun org-node--ensure-compiled-lib (lib-name)
@@ -1049,6 +1053,7 @@ to FINALIZER."
     (cl-loop for (file . mtime) in found.mtime
              do (unless (equal mtime (gethash file org-node--file<>mtime))
                   (puthash file mtime org-node--file<>mtime)
+                  ;; Expire stale previews
                   (remhash file org-node--file<>previews)))
     (dolist (node nodes)
       (org-node--record-node node))
@@ -1113,11 +1118,12 @@ to FINALIZER."
       (cl-loop for (file . mtime) in found.mtime
                do (unless (equal mtime (gethash file org-node--file<>mtime))
                     (puthash file mtime org-node--file<>mtime)
+                    ;; Expire stale previews
                     (remhash file org-node--file<>previews)))
       (dolist (node nodes)
         (org-node--record-node node))
-      (dolist (pbm problems)
-        (push pbm org-node--problems))
+      (dolist (prb problems)
+        (push prb org-node--problems))
       (when problems
         (message "org-node found issues, see M-x org-node-list-scan-problems"))
       (run-hook-with-args 'org-node-rescan-functions
@@ -1185,7 +1191,7 @@ The reason for default t is better experience with
               (puthash (concat (nth 1 affx) (nth 0 affx) (nth 2 affx))
                        node
                        org-node--candidate<>node)
-            ;; Just title as candidate, to be affixated by `org-node-collection'
+            ;; Only title as candidate, to be affixated by `org-node-collection'
             (puthash title node org-node--candidate<>node)
             (puthash title affx org-node--title<>affixation-triplet)))))))
 
@@ -2773,7 +2779,7 @@ out, with any year, month or day."
           (cons format
                 (let ((example (format-time-string format)))
                   (if (string-match-p (rx (any "^*+([\\")) example)
-                      (error "org-node: Unable to safely rename with current `org-node-datestamp-format'.  This is not inherent in your choice of format, I am just not smart enough yet")
+                      (error "org-node: Unable to safely rename with current `org-node-datestamp-format'.  This is not inherent in your choice of format, I am just not smart enough")
                     (concat "^"
                             (string-replace
                              "." "\\."
@@ -2782,8 +2788,8 @@ out, with any year, month or day."
                               (replace-regexp-in-string
                                "[[:alpha:]]+" "[[:alpha:]]+"
                                example t)))))))))
+  ;; Memoize consecutive calls with same input
   (cdr org-node--make-regexp-for-time-format))
-;; (memoize #'org-node--make-regexp-for-time-format nil)
 
 ;; This function can be removed if one day we drop support for file-level
 ;; nodes, because then just (org-entry-get nil "ID" t) will suffice.  That
@@ -3691,6 +3697,7 @@ heading, else the file-level node, whichever has an ID first."
 
 (defvar org-node--obsolete-series-warned nil)
 (defun org-node--obsolete-series-warn ()
+  "Warn about usage of obsolete series helpers/versions."
   (unless org-node--obsolete-series-warned
     (setq org-node--obsolete-series-warned t)
     (display-warning 'org-node
