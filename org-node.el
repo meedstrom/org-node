@@ -946,8 +946,10 @@ function to update current tables."
       (let* ((file-lists
               (org-node--split-into-n-sublists files org-node-perf-max-jobs))
              (n-jobs (length file-lists))
-             (gc-ultra (let ((default-directory invocation-directory))
-                         (/ (* 1000 (car (memory-info))) n-jobs))))
+             (gc-ultra (let* ((default-directory invocation-directory)
+                              (ram (car (memory-info))))
+                         (or (and ram (/ (* 1000 ram) n-jobs))
+                             (* 500 1000 1000)))))
         ;; TODO: Maybe also go back to default 800kB GC if we're dealing with
         ;;       more than ~1GB of org files. (Someone pandocs SciHub into org
         ;;       for fun?)
