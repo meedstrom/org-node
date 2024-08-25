@@ -609,19 +609,21 @@ When called from Lisp, peek on any hash table HT."
     (advice-remove 'rename-file #'org-node--handle-rename)
     (advice-remove 'delete-file #'org-node--handle-delete)))
 
-(defun org-node--handle-rename (oldname newname &rest _)
+(defun org-node--handle-rename (file newname &rest _)
   "Arrange to scan NEWNAME for nodes and links, and forget FILE."
-  (when (member (file-name-extension oldname) '("org" "org_archive"))
-    (org-node--scan-targeted (list oldname newname))))
+  (when (equal (file-name-extension file) "org")
+    (org-node--scan-targeted
+     (seq-remove #'backup-file-name-p (list file newname)))))
 
 (defun org-node--handle-delete (file &rest _)
   "Arrange to forget nodes and links in FILE."
-  (when (member (file-name-extension file) '("org" "org_archive"))
+  (when (and (equal (file-name-extension file) "org"))
     (org-node--scan-targeted file)))
 
 (defun org-node--handle-save ()
   "Arrange to re-scan nodes and links in current buffer."
-  (when (member (file-name-extension buffer-file-name) '("org" "org_archive"))
+  (when (and (equal (file-name-extension buffer-file-name) "org")
+             (not (backup-file-name-p buffer-file-name)))
     (org-node--scan-targeted buffer-file-name)))
 
 (defun org-node--maybe-adjust-idle-timer ()
@@ -1759,6 +1761,15 @@ org-roam."
 (defvar org-node-proposed-id nil
   "For use by `org-node-creation-fn'.")
 
+(defun org-node--purge-backup-file-names ()
+  "Clean backup names accidentally added to org-id database."
+  (setq org-id-files (seq-remove #'backup-file-name-p org-id-files))
+  (setq org-id-locations
+        (org-id-alist-to-hash
+         (cl-loop for entry in (org-id-hash-to-alist org-id-locations)
+                  unless (backup-file-name-p (car entry))
+                  collect entry))))
+
 (defun org-node--goto (node)
   "Visit NODE."
   (if node
@@ -1766,34 +1777,36 @@ org-roam."
         (if (backup-file-name-p file)
             (progn
               ;; FIXME: How to prevent this from happening?
-              (message "org-node: Accidentally recorded backup file, resetting cache...")
-              (org-node--forget-id-locations (list file))
+              (message "org-node: Accidentally recorded backup file, resetting...")
+              (org-node--purge-backup-file-names)
               (push (lambda ()
-                      (message "org-node: Didn't find a file, resetting cache... done"))
+                      (message "org-node: Accidentally recorded backup file, resetting... done"))
                     org-node--temp-extra-fns)
               (org-node--scan-all))
           (if (file-exists-p file)
-              (let ((pos (org-node-get-pos node)))
-                (find-file file)
-                (widen)
-                ;; Move point to node heading, unless heading is already inside
-                ;; visible part of buffer and point is at or under it
-                (if (org-node-get-is-subtree node)
-                    (progn
-                      (unless (and (pos-visible-in-window-p pos)
-                                   (not (org-invisible-p pos))
-                                   (equal (org-node-get-title node)
-                                          (org-get-heading t t t t)))
-                        (goto-char pos)
-                        (if (org-at-heading-p)
-                            (org-show-entry)
-                          (org-show-context))
-                        (recenter 0)))
-                  (unless (pos-visible-in-window-p pos)
-                    (goto-char pos))))
-            (message "org-node: Didn't find a file, resetting cache...")
+              (when (not (file-readable-p file))
+                (error "org-node: Couldn't visit unreadable file %s" file))
+            (let ((pos (org-node-get-pos node)))
+              (find-file file)
+              (widen)
+              ;; Move point to node heading, unless heading is already inside
+              ;; visible part of buffer and point is at or under it
+              (if (org-node-get-is-subtree node)
+                  (progn
+                    (unless (and (pos-visible-in-window-p pos)
+                                 (not (org-invisible-p pos))
+                                 (equal (org-node-get-title node)
+                                        (org-get-heading t t t t)))
+                      (goto-char pos)
+                      (if (org-at-heading-p)
+                          (org-show-entry)
+                        (org-show-context))
+                      (recenter 0)))
+                (unless (pos-visible-in-window-p pos)
+                  (goto-char pos))))
+            (message "org-node: Didn't find a file, resetting...")
             (push (lambda ()
-                    (message "org-node: Didn't find a file, resetting cache... done"))
+                    (message "org-node: Didn't find a file, resetting... done"))
                   org-node--temp-extra-fns)
             (org-node--scan-all))))
     (error "`org-node--goto' received a nil argument")))
