@@ -300,34 +300,6 @@ Designed to override `org-roam-reflinks-get'."
     (unless org-roam-db-autosync-mode
       (remove-hook 'kill-emacs-hook #'org-roam-db--close-all))))
 
-;; Purpose-focused alternative to `org-node-fakeroam-db-rebuild'
-;; because that is not instant.
-;; FIXME: Still too damn slow on a file with 400 nodes.  Profiler says most of
-;;        it is in EmacSQL, maybe some SQL PRAGMA settings would fix?
-;;        Or collect all data for one mega `emacsql' call?
-(defun org-node-fakeroam--db-update-files (files)
-  "Update the Roam DB about nodes and links involving FILES."
-  (when (require 'org-roam nil t)
-    (emacsql-with-transaction (org-roam-db)
-      (dolist (file files)
-        (org-roam-db-query [:delete :from files :where (= file $s1)]
-                           file))
-      (let (already)
-        (cl-loop
-         for node being the hash-values of org-nodes
-         as file = (org-node-get-file-path node)
-         when (member file files)
-         do
-         (unless (member file already)
-           (push file already)
-           (org-node-fakeroam--db-add-file-level-data node))
-         ;; Clear backlinks to prevent duplicates
-         (dolist (dest (cons (org-node-get-id node)
-                             (org-node-get-refs node)))
-           (org-roam-db-query [:delete :from links :where (= dest $s1)]
-                              dest))
-         (org-node-fakeroam--db-add-node node))))))
-
 ;; TODO: Was hoping to just run this on every save.  Is SQLite really so slow
 ;;       to accept 0-2 MB of data?  Must be some way to make it instant.
 ;; (benchmark-run (org-node-fakeroam-db-rebuild))
@@ -357,6 +329,34 @@ Designed to override `org-roam-reflinks-get'."
                    (puthash file t already)
                    (org-node-fakeroam--db-add-file-level-data node))
                  (org-node-fakeroam--db-add-node node))))))
+
+;; Purpose-focused alternative to `org-node-fakeroam-db-rebuild'
+;; because that is not instant.
+;; FIXME: Still too damn slow on a file with 400 nodes.  Profiler says most of
+;;        it is in EmacSQL, maybe some SQL PRAGMA settings would fix?
+;;        Or collect all data for one mega `emacsql' call?
+(defun org-node-fakeroam--db-update-files (files)
+  "Update the Roam DB about nodes and links involving FILES."
+  (when (require 'org-roam nil t)
+    (emacsql-with-transaction (org-roam-db)
+      (dolist (file files)
+        (org-roam-db-query [:delete :from files :where (= file $s1)]
+                           file))
+      (let (already)
+        (cl-loop
+         for node being the hash-values of org-nodes
+         as file = (org-node-get-file-path node)
+         when (member file files)
+         do
+         (unless (member file already)
+           (push file already)
+           (org-node-fakeroam--db-add-file-level-data node))
+         ;; Clear backlinks to prevent duplicates
+         (dolist (dest (cons (org-node-get-id node)
+                             (org-node-get-refs node)))
+           (org-roam-db-query [:delete :from links :where (= dest $s1)]
+                              dest))
+         (org-node-fakeroam--db-add-node node))))))
 
 ;; REVIEW: I don't like that this accesses actual files on disk when nothing
 ;;         else does.  Maybe the async parser can collect the whole vector that

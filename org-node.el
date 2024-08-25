@@ -739,23 +739,21 @@ In broad strokes:
   (org-node--try-launch-scan (ensure-list files)))
 
 (defvar org-node--retry-timer (timer-create))
-(defvar org-node--known-files nil)
 (defvar org-node--file-queue nil)
 (defvar org-node--wait-start nil)
 (defvar org-node--full-scan-requested nil)
 
-;; TODO: Shorten.  How?  At the moment, we line up a specific file for scan
-;; even if a "full" scan will happen or is happening, for (IIRC) reasons:
-;;
-;; 1. The ongoing full scan may have already gone past the targeted file at the
-;;    exact time an order comes in to scan that file, but not be done yet
-;;    (unlikely on a reasonably fast machine)
-;; 2. Only a targeted scan will execute `org-node-rescan-functions', for good reason
-;;
-;; Hm, point 2 could be taken care of after full scan by comparing to
-;; `org-node--file<>mtime'.  And point 1 by just... allowing the different
-;; scans to happen simultaneously.  There were more problems in the past, but
-;; now this safety magic is ready for gutting.
+;; REVIEW: It used to be a safety feature to only allow one scan at a time, but
+;; it's no longer needed.  The only blocker to simplifying this is that
+;; `org-node-rescan-functions' must be reliable.  And I do not think the
+;; solution is to let the finalize-full compare mtimes and run it, because of
+;; the risk that it's a very large list of files.
+;; Perhaps I can simplify by just removing that hook and making db-feed-mode work in a different, hardcoded way.
+;; Speaking of which, that thing does not handle deleted files!
+
+;; Remove this function by simply allowing multiple simultaneous scans.
+;;         However, a bunch of code needs rewrite before
+;;       we can remove this.
 (defun org-node--try-launch-scan (&optional files)
   "Launch processes to scan FILES, or wait if processes active.
 
@@ -1137,7 +1135,8 @@ to FINALIZER."
         (push pbm org-node--problems))
       (when problems
         (message "org-node found issues, see M-x org-node-list-scan-problems"))
-      (run-hook-with-args 'org-node-rescan-functions found-files))))
+      (run-hook-with-args 'org-node-rescan-functions
+                          (nconc found-files missing-files)))))
 
 (defcustom org-node-perf-eagerly-update-link-tables t
   "Update backlink tables on every save.
