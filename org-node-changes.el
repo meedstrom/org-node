@@ -61,11 +61,13 @@ value."
   ;; Bonus: a hook changed, warn if used in old way
   (cl-loop
    for fn in org-node-insert-link-hook
-   when (and (help-function-arglist fn)
+   when (and (not (eq t fn))
+             (help-function-arglist fn)
              (not (member (car-safe (help-function-arglist fn))
                           '(&optional &rest &body))))
-   return (display-warning
-           'org-node "Hook `org-node-insert-link-hook' has changed, now passes no arguments")))
+   return (lwarn 'org-node :warning
+                 "Hook `org-node-insert-link-hook' has changed, now passes no arguments, but function expects them: %s"
+                 fn)))
 
 (defmacro org-node-changes--def-whiny-alias (old new &optional interactive when removed-by)
   "Define OLD as effectively an alias for NEW.
