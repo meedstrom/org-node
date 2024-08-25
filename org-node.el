@@ -835,33 +835,30 @@ that same function."
                    (buffer-string)))))))
        1))
 
-;; TODO: Native-comp takes a long time.  Maybe launch a `native-compile-async'
-;;       then compile and return only an .elc for the first use.
-(defun org-node--ensure-compiled-lib ()
-  "Return path to freshly compiled version of org-node-parser.el.
+(defun org-node--ensure-compiled-lib (lib-name)
+  "Return path to freshly compiled version of LIB-NAME.
 Recompile if needed, in case the user\\='s package manager
-didn\\='t do so already, or local changes have been made."
+didn\\='t do so already, or local changes have been made.
+
+LIB-NAME should be something that works with `find-library-name'."
   (let* ((file-name-handler-alist nil)
-         ;; FIXME: When working on a checked-out repo, this will still just
-         ;;        find elpaca/straight's clone.  So the developer has to paste
-         ;;        in the true library path here.
-         (lib (find-library-name "org-node-parser"))
-         (native-path (and (featurep 'native-compile)
-                           (native-comp-available-p)
-                           (require 'comp)
-                           (comp-el-to-eln-filename lib)))
-         (elc-path (org-node-parser--tmpfile "parser.elc"))
+         (lib (find-library-name lib-name))
+         (native-path (when (native-comp-available-p)
+                        (comp-el-to-eln-filename lib)))
          (byte-compile-warnings '(not free-vars)))
     (mkdir (org-node-parser--tmpfile) t)
-    (if native-path
-        (unless (file-newer-than-file-p native-path lib)
-          (native-compile lib))
-      ;; No native-comp facility, so make an .elc
-      (unless (file-newer-than-file-p elc-path lib)
-        ;; Ensure the .elc won't clutter some source directory
-        (let ((byte-compile-dest-file-function `(lambda (&rest _) ,elc-path)))
-          (byte-compile-file lib))))
-    (or native-path elc-path)))
+    (if (and native-path (file-newer-than-file-p native-path lib))
+        ;; The .eln is fresh, use it
+        native-path
+      (when native-path (native-compile-async (list lib)))
+      ;; Use an .elc this time, as it compiles much faster
+      (let ((elc-path (org-node-parser--tmpfile
+                       (concat (file-name-base lib-name) ".elc"))))
+        (unless (file-newer-than-file-p elc-path lib)
+          ;; Must compile. Ensure the .elc won't clutter some source directory.
+          (let ((byte-compile-dest-file-function `(lambda (&rest _) ,elc-path)))
+            (byte-compile-file lib)))
+        elc-path))))
 
 (defvar org-node--debug nil)
 (defun org-node--scan (files finalizer)
@@ -873,11 +870,12 @@ When finished, pass a list of scan results to the FINALIZER
 function to update current tables."
   (when (= 0 org-node-perf-max-jobs)
     (setq org-node-perf-max-jobs (org-node--count-logical-cores)))
-  (let ((compiled-lib (org-node--ensure-compiled-lib))
+  ;; FIXME: When working on a checked-out repo, the developer has to paste
+  ;;        in the checked-out library path here.
+  (let ((compiled-lib (org-node--ensure-compiled-lib "org-node-parser"))
         (file-name-handler-alist nil)
         (coding-system-for-read org-node-perf-assume-coding-system)
         (coding-system-for-write org-node-perf-assume-coding-system))
-    (when org-node--debug (garbage-collect))
     (setq org-node--time-at-scan-begin (current-time))
     (setq org-node--done-ctr 0)
     (when (-any-p #'process-live-p org-node--processes)
