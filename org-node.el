@@ -2804,12 +2804,9 @@ out, with any year, month or day."
   "Get ID for current entry or up the outline tree."
   (save-excursion
     (without-restriction
-      (let (id)
-        (while (and (not (setq id (org-entry-get nil "ID")))
-                    (not (bobp)))
-          (when (eq t (org-back-to-heading-or-point-min))
-            (org-up-heading-or-point-min)))
-        id))))
+      (or (org-entry-get nil "ID" t)
+          (progn (goto-char (point-min))
+                 (org-entry-get nil "ID" t))))))
 
 (defcustom org-node-renames-allowed-dirs nil
   "Dirs in which files may be auto-renamed.
