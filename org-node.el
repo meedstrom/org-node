@@ -2794,18 +2794,21 @@ out, with any year, month or day."
 ;; This function can be removed if one day we drop support for file-level
 ;; nodes, because then just (org-entry-get nil "ID" t) will suffice.  That
 ;; demonstrates the maintenance burden of file-level anything: `org-entry-get'
-;; /can/ get the file-level ID but only if point is before first heading;
-;; someone forgot to ensure the INHERIT argument will also work as intended.
-;; And no fault to them, it's easy to miss; file-level property drawers were a
-;; mistake, they create the need for special cases all over the place.
+;; /can/ get the file-level ID but only sometimes.  Don't know where's the bug
+;; in this case, but file-level property drawers were a mistake, they create
+;; the need for special-case code all over the place, which leads to many new
+;; bugs, and bring nothing to the table.  Even here, this function had a bug
+;; earlier due to how I wrote it, but I shouldn't have had to write the
+;; function at all.
 (defun org-node-id-at-point ()
   "Get ID for current entry or up the outline tree."
   (save-excursion
     (without-restriction
       (let (id)
-        (while (and (null (setq id (org-entry-get nil "ID")))
+        (while (and (not (setq id (org-entry-get nil "ID")))
                     (not (bobp)))
-          (org-up-heading-or-point-min))
+          (when (eq t (org-back-to-heading-or-point-min))
+            (org-up-heading-or-point-min)))
         id))))
 
 (defcustom org-node-renames-allowed-dirs nil
