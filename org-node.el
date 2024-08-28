@@ -2318,8 +2318,10 @@ not exist."
   (let* ((series (cdr (assoc key org-node--series)))
          (item (assoc sortstr (plist-get series :sorted-items))))
     (when (or (null item)
-              (or (funcall (plist-get series :try-goto) item)
-                  (ignore (delete item (plist-get series :sorted-items)))))
+              (if (funcall (plist-get series :try-goto) item)
+                  nil
+                (delete item (plist-get series :sorted-items))
+                t))
       (funcall (plist-get series :creator) sortstr key))))
 
 (defun org-node-series-capture-target ()
