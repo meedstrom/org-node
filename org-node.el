@@ -57,6 +57,8 @@
 
 ;;; Code:
 
+;; TODO: Get rid of Version:, because of emacs 30 (use-package :vc)
+
 ;; TODO: A workflow to allow pseudo-untitled (numeric-titled) nodes
 ;;       - Need a bunch of commands for that, like select node by fulltext
 ;;         search
@@ -531,12 +533,12 @@ For use by `org-node-fakeroam--accelerate-get-contents'.")
   "Get list of ID-link objects pointing to NODE.
 Each object is of type `org-node-link' with these fields:
 
-:origin - ID of origin node (where the link was found)
-:pos - buffer position where the link was found
-:dest - ID of destination node, or a ref that belongs to it
-:type - link type, such as \"https\", \"ftp\", \"info\" or
-        \"man\".  For ID-links this is always \"id\".  For a
-        citation this is always nil.
+origin - ID of origin node (where the link was found)
+pos - buffer position where the link was found
+dest - ID of destination node, or a ref that belongs to it
+type - link type, such as \"https\", \"ftp\", \"info\" or
+       \"man\".  For ID-links this is always \"id\".  For a
+       citation this is always nil.
 
 This function only returns ID-links, so you can expect the :dest
 to always equal the ID of NODE.  To see other link types, use
@@ -554,7 +556,7 @@ The reflink object has the same shape as an ID-link object (see
 you have a ref string such an URL.  Common gotcha: for a web
 address such as \"http://gnu.org\", the DEST field holds only
 \"//gnu.org\", and the \"http\" part goes into the TYPE
-field.  Colon goes nowhere.
+field.  Colon is not stored anywhere.
 
 Citations such as \"@gelman2001\" have TYPE nil, so you can
 distinguish citations from other links this way."
@@ -933,13 +935,20 @@ function to update current tables."
           (setq org-node-parser--result-problems nil)
           (setq org-node-parser--result-paths-types nil)
           (setq org-node--first-init nil)
-          (load-file compiled-lib)
+          (load compiled-lib)
           (setq org-node--time-at-scan-begin (current-time))
           (with-current-buffer (get-buffer-create "*org-node debug*")
             (when (eq 'show org-node--debug)
               (pop-to-buffer (current-buffer)))
             (erase-buffer)
-            (org-node-parser--collect-dangerously)
+            (if (eq 'profile org-node--debug)
+                (progn
+                  (profiler-cpu-stop)
+                  (profiler-start 'cpu)
+                  (org-node-parser--collect-dangerously)
+                  (profiler-cpu-stop)
+                  (profiler-report-cpu))
+              (org-node-parser--collect-dangerously))
             (org-node--handle-finished-job 1 finalizer)))
 
       ;; If not debugging, split the work over many child processes
@@ -1674,7 +1683,7 @@ Example from Denote: %Y%m%dT%H%M%S--"
 (defcustom org-node-slug-fn #'org-node-slugify-for-web
   "Function taking a node title and returning a filename.
 Receives one argument: the value of an Org #+TITLE keyword, or
-the first heading if there is no #+TITLE.
+the first heading in a file that has no #+TITLE.
 
 Built-in choices:
 - `org-node-slugify-for-web'
@@ -2070,10 +2079,11 @@ KEY, NAME and CAPTURE explained in `org-node-series-defs'."
 (defun org-node-helper-try-visit-file (file)
   "Visit FILE if it exists or if a buffer exists on that file.
 Return non-nil on success."
-  (when (or (file-readable-p file)
-            (find-buffer-visiting file))
-    (find-file file)
-    t))
+  (let ((buf (find-buffer-visiting file)))
+    (if buf
+        (switch-to-buffer buf)
+      (when (file-readable-p file)
+        (find-file file)))))
 
 (defun org-node-helper-filename->ymd (path)
   "Check the filename PATH for a date and return it.
@@ -3124,7 +3134,8 @@ In case of unsolvable problems, how to wipe org-id-locations:
                            #'consult--ripgrep-make-builder
                            (org-node--root-dirs (org-node-list-files t))
                            nil)
-          ;; Much slower, no --type=org means must target files and not dirs
+          ;; Much slower, no --type=org means must target thousands of files
+          ;; and not a handful of dirs
           (consult--grep "Grep in all known Org files: "
                          #'consult--grep-make-builder
                          (org-node-list-files)
@@ -3747,10 +3758,11 @@ item using file name base as sort string."
   "Assume cdr of ITEM is a filename and try to visit it."
   (declare (obsolete nil "2024-08-21"))
   (org-node--obsolete-series-warn)
-  (when (or (file-readable-p (cdr item))
-            (find-buffer-visiting (cdr item)))
-    (find-file (cdr item))
-    t))
+  (let ((buf (find-buffer-visiting (cdr item))))
+    (if buf
+        (switch-to-buffer buf)
+      (when (file-readable-p (cdr item))
+        (find-file (cdr item))))))
 
 (defun org-node--example-try-goto-id (item)
   "Assume cdr of ITEM is an org-id and try to visit it."
