@@ -141,10 +141,10 @@ hardcoded strings."
 ;; Polite aliases for now, upgrade to whiny later
 
 (define-obsolete-function-alias
-  'org-node--extract-ymd #'org-node-extract-ymd  "2024-08-21")
+  'org-node--extract-ymd 'org-node-extract-ymd  "2024-08-21")
 
 (define-obsolete-function-alias
-  'org-node--create #'org-node-create "2024-08-21")
+  'org-node--create 'org-node-create "2024-08-21")
 
 ;; (define-obsolete-variable-alias
 ;;   'org-node-creation-fn 'org-node-new-node-fn "2024-08-22")
@@ -157,20 +157,20 @@ hardcoded strings."
 
 ;;;###autoload
 (define-obsolete-function-alias
-  'org-node-series-menu #'org-node-series-dispatch "2024-08-21")
+  'org-node-series-menu 'org-node-series-dispatch "2024-08-21")
 
 (define-obsolete-function-alias
-  'org-node-helper/try-goto-id #''org-node-helper-try-goto-id "2024-08-24")
+  'org-node-helper/try-goto-id 'org-node-helper-try-goto-id "2024-08-24")
 
 (define-obsolete-function-alias
-  'org-node-helper/try-visit-file #'org-node-helper-try-visit-file "2024-08-24")
+  'org-node-helper/try-visit-file 'org-node-helper-try-visit-file "2024-08-24")
 
 (define-obsolete-function-alias
-  'org-node-helper/filename->ymd #'org-node-helper-filename->ymd   "2024-08-24")
+  'org-node-helper/filename->ymd 'org-node-helper-filename->ymd "2024-08-24")
 
 (define-obsolete-function-alias
   'org-node-helper/mk-series-with-tag-sorted-by-property
-  #'org-node-mk-series-on-tag-sorted-by-property "2024-08-24")
+  'org-node-mk-series-on-tag-sorted-by-property "2024-08-24")
 
 ;; Variables
 

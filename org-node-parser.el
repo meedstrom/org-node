@@ -23,10 +23,6 @@
 
 ;;; Code:
 
-;; TODO: Maybe use `dump-emacs-portable' to dump an image of a running emacs
-;;       with this library loaded, so each new subprocess can start there and
-;;       skip the time it takes to load the library.
-
 (eval-when-compile
   (require 'cl-lib)
   (require 'subr-x))
