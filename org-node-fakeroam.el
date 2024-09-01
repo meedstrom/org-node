@@ -1,4 +1,4 @@
-;;; org-node-fakeroam.el --- Stand-ins for org-roam-autosync-mode -*-  no-byte-compile: t;  no-native-compile: t; lexical-binding: t; -*-
+;;; org-node-fakeroam.el --- Stand-ins for org-roam-autosync-mode -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2024 Martin Edström
 
@@ -18,7 +18,7 @@
 ;; Author:           Martin Edström <meedstrom91@gmail.com>
 ;; Created:          2024-04-13
 ;; Keywords:         org, hypermedia
-;; Package-Requires: ((emacs "28.1") (compat "30") (org-node "0.6.0.50-git") (org-roam "2.2.2") (emacsql "4.0.0"))
+;; Package-Requires: ((emacs "28") (compat "30") (org-node "0") (org-roam "2.2.2") (emacsql "4.0.0"))
 ;; URL:              https://github.com/meedstrom/org-node
 
 ;;; Commentary:
@@ -42,9 +42,14 @@
 (declare-function org-roam-buffer--visibility "org-roam-mode")
 (declare-function org-roam-buffer-persistent-redisplay "org-roam-mode")
 (declare-function org-roam-buffer-refresh "org-roam-mode")
+(declare-function org-roam-reflink-create "org-roam-mode")
+(declare-function org-roam-backlink-create "org-roam-mode")
+(declare-function org-roam-node-id "org-roam-node")
+(declare-function org-roam-node-create "org-roam-node")
 (declare-function org-roam-dailies--capture "org-roam-dailies")
 (declare-function org-roam-db "org-roam-db")
 (declare-function org-roam-db--close "org-roam-db")
+(declare-function org-roam-db--close-all "org-roam-db")
 (declare-function org-roam-db-query "org-roam-db")
 (declare-function org-roam-fontify-like-in-org-mode "org-roam-utils")
 (declare-function org-roam-node-insert-section "org-roam-mode")
@@ -474,6 +479,29 @@ This includes all links and citations that touch NODE."
 
 ;;;; Bonus advices
 
+(defvar org-node-fakeroam-dir nil
+  "Cached value of `org-roam-directory' transformed for org-node.
+This path should be directly comparable to the paths saved in
+org-node objects, which lets you skip using `file-truename' to
+compare paths.
+
+See also `org-node-fakeroam-daily-dir'.")
+
+(defvar org-node-fakeroam-daily-dir nil
+  "Cached value for Roam's dailies dir transformed for org-node.
+This path should be directly comparable to the paths saved in
+org-node objects, which lets you skip using `file-truename' to
+compare paths.
+
+Rationale: The original `org-roam-dailies-directory' was a
+relative path, which incurred verbosity penalties in all code
+that used it (plus practically a major performance penalty since
+`expand-file-name' was often used instead of `file-name-concat').
+
+Even more verbosity is added on top for org-node, which needs to
+process the path through `org-node-abbrev-file-names'.  Thus
+this variable provides an easy shorthand.")
+
 ;; (benchmark-call (byte-compile #'org-roam-list-files))
 ;; (benchmark-call (byte-compile #'org-node-fakeroam-list-files))
 (defun org-node-fakeroam-list-files ()
@@ -512,29 +540,6 @@ For argument FILE, see that function."
 
 
 ;;;; Series-related
-
-(defvar org-node-fakeroam-dir nil
-  "Cached value of `org-roam-directory' transformed for org-node.
-This path should be directly comparable to the paths saved in
-org-node objects, which lets you skip using `file-truename' to
-compare paths.
-
-See also `org-node-fakeroam-daily-dir'.")
-
-(defvar org-node-fakeroam-daily-dir nil
-  "Cached value for Roam's dailies dir transformed for org-node.
-This path should be directly comparable to the paths saved in
-org-node objects, which lets you skip using `file-truename' to
-compare paths.
-
-Rationale: The original `org-roam-dailies-directory' was a
-relative path, which incurred verbosity penalties in all code
-that used it (plus practically a major performance penalty since
-`expand-file-name' was often used instead of `file-name-concat').
-
-Even more verbosity is added on top for org-node, which needs to
-process the path through `org-node-abbrev-file-names'.  Thus
-this variable provides an easy shorthand.")
 
 ;; TODO: Somehow make `org-node-new-via-roam-capture' able to do this?
 ;;;###autoload
