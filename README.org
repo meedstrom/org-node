@@ -69,24 +69,24 @@ A comparison of three similar systems, which permit relying on org-id and don't 
 | *Time to open minibuffer*        | *1--3s*    | *instant*            | not applicable       |
 
 * Setup
+** Install
 
-This package is on its way to MELPA, but for now, use [[https://github.com/radian-software/straight.el][straight.el]] or similar and add an init snippet like this:
+This package is finally on [[https://melpa.org/#/getting-started][MELPA]]!  Assuming your package manager knows about it, add this initfile snippet:
 
 #+begin_src elisp
 (use-package org-node
-  :straight (org-node :type git :host github :repo "meedstrom/org-node"
-                      :files (:defaults (:exclude "org-node-fakeroam.el")))
   :after org
   :config (org-node-cache-mode))
 #+end_src
 
-If you are an org-roam user, you'll want this too:
+If you are an org-roam user, you'll want the *org-node-fakeroam* module as well.  It is not on MELPA yet, so use [[https://github.com/radian-software/straight.el][straight.el]] or similar and add an init snippet like this:
 
 #+begin_src elisp
 (use-package org-node-fakeroam
   :straight (org-node-fakeroam
              :type git :host github :repo "meedstrom/org-node"
-             :files ("org-node-fakeroam.el"))
+             :files ("org-node-fakeroam.el")
+             :branch "melpa")
   :after org-node
   :requires org-node)
 #+end_src
