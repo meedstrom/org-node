@@ -214,10 +214,9 @@ Arguments PLAIN-RE and MERGED-RE..."
               path (match-string 4)))
       (when link-type
         (unless (save-excursion
-                  ;; If point is on a # comment or #+keyword line, skip
+                  ;; If point is on a # comment line, skip
                   (goto-char (pos-bol))
-                  (or (looking-at-p "[[:space:]]*# ")
-                      (looking-at-p "[[:space:]]*#\\+")))
+                  (looking-at-p "[[:space:]]*# "))
           ;; The org-ref code is here. Problem is we have to patch merged-re
           ;; and plain-re to match the hundred org-ref types, and that slows
           ;; things down.
@@ -256,10 +255,10 @@ Arguments PLAIN-RE and MERGED-RE..."
                                       closing-bracket t)
               (if (save-excursion
                     (goto-char (pos-bol))
-                    (or (looking-at-p "[[:space:]]*# ")
-                        (looking-at-p "[[:space:]]*#\\+")))
-                  ;; On a # comment or #+keyword, skip citation
-                  ;; (NOTE: don't just skip line, citations can be multiline)
+                    (looking-at-p "[[:space:]]*# "))
+                  ;; On a # comment, skip citation
+                  ;; (NOTE: don't just skip whole line due to the search
+                  ;; boundary on this while-loop)
                   (goto-char closing-bracket)
                 (push (record 'org-node-link
                               id-here
