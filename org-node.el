@@ -3586,10 +3586,13 @@ Wrap the value in double-brackets if necessary."
                   (atomic-change-group
                     (delete-region (point) (pos-eol))
                     (insert ":" (string-join new-tags ":") ":")))
-              (re-search-forward "^[^:#]" nil t)
-              (skip-chars-backward "\n\t\s")
+              (if (re-search-forward "^[^:#]" nil t)
+                  (progn
+                    (backward-char 1)
+                    (skip-chars-backward "\n\t\s"))
+                (goto-char (point-max)))
               (newline)
-              (insert ":" (string-join new-tags ":") ":")))))
+              (insert "#+filetags: :" (string-join new-tags ":") ":")))))
     (org-set-tags (seq-uniq (append (ensure-list tag-or-tags)
                                     (org-get-tags))))))
 
