@@ -57,7 +57,8 @@
 
 ;;; Code:
 
-;; TODO: Get rid of Version:, because of emacs 30 (use-package :vc)
+;; TODO: Get rid of Version:, because of emacs 30's (use-package :vc) being
+;;       designed to download the OLDEST revision with a given version string
 
 ;; TODO: A workflow to allow pseudo-untitled (numeric-titled) nodes
 ;;       - Need a bunch of commands for that, like select node by fulltext
@@ -99,11 +100,15 @@
 (require 'org-node-parser)
 (require 'org-node-changes)
 
-;; Not unused lexical vars
+;; Satisfy compiler
 (defvar org-roam-directory)
 (defvar org-roam-dailies-directory)
 (defvar consult-ripgrep-args)
 (defvar $i)
+(defvar org-node-backlink-mode)
+(declare-function org-node-backlink--fix-entry-here "org-node-backlink")
+(declare-function profiler-report "profiler")
+(declare-function profiler-stop "profiler")
 
 
 ;;;; Options
@@ -692,7 +697,8 @@ SYNCHRONOUS t, unless SYNCHRONOUS is the symbol `must-async'."
 
 ;; FIXME:
 ;; A heisenbug lurks in org-id.  https://emacs.stackexchange.com/questions/81794/
-;; Backtrace will show this, which makes no sense -- CLEARLY called on a list:
+;; When it appears, backtrace will show this, which makes no sense -- it's
+;; CLEARLY called on a list:
 ;;     Debugger entered--Lisp error: (wrong-type-argument listp #<hash-table equal 3142/5277) 0x190d581ba129>
 ;;       org-id-alist-to-hash((("/home/kept/roam/semantic-tabs-in-2024.org" "f21c984c-13f3-428c-8223-0dc1a2a694df") ("/home/kept/roam/semicolons-make-javascript-h..." "b40a0757-bff4-4188-b212-e17e3fc54e13") ...))
 ;;       org-node--init-ids()
@@ -705,12 +711,12 @@ In broad strokes:
 - Ensure `org-id-locations' is a hash table and not an alist.
 - Throw error if `org-id-locations' is still empty after this,
   unless `org-node-extra-id-dirs' has members.
-- Wipe `org-id-locations' if it appears afflicted by
-  Schrödinger's org-id, a bug that makes the symbol value an
-  indeterminate superposition of one of two possible values \(a
-  hash table or an alist) depending on which code accesses it,
-  and tell the user to rebuild the value, since even org-id\\='s
-  internal functions are unable to fix it."
+- Wipe `org-id-locations' if it appears afflicted by a bug that
+  makes the symbol value an indeterminate superposition of one of
+  two possible values \(a hash table or an alist) depending on
+  which code accesses it -- like Schrödinger\\='s cat -- and tell
+  the user to rebuild the value, since even org-id\\='s internal
+  functions are unable to fix it."
   (require 'org-id)
   (when (not org-id-track-globally)
     (user-error "Org-node requires `org-id-track-globally'"))
@@ -937,17 +943,19 @@ function to update current tables."
           (setq org-node--first-init nil)
           (load compiled-lib)
           (setq org-node--time-at-scan-begin (current-time))
+          (kill-buffer "*org-node debug*")
           (with-current-buffer (get-buffer-create "*org-node debug*")
             (when (eq 'show org-node--debug)
               (pop-to-buffer (current-buffer)))
             (erase-buffer)
             (if (eq 'profile org-node--debug)
                 (progn
-                  (profiler-cpu-stop)
+                  (require 'profiler)
+                  (profiler-stop)
                   (profiler-start 'cpu)
                   (org-node-parser--collect-dangerously)
-                  (profiler-cpu-stop)
-                  (profiler-report-cpu))
+                  (profiler-stop)
+                  (profiler-report))
               (org-node-parser--collect-dangerously))
             (org-node--handle-finished-job 1 finalizer)))
 
@@ -1033,7 +1041,6 @@ to FINALIZER."
                         'editorconfig--advice-insert-file-contents)))
       (setq org-node--time-at-last-child-done
             (-last-item (sort (-map #'-last-item result-sets) #'time-less-p)))
-      (run-hooks 'org-node-before-update-tables-hook)
       ;; Merge N result-sets into one result-set, to run FINALIZER once
       (funcall finalizer (--reduce (-zip-with #'nconc it acc) result-sets)))))
 
@@ -1045,6 +1052,7 @@ to FINALIZER."
 
 (defun org-node--finalize-full (results)
   "Wipe tables and repopulate from data in RESULTS."
+  (run-hooks 'org-node-before-update-tables-hook)
   (clrhash org-node--id<>node)
   (clrhash org-node--dest<>links)
   (clrhash org-node--candidate<>node)
@@ -1090,6 +1098,7 @@ to FINALIZER."
 
 (defun org-node--finalize-modified (results)
   "Use RESULTS to update tables."
+  (run-hooks 'org-node-before-update-tables-hook)
   (seq-let (missing-files found.mtime nodes path.type links problems) results
     (let ((found-files (mapcar #'car found.mtime)))
       (org-node--forget-id-locations missing-files)
@@ -1558,7 +1567,7 @@ sub-directories, sub-sub-directories and so on, with provisos:
 	      (push full-file result))))))
     result))
 
-;; (progn (byte-compile #'org-node-list-files) (garbage-collect) (benchmark-call #'org-node-list-files))
+;; (progn (byte-compile #'org-node-abbrev-file-names) (garbage-collect) (benchmark-call #'org-node-list-files))
 ;; (get 'abbreviated-home-dir 'home)
 (defvar org-node--homedir nil)
 (defun org-node-abbrev-file-names (path-or-paths)
@@ -1839,9 +1848,12 @@ maybe grow the corresponding series.
 
 When calling from Lisp, you should not assume anything about
 which buffer will be current afterwards, since it depends on
-`org-node-creation-fn' and whether TITLE or ID had existed.
-To visit a node after creating it, either let-bind
-`org-node-creation-fn' so you know what you get, or write:
+`org-node-creation-fn', whether TITLE or ID had existed, and
+whether the user carried through with the creation.
+
+To operate on a node after creating it, either let-bind
+`org-node-creation-fn' so you know what you get, or hook
+`org-node-creation-hook' temporarily, or write:
 
     (org-node-create TITLE ID)
     (org-node-cache-ensure t)
@@ -2655,11 +2667,11 @@ adding keywords to the things to exclude:
       (goto-char (pos-eol))
       (insert " :level " (number-to-string (+ 2 level)))
       ;; If the target is a subtree rather than file-level node, I'd like to
-      ;; cut out the initial heading because we already made a heading.  (And
-      ;; we made the heading so that this transclusion will count as a
+      ;; cut out the initial heading because we already made an outer heading.
+      ;; (We made the outer heading so that this transclusion will count as a
       ;; backlink, plus it makes more sense to me on export to HTML).
       ;;
-      ;; Unfortunately the :lines trick would prevent
+      ;; Unfortunately cutting it out with the :lines trick would prevent
       ;; `org-transclusion-exclude-elements' from having an effect, and the
       ;; subtree's property drawer shows up!
       ;; TODO: Patch `org-transclusion-content-range-of-lines' to respect
