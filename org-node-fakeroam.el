@@ -35,6 +35,26 @@
     (require 'emacsql)
   (message "Install org-roam to use org-node-fakeroam library"))
 
+;; Satisfy compiler
+(declare-function emacsql-with-transaction "emacsql")
+(declare-function org-roam-buffer--redisplay-h "org-roam-mode")
+(declare-function org-roam-buffer--setup-redisplay-h "org-roam-mode")
+(declare-function org-roam-buffer--visibility "org-roam-mode")
+(declare-function org-roam-buffer-persistent-redisplay "org-roam-mode")
+(declare-function org-roam-buffer-refresh "org-roam-mode")
+(declare-function org-roam-dailies--capture "org-roam-dailies")
+(declare-function org-roam-db "org-roam-db")
+(declare-function org-roam-db--close "org-roam-db")
+(declare-function org-roam-db-query "org-roam-db")
+(declare-function org-roam-fontify-like-in-org-mode "org-roam-utils")
+(declare-function org-roam-node-insert-section "org-roam-mode")
+(declare-function org-roam-preview-get-contents "org-roam-mode")
+(defvar org-roam-buffer)
+(defvar org-roam-dailies-directory)
+(defvar org-roam-db-autosync-mode)
+(defvar org-roam-db-location)
+(defvar org-roam-directory)
+
 ;; TODO: Remove after most users have switched to the Melpa recipes
 (defun org-node-fakeroam--check-compile ()
   "Compile all fakeroam functions if not compiled.
@@ -493,6 +513,29 @@ For argument FILE, see that function."
 
 ;;;; Series-related
 
+(defvar org-node-fakeroam-dir nil
+  "Cached value of `org-roam-directory' transformed for org-node.
+This path should be directly comparable to the paths saved in
+org-node objects, which lets you skip using `file-truename' to
+compare paths.
+
+See also `org-node-fakeroam-daily-dir'.")
+
+(defvar org-node-fakeroam-daily-dir nil
+  "Cached value for Roam's dailies dir transformed for org-node.
+This path should be directly comparable to the paths saved in
+org-node objects, which lets you skip using `file-truename' to
+compare paths.
+
+Rationale: The original `org-roam-dailies-directory' was a
+relative path, which incurred verbosity penalties in all code
+that used it (plus practically a major performance penalty since
+`expand-file-name' was often used instead of `file-name-concat').
+
+Even more verbosity is added on top for org-node, which needs to
+process the path through `org-node-abbrev-file-names'.  Thus
+this variable provides an easy shorthand.")
+
 ;; TODO: Somehow make `org-node-new-via-roam-capture' able to do this?
 ;;;###autoload
 (defun org-node-fakeroam-daily-create (ymd series-key &optional goto keys)
@@ -522,28 +565,6 @@ GOTO and KEYS are like in `org-roam-dailies--capture'."
   (declare (obsolete nil "2024-08-21"))
   (org-node-fakeroam-daily-create sortstr "d" t))
 
-(defvar org-node-fakeroam-dir nil
-  "Cached value of `org-roam-directory' transformed for org-node.
-This path should be directly comparable to the paths saved in
-org-node objects, which lets you skip using `file-truename' to
-compare paths.
-
-See also `org-node-fakeroam-daily-dir'.")
-
-(defvar org-node-fakeroam-daily-dir nil
-  "Cached value for Roam's dailies dir transformed for org-node.
-This path should be directly comparable to the paths saved in
-org-node objects, which lets you skip using `file-truename' to
-compare paths.
-
-Rationale: The original `org-roam-dailies-directory' was a
-relative path, which incurred verbosity penalties in all code
-that used it (plus practically a major performance penalty since
-`expand-file-name' was often used instead of `file-name-concat').
-
-Even more verbosity is added on top for org-node, which needs to
-process the path through `org-node-abbrev-file-names'.  Thus
-this variable provides an easy shorthand.")
 
 (defun org-node-fakeroam--cache-roam-dirs ()
   "Cache some variables.
