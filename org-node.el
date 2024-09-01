@@ -1032,11 +1032,11 @@ to FINALIZER."
           (coding-system-for-write org-node-perf-assume-coding-system)
           ;; TODO: General way to inhibit advices on `'insert-file-contents'?
           (editorconfig
-           (if (advice-member-p 'editorconfig--advice-insert-file-contents
-                                #'insert-file-contents)
-               (prog1 t
-                 (advice-remove #'insert-file-contents
-                                'editorconfig--advice-insert-file-contents))))
+           (when (advice-member-p 'editorconfig--advice-insert-file-contents
+                                  #'insert-file-contents)
+             (advice-remove #'insert-file-contents
+                            'editorconfig--advice-insert-file-contents)
+             t))
           (result-sets nil))
       (unwind-protect
           (with-temp-buffer

@@ -18,7 +18,7 @@
 ;; Author:           Martin Edström <meedstrom91@gmail.com>
 ;; Created:          2024-04-13
 ;; Keywords:         org, hypermedia
-;; Package-Requires: ((emacs "28") (compat "30") (org-node "0") (org-roam "2.2.2") (emacsql "4.0.0"))
+;; Package-Requires: ((emacs "28") (compat "30") (org-node) (org-roam "2.2.2") (emacsql "4.0.0"))
 ;; URL:              https://github.com/meedstrom/org-node
 
 ;;; Commentary:
@@ -357,9 +357,9 @@ Designed to override `org-roam-reflinks-get'."
 
 ;; Purpose-focused alternative to `org-node-fakeroam-db-rebuild'
 ;; because that is not instant.
-;; FIXME: Still too damn slow on a file with 400 nodes.  Profiler says most of
+;; FIXME: Still too slow on a file with 400 nodes.  Profiler says most of
 ;;        it is in EmacSQL, maybe some SQL PRAGMA settings would fix?
-;;        Or collect all data for one mega `emacsql' call?
+;;        Or gather all data for one mega `emacsql' call?
 (defun org-node-fakeroam--db-update-files (files)
   "Update the Roam DB about nodes and links involving FILES."
   (when (require 'org-roam nil t)
@@ -397,7 +397,7 @@ Designed to override `org-roam-reflinks-get'."
                                  (org-node-get-file-title node)
                                  ;; HACK: Costs a lot of time, pass a nil hash
                                  ;; (ignore-errors (org-roam-db--file-hash file))
-                                 nil
+                                 ""
                                  (file-attribute-access-time attr)
                                  (file-attribute-modification-time attr))))))
 
