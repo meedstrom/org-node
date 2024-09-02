@@ -1,7 +1,7 @@
 #+startup: content
 [[https://melpa.org/#/org-node][file:https://melpa.org/packages/org-node-badge.svg]]
 * org-node
-** News 2024-Sep-02
+** News [2024-Sep-02]
 The git repo history was REWRITTEN!  You may have had to delete and reinstall the package.  Depends on your package manager.  Sorry about that.
 
 *What was rewritten?*  I erased the =;; Package-Version:= comment line in all historical file contents, because of Emacs 30's new =(use-package :vc)= keyword, which defaults to installing the /oldest/ commit with a given Package-Version, not the /newest/ commit.
@@ -88,6 +88,20 @@ Assuming your package manager knows about [[https://melpa.org/#/getting-started]
   :after org
   :config (org-node-cache-mode))
 #+end_src
+
+It's a very recent add, so you may have to refresh the recipe list first:
+
+: M-x package-refresh-contents RET
+
+On Elpaca:
+
+: M-x elpaca-update-menus RET elpaca-menu-melpa RET
+
+On Straight:
+
+: M-x straight-pull-package RET
+
+-----
 
 If you are an org-roam user, you'll want the *org-node-fakeroam* module as well.  It is not on MELPA yet, so use [[https://github.com/radian-software/straight.el][straight.el]] or similar and add an init snippet like this:
 
