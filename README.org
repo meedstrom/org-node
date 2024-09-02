@@ -3,9 +3,11 @@
 ** News [2024-Sep-02]
 The git repo history was REWRITTEN!  You may have had to delete and reinstall the package.  (Depends on your package manager.)  Sorry about that.
 
-*What was rewritten?*  I erased the =;; Package-Version:= comment line in all historical file contents, because of Emacs 30's new =(use-package :vc)= keyword, which defaults to installing the /oldest/ commit with a given Package-Version, not the /newest/ commit.
+*What was rewritten?*  I've erased the =;; Package-Version:= comment line in file contents, because of Emacs 30's new =(use-package :vc)= keyword, which defaults to installing the /oldest/ commit with a given Package-Version, not the /newest/ commit.
 
-See some [[https://github.com/melpa/melpa/issues/2955#issuecomment-1519154736][loooong related discussions]].  Used to be if you wanted to stop bumping Package-Version, you could just stop, because Melpa would preferentially look at the git tag anyway.  But now, with Emacs 30?  I foresee many more full-repo rewrites in the coming years.
+Even if that's 5 years old.
+
+See some [[https://github.com/melpa/melpa/issues/2955#issuecomment-1519154736][loooong related discussions]].
 
 Lesson learned -- when you create a package, never commit any file containing a Package-Version line.  Doing so curses the repo for the rest of time.
 
