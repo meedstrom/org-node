@@ -2073,7 +2073,7 @@ to false positives, if you have been changing formats over time."
              name)
         (match-string 0 name)))))
 
-(defun org-node-mk-series-on-tag-sorted-by-property
+(defun org-node-mk-series-on-tag-by-property
     (key name tag prop &optional capture)
   "Quick-define a series filtered by TAG sorted by property PROP.
 This would be a series of ID-nodes, not files.
