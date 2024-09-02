@@ -138,7 +138,7 @@ See also `org-node-fakeroam-fast-render-mode'.
           (when (boundp 'savehist-additional-variables)
             (delete 'org-node--file<>previews savehist-additional-variables)
             (delete 'org-node--file<>mtime savehist-additional-variables))
-          ;; Relying only on `kill-emacs-hook' is always a mistake
+          ;; Don't rely only on `kill-emacs-hook'
           (run-with-idle-timer 60 t (lambda ()
                                       (persist-save 'org-node--file<>previews)
                                       (persist-save 'org-node--file<>mtime)))
@@ -585,11 +585,10 @@ See docstring of `org-node-fakeroam-daily-dir'."
                                 org-roam-dailies-directory)))))))
 
 (org-node-fakeroam--cache-roam-dirs)
-(add-hook 'org-node-before-update-tables-hook
-          #'org-node-fakeroam--cache-roam-dirs)
+;; (add-hook 'org-node-before-update-tables-hook
+;;           #'org-node-fakeroam--cache-roam-dirs)
 
-;; Seems like unhygienic packaging?
-;; (eval-after-load 'org-roam-dailies #'org-node-fakeroam--cache-roam-dirs)
+(eval-after-load 'org-roam-dailies #'org-node-fakeroam--cache-roam-dirs)
 
 (provide 'org-node-fakeroam)
 
