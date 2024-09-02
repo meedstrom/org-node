@@ -1,15 +1,15 @@
 #+startup: content
 [[https://melpa.org/#/org-node][file:https://melpa.org/packages/org-node-badge.svg]]
-* org-node
 ** News [2024-Sep-02]
-The git repo history was REWRITTEN!  You may have had to delete and reinstall the package.  Depends on your package manager.  Sorry about that.
+The git repo history was REWRITTEN!  You may have had to delete and reinstall the package.  (Depends on your package manager.)  Sorry about that.
 
 *What was rewritten?*  I erased the =;; Package-Version:= comment line in all historical file contents, because of Emacs 30's new =(use-package :vc)= keyword, which defaults to installing the /oldest/ commit with a given Package-Version, not the /newest/ commit.
 
-See a [[https://github.com/melpa/melpa/issues/2955#issuecomment-1519154736][loooong reelated discussion]].  Used to be if you wanted to stop bumping Package-Version, you could just stop, because Melpa would preferentially look at the git tag anyway.  But now, with Emacs 30?  I foresee many more full-repo rewrites in the coming years.
+See some [[https://github.com/melpa/melpa/issues/2955#issuecomment-1519154736][loooong related discussions]].  Used to be if you wanted to stop bumping Package-Version, you could just stop, because Melpa would preferentially look at the git tag anyway.  But now, with Emacs 30?  I foresee many more full-repo rewrites in the coming years.
 
 Lesson learned -- when you create a package, never commit any file containing a Package-Version line.  Doing so curses the repo for the rest of time.
 
+* org-node
 ** What's all this
 
 I found org-roam too slow, so I made [[https://github.com/meedstrom/quickroam][quickroam]].  And that idea spun off into this package, a standalone thing.  I hope it's also easier to pick up than org-roam.
@@ -343,7 +343,7 @@ Anyway... there's a workaround.  Assuming you leave =org-node-affixation-fn= at 
 
 This lets you match against the node outline path and not only the title, which resolves most conflicts given that the most likely source of conflict is subheadings in disparate files, that happen to be named the same.  [[https://fosstodon.org/@nickanderson/112249581810196258][Some people]] make this trick part of their workflow.
 
-NB: this workaround won't help the in-buffer completions provided by =org-node-complete-at-point-mode=, but with a light peppering of luck this isn't something you'll ever have to notice.  (Work on Issue 38 for principled fix)
+NB: this workaround won't help the in-buffer completions provided by =org-node-complete-at-point-mode=, but with a light peppering of luck this isn't something you'll ever have to notice.
 
 ** Limitation: excluding notes
 The option =org-node-filter-fn= works well for excluding TODO items that happen to have an ID, and excluding org-drill items and that sort of thing, but beyond that, it has limited utility because unlike org-roam, *child ID nodes of an excluded node are not excluded!*
