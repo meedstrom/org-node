@@ -1464,7 +1464,6 @@ In detail:
          (after-save-hook nil)
          (before-save-hook nil)
          (enable-local-variables :safe)
-         (org-element-use-cache nil) ;; Generally prevent bugs
          (org-inhibit-startup t) ;; Don't apply startup #+options
          (org-agenda-files nil)
          (kill-buffer-hook nil) ;; Inhibit save-place etc
@@ -1477,18 +1476,20 @@ In detail:
                                              ,file)
                      (y-or-n-p org-node--imminent-recovery-msg)
                    t))
-         (with-current-buffer (or was-open
-                                  (delay-mode-hooks
-                                    (find-file-noselect ,file)))
-           (save-excursion
-             (without-restriction
-               ,@body))
-           (unless was-open
-             (when (buffer-modified-p)
-               (let ((save-silently t)
-                     (inhibit-message t))
-                 (save-buffer)))
-             (kill-buffer)))))))
+         ;; The cache has been buggy since the 9.5 rewrite, disable to be safe
+         (org-element-with-disabled-cache
+           (with-current-buffer (or was-open
+                                    (delay-mode-hooks
+                                      (find-file-noselect ,file)))
+             (save-excursion
+               (without-restriction
+                 ,@body))
+             (unless was-open
+               (when (buffer-modified-p)
+                 (let ((save-silently t)
+                       (inhibit-message t))
+                   (save-buffer)))
+               (kill-buffer))))))))
 
 (defun org-node--die (format-string &rest args)
   "Like `error' but make sure the user sees it.
@@ -1552,17 +1553,17 @@ files in a new buffer."
          ;; Abbreviating file names because org-id does too
          (org-node-abbrev-file-names ;; 5x: 70ms -> 14ms
           (cl-loop for dir in org-node-extra-id-dirs
-                   append (org-node--dir-files-recursively ;; 2x: 14ms -> 7ms
-                           (file-truename dir)
-                           "org"
-                           org-node-extra-id-dirs-exclude))))))))
+                   nconc (org-node--dir-files-recursively ;; 2x: 14ms -> 7ms
+                          (file-truename dir)
+                          "org"
+                          org-node-extra-id-dirs-exclude))))))))
 
 (defun org-node--dir-files-recursively (dir suffix excludes)
   "Faster, purpose-made variant of `directory-files-recursively'.
 Return a list of all files under directory DIR, its
 sub-directories, sub-sub-directories and so on, with provisos:
 
-- Don\\='t follow symlinks to other directories.
+- Don\\='t follow symlinks to directories.
 - Don\\='t enter directories that start with a dot.
 - Don\\='t enter directories where some substring of the path
   matches one of strings EXCLUDES literally.
@@ -1609,7 +1610,8 @@ compared, but that is probably slower."
     (setq org-node--homedir (file-name-as-directory (expand-file-name "~"))))
   (let* ((case-fold-search nil) ;; Assume case-sensitive filesystem
          (result
-          ;; TODO: maybe use in-ref and setf  (then rename this function to append -in-place)
+          ;; TODO: maybe use in-ref and setf (then rename this function to
+          ;;       `org-node-abbrev-file-names-in-place')
           (cl-loop for path in (ensure-list path-or-paths)
                    do (if (string-prefix-p "/" path)
                           (setq path (directory-abbrev-apply path))
@@ -1646,9 +1648,12 @@ this function will in many cases spit out a list of one item
 because many people keep their Org files in one root
 directory \(with various subdirectories).
 
+By \"root\", we mean the longest directory path common to a set
+of files.
+
 If it finds more than one root, it sorts by count of files they
-contain, so that the most populous root directory will be the
-first element.
+contain recursively, so that the most populous root directory
+will be the first element.
 
 Note also that the only directories that may qualify are those
 that directly contain some member of FILE-LIST, so that if you
@@ -1662,7 +1667,7 @@ the return value will not be \(\"/home/\"), but
 \(\"/home/kept/\" \"/home/me/Syncthing/\"), because \"/home\"
 itself contains no direct members of FILE-LIST.
 
-FILE-LIST must be a list of full paths.  This function does not
+FILE-LIST must be a list of full paths; this function does not
 consult the filesystem, just compares substrings to each other."
   (let* ((files (seq-uniq file-list))
          (dirs (seq-uniq (mapcar #'file-name-directory files))))
@@ -1671,7 +1676,7 @@ consult the filesystem, just compares substrings to each other."
     (cl-loop for dir in dirs
              as dirs-aside-from-this-one = (remove dir dirs)
              when (--any-p (string-prefix-p it dir) dirs-aside-from-this-one)
-             do (setq dirs (delete dir dirs)))
+             do (delete dir dirs))
     ;; Now sort by count of items inside if we found 2 or more roots
     (if (= (length dirs) 1)
         dirs

@@ -164,16 +164,15 @@ caches all results so that it should only be slow the first time.
 
 Argument ORIG-FN is presumably `org-roam-preview-get-contents',
 which see for FILE and PT."
-  (if-let ((cached (alist-get pt (gethash file org-node--file<>previews))))
-      cached
-    (setf (alist-get pt (gethash file org-node--file<>previews))
-          (let ((org-inhibit-startup t))
-            (delay-mode-hooks
-              ;; NOTE: We cannot use `org-roam-fontify-like-in-org-mode' since
-              ;;       it is temporarily overridden by
-              ;;       `org-node-fakeroam--run-without-fontifying' at the time
-              ;;       this runs.  But that's OK; it looks outdated.
-              (org-fontify-like-in-org-mode (funcall orig-fn file pt)))))))
+  (or (alist-get pt (gethash file org-node--file<>previews))
+      (setf (alist-get pt (gethash file org-node--file<>previews))
+            (let ((org-inhibit-startup t))
+              (delay-mode-hooks
+                ;; NOTE: We cannot use `org-roam-fontify-like-in-org-mode'
+                ;;       since it is temporarily overridden by
+                ;;       `org-node-fakeroam--run-without-fontifying' at the
+                ;;       time this runs.  But that's OK; it looks outdated.
+                (org-fontify-like-in-org-mode (funcall orig-fn file pt)))))))
 
 (defun org-node-fakeroam--run-without-fontifying (orig-fn &rest args)
   "Intended as around-advice for `org-roam-node-insert-section'.
@@ -523,8 +522,8 @@ For argument EXTRA-FILES, see that function."
            when (string-prefix-p org-node-fakeroam-daily-dir file)
            collect file)))
 
-;; (benchmark-call (byte-compile #'org-roam-dailies--daily-note-p) 100)
-;; (benchmark-call (byte-compile #'org-node-fakeroam-daily-note-p) 100)
+;; (benchmark-call (byte-compile #'org-roam-dailies--daily-note-p) 1000)
+;; (benchmark-call (byte-compile #'org-node-fakeroam-daily-note-p) 1000)
 (defun org-node-fakeroam-daily-note-p (&optional file)
   "Faster than `org-roam-dailies--daily-note-p' on a slow fs.
 Makes little difference if your filesystem is not the bottleneck.
