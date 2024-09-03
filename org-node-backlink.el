@@ -22,7 +22,6 @@
 
 ;;; Code:
 
-;; TODO: Wrap each backlink in quotes, it's safer
 ;; TODO: Reuse much of this logic to make org-super-links drawers
 
 (require 'org-node)

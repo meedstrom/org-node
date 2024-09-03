@@ -343,12 +343,12 @@ Designed to override `org-roam-reflinks-get'."
             (already (make-hash-table :test #'equal)))
         (cl-loop for node being the hash-values of org-nodes
                  as file = (org-node-get-file-path node)
-                 do (if (= 0 (% (cl-incf ctr)
-                                (cond ((> ctr 200) 100)
-                                      ((> ctr 20) 10)
-                                      (t 1))))
-                        (message "Inserting into %s... %d/%d"
-                                 org-roam-db-location ctr max))
+                 do (when (= 0 (% (cl-incf ctr)
+                                  (cond ((> ctr 200) 100)
+                                        ((> ctr 20) 10)
+                                        (t 1))))
+                      (message "Inserting into %s... %d/%d"
+                               org-roam-db-location ctr max))
                  (unless (gethash file already)
                    (puthash file t already)
                    (org-node-fakeroam--db-add-file-level-data node))
@@ -501,6 +501,24 @@ Even more verbosity is added on top for org-node, which needs to
 process the path through `org-node-abbrev-file-names'.  Thus
 this variable provides an easy shorthand.")
 
+(defun org-node-fakeroam--remember-roam-dirs ()
+  "Cache some convenience variables.
+See docstring of `org-node-fakeroam-daily-dir'."
+  (when (boundp 'org-roam-directory)
+    (setq org-node-fakeroam-dir
+          (org-node-abbrev-file-names
+           (file-truename org-roam-directory)))
+    (when (boundp 'org-roam-dailies-directory)
+      (setq org-node-fakeroam-daily-dir
+            (org-node-abbrev-file-names
+             (file-truename
+              (file-name-concat org-roam-directory
+                                org-roam-dailies-directory)))))))
+
+(org-node-fakeroam--remember-roam-dirs)
+(add-hook 'org-node-before-update-tables-hook
+          #'org-node-fakeroam--remember-roam-dirs)
+
 ;; (benchmark-call (byte-compile #'org-roam-list-files))
 ;; (benchmark-call (byte-compile #'org-node-fakeroam-list-files))
 (defun org-node-fakeroam-list-files ()
@@ -568,27 +586,6 @@ GOTO and KEYS are like in `org-roam-dailies--capture'."
   "Create a daily-note, for a day implied by SORTSTR."
   (declare (obsolete nil "2024-08-21"))
   (org-node-fakeroam-daily-create sortstr "d" t))
-
-
-(defun org-node-fakeroam--cache-roam-dirs ()
-  "Cache some variables.
-See docstring of `org-node-fakeroam-daily-dir'."
-  (when (require 'org-roam nil t)
-    (setq org-node-fakeroam-dir
-          (org-node-abbrev-file-names
-           (file-truename org-roam-directory)))
-    (when (boundp 'org-roam-dailies-directory)
-      (setq org-node-fakeroam-daily-dir
-            (org-node-abbrev-file-names
-             (file-truename
-              (file-name-concat org-roam-directory
-                                org-roam-dailies-directory)))))))
-
-(org-node-fakeroam--cache-roam-dirs)
-;; (add-hook 'org-node-before-update-tables-hook
-;;           #'org-node-fakeroam--cache-roam-dirs)
-
-(eval-after-load 'org-roam-dailies #'org-node-fakeroam--cache-roam-dirs)
 
 (provide 'org-node-fakeroam)
 

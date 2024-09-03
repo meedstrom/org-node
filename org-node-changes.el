@@ -31,8 +31,10 @@
 (require 'cl-lib)
 
 (defvar org-node-changes--new-names
-  '((org-node-rescan-hook org-node-rescan-functions "30 September 2024")
-    (org-node-series org-node-series-defs "15 September 2024"))
+  '((org-node-rescan-hook org-node-rescan-functions)
+    (org-node-series org-node-series-defs "15 September 2024")
+    (org-node--series-info org-node--series)
+    (org-node-mark-days org-node--mark-days))
   "Alist of deprecated symbol names and their new names.")
 
 (defun org-node-changes--warn-and-copy ()
@@ -44,7 +46,7 @@ value."
   (while-let ((row (pop org-node-changes--new-names)))
     (seq-let (old new removed-by) row
       (unless removed-by
-        (setq removed-by "30 August 2024"))
+        (setq removed-by "30 September 2024"))
       (when (boundp old)
         (if new
             (progn
@@ -58,9 +60,8 @@ value."
                    old new)
           (lwarn 'org-node :warning "Your initfiles key-bind a removed command: %S"
                  old)))))
-  ;; Bonus: a hook changed, warn if used in old way
   (cl-loop
-   for fn in org-node-insert-link-hook
+   for fn in (bound-and-true-p org-node-insert-link-hook)
    when (and (not (eq t fn))
              (help-function-arglist fn)
              (not (member (car-safe (help-function-arglist fn))
@@ -146,15 +147,6 @@ hardcoded strings."
 (define-obsolete-function-alias
   'org-node--create 'org-node-create "2024-08-21")
 
-;; (define-obsolete-variable-alias
-;;   'org-node-creation-fn 'org-node-new-node-fn "2024-08-22")
-
-;; (define-obsolete-variable-alias
-;;   'org-node-creation-hook 'org-node-new-node-hook "2024-08-22")
-
-;; (define-obsolete-function-alias
-;;   'org-node-create #'org-node-new-node "2024-08-22")
-
 ;;;###autoload
 (define-obsolete-function-alias
   'org-node-series-menu 'org-node-series-dispatch "2024-08-21")
@@ -176,13 +168,16 @@ hardcoded strings."
  org-node-mk-series-on-tag-sorted-by-property
  org-node-mk-series-on-tag-by-property)
 
+;; (define-obsolete-variable-alias
+;;   'org-node-creation-fn 'org-node-new-node-fn "2024-08-22")
+
+;; (define-obsolete-variable-alias
+;;   'org-node-creation-hook 'org-node-new-node-hook "2024-08-22")
+
+;; (define-obsolete-function-alias
+;;   'org-node-create #'org-node-new-node "2024-08-22")
+
 ;; Variables
-
-(define-obsolete-variable-alias
-  'org-node--series-info 'org-node--series "2024-08-21")
-
-(define-obsolete-variable-alias
-  'org-node-mark-days 'org-node--mark-days "2024-08-21")
 
 (provide 'org-node-changes)
 

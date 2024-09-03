@@ -57,9 +57,6 @@
 
 ;;; Code:
 
-;; TODO: Get rid of Version:, because of emacs 30's (use-package :vc) being
-;;       designed to download the OLDEST revision with a given version string
-
 ;; TODO: A workflow to allow pseudo-untitled (numeric-titled) nodes
 ;;       - Need a bunch of commands for that, like select node by fulltext
 ;;         search
@@ -124,7 +121,6 @@ saved or renamed causing an incremental update to the cache.
 
 Called with one argument: the list of files re-scanned.  It may
 include deleted files."
-  :group 'org-node
   :type 'hook)
 
 (defcustom org-node-prefer-with-heading nil
@@ -142,7 +138,6 @@ If you change your mind about this setting, the Org-roam commands
 `org-roam-promote-entire-buffer' and
 `org-roam-demote-entire-buffer' can help you transition the
 files you already have."
-  :group 'org-node
   :type 'boolean)
 
 (defcustom org-node-inject-variables (list)
@@ -156,7 +151,6 @@ handler.
 I do not use EPG, so that is probably not enough to make it work.
 Report an issue on https://github.com/meedstrom/org-node/issues
 or drop me a line on Mastodon: @meedstrom@emacs.ch"
-  :group 'org-node
   :type 'alist)
 
 ;; TODO: Maybe suggest `utf-8-auto-unix', but is it a sane system for write?
@@ -178,7 +172,6 @@ conversion or downloaded, it\\='s very possible that there\\='s a mix
 of coding systems among them.  In that case, setting this
 variable may cause org-node to fail to scan some of them, or
 display their titles with strange glyphs."
-  :group 'org-node
   :type '(choice coding-system (const nil)))
 
 (defcustom org-node-perf-keep-file-name-handlers nil
@@ -191,7 +184,6 @@ It\\='s infamous for (somewhat) slowing down the access of very
 many files, since it is a series of regexps applied to every file
 name visited.  The smaller this list, the faster
 `org-node-reset'."
-  :group 'org-node
   :type '(choice (const :tag "Keep all" t)
                  (set
                   (function-item jka-compr-handler)
@@ -230,14 +222,12 @@ directory named \"archive\".
                  (org-node-get-todo node)
                  (string-search \"/archive/\" (org-node-get-file-path node))
                  (member \"drill\" (org-node-get-tags node))))))"
-  :group 'org-node
   :type 'function)
 
 (defcustom org-node-insert-link-hook '()
   "Hook run after inserting a link to an Org-ID node.
 
 Called with point in the new link."
-  :group 'org-node
   :type 'hook)
 
 (defcustom org-node-creation-hook '(org-node-put-created)
@@ -254,7 +244,6 @@ A good function for this hook is `org-node-put-created', since
 the default `org-node-datestamp-format' is empty.  In the
 author\\='s experience, recording the creation-date somewhere may
 prove useful later on, e.g. when publishing to a blog."
-  :group 'org-node
   :type 'hook)
 
 (defcustom org-node-extra-id-dirs nil
@@ -279,7 +268,6 @@ IDs, configure `org-node-extra-id-dirs-exclude'.
 Tip: If it happened anyway, try \\[org-node-forget-dir], because
 merely removing a directory from this list does not forget the
 IDs already found."
-  :group 'org-node
   :type '(repeat directory))
 
 ;; TODO: Figure out how to permit .org.gpg and fail gracefully if
@@ -311,7 +299,6 @@ a humongous amount of files, such as the infamous
 \"node_modules\", even if they contain no Org files.  However,
 directories that start with a period are always ignored, so no
 need to specify e.g. \"~/.local/\" or \"/.git/\" for that reason."
-  :group 'org-node
   :type '(repeat string))
 
 
@@ -334,8 +321,7 @@ titles: you\\='ll be able to have two headings with the same name so
 long as their prefix or suffix differ.
 
 After changing this setting, please run \\[org-node-reset]."
-  :type 'boolean
-  :group 'org-node)
+  :type 'boolean)
 
 (defcustom org-node-affixation-fn #'org-node-affix-with-olp
   "Function to give prefix and suffix to completion candidates.
@@ -360,8 +346,7 @@ every alias, in which case TITLE is actually one of the aliases."
   :type '(radio
           (function-item org-node-affix-bare)
           (function-item org-node-affix-with-olp)
-          function)
-  :group 'org-node)
+          function))
 
 (defun org-node-affix-bare (_node title)
   "Use TITLE as-is.
@@ -588,7 +573,6 @@ When called from Lisp, peek on any hash table HT."
 
 -----"
   :global t
-  :group 'org-node
   (remove-hook 'org-mode-hook #'org-node-cache-mode)
   (if org-node-cache-mode
       (progn
@@ -3601,6 +3585,7 @@ Wrap the value in double-brackets if necessary."
                                         org-tag-alist))))))
    org-mode)
   (if (= (org-outline-level) 0)
+      ;; There's no builtin filetag setter yet
       (let* ((tags (cl-loop
                     for raw in (cdar (org-collect-keywords '("FILETAGS")))
                     append (split-string raw ":" t)))
