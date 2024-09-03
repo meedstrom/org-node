@@ -311,10 +311,11 @@ Example setting:
 #+end_src
 
 ** Completion-at-point
-It's not for everyone, but there is the option:
+To complete words at point into known node titles:
 
 #+begin_src elisp
 (org-node-complete-at-point-mode)
+(setq org-roam-completion-everywhere nil) ;; Prevent Roam's variant
 #+end_src
 
 ** Let org-open-at-point detect refs

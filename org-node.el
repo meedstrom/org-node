@@ -114,6 +114,12 @@
   "Support a zettelkasten of org-id files and subtrees."
   :group 'org)
 
+(defun org-node--set-and-remind-reset (sym val)
+  (when org-node-cache-mode
+    (run-with-timer
+     .1 nil #'message "Remember to run `org-node-reset' after configuring %S" sym))
+  (custom-set-default sym val))
+
 (defcustom org-node-rescan-functions nil
   "Hook run after scanning specific files.
 Not run after a full cache reset, only after e.g. a file is
@@ -3613,47 +3619,28 @@ Wrap the value in double-brackets if necessary."
 
 ;;;; CAPF (Completion-At-Point Function)
 
-;; TODO: Throw out most of the magic
-(defvar org-node--roam-settings nil)
+;; REVIEW: is it necessary to limit the effect to file-visiting buffers?
+
 (define-minor-mode org-node-complete-at-point-mode
   "Use `org-node-complete-at-point' in all Org buffers.
-
-Also turn off Org-roam\\='s equivalent, if active.  In that case,
-try to toggle it back on when this is turned off.
 
 -----"
   :global t
   :require 'org-node
-  (when (boundp 'org-roam-completion-everywhere)
-    ;; Remember setting
-    (unless (assoc 'org-roam-completion-everywhere org-node--roam-settings)
-      (push (cons 'org-roam-completion-everywhere
-                  org-roam-completion-everywhere)
-            org-node--roam-settings)))
   (if org-node-complete-at-point-mode
-      ;; Turn on
       (progn
-        (when (boundp 'org-roam-completion-everywhere)
-          (setq org-roam-completion-everywhere nil))
         (add-hook 'org-mode-hook #'org-node--install-capf-in-buffer)
-        ;; Add to already-open buffers
         (dolist (buf (buffer-list))
           (with-current-buffer buf
-            (when (and buffer-file-name (derived-mode-p 'org-mode))
+            (when (and buffer-file-name
+                       (derived-mode-p 'org-mode))
               (add-hook 'completion-at-point-functions
                         #'org-node-complete-at-point nil t)))))
-    ;; Turn off
     (remove-hook 'org-mode-hook #'org-node--install-capf-in-buffer)
-    ;; Remove from already-open buffers
     (dolist (buf (buffer-list))
       (with-current-buffer buf
         (remove-hook 'completion-at-point-functions
-                     #'org-node-complete-at-point t)))
-    (when (boundp 'org-roam-completion-everywhere)
-      ;; Maybe reenable Org-roam's capf
-      (setq org-roam-completion-everywhere
-            (alist-get 'org-roam-completion-everywhere
-                       org-node--roam-settings)))))
+                     #'org-node-complete-at-point t)))))
 
 (defun org-node--install-capf-in-buffer ()
   "Let in-buffer completion try `org-node-complete-at-point'."
@@ -3670,7 +3657,7 @@ Designed for `completion-at-point-functions', which see."
     (and bounds
          ;; For some reason it runs in non-org buffers, like grep results?
          (derived-mode-p 'org-mode)
-         ;; Any way to dodge these checks?
+         ;; Any way to skip these checks?
          (not (org-in-src-block-p))
          (not (save-match-data
                 (org-in-regexp org-link-any-re)))
