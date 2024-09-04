@@ -1586,26 +1586,29 @@ sub-directories, sub-sub-directories and so on, with provisos:
 (defvar org-node--homedir nil)
 (defun org-node-abbrev-file-names (path-or-paths)
   "Abbreviate all file paths in PATH-OR-PATHS.
-PATH-OR-PATHS can be a single path or a list, and presumed to be
-absolute paths.
+PATH-OR-PATHS can be a single path or a list, and are presumed to
+be absolute paths.
 
-Faster than `abbreviate-file-name'.
+Faster than calling `abbreviate-file-name' once for each item in
+a list.  Also faster than `consult--fast-abbreviate-file-name'.
 
 It is a good idea to abbreviate a path when you don\\='t know
 where it came from.  That ensures that it is comparable to a path
 provided in either `org-id-locations' or an `org-node' object.
-Alternatively, you can use `file-truename' on both paths to be
-compared, but that is probably slower."
+
+If the wild path may be a symlink or not an absolute path, it
+would be safer to process it first with `file-truename', then
+pass the result to this function.
+
+Needless to say, you can also just use `file-truename' on both
+paths to be compared, if not writing performance-critical code
+\(think slow network filesystems)."
   (unless org-node--homedir
     (setq org-node--homedir (file-name-as-directory (expand-file-name "~"))))
   (let* ((case-fold-search nil) ;; Assume case-sensitive filesystem
          (result
-          ;; TODO: maybe use in-ref and setf (then rename this function to
-          ;;       `org-node-abbrev-file-names-in-place')
           (cl-loop for path in (ensure-list path-or-paths)
-                   do (if (string-prefix-p "/" path)
-                          (setq path (directory-abbrev-apply path))
-                        (error "Not true or absolute filename: %s" path))
+                   do (setq path (directory-abbrev-apply path))
                    and collect
                    (if (string-prefix-p org-node--homedir path)
                        (concat
