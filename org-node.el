@@ -733,6 +733,8 @@ In broad strokes:
   (require 'org-id)
   (when (not org-id-track-globally)
     (user-error "Org-node requires `org-id-track-globally'"))
+  (when org-id-locations-file-relative
+    (user-error "Org-node requires nil `org-id-locations-file-relative'"))
   (when (null org-id-locations)
     (when (file-exists-p org-id-locations-file)
       (ignore-errors (org-id-locations-load))))
@@ -1522,8 +1524,8 @@ files in a new buffer."
   (if interactive
       (progn
         (pop-to-buffer (get-buffer-create "*org-node files*"))
-        (let ((files (org-node-list-files)))
-          (setq buffer-read-only nil)
+        (let ((files (org-node-list-files))
+              (inhibit-read-only t))
           (erase-buffer)
           (insert (format "Found %d Org files\n" (length files)))
           (dolist (file (sort files #'string<))
@@ -1532,9 +1534,9 @@ files in a new buffer."
                                 'action `(lambda (_button)
                                            (find-file ,file))
                                 'follow-link t)
-            (newline))
-          (goto-char (point-min))
-          (setq buffer-read-only t)))
+            (newline)))
+        (goto-char (point-min))
+        (view-mode))
     (if instant
         (hash-table-keys org-node--file<>mtime)
       (-union ;; Faster than `seq-union' by 10x: 2000ms -> 200ms
@@ -1548,6 +1550,7 @@ files in a new buffer."
                           "org"
                           org-node-extra-id-dirs-exclude))))))))
 
+;; (benchmark-run 70 (length (org-node--dir-files-recursively "/home/kept/roam" "org" '("logseq/"))))
 (defun org-node--dir-files-recursively (dir suffix excludes)
   "Faster, purpose-made variant of `directory-files-recursively'.
 Return a list of all files under directory DIR, its
@@ -1565,20 +1568,18 @@ sub-directories, sub-sub-directories and so on, with provisos:
     (dolist (file (file-name-all-completions "" dir))
       (if (directory-name-p file)
           (unless (string-prefix-p "." file)
-	    (let ((full-file (file-name-concat dir file)))
-	      (when (not (or (cl-loop for substr in excludes
-                                      when (string-search substr full-file)
-                                      return t)
-                             (file-symlink-p (directory-file-name full-file))))
-	        (setq result (nconc result
-                                    (org-node--dir-files-recursively
-			             full-file suffix excludes))))))
-	(when (string-suffix-p suffix file)
-          (let ((full-file (file-name-concat dir file)))
-            (unless (cl-loop for substr in excludes
-                             when (string-search substr full-file)
-                             return t)
-	      (push full-file result))))))
+            (setq file (file-name-concat dir file))
+            (when (not (or (cl-loop for substr in excludes
+                                    thereis (string-search substr file))
+                           (file-symlink-p (directory-file-name file))))
+              (setq result (nconc result
+                                  (org-node--dir-files-recursively
+        		           file suffix excludes)))))
+        (when (string-suffix-p suffix file)
+          (setq file (file-name-concat dir file))
+          (unless (cl-loop for substr in excludes
+                           thereis (string-search substr file))
+            (push file result)))))
     result))
 
 ;; (progn (byte-compile #'org-node-abbrev-file-names) (garbage-collect) (benchmark-call #'org-node-list-files))
@@ -3503,6 +3504,9 @@ one of them is associated with a ROAM_REFS."
       (message "Congratulations, no problems scanning %d nodes!"
                (hash-table-count org-node--id<>node)))))
 
+;; REVIEW: Is this a sane logic for picking heading?  It does not mirror how
+;;         org-set-tags picks heading to apply to, and maybe that is the
+;;         behavior to model
 (defun org-node--call-at-nearest-node (function &rest args)
   "With point at the relevant heading, call FUNCTION with ARGS.
 

@@ -494,12 +494,12 @@ compare paths.
 
 Rationale: The original `org-roam-dailies-directory' was a
 relative path, which incurred verbosity penalties in all code
-that used it (plus practically a major performance penalty since
+that used it \(plus practically a major performance penalty since
 `expand-file-name' was often used instead of `file-name-concat').
 
 Even more verbosity is added on top for org-node, which needs to
-process the path through `org-node-abbrev-file-names'.  Thus
-this variable provides an easy shorthand.")
+process the path through `abbreviate-file-name'.  Thus this
+variable provides an easy shorthand.")
 
 (defun org-node-fakeroam--remember-roam-dirs ()
   "Cache some convenience variables.

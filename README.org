@@ -7,9 +7,9 @@ The git repo history was REWRITTEN!  You may have had to delete and reinstall th
 
 Even if that's 5 years old.
 
-See some [[https://github.com/melpa/melpa/issues/2955#issuecomment-1519154736][loooong related discussions]].
+See some [[https://github.com/melpa/melpa/issues/2955#issuecomment-1519154736][loooong related discussions]] about the untrustworthiness of Package-Version, and that's leaving aside the fact the ecosystem [[https://github.com/melpa/melpa/issues/6656][doesn't really make use of]] the concept of versioned releases, and when half the ecosystem pretends it does instead of taking the newest commit, they make it less stable for all.
 
-Lesson learned -- when you create a package, never commit any file containing a Package-Version line.  Doing so curses the repo for the rest of time.
+Lesson learned -- when /you/ create a package, never commit a file containing a Package-Version line.  Doing so curses the repo for the rest of time, or until you learn to use git-filter-repo to undo the damage.
 
 * org-node
 ** What's all this
