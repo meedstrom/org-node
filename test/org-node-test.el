@@ -1,4 +1,4 @@
-;;; org-node-test.el -*- lexical-binding: t; -*-
+;;; org-node-test.el --- Test suite -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2024 Martin Edström
 
@@ -75,7 +75,10 @@
                    "d3"))))
 
 (ert-deftest org-node/test-parsing-testfile2.org ()
-  (org-node--scan-targeted (list (file-truename "testfile2.org")))
+  (org-node--scan-targeted
+   (list (file-name-concat (file-name-directory (locate-library "org-node"))
+                           "test"
+                           "testfile2.org")))
   (org-node-cache-ensure t)
   (let ((node (gethash "bb02315f-f329-4566-805e-1bf17e6d892d" org-node--id<>node)))
     (should (equal (org-node-get-olp node) nil))
