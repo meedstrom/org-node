@@ -54,9 +54,10 @@ keywords within."
 
 (defun org-node-parser--memq-car (key alist)
   "Like `memq', but check the `car' of each member.
-In other words, recurse into the `cdr' of ALIST until the `caar'
-is `eq' to KEY.  This may sound like `assq', but `assq' returns
-only one item, while this returns the entire tail of ALIST."
+In other words: like `assq', but return the entire tail of ALIST.
+
+Concretely: recurse into the `cdr' of ALIST until the `caar'
+is `eq' to KEY, then return what remains of ALIST."
   (while (and alist (not (eq key (caar alist))))
     (setq alist (cdr alist)))
   alist)
@@ -660,6 +661,8 @@ findings to another temp file."
                                 (current-time)))))))
   ;; TODO: Does emacs in batch mode garbage-collect at the end? I guess not but
   ;;       if it does then maybe exec a kill -9 on itself here to skip it.
+  ;;       Profile this.
+  ;; (call-process "kill" nil nil nil "-9" (number-to-string (emacs-pid)))
   )
 
 (provide 'org-node-parser)

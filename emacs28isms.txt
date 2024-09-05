@@ -1,11 +1,11 @@
 Seems that Debian stable will be stuck on Emacs 28 until mid-2025,
 then likely leap to Emacs 30.
 
-List of 28-isms to drop in future
+List of 28-isms and 29-isms to drop in future
 
 - (cadar (org-collect-keywords "TITLE")) -> (org-get-title)
 - (org-node--emacs25-strip-diacritics)
 - ;;;###autoload (autoload 'org-node-series-dispatch "org-node" nil t)
-  - In Emacs 30 just ;;;###autoload
+  - In Emacs 30, replace with just ;;;###autoload
 - any usages of compat-call
 - what the compiler tells you is obsolete

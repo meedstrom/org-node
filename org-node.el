@@ -2219,13 +2219,13 @@ Each item looks like
      :prompter PROMPTER
      :try-goto TRY-GOTO
      :creator CREATOR
-     :version VERSION
-     :capture CAPTURE)
+     :capture CAPTURE
+     :version VERSION)
 
 KEY uniquely identifies the series, and is the key to type after
 \\[org-node-series-dispatch] to select it.  It may not be \"j\",
-\"n\" or \"p\", these keys are reserved for Jump, Next and
-Previous actions.
+\"n\", \"p\" or \"c\", these keys are reserved for
+Jump/Next/Previous/Capture actions.
 
 NAME describes the series, in one or a few words.
 
@@ -2246,12 +2246,13 @@ interactively prompt for a sort-string.  This highlights the
 other use of the sort-string: finding our way back from scant
 context.
 
-In the example of a series of daily-notes sorted on YYYY-MM-DD, a
-simple prompter can use `org-read-date' because it returns
-strings in YYYY-MM-DD format as well.
+For example, in a series of daily-notes sorted on YYYY-MM-DD, a
+prompter could use `org-read-date'.
 
-PROMPTER receives one argument, the series plist, of which an
-useful member may be (plist-get series :sorted-items).
+PROMPTER receives one argument, the series plist, which has the
+same form as one of the values in `org-node-series-defs' but
+includes two extra members :key, corresponding to KEY, and
+:sorted-items, which may be useful for interactive completion.
 
 Function WHEREAMI is like PROMPTER in that it should return a
 sort-string.  However, it should do this without user
@@ -2270,7 +2271,18 @@ function.
 Function CREATOR creates a place that did not exist.  For
 example, if the user picked a date from `org-read-date' but no
 daily-note exists for that date, CREATOR is called to create that
-daily-note.  It receives a would-be sort-string as argument."
+daily-note.  It receives a would-be sort-string as argument.
+
+Optional string CAPTURE indicates the keys to a capture template
+to autoselect, when you choose the capture option in the
+`org-node-series-dispatch' menu.
+
+Integer VERSION indicates the series definition language.  New
+series should use version 2, as of 2024-09-05.  When org-node
+updates the series definition language, old versions may still
+work, but this is not heavily tested, so it will start printing a
+message to remind you to check out the wiki on GitHub and port
+your definitions."
   :type 'alist)
 
 (defvar org-node--series nil
@@ -2403,7 +2415,9 @@ not exist."
 
 (defun org-node--build-series (def)
   "From plist DEF, populate `org-node--series'.
-Also add a corresponding entry to `org-node-series-dispatch'."
+Then add a corresponding entry to `org-node-series-dispatch'.
+
+DEF is a member of `org-node-series-defs'."
   (let ((classifier (org-node--ensure-compiled
                      (plist-get (cdr def) :classifier)))
         (unique-sortstrs (make-hash-table :test #'equal)))
@@ -2821,7 +2835,10 @@ creation-date as more \"truthful\" than today\\='s date.
 In other words, if e.g. FORMAT is %Y-%m-%d, which can be
 instantiated in many ways such as 2024-08-10, then this should
 return a regexp that can match any of those ways it might turn
-out, with any year, month or day."
+out, with any year, month or day.
+
+Memoize the value, so consecutive calls with the same FORMAT only
+need to compute once."
   (unless (equal format (car org-node--make-regexp-for-time-format))
     (setq org-node--make-regexp-for-time-format
           (cons format
