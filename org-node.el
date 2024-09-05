@@ -482,11 +482,11 @@ or you can visit the homepage:
 
 (cl-defstruct (org-node-link (:constructor org-node-link--make-obj)
                              (:copier nil))
+  "Please see docstring of `org-node-get-id-links'."
   origin
   pos
   type
-  dest
-  properties)
+  dest)
 
 
 ;;;; Tables
@@ -1302,9 +1302,7 @@ point but assume it is a link to ID."
              :origin origin
              :pos (point)
              :type "id"
-             :dest dest
-             :properties (list :outline (ignore-errors
-                                          (org-get-outline-path t))))
+             :dest dest)
             (gethash dest org-node--dest<>links)))))
 
 (defun org-node--dirty-ensure-node-known ()

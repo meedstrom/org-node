@@ -231,15 +231,13 @@ Arguments PLAIN-RE and MERGED-RE..."
           ;;                       id-here
           ;;                       (point)
           ;;                       link-type
-          ;;                       (substring citekey 1) ;; Drop &
-          ;;                       (list :outline olp-with-self))
+          ;;                       (substring citekey 1)) ;; Drop &
           ;;               org-node-parser--result-found-links)))
           (push (record 'org-node-link
                         id-here
                         (point)
                         link-type
-                        (string-replace "%20" " " path) ;; sane?
-                        (list :outline olp-with-self))
+                        (string-replace "%20" " " path))
                 org-node-parser--result-found-links))))
 
     ;; Start over and look for Org 9.5 @citekeys
@@ -264,8 +262,7 @@ Arguments PLAIN-RE and MERGED-RE..."
                               id-here
                               (point)
                               nil
-                              (substring (match-string 0) 1) ;; drop @
-                              (list :outline olp-with-self))
+                              (substring (match-string 0) 1)) ;; drop @
                       org-node-parser--result-found-links)))
           (error "No closing [cite: bracket")))))
   (goto-char (or end (point-max))))
@@ -447,11 +444,11 @@ findings to another temp file."
                       (unless (search-forward ":end:" nil t)
                         (error "Couldn't find :END: of drawer"))
                       (org-node-parser--collect-links-until
-                       nil FILE-ID nil $plain-re $merged-re))
+                       nil FILE-ID $plain-re $merged-re))
                   (setq END (point-max)))
                 (goto-char HERE)
                 (org-node-parser--collect-links-until
-                 END FILE-ID nil $plain-re $merged-re)
+                 END FILE-ID $plain-re $merged-re)
 
                 ;; NOTE: A plist would be more readable than a record, but then
                 ;; main Emacs has more work to do.  Profiled using:
@@ -582,7 +579,6 @@ findings to another temp file."
                 ;; NOTE: nil ID is allowed
                 (push (list HEADING-POS TITLE LEVEL ID) OUTLINE-DATA)
                 (when ID
-                  (setq OLP (org-node-parser--pos->olp OUTLINE-DATA HEADING-POS))
                   (push
                    ;; NOTE: See the defstruct for the ordering of fields
                    (record 'org-node
@@ -595,7 +591,7 @@ findings to another temp file."
                            ID
                            t
                            LEVEL
-                           OLP
+                           (org-node-parser--pos->olp OUTLINE-DATA HEADING-POS)
                            HEADING-POS
                            PRIORITY
                            PROPS
@@ -612,7 +608,6 @@ findings to another temp file."
                                   (org-node-parser--pos->parent-id
                                    OUTLINE-DATA HEADING-POS FILE-ID)
                                   (throw 'entry-done t)))
-                (setq OLP-WITH-SELF (append OLP (list TITLE)))
                 (setq HERE (point))
                 ;; Don't count org-super-links backlinks
                 ;; TODO: Generalize this mechanism to skip src blocks too
@@ -628,16 +623,16 @@ findings to another temp file."
                 ;; Gotcha... collect links inside the heading too
                 (goto-char HEADING-POS)
                 (org-node-parser--collect-links-until
-                 (pos-eol) ID-HERE OLP-WITH-SELF $plain-re $merged-re)
+                 (pos-eol) ID-HERE $plain-re $merged-re)
                 ;; Collect links between property drawer and backlinks drawer
                 (goto-char HERE)
                 (when DRAWER-BEG
                   (org-node-parser--collect-links-until
-                   DRAWER-BEG ID-HERE OLP-WITH-SELF $plain-re $merged-re))
+                   DRAWER-BEG ID-HERE $plain-re $merged-re))
                 ;; Collect links until next heading
                 (goto-char (or DRAWER-END HERE))
                 (org-node-parser--collect-links-until
-                 (point-max) ID-HERE OLP-WITH-SELF $plain-re $merged-re))
+                 (point-max) ID-HERE $plain-re $merged-re))
               (goto-char (point-max))
               (widen)))
 

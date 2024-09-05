@@ -280,7 +280,7 @@ Designed to override `org-roam-backlinks-get'."
                 :target-node target-roam-node
                 :source-node (org-node-fakeroam--mk-node src-node)
                 :point (org-node-link-pos link)
-                :properties (org-node-link-properties link))))))
+                :properties (list :outline nil))))))
 
 (defun org-node-fakeroam--mk-reflinks (target-roam-node &rest _)
   "Make org-roam-reflink objects pointing to TARGET-ROAM-NODE.
@@ -300,7 +300,7 @@ Designed to override `org-roam-reflinks-get'."
                           :ref (org-node-link-dest link)
                           :source-node (org-node-fakeroam--mk-node src-node)
                           :point (org-node-link-pos link)
-                          :properties (org-node-link-properties link))))))))
+                          :properties (list :outline nil))))))))
 
 
 ;;;; Feed method: supply data to Roam's DB
@@ -334,6 +334,7 @@ Designed to override `org-roam-reflinks-get'."
   "Wipe the Roam DB and rebuild."
   (interactive)
   (when (require 'org-roam nil t)
+    (org-node-fakeroam--check-compile)
     (org-node-cache-ensure)
     (org-roam-db--close)
     (delete-file org-roam-db-location)
@@ -457,23 +458,23 @@ This includes all links and citations that touch NODE."
                                  (vector id ref type)
                                ;; Ref is a @citekey
                                (vector id ref "cite")))))
+
       (dolist (link (nconc (org-node-get-id-links node)
                            (org-node-get-reflinks node)))
-        ;; See `org-roam-db-insert-link'
-        ;; Don't add citations (type=nil), they go in a separate table
         (if (org-node-link-type link)
+            ;; See `org-roam-db-insert-link'
             (org-roam-db-query [:insert :into links :values $v1]
                                (vector (org-node-link-pos link)
                                        (org-node-link-origin link)
                                        id
                                        (org-node-link-type link)
-                                       (org-node-link-properties link)))
+                                       (list :outline nil)))
           ;; See `org-roam-db-insert-citation'
           (org-roam-db-query [:insert :into citations :values $v1]
                              (vector (org-node-link-origin link)
                                      (org-node-link-dest link)
                                      (org-node-link-pos link)
-                                     (org-node-link-properties link))))))))
+                                     (list :outline nil))))))))
 
 
 ;;;; Bonus advices
