@@ -125,12 +125,11 @@ in one of the elements."
 Format string S for display - this means replace every link in S
 with only their description.  A perhaps surprising application is
 formatting node titles that may have links in them."
-  (save-match-data
-    (replace-regexp-in-string
-     ;; The regexp is `org-link-bracket-re'
-     "\\[\\[\\(\\(?:[^][\\]\\|\\\\\\(?:\\\\\\\\\\)*[][]\\|\\\\+[^][]\\)+\\)]\\(?:\\[\\([^z-a]+?\\)]\\)?]"
-     (lambda (m) (or (match-string 2 m) (match-string 1 m)))
-     s nil t)))
+  (replace-regexp-in-string
+   ;; The regexp is `org-link-bracket-re'
+   "\\[\\[\\(\\(?:[^][\\]\\|\\\\\\(?:\\\\\\\\\\)*[][]\\|\\\\+[^][]\\)+\\)]\\(?:\\[\\([^z-a]+?\\)]\\)?]"
+   (lambda (m) (or (match-string 2 m) (match-string 1 m)))
+   s nil t))
 
 (defun org-node-parser--next-heading ()
   "Similar to `outline-next-heading'."
@@ -524,15 +523,16 @@ findings to another temp file."
                   (skip-chars-forward " "))
                 (setq HERE (point))
                 ;; Any tags in heading?
-                (if (re-search-forward " +\\(:.+:\\) *$" (pos-eol) t)
+                (if (re-search-forward " +:.+: *$" (pos-eol) t)
                     (progn
+                      (goto-char (match-beginning 0))
+                      (setq TAGS (split-string (match-string 0) ":" t " *"))
                       (setq TITLE (org-node-parser--org-link-display-format
-                                   (buffer-substring HERE (match-beginning 0))))
-                      (setq TAGS (split-string (match-string 1) ":" t)))
+                                   (buffer-substring HERE (point)))))
+                  (setq TAGS nil)
                   (setq TITLE
                         (org-node-parser--org-link-display-format
-                         (buffer-substring HERE (pos-eol))))
-                  (setq TAGS nil))
+                         (buffer-substring HERE (pos-eol)))))
                 ;; Gotta go forward 1 line, see if it is a planning-line, and
                 ;; if it is, then go forward 1 more line, and if that is a
                 ;; :PROPERTIES: line, then we're good
