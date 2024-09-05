@@ -1,0 +1,910 @@
+\input texinfo    @c -*- texinfo -*-
+@c %**start of header
+@setfilename doc/org-node.info
+@settitle Org-Node
+@documentencoding UTF-8
+@documentlanguage en
+@c %**end of header
+
+@dircategory Emacs
+@direntry
+* Org-Node: (org-node). Link org-id entries into a network.
+@end direntry
+
+@finalout
+@titlepage
+@title Org-Node
+@author Martin Edström
+@end titlepage
+
+@ifnottex
+@node Top
+@top Org-Node
+@end ifnottex
+
+@menu
+* News::
+* Background::
+* Setup::
+* Backlinks::
+* Misc::
+* Appendix::
+
+@detailmenu
+--- The Detailed Node Listing ---
+
+Background
+
+* What's all this::
+* What's a "node"?::
+* Features::
+
+Setup
+
+* Install::
+* Quick start::
+* Use Org-roam at the same time?::
+
+Backlinks
+
+* What are backlinks?::
+* Backlink solution 1 Borrow org-roam's backlink buffer::
+* Backlink solution 2 Print inside the file::
+
+Backlink solution 1: Borrow org-roam's backlink buffer
+
+* Option 1A Let org-roam manage its own DB::
+* Option 1B Tell org-node to write to the org-roam DB::
+* Option 1C Cut out the DB altogether::
+
+Backlink solution 2: Print inside the file
+
+* Option 2A Let org-node manage aBACKLINKS property: Option 2A Let org-node manage a BACKLINKS property. 
+* Option 2B Let org-super-links manage aBACKLINKS@dots{}END drawer: Option 2B Let org-super-links manage a BACKLINKS@dots{}END drawer. 
+
+Misc
+
+* Org-capture::
+* Node series::
+* Managing org-id-locations::
+* Completion-at-point::
+* Let org-open-at-point detect refs::
+* Limitation TRAMP::
+* Limitation Unique titles::
+* Limitation Excluding notes::
+* Limitation Org-ref::
+* Tip On very slow filesystems::
+* Tip Word-wrap in the Roam buffer?::
+* Toolbox::
+
+Node series
+
+* What are series?::
+
+Appendix
+
+* Appendix I Rosetta stone::
+
+@end detailmenu
+@end menu
+
+@node News
+@chapter News
+
+On @emph{[2024-09-02 Mon]}, the git repo history was REWRITTEN@!  You may have had to delete and reinstall the package.  (Depends on your package manager.)  Sorry about that.
+
+@strong{What was rewritten?}  I've erased the @samp{;; Package-Version:} comment line in file contents, because of Emacs 30's new @samp{(use-package :vc)} keyword, which defaults to installing the @emph{oldest} commit with a given Package-Version, not the @emph{newest} commit.
+
+Even if that's 5 years old.
+
+See some @uref{https://github.com/melpa/melpa/issues/2955#issuecomment-1519154736, loooong related discussions} about the untrustworthiness of Package-Version, and that's leaving aside the fact the ecosystem @uref{https://github.com/melpa/melpa/issues/6656, doesn't really make use of} the concept of versioned releases, and when some tools pretend it does instead of taking the newest commit, they make it less stable for all.
+
+Lesson learned -- when @emph{you} create a package, never commit a file containing a Package-Version line.  Doing so curses the repo for the rest of time, or until you use git-filter-repo to undo the damage.
+
+@node Background
+@chapter Background
+
+@menu
+* What's all this::
+* What's a "node"?::
+* Features::
+@end menu
+
+@node What's all this
+@section What's all this
+
+I found org-roam too slow, so I made @uref{https://github.com/meedstrom/quickroam, quickroam}.  And that idea spun off into this package, a standalone thing.  I hope it's also easier to pick up than org-roam.
+
+@itemize
+@item
+@strong{If you were using org-roam}, there is nothing to migrate.  You can use both packages.  It's exactly the same on-disk format: "notes" are identified by their org-id.
+
+With optional shims, you can even @strong{skip syncing the org-roam DB} and continue using its rich backlinks buffer and org-roam-capture!
+
+In pursuit of being "just org-id", this package has no equivalent setting to @samp{org-roam-directory} -- it just looks up @samp{org-id-locations}.
+
+@item
+@strong{If you were not using org-roam}, maybe think of it as somewhat like @uref{https://github.com/alphapapa/org-recent-headings, org-recent-headings} beefed-up to the extent that you won't need other methods of browsing.
+
+If you were the sort of person to prefer ID-links over file links or any other type of link, you're in the right place!  Now you can rely on IDs, and---if you want---stop worrying about filenames, directories and subtree hierarchies.  As long as you've assigned an ID to a heading, you can find it later.
+@end itemize
+
+@node What's a "node"?
+@section What's a "node"?
+
+My life can be divided into two periods "@strong{before org-roam}" and "@strong{after org-roam}".  I crossed a kind of gap once I got a good way to link between my notes.  It's odd to remember when I just relied on browsing subtrees and folders -- what a strange way to work!
+
+I used to lose track of things I had written, under some forgotten heading in a forgotten file in a forgotten directory.  The org-roam method let me @strong{find} and @strong{build on} my own work, instead of @uref{https://en.wikipedia.org/wiki/Cryptomnesia, recreating my work all the time}.
+
+At the core, all the "notetaking packages" (@uref{https://github.com/rtrppl/orgrr, orgrr}/@uref{https://github.com/localauthor/zk, zk}/@uref{https://github.com/EFLS/zetteldeft, zetteldeft}/@uref{https://github.com/org-roam/org-roam, org-roam}/@uref{https://github.com/protesilaos/denote, denote}/@uref{https://github.com/kaorahi/howm, howm}/@uref{https://github.com/kisaragi-hiu/minaduki, minaduki}/@dots{}) try to help you with this: make it easy to link between notes and explore them.
+
+Right off the bat, that imposes two requirements: a method to search for notes, since you can't link to something you can't search for, and a design-choice about what kinds of things should turn up as search hits.  What's a "note"?
+
+Just searching for Org files is too coarse.  Just searching for any subtree anywhere brings in too much clutter.
+
+@strong{Here's what org-roam invented.}  It turns out that if you limit the search-hits to just those files and subtrees you've deigned to assign an org-id -- which roughly maps to @emph{everything you've ever thought it was worth linking to} -- it filters out the noise excellently.
+
+Once a subtree has an ID you can link to, it's a "node" because it has joined the wider graph, the network of linked nodes.  I wish the English language had more distinct sounds for the words "node" and "note", but to clarify, I'll say "ID-node" when the distinction matters.
+
+@node Features
+@section Features
+
+A comparison of three similar systems, which permit relying on org-id and don't lock you into the all-too-seductive concept of "one-note-per-file".
+
+@multitable {aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa} {aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa} {aaaaaaaaaaaaaaaaaa} {aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}
+@headitem Feature
+@tab @uref{https://github.com/org-roam/org-roam, org-roam}
+@tab org-node
+@tab @uref{https://github.com/toshism/org-super-links, org-super-links}
+@item Backlinks
+@tab yes
+@tab yes
+@tab yes
+@item Node search and insert
+@tab yes
+@tab yes
+@tab -- (suggests @uref{https://github.com/alphapapa/org-ql, org-ql})
+@item Node aliases
+@tab yes
+@tab yes
+@tab --
+@item Node exclusion
+@tab yes
+@tab limited
+@tab not applicable
+@item Rich backlinks buffer
+@tab yes
+@tab yes (org-roam's)
+@tab --
+@item Customize how backlinks shown
+@tab yes
+@tab yes (org-roam's)
+@tab yes
+@item Reflinks
+@tab yes
+@tab yes (as backlinks)
+@tab --
+@item Ref search
+@tab yes
+@tab yes (as aliases)
+@tab not applicable
+@item Org 9.5 @@citekeys as refs
+@tab yes
+@tab yes
+@tab not applicable
+@item Support org-ref v2 and v3
+@tab yes
+@tab limited
+@tab not applicable
+@item Work thru org-roam-capture
+@tab yes
+@tab yes
+@tab ?
+@item Work thru org-capture
+@tab --
+@tab yes
+@tab ?
+@item Daily-nodes
+@tab yes
+@tab yes
+@tab --
+@item Node series
+@tab --
+@tab yes
+@tab --
+@item Show backlinks in same window
+@tab --
+@tab yes
+@tab yes
+@item Cooperate with org-super-links
+@tab --
+@tab yes
+@tab not applicable
+@item Fix link descriptions
+@tab --
+@tab yes
+@tab --
+@item List dead links
+@tab --
+@tab yes
+@tab --
+@item Rename file when title changes
+@tab --
+@tab yes
+@tab --
+@item Warn about duplicate titles
+@tab --
+@tab yes
+@tab --
+@item Principled "related-section"
+@tab --
+@tab --
+@tab yes
+@item Refile
+@tab yes
+@tab --
+@tab --
+@item Untitled notes
+@tab --
+@tab --
+@tab --
+@item Support @samp{roam:} links
+@tab yes
+@tab -- (WONTFIX)
+@tab not applicable
+@item Can have separate note piles
+@tab yes
+@tab -- (WONTFIX)
+@tab not applicable
+@item Some query-able cache
+@tab EmacSQL
+@tab hash tables
+@tab --
+@item Async cache rebuild
+@tab --
+@tab yes
+@tab not applicable
+@item @strong{Time to cache my 3000 nodes}
+@tab @strong{2m 48s}
+@tab @strong{0m 02s}
+@tab not applicable
+@item @strong{Time to save file w/ 400 nodes}
+@tab @strong{5--10s}
+@tab @strong{instant}
+@tab ?
+@item @strong{Time to open minibuffer}
+@tab @strong{1--3s}
+@tab @strong{instant}
+@tab not applicable
+@end multitable
+
+@node Setup
+@chapter Setup
+
+@menu
+* Install::
+* Quick start::
+* Use Org-roam at the same time?::
+@end menu
+
+@node Install
+@section Install
+
+Assuming your package manager knows about @uref{https://melpa.org/#/getting-started, MELPA}, add this initfile snippet:
+
+@lisp
+(use-package org-node
+  :after org
+  :config (org-node-cache-mode))
+@end lisp
+
+It's a very recent add, so you may have to refresh the recipe list first:
+
+@example
+M-x package-refresh-contents RET
+@end example
+
+
+On Elpaca:
+
+@example
+M-x elpaca-update-menus RET elpaca-menu-melpa RET
+@end example
+
+
+On Straight:
+
+@example
+M-x straight-pull-package RET
+@end example
+
+
+If you are an org-roam user, you'll want the @strong{org-node-fakeroam} module as well.  It is not on MELPA yet, so use @uref{https://github.com/radian-software/straight.el, straight.el} or similar and add an init snippet like this:
+
+@lisp
+(use-package org-node-fakeroam
+  :straight (org-node-fakeroam
+             :type git :host github :repo "meedstrom/org-node"
+             :files ("org-node-fakeroam.el")
+             :branch "melpa")
+  :after org-node
+  :requires org-node)
+@end lisp
+
+@node Quick start
+@section Quick start
+
+If you're new to these concepts, fear not.  The main things for day-to-day operation are two verbs: "find" and "link".
+
+Pick some short keys and try them out.
+
+@lisp
+(keymap-set global-map "M-s M-f" #'org-node-find)
+(keymap-set org-mode-map "M-s M-i" #'org-node-insert-link)
+@end lisp
+
+To browse config options, type @samp{M-x customize-group RET org-node RET}.
+
+Final tip: there's @strong{no separate command} for creating a new node!  Reuse one of the commands above, then type the name of a node that doesn't exist.  Try it and see what happens!
+
+@node Use Org-roam at the same time?
+@section Use Org-roam at the same time?
+
+These settings help you feel at home using both packages side-by-side:
+
+@lisp
+(setq org-node-creation-fn #'org-node-new-via-roam-capture)
+(setq org-node-slug-fn #'org-node-slugify-like-roam-actual)
+(setq org-node-datestamp-format "%Y%m%d%H%M%S-")
+@end lisp
+
+If you've struggled in the past with big files taking a long time to save, consider these org-roam settings:
+
+@lisp
+(setq org-roam-db-update-on-save nil) ;; don't update DB on save, not needed
+(setq org-roam-link-auto-replace nil) ;; don't look for "roam:" links on save
+@end lisp
+
+And if the backlinks buffer is laggy:
+
+@lisp
+(org-node-fakeroam-fast-render-mode) ;; build the Roam buffer faster
+@end lisp
+
+Finally, make sure the underlying org-id knows about the files org-roam knows.  You'd think it would, but that isn't a given!  Do either of these:
+
+@enumerate
+@item
+Run @samp{M-x org-roam-update-org-id-locations} after every Emacs restart
+
+@item
+Edit the following setting so it includes your @samp{org-roam-directory}.  Supposing that is "~/org/", set this:
+@end enumerate
+
+@lisp
+(setq org-node-extra-id-dirs '("~/org/"))
+@end lisp
+
+With that done, try out the commands we went over in @uref{https://github.com/meedstrom/org-node#quick-start, Quick start}.  There's more under @uref{https://github.com/meedstrom/org-node#toolbox, Toolbox}.  Enjoy!
+
+@node Backlinks
+@chapter Backlinks
+
+@menu
+* What are backlinks?::
+* Backlink solution 1 Borrow org-roam's backlink buffer::
+* Backlink solution 2 Print inside the file::
+@end menu
+
+@node What are backlinks?
+@section What are backlinks?
+
+Backlinks are the butter on the bread of your notes.  If you've ever seen a "What links here" section on some webpage, that's exactly what it is.  Imagine seeing that, all the time.  The below sections outline two general ways to do so.
+
+@node Backlink solution 1 Borrow org-roam's backlink buffer
+@section Backlink solution 1: Borrow org-roam's backlink buffer
+
+As a Roam user, you can just keep using @samp{M-x org-roam-buffer-toggle}, but you get some new ways to keep its data fresh, circumventing Roam's autosync mode.
+
+@menu
+* Option 1A Let org-roam manage its own DB::
+* Option 1B Tell org-node to write to the org-roam DB::
+* Option 1C Cut out the DB altogether::
+@end menu
+
+@node Option 1A Let org-roam manage its own DB
+@subsection Option 1A: Let org-roam manage its own DB
+
+If you didn't have laggy saves, this is fine.  In other words, keep variable @samp{org-roam-db-update-on-save} at t.
+
+@node Option 1B Tell org-node to write to the org-roam DB
+@subsection Option 1B: Tell org-node to write to the org-roam DB
+
+@lisp
+(setq org-roam-db-update-on-save nil)
+(org-node-fakeroam-db-feed-mode)
+@end lisp
+
+Unfortunately, it is still a bit slow when I save a file with 400 nodes.  Maybe 100x faster than org-roam, but still a noticeable delay.  It appears to be all down to EmacSQL -- if someone could help optimize how we call EmacSQL, that'd be much appreciated.  Until then, I recommend Option 1C@.
+
+Related: if you often have reason to full-reset the DB, there is a faster command than @samp{C-u M-x org-roam-db-sync}!  Try @samp{M-x org-node-fakeroam-db-rebuild}.  Benchmark:
+
+@itemize
+@item
+@samp{C-u M-x org-roam-db-sync}! 179 seconds
+@item
+@samp{M-x org-node-fakeroam-db-rebuild}: 6 seconds
+@end itemize
+
+This is also a matter where I request help, since 6 seconds seems about a thousand times slower than it needs to be.  I envision running it on every save -- that's obviously not possible yet.
+
+@node Option 1C Cut out the DB altogether
+@subsection Option 1C: Cut out the DB altogether
+
+No more battling SQLite!  Type @samp{M-x org-node-fakeroam-jit-backlinks-mode}, then see what populates your Roam buffer henceforth.  Hopefully you see the same links as before.
+
+If you're happy with the result, you can disable @samp{org-roam-db-autosync-mode} entirely in favour of the slimmer @samp{M-x org-node-fakeroam-redisplay-mode}.  As an init snippet:
+
+@lisp
+(org-roam-db-autosync-mode 0)
+(org-node-fakeroam-jit-backlinks-mode) ;; no use sqlite to build buffer
+(org-node-fakeroam-fast-render-mode) ;; build the buffer fast
+(org-node-fakeroam-redisplay-mode) ;; always show relevant backlinks
+@end lisp
+
+@node Backlink solution 2 Print inside the file
+@section Backlink solution 2: Print inside the file
+
+I rarely have the screen space to display a backlink buffer.  Because it needs my active involvement to keep visible, I go long periods seeing no backlinks.  This solution can be a great complement (or even stand alone).
+
+@menu
+* Option 2A Let org-node manage aBACKLINKS property: Option 2A Let org-node manage a BACKLINKS property. 
+* Option 2B Let org-super-links manage aBACKLINKS@dots{}END drawer: Option 2B Let org-super-links manage a BACKLINKS@dots{}END drawer. 
+@end menu
+
+@node Option 2A Let org-node manage a BACKLINKS property
+@subsection Option 2A: Let org-node manage a :BACKLINKS: property
+
+For a first-time run, type @samp{M-x org-node-backlink-fix-all}.  (Don't worry, if you change your mind, you can undo with @samp{M-x org-node-backlink-regret}.)
+
+Then start using the minor mode @samp{org-node-backlink-mode}, which keeps these properties updated.  Init snippet:
+
+@lisp
+(add-hook 'org-mode-hook #'org-node-backlink-mode)
+@end lisp
+
+NOTE:  I hadn't even realized this, but people who @emph{don't} use visual-line-mode may not find this solution very scalable, since Org properties must stay on one line.  This marks the second time I distribute software that assumes visual-line-mode :-)
+
+@node Option 2B Let org-super-links manage a BACKLINKS@dots{}END drawer
+@subsection Option 2B Let org-super-links manage a :BACKLINKS:@dots{}:END: drawer
+
+I @emph{think} the following should work. Totally untested, let me know!
+
+@lisp
+(add-hook 'org-node-insert-link-hook #'org-node-convert-link-to-super)
+@end lisp
+
+Bad news: this is currently directed towards people who used @uref{https://github.com/toshism/org-super-links, org-super-links} from the beginning, or people who are just now starting to assign IDs, as there is not yet a command to add new BACKLINKS drawers in bulk to preexisting nodes. (@uref{https://github.com/toshism/org-super-links/issues/93, org-super-links#93})
+
+@node Misc
+@chapter Misc
+
+@menu
+* Org-capture::
+* Node series::
+* Managing org-id-locations::
+* Completion-at-point::
+* Let org-open-at-point detect refs::
+* Limitation TRAMP::
+* Limitation Unique titles::
+* Limitation Excluding notes::
+* Limitation Org-ref::
+* Tip On very slow filesystems::
+* Tip Word-wrap in the Roam buffer?::
+* Toolbox::
+@end menu
+
+@node Org-capture
+@section Org-capture
+
+You may have heard that org-roam has its own special set of capture templates: the @samp{org-roam-capture-templates}.
+
+People who understand the magic of capture templates, they may take this in stride.  Me, I never felt confident using a second-order abstraction over an already leaky abstraction I didn't fully understand.
+
+Can we just use vanilla org-capture?  That'd be less scary.  The answer is yes!
+
+The secret sauce is @samp{(function org-node-capture-target)}:
+
+@lisp
+(setq org-capture-templates
+      '(("i" "Capture into ID node"
+         plain (function org-node-capture-target) nil
+         :empty-lines-after 1)
+
+        ("j" "Jump to ID node"
+         plain (function org-node-capture-target) nil
+         :jump-to-captured t
+         :immediate-finish t)
+
+        ;; Sometimes handy after `org-node-insert-link' to
+        ;; make a stub you plan to fill in later
+        ("q" "Make quick stub ID node"
+         plain (function org-node-capture-target) nil
+         :immediate-finish t)))
+@end lisp
+
+With that done, you can optionally configure the everyday commands @samp{org-node-find} & @samp{org-node-insert-link} to outsource to org-capture when they try to create new nodes:
+
+@lisp
+(setq org-node-creation-fn #'org-capture)
+@end lisp
+
+@node Node series
+@section Node series
+
+Do you already know about "daily-notes"?  Then get started with a keybinding such as:
+
+@lisp
+(keymap-set global-map "M-s s" #'org-node-series-dispatch)
+@end lisp
+
+and configure @samp{org-node-series-defs} if needed.  See @uref{https://github.com/meedstrom/org-node/wiki/Configuring-series, wiki}.
+
+@menu
+* What are series?::
+@end menu
+
+@node What are series?
+@subsection What are series?
+
+It's easiest to explain series if we use "daily-notes" (or "dailies") as an example of a series.
+
+Roam's idea of a "daily-note" is the same as an @uref{https://github.com/bastibe/org-journal, org-journal} entry: a file/entry where the title is just today's date.
+
+You don't need software for that basic idea, only to make it extra convenient to navigate them and jump back and forth in the series.
+
+Thus, fundamentally, any "journal" or "dailies" software are just operating on a sorted series to navigate through.  I was resisting having to implement an equivalent to the Org-roam option @samp{org-roam-dailies-directory}, so I ended up generalizing the concept and it's really powerful!
+
+You could have series about, let's say, historical events, Star Trek episodes, your school curriculum@dots{}
+
+Define more series in the variable @samp{org-node-series-defs}.
+
+Already included is a definition that approximates the org-roam-dailies defaults, but I encourage you to override it to suit your tastes.
+
+You may be taken aback that defining a new series requires writing 5 lambdas, but once you get the hang of it, you can often reuse those lambdas.
+
+@node Managing org-id-locations
+@section Managing org-id-locations
+
+I find unsatisfactory the config options in org-id (Why? See @uref{http://edstrom.dev/wjwrl/taking-ownership-of-org-id, Taking ownership of org-id}), so org-node gives you an extra way to feed data to org-id, making sure we won't run into "ID not found" situations.
+
+Example setting:
+
+@lisp
+(setq org-node-extra-id-dirs
+      '("/home/kept/org/"
+        "~/Syncthing/project2/"
+        "/mnt/stuff/"))
+@end lisp
+
+@node Completion-at-point
+@section Completion-at-point
+
+To complete words at point into known node titles:
+
+@lisp
+(org-node-complete-at-point-mode)
+(setq org-roam-completion-everywhere nil) ;; Prevent Roam's variant
+@end lisp
+
+@node Let org-open-at-point detect refs
+@section Let org-open-at-point detect refs
+
+Say there's a link to a web URL, and you've forgotten you also have a node listing that exact URL in its @samp{ROAM_REFS} property.
+
+Wouldn't it be nice if, clicking on that link, you automatically visit that node first instead of being sent to the web?  Here you go:
+
+@lisp
+(add-hook 'org-open-at-point-functions
+          #'org-node-try-visit-ref-node)
+@end lisp
+
+@node Limitation TRAMP
+@section Limitation: TRAMP
+
+Working over TRAMP is untested, but I suspect it won't work.  Org-node tries to be very fast, often nulling @samp{file-name-handler-alist}, which TRAMP needs.
+
+The best way to change this is to @uref{https://github.com/meedstrom/org-node/issues, file an issue} to show you care :-)
+
+@node Limitation Unique titles
+@section Limitation: Unique titles
+
+If two ID-nodes exist with the same title, one of them disappears from minibuffer completions.
+
+That's just the nature of completion.  Other packages such as Roam have the same limitation.  Much can be said for embracing the uniqueness constraint, and org-node will print messages telling you about title collisions.
+
+Anyway@dots{} there's a workaround.  Assuming you leave @samp{org-node-affixation-fn} at its default setting, just add to initfiles:
+
+@lisp
+(setq org-node-alter-candidates t)
+@end lisp
+
+This lets you match against the node outline path and not only the title, which resolves most conflicts given that the most likely source of conflict is subheadings in disparate files, that happen to be named the same.  @uref{https://fosstodon.org/@@nickanderson/112249581810196258, Some people} make this trick part of their workflow.
+
+NB: this workaround won't help the in-buffer completions provided by @samp{org-node-complete-at-point-mode}, but with a light peppering of luck this isn't something you'll ever have to notice.
+
+@node Limitation Excluding notes
+@section Limitation: Excluding notes
+
+The option @samp{org-node-filter-fn} works well for excluding TODO items that happen to have an ID, and excluding org-drill items and that sort of thing, but beyond that, it has limited utility because unlike org-roam, @strong{child ID nodes of an excluded node are not excluded!}
+
+So let's say you have a big archive file, fulla IDs, and you want to exclude all of them from appearing in the minibuffer.  Putting a @samp{:ROAM_EXCLUDE: t} at the top won't do it.  As it stands, what I'd suggest is to use the file name.
+
+While a big selling point of IDs is that you avoid depending on filenames, it's often pragmatic to let up on purism just a bit :-) It works well for me to filter out any file or directory that happens to contain "archive" in the name -- see the last line here:
+
+@lisp
+(setq org-node-filter-fn
+      (lambda (node)
+        (not (or (org-node-get-todo node) ;; Ignore headings with todo state
+                 (member "drill" (org-node-get-tags node)) ;; Ignore :drill:
+                 (assoc "ROAM_EXCLUDE" (org-node-get-properties node))
+                 (string-search "archive" (org-node-get-file-path node))))))
+@end lisp
+
+@node Limitation Org-ref
+@section Limitation: Org-ref
+
+We support the builtin @@citations, not (yet) org-ref &citations, since it slows down my scan about 50% if I amend @samp{org-link-plain-re} to match them.  There's a commented-out block of code in the file org-node-parser.el if you feel like getting your elbows dirty.
+
+You can still find nodes with e.g. @samp{:ROAM_REFS: &citekey}, just not see backlinks.
+
+@node Tip On very slow filesystems
+@section Tip: On very slow filesystems
+
+I hear that on Termux on Android, filesystem access can be so slow that it's a pain to cycle dailies with org-roam (@uref{https://github.com/meedstrom/org-node/issues/24#issuecomment-2278605819, 11 seconds just to goto next daily}!).  A Redditor also said Apple NFS is not ideal for Emacs.
+
+Good news.  You can speed up some functions by making them look up org-node tables and avoid the filesystem:
+
+@lisp
+(advice-add #'org-roam-list-files :override
+            #'org-node-fakeroam-list-files)
+
+(advice-add #'org-roam-dailies--list-files :override
+            #'org-node-fakeroam-list-dailies)
+
+(advice-add #'org-roam-dailies--daily-note-p :override
+            #'org-node-fakeroam-daily-note-p)
+@end lisp
+
+@node Tip Word-wrap in the Roam buffer?
+@section Tip: Word-wrap in the Roam buffer?
+
+This has nothing to do with org-node, but I actually didn't know this for ages.
+
+If you don't hard-wrap but prefer visual-line-mode or similar (@uref{https://github.com/org-roam/org-roam/issues/1862, org-roam#1862}), you have to enable such modes yourself -- it sensibly doesn't inherit your Org hooks:
+
+@lisp
+(add-hook 'org-roam-mode-hook #'visual-line-mode)
+@end lisp
+
+@node Toolbox
+@section Toolbox
+
+Basic commands:
+
+@itemize
+@item
+@samp{org-node-find}
+@item
+@samp{org-node-insert-link}
+@item
+@samp{org-node-insert-transclusion}
+@item
+@samp{org-node-insert-transclusion-as-subtree}
+@item
+@samp{org-node-visit-random}
+@item
+@samp{org-node-series-dispatch}
+@itemize
+@item
+Browse node series -- see README
+@end itemize
+@item
+@samp{org-node-extract-subtree}
+@itemize
+@item
+A bizarro counterpart to @samp{org-roam-extract-subtree}.  Export the subtree at point into a file-level node, @strong{leave a link where the subtree was}, and show the new file as current buffer.
+@end itemize
+@item
+@samp{org-node-nodeify-entry}
+@itemize
+@item
+(Trivial) Give an ID to the subtree at point, and run the hook @samp{org-node-creation-hook}
+@end itemize
+@item
+@samp{org-node-insert-heading}
+@itemize
+@item
+(Trivial) Shortcut for @samp{org-insert-heading} + @samp{org-node-nodeify-entry}
+@end itemize
+@item
+@samp{org-node-grep}
+@itemize
+@item
+(Requires @uref{https://github.com/minad/consult, consult}) Grep across all known Org files.
+@itemize
+@item
+Very useful combined with @uref{https://github.com/oantolin/embark, embark}-export & @uref{https://github.com/mhayashi1120/Emacs-wgrep, wgrep}, to search-and-replace a given string everywhere in every directory, for example to rename a tag once and for all.
+@item
+This will use ripgrep if installed, otherwise it is very slow.
+@end itemize
+@end itemize
+@item
+@samp{org-node-fakeroam-show-roam-buffer}
+@itemize
+@item
+A different way to invoke the Roam buffer: display the buffer @emph{or} refresh it if it was already visible.  And a plot twist, if it was not visible, do not refresh until the second invocation.
+@itemize
+@item
+Useful if you have disabled the automatic redisplay, because the Roam command @samp{org-roam-buffer-toggle} is not meant for that.
+@end itemize
+@end itemize
+@end itemize
+
+Rarer commands:
+
+@itemize
+@item
+@samp{org-node-lint-all-files}
+@itemize
+@item
+Can help you fix a broken setup: it runs org-lint on all known files and generates a report of syntax problems, for you to correct at will.  Org-node @uref{https://github.com/meedstrom/org-node/issues/8#issuecomment-2101316447, assumes all files have valid syntax}, though many of the problems reported by org-lint are survivable.
+@end itemize
+@item
+@samp{org-node-list-dead-links}
+@itemize
+@item
+List links where the destination ID could not be found
+@end itemize
+@item
+@samp{org-node-list-reflinks}
+@itemize
+@item
+List citations and non-ID links
+@end itemize
+@item
+@samp{org-node-rewrite-links-ask}
+@itemize
+@item
+Look for link descriptions that got out of sync with the corresponding node title, then prompt at each link to update it
+@end itemize
+@item
+@samp{org-node-rename-file-by-title}
+@itemize
+@item
+Auto-rename the file based on the current @samp{#+title}
+@itemize
+@item
+Works as an after-save-hook!  Does nothing until you configure @samp{org-node-renames-allowed-dirs}.
+@end itemize
+@end itemize
+@item
+@samp{org-node-backlink-fix-all}
+@itemize
+@item
+Update @samp{BACKLINKS} property in all nodes
+@end itemize
+@item
+@samp{org-node-list-feedback-arcs}
+@itemize
+@item
+(Requires GNU R) Explore @uref{https://en.wikipedia.org/wiki/Feedback_arc_set, feedback arcs} in your ID link network.  Can be a nice @uref{https://edstrom.dev/zvjjm/slipbox-workflow#ttqyc, occasional QA routine}.
+@end itemize
+@item
+@samp{org-node-rename-asset-and-rewrite-links}
+@itemize
+@item
+Interactively rename an asset such as an image file and try to update all Org links to them.  Requires @uref{https://github.com/mhayashi1120/Emacs-wgrep, wgrep}.
+@itemize
+@item
+NOTE: For now, it only looks for links inside the root directory that it prompts you for, and sub and sub-subdirectories and so on -- but won't find a link outside that root directory.
+
+Like if you have Org files under /mnt linking to assets in /home, those links won't be updated.  Neither if you choose ~/org/subdir as the root directory will links in ~/org/file.org be updated.
+@end itemize
+@end itemize
+@end itemize
+
+@node Appendix
+@chapter Appendix
+
+@menu
+* Appendix I Rosetta stone::
+@end menu
+
+@node Appendix I Rosetta stone
+@section Appendix I: Rosetta stone
+
+API cheatsheet between org-roam and org-node.
+
+@multitable {aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa} {aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa} {aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}
+@headitem Action
+@tab org-roam
+@tab org-node
+@item Get ID near point
+@tab @samp{(org-roam-id-at-point)}
+@tab @samp{(org-id-get nil nil nil t)}
+@item Get node at point
+@tab @samp{(org-roam-node-at-point)}
+@tab @samp{(org-node-at-point)}
+@item Get list of files
+@tab @samp{(org-roam-list-files)}
+@tab @samp{(org-node-list-files)}
+@item Prompt user to pick a node
+@tab @samp{(org-roam-node-read)}
+@tab @samp{(org-node-read)}
+@item Get backlink objects
+@tab @samp{(org-roam-backlinks-get NODE)}
+@tab @samp{(org-node-get-backlinks NODE)}
+@item Get reflink objects
+@tab @samp{(org-roam-reflinks-get NODE)}
+@tab @samp{(org-node-get-reflinks NODE)}
+@item Get title
+@tab @samp{(org-roam-node-title NODE)}
+@tab @samp{(org-node-get-title NODE)}
+@item Get title of file where NODE is
+@tab @samp{(org-roam-node-file-title NODE)}
+@tab @samp{(org-node-get-file-title NODE)}
+@item Get title @emph{or} name of file where NODE is
+@tab 
+@tab @samp{(org-node-get-file-title-or-basename NODE)}
+@item Get name of file where NODE is
+@tab @samp{(org-roam-node-file NODE)}
+@tab @samp{(org-node-get-file-path NODE)}
+@item Get ID
+@tab @samp{(org-roam-node-id NODE)}
+@tab @samp{(org-node-get-id NODE)}
+@item Get tags
+@tab @samp{(org-roam-node-tags NODE)}
+@tab @samp{(org-node-get-tags NODE)}, no inheritance
+@item Get outline level
+@tab @samp{(org-roam-node-level NODE)}
+@tab @samp{(org-node-get-level NODE)}
+@item Get whether this is a subtree
+@tab @samp{(zerop (org-roam-node-level NODE))}
+@tab @samp{(org-node-get-is-subtree NODE)}
+@item Get char position
+@tab @samp{(org-roam-node-point NODE)}
+@tab @samp{(org-node-get-pos NODE)}
+@item Get properties
+@tab @samp{(org-roam-node-properties NODE)}
+@tab @samp{(org-node-get-properties NODE)}, no inheritance
+@item Get subtree TODO state
+@tab @samp{(org-roam-node-todo NODE)}
+@tab @samp{(org-node-get-todo NODE)}
+@item Get subtree SCHEDULED
+@tab @samp{(org-roam-node-scheduled NODE)}
+@tab @samp{(org-node-get-scheduled NODE)}
+@item Get subtree DEADLINE
+@tab @samp{(org-roam-node-deadline NODE)}
+@tab @samp{(org-node-get-deadline NODE)}
+@item Get subtree priority
+@tab @samp{(org-roam-node-priority NODE)}
+@tab @samp{(org-node-get-priority NODE)}
+@item Get outline-path
+@tab @samp{(org-roam-node-olp NODE)}
+@tab @samp{(org-node-get-olp NODE)}
+@item Get @samp{ROAM_REFS}
+@tab @samp{(org-roam-node-refs NODE)}
+@tab @samp{(org-node-get-refs NODE)}
+@item Get @samp{ROAM_ALIASES}
+@tab @samp{(org-roam-node-aliases NODE)}
+@tab @samp{(org-node-get-aliases NODE)}
+@item Get @samp{ROAM_EXCLUDE}
+@tab 
+@tab @samp{(assoc "ROAM_EXCLUDE" (org-node-get-properties NODE))}, no inheritance
+@item Ensure fresh data
+@tab @samp{(org-roam-db-sync)}
+@tab @samp{(org-node-cache-ensure t t)}
+@end multitable
+
+@bye

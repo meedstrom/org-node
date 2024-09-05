@@ -42,6 +42,8 @@
 (define-minor-mode org-node-backlink-mode
   "Keep :BACKLINKS: properties updated.
 
+See Info node `(org-node)'.
+
 -----"
   :group 'org-node
   (if org-node-backlink-mode

@@ -1,17 +1,26 @@
-#+startup: content
-[[https://melpa.org/#/org-node][file:https://melpa.org/packages/org-node-badge.svg]]
-** News [2024-Sep-02]
-The git repo history was REWRITTEN!  You may have had to delete and reinstall the package.  (Depends on your package manager.)  Sorry about that.
+#+TITLE: Org-Node
+#+STARTUP: content
+#+AUTHOR: Martin Edström
+#+EMAIL: meedstrom91@gmail.com
+#+DATE: 2024
+#+LANGUAGE: en
+#+TEXINFO_DIR_CATEGORY: Emacs
+#+TEXINFO_DIR_TITLE: Org-Node: (org-node).
+#+TEXINFO_DIR_DESC: Link org-id entries into a network.
+#+EXPORT_FILE_NAME: doc/org-node.info
+#+HTML: <a href="https://melpa.org/#/org-node"><img alt="MELPA" src="https://melpa.org/packages/org-node-badge.svg"/></a>
+* News
+On [2024-09-02], the git repo history was REWRITTEN!  You may have had to delete and reinstall the package.  (Depends on your package manager.)  Sorry about that.
 
 *What was rewritten?*  I've erased the =;; Package-Version:= comment line in file contents, because of Emacs 30's new =(use-package :vc)= keyword, which defaults to installing the /oldest/ commit with a given Package-Version, not the /newest/ commit.
 
 Even if that's 5 years old.
 
-See some [[https://github.com/melpa/melpa/issues/2955#issuecomment-1519154736][loooong related discussions]] about the untrustworthiness of Package-Version, and that's leaving aside the fact the ecosystem [[https://github.com/melpa/melpa/issues/6656][doesn't really make use of]] the concept of versioned releases, and when half the ecosystem pretends it does instead of taking the newest commit, they make it less stable for all.
+See some [[https://github.com/melpa/melpa/issues/2955#issuecomment-1519154736][loooong related discussions]] about the untrustworthiness of Package-Version, and that's leaving aside the fact the ecosystem [[https://github.com/melpa/melpa/issues/6656][doesn't really make use of]] the concept of versioned releases, and when some tools pretend it does instead of taking the newest commit, they make it less stable for all.
 
-Lesson learned -- when /you/ create a package, never commit a file containing a Package-Version line.  Doing so curses the repo for the rest of time, or until you learn to use git-filter-repo to undo the damage.
+Lesson learned -- when /you/ create a package, never commit a file containing a Package-Version line.  Doing so curses the repo for the rest of time, or until you use git-filter-repo to undo the damage.
 
-* org-node
+* Background
 ** What's all this
 
 I found org-roam too slow, so I made [[https://github.com/meedstrom/quickroam][quickroam]].  And that idea spun off into this package, a standalone thing.  I hope it's also easier to pick up than org-roam.
@@ -165,21 +174,20 @@ Finally, make sure the underlying org-id knows about the files org-roam knows.  
 (setq org-node-extra-id-dirs '("~/org/"))
 #+end_src
 
-With that done, try out the commands we went over in [[https://github.com/meedstrom/org-node?tab=readme-ov-file#quick-start][Quick start]].  There's more under [[https://github.com/meedstrom/org-node?tab=readme-ov-file#toolbox][Toolbox]].  Enjoy!
+With that done, try out the commands we went over in [[https://github.com/meedstrom/org-node#quick-start][Quick start]].  There's more under [[https://github.com/meedstrom/org-node#toolbox][Toolbox]].  Enjoy!
 
 * Backlinks
+** What are backlinks?
 Backlinks are the butter on the bread of your notes.  If you've ever seen a "What links here" section on some webpage, that's exactly what it is.  Imagine seeing that, all the time.  The below sections outline two general ways to do so.
 
-** Backlink solution 1: borrow org-roam's backlink buffer
+** Backlink solution 1: Borrow org-roam's backlink buffer
 As a Roam user, you can just keep using =M-x org-roam-buffer-toggle=, but you get some new ways to keep its data fresh, circumventing Roam's autosync mode.
 
-*** Option 1A
-*Let org-roam manage its own DB.*
+*** Option 1A: Let org-roam manage its own DB
 
 If you didn't have laggy saves, this is fine.  In other words, keep variable =org-roam-db-update-on-save= at t.
 
-*** *Option 1B*
-*Tell org-node to write to the org-roam DB.*
+*** Option 1B: Tell org-node to write to the org-roam DB
 
 #+begin_src elisp
 (setq org-roam-db-update-on-save nil)
@@ -195,8 +203,7 @@ Related: if you often have reason to full-reset the DB, there is a faster comman
 
 This is also a matter where I request help, since 6 seconds seems about a thousand times slower than it needs to be.  I envision running it on every save -- that's obviously not possible yet.
 
-*** *Option 1C*
-*Cut out the DB altogether.*
+*** Option 1C: Cut out the DB altogether
 
 No more battling SQLite!  Type =M-x org-node-fakeroam-jit-backlinks-mode=, then see what populates your Roam buffer henceforth.  Hopefully you see the same links as before.
 
@@ -209,11 +216,10 @@ If you're happy with the result, you can disable =org-roam-db-autosync-mode= ent
 (org-node-fakeroam-redisplay-mode) ;; always show relevant backlinks
 #+end_src
 
-** Backlink solution 2: print inside the file
+** Backlink solution 2: Print inside the file
 I rarely have the screen space to display a backlink buffer.  Because it needs my active involvement to keep visible, I go long periods seeing no backlinks.  This solution can be a great complement (or even stand alone).
 
-*** *Option 2A*
-*Let org-node add a :BACKLINKS: property to all nodes.*
+*** Option 2A: Let org-node manage a :BACKLINKS: property
 
 For a first-time run, type =M-x org-node-backlink-fix-all=.  (Don't worry, if you change your mind, you can undo with =M-x org-node-backlink-regret=.)
 
@@ -225,8 +231,7 @@ Then start using the minor mode =org-node-backlink-mode=, which keeps these prop
 
 NOTE:  I hadn't even realized this, but people who /don't/ use visual-line-mode may not find this solution very scalable, since Org properties must stay on one line.  This marks the second time I distribute software that assumes visual-line-mode :-)
 
-*** *Option 2B*
-*Let [[https://github.com/toshism/org-super-links][org-super-links]] manage a :BACKLINKS:...:END: drawer under all nodes.*
+*** Option 2B Let org-super-links manage a :BACKLINKS:...:END: drawer
 
 I /think/ the following should work. Totally untested, let me know!
 
@@ -234,7 +239,7 @@ I /think/ the following should work. Totally untested, let me know!
 (add-hook 'org-node-insert-link-hook #'org-node-convert-link-to-super)
 #+end_src
 
-Bad news: this is currently directed towards people who used org-super-links from the beginning, or people who are just now starting to assign IDs, as there is not yet a command to add new BACKLINKS drawers in bulk to preexisting nodes. ([[https://github.com/toshism/org-super-links/issues/93][org-super-links#93]])
+Bad news: this is currently directed towards people who used [[https://github.com/toshism/org-super-links][org-super-links]] from the beginning, or people who are just now starting to assign IDs, as there is not yet a command to add new BACKLINKS drawers in bulk to preexisting nodes. ([[https://github.com/toshism/org-super-links/issues/93][org-super-links#93]])
 
 * Misc
 ** Org-capture
@@ -333,7 +338,7 @@ Working over TRAMP is untested, but I suspect it won't work.  Org-node tries to 
 
 The best way to change this is to [[https://github.com/meedstrom/org-node/issues][file an issue]] to show you care :-)
 
-** Limitation: unique titles
+** Limitation: Unique titles
 If two ID-nodes exist with the same title, one of them disappears from minibuffer completions.
 
 That's just the nature of completion.  Other packages such as Roam have the same limitation.  Much can be said for embracing the uniqueness constraint, and org-node will print messages telling you about title collisions.
@@ -348,7 +353,7 @@ This lets you match against the node outline path and not only the title, which 
 
 NB: this workaround won't help the in-buffer completions provided by =org-node-complete-at-point-mode=, but with a light peppering of luck this isn't something you'll ever have to notice.
 
-** Limitation: excluding notes
+** Limitation: Excluding notes
 The option =org-node-filter-fn= works well for excluding TODO items that happen to have an ID, and excluding org-drill items and that sort of thing, but beyond that, it has limited utility because unlike org-roam, *child ID nodes of an excluded node are not excluded!*
 
 So let's say you have a big archive file, fulla IDs, and you want to exclude all of them from appearing in the minibuffer.  Putting a =:ROAM_EXCLUDE: t= at the top won't do it.  As it stands, what I'd suggest is to use the file name.
@@ -364,7 +369,7 @@ While a big selling point of IDs is that you avoid depending on filenames, it's 
                  (string-search "archive" (org-node-get-file-path node))))))
 #+end_src
 
-** Limitation: org-ref
+** Limitation: Org-ref
 We support the builtin @citations, not (yet) org-ref &citations, since it slows down my scan about 50% if I amend =org-link-plain-re= to match them.  There's a commented-out block of code in the file org-node-parser.el if you feel like getting your elbows dirty.
 
 You can still find nodes with e.g. =:ROAM_REFS: &citekey=, just not see backlinks.
@@ -414,7 +419,7 @@ Basic commands:
   - (Trivial) Shortcut for =org-insert-heading= + =org-node-nodeify-entry=
 - =org-node-grep=
   - (Requires [[https://github.com/minad/consult][consult]]) Grep across all known Org files.
-    - Very useful combined with [[https://github.com/oantolin/embark][embark]]-export & [[wgrep][wgrep]], to search-and-replace a given string everywhere in every directory, for example to rename a tag once and for all.
+    - Very useful combined with [[https://github.com/oantolin/embark][embark]]-export & [[https://github.com/mhayashi1120/Emacs-wgrep][wgrep]], to search-and-replace a given string everywhere in every directory, for example to rename a tag once and for all.
     - This will use ripgrep if installed, otherwise it is very slow.
 - =org-node-fakeroam-show-roam-buffer=
   - A different way to invoke the Roam buffer: display the buffer /or/ refresh it if it was already visible.  And a plot twist, if it was not visible, do not refresh until the second invocation.
