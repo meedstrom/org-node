@@ -59,8 +59,8 @@ Backlink solution 1: Borrow org-roam's backlink buffer
 
 Backlink solution 2: Print inside the file
 
-* Option 2A Let org-node manage aBACKLINKS property: Option 2A Let org-node manage a BACKLINKS property. 
-* Option 2B Let org-super-links manage aBACKLINKS@dots{}END drawer: Option 2B Let org-super-links manage a BACKLINKS@dots{}END drawer. 
+* Option 2A Let org-node manage a @samp{BACKLINKS} property::
+* Option 2B Let org-super-links manage a @samp{BACKLINKS...END} drawer: Option 2B Let org-super-links manage a @samp{BACKLINKSEND} drawer. 
 
 Misc
 
@@ -151,9 +151,9 @@ Once a subtree has an ID you can link to, it's a "node" because it has joined th
 
 A comparison of three similar systems, which permit relying on org-id and don't lock you into the all-too-seductive concept of "one-note-per-file".
 
-@multitable {aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa} {aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa} {aaaaaaaaaaaaaaaaaa} {aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}
+@multitable {aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa} {aaaaaaaa} {aaaaaaaaaaaaaaaaaa} {aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}
 @headitem Feature
-@tab @uref{https://github.com/org-roam/org-roam, org-roam}
+@tab org-roam
 @tab org-node
 @tab @uref{https://github.com/toshism/org-super-links, org-super-links}
 @item Backlinks
@@ -298,7 +298,7 @@ Assuming your package manager knows about @uref{https://melpa.org/#/getting-star
   :config (org-node-cache-mode))
 @end lisp
 
-It's a very recent add, so you may have to refresh the recipe list first:
+It's a very recent addition to MELPA, so you may have to refresh the recipe list first:
 
 @example
 M-x package-refresh-contents RET
@@ -365,17 +365,17 @@ If you've struggled in the past with big files taking a long time to save, consi
 (setq org-roam-link-auto-replace nil) ;; don't look for "roam:" links on save
 @end lisp
 
-And if the backlinks buffer is laggy:
+And if the backlinks buffer has been laggy:
 
 @lisp
 (org-node-fakeroam-fast-render-mode) ;; build the Roam buffer faster
 @end lisp
 
-Finally, make sure the underlying org-id knows about the files org-roam knows.  You'd think it would, but that isn't a given!  Do either of these:
+Finally, make sure the underlying org-id knows about the files org-roam knows about.  You'd think it would, but that isn't a given!  Do either of these:
 
 @enumerate
 @item
-Run @samp{M-x org-roam-update-org-id-locations} after every Emacs restart
+Run @samp{M-x org-roam-update-org-id-locations} every now and then
 
 @item
 Edit the following setting so it includes your @samp{org-roam-directory}.  Supposing that is "~/org/", set this:
@@ -399,7 +399,7 @@ With that done, try out the commands we went over in @uref{https://github.com/me
 @node What are backlinks?
 @section What are backlinks?
 
-Backlinks are the butter on the bread of your notes.  If you've ever seen a "What links here" section on some webpage, that's exactly what it is.  Imagine seeing that, all the time.  The below sections outline two general ways to do so.
+Backlinks are the butter on the bread of your notes.  If you've ever seen a "What links here" section on some webpage, that's exactly what it is.  Imagine seeing that, all the time.  The following sections outline two general ways to do so.
 
 @node Backlink solution 1 Borrow org-roam's backlink buffer
 @section Backlink solution 1: Borrow org-roam's backlink buffer
@@ -420,36 +420,38 @@ If you didn't have laggy saves, this is fine.  In other words, keep variable @sa
 @node Option 1B Tell org-node to write to the org-roam DB
 @subsection Option 1B: Tell org-node to write to the org-roam DB
 
+Add this init snippet:
+
 @lisp
 (setq org-roam-db-update-on-save nil)
 (org-node-fakeroam-db-feed-mode)
 @end lisp
 
-Unfortunately, it is still a bit slow when I save a file with 400 nodes.  Maybe 100x faster than org-roam, but still a noticeable delay.  It appears to be all down to EmacSQL -- if someone could help optimize how we call EmacSQL, that'd be much appreciated.  Until then, I recommend Option 1C@.
+Unfortunately, it is still a bit slow when I save a file with 400 nodes.  Only about 100x faster than org-roam, so still a noticeable delay.  It appears to be all down to EmacSQL -- if someone could help optimize how we call EmacSQL, that'd be much appreciated.  Until then, I recommend Option 1C@.
 
-Related: if you often have reason to full-reset the DB, there is a faster command than @samp{C-u M-x org-roam-db-sync}!  Try @samp{M-x org-node-fakeroam-db-rebuild}.  Benchmark:
+Related: if you often have reason to full-reset the DB, there is a faster command than @samp{C-u M-x org-roam-db-sync}!  Try @samp{M-x org-node-fakeroam-db-rebuild}.  Benchmark on my device:
 
 @itemize
 @item
-@samp{C-u M-x org-roam-db-sync}! 179 seconds
+@samp{C-u M-x org-roam-db-sync}: 179 seconds
 @item
 @samp{M-x org-node-fakeroam-db-rebuild}: 6 seconds
 @end itemize
 
-This is also a matter where I request help, since 6 seconds seems about a thousand times slower than it needs to be.  I envision running it on every save -- that's obviously not possible yet.
+This is also a place where I request help, since 6 seconds seems a lot slower than it needs to be.  I envision it taking 6 ms so as to run it on every save -- that's obviously not possible yet.
 
 @node Option 1C Cut out the DB altogether
 @subsection Option 1C: Cut out the DB altogether
 
 No more battling SQLite!  Type @samp{M-x org-node-fakeroam-jit-backlinks-mode}, then see what populates your Roam buffer henceforth.  Hopefully you see the same links as before.
 
-If you're happy with the result, you can disable @samp{org-roam-db-autosync-mode} entirely in favour of the slimmer @samp{M-x org-node-fakeroam-redisplay-mode}.  As an init snippet:
+If you're happy with the result, you can disable @samp{org-roam-db-autosync-mode} entirely.  Its remaining functionality can be reproduced by @samp{M-x org-node-fakeroam-redisplay-mode}.  As an init snippet:
 
 @lisp
 (org-roam-db-autosync-mode 0)
-(org-node-fakeroam-jit-backlinks-mode) ;; no use sqlite to build buffer
+(org-node-fakeroam-jit-backlinks-mode) ;; no use roam db to build buffer
 (org-node-fakeroam-fast-render-mode) ;; build the buffer fast
-(org-node-fakeroam-redisplay-mode) ;; always show relevant backlinks
+(org-node-fakeroam-redisplay-mode) ;; always show local backlinks
 @end lisp
 
 @node Backlink solution 2 Print inside the file
@@ -458,12 +460,12 @@ If you're happy with the result, you can disable @samp{org-roam-db-autosync-mode
 I rarely have the screen space to display a backlink buffer.  Because it needs my active involvement to keep visible, I go long periods seeing no backlinks.  This solution can be a great complement (or even stand alone).
 
 @menu
-* Option 2A Let org-node manage aBACKLINKS property: Option 2A Let org-node manage a BACKLINKS property. 
-* Option 2B Let org-super-links manage aBACKLINKS@dots{}END drawer: Option 2B Let org-super-links manage a BACKLINKS@dots{}END drawer. 
+* Option 2A Let org-node manage a @samp{BACKLINKS} property::
+* Option 2B Let org-super-links manage a @samp{BACKLINKS...END} drawer: Option 2B Let org-super-links manage a @samp{BACKLINKSEND} drawer. 
 @end menu
 
-@node Option 2A Let org-node manage a BACKLINKS property
-@subsection Option 2A: Let org-node manage a :BACKLINKS: property
+@node Option 2A Let org-node manage a @samp{BACKLINKS} property
+@subsection Option 2A: Let org-node manage a @samp{:BACKLINKS:} property
 
 For a first-time run, type @samp{M-x org-node-backlink-fix-all}.  (Don't worry, if you change your mind, you can undo with @samp{M-x org-node-backlink-regret}.)
 
@@ -475,8 +477,8 @@ Then start using the minor mode @samp{org-node-backlink-mode}, which keeps these
 
 NOTE:  I hadn't even realized this, but people who @emph{don't} use visual-line-mode may not find this solution very scalable, since Org properties must stay on one line.  This marks the second time I distribute software that assumes visual-line-mode :-)
 
-@node Option 2B Let org-super-links manage a BACKLINKS@dots{}END drawer
-@subsection Option 2B Let org-super-links manage a :BACKLINKS:@dots{}:END: drawer
+@node Option 2B Let org-super-links manage a @samp{BACKLINKSEND} drawer
+@subsection Option 2B: Let org-super-links manage a @samp{:BACKLINKS:...:END:} drawer
 
 I @emph{think} the following should work. Totally untested, let me know!
 

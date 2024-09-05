@@ -55,7 +55,7 @@ Once a subtree has an ID you can link to, it's a "node" because it has joined th
 
 A comparison of three similar systems, which permit relying on org-id and don't lock you into the all-too-seductive concept of "one-note-per-file".
 
-| Feature                        | [[https://github.com/org-roam/org-roam][org-roam]] | org-node           | [[https://github.com/toshism/org-super-links][org-super-links]]      |
+| Feature                        | org-roam | org-node           | [[https://github.com/toshism/org-super-links][org-super-links]]      |
 |--------------------------------+----------+--------------------+----------------------|
 | Backlinks                      | yes      | yes                | yes                  |
 | Node search and insert         | yes      | yes                | -- (suggests [[https://github.com/alphapapa/org-ql][org-ql]]) |
@@ -100,7 +100,7 @@ Assuming your package manager knows about [[https://melpa.org/#/getting-started]
   :config (org-node-cache-mode))
 #+end_src
 
-It's a very recent add, so you may have to refresh the recipe list first:
+It's a very recent addition to MELPA, so you may have to refresh the recipe list first:
 
 : M-x package-refresh-contents RET
 
@@ -158,15 +158,15 @@ If you've struggled in the past with big files taking a long time to save, consi
 (setq org-roam-link-auto-replace nil) ;; don't look for "roam:" links on save
 #+end_src
 
-And if the backlinks buffer is laggy:
+And if the backlinks buffer has been laggy:
 
 #+begin_src elisp
 (org-node-fakeroam-fast-render-mode) ;; build the Roam buffer faster
 #+end_src
 
-Finally, make sure the underlying org-id knows about the files org-roam knows.  You'd think it would, but that isn't a given!  Do either of these:
+Finally, make sure the underlying org-id knows about the files org-roam knows about.  You'd think it would, but that isn't a given!  Do either of these:
 
-1. Run =M-x org-roam-update-org-id-locations= after every Emacs restart
+1. Run =M-x org-roam-update-org-id-locations= every now and then
 
 2. Edit the following setting so it includes your =org-roam-directory=.  Supposing that is "~/org/", set this:
 
@@ -178,7 +178,7 @@ With that done, try out the commands we went over in [[https://github.com/meedst
 
 * Backlinks
 ** What are backlinks?
-Backlinks are the butter on the bread of your notes.  If you've ever seen a "What links here" section on some webpage, that's exactly what it is.  Imagine seeing that, all the time.  The below sections outline two general ways to do so.
+Backlinks are the butter on the bread of your notes.  If you've ever seen a "What links here" section on some webpage, that's exactly what it is.  Imagine seeing that, all the time.  The following sections outline two general ways to do so.
 
 ** Backlink solution 1: Borrow org-roam's backlink buffer
 As a Roam user, you can just keep using =M-x org-roam-buffer-toggle=, but you get some new ways to keep its data fresh, circumventing Roam's autosync mode.
@@ -189,37 +189,39 @@ If you didn't have laggy saves, this is fine.  In other words, keep variable =or
 
 *** Option 1B: Tell org-node to write to the org-roam DB
 
+Add this init snippet:
+
 #+begin_src elisp
 (setq org-roam-db-update-on-save nil)
 (org-node-fakeroam-db-feed-mode)
 #+end_src
 
-Unfortunately, it is still a bit slow when I save a file with 400 nodes.  Maybe 100x faster than org-roam, but still a noticeable delay.  It appears to be all down to EmacSQL -- if someone could help optimize how we call EmacSQL, that'd be much appreciated.  Until then, I recommend Option 1C.
+Unfortunately, it is still a bit slow when I save a file with 400 nodes.  Only about 100x faster than org-roam, so still a noticeable delay.  It appears to be all down to EmacSQL -- if someone could help optimize how we call EmacSQL, that'd be much appreciated.  Until then, I recommend Option 1C.
 
-Related: if you often have reason to full-reset the DB, there is a faster command than =C-u M-x org-roam-db-sync=!  Try =M-x org-node-fakeroam-db-rebuild=.  Benchmark:
+Related: if you often have reason to full-reset the DB, there is a faster command than =C-u M-x org-roam-db-sync=!  Try =M-x org-node-fakeroam-db-rebuild=.  Benchmark on my device:
 
-- =C-u M-x org-roam-db-sync=! 179 seconds
+- =C-u M-x org-roam-db-sync=: 179 seconds
 - =M-x org-node-fakeroam-db-rebuild=: 6 seconds
 
-This is also a matter where I request help, since 6 seconds seems about a thousand times slower than it needs to be.  I envision running it on every save -- that's obviously not possible yet.
+This is also a place where I request help, since 6 seconds seems a lot slower than it needs to be.  I envision it taking 6 ms so as to run it on every save -- that's obviously not possible yet.
 
 *** Option 1C: Cut out the DB altogether
 
 No more battling SQLite!  Type =M-x org-node-fakeroam-jit-backlinks-mode=, then see what populates your Roam buffer henceforth.  Hopefully you see the same links as before.
 
-If you're happy with the result, you can disable =org-roam-db-autosync-mode= entirely in favour of the slimmer =M-x org-node-fakeroam-redisplay-mode=.  As an init snippet:
+If you're happy with the result, you can disable =org-roam-db-autosync-mode= entirely.  Its remaining functionality can be reproduced by =M-x org-node-fakeroam-redisplay-mode=.  As an init snippet:
 
 #+begin_src elisp
 (org-roam-db-autosync-mode 0)
-(org-node-fakeroam-jit-backlinks-mode) ;; no use sqlite to build buffer
+(org-node-fakeroam-jit-backlinks-mode) ;; no use roam db to build buffer
 (org-node-fakeroam-fast-render-mode) ;; build the buffer fast
-(org-node-fakeroam-redisplay-mode) ;; always show relevant backlinks
+(org-node-fakeroam-redisplay-mode) ;; always show local backlinks
 #+end_src
 
 ** Backlink solution 2: Print inside the file
 I rarely have the screen space to display a backlink buffer.  Because it needs my active involvement to keep visible, I go long periods seeing no backlinks.  This solution can be a great complement (or even stand alone).
 
-*** Option 2A: Let org-node manage a :BACKLINKS: property
+*** Option 2A: Let org-node manage a =:BACKLINKS:= property
 
 For a first-time run, type =M-x org-node-backlink-fix-all=.  (Don't worry, if you change your mind, you can undo with =M-x org-node-backlink-regret=.)
 
@@ -231,7 +233,7 @@ Then start using the minor mode =org-node-backlink-mode=, which keeps these prop
 
 NOTE:  I hadn't even realized this, but people who /don't/ use visual-line-mode may not find this solution very scalable, since Org properties must stay on one line.  This marks the second time I distribute software that assumes visual-line-mode :-)
 
-*** Option 2B: Let org-super-links manage a :BACKLINKS:...:END: drawer
+*** Option 2B: Let org-super-links manage a =:BACKLINKS:...:END:= drawer
 
 I /think/ the following should work. Totally untested, let me know!
 

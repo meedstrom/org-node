@@ -49,8 +49,8 @@ Backlink solution 1: Borrow org-roam's backlink buffer
 
 Backlink solution 2: Print inside the file
 
-* Option 2A Let org-node manage aBACKLINKS property: Option 2A Let org-node manage a BACKLINKS property.
-* Option 2B Let org-super-links manage aBACKLINKS...END drawer: Option 2B Let org-super-links manage a BACKLINKS...END drawer.
+* Option 2A Let org-node manage a BACKLINKS property::
+* Option 2B Let org-super-links manage a ‘BACKLINKS...END’ drawer: Option 2B Let org-super-links manage a BACKLINKSEND drawer.
 
 Misc
 
@@ -204,38 +204,38 @@ A comparison of three similar systems, which permit relying on org-id
 and don't lock you into the all-too-seductive concept of
 "one-note-per-file".
 
-Feature                            org-roam (https://github.com/org-roam/org-roam)      org-node             org-super-links (https://github.com/toshism/org-super-links)
--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-Backlinks                          yes                                                  yes                  yes
-Node search and insert             yes                                                  yes                  - (suggests org-ql (https://github.com/alphapapa/org-ql))
-Node aliases                       yes                                                  yes                  -
-Node exclusion                     yes                                                  limited              not applicable
-Rich backlinks buffer              yes                                                  yes (org-roam's)     -
-Customize how backlinks shown      yes                                                  yes (org-roam's)     yes
-Reflinks                           yes                                                  yes (as backlinks)   -
-Ref search                         yes                                                  yes (as aliases)     not applicable
-Org 9.5 @citekeys as refs          yes                                                  yes                  not applicable
-Support org-ref v2 and v3          yes                                                  limited              not applicable
-Work thru org-roam-capture         yes                                                  yes                  ?
-Work thru org-capture              -                                                    yes                  ?
-Daily-nodes                        yes                                                  yes                  -
-Node series                        -                                                    yes                  -
-Show backlinks in same window      -                                                    yes                  yes
-Cooperate with org-super-links     -                                                    yes                  not applicable
-Fix link descriptions              -                                                    yes                  -
-List dead links                    -                                                    yes                  -
-Rename file when title changes     -                                                    yes                  -
-Warn about duplicate titles        -                                                    yes                  -
-Principled "related-section"       -                                                    -                    yes
-Refile                             yes                                                  -                    -
-Untitled notes                     -                                                    -                    -
-Support ‘roam:’ links              yes                                                  - (WONTFIX)          not applicable
-Can have separate note piles       yes                                                  - (WONTFIX)          not applicable
-Some query-able cache              EmacSQL                                              hash tables          -
-Async cache rebuild                -                                                    yes                  not applicable
-*Time to cache my 3000 nodes*      *2m 48s*                                             *0m 02s*             not applicable
-*Time to save file w/ 400 nodes*   *5-10s*                                              *instant*            ?
-*Time to open minibuffer*          *1-3s*                                               *instant*            not applicable
+Feature                            org-roam   org-node             org-super-links (https://github.com/toshism/org-super-links)
+-------------------------------------------------------------------------------------------------------------------------------------
+Backlinks                          yes        yes                  yes
+Node search and insert             yes        yes                  - (suggests org-ql (https://github.com/alphapapa/org-ql))
+Node aliases                       yes        yes                  -
+Node exclusion                     yes        limited              not applicable
+Rich backlinks buffer              yes        yes (org-roam's)     -
+Customize how backlinks shown      yes        yes (org-roam's)     yes
+Reflinks                           yes        yes (as backlinks)   -
+Ref search                         yes        yes (as aliases)     not applicable
+Org 9.5 @citekeys as refs          yes        yes                  not applicable
+Support org-ref v2 and v3          yes        limited              not applicable
+Work thru org-roam-capture         yes        yes                  ?
+Work thru org-capture              -          yes                  ?
+Daily-nodes                        yes        yes                  -
+Node series                        -          yes                  -
+Show backlinks in same window      -          yes                  yes
+Cooperate with org-super-links     -          yes                  not applicable
+Fix link descriptions              -          yes                  -
+List dead links                    -          yes                  -
+Rename file when title changes     -          yes                  -
+Warn about duplicate titles        -          yes                  -
+Principled "related-section"       -          -                    yes
+Refile                             yes        -                    -
+Untitled notes                     -          -                    -
+Support ‘roam:’ links              yes        - (WONTFIX)          not applicable
+Can have separate note piles       yes        - (WONTFIX)          not applicable
+Some query-able cache              EmacSQL    hash tables          -
+Async cache rebuild                -          yes                  not applicable
+*Time to cache my 3000 nodes*      *2m 48s*   *0m 02s*             not applicable
+*Time to save file w/ 400 nodes*   *5-10s*    *instant*            ?
+*Time to open minibuffer*          *1-3s*     *instant*            not applicable
 
 
 File: org-node.info,  Node: Setup,  Next: Backlinks,  Prev: Background,  Up: Top
@@ -262,8 +262,8 @@ Assuming your package manager knows about MELPA
        :after org
        :config (org-node-cache-mode))
 
-   It's a very recent add, so you may have to refresh the recipe list
-first:
+   It's a very recent addition to MELPA, so you may have to refresh the
+recipe list first:
 
      M-x package-refresh-contents RET
 
@@ -327,16 +327,15 @@ save, consider these org-roam settings:
      (setq org-roam-db-update-on-save nil) ;; don't update DB on save, not needed
      (setq org-roam-link-auto-replace nil) ;; don't look for "roam:" links on save
 
-   And if the backlinks buffer is laggy:
+   And if the backlinks buffer has been laggy:
 
      (org-node-fakeroam-fast-render-mode) ;; build the Roam buffer faster
 
    Finally, make sure the underlying org-id knows about the files
-org-roam knows.  You'd think it would, but that isn't a given!  Do
+org-roam knows about.  You'd think it would, but that isn't a given!  Do
 either of these:
 
-  1. Run ‘M-x org-roam-update-org-id-locations’ after every Emacs
-     restart
+  1. Run ‘M-x org-roam-update-org-id-locations’ every now and then
 
   2. Edit the following setting so it includes your
      ‘org-roam-directory’.  Supposing that is "~/org/", set this:
@@ -367,8 +366,8 @@ File: org-node.info,  Node: What are backlinks?,  Next: Backlink solution 1 Borr
 
 Backlinks are the butter on the bread of your notes.  If you've ever
 seen a "What links here" section on some webpage, that's exactly what it
-is.  Imagine seeing that, all the time.  The below sections outline two
-general ways to do so.
+is.  Imagine seeing that, all the time.  The following sections outline
+two general ways to do so.
 
 
 File: org-node.info,  Node: Backlink solution 1 Borrow org-roam's backlink buffer,  Next: Backlink solution 2 Print inside the file,  Prev: What are backlinks?,  Up: Backlinks
@@ -401,24 +400,26 @@ File: org-node.info,  Node: Option 1B Tell org-node to write to the org-roam DB,
 4.2.2 Option 1B: Tell org-node to write to the org-roam DB
 ----------------------------------------------------------
 
+Add this init snippet:
+
      (setq org-roam-db-update-on-save nil)
      (org-node-fakeroam-db-feed-mode)
 
    Unfortunately, it is still a bit slow when I save a file with 400
-nodes.  Maybe 100x faster than org-roam, but still a noticeable delay.
-It appears to be all down to EmacSQL - if someone could help optimize
-how we call EmacSQL, that'd be much appreciated.  Until then, I
+nodes.  Only about 100x faster than org-roam, so still a noticeable
+delay.  It appears to be all down to EmacSQL - if someone could help
+optimize how we call EmacSQL, that'd be much appreciated.  Until then, I
 recommend Option 1C.
 
    Related: if you often have reason to full-reset the DB, there is a
 faster command than ‘C-u M-x org-roam-db-sync’!  Try ‘M-x
-org-node-fakeroam-db-rebuild’.  Benchmark:
+org-node-fakeroam-db-rebuild’.  Benchmark on my device:
 
-   • ‘C-u M-x org-roam-db-sync’!  179 seconds
+   • ‘C-u M-x org-roam-db-sync’: 179 seconds
    • ‘M-x org-node-fakeroam-db-rebuild’: 6 seconds
 
-   This is also a matter where I request help, since 6 seconds seems
-about a thousand times slower than it needs to be.  I envision running
+   This is also a place where I request help, since 6 seconds seems a
+lot slower than it needs to be.  I envision it taking 6 ms so as to run
 it on every save - that's obviously not possible yet.
 
 
@@ -432,13 +433,14 @@ org-node-fakeroam-jit-backlinks-mode’, then see what populates your Roam
 buffer henceforth.  Hopefully you see the same links as before.
 
    If you're happy with the result, you can disable
-‘org-roam-db-autosync-mode’ entirely in favour of the slimmer ‘M-x
-org-node-fakeroam-redisplay-mode’.  As an init snippet:
+‘org-roam-db-autosync-mode’ entirely.  Its remaining functionality can
+be reproduced by ‘M-x org-node-fakeroam-redisplay-mode’.  As an init
+snippet:
 
      (org-roam-db-autosync-mode 0)
-     (org-node-fakeroam-jit-backlinks-mode) ;; no use sqlite to build buffer
+     (org-node-fakeroam-jit-backlinks-mode) ;; no use roam db to build buffer
      (org-node-fakeroam-fast-render-mode) ;; build the buffer fast
-     (org-node-fakeroam-redisplay-mode) ;; always show relevant backlinks
+     (org-node-fakeroam-redisplay-mode) ;; always show local backlinks
 
 
 File: org-node.info,  Node: Backlink solution 2 Print inside the file,  Prev: Backlink solution 1 Borrow org-roam's backlink buffer,  Up: Backlinks
@@ -453,14 +455,14 @@ alone).
 
 * Menu:
 
-* Option 2A Let org-node manage aBACKLINKS property: Option 2A Let org-node manage a BACKLINKS property.
-* Option 2B Let org-super-links manage aBACKLINKS...END drawer: Option 2B Let org-super-links manage a BACKLINKS...END drawer.
+* Option 2A Let org-node manage a BACKLINKS property::
+* Option 2B Let org-super-links manage a ‘BACKLINKS...END’ drawer: Option 2B Let org-super-links manage a BACKLINKSEND drawer.
 
 
-File: org-node.info,  Node: Option 2A Let org-node manage a BACKLINKS property,  Next: Option 2B Let org-super-links manage a BACKLINKS...END drawer,  Up: Backlink solution 2 Print inside the file
+File: org-node.info,  Node: Option 2A Let org-node manage a BACKLINKS property,  Next: Option 2B Let org-super-links manage a BACKLINKSEND drawer,  Up: Backlink solution 2 Print inside the file
 
-4.3.1 Option 2A: Let org-node manage a :BACKLINKS: property
------------------------------------------------------------
+4.3.1 Option 2A: Let org-node manage a ‘:BACKLINKS:’ property
+-------------------------------------------------------------
 
 For a first-time run, type ‘M-x org-node-backlink-fix-all’.  (Don't
 worry, if you change your mind, you can undo with ‘M-x
@@ -477,10 +479,10 @@ properties must stay on one line.  This marks the second time I
 distribute software that assumes visual-line-mode :-)
 
 
-File: org-node.info,  Node: Option 2B Let org-super-links manage a BACKLINKS...END drawer,  Prev: Option 2A Let org-node manage a BACKLINKS property,  Up: Backlink solution 2 Print inside the file
+File: org-node.info,  Node: Option 2B Let org-super-links manage a BACKLINKSEND drawer,  Prev: Option 2A Let org-node manage a BACKLINKS property,  Up: Backlink solution 2 Print inside the file
 
-4.3.2 Option 2B Let org-super-links manage a :BACKLINKS:...:END: drawer
------------------------------------------------------------------------
+4.3.2 Option 2B: Let org-super-links manage a ‘:BACKLINKS:...:END:’ drawer
+--------------------------------------------------------------------------
 
 I _think_ the following should work.  Totally untested, let me know!
 
@@ -914,40 +916,40 @@ Ensure fresh data                           ‘(org-roam-db-sync)’            
 
 Tag Table:
 Node: Top201
-Node: News1540
-Node: Background2723
-Node: What's all this2893
-Node: What's a "node"?4278
-Node: Features6318
-Node: Setup10451
-Node: Install10625
-Node: Quick start11661
-Node: Use Org-roam at the same time?12348
-Node: Backlinks13779
-Node: What are backlinks?14020
-Node: Backlink solution 1 Borrow org-roam's backlink buffer14436
-Node: Option 1A Let org-roam manage its own DB15046
-Node: Option 1B Tell org-node to write to the org-roam DB15452
-Node: Option 1C Cut out the DB altogether16670
-Node: Backlink solution 2 Print inside the file17560
-Node: Option 2A Let org-node manage a BACKLINKS property18270
-Node: Option 2B Let org-super-links manage a BACKLINKS...END drawer19180
-Node: Misc20035
-Node: Org-capture20452
-Node: Node series21862
-Node: What are series?22317
-Node: Managing org-id-locations23590
-Node: Completion-at-point24182
-Node: Let org-open-at-point detect refs24534
-Node: Limitation TRAMP25102
-Node: Limitation Unique titles25560
-Node: Limitation Excluding notes26771
-Node: Limitation Org-ref28124
-Node: Tip On very slow filesystems28666
-Node: Tip Word-wrap in the Roam buffer?29595
-Node: Toolbox30161
-Node: Appendix34330
-Node: Appendix I Rosetta stone34455
+Node: News1494
+Node: Background2677
+Node: What's all this2847
+Node: What's a "node"?4232
+Node: Features6272
+Node: Setup9061
+Node: Install9235
+Node: Quick start10285
+Node: Use Org-roam at the same time?10972
+Node: Backlinks12403
+Node: What are backlinks?12644
+Node: Backlink solution 1 Borrow org-roam's backlink buffer13064
+Node: Option 1A Let org-roam manage its own DB13674
+Node: Option 1B Tell org-node to write to the org-roam DB14080
+Node: Option 1C Cut out the DB altogether15341
+Node: Backlink solution 2 Print inside the file16255
+Node: Option 2A Let org-node manage a BACKLINKS property16919
+Node: Option 2B Let org-super-links manage a BACKLINKSEND drawer17834
+Node: Misc18696
+Node: Org-capture19113
+Node: Node series20523
+Node: What are series?20978
+Node: Managing org-id-locations22251
+Node: Completion-at-point22843
+Node: Let org-open-at-point detect refs23195
+Node: Limitation TRAMP23763
+Node: Limitation Unique titles24221
+Node: Limitation Excluding notes25432
+Node: Limitation Org-ref26785
+Node: Tip On very slow filesystems27327
+Node: Tip Word-wrap in the Roam buffer?28256
+Node: Toolbox28822
+Node: Appendix32991
+Node: Appendix I Rosetta stone33116
 
 End Tag Table
 
