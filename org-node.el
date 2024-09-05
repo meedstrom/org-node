@@ -81,19 +81,20 @@
 ;; TODO: Let series dispatch have another "level" for nav keys after selecting
 ;;       the series, so "j" "n" "p", "c" are available
 
+(require 'seq)
 (require 'cl-lib)
 (require 'subr-x)
-(require 'seq)
+(require 'bytecomp)
 (require 'transient)
 (require 'find-func)
-(require 'bytecomp)
-(require 'persist)
-(require 'compat)
-(require 'dash)
 (require 'org)
 (require 'org-id)
 (require 'org-macs)
 (require 'org-element)
+
+(require 'dash)
+(require 'compat)
+(require 'persist)
 (require 'org-node-parser)
 (require 'org-node-changes)
 
@@ -2148,21 +2149,21 @@ format-constructs occur before these."
   (let ((verify-re (org-node--make-regexp-for-time-format time-format)))
     (when (string-match-p verify-re instance)
       (let ((case-fold-search nil))
-        (let ((idx-year (string-search "%Y" time-format))
-              (idx-month (string-search "%m" time-format))
-              (idx-day (string-search "%d" time-format))
-              (idx-%F (string-search "%F" time-format)))
-          (if (-none-p #'null (list idx-year idx-month idx-day))
+        (let ((pos-year (string-search "%Y" time-format))
+              (pos-month (string-search "%m" time-format))
+              (pos-day (string-search "%d" time-format))
+              (pos-ymd (string-search "%F" time-format)))
+          (if (-none-p #'null (list pos-year pos-month pos-day))
               (progn
-                (if (> idx-month idx-year) (cl-incf idx-month 2))
-                (if (> idx-day idx-year) (cl-incf idx-day 2))
-                (concat (substring instance idx-year (+ idx-year 4))
+                (if (> pos-month pos-year) (cl-incf pos-month 2))
+                (if (> pos-day pos-year) (cl-incf pos-day 2))
+                (concat (substring instance pos-year (+ pos-year 4))
                         "-"
-                        (substring instance idx-month (+ idx-month 2))
+                        (substring instance pos-month (+ pos-month 2))
                         "-"
-                        (substring instance idx-day (+ idx-day 2))))
-            (cl-assert idx-%F)
-            (substring instance idx-%F (+ idx-%F 10))))))))
+                        (substring instance pos-day (+ pos-day 2))))
+            (cl-assert pos-ymd)
+            (substring instance pos-ymd (+ pos-ymd 10))))))))
 
 
 ;;;; Series plumbing

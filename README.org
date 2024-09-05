@@ -231,7 +231,7 @@ Then start using the minor mode =org-node-backlink-mode=, which keeps these prop
 
 NOTE:  I hadn't even realized this, but people who /don't/ use visual-line-mode may not find this solution very scalable, since Org properties must stay on one line.  This marks the second time I distribute software that assumes visual-line-mode :-)
 
-*** Option 2B Let org-super-links manage a :BACKLINKS:...:END: drawer
+*** Option 2B: Let org-super-links manage a :BACKLINKS:...:END: drawer
 
 I /think/ the following should work. Totally untested, let me know!
 

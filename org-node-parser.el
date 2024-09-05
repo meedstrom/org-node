@@ -36,7 +36,7 @@ On most systems, the resulting string will be
 OS and variable `temporary-file-directory'."
   (file-name-concat temporary-file-directory
                     "org-node"
-                    (if basename (apply #'format basename args) "")))
+                    (when basename (apply #'format basename args))))
 
 (defun org-node-parser--make-todo-regexp (keywords-string)
   "Build a regexp from KEYWORDS-STRING.
@@ -332,7 +332,6 @@ findings to another temp file."
         result/missing-files
         result/found-nodes
         result/mtimes
-        ;; result/roam-db-file-data-vectors
         ;; Perf
         (file-name-handler-alist $file-name-handler-alist)
         (coding-system-for-read $assume-coding-system)
@@ -352,8 +351,10 @@ findings to another temp file."
                       (file-symlink-p FILE))
               ;; If FILE does not exist (not readable), user probably deleted
               ;; or renamed a file.  If it was a rename, hopefully the new name
-              ;; is also in file list.
-              ;; And symlinks... (who does symlinks?)  Skip for two reasons:
+              ;; is also in file list.  Else, like if it was done outside Emacs
+              ;; by typing `mv' on the command line, it gets picked up on next
+              ;; scan.
+              ;; And symlinks... (Who symlinks a note?)  Skip for two reasons:
               ;; - Causes duplicates if the true file is also in the file list.
               ;; - For performance, the codebase rarely uses `file-truename'.
               (push FILE result/missing-files)
@@ -444,7 +445,7 @@ findings to another temp file."
                     (progn
                       (setq END (point))
                       (unless (search-forward ":end:" nil t)
-                        (error "Couldn't find matching :END: drawer"))
+                        (error "Couldn't find :END: of drawer"))
                       (org-node-parser--collect-links-until
                        nil FILE-ID nil $plain-re $merged-re))
                   (setq END (point-max)))
@@ -531,9 +532,8 @@ findings to another temp file."
                       (setq TITLE (org-node-parser--org-link-display-format
                                    (buffer-substring HERE (point)))))
                   (setq TAGS nil)
-                  (setq TITLE
-                        (org-node-parser--org-link-display-format
-                         (buffer-substring HERE (pos-eol)))))
+                  (setq TITLE (org-node-parser--org-link-display-format
+                               (buffer-substring HERE (pos-eol)))))
                 ;; Gotta go forward 1 line, see if it is a planning-line, and
                 ;; if it is, then go forward 1 more line, and if that is a
                 ;; :PROPERTIES: line, then we're good
@@ -576,7 +576,7 @@ findings to another temp file."
                                    ;; keep going.
                                    ;; REVIEW What?
                                    (goto-char FAR))
-                               (error "Couldn't find matching :END: drawer"))))
+                               (error "Couldn't find :END: of drawer"))))
                         nil))
                 (setq ID (cdr (assoc "ID" PROPS)))
                 ;; NOTE: nil ID is allowed
@@ -646,6 +646,7 @@ findings to another temp file."
         (( t error )
          (push (list FILE (point) err) org-node-parser--result-problems))))
 
+    ;; All done
     (with-temp-file (org-node-parser--tmpfile "results-%d.eld" $i)
       (let ((write-region-inhibit-fsync nil) ;; Default t in batch mode
             (print-length nil)
