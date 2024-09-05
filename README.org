@@ -16,7 +16,7 @@ On [2024-09-02], the git repo history was REWRITTEN!  You may have had to delete
 
 Even if that's 5 years old.
 
-See some [[https://github.com/melpa/melpa/issues/2955#issuecomment-1519154736][loooong related discussions]] about the untrustworthiness of Package-Version, and that's leaving aside the fact the ecosystem [[https://github.com/melpa/melpa/issues/6656][doesn't really make use of]] the concept of versioned releases, and when some tools pretend it does instead of taking the newest commit, they make it less stable for all.
+See some [[https://github.com/melpa/melpa/issues/2955#issuecomment-1519154736][loooong related discussions]] about the untrustworthiness of Package-Version, and that's leaving aside the fact the ecosystem [[https://github.com/melpa/melpa/issues/6656][doesn't really make use of the concept of versioned releases]], and when some tools pretend it does instead of taking the newest commit, they make it [[https://old.reddit.com/r/emacs/comments/1f8ok7c/do_you_set_packageinstallupgradebuiltin_to_t/llimwe0/][less stable for all]].
 
 Lesson learned -- when /you/ create a package, never commit a file containing a Package-Version line.  Doing so curses the repo for the rest of time, or until you use git-filter-repo to undo the damage.
 
@@ -111,8 +111,6 @@ On Elpaca:
 On Straight:
 
 : M-x straight-pull-package RET
-
------
 
 If you are an org-roam user, you'll want the *org-node-fakeroam* module as well.  It is not on MELPA yet, so use [[https://github.com/radian-software/straight.el][straight.el]] or similar and add an init snippet like this:
 
