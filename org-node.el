@@ -606,6 +606,19 @@ When called from Lisp, peek on any hash table HT."
              (not (backup-file-name-p buffer-file-name)))
     (org-node--scan-targeted buffer-file-name)))
 
+;; FIXME: Sure, it detects them, but won't run `org-node-rescan-functions' on
+;;        them
+(defvar org-node--idle-timer (timer-create)
+  "Timer for intermittently checking `org-node-extra-id-dirs'.
+for new, changed or deleted files.
+
+This redundant behavior helps detect changes made by something
+other than the current instance of Emacs, such as an user typing
+rm on the command line instead of using \\[delete-file].
+
+This timer is set by `org-node--maybe-adjust-idle-timer'.
+Override that function to configure timer behavior.")
+
 (defun org-node--maybe-adjust-idle-timer ()
   "Adjust `org-node--idle-timer' based on duration of last scan.
 If not running, start it."
@@ -617,6 +630,13 @@ If not running, start it."
       (cancel-timer org-node--idle-timer)
       (setq org-node--idle-timer
             (run-with-idle-timer new-delay t #'org-node--scan-all)))))
+
+(defun org-node--catch-unknown-modifications ()
+  (let ((new (-difference (org-node-list-files) (org-node-list-files t)))))
+  (if (> 10 )
+      (org-node--scan-all)
+    (org-node--scan-targeted))
+  )
 
 (defvar org-node--not-yet-saved nil
   "List of buffers created to hold a new node.")
@@ -861,7 +881,16 @@ LIB-NAME should be something that works with `find-library-name'."
             (byte-compile-file lib)))
         elc-path))))
 
-(defvar org-node--debug 'show)
+(defvar org-node-link-types
+  '("http" "https" "ftp" "file" "info" "eww" "id")
+  "Link types that may count as backlinks.
+Fewer means faster \\[org-node-reset].
+Tip: call `org-link-types' to see all default types.
+
+There is no need to add the \"cite\" type,
+even for Org-ref users.")
+
+(defvar org-node--debug nil)
 (defun org-node--scan (files finalizer)
   "Begin async scanning FILES for id-nodes and links.
 Other functions have similar docstrings, but this function
@@ -890,15 +919,34 @@ function to update current tables."
     (with-temp-file (org-node-parser--tmpfile "work-variables.eld")
       (let ((standard-output (current-buffer))
             (print-length nil)
-            (print-level nil))
+            (print-level nil)
+            (reduced-plain-re
+             ;; Copied from `org-link-make-regexps'
+             (let* ((non-space-bracket "[^][ \t\n()<>]")
+                    (parenthesis
+		     `(seq (any "<([")
+		           (0+ (or (regex ,non-space-bracket)
+			           (seq (any "<([")
+				        (0+ (regex ,non-space-bracket))
+				        (any "])>"))))
+		           (any "])>"))))
+	       (rx-to-string
+	        `(seq word-start
+		      (regexp ,(regexp-opt org-node-link-types t))
+		      ":"
+                      (group
+		       (1+ (or (regex ,non-space-bracket)
+			       ,parenthesis))
+		       (or (regexp "[^[:punct:][:space:]\n]")
+                           ?- ?/ ,parenthesis)))))))
         (prin1
          ;; NOTE The $sigils in the names are to visually distinguish these
          ;;      "external" variables in the body of
          ;;      `org-node-parser--collect-dangerously'.
          (append
           org-node-inject-variables
-          `(($plain-re . ,org-link-plain-re)
-            ($merged-re . ,(concat org-link-bracket-re "\\|" org-link-plain-re))
+          `(($plain-re . ,reduced-plain-re)
+            ($merged-re . ,(concat org-link-bracket-re "\\|" reduced-plain-re))
             ($assume-coding-system . ,org-node-perf-assume-coding-system)
             ($file-todo-option-re
              . ,(rx bol (* space)
@@ -1047,6 +1095,9 @@ to FINALIZER."
 
 ;;;; Scan-finalizers
 
+;; TODO: Some perf ideas: try integer mtimes, try `string=' over `equal', try
+;;       `cl-loop' over `dolist', do fewer remhash/clrhash if possible, define
+;;       inline functions, pre-associate each dest with a list of links
 (defun org-node--finalize-full (results)
   "Wipe tables and repopulate from data in RESULTS."
   (run-hooks 'org-node-before-update-tables-hook)
@@ -1211,25 +1262,37 @@ The reason for default t is better experience with
             (puthash title affx org-node--title<>affixation-triplet)))))))
 
 (defun org-node--ensure-compiled (fn)
-  "Return FN as a compiled function.
+  "Try to return FN as a compiled function.
 
-- If FN is a symbol with uncompiled function definition, compile it
-  and return the same symbol.
+- If FN is a symbol with uncompiled function definition, return
+  the same symbol and arrange to natively compile it after some
+  idle time.
+
 - If FN is an anonymous lambda, compile it, cache the resulting
-  bytecode, and return that bytecode."
+  bytecode, and return that bytecode.  Then arrange to replace
+  the cached value with native bytecode after some idle time."
   (cond ((compiled-function-p fn) fn)
         ((symbolp fn)
          (if (compiled-function-p (symbol-function fn))
              fn
-           (if (native-comp-available-p) (native-compile fn) (byte-compile fn))
+           (if (native-comp-available-p)
+               (unless (alist-get fn org-node--compile-timers)
+                 (setf (alist-get fn org-node--compile-timers)
+                       (run-with-idle-timer
+                        (+ 10 (random 10)) nil #'native-compile fn)))
+             (byte-compile fn))
            fn))
         ((gethash fn org-node--compiled-lambdas))
-        ((puthash fn (if (and (native-comp-available-p)
-                              (not (eq 'closure (car-safe fn))))
-                         (native-compile fn)
-                       (byte-compile fn))
-                  org-node--compiled-lambdas))))
+        ((prog1 (puthash fn (byte-compile fn) org-node--compiled-lambdas)
+           (when (and (native-comp-available-p)
+                      (not (eq 'closure (car-safe fn))))
+             (run-with-idle-timer (+ 10 (random 10))
+                                  nil
+                                  `(lambda ()
+                                     (puthash ,fn (native-compile ,fn)
+                                              org-node--compiled-lambdas))))))))
 
+(defvar org-node--compile-timers nil)
 (defvar org-node--compiled-lambdas (make-hash-table :test #'equal)
   "1:1 table mapping lambda expressions to compiled bytecode.")
 
@@ -1334,18 +1397,6 @@ also necessary is `org-node--dirty-ensure-link-known' elsewhere."
 
 
 ;;;; Scanning: Etc
-
-;; FIXME: Sure, it detects them, but won't run `org-node-rescan-functions' on them
-(defvar org-node--idle-timer (timer-create)
-  "Timer for intermittently checking `org-node-extra-id-dirs'.
-for new, changed or deleted files.
-
-This redundant behavior helps detect changes made by something
-other than the current instance of Emacs, such as an user typing
-rm on the command line instead of using \\[delete-file].
-
-This timer is set by `org-node--maybe-adjust-idle-timer'.
-Override that function to configure timer behavior.")
 
 (defvar org-node--time-elapsed 1.0
   "Duration of the last cache reset.")
@@ -1488,20 +1539,21 @@ operation."
            return nil
            finally return t))
 
-;; (benchmark-call (byte-compile #'org-node-list-files))
+;; (benchmark-call #'org-node-list-files)
 ;; => (0.009714744 0 0.0)
-;; (benchmark-call (byte-compile #'org-roam-list-files))
+;; (benchmark-call #'org-roam-list-files)
 ;; => (1.488666741 1 0.23508516499999388)
 (defun org-node-list-files (&optional instant interactive)
   "List files in `org-id-locations' or `org-node-extra-id-dirs'.
-With optional argument INSTANT t, return files already known to
-contain IDs instead of calculating a new \(often somewhat longer)
-list of files that may or may not contain IDs.
+With optional argument INSTANT t, return already known files
+instead of checking the filesystem.
 
 When called interactively \(INTERACTIVE is non-nil), list the
 files in a new buffer."
   (interactive "i\np")
   (if interactive
+      ;; TODO: Use tabulated-list (or better, something like a find-dired
+      ;;       buffer)
       (progn
         (pop-to-buffer (get-buffer-create "*org-node files*"))
         (let ((files (org-node-list-files))
@@ -1530,17 +1582,17 @@ files in a new buffer."
                           "org"
                           org-node-extra-id-dirs-exclude))))))))
 
-;; (benchmark-run 70 (length (org-node--dir-files-recursively "/home/kept/roam" "org" '("logseq/"))))
+;; (progn (ignore-errors (native-compile #'org-node--dir-files-recursively)) (benchmark-run 100 (org-node--dir-files-recursively org-roam-directory "org" '("logseq/"))))
 (defun org-node--dir-files-recursively (dir suffix excludes)
   "Faster, purpose-made variant of `directory-files-recursively'.
 Return a list of all files under directory DIR, its
 sub-directories, sub-sub-directories and so on, with provisos:
 
-- Don\\='t follow symlinks to directories.
-- Don\\='t enter directories that start with a dot.
+- Don\\='t follow symlinks to other directories.
+- Don\\='t enter directories whose name start with a dot.
 - Don\\='t enter directories where some substring of the path
   matches one of strings EXCLUDES literally.
-- Don\\='t collect any file where some substring of the path
+- Don\\='t collect any file where some substring of the name
   matches one of strings EXCLUDES literally.
 - Collect only files that end in SUFFIX literally.
 - Don\\='t sort final results in any particular order."
@@ -1549,21 +1601,18 @@ sub-directories, sub-sub-directories and so on, with provisos:
       (if (directory-name-p file)
           (unless (string-prefix-p "." file)
             (setq file (file-name-concat dir file))
-            (when (not (or (cl-loop for substr in excludes
-                                    thereis (string-search substr file))
-                           (file-symlink-p (directory-file-name file))))
-              (setq result (nconc result
-                                  (org-node--dir-files-recursively
-        		           file suffix excludes)))))
+            (unless (or (cl-loop for substr in excludes
+                                 thereis (string-search substr file))
+                        (file-symlink-p (directory-file-name file)))
+              (setq result (nconc result (org-node--dir-files-recursively
+        		                  file suffix excludes)))))
         (when (string-suffix-p suffix file)
-          (setq file (file-name-concat dir file))
           (unless (cl-loop for substr in excludes
                            thereis (string-search substr file))
-            (push file result)))))
+            (push (file-name-concat dir file) result)))))
     result))
 
-;; (progn (byte-compile #'org-node-abbrev-file-names) (garbage-collect) (benchmark-call #'org-node-list-files))
-;; (get 'abbreviated-home-dir 'home)
+;; (progn (ignore-errors (native-compile #'org-node-list-files)) (benchmark-call #'org-node-list-files))
 (defvar org-node--homedir nil)
 (defun org-node-abbrev-file-names (path-or-paths)
   "Abbreviate all file paths in PATH-OR-PATHS.
@@ -1587,14 +1636,14 @@ paths to be compared, if not writing performance-critical code
   (unless org-node--homedir
     (setq org-node--homedir (file-name-as-directory (expand-file-name "~"))))
   (let* ((case-fold-search nil) ;; Assume case-sensitive filesystem
-         (result
-          (cl-loop for path in (ensure-list path-or-paths)
-                   do (setq path (directory-abbrev-apply path))
-                   and collect
-                   (if (string-prefix-p org-node--homedir path)
-                       (concat
-                        "~" (substring path (1- (length org-node--homedir))))
-                     path))))
+         (result (cl-loop
+                  for path in (ensure-list path-or-paths)
+                  do (setq path (directory-abbrev-apply path))
+                  and collect
+                  (if (string-prefix-p org-node--homedir path)
+                      (concat
+                       "~" (substring path (1- (length org-node--homedir))))
+                    path))))
     (if (listp path-or-paths)
         result
       (car result))))
@@ -1613,7 +1662,7 @@ for you."
 
 ;;;; Filename functions
 
-;; (progn (byte-compile #'org-node--root-dirs) (garbage-collect) (benchmark-run 10 (org-node--root-dirs (hash-table-values org-id-locations))))
+;; (progn (byte-compile #'org-node--root-dirs) (benchmark-run 10 (org-node--root-dirs (hash-table-values org-id-locations))))
 (defun org-node--root-dirs (file-list)
   "Infer root directories of FILE-LIST.
 
@@ -1718,9 +1767,10 @@ Built-in choices:
                    (string-glyph-compose))
     ;; Emacs 25+ solution  https://irreal.org/blog/?p=11896
     (let ((diacritics-alist
-           (seq-mapn (lambda (a b) (cons a b))
-                     "ÀÁÂÃÄÅàáâãäåÒÓÔÕÕÖØòóôõöøÈÉÊËèéêëðÇçÐÌÍÎÏìíîïÙÚÛÜùúûüÑñŠšŸÿýŽža"
-                     "AAAAAAaaaaaaOOOOOOOooooooEEEEeeeeeCcDIIIIiiiiUUUUuuuuNnSsYyyZz")))
+           (seq-mapn
+            (lambda (a b) (cons a b))
+            "ÀÁÂÃÄÅàáâãäåÒÓÔÕÕÖØòóôõöøÈÉÊËèéêëðÇçÐÌÍÎÏìíîïÙÚÛÜùúûüÑñŠšŸÿýŽža"
+            "AAAAAAaaaaaaOOOOOOOooooooEEEEeeeeeCcDIIIIiiiiUUUUuuuuNnSsYyyZz")))
       (concat (seq-map (lambda (char)
                          (or (alist-get char diacritics-alist)
                              char))
@@ -1734,7 +1784,7 @@ Built-in choices:
 ;; (org-node-slugify-for-web "Mañana Çedilla")
 ;; (org-node-slugify-for-web "How to convince me that 2 + 2 = 3")
 ;; (org-node-slugify-for-web "E. T. Jaynes")
-;; (org-node-slugify-for-web "Amnesic recentf? Solution: Run kill-emacs-hook periodically.")
+;; (org-node-slugify-for-web "Amnesic recentf? Solution: Foo.")
 ;; (org-node-slugify-for-web "Slimline/\"pizza box\" computer chassis")
 ;; (org-node-slugify-for-web "#emacs")
 ;; (org-node-slugify-for-web "칹え🐛")
@@ -1776,7 +1826,8 @@ org-roam."
            (fboundp 'org-roam-node-slug)
            (fboundp 'org-roam-node-create)
            (org-roam-node-slug (org-roam-node-create :title title)))
-      (user-error "Install org-roam to use `org-node-slugify-like-roam-actual'")))
+      (user-error
+       "Install org-roam to use `org-node-slugify-like-roam-actual'")))
 
 
 ;;;; How to create new nodes
@@ -1803,10 +1854,10 @@ org-roam."
         (if (backup-file-name-p file)
             (progn
               ;; FIXME: How to prevent this from happening?
-              (message "org-node: Accidentally recorded backup file, resetting...")
+              (message "org-node: Somehow recorded backup file, resetting...")
               (org-node--purge-backup-file-names)
               (push (lambda ()
-                      (message "org-node: Accidentally recorded backup file, resetting... done"))
+                      (message "org-node: Somehow recorded backup file, resetting... done"))
                     org-node--temp-extra-fns)
               (org-node--scan-all))
           (if (file-exists-p file)
@@ -1816,8 +1867,8 @@ org-roam."
                 (let ((pos (org-node-get-pos node)))
                   (find-file file)
                   (widen)
-                  ;; Move point to node heading, unless heading is already inside
-                  ;; visible part of buffer and point is at or under it
+                  ;; Move point to node heading, unless heading is already
+                  ;; inside visible part of buffer and point is at or under it
                   (if (org-node-get-is-subtree node)
                       (progn
                         (unless (and (pos-visible-in-window-p pos)
@@ -1831,9 +1882,9 @@ org-roam."
                           (recenter 0)))
                     (unless (pos-visible-in-window-p pos)
                       (goto-char pos)))))
-            (message "org-node: Didn't find a file, resetting...")
+            (message "org-node: Didn't find file, resetting...")
             (push (lambda ()
-                    (message "org-node: Didn't find a file, resetting... done"))
+                    (message "org-node: Didn't find file, resetting... done"))
                   org-node--temp-extra-fns)
             (org-node--scan-all))))
     (error "`org-node--goto' received a nil argument")))
@@ -2047,7 +2098,7 @@ to false positives, if you have been changing formats over time."
              name)
         (match-string 0 name)))))
 
-(defun org-node-mk-series-on-tag-by-property
+(defun org-node-mk-series-on-tag-sorted-by-property
     (key name tag prop &optional capture)
   "Quick-define a series filtered by TAG sorted by property PROP.
 This would be a series of ID-nodes, not files.
@@ -2410,22 +2461,15 @@ DEF is a member of `org-node-series-defs'."
      into items
      finally do
      (setf (alist-get (car def) org-node--series nil nil #'equal)
-           (nconc (if org-node--first-init
-                      ;; Faster first-time caching
-                      (cl-loop for elt in (cdr def)
-                               if (functionp elt)
-                               collect (byte-compile elt)
-                               else collect elt)
-                    (cl-loop for elt in (cdr def)
-                             if (functionp elt)
-                             collect (org-node--ensure-compiled elt)
-                             else collect elt))
+           (nconc (cl-loop for elt in (cdr def)
+                           if (functionp elt)
+                           collect (org-node--ensure-compiled elt)
+                           else collect elt)
                   (list :key (car def)
-                        :sorted-items
                         ;; Using `string>' due to most recent dailies probably
                         ;; being most relevant, thus cycling thru recent
                         ;; dailies will have the best perf.
-                        (cl-sort items #'string> :key #'car)))))
+                        :sorted-items (cl-sort items #'string> :key #'car)))))
     (org-node--add-series-to-dispatch (car def) (plist-get (cdr def) :name))))
 
 (defvar org-node-current-series-key nil
@@ -3734,8 +3778,8 @@ heading, else the file-level node, whichever has an ID first."
   "Warn about usage of obsolete series helpers/versions."
   (unless org-node--obsolete-series-warned
     (setq org-node--obsolete-series-warned t)
-    (display-warning 'org-node
-                     "Your initfiles use an old version of series definitions (still works), see wiki when you can \nhttps://github.com/meedstrom/org-node/wiki")))
+    (display-warning
+     'org-node "Your initfiles use a now-old version of series definitions. Still works, but port them when you can: https://github.com/meedstrom/org-node/wiki")))
 
 (defun org-node--example-daily-creator (sortstr &rest _)
   "Create a daily-note using SORTSTR as the date."

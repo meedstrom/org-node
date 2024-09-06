@@ -19,8 +19,8 @@
 
 ;; I rename things a lot.  That would break things for users unless I make
 ;; aliases.  But `define-obsolete-variable-alias' does not warn users about
-;; user options, so they can blissfully keep referring to a thrice-deprecated
-;; variable name for years and not even know.
+;; user options, which means they can blissfully keep referring to a
+;; thrice-deprecated variable name for years and not even know.
 
 ;; Thus this file.  Actually tell the user, once, for each old symbol that
 ;; they set or call.
@@ -68,9 +68,13 @@ value."
                           '(&optional &rest &body))))
    return (lwarn 'org-node :warning
                  "Hook `org-node-insert-link-hook' has changed, now passes no arguments, but function expects them: %s"
-                 fn)))
+                 fn))
+  (when (and (featurep 'org-roam)
+             (equal (file-name-directory (locate-library "org-node-fakeroam"))
+                    (file-name-directory (locate-library "org-node"))))
+    (message "org-node-fakeroam now has its own repo. If you need it, use the new MELPA recipe, or change your recipe to point to https://github.com/meedstrom/org-node-fakeroam")))
 
-(defmacro org-node-changes--def-whiny-alias (old new &optional interactive when removed-by)
+(defmacro org-node-changes--def-whiny-alias (old new &optional when interactive removed-by)
   "Define OLD as effectively an alias for NEW.
 Also, running OLD will emit a deprecation warning the first time.
 
@@ -79,94 +83,44 @@ string WHEN says when it was deprecated and REMOVED-BY when it
 may be removed.  When these strings are omitted, fall back on
 hardcoded strings."
   `(let (warned-once)
-     (add-to-list 'org-node-changes--new-names '(,old ,new ,removed-by))
-     (defun ,old (&rest args)
-       (declare (obsolete ',new ,(or when "2024")))
+     (add-to-list 'org-node-changes--new-names '(,(cadr old) ,(cadr new) ,removed-by))
+     (defun ,(cadr old) (&rest args)
+       (declare (obsolete ,new ,(or when "2024")))
        ,@(if interactive '((interactive)))
        (unless warned-once
          (setq warned-once t)
          (lwarn 'org-node :warning "Your initfiles use old function name: %S, which will be REMOVED by %s.  Please use new name: %S"
-                ',old ,(or removed-by "30 August 2024") ',new))
-       (apply ',new args))))
+                ,old ,(or removed-by "30 August 2024") ,new))
+       (apply ,new args))))
 
-(org-node-changes--def-whiny-alias org-node-files
-                                   org-node-list-files)
-
-(org-node-changes--def-whiny-alias org-node-rename-file-by-title-maybe
-                                   org-node-rename-file-by-title)
-
-(org-node-changes--def-whiny-alias org-node-faster-roam-list-files
-                                   org-node-fakeroam-list-files)
-
-(org-node-changes--def-whiny-alias org-node-faster-roam-list-dailies
-                                   org-node-fakeroam-list-dailies)
-
-(org-node-changes--def-whiny-alias org-node-faster-roam-daily-note-p
-                                   org-node-fakeroam-daily-note-p)
-
-;; Many of these existed only briefly, 0-3 days 2024-08-19
-
-(org-node-changes--def-whiny-alias org-node--series-standard-goto
-                                   org-node--example-try-goto-id)
-
-(org-node-changes--def-whiny-alias org-node--series-standard-try-goto
-                                   org-node--example-try-goto-id)
-
-(org-node-changes--def-whiny-alias org-node--standard-series-try-goto-id
-                                   org-node--example-try-goto-id)
-
-(org-node-changes--def-whiny-alias org-node--series-standard-prompter
-                                   org-node--example-prompter)
-
-(org-node-changes--def-whiny-alias org-node--standard-series-prompter
-                                   org-node--example-prompter)
-
-(org-node-changes--def-whiny-alias org-node--default-daily-goto
-                                   org-node--example-try-goto-file)
-
-(org-node-changes--def-whiny-alias org-node--standard-series-try-goto-file
-                                   org-node--example-try-goto-file)
-
-(org-node-changes--def-whiny-alias org-node--default-daily-try-goto
-                                   org-node--example-try-goto-file)
-
-(org-node-changes--def-whiny-alias org-node--default-daily-classifier
-                                   org-node--example-daily-classifier)
-
-(org-node-changes--def-whiny-alias org-node--default-daily-whereami
-                                   org-node--example-daily-whereami)
-
-(org-node-changes--def-whiny-alias org-node--default-daily-creator
-                                   org-node--example-daily-creator)
 
 ;; Polite aliases for now, upgrade to whiny later
 
-(define-obsolete-function-alias
-  'org-node--extract-ymd 'org-node-extract-ymd  "2024-08-21")
-
-(define-obsolete-function-alias
-  'org-node--create 'org-node-create "2024-08-21")
-
-;;;###autoload
-(define-obsolete-function-alias
-  'org-node-series-menu 'org-node-series-dispatch "2024-08-21")
-
-(define-obsolete-function-alias
-  'org-node-helper/try-goto-id 'org-node-helper-try-goto-id "2024-08-24")
-
-(define-obsolete-function-alias
-  'org-node-helper/try-visit-file 'org-node-helper-try-visit-file "2024-08-24")
-
-(define-obsolete-function-alias
-  'org-node-helper/filename->ymd 'org-node-helper-filename->ymd "2024-08-24")
+(org-node-changes--def-whiny-alias
+ 'org-node--extract-ymd 'org-node-extract-ymd)
 
 (org-node-changes--def-whiny-alias
- org-node-helper/mk-series-with-tag-sorted-by-property
- org-node-mk-series-on-tag-by-property)
+ 'org-node--create 'org-node-create)
 
 (org-node-changes--def-whiny-alias
- org-node-mk-series-on-tag-sorted-by-property
- org-node-mk-series-on-tag-by-property)
+ 'org-node-series-menu 'org-node-series-dispatch)
+
+(org-node-changes--def-whiny-alias
+ 'org-node-helper/try-goto-id 'org-node-helper-try-goto-id)
+
+(org-node-changes--def-whiny-alias
+ 'org-node-helper/try-visit-file 'org-node-helper-try-visit-file)
+
+(org-node-changes--def-whiny-alias
+ 'org-node-helper/filename->ymd 'org-node-helper-filename->ymd)
+
+(org-node-changes--def-whiny-alias
+ 'org-node-helper/mk-series-with-tag-sorted-by-property
+ 'org-node-mk-series-on-tag-sorted-by-property)
+
+(org-node-changes--def-whiny-alias
+ 'org-node-mk-series-on-tag-by-property
+ 'org-node-mk-series-on-tag-sorted-by-property)
 
 ;; (define-obsolete-variable-alias
 ;;   'org-node-creation-fn 'org-node-new-node-fn "2024-08-22")
@@ -174,7 +128,7 @@ hardcoded strings."
 ;; (define-obsolete-variable-alias
 ;;   'org-node-creation-hook 'org-node-new-node-hook "2024-08-22")
 
-;; (define-obsolete-function-alias
+;; (org-node-changes--def-whiny-alias
 ;;   'org-node-create #'org-node-new-node "2024-08-22")
 
 ;; Variables

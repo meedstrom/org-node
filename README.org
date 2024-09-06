@@ -1,9 +1,9 @@
-#+TITLE: Org-Node
-#+STARTUP: content
+#+TITLE: org-node
 #+AUTHOR: Martin Edström
 #+EMAIL: meedstrom91@gmail.com
 #+DATE: 2024
 #+LANGUAGE: en
+#+STARTUP: content
 #+TEXINFO_DIR_CATEGORY: Emacs
 #+TEXINFO_DIR_TITLE: Org-Node: (org-node).
 #+TEXINFO_DIR_DESC: Link org-id entries into a network.
@@ -370,9 +370,9 @@ While a big selling point of IDs is that you avoid depending on filenames, it's 
 #+end_src
 
 ** Limitation: Org-ref
-We support the builtin @citations, not (yet) org-ref &citations, since it slows down my scan about 50% if I amend =org-link-plain-re= to match them.  There's a commented-out block of code in the file org-node-parser.el if you feel like getting your elbows dirty.
+We support the builtin @citations, not fully org-ref &citations, since it slows down my scan about 50% if I amend =org-link-plain-re= to match all of =org-ref-cite-types=.  But! The system will pick up Org-ref v3 citations that start with "cite" (e.g. =[[citep:...]]=, =[[Citealt:...]]=) since doing that was free.
 
-You can still find nodes with e.g. =:ROAM_REFS: &citekey=, just not see backlinks.
+There's a commented-out block of code in the file org-node-parser.el if you feel like getting your elbows dirty.
 
 ** Tip: On very slow filesystems
 

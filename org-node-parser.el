@@ -67,11 +67,13 @@ keywords within."
                (split-string)
                (regexp-opt)))
 
+;; ;; Ok, it seems plenty fast enough
+;; (benchmark-run 1000 (org-node-parser--org-link-display-format " OUTCOME Made enough progress on [[id:f42d4ea8-ce6a-4ecb-bbcd-22dcb4c18671][Math blah]] to blah"))
 (defun org-node-parser--org-link-display-format (s)
   "Copy of `org-link-display-format'.
 Format string S for display - this means replace every link in S
-with only their description.  A perhaps surprising application is
-formatting node titles that may have links in them."
+with only their description if they have one, and in any case
+strip the brackets."
   (replace-regexp-in-string
    ;; The regexp is `org-link-bracket-re'
    "\\[\\[\\(\\(?:[^][\\]\\|\\\\\\(?:\\\\\\\\\\)*[][]\\|\\\\+[^][]\\)+\\)]\\(?:\\[\\([^z-a]+?\\)]\\)?]"
@@ -158,7 +160,7 @@ Argument PLAIN-RE is expected to be the value of
               path (match-string 4)))
       (when link-type
         (unless (save-excursion
-                  ;; If point is on a # comment line, skip
+                  ;; If point is on a # comment line, skip line
                   (goto-char (pos-bol))
                   (looking-at-p "[[:space:]]*# "))
           ;; The org-ref code is here. Problem is we have to patch merged-re
@@ -184,23 +186,20 @@ Argument PLAIN-RE is expected to be the value of
                         (string-replace "%20" " " path))
                 org-node-parser--result-found-links))))
 
-    ;; Start over and look for Org 9.5 @citekeys
+    ;; Start over and look for @citekeys
     (goto-char beg)
-    ;; NOTE: Technically this search matches org-ref [[cite too, causing a bit
-    ;; of redundant work, but tricky to workaround since point may be right on
-    ;; a [cite when we start
     (while (search-forward "[cite" end t)
       (let ((closing-bracket (save-excursion (search-forward "]" end t))))
         (if closing-bracket
-            ;; The regexp is `org-element-citation-key-re'
-            (while (re-search-forward "@\\([!#-+./:<>-@^-`{-~[:word:]-]+\\)"
+            ;; The regexp is a modified `org-element-citation-key-re'
+            (while (re-search-forward "[&@][!#-+./:<>-@^-`{-~[:word:]-]+"
                                       closing-bracket t)
               (if (save-excursion
                     (goto-char (pos-bol))
                     (looking-at-p "[[:space:]]*# "))
                   ;; On a # comment, skip citation
-                  ;; (NOTE: don't just skip whole line due to the search
-                  ;; boundary on this while-loop)
+                  ;; NOTE: Don't just skip whole line due to the search
+                  ;;       boundary on this while-loop
                   (goto-char closing-bracket)
                 (push (record 'org-node-link
                               id-here
@@ -208,7 +207,7 @@ Argument PLAIN-RE is expected to be the value of
                               nil
                               (substring (match-string 0) 1)) ;; drop @
                       org-node-parser--result-found-links)))
-          (error "No closing [cite: bracket")))))
+          (error "No closing bracket to [cite:")))))
   (goto-char (or end (point-max))))
 
 (defun org-node-parser--collect-properties (beg end)
@@ -217,7 +216,7 @@ Assumes BEG and END delimit the region in between
 a :PROPERTIES: and :END: string."
   (let (result)
     (goto-char beg)
-    (while (not (>= (point) end))
+    (while (< (point) end)
       (skip-chars-forward "[:space:]")
       (unless (looking-at-p ":")
         (error "Possibly malformed property drawer"))
@@ -299,7 +298,6 @@ findings to another temp file."
             (unless (re-search-forward "^[[:space:]]*:id: " nil t)
               (throw 'file-done t))
             (goto-char 1)
-            (setq LAST-LEVEL 0)
             (setq OLPATH nil)
 
             ;; If the very first line of file is a heading (typical for people
@@ -521,7 +519,7 @@ findings to another temp file."
                            ID
                            t
                            LEVEL
-                           (reverse (mapcar #'cadr (cdr OLPATH)))
+                           (nreverse (mapcar #'cadr (cdr OLPATH)))
                            HEADING-POS
                            PRIORITY
                            PROPS

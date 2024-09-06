@@ -212,9 +212,9 @@ the user invokes the command.  Or let the mode
 ;; Fabricate knockoff Roam backlinks in real time, so that a DB is not needed
 ;; to display the Roam buffer
 
-(org-node-changes--def-whiny-alias org-node-fakeroam-nosql-mode
-                                   org-node-fakeroam-jit-backlinks-mode
-                                   nil "2024-08-18" "2024-09-30")
+(org-node-changes--def-whiny-alias 'org-node-fakeroam-nosql-mode
+                                   'org-node-fakeroam-jit-backlinks-mode
+                                   "2024-08-18" nil "2024-09-30")
 
 ;;;###autoload
 (define-minor-mode org-node-fakeroam-jit-backlinks-mode
@@ -572,15 +572,16 @@ done.
 
 GOTO and KEYS are like in `org-roam-dailies--capture'."
   (require 'org-roam-dailies)
-  (add-hook 'org-roam-capture-new-node-hook #'org-node--add-series-item)
-  (setq org-node-proposed-series-key series-key)
-  (unwind-protect
-      (org-roam-dailies--capture
-       (encode-time
-        (parse-time-string (concat ymd (format-time-string " %T %z"))))
-       goto keys)
-    (remove-hook 'org-roam-capture-new-node-hook #'org-node--add-series-item)
-    (setq org-node-proposed-series-key nil)))
+  (when (fboundp 'org-roam-dailies--capture)
+    (add-hook 'org-roam-capture-new-node-hook #'org-node--add-series-item)
+    (setq org-node-proposed-series-key series-key)
+    (unwind-protect
+        (org-roam-dailies--capture
+         (encode-time
+          (parse-time-string (concat ymd (format-time-string " %T %z"))))
+         goto keys)
+      (remove-hook 'org-roam-capture-new-node-hook #'org-node--add-series-item)
+      (setq org-node-proposed-series-key nil))))
 
 ;; DEPRECATED
 ;;;###autoload
