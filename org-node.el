@@ -882,14 +882,17 @@ LIB-NAME should be something that works with `find-library-name'."
             (byte-compile-file lib)))
         elc-path))))
 
-(defvar org-node-link-types
-  '("http" "https" "ftp" "file" "info" "eww" "id")
+(defcustom org-node-link-types
+  '("http" "https" "file" "id")
   "Link types that may count as backlinks.
-Fewer means faster \\[org-node-reset].
-Tip: call `org-link-types' to see all default types.
+Types other than \"id\" only result in a backlink when there is
+some node with the same link in its ROAM_REFS property.
 
-There is no need to add the \"cite\" type,
-even for Org-ref users.")
+The fewer types, the faster \\[org-node-reset].
+Tip: eval `(org-link-types)' to see all types.
+
+There is no need to add the \"cite\" type."
+  :type '(repeat string))
 
 (defvar org-node--debug nil)
 (defun org-node--scan (files finalizer)
