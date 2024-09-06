@@ -1,4 +1,4 @@
-;;; org-node-fakeroam.el --- Stand-ins for org-roam-autosync-mode -*- lexical-binding: t; -*-
+;;; org-node-fakeroam.el --- Stand-ins for org-roam-autosync-mode -*- no-byte-compile: t; lexical-binding: t; -*-
 
 ;; Copyright (C) 2024 Martin Edström
 
