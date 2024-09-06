@@ -94,6 +94,57 @@ hardcoded strings."
        (apply ,new args))))
 
 
+;; Old, remove soon
+
+(org-node-changes--def-whiny-alias 'org-node-files
+                                   'org-node-list-files)
+
+(org-node-changes--def-whiny-alias 'org-node-rename-file-by-title-maybe
+                                   'org-node-rename-file-by-title)
+
+(org-node-changes--def-whiny-alias 'org-node-faster-roam-list-files
+                                   'org-node-fakeroam-list-files)
+
+(org-node-changes--def-whiny-alias 'org-node-faster-roam-list-dailies
+                                   'org-node-fakeroam-list-dailies)
+
+(org-node-changes--def-whiny-alias 'org-node-faster-roam-daily-note-p
+                                   'org-node-fakeroam-daily-note-p)
+
+(org-node-changes--def-whiny-alias 'org-node--series-standard-goto
+                                   'org-node--example-try-goto-id)
+
+(org-node-changes--def-whiny-alias 'org-node--series-standard-try-goto
+                                   'org-node--example-try-goto-id)
+
+(org-node-changes--def-whiny-alias 'org-node--standard-series-try-goto-id
+                                   'org-node--example-try-goto-id)
+
+(org-node-changes--def-whiny-alias 'org-node--series-standard-prompter
+                                   'org-node--example-prompter)
+
+(org-node-changes--def-whiny-alias 'org-node--standard-series-prompter
+                                   'org-node--example-prompter)
+
+(org-node-changes--def-whiny-alias 'org-node--default-daily-goto
+                                   'org-node--example-try-goto-file)
+
+(org-node-changes--def-whiny-alias 'org-node--standard-series-try-goto-file
+                                   'org-node--example-try-goto-file)
+
+(org-node-changes--def-whiny-alias 'org-node--default-daily-try-goto
+                                   'org-node--example-try-goto-file)
+
+(org-node-changes--def-whiny-alias 'org-node--default-daily-classifier
+                                   'org-node--example-daily-classifier)
+
+(org-node-changes--def-whiny-alias 'org-node--default-daily-whereami
+                                   'org-node--example-daily-whereami)
+
+(org-node-changes--def-whiny-alias 'org-node--default-daily-creator
+                                   'org-node--example-daily-creator)
+
+
 ;; Polite aliases for now, upgrade to whiny later
 
 (org-node-changes--def-whiny-alias
