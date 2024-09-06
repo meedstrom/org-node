@@ -139,9 +139,10 @@ See also `org-node-fakeroam-fast-render-mode'.
             (delete 'org-node--file<>previews savehist-additional-variables)
             (delete 'org-node--file<>mtime savehist-additional-variables))
           ;; Don't rely only on `kill-emacs-hook'
-          (run-with-idle-timer 60 t (lambda ()
-                                      (persist-save 'org-node--file<>previews)
-                                      (persist-save 'org-node--file<>mtime)))
+          (unless (memq system-type '(windows-nt ms-dos))
+            (run-with-idle-timer 60 t (lambda ()
+                                        (persist-save 'org-node--file<>previews)
+                                        (persist-save 'org-node--file<>mtime))))
           (advice-add #'org-roam-preview-get-contents :around
                       #'org-node-fakeroam--accelerate-get-contents)
           (advice-add #'org-roam-node-insert-section :around

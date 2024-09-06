@@ -502,6 +502,10 @@ For use by `org-node-fakeroam--accelerate-get-contents'.")
 (persist-defvar org-node--file<>mtime (make-hash-table :test #'equal)
   "1:1 table mapping files to their last-modification times.")
 
+(when (memq system-type '(windows-nt ms-dos))
+  (persist-unpersist 'org-node--file<>mtime)
+  (persist-unpersist 'org-node--file<>previews))
+
 (defun org-node-get-id-links (node)
   "Get list of ID-link objects pointing to NODE.
 Each object is of type `org-node-link' with these fields:
