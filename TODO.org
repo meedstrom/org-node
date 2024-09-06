@@ -1,3 +1,5 @@
+- [ ] Expunge more Roam-specific stuff to the fakeroam module
+
 - [ ] Spin out a library for the async processing (=org-node--scan= and friends)
 
 - [ ] Refile

@@ -53,7 +53,7 @@ Once a subtree has an ID you can link to, it's a "node" because it has joined th
 
 ** Features
 
-A comparison of three similar systems, which permit relying on org-id and don't lock you into the all-too-seductive concept of "one-note-per-file".
+A comparison of three similar systems, which permit relying on org-id and don't lock you into the all-too-seductive (for developers) concept of "one-note-per-file".
 
 | Feature                        | org-roam | org-node           | [[https://github.com/toshism/org-super-links][org-super-links]]      |
 |--------------------------------+----------+--------------------+----------------------|
@@ -65,8 +65,9 @@ A comparison of three similar systems, which permit relying on org-id and don't 
 | Customize how backlinks shown  | yes      | yes (org-roam's)   | yes                  |
 | Reflinks                       | yes      | yes (as backlinks) | --                   |
 | Ref search                     | yes      | yes (as aliases)   | not applicable       |
-| Org 9.5 @citekeys as refs      | yes      | yes                | not applicable       |
-| Support org-ref v2 and v3      | yes      | limited            | not applicable       |
+| Org 9.5 @citations as refs     | yes      | yes                | not applicable       |
+| Support org-ref v3             | yes      | limited            | not applicable       |
+| Support org-ref v2             | yes      | --                 | not applicable       |
 | Work thru org-roam-capture     | yes      | yes                | ?                    |
 | Work thru org-capture          | --       | yes                | ?                    |
 | Daily-nodes                    | yes      | yes                | --                   |
@@ -80,8 +81,8 @@ A comparison of three similar systems, which permit relying on org-id and don't 
 | Principled "related-section"   | --       | --                 | yes                  |
 | Refile                         | yes      | --                 | --                   |
 | Untitled notes                 | --       | --                 | --                   |
-| Support =roam:= links            | yes      | -- (WONTFIX)       | not applicable       |
-| Can have separate note piles   | yes      | -- (WONTFIX)       | not applicable       |
+| Support =roam:= links            | yes      | -- (wontfix)       | not applicable       |
+| Can have separate note piles   | yes      | -- (wontfix)       | not applicable       |
 |--------------------------------+----------+--------------------+----------------------|
 | Some query-able cache          | EmacSQL  | hash tables        | --                   |
 | Async cache rebuild            | --       | yes                | not applicable       |
