@@ -27,6 +27,21 @@
   (require 'cl-lib)
   (require 'subr-x))
 
+;; Tell compiler these aren't free variables
+(defvar $plain-re)
+(defvar $merged-re)
+(defvar $assume-coding-system)
+(defvar $file-name-handler-alist)
+(defvar $file-todo-option-re)
+(defvar $global-todo-re)
+(defvar $backlink-drawer-re)
+(defvar $i)
+(defvar $files)
+
+(defvar org-node-parser--result-paths-types nil)
+(defvar org-node-parser--result-found-links nil)
+(defvar org-node-parser--result-problems nil)
+
 (defun org-node-parser--tmpfile (&optional basename &rest args)
   "Return a path that puts BASENAME in a temporary directory.
 As a nicety, `format' BASENAME with ARGS too.
@@ -51,75 +66,6 @@ keywords within."
                (string-trim)
                (split-string)
                (regexp-opt)))
-
-(defun org-node-parser--memq-car (key alist)
-  "Like `memq', but check the `car' of each member.
-In other words: like `assq', but return the entire tail of ALIST.
-
-Concretely: recurse into the `cdr' of ALIST until the `caar'
-is `eq' to KEY, then return what remains of ALIST."
-  (while (and alist (not (eq key (caar alist))))
-    (setq alist (cdr alist)))
-  alist)
-
-;; TODO: Merge with `org-node-parser--pos->olp'?
-(defun org-node-parser--pos->parent-id (oldata pos file-id)
-  "Return ID of the closest ancestor heading that has an ID.
-See `org-node-parser--pos->olp' for explanation of OLDATA and POS.
-
-Extra argument FILE-ID is the file-level id, used as a fallback
-if no ancestor heading has an ID.  It can be nil."
-  (let (;; Drop all the data about positions below HEADING-POS
-        (data-until-pos
-         (or (org-node-parser--memq-car pos oldata)
-             (error "Broken algo: HEADING-POS %s not found in OLDATA %s"
-                    pos oldata))))
-    (let ((previous-level (nth 2 (car data-until-pos))))
-      ;; Work backwards towards the top of the file
-      (cl-loop for row in data-until-pos
-               as id = (nth 3 row)
-               as curr-level = (nth 2 row)
-               if (> previous-level curr-level)
-               do (setq previous-level curr-level)
-               and if id return id
-               ;; Even the top-level heading had no id
-               if (= 1 previous-level) return file-id))))
-
-(defun org-node-parser--pos->olp (oldata pos)
-  "Given buffer position POS, return the Org outline path.
-Result should look like a result from `org-get-outline-path'.
-
-Argument OLDATA must be of a form looking like
- ((373 \"A subheading\" 2)
-  (250 \"A top heading\" 1)
-  (199 \"Another top heading\" 1)
-  (123 \"First heading in the file is apparently third-level\" 3))
-
-where the car of each element represents a buffer position, the cadr the
-heading title, and the caddr the outline depth i.e. the number of
-asterisks in the heading at that location.
-
-As apparent in the example, OLDATA is expected in \"reverse\"
-order, such that the last heading in the file is represented in
-the first element.  An exact match for POS must also be included
-in one of the elements."
-  (let* (olp
-         ;; Drop all the data about positions below HEADING-POS
-         (data-until-pos
-          (or (org-node-parser--memq-car pos oldata)
-              (error "Broken algo: HEADING-POS %s not found in OLDATA %s"
-                     pos oldata))))
-    (let ((previous-level (caddr (car data-until-pos))))
-      ;; Work backwards towards the top of the file
-      ;; NOTE: Profiled dolist and while-catch pattern, `cl-loop' wins at perf
-      (cl-loop for row in data-until-pos
-               when (> previous-level (caddr row))
-               do (setq previous-level (caddr row))
-               (push (cadr row) olp)
-               and if (= 1 previous-level)
-               ;; Stop
-               return nil))
-    olp))
 
 (defun org-node-parser--org-link-display-format (s)
   "Copy of `org-link-display-format'.
@@ -182,8 +128,8 @@ What this means?  See org-node-test.el."
 ;;    ;; Default keys of `org-ref-cite-types' 2024-07-25
 ;;    '("cite" "nocite" "citet" "citet*" "citep" "citep*" "citealt" "citealt*" "citealp" "citealp*" "citenum" "citetext" "citeauthor" "citeauthor*" "citeyear" "citeyearpar" "Citet" "Citep" "Citealt" "Citealp" "Citeauthor" "Citet*" "Citep*" "Citealt*" "Citealp*" "Citeauthor*" "Cite" "parencite" "Parencite" "footcite" "footcitetext" "textcite" "Textcite" "smartcite" "Smartcite" "cite*" "parencite*" "supercite" "autocite" "Autocite" "autocite*" "Autocite*" "citetitle" "citetitle*" "citeyear" "citeyear*" "citedate" "citedate*" "citeurl" "fullcite" "footfullcite" "notecite" "Notecite" "pnotecite" "Pnotecite" "fnotecite" "cites" "Cites" "parencites" "Parencites" "footcites" "footcitetexts" "smartcites" "Smartcites" "textcites" "Textcites" "supercites" "autocites" "Autocites" "bibentry")))
 
-(defun org-node-parser--collect-links-until
-    (end id-here olp-with-self plain-re merged-re)
+;; TODO: Don't pass plain-re and merged-re, just use dynamic values
+(defun org-node-parser--collect-links-until (end id-here plain-re merged-re)
   "From here to buffer position END, look for forward-links.
 vArgument ID-HERE is the ID of the subtree where this function is
 being executed (or that of an ancestor heading, if the current
@@ -192,11 +138,9 @@ subtree has none), to be included in each link's metadata.
 It is important that END does not extend past any sub-heading, as
 the subheading potentially has an ID of its own.
 
-Argument OLP-WITH-SELF is the outline path to the current
-subtree, with its own heading tacked onto the end.  This is data
-that org-roam expects to have, so too org-node-fakeroam.
-
-Arguments PLAIN-RE and MERGED-RE..."
+Argument PLAIN-RE is expected to be the value of
+`org-link-plain-re', and MERGED-RE a regexp that merges that with
+`org-link-bracket-re'."
   (let ((beg (point))
         link-type path)
     (while (re-search-forward merged-re end t)
@@ -293,21 +237,6 @@ a :PROPERTIES: and :END: string."
 
 ;;; Main
 
-(defvar org-node-parser--result-paths-types nil)
-(defvar org-node-parser--result-found-links nil)
-(defvar org-node-parser--result-problems nil)
-
-;; Tell compiler these aren't free variables
-(defvar $plain-re)
-(defvar $merged-re)
-(defvar $assume-coding-system)
-(defvar $file-name-handler-alist)
-(defvar $file-todo-option-re)
-(defvar $global-todo-re)
-(defvar $backlink-drawer-re)
-(defvar $i)
-(defvar $files)
-
 (defun org-node-parser--collect-dangerously ()
   "Dangerous!
 Overwrites the current buffer!
@@ -333,13 +262,13 @@ findings to another temp file."
         (file-name-handler-alist $file-name-handler-alist)
         (coding-system-for-read $assume-coding-system)
         (coding-system-for-write $assume-coding-system)
-        ;; Assigned on every iteration, so let-bind once to produce less
-        ;; garbage.  Not sure how elisp works... but profiling shows a speedup
-        HEADING-POS HERE FAR END OUTLINE-DATA OLP-WITH-SELF ID-HERE
+        ;; Let-bind outside rather than inside the loop, to produce less
+        ;; garbage.  Not sure how elisp works... but profiling shows a speedup.
+        HEADING-POS HERE FAR END ID-HERE OLPATH
         DRAWER-BEG DRAWER-END
-        TITLE FILE-TITLE FILE-TITLE-OR-BASENAME FILE-ATTRS
+        TITLE FILE-TITLE FILE-TITLE-OR-BASENAME
         TODO-STATE TODO-RE FILE-TODO-SETTINGS
-        TAGS FILE-TAGS ID FILE-ID SCHED DEADLINE OLP PRIORITY LEVEL PROPS)
+        TAGS FILE-TAGS ID FILE-ID SCHED DEADLINE PRIORITY LEVEL PROPS)
 
     (dolist (FILE $files)
       (condition-case err
@@ -356,10 +285,10 @@ findings to another temp file."
               ;; - For performance, the codebase rarely uses `file-truename'.
               (push FILE result/missing-files)
               (throw 'file-done t))
-            (setq FILE-ATTRS (file-attributes FILE))
-            (push (cons FILE (file-attribute-modification-time FILE-ATTRS))
+            (push (cons FILE (file-attribute-modification-time
+                              (file-attributes FILE)))
                   result/mtimes)
-            ;; NOTE: Don't use `insert-file-contents-literally'.  It gives
+            ;; NOTE: Don't use `insert-file-contents-literally'!  It gives
             ;;       wrong values to HEADING-POS when there is any Unicode in
             ;;       the file.  Just overriding `coding-system-for-read' and
             ;;       `file-name-handler-alist' grants similar performance.
@@ -370,7 +299,8 @@ findings to another temp file."
             (unless (re-search-forward "^[[:space:]]*:id: " nil t)
               (throw 'file-done t))
             (goto-char 1)
-            (setq OUTLINE-DATA nil)
+            (setq LAST-LEVEL 0)
+            (setq OLPATH nil)
 
             ;; If the very first line of file is a heading (typical for people
             ;; who set `org-node-prefer-with-heading'), don't try to scan any
@@ -436,7 +366,6 @@ findings to another temp file."
               (when FILE-ID
                 (goto-char DRAWER-END)
                 (setq HERE (point))
-
                 ;; Don't count org-super-links backlinks as forward links
                 (if (re-search-forward $backlink-drawer-re nil t)
                     (progn
@@ -576,8 +505,9 @@ findings to another temp file."
                                (error "Couldn't find :END: of drawer"))))
                         nil))
                 (setq ID (cdr (assoc "ID" PROPS)))
-                ;; NOTE: nil ID is allowed
-                (push (list HEADING-POS TITLE LEVEL ID) OUTLINE-DATA)
+                (cl-loop until (> LEVEL (or (caar OLPATH) 0))
+                         do (pop OLPATH)
+                         finally do (push (list LEVEL TITLE ID) OLPATH))
                 (when ID
                   (push
                    ;; NOTE: See the defstruct for the ordering of fields
@@ -591,7 +521,7 @@ findings to another temp file."
                            ID
                            t
                            LEVEL
-                           (org-node-parser--pos->olp OUTLINE-DATA HEADING-POS)
+                           (reverse (mapcar #'cadr (cdr OLPATH)))
                            HEADING-POS
                            PRIORITY
                            PROPS
@@ -604,10 +534,11 @@ findings to another temp file."
                    result/found-nodes))
 
                 ;; Heading recorded, now collect links in the entry body!
-                (setq ID-HERE (or ID
-                                  (org-node-parser--pos->parent-id
-                                   OUTLINE-DATA HEADING-POS FILE-ID)
-                                  (throw 'entry-done t)))
+                (setq ID-HERE
+                      (or ID
+                          (cl-loop for crumb in OLPATH thereis (caddr crumb))
+                          FILE-ID
+                          (throw 'entry-done t)))
                 (setq HERE (point))
                 ;; Don't count org-super-links backlinks
                 ;; TODO: Generalize this mechanism to skip src blocks too
