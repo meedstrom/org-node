@@ -144,8 +144,7 @@ hardcoded strings."
 (org-node-changes--def-whiny-alias 'org-node--default-daily-creator
                                    'org-node--example-daily-creator)
 
-
-;; Polite aliases for now, upgrade to whiny later
+;; Bit newer
 
 (org-node-changes--def-whiny-alias
  'org-node--extract-ymd 'org-node-extract-ymd)
@@ -181,8 +180,6 @@ hardcoded strings."
 
 ;; (org-node-changes--def-whiny-alias
 ;;   'org-node-create #'org-node-new-node "2024-08-22")
-
-;; Variables
 
 (provide 'org-node-changes)
 

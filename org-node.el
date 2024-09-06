@@ -92,6 +92,7 @@
   "Support a zettelkasten of org-id files and subtrees."
   :group 'org)
 
+;; UNUSED: A custom-setter that causes all kinds of compiler warnings
 (defun org-node--set-and-remind-reset (sym val)
   (when org-node-cache-mode
     (run-with-timer
@@ -155,7 +156,7 @@ system migrations, or some of it was generated via Pandoc
 conversion or downloaded, it\\='s very possible that there\\='s a mix
 of coding systems among them.  In that case, setting this
 variable may cause org-node to fail to scan some of them, or
-display their titles with strange glyphs."
+display strange-looking data."
   :type '(choice coding-system (const nil)))
 
 (defcustom org-node-perf-keep-file-name-handlers nil
@@ -3552,7 +3553,7 @@ one of them is associated with a ROAM_REFS."
 
 ;; REVIEW: Is this a sane logic for picking heading?  It does not mirror how
 ;;         org-set-tags picks heading to apply to, and maybe that is the
-;;         behavior to model
+;;         behavior to model.
 (defun org-node--call-at-nearest-node (function &rest args)
   "With point at the relevant heading, call FUNCTION with ARGS.
 
@@ -3673,7 +3674,6 @@ Wrap the value in double-brackets if necessary."
 ;;;; CAPF (Completion-At-Point Function)
 
 ;; REVIEW: is it necessary to limit the effect to file-visiting buffers?
-
 (define-minor-mode org-node-complete-at-point-mode
   "Use `org-node-complete-at-point' in all Org buffers.
 
@@ -3683,10 +3683,11 @@ Wrap the value in double-brackets if necessary."
   (if org-node-complete-at-point-mode
       (progn
         (add-hook 'org-mode-hook #'org-node--install-capf-in-buffer)
+        (when (bound-and-true-p org-roam-completion-everywhere)
+          (message "You may want to set `org-roam-completion-everywhere' nil"))
         (dolist (buf (buffer-list))
           (with-current-buffer buf
-            (when (and buffer-file-name
-                       (derived-mode-p 'org-mode))
+            (when (and buffer-file-name (derived-mode-p 'org-mode))
               (add-hook 'completion-at-point-functions
                         #'org-node-complete-at-point nil t)))))
     (remove-hook 'org-mode-hook #'org-node--install-capf-in-buffer)
@@ -3699,7 +3700,7 @@ Wrap the value in double-brackets if necessary."
   "Let in-buffer completion try `org-node-complete-at-point'."
   (and buffer-file-name
        (derived-mode-p 'org-mode)
-       (equal "org" (file-name-extension buffer-file-name))
+       (string-suffix-p "org" buffer-file-name)
        (add-hook 'completion-at-point-functions
                  #'org-node-complete-at-point nil t)))
 
