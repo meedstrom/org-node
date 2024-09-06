@@ -41,8 +41,8 @@
 
 ;; Compared to other systems:
 
-;; - org-roam: Same idea, compatible disk format(!), but org-node is much
-;;   faster, does not depend on SQLite, lets you opt out of file-level property
+;; - org-roam: Same idea, compatible disk format(!), but org-node is faster,
+;;   does not depend on SQLite, lets you opt out of file-level property
 ;;   drawers, does not support "roam:" links, and tries to rely in a bare-metal
 ;;   way on upstream org-id and org-capture.  As a drawback, if a heading in
 ;;   some Git README has an ID, it's considered part of your collection --
@@ -56,30 +56,6 @@
 ;;   search.
 
 ;;; Code:
-
-;; TODO: A workflow to allow pseudo-untitled (numeric-titled) nodes
-;;       - Need a bunch of commands for that, like select node by fulltext
-;;         search
-;;         - Already `org-node-grep' is an equivalent to `org-node-find', so
-;;           "just" need an equivalent to `org-node-insert-link'.
-;;           Basically, capture, refile, and insert-link would all use the same
-;;           mechanism for identifying a node by a grep result.
-
-;; TODO: org-node-refile
-
-;; TODO: If a roam-ref exists like //www.website.com, allow counting
-;;       //www.website.com?key=val&key2=val2#hash as a reflink to the same,
-;;       unless the latter has a roam-ref of its own.
-;;       Would have to wait until all nodes registered, then do some sort of
-;;       `string-prefix-p' filtering...
-
-;; TODO: Support .org.gpg, .org.age
-
-;; TODO: A series that allows >1 dailies per day, disambiguating only by
-;;       directory
-
-;; TODO: Let series dispatch have another "level" for nav keys after selecting
-;;       the series, so "j" "n" "p", "c" are available
 
 (require 'seq)
 (require 'cl-lib)
@@ -881,7 +857,7 @@ LIB-NAME should be something that works with `find-library-name'."
             (byte-compile-file lib)))
         elc-path))))
 
-(defvar org-node--debug nil)
+(defvar org-node--debug 'show)
 (defun org-node--scan (files finalizer)
   "Begin async scanning FILES for id-nodes and links.
 Other functions have similar docstrings, but this function
@@ -942,13 +918,15 @@ function to update current tables."
                             "backlinks")
                         ":")))))))
 
+    (setq org-node--debug nil)
     (if org-node--debug
         ;; Special case for debugging; run single-threaded so we can step
         ;; through the org-node-parser.el functions with edebug
         (let (($i 0)
               (write-region-inhibit-fsync nil)
               (print-length nil))
-          (write-region (prin1-to-string files)
+          (write-region (prin1-to-string (sort files (lambda (_ _)
+                                                       (natnump (random)))))
                         nil
                         (org-node-parser--tmpfile "file-list-0.eld")
                         nil
@@ -957,10 +935,9 @@ function to update current tables."
           (setq org-node-parser--result-problems nil)
           (setq org-node-parser--result-paths-types nil)
           (setq org-node--first-init nil)
-          (load compiled-lib)
           (setq org-node--time-at-scan-begin (current-time))
-          (kill-buffer "*org-node debug*")
           (with-current-buffer (get-buffer-create "*org-node debug*")
+            (setq buffer-read-only nil)
             (when (eq 'show org-node--debug)
               (pop-to-buffer (current-buffer)))
             (erase-buffer)
