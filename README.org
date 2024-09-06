@@ -106,22 +106,20 @@ It's a very recent addition to MELPA, so you may have to refresh the recipe list
 
 On Elpaca:
 
-: M-x elpaca-update-menus RET elpaca-menu-melpa RET
+: C-u M-x elpaca-update-menus RET
 
-On Straight:
+On Straight (I think):
 
-: M-x straight-pull-package RET
+: M-x straight-fetch-all RET
 
-If you are an org-roam user, you'll want the *org-node-fakeroam* module as well.  It is not on MELPA yet, so use [[https://github.com/radian-software/straight.el][straight.el]] or similar and add an init snippet like this:
+If you are an org-roam user, you'll want the [[https://github.com/meedstrom/org-node-fakeroam][org-node-fakeroam]] module as well.  It is not on MELPA yet, so use [[https://github.com/radian-software/straight.el][straight.el]] or similar and add an init snippet like this:
 
 #+begin_src elisp
 (use-package org-node-fakeroam
   :straight (org-node-fakeroam
-             :type git :host github :repo "meedstrom/org-node"
-             :files ("org-node-fakeroam.el")
+             :type git :host github :repo "meedstrom/org-node-fakeroam"
              :branch "melpa")
-  :after org-node
-  :requires org-node)
+  :defer)
 #+end_src
 
 ** Quick start
@@ -194,14 +192,14 @@ Add this init snippet:
 (org-node-fakeroam-db-feed-mode)
 #+end_src
 
-Unfortunately, it is still a bit slow when I save a file with 400 nodes.  Only about 100x faster than org-roam, so still a noticeable delay.  It appears to be all down to EmacSQL -- if someone could help optimize how we call EmacSQL, that'd be much appreciated.  Until then, I recommend Option 1C.
+Unfortunately, it is still a bit slow when I save a file with 400 nodes.  It appears to be all down to EmacSQL -- if someone could help optimize how we call EmacSQL, that'd be much appreciated.  Until then, I recommend Option 1C.
 
 Related: if you often have reason to full-reset the DB, there is a faster command than =C-u M-x org-roam-db-sync=!  Try =M-x org-node-fakeroam-db-rebuild=.  Benchmark on my device:
 
 - =C-u M-x org-roam-db-sync=: 179 seconds
 - =M-x org-node-fakeroam-db-rebuild=: 6 seconds
 
-This is also a place where I request help, since 6 seconds seems a lot slower than it needs to be.  I envision it taking 6 ms so as to run it on every save -- that's obviously not possible yet.
+This is also a place where I request help, since 6 seconds seems a lot slower than it needs to be.  I envision running it on every save -- that's obviously not possible yet.
 
 *** Option 1C: Cut out the DB altogether
 

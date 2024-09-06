@@ -83,6 +83,7 @@
 (declare-function org-node-backlink--fix-entry-here "org-node-backlink")
 (declare-function profiler-report "profiler")
 (declare-function profiler-stop "profiler")
+(declare-function org-lint "org-lint")
 
 
 ;;;; Options
@@ -631,12 +632,12 @@ If not running, start it."
       (setq org-node--idle-timer
             (run-with-idle-timer new-delay t #'org-node--scan-all)))))
 
-(defun org-node--catch-unknown-modifications ()
-  (let ((new (-difference (org-node-list-files) (org-node-list-files t)))))
-  (if (> 10 )
-      (org-node--scan-all)
-    (org-node--scan-targeted))
-  )
+;; (defun org-node--catch-unknown-modifications ()
+;;   (let ((new (-difference (org-node-list-files) (org-node-list-files t)))))
+;;   (if (> 10 )
+;;       (org-node--scan-all)
+;;     (org-node--scan-targeted))
+;;   )
 
 (defvar org-node--not-yet-saved nil
   "List of buffers created to hold a new node.")
@@ -3228,6 +3229,7 @@ If last run was interrupted, resume working through the file list
 from where it stopped.  With prefix argument RESTART, start over
 from the beginning."
   (interactive "P")
+  (require 'org-lint)
   (org-node--init-ids)
   (let* ((warnings nil)
          (report-buffer (get-buffer-create "*org-node lint report*"))

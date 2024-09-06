@@ -1,27 +1,30 @@
-*** In 2025: drop Emacs 28 and 29
-Seems that Debian stable will be stuck on Emacs 28 until mid-2025,
-then likely leap to Emacs 30.
+- [ ] Spin out a library for the async processing (=org-node--scan= and friends)
 
-List of 28-isms and 29-isms to drop in future
+- [ ] Refile
 
-- =(cadar (org-collect-keywords "TITLE"))= -> =(org-get-title)=
-- simplify =(org-node--strip-diacritics)=
-- =;;;###autoload (autoload 'org-node-series-dispatch "org-node" nil t)=
-  - In Emacs 30, replace with just =;;;###autoload=
-- any usages of compat-call
-- what the compiler tells you is obsolete
+- [ ] A workflow to allow pseudo-untitled (numeric-titled) nodes
 
-*** org-node-refile
-*** Support .org.gpg, .org.age
-*** A workflow to allow pseudo-untitled (numeric-titled) nodes
-- Need a bunch of commands for that, like select node by fulltext search
-  - Already =org-node-grep= is an equivalent to =org-node-find=, so "just" need an equivalent to =org-node-insert-link=.  Basically, capture, refile, and insert-link would probably all use the same mechanism for identifying a node by a grep result.
+  Already =org-node-grep= can be considered an equivalent to =org-node-find=, so we "just" need an equivalent to =org-node-insert-link=.  Basically, capture, refile, and insert-link would probably all use the same mechanism for *identifying a node by a grep result.*
 
-*** Capture more ref variants as the same ref
-If a roam-ref exists like =//www.website.com=, allow counting =//www.website.com?key=val&key2=val2#hash= as a reflink to the same, unless the latter has a roam-ref of its own.  Would have to wait until all nodes registered, then do some sort of =string-prefix-p= filtering...
+- [ ] Capture more ref variants as the same ref
+  If a roam-ref exists like =//www.website.com=, allow counting =//www.website.com?key=val&key2=val2#hash= as a reflink to the same, unless the latter has a roam-ref of its own.  Would have to wait until all nodes registered, then do some sort of =string-prefix-p= filtering...
 
-*** Make possible a series that allows >1 dailies per day
-Disambiguating by directory.
+- [ ] org-node-series-dispatch: Free up keys "j" "n" "p", "c"
 
-*** org-node-series-dispatch: Make "j" "n" "p", "c" available
-Let them be bound only after selecting the series to operate on.
+- [ ] Make possible a series with >1 dailies per day
+
+- [ ] Support .org.gpg, .org.age
+
+- [ ] In 2025: drop Emacs 28
+
+  Seems that Debian stable will be stuck on Emacs 28 until mid-2025,
+  then likely leap to Emacs 30.
+
+  List of 28-isms and 29-isms to drop in future
+
+  - =(cadar (org-collect-keywords "TITLE"))= -> =(org-get-title)=
+  - simplify =(org-node--strip-diacritics)=
+  - =;;;###autoload (autoload 'org-node-series-dispatch "org-node" nil t)=
+    - In Emacs 30, replace with just =;;;###autoload=
+  - any usages of =compat-call=
+  - what the compiler tells you is obsolete
