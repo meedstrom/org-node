@@ -1,7 +1,7 @@
 \input texinfo    @c -*- texinfo -*-
 @c %**start of header
 @setfilename doc/org-node.info
-@settitle Org-Node
+@settitle org-node
 @documentencoding UTF-8
 @documentlanguage en
 @c %**end of header
@@ -13,13 +13,13 @@
 
 @finalout
 @titlepage
-@title Org-Node
+@title org-node
 @author Martin Edström
 @end titlepage
 
 @ifnottex
 @node Top
-@top Org-Node
+@top org-node
 @end ifnottex
 
 @menu
@@ -97,7 +97,7 @@ On @emph{[2024-09-02 Mon]}, the git repo history was REWRITTEN@!  You may have h
 
 Even if that's 5 years old.
 
-See some @uref{https://github.com/melpa/melpa/issues/2955#issuecomment-1519154736, loooong related discussions} about the untrustworthiness of Package-Version, and that's leaving aside the fact the ecosystem @uref{https://github.com/melpa/melpa/issues/6656, doesn't really make use of} the concept of versioned releases, and when some tools pretend it does instead of taking the newest commit, they make it less stable for all.
+See some @uref{https://github.com/melpa/melpa/issues/2955#issuecomment-1519154736, loooong related discussions} about the untrustworthiness of Package-Version, and that's leaving aside the fact the ecosystem @uref{https://github.com/melpa/melpa/issues/6656, doesn't really make use of the concept of versioned releases}, and when some tools pretend it does instead of taking the newest commit, they make it @uref{https://old.reddit.com/r/emacs/comments/1f8ok7c/do_you_set_packageinstallupgradebuiltin_to_t/llimwe0/, less stable for all}.
 
 Lesson learned -- when @emph{you} create a package, never commit a file containing a Package-Version line.  Doing so curses the repo for the rest of time, or until you use git-filter-repo to undo the damage.
 
@@ -149,7 +149,7 @@ Once a subtree has an ID you can link to, it's a "node" because it has joined th
 @node Features
 @section Features
 
-A comparison of three similar systems, which permit relying on org-id and don't lock you into the all-too-seductive concept of "one-note-per-file".
+A comparison of three similar systems, which permit relying on org-id and don't lock you into the all-too-seductive (for developers) concept of "one-note-per-file".
 
 @multitable {aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa} {aaaaaaaa} {aaaaaaaaaaaaaaaaaa} {aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}
 @headitem Feature
@@ -188,13 +188,17 @@ A comparison of three similar systems, which permit relying on org-id and don't 
 @tab yes
 @tab yes (as aliases)
 @tab not applicable
-@item Org 9.5 @@citekeys as refs
+@item Org 9.5 @@citations as refs
 @tab yes
 @tab yes
 @tab not applicable
-@item Support org-ref v2 and v3
+@item Support org-ref v3
 @tab yes
 @tab limited
+@tab not applicable
+@item Support org-ref v2
+@tab yes
+@tab --
 @tab not applicable
 @item Work thru org-roam-capture
 @tab yes
@@ -250,11 +254,11 @@ A comparison of three similar systems, which permit relying on org-id and don't 
 @tab --
 @item Support @samp{roam:} links
 @tab yes
-@tab -- (WONTFIX)
+@tab -- (wontfix)
 @tab not applicable
 @item Can have separate note piles
 @tab yes
-@tab -- (WONTFIX)
+@tab -- (wontfix)
 @tab not applicable
 @item Some query-able cache
 @tab EmacSQL
@@ -308,27 +312,25 @@ M-x package-refresh-contents RET
 On Elpaca:
 
 @example
-M-x elpaca-update-menus RET elpaca-menu-melpa RET
+C-u M-x elpaca-update-menus RET
 @end example
 
 
-On Straight:
+On Straight (I think):
 
 @example
-M-x straight-pull-package RET
+M-x straight-fetch-all RET
 @end example
 
 
-If you are an org-roam user, you'll want the @strong{org-node-fakeroam} module as well.  It is not on MELPA yet, so use @uref{https://github.com/radian-software/straight.el, straight.el} or similar and add an init snippet like this:
+If you are an org-roam user, you'll want the @uref{https://github.com/meedstrom/org-node-fakeroam, org-node-fakeroam} module as well.  It is not on MELPA yet, so use @uref{https://github.com/radian-software/straight.el, straight.el} or similar and add an init snippet like this:
 
 @lisp
 (use-package org-node-fakeroam
   :straight (org-node-fakeroam
-             :type git :host github :repo "meedstrom/org-node"
-             :files ("org-node-fakeroam.el")
+             :type git :host github :repo "meedstrom/org-node-fakeroam"
              :branch "melpa")
-  :after org-node
-  :requires org-node)
+  :defer)
 @end lisp
 
 @node Quick start
@@ -427,7 +429,7 @@ Add this init snippet:
 (org-node-fakeroam-db-feed-mode)
 @end lisp
 
-Unfortunately, it is still a bit slow when I save a file with 400 nodes.  Only about 100x faster than org-roam, so still a noticeable delay.  It appears to be all down to EmacSQL -- if someone could help optimize how we call EmacSQL, that'd be much appreciated.  Until then, I recommend Option 1C@.
+Unfortunately, it is still a bit slow when I save a file with 400 nodes.  It appears to be all down to EmacSQL -- if someone could help optimize how we call EmacSQL, that'd be much appreciated.  Until then, I recommend Option 1C@.
 
 Related: if you often have reason to full-reset the DB, there is a faster command than @samp{C-u M-x org-roam-db-sync}!  Try @samp{M-x org-node-fakeroam-db-rebuild}.  Benchmark on my device:
 
@@ -438,7 +440,7 @@ Related: if you often have reason to full-reset the DB, there is a faster comman
 @samp{M-x org-node-fakeroam-db-rebuild}: 6 seconds
 @end itemize
 
-This is also a place where I request help, since 6 seconds seems a lot slower than it needs to be.  I envision it taking 6 ms so as to run it on every save -- that's obviously not possible yet.
+This is also a place where I request help, since 6 seconds seems a lot slower than it needs to be.  I envision running it on every save -- that's obviously not possible yet.
 
 @node Option 1C Cut out the DB altogether
 @subsection Option 1C: Cut out the DB altogether
@@ -656,9 +658,9 @@ While a big selling point of IDs is that you avoid depending on filenames, it's 
 @node Limitation Org-ref
 @section Limitation: Org-ref
 
-We support the builtin @@citations, not (yet) org-ref &citations, since it slows down my scan about 50% if I amend @samp{org-link-plain-re} to match them.  There's a commented-out block of code in the file org-node-parser.el if you feel like getting your elbows dirty.
+We support the builtin @@citations, not fully org-ref &citations, since it slows down my scan about 50% if I amend @samp{org-link-plain-re} to match all of @samp{org-ref-cite-types}.  But! The system will pick up Org-ref v3 citations that start with "cite" (e.g. @samp{[[citep:...]]}, @samp{[[Citealt:...]]}) since doing that was free.
 
-You can still find nodes with e.g. @samp{:ROAM_REFS: &citekey}, just not see backlinks.
+There's a commented-out block of code in the file org-node-parser.el if you feel like getting your elbows dirty.
 
 @node Tip On very slow filesystems
 @section Tip: On very slow filesystems

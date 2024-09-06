@@ -9,7 +9,7 @@ END-INFO-DIR-ENTRY
 
 File: org-node.info,  Node: Top,  Next: News,  Up: (dir)
 
-Org-Node
+org-node
 ********
 
 * Menu:
@@ -96,10 +96,11 @@ Package-Version, not the _newest_ commit.
    See some loooong related discussions
 (https://github.com/melpa/melpa/issues/2955#issuecomment-1519154736)
 about the untrustworthiness of Package-Version, and that's leaving aside
-the fact the ecosystem doesn't really make use of
-(https://github.com/melpa/melpa/issues/6656) the concept of versioned
-releases, and when some tools pretend it does instead of taking the
-newest commit, they make it less stable for all.
+the fact the ecosystem doesn't really make use of the concept of
+versioned releases (https://github.com/melpa/melpa/issues/6656), and
+when some tools pretend it does instead of taking the newest commit,
+they make it less stable for all
+(https://old.reddit.com/r/emacs/comments/1f8ok7c/do_you_set_packageinstallupgradebuiltin_to_t/llimwe0/).
 
    Lesson learned - when _you_ create a package, never commit a file
 containing a Package-Version line.  Doing so curses the repo for the
@@ -201,8 +202,8 @@ File: org-node.info,  Node: Features,  Prev: What's a "node"?,  Up: Background
 ============
 
 A comparison of three similar systems, which permit relying on org-id
-and don't lock you into the all-too-seductive concept of
-"one-note-per-file".
+and don't lock you into the all-too-seductive (for developers) concept
+of "one-note-per-file".
 
 Feature                            org-roam   org-node             org-super-links (https://github.com/toshism/org-super-links)
 -------------------------------------------------------------------------------------------------------------------------------------
@@ -214,8 +215,9 @@ Rich backlinks buffer              yes        yes (org-roam's)     -
 Customize how backlinks shown      yes        yes (org-roam's)     yes
 Reflinks                           yes        yes (as backlinks)   -
 Ref search                         yes        yes (as aliases)     not applicable
-Org 9.5 @citekeys as refs          yes        yes                  not applicable
-Support org-ref v2 and v3          yes        limited              not applicable
+Org 9.5 @citations as refs         yes        yes                  not applicable
+Support org-ref v3                 yes        limited              not applicable
+Support org-ref v2                 yes        -                    not applicable
 Work thru org-roam-capture         yes        yes                  ?
 Work thru org-capture              -          yes                  ?
 Daily-nodes                        yes        yes                  -
@@ -229,8 +231,8 @@ Warn about duplicate titles        -          yes                  -
 Principled "related-section"       -          -                    yes
 Refile                             yes        -                    -
 Untitled notes                     -          -                    -
-Support ‘roam:’ links              yes        - (WONTFIX)          not applicable
-Can have separate note piles       yes        - (WONTFIX)          not applicable
+Support ‘roam:’ links              yes        - (wontfix)          not applicable
+Can have separate note piles       yes        - (wontfix)          not applicable
 Some query-able cache              EmacSQL    hash tables          -
 Async cache rebuild                -          yes                  not applicable
 *Time to cache my 3000 nodes*      *2m 48s*   *0m 02s*             not applicable
@@ -269,24 +271,23 @@ recipe list first:
 
    On Elpaca:
 
-     M-x elpaca-update-menus RET elpaca-menu-melpa RET
+     C-u M-x elpaca-update-menus RET
 
-   On Straight:
+   On Straight (I think):
 
-     M-x straight-pull-package RET
+     M-x straight-fetch-all RET
 
-   If you are an org-roam user, you'll want the *org-node-fakeroam*
-module as well.  It is not on MELPA yet, so use straight.el
+   If you are an org-roam user, you'll want the org-node-fakeroam
+(https://github.com/meedstrom/org-node-fakeroam) module as well.  It is
+not on MELPA yet, so use straight.el
 (https://github.com/radian-software/straight.el) or similar and add an
 init snippet like this:
 
      (use-package org-node-fakeroam
        :straight (org-node-fakeroam
-                  :type git :host github :repo "meedstrom/org-node"
-                  :files ("org-node-fakeroam.el")
+                  :type git :host github :repo "meedstrom/org-node-fakeroam"
                   :branch "melpa")
-       :after org-node
-       :requires org-node)
+       :defer)
 
 
 File: org-node.info,  Node: Quick start,  Next: Use Org-roam at the same time?,  Prev: Install,  Up: Setup
@@ -406,8 +407,7 @@ Add this init snippet:
      (org-node-fakeroam-db-feed-mode)
 
    Unfortunately, it is still a bit slow when I save a file with 400
-nodes.  Only about 100x faster than org-roam, so still a noticeable
-delay.  It appears to be all down to EmacSQL - if someone could help
+nodes.  It appears to be all down to EmacSQL - if someone could help
 optimize how we call EmacSQL, that'd be much appreciated.  Until then, I
 recommend Option 1C.
 
@@ -419,8 +419,8 @@ org-node-fakeroam-db-rebuild’.  Benchmark on my device:
    • ‘M-x org-node-fakeroam-db-rebuild’: 6 seconds
 
    This is also a place where I request help, since 6 seconds seems a
-lot slower than it needs to be.  I envision it taking 6 ms so as to run
-it on every save - that's obviously not possible yet.
+lot slower than it needs to be.  I envision running it on every save -
+that's obviously not possible yet.
 
 
 File: org-node.info,  Node: Option 1C Cut out the DB altogether,  Prev: Option 1B Tell org-node to write to the org-roam DB,  Up: Backlink solution 1 Borrow org-roam's backlink buffer
@@ -731,13 +731,14 @@ File: org-node.info,  Node: Limitation Org-ref,  Next: Tip On very slow filesyst
 5.9 Limitation: Org-ref
 =======================
 
-We support the builtin @citations, not (yet) org-ref &citations, since
+We support the builtin @citations, not fully org-ref &citations, since
 it slows down my scan about 50% if I amend ‘org-link-plain-re’ to match
-them.  There's a commented-out block of code in the file
-org-node-parser.el if you feel like getting your elbows dirty.
+all of ‘org-ref-cite-types’.  But!  The system will pick up Org-ref v3
+citations that start with "cite" (e.g.  ‘[[citep:...]]’,
+‘[[Citealt:...]]’) since doing that was free.
 
-   You can still find nodes with e.g.  ‘:ROAM_REFS: &citekey’, just not
-see backlinks.
+   There's a commented-out block of code in the file org-node-parser.el
+if you feel like getting your elbows dirty.
 
 
 File: org-node.info,  Node: Tip On very slow filesystems,  Next: Tip Word-wrap in the Roam buffer?,  Prev: Limitation Org-ref,  Up: Misc
@@ -917,39 +918,39 @@ Ensure fresh data                           ‘(org-roam-db-sync)’            
 Tag Table:
 Node: Top201
 Node: News1494
-Node: Background2677
-Node: What's all this2847
-Node: What's a "node"?4232
-Node: Features6272
-Node: Setup9061
-Node: Install9235
-Node: Quick start10285
-Node: Use Org-roam at the same time?10972
-Node: Backlinks12403
-Node: What are backlinks?12644
-Node: Backlink solution 1 Borrow org-roam's backlink buffer13064
-Node: Option 1A Let org-roam manage its own DB13674
-Node: Option 1B Tell org-node to write to the org-roam DB14080
-Node: Option 1C Cut out the DB altogether15341
-Node: Backlink solution 2 Print inside the file16255
-Node: Option 2A Let org-node manage a BACKLINKS property16919
-Node: Option 2B Let org-super-links manage a BACKLINKSEND drawer17834
-Node: Misc18696
-Node: Org-capture19113
-Node: Node series20523
-Node: What are series?20978
-Node: Managing org-id-locations22251
-Node: Completion-at-point22843
-Node: Let org-open-at-point detect refs23195
-Node: Limitation TRAMP23763
-Node: Limitation Unique titles24221
-Node: Limitation Excluding notes25432
-Node: Limitation Org-ref26785
-Node: Tip On very slow filesystems27327
-Node: Tip Word-wrap in the Roam buffer?28256
-Node: Toolbox28822
-Node: Appendix32991
-Node: Appendix I Rosetta stone33116
+Node: Background2781
+Node: What's all this2951
+Node: What's a "node"?4336
+Node: Features6376
+Node: Setup9264
+Node: Install9438
+Node: Quick start10448
+Node: Use Org-roam at the same time?11135
+Node: Backlinks12566
+Node: What are backlinks?12807
+Node: Backlink solution 1 Borrow org-roam's backlink buffer13227
+Node: Option 1A Let org-roam manage its own DB13837
+Node: Option 1B Tell org-node to write to the org-roam DB14243
+Node: Option 1C Cut out the DB altogether15416
+Node: Backlink solution 2 Print inside the file16330
+Node: Option 2A Let org-node manage a BACKLINKS property16994
+Node: Option 2B Let org-super-links manage a BACKLINKSEND drawer17909
+Node: Misc18771
+Node: Org-capture19188
+Node: Node series20598
+Node: What are series?21053
+Node: Managing org-id-locations22326
+Node: Completion-at-point22918
+Node: Let org-open-at-point detect refs23270
+Node: Limitation TRAMP23838
+Node: Limitation Unique titles24296
+Node: Limitation Excluding notes25507
+Node: Limitation Org-ref26860
+Node: Tip On very slow filesystems27493
+Node: Tip Word-wrap in the Roam buffer?28422
+Node: Toolbox28988
+Node: Appendix33157
+Node: Appendix I Rosetta stone33282
 
 End Tag Table
 
