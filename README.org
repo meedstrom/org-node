@@ -9,6 +9,21 @@
 #+TEXINFO_DIR_DESC: Link org-id entries into a network.
 #+EXPORT_FILE_NAME: doc/org-node.info
 #+HTML: <a href="https://melpa.org/#/org-node"><img alt="MELPA" src="https://melpa.org/packages/org-node-badge.svg"/></a>
+:preamble:
+#+begin_export texinfo
+Copyright (C) 2024 Martin Edström <meedstrom91@gmail.com>
+
+You can redistribute this document and/or modify it under the terms
+of the GNU General Public License as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any
+later version.
+
+This document is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+General Public License for more details.
+#+end_export
+:end:
 * News
 On [2024-09-02], the git repo history was REWRITTEN!  You may have had to delete and reinstall the package.  (Depends on your package manager.)  Sorry about that.
 
