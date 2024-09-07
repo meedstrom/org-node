@@ -15,8 +15,11 @@
 ;; You should have received a copy of the GNU General Public License
 ;; along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+;;; Code:
+
 (require 'ert)
 (require 'dash)
+(require 'find-func)
 (require 'org-node)
 (require 'org-node-parser)
 (require 'org-node-backlink)
@@ -89,9 +92,19 @@
     (should (equal (car (org-node--root-dirs (org-node-list-files)))
                    "/tmp/org-node/test2/"))))
 
+(defun org-node-test-file (file)
+  "Look for FILE in test/ directory or in default directory."
+  (let ((loaded-org-node (find-library-name "org-node")))
+    (or (and loaded-org-node
+             (let ((file (file-name-concat
+                          (file-name-directory (file-truename loaded-org-node))
+                          "test" file)))
+               (if (file-exists-p file) file)))
+        file)))
+
 (ert-deftest org-node/test-goto-random ()
   (require 'seq)
-  (org-node--scan-targeted (list "testfile2.org"))
+  (org-node--scan-targeted (list (org-node-test-file "testfile2.org")))
   (org-node-cache-ensure t)
   (let ((node (seq-random-elt (hash-table-values org-node--id<>node))))
     (org-node--goto node)
