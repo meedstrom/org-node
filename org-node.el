@@ -1242,11 +1242,10 @@ The reason for default t is better experience with
         (puthash ref node org-node--candidate<>node)
         (puthash ref
                  (list (propertize ref 'face 'org-cite)
-                       (propertize
-                        (let ((type (gethash ref org-node--uri-path<>uri-type)))
-                          (if type (concat type ":") "@"))
-                        'face
-                        'completions-annotations)
+                       (let ((type (gethash ref org-node--uri-path<>uri-type)))
+                         (when type
+                           (propertize
+                            (concat type ":") 'face 'completions-annotations)))
                        nil)
                  org-node--title<>affixation-triplet))
       (dolist (title (cons (org-node-get-title node)

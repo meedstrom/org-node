@@ -110,9 +110,11 @@ What this means?  See test/org-node-test.el."
          for link? in (append links (split-string-and-unquote (buffer-string)))
          ;; @citekey or &citekey
          if (string-match (rx (or bol (any ";:"))
-                              (group (any "@&") (+ (not (any " ;]")))))
+                              (group (any "@&")
+                                     (+ (not (any " ;]")))))
                           link?)
-         collect (substring (match-string 1 link?) 1)
+         ;; Replace & with @
+         collect (concat "@" (substring (match-string 1 link?) 1))
          ;; Some sort of uri://path
          else when (string-match "^\\(.*?\\):" link?)
          collect (let ((path (string-replace
@@ -182,7 +184,8 @@ Argument PLAIN-RE is expected to be the value of
                               id-here
                               (point)
                               nil
-                              (substring (match-string 0) 1)) ;; drop @
+                              ;; Replace & with @
+                              (concat "@" (substring (match-string 0) 1)))
                       org-node-parser--result-found-links)))
           (error "No closing bracket to [cite:")))))
   (goto-char (or end (point-max))))

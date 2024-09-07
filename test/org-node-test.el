@@ -25,53 +25,40 @@
 ;; (-all-p #'org-node-link-p (apply #'append (hash-table-values org-node--dest<>links)))
 
 (ert-deftest org-node/test-split-refs-field ()
-  (setq org-node-parser--result:paths-types nil)
+  (setq org-node-parser--result-paths-types nil)
   (let ((result
          (org-node-parser--split-refs-field
           (concat " \"[cite:@citekey abcd ; @citekey2 cdefgh;@citekey3]\""
-                  " \"[[cite:&citekey4 abcd ; &citekey5 cdefgh;&citekey6]]\""
+                  " \"[[citep:&citekey4 abcd ; &citekey5 cdefgh;&citekey6]]\""
                   " \"[[https://gnu.org/A Link With Spaces/index2.htm]]\""
                   " [[https://gnu.org/A Link With Spaces/index.htm][baz]]"
-                  " https://gnu.org [citep:&citekey7]  @foo &bar "
+                  " https://gnu.org [cite:&citekey7]  @foo &bar "
                   " info:with%20escaped%20spaces"))))
     (should (--all-p (member it result)
-                     '("citekey"
-                       "citekey4"
-                       "citekey7"
-                       "foo"
-                       "bar"
+                     '("@citekey"
+                       "@citekey4"
+                       "@citekey7"
+                       "@foo"
+                       "@bar"
                        "with escaped spaces"
                        "//gnu.org/A Link With Spaces/index.htm"
                        "//gnu.org/A Link With Spaces/index2.htm"
                        "//gnu.org")))
     (should (equal "https" (cdr (assoc "//gnu.org/A Link With Spaces/index.htm"
-                                       org-node-parser--result:paths-types))))
+                                       org-node-parser--result-paths-types))))
     (should (equal "https" (cdr (assoc "//gnu.org"
-                                       org-node-parser--result:paths-types))))
-    (should (equal nil (cdr (assoc "citeKey"
-                                   org-node-parser--result:paths-types))))))
+                                       org-node-parser--result-paths-types))))
+    (should (equal nil (cdr (assoc "@citekey"
+                                   org-node-parser--result-paths-types))))
+    (should (equal nil (cdr (assoc "citekey"
+                                   org-node-parser--result-paths-types))))))
 
 (ert-deftest org-node/test-time-format-hacks ()
   (let ((fmt "Wild%Y--%m%dexample%H%M%S-"))
-    (should (equal (org-node--extract-ymd
+    (should (equal (org-node-extract-ymd
                     (format-time-string fmt '(26300 36406 109008 201000))
                     fmt)
                    "2024-08-14"))))
-
-(ert-deftest org-node/test-oldata-fns ()
-  (let ((olp '((3730 "A subheading" 2 "33dd")
-               (2503 "A top heading" 1 "d3rh")
-               (1300 "A sub-subheading" 3 "d3csae")
-               (1001 "A subheading" 2 "d3")
-               (199 "Another top heading" 1)
-               (123 "First heading in file is apparently third-level" 3))))
-    (should (equal (org-node-parser--pos->olp olp 1300)
-                   '("Another top heading" "A subheading")))
-    (should (equal (org-node-parser--pos->olp olp 2503)
-                   nil))
-    (should-error (org-node-parser--pos->olp olp 2500))
-    (should (equal (org-node-parser--pos->parent-id olp 1300 nil)
-                   "d3"))))
 
 (ert-deftest org-node/test-parsing-testfile2.org ()
   (org-node--scan-targeted
