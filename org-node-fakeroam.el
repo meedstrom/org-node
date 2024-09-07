@@ -25,6 +25,10 @@
 
 ;; Provide stand-ins for `org-roam-autosync-mode'.
 
+;; NOTE: This file is deprecated.  See
+;;     https://github.com/meedstrom/org-node-fakeroam
+;; or await the MELPA package.
+
 ;;; Code:
 
 (require 'cl-lib)
@@ -60,7 +64,6 @@
 (defvar org-roam-db-location)
 (defvar org-roam-directory)
 
-;; TODO: Remove after most users have switched to the Melpa recipes
 (defun org-node-fakeroam--check-compile ()
   "Compile all fakeroam functions if not compiled.
 
@@ -587,6 +590,7 @@ GOTO and KEYS are like in `org-roam-dailies--capture'."
 (defun org-node-fakeroam-daily-creator (sortstr)
   "Create a daily-note, for a day implied by SORTSTR."
   (declare (obsolete nil "2024-08-21"))
+  (org-node--obsolete-series-warn)
   (org-node-fakeroam-daily-create sortstr "d" t))
 
 (provide 'org-node-fakeroam)

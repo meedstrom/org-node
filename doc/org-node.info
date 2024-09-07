@@ -736,12 +736,21 @@ org-ref (https://github.com/jkitchin/org-ref) &citations that emulate
 LaTeX look-and-feel, since it nearly doubles my scan time if I amend
 ‘org-link-plain-re’ to match all of ‘org-ref-cite-types’.
 
-   What works is bracketed Org-ref v3 citations that start with "cite"
-or "Cite", e.g.  ‘[[citep:...]]’, ‘[[Citealt:...]]’,
-‘[[citeauthor:...]]’, since org-node-parser.el is able to pick them up
-for free.  What's doesn't work is e.g.  ‘[[parencite:...]]’ since it
-doesn't start with "cite", and plain ‘citep:...’ since it is not wrapped
-in brackets.
+   What works is bracketed Org-ref v3 citations that start with "cite",
+e.g.  ‘[[citep:...]]’, ‘[[citealt:...]]’, ‘[[citeauthor:...]]’, since
+org-node-parser.el is able to pick them up for free.  What doesn't work
+is e.g.  ‘[[Citealt*:...]]’ since it doesn't start with "cite", nor
+plain ‘citep:...’ since it is not wrapped in brackets.
+
+   If you need more of Org-ref, you have at least two options:
+   • Use org-roam - see discussions on boosting its performance here
+     (https://org-roam.discourse.group/t/rewriting-org-roam-node-list-for-speed-it-is-not-sqlite/3475/92)
+     and here
+     (https://org-roam.discourse.group/t/improving-performance-of-node-find-et-al/3326/33)
+   • Get your elbows dirty and try to update the archived branch
+     "orgref" (https://github.com/meedstrom/org-node/branches), see
+     relevant commit
+     (https://github.com/meedstrom/org-node/commit/90b0e503ac75428a5d3ca6a4c8c51b5e075064d3).
 
 
 File: org-node.info,  Node: Tip On very slow filesystems,  Next: Tip Word-wrap in the Roam buffer?,  Prev: Limitation Org-ref,  Up: Misc
@@ -949,11 +958,11 @@ Node: Limitation TRAMP23838
 Node: Limitation Unique titles24296
 Node: Limitation Excluding notes25507
 Node: Limitation Org-ref26860
-Node: Tip On very slow filesystems27691
-Node: Tip Word-wrap in the Roam buffer?28620
-Node: Toolbox29186
-Node: Appendix33355
-Node: Appendix I Rosetta stone33480
+Node: Tip On very slow filesystems28274
+Node: Tip Word-wrap in the Roam buffer?29203
+Node: Toolbox29769
+Node: Appendix33938
+Node: Appendix I Rosetta stone34063
 
 End Tag Table
 

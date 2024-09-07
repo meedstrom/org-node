@@ -10,7 +10,7 @@
 #+EXPORT_FILE_NAME: doc/org-node.info
 #+HTML: <a href="https://melpa.org/#/org-node"><img alt="MELPA" src="https://melpa.org/packages/org-node-badge.svg"/></a>
 :preamble:
-#+begin_export texinfo
+#+BEGIN_EXPORT info
 Copyright (C) 2024 Martin Edström <meedstrom91@gmail.com>
 
 You can redistribute this document and/or modify it under the terms
@@ -22,7 +22,7 @@ This document is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 General Public License for more details.
-#+end_export
+#+END_EXPORT
 :end:
 * News
 On [2024-09-02], the git repo history was REWRITTEN!  You may have had to delete and reinstall the package.  (Depends on your package manager.)  Sorry about that.

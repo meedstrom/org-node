@@ -988,9 +988,8 @@ function to update current tables."
                         (org-node-parser--tmpfile "file-list-0.eld")
                         nil
                         'quiet)
-          (setq org-node-parser--result-found-links nil)
-          (setq org-node-parser--result-problems nil)
-          (setq org-node-parser--result-paths-types nil)
+          (setq org-node-parser--found-links nil)
+          (setq org-node-parser--paths-types nil)
           (setq org-node--first-init nil)
           (setq org-node--time-at-scan-begin (current-time))
           (with-current-buffer (get-buffer-create "*org-node debug*")
