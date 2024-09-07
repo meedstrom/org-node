@@ -124,10 +124,11 @@ What this means?  See test/org-node-test.el."
                    ;; .. but the actual ref is just the //path
                    path))))))
 
-;; (defconst org-node-parser--org-ref-type-re
-;;   (regexp-opt
-;;    ;; Default keys of `org-ref-cite-types' 2024-07-25
-;;    '("cite" "nocite" "citet" "citet*" "citep" "citep*" "citealt" "citealt*" "citealp" "citealp*" "citenum" "citetext" "citeauthor" "citeauthor*" "citeyear" "citeyearpar" "Citet" "Citep" "Citealt" "Citealp" "Citeauthor" "Citet*" "Citep*" "Citealt*" "Citealp*" "Citeauthor*" "Cite" "parencite" "Parencite" "footcite" "footcitetext" "textcite" "Textcite" "smartcite" "Smartcite" "cite*" "parencite*" "supercite" "autocite" "Autocite" "autocite*" "Autocite*" "citetitle" "citetitle*" "citeyear" "citeyear*" "citedate" "citedate*" "citeurl" "fullcite" "footfullcite" "notecite" "Notecite" "pnotecite" "Pnotecite" "fnotecite" "cites" "Cites" "parencites" "Parencites" "footcites" "footcitetexts" "smartcites" "Smartcites" "textcites" "Textcites" "supercites" "autocites" "Autocites" "bibentry")))
+;; Default keys of `org-ref-cite-types' 2024-07-25
+(defconst org-node-parser--org-ref-types
+  '("cite" "nocite" "citet" "citet*" "citep" "citep*" "citealt" "citealt*" "citealp" "citealp*" "citenum" "citetext" "citeauthor" "citeauthor*" "citeyear" "citeyearpar" "Citet" "Citep" "Citealt" "Citealp" "Citeauthor" "Citet*" "Citep*" "Citealt*" "Citealp*" "Citeauthor*" "Cite" "parencite" "Parencite" "footcite" "footcitetext" "textcite" "Textcite" "smartcite" "Smartcite" "cite*" "parencite*" "supercite" "autocite" "Autocite" "autocite*" "Autocite*" "citetitle" "citetitle*" "citeyear" "citeyear*" "citedate" "citedate*" "citeurl" "fullcite" "footfullcite" "notecite" "Notecite" "pnotecite" "Pnotecite" "fnotecite" "cites" "Cites" "parencites" "Parencites" "footcites" "footcitetexts" "smartcites" "Smartcites" "textcites" "Textcites" "supercites" "autocites" "Autocites" "bibentry"))
+(defconst org-node-parser--org-ref-type-re
+  (regexp-opt org-node-parser--org-ref-types))
 
 (defun org-node-parser--collect-links-until (end id-here)
   "From here to buffer position END, look for forward-links.
@@ -161,28 +162,25 @@ Argument PLAIN-RE is expected to be the value of
                   ;; If point is on a # comment line, skip line
                   (goto-char (pos-bol))
                   (looking-at-p "[[:space:]]*# "))
-          ;; The org-ref code is here. Problem is we have to patch $merged-re
-          ;; and $plain-re to match the hundred org-ref types, and that slows
-          ;; things down.
-          ;; (if (and (string-search "&" path)
-          ;;          (string-match-p org-node-parser--org-ref-type-re link-type))
-          ;;     ;; A citep:, citealt: or some such.  Specifically org-ref v3
-          ;;     ;; because PATH contains at least one ampersand.
-          ;;     (while (string-match "&.+\\b" path)
-          ;;       (let ((citekey (match-string 0 path)))
-          ;;         (setq path (substring path (match-end 0)))
-          ;;         (push (record 'org-node-link
-          ;;                       id-here
-          ;;                       (point)
-          ;;                       link-type
-          ;;                       (substring citekey 1)) ;; Drop &
-          ;;               org-node-parser--result-found-links)))
-          (push (record 'org-node-link
-                        id-here
-                        (point)
-                        link-type
-                        (string-replace "%20" " " path))
-                org-node-parser--result-found-links))))
+          (if (and (string-search "&" path)
+                   (string-match-p org-node-parser--org-ref-type-re link-type))
+              ;; A citep:, citealt: or some such.  Specifically org-ref v3
+              ;; because PATH contains at least one ampersand.
+              (while (string-match "&.+?\\b" path)
+                (let ((citekey (match-string 0 path)))
+                  (setq path (substring path (match-end 0)))
+                  (push (record 'org-node-link
+                                id-here
+                                (point)
+                                link-type
+                                (substring citekey 1)) ;; Drop &
+                        org-node-parser--result-found-links)))
+            (push (record 'org-node-link
+                          id-here
+                          (point)
+                          link-type
+                          (string-replace "%20" " " path))
+                  org-node-parser--result-found-links)))))
 
     ;; Start over and look for @citekeys
     (goto-char beg)
@@ -190,7 +188,7 @@ Argument PLAIN-RE is expected to be the value of
       (let ((closing-bracket (save-excursion (search-forward "]" end t))))
         (if closing-bracket
             ;; The regexp is a modified `org-element-citation-key-re'
-            (while (re-search-forward "[&@][!#-+./:<>-@^-`{-~[:word:]-]+"
+            (while (re-search-forward "@[!#-+./:<>-@^-`{-~[:word:]-]+"
                                       closing-bracket t)
               (if (save-excursion
                     (goto-char (pos-bol))

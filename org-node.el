@@ -937,7 +937,10 @@ function to update current tables."
 		           (any "])>"))))
 	       (rx-to-string
 	        `(seq word-start
-		      (regexp ,(regexp-opt org-node-link-types t))
+		      (regexp ,(regexp-opt
+                                (append org-node-link-types
+                                        org-node-parser--org-ref-types)
+                                t))
 		      ":"
                       (group
 		       (1+ (or (regex ,non-space-bracket)
