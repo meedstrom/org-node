@@ -2113,17 +2113,17 @@ KEY, NAME and CAPTURE explained in `org-node-series-defs'."
     :version 2
     :capture ,capture
     :classifier (lambda (node)
-                  (let ((propv (cdr (assoc ,prop (org-node-get-props node))))
+                  (let ((sortstr (cdr (assoc ,prop (org-node-get-props node))))
                         (tagged (member ,tag (org-node-get-tags node))))
-                    (when (and propv tagged (not (string-blank-p propv)))
-                      (cons (concat propv " " (org-node-get-title node))
+                    (when (and sortstr tagged (not (string-blank-p sortstr)))
+                      (cons (concat sortstr " " (org-node-get-title node))
                             (org-node-get-id node)))))
     :whereami (lambda ()
                 (when (member ,tag (org-get-tags))
-                  (let ((propv (org-entry-get nil ,prop t))
+                  (let ((sortstr (org-entry-get nil ,prop t))
                         (node (gethash (org-node-id-at-point) org-nodes)))
-                    (when (and propv node)
-                      (concat propv " " (org-node-get-title node))))))
+                    (when (and sortstr node)
+                      (concat sortstr " " (org-node-get-title node))))))
     :prompter (lambda (key)
                 (let ((series (cdr (assoc key org-node--series))))
                   (completing-read "Go to: " (plist-get series :sorted-items))))
@@ -2229,7 +2229,6 @@ format-constructs occur before these."
    ;; `org-node-creation-hook'.
    '("a" :name "All ID-nodes by property :CREATED:"
      :version 2
-     :capture "n"
      :classifier (lambda (node)
                    (let ((time (cdr (assoc "CREATED" (org-node-get-props node)))))
                      (when (and time (not (string-blank-p time)))
@@ -2239,7 +2238,8 @@ format-constructs occur before these."
                    (and time (not (string-blank-p time)) time)))
      :prompter (lambda (key)
                  (let ((series (cdr (assoc key org-node--series))))
-                   (completing-read "Go to: " (plist-get series :sorted-items))))
+                   (completing-read
+                    "Go to: " (plist-get series :sorted-items))))
      :try-goto (lambda (item)
                  (when (org-node-helper-try-goto-id (cdr item))
                    t))

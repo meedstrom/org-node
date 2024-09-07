@@ -40,7 +40,6 @@
 
 (defvar org-node-parser--result-paths-types nil)
 (defvar org-node-parser--result-found-links nil)
-(defvar org-node-parser--result-problems nil)
 
 (defun org-node-parser--tmpfile (&optional basename &rest args)
   "Return a path that puts BASENAME in a temporary directory.
@@ -90,7 +89,7 @@ strip the brackets."
 
 (defun org-node-parser--split-refs-field (roam-refs)
   "Split a ROAM-REFS field correctly.
-What this means?  See org-node-test.el."
+What this means?  See test/org-node-test.el."
   (when roam-refs
     (with-temp-buffer
       (insert roam-refs)
@@ -130,8 +129,7 @@ What this means?  See org-node-test.el."
 ;;    ;; Default keys of `org-ref-cite-types' 2024-07-25
 ;;    '("cite" "nocite" "citet" "citet*" "citep" "citep*" "citealt" "citealt*" "citealp" "citealp*" "citenum" "citetext" "citeauthor" "citeauthor*" "citeyear" "citeyearpar" "Citet" "Citep" "Citealt" "Citealp" "Citeauthor" "Citet*" "Citep*" "Citealt*" "Citealp*" "Citeauthor*" "Cite" "parencite" "Parencite" "footcite" "footcitetext" "textcite" "Textcite" "smartcite" "Smartcite" "cite*" "parencite*" "supercite" "autocite" "Autocite" "autocite*" "Autocite*" "citetitle" "citetitle*" "citeyear" "citeyear*" "citedate" "citedate*" "citeurl" "fullcite" "footfullcite" "notecite" "Notecite" "pnotecite" "Pnotecite" "fnotecite" "cites" "Cites" "parencites" "Parencites" "footcites" "footcitetexts" "smartcites" "Smartcites" "textcites" "Textcites" "supercites" "autocites" "Autocites" "bibentry")))
 
-;; TODO: Don't pass plain-re and merged-re, just use dynamic values
-(defun org-node-parser--collect-links-until (end id-here plain-re merged-re)
+(defun org-node-parser--collect-links-until (end id-here)
   "From here to buffer position END, look for forward-links.
 vArgument ID-HERE is the ID of the subtree where this function is
 being executed (or that of an ancestor heading, if the current
@@ -145,12 +143,12 @@ Argument PLAIN-RE is expected to be the value of
 `org-link-bracket-re'."
   (let ((beg (point))
         link-type path)
-    (while (re-search-forward merged-re end t)
+    (while (re-search-forward $merged-re end t)
       (if (setq path (match-string 1))
           ;; Link is the [[bracketed]] kind.  Is there an URI: style link
           ;; inside?  Here is the magic that allows links to have spaces, it is
-          ;; not possible with plain-re alone.
-          (if (string-match plain-re path)
+          ;; not possible with $plain-re alone.
+          (if (string-match $plain-re path)
               (setq link-type (match-string 1 path)
                     path (string-trim-left path ".*?:"))
             ;; Nothing of interest between the brackets
@@ -163,8 +161,8 @@ Argument PLAIN-RE is expected to be the value of
                   ;; If point is on a # comment line, skip line
                   (goto-char (pos-bol))
                   (looking-at-p "[[:space:]]*# "))
-          ;; The org-ref code is here. Problem is we have to patch merged-re
-          ;; and plain-re to match the hundred org-ref types, and that slows
+          ;; The org-ref code is here. Problem is we have to patch $merged-re
+          ;; and $plain-re to match the hundred org-ref types, and that slows
           ;; things down.
           ;; (if (and (string-search "&" path)
           ;;          (string-match-p org-node-parser--org-ref-type-re link-type))
@@ -257,12 +255,17 @@ findings to another temp file."
         result/missing-files
         result/found-nodes
         result/mtimes
+        result/problems
         ;; Perf
         (file-name-handler-alist $file-name-handler-alist)
         (coding-system-for-read $assume-coding-system)
         (coding-system-for-write $assume-coding-system)
-        ;; Let-bind outside rather than inside the loop, to produce less
-        ;; garbage.  Not sure how elisp works... but profiling shows a speedup.
+        ;; Let-bind outside rather than inside the loop, even though they are
+        ;; only used inside the loop, to produce less garbage.  Not sure how
+        ;; Elisp works, but profiling shows a speedup... or it did once upon a
+        ;; time.  Suspect it makes no diff now that we nix GC, but I'm not
+        ;; gonna convert back to local `let' forms as it still matters if you
+        ;; wanna run this code synchronously.
         HEADING-POS HERE FAR END ID-HERE OLPATH
         DRAWER-BEG DRAWER-END
         TITLE FILE-TITLE FILE-TITLE-OR-BASENAME
@@ -287,8 +290,8 @@ findings to another temp file."
             (push (cons FILE (file-attribute-modification-time
                               (file-attributes FILE)))
                   result/mtimes)
-            ;; NOTE: Don't use `insert-file-contents-literally'!  It gives
-            ;;       wrong values to HEADING-POS when there is any Unicode in
+            ;; NOTE: Don't use `insert-file-contents-literally'!  It causes
+            ;;       wrong values for HEADING-POS when there is any Unicode in
             ;;       the file.  Just overriding `coding-system-for-read' and
             ;;       `file-name-handler-alist' grants similar performance.
             (let ((inhibit-read-only t))
@@ -370,12 +373,10 @@ findings to another temp file."
                       (setq END (point))
                       (unless (search-forward ":end:" nil t)
                         (error "Couldn't find :END: of drawer"))
-                      (org-node-parser--collect-links-until
-                       nil FILE-ID $plain-re $merged-re))
+                      (org-node-parser--collect-links-until nil FILE-ID))
                   (setq END (point-max)))
                 (goto-char HERE)
-                (org-node-parser--collect-links-until
-                 END FILE-ID $plain-re $merged-re)
+                (org-node-parser--collect-links-until END FILE-ID)
 
                 ;; NOTE: A plist would be more readable than a record, but then
                 ;; main Emacs has more work to do.  Profiled using:
@@ -545,30 +546,27 @@ findings to another temp file."
                     (unless (setq DRAWER-END (search-forward ":end:" nil t))
                       (push (list FILE (point)
                                   "Couldn't find matching :END: drawer")
-                            org-node-parser--result-problems)
+                            result/problems)
                       (throw 'entry-done t))
                   ;; Danger, Robinson
                   (setq DRAWER-END nil))
                 ;; Gotcha... collect links inside the heading too
                 (goto-char HEADING-POS)
-                (org-node-parser--collect-links-until
-                 (pos-eol) ID-HERE $plain-re $merged-re)
+                (org-node-parser--collect-links-until (pos-eol) ID-HERE)
                 ;; Collect links between property drawer and backlinks drawer
                 (goto-char HERE)
                 (when DRAWER-BEG
-                  (org-node-parser--collect-links-until
-                   DRAWER-BEG ID-HERE $plain-re $merged-re))
+                  (org-node-parser--collect-links-until DRAWER-BEG ID-HERE))
                 ;; Collect links until next heading
                 (goto-char (or DRAWER-END HERE))
-                (org-node-parser--collect-links-until
-                 (point-max) ID-HERE $plain-re $merged-re))
+                (org-node-parser--collect-links-until (point-max) ID-HERE))
               (goto-char (point-max))
               (widen)))
 
         ;; Don't crash the process when there is an error signal,
         ;; report it and continue to the next file
         (( t error )
-         (push (list FILE (point) err) org-node-parser--result-problems))))
+         (push (list FILE (point) err) result/problems))))
 
     ;; All done
     (with-temp-file (org-node-parser--tmpfile "results-%d.eld" $i)
@@ -582,7 +580,7 @@ findings to another temp file."
                                 ;; result/roam-db-file-data-vectors
                                 org-node-parser--result-paths-types
                                 org-node-parser--result-found-links
-                                org-node-parser--result-problems
+                                result/problems
                                 (current-time)))))))
   ;; TODO: Does emacs in batch mode garbage-collect at the end? I guess not but
   ;;       if it does then maybe exec a kill -9 on itself here to skip it.

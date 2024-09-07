@@ -22,7 +22,6 @@
 (require 'org-node-backlink)
 ;; (require 'org-node-fakeroam)
 
-
 ;; (-all-p #'org-node-link-p (apply #'append (hash-table-values org-node--dest<>links)))
 
 (ert-deftest org-node/test-split-refs-field ()

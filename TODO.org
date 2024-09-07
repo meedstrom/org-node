@@ -9,13 +9,14 @@
   Already =org-node-grep= can be considered an equivalent to =org-node-find=, so we "just" need an equivalent to =org-node-insert-link=.  Basically, capture, refile, and insert-link would probably all use the same mechanism for *identifying a node by a grep result.*
 
 - [ ] Capture more ref variants as the same ref
-  If a roam-ref exists like =//www.website.com=, allow counting =//www.website.com?key=val&key2=val2#hash= as a reflink to the same, unless the latter has a roam-ref of its own.  Would have to wait until all nodes registered, then do some sort of =string-prefix-p= filtering...
+
+  If a roam-ref exists like =//www.website.com=, allow counting =//www.website.com?key=val&key2=val2#hash= as a reflink to the same, unless the latter has a roam-ref of its own.
+
+  Would prolly be a fairly expensive operation.  After building ref<>id and dest<>links, run thru every dest and check if an existing ref is a prefix of it, then simply nconc the value with the value for the corresponding dest.  But having to check for other dests that may also be a prefix is where it would get expensive... O(n^2) I guess.
+
+  Hm... Sort all dests alphabetically.  All near-matches will be very close to each other, and indeed an alphabetic sort even results in a sort-by-length within each possible "group". So just run down progressively shorter prefixes until the length goes up again, then we know we're in another group.  Rough idea, but O(n^2) looks beatable.
 
 - [ ] org-node-series-dispatch: Free up keys "j" "n" "p", "c"
-
-- [ ] Make possible a series with >1 dailies per day
-
-- [ ] Support .org.gpg, .org.age
 
 - [ ] In 2025: drop Emacs 28
 
