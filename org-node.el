@@ -1100,9 +1100,11 @@ to FINALIZER."
 
 ;;;; Scan-finalizers
 
-;; TODO: Some perf ideas: try integer mtimes, try `string=' over `equal', try
-;;       `cl-loop' over `dolist', do fewer remhash/clrhash if possible, define
-;;       inline functions, pre-associate each dest with a list of links
+;; TODO: Some perf ideas:
+;;       produce minimal garbage with hand-written `while' loops,
+;;       look for places to do fewer remhash/clrhash if possible,
+;;       define inline functions,
+;;       let the parser pre-collect list of links for each dest
 (defun org-node--finalize-full (results)
   "Wipe tables and repopulate from data in RESULTS."
   (run-hooks 'org-node-before-update-tables-hook)

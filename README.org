@@ -387,7 +387,7 @@ While a big selling point of IDs is that you avoid depending on filenames, it's 
 
 Org-node supports the Org 9.5 @citations, but not fully the aftermarket [[https://github.com/jkitchin/org-ref][org-ref]] &citations that emulate LaTeX look-and-feel, since it nearly doubles my scan time if I amend =org-link-plain-re= to match all of =org-ref-cite-types=.
 
-What works is bracketed Org-ref v3 citations that start with "cite" or "Cite", e.g. =[[citep:...]]=, =[[Citealt:...]]=, =[[citeauthor:...]]=, since org-node-parser.el is able to pick them up for free.  What's doesn't work is e.g. =[[parencite:...]]= since it doesn't start with "cite", and plain =citep:...= since it is not wrapped in brackets.
+What works is bracketed Org-ref v3 citations that start with "cite", e.g. =[[citep:...]]=, =[[citealt:...]]=, =[[citeauthor:...]]=, since org-node-parser.el is able to pick them up for free.  What doesn't work is e.g. =[[Citealt*:...]]= since it doesn't start with "cite", nor plain =citep:...= since it is not wrapped in brackets.
 
 If you need more of Org-ref, you have at least two options:
 - Use org-roam - see discussions on boosting its performance [[https://org-roam.discourse.group/t/rewriting-org-roam-node-list-for-speed-it-is-not-sqlite/3475/92][here]] and [[https://org-roam.discourse.group/t/improving-performance-of-node-find-et-al/3326/33][here]]
