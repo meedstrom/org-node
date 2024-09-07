@@ -38,8 +38,8 @@
 (defvar $i)
 (defvar $files)
 
-(defvar org-node-parser--result-paths-types nil)
-(defvar org-node-parser--result-found-links nil)
+(defvar org-node-parser--paths-types nil)
+(defvar org-node-parser--found-links nil)
 
 (defun org-node-parser--tmpfile (&optional basename &rest args)
   "Return a path that puts BASENAME in a temporary directory.
@@ -94,7 +94,7 @@ What this means?  See test/org-node-test.el."
     (with-temp-buffer
       (insert roam-refs)
       (goto-char 1)
-      (let (links beg end)
+      (let (links beg end colon-pos)
         ;; Extract all [[bracketed links]]
         (while (search-forward "[[" nil t)
           (setq beg (match-beginning 0))
@@ -116,13 +116,13 @@ What this means?  See test/org-node-test.el."
          ;; Replace & with @
          collect (concat "@" (substring (match-string 1 link?) 1))
          ;; Some sort of uri://path
-         else when (string-match "^\\(.*?\\):" link?)
+         else when (setq colon-pos (string-search ":" link?))
          collect (let ((path (string-replace
                               "%20" " "
-                              (substring link? (match-end 0)))))
+                              (substring link? (1+ colon-pos)))))
                    ;; Remember the uri: prefix for pretty completions
-                   (push (cons path (match-string 1 link?))
-                         org-node-parser--result-paths-types)
+                   (push (cons path (substring link? 0 colon-pos))
+                         org-node-parser--paths-types)
                    ;; .. but the actual ref is just the //path
                    path))))))
 
@@ -163,7 +163,7 @@ Argument PLAIN-RE is expected to be the value of
                         (point)
                         link-type
                         (string-replace "%20" " " path))
-                org-node-parser--result-found-links))))
+                org-node-parser--found-links))))
 
     ;; Start over and look for @citekeys
     (goto-char beg)
@@ -186,7 +186,7 @@ Argument PLAIN-RE is expected to be the value of
                               nil
                               ;; Replace & with @
                               (concat "@" (substring (match-string 0) 1)))
-                      org-node-parser--result-found-links)))
+                      org-node-parser--found-links)))
           (error "No closing bracket to [cite:")))))
   (goto-char (or end (point-max))))
 
@@ -520,10 +520,7 @@ findings to another temp file."
                 (if (setq DRAWER-BEG
                           (re-search-forward $backlink-drawer-re nil t))
                     (unless (setq DRAWER-END (search-forward ":end:" nil t))
-                      (push (list FILE (point)
-                                  "Couldn't find matching :END: drawer")
-                            result/problems)
-                      (throw 'entry-done t))
+                      (error "Couldn't find :END: of drawer"))
                   ;; Danger, Robinson
                   (setq DRAWER-END nil))
                 ;; Gotcha... collect links inside the heading too
@@ -545,18 +542,19 @@ findings to another temp file."
          (push (list FILE (point) err) result/problems))))
 
     ;; All done
-    (with-temp-file (org-node-parser--tmpfile "results-%d.eld" $i)
-      (let ((write-region-inhibit-fsync nil) ;; Default t in batch mode
-            (print-length nil)
-            (print-level nil))
-        (insert
-         (prin1-to-string (list result/missing-files
-                                result/mtimes
-                                result/found-nodes
-                                org-node-parser--result-paths-types
-                                org-node-parser--result-found-links
-                                result/problems
-                                (current-time))))))))
+    (let ((write-region-inhibit-fsync nil) ;; Default t in batch mode
+          (print-length nil)
+          (print-level nil))
+      (write-region
+       (prin1-to-string (list result/missing-files
+                              result/mtimes
+                              result/found-nodes
+                              org-node-parser--paths-types
+                              org-node-parser--found-links
+                              result/problems
+                              (current-time)))
+       nil
+       (org-node-parser--tmpfile "results-%d.eld" $i)))))
 
 (provide 'org-node-parser)
 
