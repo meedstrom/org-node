@@ -1121,13 +1121,13 @@ to FINALIZER."
     (cl-loop for (path . type) in path.type
              do (puthash path type org-node--uri-path<>uri-type))
     (cl-loop for (file . mtime) in found.mtime
-             do (unless (equal mtime (gethash file org-node--file<>mtime))
+             do (unless (eq mtime (gethash file org-node--file<>mtime))
                   (puthash file mtime org-node--file<>mtime)
                   ;; Expire stale previews
                   (remhash file org-node--file<>previews)))
     (dolist (node nodes)
       (org-node--record-node node))
-    ;; (org-id-locations-save) ;; 10% of exec time on my machine
+    ;; (org-id-locations-save) ;; A nicety, but sometimes slow
     (setq org-node--series nil)
     (dolist (def org-node-series-defs)
       (org-node--build-series def))
@@ -1187,16 +1187,16 @@ to FINALIZER."
       (cl-loop for (path . type) in path.type
                do (puthash path type org-node--uri-path<>uri-type))
       (cl-loop for (file . mtime) in found.mtime
-               do (unless (equal mtime (gethash file org-node--file<>mtime))
+               do (unless (eq mtime (gethash file org-node--file<>mtime))
                     (puthash file mtime org-node--file<>mtime)
                     ;; Expire stale previews
                     (remhash file org-node--file<>previews)))
       (dolist (node nodes)
         (org-node--record-node node))
-      (dolist (prb problems)
-        (push prb org-node--problems))
+      (dolist (prob problems)
+        (push prob org-node--problems))
       (when problems
-        (message "org-node found issues, see M-x org-node-list-scan-problems"))
+        (message "Scan had problems, see M-x org-node-list-scan-problems"))
       (run-hook-with-args 'org-node-rescan-functions
                           (append missing-files found-files)))))
 

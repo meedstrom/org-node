@@ -269,8 +269,10 @@ findings to another temp file."
               ;; - For performance, the codebase rarely uses `file-truename'.
               (push FILE result/missing-files)
               (throw 'file-done t))
-            (push (cons FILE (file-attribute-modification-time
-                              (file-attributes FILE)))
+            (push (cons FILE (floor
+                              (time-to-seconds
+                               (file-attribute-modification-time
+                                (file-attributes FILE)))))
                   result/mtimes)
             ;; NOTE: Don't use `insert-file-contents-literally'!  It causes
             ;;       wrong values for HEADING-POS when there is any Unicode in
