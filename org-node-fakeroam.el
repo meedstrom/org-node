@@ -384,9 +384,6 @@ Designed to override `org-roam-reflinks-get'."
                               dest))
          (org-node-fakeroam--db-add-node node))))))
 
-;; REVIEW: I don't like that this accesses actual files on disk when nothing
-;;         else does.  Maybe the async parser can collect the whole vector that
-;;         this needs, ahead of time.
 (defun org-node-fakeroam--db-add-file-level-data (node)
   "Send to the database the metadata for the file where NODE is."
   (when (require 'org-roam nil t)
@@ -514,8 +511,10 @@ See docstring of `org-node-fakeroam-daily-dir'."
       (setq org-node-fakeroam-daily-dir
             (org-node-abbrev-file-names
              (file-truename
-              (file-name-concat org-roam-directory
-                                org-roam-dailies-directory)))))))
+              (if (file-name-absolute-p org-roam-dailies-directory)
+                  org-roam-dailies-directory
+                (file-name-concat org-roam-directory
+                                  org-roam-dailies-directory))))))))
 
 (org-node-fakeroam--remember-roam-dirs)
 (add-hook 'org-node-before-update-tables-hook
