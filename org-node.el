@@ -135,7 +135,7 @@ handler.
 
 I do not use EPG, so that is probably not enough to make it work.
 Report an issue on https://github.com/meedstrom/org-node/issues
-or drop me a line on Mastodon: @meedstrom@emacs.ch"
+or drop me a line on Mastodon: @meedstrom@hachyderm.io"
   :type 'alist)
 
 ;; TODO: Maybe suggest `utf-8-auto-unix', but is it a sane system for write?
@@ -247,12 +247,8 @@ EXCEPTION: Subdirectories that start with a dot, such as
 explicitly.
 
 To avoid accidentally picking up duplicate files such as
-versioned backups, causing org-id complaints about duplicate
-IDs, configure `org-node-extra-id-dirs-exclude'.
-
-Tip: If it happened anyway, try \\[org-node-forget-dir], because
-merely removing a directory from this list does not forget the
-IDs already found."
+versioned backups, causing org-id to complain about duplicate
+IDs, configure `org-node-extra-id-dirs-exclude'."
   :type '(repeat directory))
 
 ;; TODO: Figure out how to permit .org.gpg and fail gracefully if
@@ -264,26 +260,26 @@ IDs already found."
     ".sync-conflict-")
   "Path substrings of files that should not be searched for IDs.
 
-This option only influences how the function `org-node-list-files'
-should seek files found in `org-node-extra-id-dirs'.  It is meant
-as a way to avoid collecting IDs inside versioned backup files
-causing org-id complaints about duplicate IDs.
+This option only influences which files under
+`org-node-extra-id-dirs' should be scanned.  It is meant as a way
+to avoid collecting IDs inside versioned backup files causing
+org-id to complain about duplicate IDs.
 
 For all other \"excludey\" purposes, you probably mean to
 configure `org-node-filter-fn' instead.
 
-If you have accidentally added a directory of backup files, try
-\\[org-node-forget-dir].
+If you have accidentally let org-id add a directory of backup
+files, try \\[org-node-forget-dir].
 
 It is not necessary to exclude backups or autosaves that end in ~
-or # or .bak since `org-node-list-files' only considers files
-that end in precisely \".org\" anyway.
+or # or .bak, since the workhorse `org-node-list-files' only
+considers files that end in precisely \".org\" anyway.
 
 You can eke out a performance boost by excluding directories with
 a humongous amount of files, such as the infamous
 \"node_modules\", even if they contain no Org files.  However,
 directories that start with a period are always ignored, so no
-need to specify e.g. \"~/.local/\" or \"/.git/\" for that reason."
+need to specify e.g. \"~/.local/\" or \".git/\" for that reason."
   :type '(repeat string))
 
 
@@ -296,6 +292,9 @@ This means that org-node will concatenate the result of
 `org-node-affixation-fn' into a single string, so what the
 user types in the minibuffer can match against the prefix and
 suffix as well as against the node title.
+
+In other words: with the default `org-node-affixation-fn', you
+can match against the node's outline path.
 
 \(Tip: users of the orderless library on versions from 2024-07-11
 can match the prefix and suffix via `orderless-annotation',
@@ -312,22 +311,23 @@ After changing this setting, please run \\[org-node-reset]."
   "Function to give prefix and suffix to completion candidates.
 
 The results will style the appearance of completions during
-\\[org-node-find] et al.
+\\[org-node-find], \\[org-node-insert-link] et al.
 
 To read more about affixations, see docstring
 `completion-extra-properties', however this function operates on
 one candidate at a time, not the whole collection.
 
 It receives two arguments: NODE and TITLE, and it must return a
-list of three strings: title, prefix and suffix.  Actually,
-prefix and suffix can be nil.  Title should be TITLE unmodified.
+list of three strings: title, prefix and suffix.  The prefix and
+suffix can be nil.  Title should be TITLE unmodified.
 
 NODE is an object which form you can observe in examples from
 \\[org-node-peek] and specified in type `org-node'
 \(type \\[describe-symbol] org-node RET).
 
-If a node has aliases, it is passed to this function again for
-every alias, in which case TITLE is actually one of the aliases."
+If a node has aliases, the same node is passed to this function
+again for every alias, in which case TITLE is actually one of the
+aliases."
   :type '(radio
           (function-item org-node-affix-bare)
           (function-item org-node-affix-with-olp)
@@ -486,7 +486,12 @@ can demonstrate the data format.  See also the type `org-node'.")
   "1:1 table mapping ROAM_REFS members to the ID property near.")
 
 (defvar org-node--uri-path<>uri-type (make-hash-table :test #'equal)
-  "1:1 table mapping //paths to types:.")
+  "1:1 table mapping //paths to types:.
+
+While the same path can be found with multiple types \(e.g. http
+and https), this table will store only one of these \(random).
+
+To see all links found, try \\[org-node-list-reflinks].")
 
 (defvar org-node--dest<>links (make-hash-table :test #'equal)
   "1:N table of links.
@@ -889,7 +894,7 @@ LIB-NAME should be something that works with `find-library-name'."
 Types other than \"id\" only result in a backlink when there is
 some node with the same link in its ROAM_REFS property.
 
-The fewer types, the faster \\[org-node-reset].
+Having fewer types results in a faster \\[org-node-reset].
 Tip: eval `(org-link-types)' to see all types.
 
 There is no need to add the \"cite\" type."
@@ -953,6 +958,8 @@ function to update current tables."
           `(($plain-re . ,reduced-plain-re)
             ($merged-re . ,(concat org-link-bracket-re "\\|" reduced-plain-re))
             ($assume-coding-system . ,org-node-perf-assume-coding-system)
+            ($inlinetask-min-level
+             . ,(bound-and-true-p org-inlinetask-min-level))
             ($file-todo-option-re
              . ,(rx bol (* space)
                     (or "#+todo: " "#+seq_todo: " "#+typ_todo: ")))
@@ -1721,7 +1728,7 @@ consult the filesystem, just compares substrings to each other."
 - Symbol nil: put file in the most populous root directory in
        `org-id-locations' without asking
 - String: a directory path in which to put the file
-- Symbol t: ask every time, starting from the current directory
+- Symbol t: ask every time
 
 This variable controls the directory component, but the file
 basename is controlled by `org-node-slug-fn' and
@@ -1753,7 +1760,10 @@ the first heading in a file that has no #+TITLE.
 Built-in choices:
 - `org-node-slugify-for-web'
 - `org-node-slugify-like-roam-default'
-- `org-node-slugify-like-roam-actual'"
+- `org-node-slugify-like-roam-actual'
+
+It is popular to also prefix filenames with a datestamp.  To do
+that, configure `org-node-datestamp-format'."
   :type '(radio
           (function-item org-node-slugify-for-web)
           (function-item org-node-slugify-like-roam-default)
@@ -1935,14 +1945,14 @@ Built-in choices:
 - `org-node-new-via-roam-capture'
 - `org-capture'
 
-If you choose `org-capture' here, configure
+It is pointless to choose `org-capture' here unless you configure
 `org-capture-templates' such that some capture templates use
-`org-node-capture-target' as their target, else it is pointless.
+`org-node-capture-target' as their target.
 
 If you wish to write a custom function instead of any of the
 above three choices, know that two variables are set at the time
 the function is called: `org-node-proposed-title' and
-`org-node-proposed-id', which you are expected to use."
+`org-node-proposed-id', which it is expected to obey."
   :group 'org-node
   :type '(radio
           (function-item org-node-new-file)
@@ -2544,7 +2554,7 @@ DEF is a member of `org-node-series-defs'."
   "Key for the series that should mark days in the calendar.
 
 This affects the appearance of the `org-read-date' calendar
-popup.  For example, it can indicate which days have a
+popup.  For example, you can use it to indicate which days have a
 daily-journal entry.
 
 This need usually not be customized!  When you use
@@ -2553,7 +2563,7 @@ other date-based series, that series may be designed to
 temporarily set this variable.
 
 Customize this mainly if you want a given series to always be
-indicated, any time a Org pops up a calendar for you.
+indicated, any time Org pops up a calendar for you.
 
 The sort-strings in the series that corresponds to this key
 should be correctly parseable by `org-parse-time-string'."
@@ -3457,7 +3467,7 @@ one of them is associated with a ROAM_REFS."
           (let ((node (gethash origin org-node--id<>node)))
             (push (list link
                         (vector
-                         (if (gethash dest org-node--ref<>id) "y" "")
+                         (if (gethash dest org-node--ref<>id) "*" "")
                          (if node
                              (list (org-node-get-title node)
                                    'action `(lambda (_button)
@@ -3482,6 +3492,7 @@ one of them is associated with a ROAM_REFS."
 
 (defvar org-node--collisions nil
   "Alist of node title collisions.")
+
 (defun org-node-list-collisions ()
   "Pop up a buffer listing node title collisions."
   (interactive)
@@ -3519,6 +3530,7 @@ one of them is associated with a ROAM_REFS."
 
 (defvar org-node--problems nil
   "Alist of errors encountered by org-node-parser.")
+
 (defun org-node-list-scan-problems ()
   "Pop up a buffer listing errors found by org-node-parser."
   (interactive)
@@ -3638,14 +3650,12 @@ Wrap the value in double-brackets if necessary."
            (cl-loop for node being the hash-values of org-nodes
                     append (org-node-get-tags node))
            (cl-remove-if #'keywordp
-                         (mapcar #'car (append
-                                        ;; 200ms in big file w/o org elem cache
-                                        ;; (org-get-buffer-tags)
-                                        org-tag-persistent-alist
-                                        org-tag-alist))))))
+                         (mapcar #'car (append org-tag-persistent-alist
+                                               org-tag-alist)))
+           :test #'equal)))
    org-mode)
   (if (= (org-outline-level) 0)
-      ;; There's no builtin filetag setter yet
+      ;; There's no Org builtin to set filetags yet
       (let* ((tags (cl-loop
                     for raw in (cdar (org-collect-keywords '("FILETAGS")))
                     append (split-string raw ":" t)))
