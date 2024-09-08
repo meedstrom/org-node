@@ -41,7 +41,6 @@
 
 (defvar org-node-parser--paths-types nil)
 (defvar org-node-parser--found-links nil)
-(defvar org-node-parser--heading-re (rx bol (repeat 1 14 "*") " "))
 
 (defun org-node-parser--tmpfile (&optional basename &rest args)
   "Return a path that puts BASENAME in a temporary directory.
@@ -81,6 +80,7 @@ strip the brackets."
    (lambda (m) (or (match-string 2 m) (match-string 1 m)))
    s nil t))
 
+(defvar org-node-parser--heading-re (rx bol (repeat 1 14 "*") " "))
 (defun org-node-parser--next-heading ()
   "Similar to `outline-next-heading'."
   (if (and (bolp) (not (eobp)))
@@ -210,7 +210,7 @@ a :PROPERTIES: and :END: string."
                             (error "Possibly malformed property drawer")))))
                   (string-trim
                    (buffer-substring
-                    (point) (pos-eol))))
+                    (1+ (point)) (pos-eol))))
             result)
       (forward-line 1))
     result))
@@ -237,7 +237,8 @@ findings to another temp file."
   (setq buffer-read-only t)
   (when $inlinetask-min-level
     (setq org-node-parser--heading-re
-          `(rx bol (repeat 1 ,(1- $inlinetask-min-level) "*") " ")))
+          (rx-to-string
+           `(seq bol (repeat 1 ,(1- $inlinetask-min-level) "*") " "))))
   (let ((case-fold-search t)
         result/missing-files
         result/found-nodes
