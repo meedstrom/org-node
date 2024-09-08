@@ -23,6 +23,13 @@
 
 ;;; Code:
 
+;; TODO: Find ways to do fewer regexp searches.  Could e.g. write an
+;;       autoformatter that removes indentation for :PROPERTIES: drawers,
+;;       recommend its use, then just do (search-forward "\n:END:")
+;;       instead of (re-search-forward "^[[:space:]]*:END:").
+;;       Same autoformatter would also reduce the need for `string-trim' and
+;;       such things.
+
 (eval-when-compile
   (require 'cl-lib)
   (require 'subr-x))
@@ -157,7 +164,7 @@ Argument PLAIN-RE is expected to be the value of
               path (match-string 4)))
       (when link-type
         (unless (save-excursion
-                  ;; If point is on a # comment line, skip line
+                  ;; If point is on a # comment line, skip
                   (goto-char (pos-bol))
                   (looking-at-p "[[:space:]]*# "))
           (push (record 'org-node-link
@@ -179,8 +186,6 @@ Argument PLAIN-RE is expected to be the value of
                     (goto-char (pos-bol))
                     (looking-at-p "[[:space:]]*# "))
                   ;; On a # comment, skip citation
-                  ;; NOTE: Don't just skip whole line due to the search
-                  ;;       boundary on this while-loop
                   (goto-char closing-bracket)
                 (push (record 'org-node-link
                               id-here
@@ -267,9 +272,9 @@ findings to another temp file."
                       (file-symlink-p FILE))
               ;; If FILE does not exist (not readable), user probably deleted
               ;; or renamed a file.  If it was a rename, hopefully the new name
-              ;; is also in file list.  Else, like if it was done outside Emacs
-              ;; by typing `mv' on the command line, it gets picked up on next
-              ;; scan.
+              ;; is also in the file list.  Else, like if it was done outside
+              ;; Emacs by typing `mv' on the command line, it gets picked up on
+              ;; next scan.
               ;; And symlinks... (Who symlinks a note?)  Skip for two reasons:
               ;; - Causes duplicates if the true file is also in the file list.
               ;; - For performance, the codebase rarely uses `file-truename'.
@@ -375,28 +380,27 @@ findings to another temp file."
                 ;; (8.152532984 15 4.110698459000105)
                 ;; Result when finalizer accepts these premade records:
                 ;; (5.928453786 10 2.7291036080000595)
-                (push
-                 (record 'org-node
-                         (split-string-and-unquote
-                          (or (cdr (assoc "ROAM_ALIASES" PROPS)) ""))
-                         nil
-                         FILE
-                         FILE-TITLE
-                         FILE-TITLE-OR-BASENAME
-                         FILE-ID
-                         nil
-                         0
-                         nil
-                         1
-                         nil
-                         PROPS
-                         (org-node-parser--split-refs-field
-                          (cdr (assoc "ROAM_REFS" PROPS)))
-                         nil
-                         FILE-TAGS
-                         FILE-TITLE-OR-BASENAME ;; Title mandatory
-                         nil)
-                 result/found-nodes))
+                (push (record 'org-node
+                              (split-string-and-unquote
+                               (or (cdr (assoc "ROAM_ALIASES" PROPS)) ""))
+                              nil
+                              FILE
+                              FILE-TITLE
+                              FILE-TITLE-OR-BASENAME
+                              FILE-ID
+                              nil
+                              0
+                              nil
+                              1
+                              nil
+                              PROPS
+                              (org-node-parser--split-refs-field
+                               (cdr (assoc "ROAM_REFS" PROPS)))
+                              nil
+                              FILE-TAGS
+                              FILE-TITLE-OR-BASENAME ;; Title mandatory
+                              nil)
+                      result/found-nodes))
               (goto-char (point-max))
               ;; We should now be at the first heading
               (widen))
@@ -411,11 +415,6 @@ findings to another temp file."
                                         (point-max))))
                 (setq HEADING-POS (point))
                 (setq LEVEL (skip-chars-forward "*"))
-                ;; (when (>= LEVEL $inlinetask-min-level)
-                ;;   (push (list FILE (point)
-                ;;               "Inlinetasks not supported, whole entry skipped")
-                ;;         result/problems)
-                ;;   (throw 'entry-done t))
                 (skip-chars-forward " ")
                 (let ((case-fold-search nil))
                   (setq TODO-STATE
@@ -456,7 +455,6 @@ findings to another temp file."
                       (if (re-search-forward "[[:space:]]*SCHEDULED: +" FAR t)
                           (prog1 (buffer-substring
                                   (point)
-                                  ;; \n just there for safety
                                   (+ 1 (point) (skip-chars-forward "^]>\n")))
                             (goto-char HERE))
                         nil))
@@ -471,23 +469,18 @@ findings to another temp file."
                           DEADLINE
                           (re-search-forward "[[:space:]]*CLOSED: +" FAR t))
                   ;; Alright, so there was a planning-line, meaning any
-                  ;; :PROPERTIES: must be on the next line.
+                  ;; :PROPERTIES: are not on this line but the next.
                   (forward-line 1)
+                  (skip-chars-forward "\t\s")
                   (setq FAR (pos-eol)))
                 (setq PROPS
-                      (if (re-search-forward "^[[:space:]]*:properties:" FAR t)
+                      (if (looking-at-p ":properties:")
                           (progn
                             (forward-line 1)
                             (org-node-parser--collect-properties
                              (point)
                              (if (re-search-forward "^[[:space:]]*:end:" nil t)
-                                 (prog1 (pos-bol)
-                                   ;; In case seeking :END: landed us way down
-                                   ;; the file.  Some error will likely be
-                                   ;; printed about this subtree, but we can
-                                   ;; keep going.
-                                   ;; REVIEW What?
-                                   (goto-char FAR))
+                                 (pos-bol)
                                (error "Couldn't find :END: of drawer"))))
                         nil))
                 (setq ID (cdr (assoc "ID" PROPS)))
@@ -495,29 +488,27 @@ findings to another temp file."
                          do (pop OLPATH)
                          finally do (push (list LEVEL TITLE ID) OLPATH))
                 (when ID
-                  (push
-                   ;; NOTE: See the defstruct for the ordering of fields
-                   (record 'org-node
-                           (split-string-and-unquote
-                            (or (cdr (assoc "ROAM_ALIASES" PROPS)) ""))
-                           DEADLINE
-                           FILE
-                           FILE-TITLE
-                           FILE-TITLE-OR-BASENAME
-                           ID
-                           t
-                           LEVEL
-                           (nreverse (mapcar #'cadr (cdr OLPATH)))
-                           HEADING-POS
-                           PRIORITY
-                           PROPS
-                           (org-node-parser--split-refs-field
-                            (cdr (assoc "ROAM_REFS" PROPS)))
-                           SCHED
-                           TAGS
-                           TITLE
-                           TODO-STATE)
-                   result/found-nodes))
+                  (push (record 'org-node
+                                (split-string-and-unquote
+                                 (or (cdr (assoc "ROAM_ALIASES" PROPS)) ""))
+                                DEADLINE
+                                FILE
+                                FILE-TITLE
+                                FILE-TITLE-OR-BASENAME
+                                ID
+                                t
+                                LEVEL
+                                (nreverse (mapcar #'cadr (cdr OLPATH)))
+                                HEADING-POS
+                                PRIORITY
+                                PROPS
+                                (org-node-parser--split-refs-field
+                                 (cdr (assoc "ROAM_REFS" PROPS)))
+                                SCHED
+                                TAGS
+                                TITLE
+                                TODO-STATE)
+                        result/found-nodes))
 
                 ;; Heading recorded, now collect links in the entry body!
                 (setq ID-HERE
@@ -534,7 +525,7 @@ findings to another temp file."
                       (error "Couldn't find :END: of drawer"))
                   ;; Danger, Robinson
                   (setq DRAWER-END nil))
-                ;; Gotcha... collect links inside the heading too
+                ;; Collect links inside the heading
                 (goto-char HEADING-POS)
                 (org-node-parser--collect-links-until (pos-eol) ID-HERE)
                 ;; Collect links between property drawer and backlinks drawer
