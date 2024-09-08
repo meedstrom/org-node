@@ -35,11 +35,13 @@
 (defvar $file-todo-option-re)
 (defvar $global-todo-re)
 (defvar $backlink-drawer-re)
+(defvar $inlinetask-min-level)
 (defvar $i)
 (defvar $files)
 
 (defvar org-node-parser--paths-types nil)
 (defvar org-node-parser--found-links nil)
+(defvar org-node-parser--heading-re (rx bol (repeat 1 14 "*") " "))
 
 (defun org-node-parser--tmpfile (&optional basename &rest args)
   "Return a path that puts BASENAME in a temporary directory.
@@ -84,7 +86,7 @@ strip the brackets."
   (if (and (bolp) (not (eobp)))
       ;; Prevent matching the same line forever
       (forward-char))
-  (if (re-search-forward "^\\*+ " nil 'move)
+  (if (re-search-forward org-node-parser--heading-re nil 'move)
       (goto-char (pos-bol))))
 
 (defun org-node-parser--split-refs-field (roam-refs)
@@ -233,6 +235,9 @@ findings to another temp file."
     (insert-file-contents (org-node-parser--tmpfile "file-list-%d.eld" $i)))
   (setq $files (read (buffer-string)))
   (setq buffer-read-only t)
+  (when $inlinetask-min-level
+    (setq org-node-parser--heading-re
+          `(rx bol (repeat 1 ,(1- $inlinetask-min-level) "*") " ")))
   (let ((case-fold-search t)
         result/missing-files
         result/found-nodes
@@ -405,6 +410,11 @@ findings to another temp file."
                                         (point-max))))
                 (setq HEADING-POS (point))
                 (setq LEVEL (skip-chars-forward "*"))
+                ;; (when (>= LEVEL $inlinetask-min-level)
+                ;;   (push (list FILE (point)
+                ;;               "Inlinetasks not supported, whole entry skipped")
+                ;;         result/problems)
+                ;;   (throw 'entry-done t))
                 (skip-chars-forward " ")
                 (let ((case-fold-search nil))
                   (setq TODO-STATE
