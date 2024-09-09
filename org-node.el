@@ -148,7 +148,8 @@ On MS Windows this probably should be nil.  Same if you access
 your files from multiple platforms.
 
 Modern GNU/Linux, BSD and MacOS systems almost always encode new
-files as `utf-8-unix'.
+files as `utf-8-unix'.  You can verify with a helper command
+\\[org-node-list-file-coding-systems].
 
 Note that if your Org collection is old and has survived several
 system migrations, or some of it was generated via Pandoc
@@ -1526,6 +1527,11 @@ In detail:
                    (save-buffer)))
                (kill-buffer))))))))
 
+(defmacro org-node--with-quick-fundamental-buffer (file &rest body)
+  (declare (indent 1) (debug t))
+  `(let ((auto-mode-alist nil))
+     (org-node--with-quick-file-buffer ,file ,@body)))
+
 (defun org-node--die (format-string &rest args)
   "Like `error' but make sure the user sees it.
 Useful because not everyone has `debug-on-error' t, and then
@@ -2459,6 +2465,7 @@ not exist."
             (funcall (plist-get series :creator) sortstr key)
           (funcall (plist-get series :creator) sortstr))))))
 
+;; TODO: Loop over the hash-values of `org-node--id<>node' only once
 (defun org-node--build-series (def)
   "From plist DEF, populate `org-node--series'.
 Then add a corresponding entry to `org-node-series-dispatch'.
@@ -3389,14 +3396,60 @@ from ID links found in `org-node--dest<>links'."
                        collect (concat dest "\t" (org-node-link-origin link)))))
     "\n")))
 
-;; TODO: Command to list the coding systems of all files
-;;       to help choose `org-node-perf-assume-coding-system'
-;; (defvar org-node--found-systems nil)
-;; (defun org-node-list-file-coding-systems ()
-;;   (dolist (file (take 20 (org-node-list-files)))
-;;     (org-node--with-quick-file-buffer file
-;;       (push buffer-file-coding-system org-node--found-systems)))
-;;   org-node--found-systems)
+(defvar org-node--found-systems nil)
+(defvar org-node--list-file-coding-systems-files nil)
+(defun org-node-list-file-coding-systems ()
+  "Check coding systems of files found by `org-node-list-files'.
+This is done by temporarily visiting each file and checking what
+Emacs decides to decode it as.  To start over, run the command
+with \\[universal-argument] prefix."
+  (interactive)
+  (when (equal current-prefix-arg '(4))
+    (setq current-prefix-arg nil)
+    (setq org-node--list-file-coding-systems-files (org-node-list-files t))
+    (setq org-node--found-systems nil))
+  (let ((ok nil)
+        (ctr 0)
+        file)
+    (condition-case err
+        (while (and (< (cl-incf ctr) 500)
+                    (not (null org-node--list-file-coding-systems-files)))
+          (when (= 0 (% ctr 10))
+            (message  "Checking... %d to go (quit and resume anytime)"
+                      (length org-node--list-file-coding-systems-files)))
+          (setq file (pop org-node--list-file-coding-systems-files))
+          (org-node--with-quick-fundamental-buffer file
+            (push (cons file buffer-file-coding-system)
+                  org-node--found-systems)))
+      ((quit)
+       (setq ok t))
+      (:success
+       ;; Reap open file handles & continue if more to do
+       (garbage-collect)
+       (if org-node--list-file-coding-systems-files
+           (run-with-timer .1 nil #'org-node-list-file-coding-systems)
+         (setq ok t)))
+      (t
+       (signal (car err) (cdr err))))
+    (when ok
+      (pop-to-buffer (get-buffer-create "*org file coding systems*"))
+      (tabulated-list-mode)
+      (setq tabulated-list-format
+            [("Coding system" 20 t)
+             ("File" 40 t)])
+      (tabulated-list-init-header)
+      (add-hook 'tabulated-list-revert-hook
+                #'org-node-list-file-coding-systems-revert nil t)
+      (org-node-list-file-coding-systems-revert))))
+
+(defun org-node-list-file-coding-systems-revert ()
+  "Re-print entries for `org-node-list-file-coding-systems'."
+  (setq tabulated-list-entries
+        (cl-loop
+         for (file . sys) in org-node--found-systems
+         collect (list file (vector (symbol-name sys)
+                                    file))))
+  (tabulated-list-print))
 
 (defun org-node-list-dead-links ()
   "List links that lead to no known ID."
