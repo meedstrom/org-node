@@ -296,13 +296,11 @@ findings to another temp file."
             (unless (re-search-forward "^[[:space:]]*:id: " nil t)
               (throw 'file-done t))
             (goto-char 1)
-            (setq OLPATH nil)
 
             ;; If the very first line of file is a heading (typical for people
             ;; who set `org-node-prefer-with-heading'), don't try to scan any
-            ;; file-level front matter.  Anyway, our usage of
-            ;; `org-node-parser--next-heading' cannot handle that edge-case, so
-            ;; we must check.
+            ;; file-level front matter.  Our usage of
+            ;; `org-node-parser--next-heading' cannot handle that edge-case.
             (if (looking-at-p "\\*")
                 (progn
                   (setq FILE-ID nil)
@@ -406,6 +404,7 @@ findings to another temp file."
               (widen))
 
             ;; Loop over the file's headings
+            (setq OLPATH nil)
             (while (not (eobp))
               (catch 'entry-done
                 ;; Narrow til next heading

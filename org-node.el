@@ -138,7 +138,6 @@ Report an issue on https://github.com/meedstrom/org-node/issues
 or drop me a line on Mastodon: @meedstrom@hachyderm.io"
   :type 'alist)
 
-;; TODO: Maybe suggest `utf-8-auto-unix', but is it a sane system for write?
 (defcustom org-node-perf-assume-coding-system nil
   "Coding system to assume while scanning ID nodes.
 
@@ -1436,7 +1435,7 @@ be misleading."
           (n-reflinks (cl-loop
                        for ref being the hash-keys of org-node--ref<>id
                        sum (length (gethash ref org-node--dest<>links)))))
-      (message "org-node saw %d files, %d subtrees, %d ID-links, %d reflinks in %.2fs"
+      (message "org-node read %d files, %d subtrees, %d ID-links, %d reflinks in %.2fs"
                (- (hash-table-count org-node--id<>node) n-subtrees)
                n-subtrees
                n-backlinks

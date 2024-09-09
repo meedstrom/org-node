@@ -172,6 +172,22 @@ If REMOVE? is non-nil, remove it instead."
                 (org-entry-put nil "BACKLINKS" links-string))
             (org-entry-delete nil "BACKLINKS")))))))
 
+(defun org-node-backlink--flag-buffer-modification (beg end _n-deleted-chars)
+  "Add text property `org-node-flag' to region between BEG and END.
+
+Designed for `after-change-functions', so this effectively flags
+all areas where text is added/changed/deleted.  Where text was
+purely deleted, it flags the preceding and succeeding char."
+  (unless (derived-mode-p 'org-mode)
+    (error "Backlink function called in non-Org buffer"))
+  (when org-node-backlink-mode
+    (with-silent-modifications
+      (if (= beg end)
+          (put-text-property (max (1- beg) (point-min))
+                             (min (1+ end) (point-max))
+                             'org-node-flag t)
+        (put-text-property beg end 'org-node-flag t)))))
+
 (defun org-node-backlink--fix-flagged-parts-of-buffer ()
   "Fix backlinks around parts of buffer that have been modified.
 
@@ -240,22 +256,6 @@ headings but you have only done work under one of them."
        (when debug-on-error
          (message "org-node: Printing backtrace")
          (backtrace))))))
-
-(defun org-node-backlink--flag-buffer-modification (beg end _n-deleted-chars)
-  "Add text property `org-node-flag' to region between BEG and END.
-
-Designed for `after-change-functions', so this effectively flags
-all areas where text is added/changed/deleted.  Where text was
-purely deleted, it flags the preceding and succeeding char."
-  (unless (derived-mode-p 'org-mode)
-    (error "Backlink function called in non-Org buffer"))
-  (when org-node-backlink-mode
-    (with-silent-modifications
-      (if (= beg end)
-          (put-text-property (max (1- beg) (point-min))
-                             (min (1+ end) (point-max))
-                             'org-node-flag t)
-        (put-text-property beg end 'org-node-flag t)))))
 
 
 ;;;; Link-insertion advice
