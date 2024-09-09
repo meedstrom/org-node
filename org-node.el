@@ -501,16 +501,17 @@ records describing each link to that destination, with info such
 as from which ID-node the link originates.  See
 `org-node-get-id-links' for more info.")
 
-(persist-defvar org-node--file<>previews (make-hash-table :test #'equal)
+(defvar org-node--file<>previews (make-hash-table :test #'equal)
   "1:N table mapping files to previews of backlink contexts.
 For use by `org-node-fakeroam--accelerate-get-contents'.")
 
-(persist-defvar org-node--file<>mtime (make-hash-table :test #'equal)
+(defvar org-node--file<>mtime (make-hash-table :test #'equal)
   "1:1 table mapping files to their last-modification times.")
 
-(when (memq system-type '(windows-nt ms-dos))
-  (persist-unpersist 'org-node--file<>mtime)
-  (persist-unpersist 'org-node--file<>previews))
+;; Angle brackets not permitted in Windows file names (bug reported)
+(unless (memq system-type '(windows-nt ms-dos))
+  (persist--defvar-1 'org-node--file<>mtime nil)
+  (persist--defvar-1 'org-node--file<>previews nil))
 
 (defun org-node-get-id-links (node)
   "Get list of ID-link objects pointing to NODE.
