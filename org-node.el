@@ -1790,7 +1790,7 @@ that, configure `org-node-datestamp-format'."
     (let ((diacritics-alist
            (seq-mapn
             (lambda (a b) (cons a b))
-            "ÀÁÂÃÄÅàáâãäåÒÓÔÕÕÖØòóôõöøÈÉÊËèéêëðÇçÐÌÍÎÏìíîïÙÚÛÜùúûüÑñŠšŸÿýŽža"
+            "ÀÁÂÃÄÅàáâãäåÒÓÔÕÕÖØòóôõöøÈÉÊËèéêëðÇçÐÌÍÎÏìíîïÙÚÛÜùúûüÑñŠšŸÿýŽž"
             "AAAAAAaaaaaaOOOOOOOooooooEEEEeeeeeCcDIIIIiiiiUUUUuuuuNnSsYyyZz")))
       (concat (seq-map (lambda (char)
                          (or (alist-get char diacritics-alist)
