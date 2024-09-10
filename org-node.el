@@ -2472,15 +2472,13 @@ Then add a corresponding entry to `org-node-series-dispatch'.
 
 DEF is a member of `org-node-series-defs'."
   (let ((classifier (org-node--ensure-compiled
-                     (plist-get (cdr def) :classifier)))
-        (unique-sortstrs (make-hash-table :test #'equal)))
+                     (plist-get (cdr def) :classifier))))
     (cl-loop
      for node being the hash-values of org-node--id<>node
-     as item = (funcall classifier node)
-     when (and item (not (gethash (car item) unique-sortstrs)))
-     collect (progn (puthash (car item) t unique-sortstrs)
-                    item)
-     into items
+     as result = (funcall classifier node)
+     if (listp (car result))
+     nconc result into items
+     else collect result into items
      finally do
      (setf (alist-get (car def) org-node--series nil nil #'equal)
            (nconc (cl-loop for elt in (cdr def)
