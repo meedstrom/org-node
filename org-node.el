@@ -428,12 +428,8 @@ or you can visit the homepage:
               "Returns node's full file path.")
   (file-title nil :read-only t :type string :documentation
               "Returns the #+title of the file where this node is. May be nil.")
-  (file-title-or-basename nil :read-only t :type string  :documentation
-                          "Returns the title of the file where this node is, or its filename if untitled.")
   (id         nil :read-only t :type string :documentation
               "Returns node's ID property.")
-  (is-subtree nil :read-only t :type boolean :documentation
-              "Returns t if node is a subtree, nil if it is file-level.")
   (level      nil :read-only t :type integer :documentation
               "Returns number of stars in the node heading. File-level node always 0.")
   (olp        nil :read-only t :type list :documentation
@@ -455,8 +451,19 @@ or you can visit the homepage:
   (todo       nil :read-only t :type string :documentation
               "Returns node's TODO state."))
 
+(defun org-node-get-file-title-or-basename (node)
+  (or (org-node-get-file-title node)
+      (file-name-nondirectory (org-node-get-file-path node))))
+
+(defun org-node-get-is-subtree (node)
+  (> (org-node-get-level node) 0))
+
 ;; It's safe to alias an accessor, because they are all read only
 (defalias 'org-node-get-props #'org-node-get-properties)
+;; (defalias 'org-node-get-prio #'org-node-get-priority)
+;; (defalias 'org-node-get-sched #'org-node-get-scheduled)
+;; (defalias 'org-node-get-file #'org-node-get-file-path)
+;; (defalias 'org-node-get-lvl #'org-node-get-level)
 
 (cl-defstruct (org-node-link (:constructor org-node-link--make-obj)
                              (:copier nil))
@@ -1390,10 +1397,8 @@ also necessary is `org-node--dirty-ensure-link-known' elsewhere."
              (org-node--make-obj
               :title (or heading ftitle)
               :id id
-              :is-subtree (if heading t)
               :file-path fpath
               :file-title ftitle
-              :file-title-or-basename (or ftitle (file-name-nondirectory fpath))
               :aliases (split-string-and-unquote
                         (or (cdr (assoc "ROAM_ALIASES" props)) ""))
               :refs (org-node-parser--split-refs-field

@@ -354,8 +354,6 @@ findings to another temp file."
               (setq FILE-TITLE (when (re-search-forward "^#\\+title: " FAR t)
                                  (org-node-parser--org-link-display-format
                                   (buffer-substring (point) (pos-eol)))))
-              (setq FILE-TITLE-OR-BASENAME
-                    (or FILE-TITLE (file-name-nondirectory FILE)))
               (setq FILE-ID (cdr (assoc "ID" PROPS)))
               (when FILE-ID
                 (goto-char DRAWER-END)
@@ -384,9 +382,7 @@ findings to another temp file."
                               nil
                               FILE
                               FILE-TITLE
-                              FILE-TITLE-OR-BASENAME
                               FILE-ID
-                              nil
                               0
                               nil
                               1
@@ -396,7 +392,8 @@ findings to another temp file."
                                (cdr (assoc "ROAM_REFS" PROPS)))
                               nil
                               FILE-TAGS
-                              FILE-TITLE-OR-BASENAME ;; Title mandatory
+                              ;; Title mandatory
+                              (or FILE-TITLE (file-name-nondirectory FILE))
                               nil)
                       result/found-nodes))
               (goto-char (point-max))
@@ -493,9 +490,7 @@ findings to another temp file."
                                 DEADLINE
                                 FILE
                                 FILE-TITLE
-                                FILE-TITLE-OR-BASENAME
                                 ID
-                                t
                                 LEVEL
                                 (nreverse (mapcar #'cadr (cdr OLPATH)))
                                 HEADING-POS
