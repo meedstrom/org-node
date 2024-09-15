@@ -101,6 +101,13 @@ Assuming your package manager knows about [[https://melpa.org/#/getting-started]
   :config (org-node-cache-mode))
 #+end_src
 
+If you are an org-roam user, you'll want the [[https://github.com/meedstrom/org-node-fakeroam][org-node-fakeroam]] module as well.  Check out [[https://github.com/meedstrom/org-node-fakeroam][its README]] to make org-node *work with org-roam side-by-side!*
+
+#+begin_src elisp
+(use-package org-node-fakeroam
+  :defer)
+#+end_src
+
 It's a very recent addition to MELPA, so you may have to refresh the recipe list first:
 
 : M-x package-refresh-contents RET
@@ -112,15 +119,6 @@ On Elpaca:
 On Straight (I think):
 
 : M-x straight-fetch-all RET
-
-If you are an org-roam user, you'll want the [[https://github.com/meedstrom/org-node-fakeroam][org-node-fakeroam]] module as well.  It is not on MELPA yet, so use [[https://github.com/radian-software/straight.el][straight.el]] or similar and add an init snippet like this:
-
-#+begin_src elisp
-(use-package org-node-fakeroam
-  :straight (org-node-fakeroam
-             :type git :host github :repo "meedstrom/org-node-fakeroam")
-  :defer)
-#+end_src
 
 ** Quick start
 
@@ -136,10 +134,6 @@ Pick some short keys and try them out.
 To browse config options, type =M-x customize-group RET org-node RET=.
 
 Final tip: there's *no separate command* for creating a new node!  Reuse one of the commands above, then type the name of a node that doesn't exist.  Try it and see what happens!
-
-** Use Org-roam at the same time?
-
-Check out the README at https://github.com/meedstrom/org-node-fakeroam.
 
 * Backlinks
 ** What are backlinks?
