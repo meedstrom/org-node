@@ -1,5 +1,9 @@
 - [ ] Expunge more Roam-specific stuff to the fakeroam module
 
+- [ ] DRY the tabulated-list usages
+
+- [ ] DRY the mass-file-visiting commands (org-node-lint-all-files, org-node-backlink-fix-all, org-node-list-file-coding-systems)
+
 - [ ] Spin out a library for the async processing (=org-node--scan= and friends)
 
 - [ ] Refile
@@ -8,9 +12,9 @@
 
   Already =org-node-grep= can be considered an equivalent to =org-node-find=, so we "just" need an equivalent to =org-node-insert-link=.  Basically, capture, refile, and insert-link would probably all use the same mechanism for *identifying a node by a grep result.*
 
-- [ ] Capture more ref variants as the same ref
+- [ ] Accept more ref variants as the same ref
 
-  If a roam-ref exists like =//www.website.com=, allow counting =//www.website.com?key=val&key2=val2#hash= as a reflink to the same, unless the latter has a roam-ref of its own.
+  If a roam-ref exists like =//www.website.com=, allow counting a link =//www.website.com?key=val&key2=val2#hash= as a reflink to the same, unless the latter has a roam-ref of its own.
 
   Would prolly be a fairly expensive operation.  After building ref<>id and dest<>links, run thru every dest and check if an existing ref is a prefix of it, then simply nconc the value with the value for the corresponding dest.  But having to check for other dests that may also be a prefix is where it would get expensive... O(n^2) I guess.
 

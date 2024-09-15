@@ -63,8 +63,6 @@ Misc
 * Limitation Unique titles::
 * Limitation Excluding notes::
 * Limitation Org-ref::
-* Tip On very slow filesystems::
-* Tip Word-wrap in the Roam buffer?::
 * Toolbox::
 
 Node series
@@ -235,7 +233,7 @@ Support ‘roam:’ links              yes        - (wontfix)          not appli
 Can have separate note piles       yes        - (wontfix)          not applicable
 Some query-able cache              EmacSQL    hash tables          -
 Async cache rebuild                -          yes                  not applicable
-*Time to cache my 3000 nodes*      *2m 48s*   *0m 02s*             not applicable
+*Time to cache my 3000 nodes*      *2m 48s*   *0m 01s*             not applicable
 *Time to save file w/ 400 nodes*   *5-10s*    *instant*            ?
 *Time to open minibuffer*          *1-3s*     *instant*            not applicable
 
@@ -285,8 +283,7 @@ init snippet like this:
 
      (use-package org-node-fakeroam
        :straight (org-node-fakeroam
-                  :type git :host github :repo "meedstrom/org-node-fakeroam"
-                  :branch "melpa")
+                  :type git :host github :repo "meedstrom/org-node-fakeroam")
        :defer)
 
 
@@ -316,36 +313,8 @@ File: org-node.info,  Node: Use Org-roam at the same time?,  Prev: Quick start, 
 3.3 Use Org-roam at the same time?
 ==================================
 
-These settings help you feel at home using both packages side-by-side:
-
-     (setq org-node-creation-fn #'org-node-new-via-roam-capture)
-     (setq org-node-slug-fn #'org-node-slugify-like-roam-actual)
-     (setq org-node-datestamp-format "%Y%m%d%H%M%S-")
-
-   If you've struggled in the past with big files taking a long time to
-save, consider these org-roam settings:
-
-     (setq org-roam-db-update-on-save nil) ;; don't update DB on save, not needed
-     (setq org-roam-link-auto-replace nil) ;; don't look for "roam:" links on save
-
-   And if the backlinks buffer has been laggy:
-
-     (org-node-fakeroam-fast-render-mode) ;; build the Roam buffer faster
-
-   Finally, make sure the underlying org-id knows about the files
-org-roam knows about.  You'd think it would, but that isn't a given!  Do
-either of these:
-
-  1. Run ‘M-x org-roam-update-org-id-locations’ every now and then
-
-  2. Edit the following setting so it includes your
-     ‘org-roam-directory’.  Supposing that is "~/org/", set this:
-
-     (setq org-node-extra-id-dirs '("~/org/"))
-
-   With that done, try out the commands we went over in Quick start
-(https://github.com/meedstrom/org-node#quick-start).  There's more under
-Toolbox (https://github.com/meedstrom/org-node#toolbox).  Enjoy!
+Check out the README at
+<https://github.com/meedstrom/org-node-fakeroam>.
 
 
 File: org-node.info,  Node: Backlinks,  Next: Misc,  Prev: Setup,  Up: Top
@@ -512,8 +481,6 @@ File: org-node.info,  Node: Misc,  Next: Appendix,  Prev: Backlinks,  Up: Top
 * Limitation Unique titles::
 * Limitation Excluding notes::
 * Limitation Org-ref::
-* Tip On very slow filesystems::
-* Tip Word-wrap in the Roam buffer?::
 * Toolbox::
 
 
@@ -726,7 +693,7 @@ contain "archive" in the name - see the last line here:
                       (string-search "archive" (org-node-get-file-path node))))))
 
 
-File: org-node.info,  Node: Limitation Org-ref,  Next: Tip On very slow filesystems,  Prev: Limitation Excluding notes,  Up: Misc
+File: org-node.info,  Node: Limitation Org-ref,  Next: Toolbox,  Prev: Limitation Excluding notes,  Up: Misc
 
 5.9 Limitation: Org-ref
 =======================
@@ -753,49 +720,9 @@ plain ‘citep:...’ since it is not wrapped in brackets.
      (https://github.com/meedstrom/org-node/commit/90b0e503ac75428a5d3ca6a4c8c51b5e075064d3).
 
 
-File: org-node.info,  Node: Tip On very slow filesystems,  Next: Tip Word-wrap in the Roam buffer?,  Prev: Limitation Org-ref,  Up: Misc
+File: org-node.info,  Node: Toolbox,  Prev: Limitation Org-ref,  Up: Misc
 
-5.10 Tip: On very slow filesystems
-==================================
-
-I hear that on Termux on Android, filesystem access can be so slow that
-it's a pain to cycle dailies with org-roam (11 seconds just to goto next
-daily
-(https://github.com/meedstrom/org-node/issues/24#issuecomment-2278605819)!).
-A Redditor also said Apple NFS is not ideal for Emacs.
-
-   Good news.  You can speed up some functions by making them look up
-org-node tables and avoid the filesystem:
-
-     (advice-add #'org-roam-list-files :override
-                 #'org-node-fakeroam-list-files)
-
-     (advice-add #'org-roam-dailies--list-files :override
-                 #'org-node-fakeroam-list-dailies)
-
-     (advice-add #'org-roam-dailies--daily-note-p :override
-                 #'org-node-fakeroam-daily-note-p)
-
-
-File: org-node.info,  Node: Tip Word-wrap in the Roam buffer?,  Next: Toolbox,  Prev: Tip On very slow filesystems,  Up: Misc
-
-5.11 Tip: Word-wrap in the Roam buffer?
-=======================================
-
-This has nothing to do with org-node, but I actually didn't know this
-for ages.
-
-   If you don't hard-wrap but prefer visual-line-mode or similar
-(org-roam#1862 (https://github.com/org-roam/org-roam/issues/1862)), you
-have to enable such modes yourself - it sensibly doesn't inherit your
-Org hooks:
-
-     (add-hook 'org-roam-mode-hook #'visual-line-mode)
-
-
-File: org-node.info,  Node: Toolbox,  Prev: Tip Word-wrap in the Roam buffer?,  Up: Misc
-
-5.12 Toolbox
+5.10 Toolbox
 ============
 
 Basic commands:
@@ -929,40 +856,38 @@ Ensure fresh data                           ‘(org-roam-db-sync)’            
 
 Tag Table:
 Node: Top201
-Node: News1494
-Node: Background2781
-Node: What's all this2951
-Node: What's a "node"?4336
-Node: Features6376
-Node: Setup9264
-Node: Install9438
-Node: Quick start10448
-Node: Use Org-roam at the same time?11135
-Node: Backlinks12566
-Node: What are backlinks?12807
-Node: Backlink solution 1 Borrow org-roam's backlink buffer13227
-Node: Option 1A Let org-roam manage its own DB13837
-Node: Option 1B Tell org-node to write to the org-roam DB14243
-Node: Option 1C Cut out the DB altogether15416
-Node: Backlink solution 2 Print inside the file16330
-Node: Option 2A Let org-node manage a BACKLINKS property16994
-Node: Option 2B Let org-super-links manage a BACKLINKSEND drawer17909
-Node: Misc18771
-Node: Org-capture19188
-Node: Node series20598
-Node: What are series?21053
-Node: Managing org-id-locations22326
-Node: Completion-at-point22918
-Node: Let org-open-at-point detect refs23270
-Node: Limitation TRAMP23838
-Node: Limitation Unique titles24296
-Node: Limitation Excluding notes25507
-Node: Limitation Org-ref26860
-Node: Tip On very slow filesystems28274
-Node: Tip Word-wrap in the Roam buffer?29203
-Node: Toolbox29769
-Node: Appendix33938
-Node: Appendix I Rosetta stone34063
+Node: News1423
+Node: Background2710
+Node: What's all this2880
+Node: What's a "node"?4265
+Node: Features6305
+Node: Setup9193
+Node: Install9367
+Node: Quick start10343
+Node: Use Org-roam at the same time?11030
+Node: Backlinks11270
+Node: What are backlinks?11511
+Node: Backlink solution 1 Borrow org-roam's backlink buffer11931
+Node: Option 1A Let org-roam manage its own DB12541
+Node: Option 1B Tell org-node to write to the org-roam DB12947
+Node: Option 1C Cut out the DB altogether14120
+Node: Backlink solution 2 Print inside the file15034
+Node: Option 2A Let org-node manage a BACKLINKS property15698
+Node: Option 2B Let org-super-links manage a BACKLINKSEND drawer16613
+Node: Misc17475
+Node: Org-capture17821
+Node: Node series19231
+Node: What are series?19686
+Node: Managing org-id-locations20959
+Node: Completion-at-point21551
+Node: Let org-open-at-point detect refs21903
+Node: Limitation TRAMP22471
+Node: Limitation Unique titles22929
+Node: Limitation Excluding notes24140
+Node: Limitation Org-ref25493
+Node: Toolbox26886
+Node: Appendix31040
+Node: Appendix I Rosetta stone31165
 
 End Tag Table
 

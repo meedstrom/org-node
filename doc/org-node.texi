@@ -73,8 +73,6 @@ Misc
 * Limitation Unique titles::
 * Limitation Excluding notes::
 * Limitation Org-ref::
-* Tip On very slow filesystems::
-* Tip Word-wrap in the Roam buffer?::
 * Toolbox::
 
 Node series
@@ -270,7 +268,7 @@ A comparison of three similar systems, which permit relying on org-id and don't 
 @tab not applicable
 @item @strong{Time to cache my 3000 nodes}
 @tab @strong{2m 48s}
-@tab @strong{0m 02s}
+@tab @strong{0m 01s}
 @tab not applicable
 @item @strong{Time to save file w/ 400 nodes}
 @tab @strong{5--10s}
@@ -328,8 +326,7 @@ If you are an org-roam user, you'll want the @uref{https://github.com/meedstrom/
 @lisp
 (use-package org-node-fakeroam
   :straight (org-node-fakeroam
-             :type git :host github :repo "meedstrom/org-node-fakeroam"
-             :branch "melpa")
+             :type git :host github :repo "meedstrom/org-node-fakeroam")
   :defer)
 @end lisp
 
@@ -352,42 +349,7 @@ Final tip: there's @strong{no separate command} for creating a new node!  Reuse 
 @node Use Org-roam at the same time?
 @section Use Org-roam at the same time?
 
-These settings help you feel at home using both packages side-by-side:
-
-@lisp
-(setq org-node-creation-fn #'org-node-new-via-roam-capture)
-(setq org-node-slug-fn #'org-node-slugify-like-roam-actual)
-(setq org-node-datestamp-format "%Y%m%d%H%M%S-")
-@end lisp
-
-If you've struggled in the past with big files taking a long time to save, consider these org-roam settings:
-
-@lisp
-(setq org-roam-db-update-on-save nil) ;; don't update DB on save, not needed
-(setq org-roam-link-auto-replace nil) ;; don't look for "roam:" links on save
-@end lisp
-
-And if the backlinks buffer has been laggy:
-
-@lisp
-(org-node-fakeroam-fast-render-mode) ;; build the Roam buffer faster
-@end lisp
-
-Finally, make sure the underlying org-id knows about the files org-roam knows about.  You'd think it would, but that isn't a given!  Do either of these:
-
-@enumerate
-@item
-Run @samp{M-x org-roam-update-org-id-locations} every now and then
-
-@item
-Edit the following setting so it includes your @samp{org-roam-directory}.  Supposing that is "~/org/", set this:
-@end enumerate
-
-@lisp
-(setq org-node-extra-id-dirs '("~/org/"))
-@end lisp
-
-With that done, try out the commands we went over in @uref{https://github.com/meedstrom/org-node#quick-start, Quick start}.  There's more under @uref{https://github.com/meedstrom/org-node#toolbox, Toolbox}.  Enjoy!
+Check out the README at @uref{https://github.com/meedstrom/org-node-fakeroam}.
 
 @node Backlinks
 @chapter Backlinks
@@ -503,8 +465,6 @@ Bad news: this is currently directed towards people who used @uref{https://githu
 * Limitation Unique titles::
 * Limitation Excluding notes::
 * Limitation Org-ref::
-* Tip On very slow filesystems::
-* Tip Word-wrap in the Roam buffer?::
 * Toolbox::
 @end menu
 
@@ -669,35 +629,6 @@ Use org-roam - see discussions on boosting its performance @uref{https://org-roa
 @item
 Get your elbows dirty and try to update the archived branch @uref{https://github.com/meedstrom/org-node/branches, "orgref"}, see relevant @uref{https://github.com/meedstrom/org-node/commit/90b0e503ac75428a5d3ca6a4c8c51b5e075064d3, commit}.
 @end itemize
-
-@node Tip On very slow filesystems
-@section Tip: On very slow filesystems
-
-I hear that on Termux on Android, filesystem access can be so slow that it's a pain to cycle dailies with org-roam (@uref{https://github.com/meedstrom/org-node/issues/24#issuecomment-2278605819, 11 seconds just to goto next daily}!).  A Redditor also said Apple NFS is not ideal for Emacs.
-
-Good news.  You can speed up some functions by making them look up org-node tables and avoid the filesystem:
-
-@lisp
-(advice-add #'org-roam-list-files :override
-            #'org-node-fakeroam-list-files)
-
-(advice-add #'org-roam-dailies--list-files :override
-            #'org-node-fakeroam-list-dailies)
-
-(advice-add #'org-roam-dailies--daily-note-p :override
-            #'org-node-fakeroam-daily-note-p)
-@end lisp
-
-@node Tip Word-wrap in the Roam buffer?
-@section Tip: Word-wrap in the Roam buffer?
-
-This has nothing to do with org-node, but I actually didn't know this for ages.
-
-If you don't hard-wrap but prefer visual-line-mode or similar (@uref{https://github.com/org-roam/org-roam/issues/1862, org-roam#1862}), you have to enable such modes yourself -- it sensibly doesn't inherit your Org hooks:
-
-@lisp
-(add-hook 'org-roam-mode-hook #'visual-line-mode)
-@end lisp
 
 @node Toolbox
 @section Toolbox
