@@ -261,7 +261,7 @@ findings to another temp file."
         ;; wanna run this code synchronously.
         HEADING-POS HERE FAR END ID-HERE OLPATH
         DRAWER-BEG DRAWER-END
-        TITLE FILE-TITLE FILE-TITLE-OR-BASENAME
+        TITLE FILE-TITLE
         TODO-STATE TODO-RE FILE-TODO-SETTINGS
         TAGS FILE-TAGS ID FILE-ID SCHED DEADLINE PRIORITY LEVEL PROPS)
 
@@ -305,7 +305,6 @@ findings to another temp file."
                 (progn
                   (setq FILE-ID nil)
                   (setq FILE-TITLE nil)
-                  (setq FILE-TITLE-OR-BASENAME (file-name-nondirectory FILE))
                   (setq TODO-RE $global-todo-re))
               ;; Narrow until first heading
               (when (org-node-parser--next-heading)

@@ -1063,11 +1063,12 @@ Muffles some messages.")
 
 (defun org-node--handle-finished-job (n-jobs finalizer)
   "If called by the last sentinel, run FINALIZER.
-In detail: count up to N-JOBS, then if this call is the one that
-hits N-JOBS, read all files into a results variable and pass it
-to FINALIZER."
+In detail: count up to N-JOBS, then if this call is the one that hits
+N-JOBS, read contents of all result files into a merged variable and
+pass that to FINALIZER."
   (when (eq (cl-incf org-node--done-ctr) n-jobs)
     (setq org-node--time-at-finalize (current-time))
+    (setq org-node--time-at-last-child-done nil)
     (let ((file-name-handler-alist nil)
           (coding-system-for-read org-node-perf-assume-coding-system)
           (coding-system-for-write org-node-perf-assume-coding-system)
@@ -1078,35 +1079,45 @@ to FINALIZER."
              (advice-remove #'insert-file-contents
                             'editorconfig--advice-insert-file-contents)
              t))
-          (result-sets nil))
-      (unwind-protect
-          (with-temp-buffer
+          merged-result)
+      (with-temp-buffer
+        (unwind-protect
             (dotimes (i n-jobs)
               (let ((results-file (org-node-parser--tmpfile "results-%d.eld" i)))
                 (if (not (file-exists-p results-file))
-                    (let ((buf (get-buffer " *org-node*")))
-                      (when buf
-                        ;; Had 1+ errors, so unhide stderr buffer from now on
+                    (progn
+                      ;; Had 1+ errors, so unhide stderr buffer from now on
+                      (when-let (buf (get-buffer " *org-node*"))
                         (setq org-node--stderr-name "*org-node errors*")
                         (with-current-buffer buf
                           (rename-buffer org-node--stderr-name)))
-                      ;; Don't warn on first run, for better UX.  First-time init
-                      ;; thru autoloads can have bugs for seemingly magical reasons
-                      ;; that go away afterwards (e.g. it says the files aren't on
-                      ;; disk but they are).
+                      ;; Don't warn on first run, for better UX.  First-time
+                      ;; init thru autoloads can have bugs for seemingly
+                      ;; magical reasons that go away afterwards (e.g. it says
+                      ;; the files aren't on disk but they are).
                       (unless org-node--first-init
                         (message "An org-node worker failed to produce %s.  See buffer %s"
                                  results-file org-node--stderr-name)))
                   (erase-buffer)
                   (insert-file-contents results-file)
-                  (push (read (buffer-string)) result-sets)))))
-        (if editorconfig
+                  (let* ((result (read (buffer-string)))
+                         (time (car (last result)))
+                         result2)
+                    (nbutlast result)
+                    (when (time-less-p
+                           org-node--time-at-last-child-done time)
+                      (setq org-node--time-at-last-child-done time))
+                    (if (= i 0)
+                        (setq merged-result result)
+                      (while result
+                        (push (nconc (pop result) (pop merged-result))
+                              result2))
+                      (setq merged-result (nreverse result2)))))))
+          (when editorconfig
             (advice-add #'insert-file-contents :around
-                        'editorconfig--advice-insert-file-contents)))
-      (setq org-node--time-at-last-child-done
-            (-last-item (sort (-map #'-last-item result-sets) #'time-less-p)))
-      ;; Merge N result-sets into one result-set, to run FINALIZER once
-      (funcall finalizer (--reduce (-zip-with #'nconc it acc) result-sets)))))
+                        'editorconfig--advice-insert-file-contents))))
+      (funcall finalizer merged-result))))
+
 
 (defvar org-node-before-update-tables-hook nil
   "Hook run just before processing results from scan.")
@@ -1144,6 +1155,7 @@ to FINALIZER."
     (dolist (node nodes)
       (org-node--record-node node))
     ;; (org-id-locations-save) ;; A nicety, but sometimes slow
+    ;; (setq org-node--series (org-node--build-series* org-node-series-defs))
     (setq org-node--series nil)
     (dolist (def org-node-series-defs)
       (org-node--build-series def))
@@ -1513,9 +1525,12 @@ In detail:
          (buffer-list-update-hook nil))
      (let ((was-open (find-buffer-visiting ,file)))
        (when (or was-open
-                 (if (file-newer-than-file-p (let ((buffer-file-name ,file))
-                                               (make-auto-save-file-name))
-                                             ,file)
+                 (if (and
+                      (not (and buffer-file-name
+			        auto-save-visited-file-name))
+                      (file-newer-than-file-p (let ((buffer-file-name ,file))
+                                                (make-auto-save-file-name))
+                                              ,file))
                      (y-or-n-p org-node--imminent-recovery-msg)
                    t))
          ;; The cache has been buggy since the 9.5 rewrite, disable to be safe
@@ -1572,27 +1587,22 @@ operation."
 With optional argument INSTANT t, return already known files
 instead of checking the filesystem.
 
-When called interactively \(INTERACTIVE is non-nil), list the
-files in a new buffer."
+When called interactively \(automatically making INTERACTIVE
+non-nil), list the files in a new buffer."
   (interactive "i\np")
   (if interactive
-      ;; TODO: Use tabulated-list (or better, something like a find-dired
-      ;;       buffer)
-      (progn
-        (pop-to-buffer (get-buffer-create "*org-node files*"))
-        (let ((files (org-node-list-files))
-              (inhibit-read-only t))
-          (erase-buffer)
-          (insert (format "Found %d Org files\n" (length files)))
-          (dolist (file (sort files #'string<))
-            (insert-text-button file
-                                'face 'link
-                                'action `(lambda (_button)
-                                           (find-file ,file))
-                                'follow-link t)
-            (newline)))
-        (goto-char (point-min))
-        (view-mode))
+      ;; TODO: Use something like a find-dired buffer
+      (org-node--pop-to-tabulated-list
+       :buffer "*org-node files*"
+       :format [("File" 0)]
+       :entries (cl-loop
+                 for file in (org-node-list-files)
+                 collect (list file (vector
+                                     (list file
+                                           'action `(lambda (_button)
+                                                      (find-file ,file))
+                                           'face 'link
+                                           'follow-link t)))))
     (if instant
         (hash-table-keys org-node--file<>mtime)
       (-union ;; Faster than `seq-union' by 10x: 2000ms -> 200ms
@@ -2471,7 +2481,6 @@ not exist."
             (funcall (plist-get series :creator) sortstr key)
           (funcall (plist-get series :creator) sortstr))))))
 
-;; TODO: Loop over the hash-values of `org-node--id<>node' only once
 (defun org-node--build-series (def)
   "From plist DEF, populate `org-node--series'.
 Then add a corresponding entry to `org-node-series-dispatch'.
@@ -3260,7 +3269,7 @@ from the beginning."
   (org-node--init-ids)
   (let* ((warnings nil)
          (report-buffer (get-buffer-create "*org-node lint report*"))
-         (files (-difference (org-node-list-files) org-node--linted))
+         (files (seq-difference (org-node-list-files) org-node--linted))
          (ctr (length org-node--linted))
          (ctrmax (+ (length files) (length org-node--linted))))
     (with-current-buffer report-buffer
@@ -3438,24 +3447,39 @@ with \\[universal-argument] prefix."
       (t
        (signal (car err) (cdr err))))
     (when ok
-      (pop-to-buffer (get-buffer-create "*org file coding systems*"))
-      (tabulated-list-mode)
-      (setq tabulated-list-format
-            [("Coding system" 20 t)
-             ("File" 40 t)])
-      (tabulated-list-init-header)
-      (add-hook 'tabulated-list-revert-hook
-                #'org-node-list-file-coding-systems-revert nil t)
-      (org-node-list-file-coding-systems-revert))))
+      (org-node--pop-to-tabulated-list
+       :buffer "*org file coding systems*"
+       :format [("Coding system" 20 t) ("File" 40 t)]
+       :entries (cl-loop for (file . sys) in org-node--found-systems
+                         collect (list file (vector (symbol-name sys) file)))
+       :reverter #'org-node-list-file-coding-systems))))
 
 (defun org-node-list-file-coding-systems-revert ()
   "Re-print entries for `org-node-list-file-coding-systems'."
   (setq tabulated-list-entries
-        (cl-loop
-         for (file . sys) in org-node--found-systems
-         collect (list file (vector (symbol-name sys)
-                                    file))))
+        (cl-loop for (file . sys) in org-node--found-systems
+                 collect (list file (vector (symbol-name sys) file))))
   (tabulated-list-print))
+
+(cl-defun org-node--pop-to-tabulated-list
+    (&key buffer format entries reverter)
+  "Boilerplate abstraction.
+BUFFER-OR-NAME identifies the buffer.  FORMAT is the value to
+which `tabulated-list-format' should be set.  ENTRIES is the
+value to which `tabulated-list-entries' should be set.
+
+Optional argument REVERTER is a function to add to
+`tabulated-list-revert-hook'."
+  (unless (and buffer format entries)
+    (user-error
+     "org-node--pop-to-tabulated-list needs buffer, format, entries"))
+  (pop-to-buffer (get-buffer-create buffer))
+  (tabulated-list-mode)
+  (setq tabulated-list-format format)
+  (tabulated-list-init-header)
+  (setq tabulated-list-entries entries)
+  (when reverter (add-hook 'tabulated-list-revert-hook reverter nil t))
+  (tabulated-list-print t))
 
 (defun org-node-list-dead-links ()
   "List links that lead to no known ID."
