@@ -95,87 +95,8 @@ hardcoded strings."
        (unless warned-once
          (setq warned-once t)
          (lwarn 'org-node :warning "Your initfiles use old function name: %S, which will be REMOVED by %s.  Please use new name: %S"
-                ,old ,(or removed-by "30 August 2024") ,new))
+                ,old ,(or removed-by "30 September 2024") ,new))
        (apply ,new args))))
-
-
-;; Old, remove soon
-
-(org-node-changes--def-whiny-alias 'org-node-files
-                                   'org-node-list-files)
-
-(org-node-changes--def-whiny-alias 'org-node-rename-file-by-title-maybe
-                                   'org-node-rename-file-by-title)
-
-(org-node-changes--def-whiny-alias 'org-node-faster-roam-list-files
-                                   'org-node-fakeroam-list-files)
-
-(org-node-changes--def-whiny-alias 'org-node-faster-roam-list-dailies
-                                   'org-node-fakeroam-list-dailies)
-
-(org-node-changes--def-whiny-alias 'org-node-faster-roam-daily-note-p
-                                   'org-node-fakeroam-daily-note-p)
-
-(org-node-changes--def-whiny-alias 'org-node--series-standard-goto
-                                   'org-node--example-try-goto-id)
-
-(org-node-changes--def-whiny-alias 'org-node--series-standard-try-goto
-                                   'org-node--example-try-goto-id)
-
-(org-node-changes--def-whiny-alias 'org-node--standard-series-try-goto-id
-                                   'org-node--example-try-goto-id)
-
-(org-node-changes--def-whiny-alias 'org-node--series-standard-prompter
-                                   'org-node--example-prompter)
-
-(org-node-changes--def-whiny-alias 'org-node--standard-series-prompter
-                                   'org-node--example-prompter)
-
-(org-node-changes--def-whiny-alias 'org-node--default-daily-goto
-                                   'org-node--example-try-goto-file)
-
-(org-node-changes--def-whiny-alias 'org-node--standard-series-try-goto-file
-                                   'org-node--example-try-goto-file)
-
-(org-node-changes--def-whiny-alias 'org-node--default-daily-try-goto
-                                   'org-node--example-try-goto-file)
-
-(org-node-changes--def-whiny-alias 'org-node--default-daily-classifier
-                                   'org-node--example-daily-classifier)
-
-(org-node-changes--def-whiny-alias 'org-node--default-daily-whereami
-                                   'org-node--example-daily-whereami)
-
-(org-node-changes--def-whiny-alias 'org-node--default-daily-creator
-                                   'org-node--example-daily-creator)
-
-;; Bit newer
-
-(org-node-changes--def-whiny-alias
- 'org-node--extract-ymd 'org-node-extract-ymd)
-
-(org-node-changes--def-whiny-alias
- 'org-node--create 'org-node-create)
-
-(org-node-changes--def-whiny-alias
- 'org-node-series-menu 'org-node-series-dispatch)
-
-(org-node-changes--def-whiny-alias
- 'org-node-helper/try-goto-id 'org-node-helper-try-goto-id)
-
-(org-node-changes--def-whiny-alias
- 'org-node-helper/try-visit-file 'org-node-helper-try-visit-file)
-
-(org-node-changes--def-whiny-alias
- 'org-node-helper/filename->ymd 'org-node-helper-filename->ymd)
-
-(org-node-changes--def-whiny-alias
- 'org-node-helper/mk-series-with-tag-sorted-by-property
- 'org-node-mk-series-on-tag-sorted-by-property)
-
-(org-node-changes--def-whiny-alias
- 'org-node-mk-series-on-tag-by-property
- 'org-node-mk-series-on-tag-sorted-by-property)
 
 ;; (define-obsolete-variable-alias
 ;;   'org-node-creation-fn 'org-node-new-node-fn "2024-08-22")

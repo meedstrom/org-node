@@ -70,7 +70,7 @@ See Info node `(org-node)'.
     (remove-hook 'before-save-hook
                  #'org-node-backlink--fix-flagged-parts-of-buffer t)))
 
-(defun org-node-backlink--enable ()
+(defun org-node-backlink--enable-mode-if-org ()
   "Enable `org-node-backlink-mode' if buffer is Org-mode."
   (when (derived-mode-p 'org-mode)
     (org-node-backlink-mode)))
@@ -78,7 +78,7 @@ See Info node `(org-node)'.
 ;;;###autoload
 (define-globalized-minor-mode org-node-backlink-global-mode
   org-node-backlink-mode
-  org-node-backlink--enable
+  org-node-backlink--enable-mode-if-org
   :group 'org-node)
 
 
@@ -166,7 +166,7 @@ If REMOVE? is non-nil, remove it instead."
                              org-node--temp-extra-fns)
                        (org-node--scan-all)
                        (throw 'break t)))
-               (links-string (string-join links "   ")))
+               (links-string (string-join links "  ")))
           (if links
               (unless (equal links-string (org-entry-get nil "BACKLINKS"))
                 (org-entry-put nil "BACKLINKS" links-string))
@@ -373,7 +373,7 @@ it in the nearby :BACKLINKS: property."
             ;; Enforce deterministic order to prevent unnecessarily reordering
             ;; every time a node is linked that already has the backlink
             (sort links #'string-lessp)
-            (setq new-value (string-join links "   ")))
+            (setq new-value (string-join links "  ")))
         (setq new-value src-link))
       (unless (equal current-backlinks-value new-value)
         (let ((after-change-functions

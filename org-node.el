@@ -1301,6 +1301,7 @@ The reason for default t is better experience with
                        (run-with-idle-timer
                         (+ 10 (random 10)) nil #'native-compile fn)))
              (byte-compile fn))
+           ;; May actually use entirely uncompiled until native is available
            fn))
         ((gethash fn org-node--compiled-lambdas))
         ((prog1 (puthash fn (byte-compile fn) org-node--compiled-lambdas)
@@ -1737,7 +1738,7 @@ consult the filesystem, just compares substrings to each other."
   "Whether to ask the user where to save a new file node.
 
 - Symbol nil: put file in the most populous root directory in
-       `org-id-locations' without asking
+              `org-id-locations' without asking
 - String: a directory path in which to put the file
 - Symbol t: ask every time
 
@@ -2774,19 +2775,20 @@ adding keywords to the things to exclude:
 ;;;###autoload
 (defun org-node-extract-subtree ()
   "Extract subtree at point into a file of its own.
-Leave a link in the source file, and show the newly created file.
+Leave a link in the source file, and show the newly created file
+as current buffer.
 
 You may find it a common situation that the subtree had not yet
 been assigned an ID nor any other property that you normally
-assign to a proper node.  Thus, this creates an ID for you if
-there was no ID, copies over all inherited tags, and runs
-`org-node-creation-hook'.
+assign to your nodes.  Thus, this creates an ID if there was
+no ID, copies over all inherited tags \(making them explicit),
+and runs `org-node-creation-hook'.
 
 Adding to that, see below for an example advice that copies any
-inherited \"CREATED\" property, if an ancestor has such a
+inherited \"CREATED\" property, if an ancestor had such a
 property.  It is subjective whether you\\='d want this behavior,
 but it can be desirable if you know the subtree had been part of
-the source file for ages so that you see the ancestor\\='s
+the source file for ages so that you regard the ancestor\\='s
 creation-date as more \"truthful\" than today\\='s date.
 
 \(advice-add \\='org-node-extract-subtree :around
@@ -2796,7 +2798,8 @@ creation-date as more \"truthful\" than today\\='s date.
                      ;; Now in the new buffer
                      (org-entry-put nil \"CREATED\"
                                     (or parent-creation
-                                        (format-time-string \"[%F %a]\"))))))"
+                                        (format-time-string
+                                         (org-time-stamp-format t t)))))))"
   (interactive nil org-mode)
   (unless (derived-mode-p 'org-mode)
     (user-error "This command expects an org-mode buffer"))
@@ -3697,6 +3700,7 @@ Wrap the value in double-brackets if necessary."
                         "]]")))
     (org-node--add-to-property-keep-space "ROAM_REFS" ref)))
 
+;; FIXME: Does not work correctly in an ID-less entry
 (defun org-node-tag-add (tag-or-tags)
   "Add TAG-OR-TAGS to the entry at point."
   (interactive
