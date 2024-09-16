@@ -37,6 +37,7 @@
     (org-node-mark-days org-node--mark-days))
   "Alist of deprecated symbol names and their new names.")
 
+(defvar org-node-changes--warned-once nil)
 (defun org-node-changes--warn-and-copy ()
   "Maybe print one-shot warnings, then become a no-op.
 
@@ -60,19 +61,23 @@ value."
                    old new)
           (lwarn 'org-node :warning "Your initfiles key-bind a removed command: %S"
                  old)))))
-  (cl-loop
-   for fn in (bound-and-true-p org-node-insert-link-hook)
-   when (and (not (eq t fn))
-             (help-function-arglist fn)
-             (not (member (car-safe (help-function-arglist fn))
-                          '(&optional &rest &body))))
-   return (lwarn 'org-node :warning
-                 "Hook `org-node-insert-link-hook' has changed, now passes no arguments, but function expects them: %s"
-                 fn))
-  (when (and (featurep 'org-roam)
-             (equal (file-name-directory (locate-library "org-node-fakeroam"))
-                    (file-name-directory (locate-library "org-node"))))
-    (message "org-node-fakeroam now has its own repo. If you need it, use the new MELPA recipe, or change your recipe to point to https://github.com/meedstrom/org-node-fakeroam")))
+  (unless org-node-changes--warned-once
+    (setq org-node-changes--warned-once t)
+    (cl-loop
+     for fn in (bound-and-true-p org-node-insert-link-hook)
+     when (and (not (eq t fn))
+               (help-function-arglist fn)
+               (not (member (car-safe (help-function-arglist fn))
+                            '(&optional &rest &body))))
+     return (lwarn 'org-node :warning
+                   "Hook `org-node-insert-link-hook' has changed, now passes no arguments, but function expects them: %s"
+                   fn))
+    (when (and (featurep 'org-roam)
+               (when-let ((fakeroam-path (find-library-name "org-node-fakeroam")))
+                 (equal (file-name-directory (file-truename fakeroam-path))
+                        (file-name-directory
+                         (file-truename (find-library-name "org-node"))))))
+      (message "org-node-fakeroam now has its own repo. If you need it, use the new MELPA recipe!"))))
 
 (defmacro org-node-changes--def-whiny-alias (old new &optional when interactive removed-by)
   "Define OLD as effectively an alias for NEW.
