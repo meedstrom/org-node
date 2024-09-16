@@ -21,16 +21,39 @@
 
 ;;; Code:
 
+(defun org-node-fakeroam-warn ()
+  (display-warning
+   'org-node (concat
+              "Please check out the new MELPA packages to update org-node."
+              "\n\tInstructions at: https://github.com/meedstrom/org-node")))
+
+;;;###autoload
+(defun org-node-fakeroam-redisplay-mode (&rest _)
+  (org-node-fakeroam-warn))
+
+;;;###autoload
+(defun org-node-fakeroam-fast-render-mode (&rest _)
+  (org-node-fakeroam-warn))
+
+;;;###autoload
+(defun org-node-fakeroam-daily-create (&rest _)
+  (org-node-fakeroam-warn))
+
+;;;###autoload
+(defun org-node-fakeroam-db-feed-mode (&rest _)
+  (org-node-fakeroam-warn))
+
+;;;###autoload
+(defun org-node-fakeroam-jit-backlinks-mode (&rest _)
+  (org-node-fakeroam-warn))
+
 ;; NOTE: The MELPA recipe excludes this file.  So this warning is only
 ;; displayed to people who are still cloning the package using a manually
 ;; written recipe passed to Straight/Elpaca.
 ;;
 ;; (Even Straight/Elpaca reuse the MELPA recipe when the recipe is not
 ;; specified.)
-(display-warning
- 'org-node (concat
-            "Please check out the new MELPA packages to update org-node."
-            "\n\tInstructions at: https://github.com/meedstrom/org-node"))
+(org-node-fakeroam-warn)
 
 (provide 'org-node-fakeroam)
 
