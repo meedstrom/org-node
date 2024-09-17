@@ -222,8 +222,8 @@ Applied only by `org-node-new-file', `org-node-capture-target',
 `org-node-insert-heading', `org-node-nodeify-entry' and
 `org-node-extract-subtree'.
 
-NOT applied by `org-node-new-via-roam-capture' -- see org-roam\\='s
-`org-roam-capture-new-node-hook' instead.
+NOT applied by `org-node-fakeroam-new-via-roam-capture' -- see
+org-roam\\='s `org-roam-capture-new-node-hook' instead.
 
 A good function for this hook is `org-node-put-created', since
 the default `org-node-datestamp-format' is empty.  In the
@@ -1782,14 +1782,14 @@ the first heading in a file that has no #+TITLE.
 Built-in choices:
 - `org-node-slugify-for-web'
 - `org-node-slugify-like-roam-default'
-- `org-node-slugify-like-roam-actual'
+- `org-node-fakeroam-slugify-via-roam'
 
 It is popular to also prefix filenames with a datestamp.  To do
 that, configure `org-node-datestamp-format'."
   :type '(radio
           (function-item org-node-slugify-for-web)
           (function-item org-node-slugify-like-roam-default)
-          (function-item org-node-slugify-like-roam-actual)
+          (function-item org-node-fakeroam-slugify-via-roam)
           function))
 
 ;; To be removed in 2025 when Debian bumps stable
@@ -1845,9 +1845,8 @@ preserving for example kanji and Greek letters."
                (replace-regexp-in-string "-$" "")))
 
 (defun org-node-slugify-like-roam-default (title)
-  "From TITLE, make a filename in the default org-roam style.
-Unlike `org-node-slugify-like-roam-actual', does not load
-org-roam."
+  "From TITLE, make a filename slug in default org-roam style.
+Does not require org-roam installed."
   (thread-last title
                (org-node--strip-diacritics)
                (downcase)
@@ -1856,15 +1855,6 @@ org-roam."
                (replace-regexp-in-string "__*" "_")
                (replace-regexp-in-string "^_" "")
                (replace-regexp-in-string "_$" "")))
-
-(defun org-node-slugify-like-roam-actual (title)
-  "Call on `org-roam-node-slug' to transform TITLE."
-  (or (and (require 'org-roam nil t)
-           (fboundp 'org-roam-node-slug)
-           (fboundp 'org-roam-node-create)
-           (org-roam-node-slug (org-roam-node-create :title title)))
-      (user-error
-       "Install org-roam to use `org-node-slugify-like-roam-actual'")))
 
 
 ;;;; How to create new nodes
@@ -1962,9 +1952,9 @@ To operate on a node after creating it, either let-bind
   "Function called to create a node that does not yet exist.
 Used by commands such as `org-node-find'.
 
-Built-in choices:
+Some choices:
 - `org-node-new-file'
-- `org-node-new-via-roam-capture'
+- `org-node-fakeroam-new-via-roam-capture'
 - `org-capture'
 
 It is pointless to choose `org-capture' here unless you configure
@@ -1978,7 +1968,7 @@ the function is called: `org-node-proposed-title' and
   :group 'org-node
   :type '(radio
           (function-item org-node-new-file)
-          (function-item org-node-new-via-roam-capture)
+          (function-item org-node-fakeroam-new-via-roam-capture)
           (function-item org-capture)
           function))
 
@@ -2015,24 +2005,6 @@ which it gets some necessary variables."
       (goto-char (point-max))
       (push (current-buffer) org-node--not-yet-saved)
       (run-hooks 'org-node-creation-hook))))
-
-;;; TODO: Maybe move this to fakeroam.el
-(defun org-node-new-via-roam-capture ()
-  "Call `org-roam-capture-' with predetermined arguments.
-Meant to be called indirectly as `org-node-creation-fn', at which
-time some necessary variables are set."
-  (if (or (null org-node-proposed-title)
-          (null org-node-proposed-id))
-      (message "`org-node-new-via-roam-capture' is meant to be called indirectly via `org-node-create'")
-    (unless (require 'org-roam nil t)
-      (user-error "Didn't create node %s! Either install org-roam or %s"
-                  org-node-proposed-title
-                  "configure `org-node-creation-fn'"))
-    (when (and (fboundp 'org-roam-capture-)
-               (fboundp 'org-roam-node-create))
-      (org-roam-capture- :node (org-roam-node-create
-                                :title org-node-proposed-title
-                                :id    org-node-proposed-id)))))
 
 (defun org-node-capture-target ()
   "Can be used as target in a capture template.
@@ -2632,7 +2604,7 @@ Meant to sit on these hooks:
   "Select and visit one of your ID nodes.
 
 To behave like `org-roam-node-find' when creating new nodes, set
-`org-node-creation-fn' to `org-node-new-via-roam-capture'."
+`org-node-creation-fn' to `org-node-fakeroam-new-via-roam-capture'."
   (interactive)
   (org-node-cache-ensure)
   (let* ((input (completing-read "Go to ID-node: " #'org-node-collection

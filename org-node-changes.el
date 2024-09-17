@@ -107,6 +107,11 @@ hardcoded strings."
 ;; (org-node-changes--def-whiny-alias
 ;;   'org-node-create #'org-node-new-node "2024-08-22")
 
+;; 2024-09-17
+;; NOTE: Marking them as obsolete or whiny has to be done inside that library
+(defalias 'org-node-new-via-roam-capture #'org-node-fakeroam-new-via-roam-capture)
+(defalias 'org-node-slugify-like-roam-actual #'org-node-fakeroam-slugify-via-roam)
+
 (provide 'org-node-changes)
 
 ;;; org-node-changes.el ends here

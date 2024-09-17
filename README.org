@@ -140,42 +140,9 @@ Final tip: there's *no separate command* for creating a new node!  Reuse one of 
 Backlinks are the butter on the bread of your notes.  If you've ever seen a "What links here" section on some webpage, that's exactly what it is.  Imagine seeing that, all the time.  The following sections outline two general ways to do so.
 
 ** Backlink solution 1: Borrow org-roam's backlink buffer
-As a Roam user, you can just keep using =M-x org-roam-buffer-toggle=, but you get some new ways to keep its data fresh, circumventing Roam's autosync mode.
+As a Roam user, you can keep using =M-x org-roam-buffer-toggle=.
 
-*** Option 1A: Let org-roam manage its own DB
-
-If you didn't have laggy saves, this is fine.  In other words, keep variable =org-roam-db-update-on-save= at t.
-
-*** Option 1B: Tell org-node to write to the org-roam DB
-
-Add this init snippet:
-
-#+begin_src elisp
-(setq org-roam-db-update-on-save nil)
-(org-node-fakeroam-db-feed-mode)
-#+end_src
-
-Unfortunately, it is still a bit slow when I save a file with 400 nodes.  It appears to be all down to EmacSQL -- if someone could help optimize how we call EmacSQL, that'd be much appreciated.  Until then, I recommend Option 1C.
-
-Related: if you often have reason to full-reset the DB, there is a faster command than =C-u M-x org-roam-db-sync=!  Try =M-x org-node-fakeroam-db-rebuild=.  Benchmark on my device:
-
-- =C-u M-x org-roam-db-sync=: 179 seconds
-- =M-x org-node-fakeroam-db-rebuild=: 6 seconds
-
-This is also a place where I request help, since 6 seconds seems a lot slower than it needs to be.  I envision running it on every save -- that's obviously not possible yet.
-
-*** Option 1C: Cut out the DB altogether
-
-No more battling SQLite!  Type =M-x org-node-fakeroam-jit-backlinks-mode=, then see what populates your Roam buffer henceforth.  Hopefully you see the same links as before.
-
-If you're happy with the result, you can disable =org-roam-db-autosync-mode= entirely.  Its remaining functionality can be reproduced by =M-x org-node-fakeroam-redisplay-mode=.  As an init snippet:
-
-#+begin_src elisp
-(org-roam-db-autosync-mode 0)
-(org-node-fakeroam-jit-backlinks-mode) ;; no use roam db to build buffer
-(org-node-fakeroam-fast-render-mode) ;; build the buffer fast
-(org-node-fakeroam-redisplay-mode) ;; always show local backlinks
-#+end_src
+If saving files has been slow, [[https://github.com/meedstrom/org-node-fakeroam][org-node-fakeroam]] gives you some new ways to keep Roam's DB data fresh, circumventing Roam's "autosync mode".
 
 ** Backlink solution 2: Print inside the file
 I rarely have the screen space to display a backlink buffer.  Because it needs my active involvement to keep visible, I go long periods seeing no backlinks.  This solution can be a great complement (or even stand alone).
@@ -378,6 +345,7 @@ Rarer commands:
 - =org-node-rename-file-by-title=
   - Auto-rename the file based on the current =#+title=
     - Works as an after-save-hook!  Does nothing until you configure =org-node-renames-allowed-dirs=.
+    - Please note that if your filenames have datestamp prefixes, it is important to get =org-node-datestamp-format= right or it may clobber a pre-existing datestamp.
 - =org-node-backlink-fix-all=
   - Update =BACKLINKS= property in all nodes
 - =org-node-list-feedback-arcs=
