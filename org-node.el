@@ -2390,7 +2390,7 @@ Only do something if `org-node-proposed-series-key' is non-nil."
                   (string> (car item1) (car item2)))))))))
 
 (defun org-node--series-jump (key)
-  "Jump to an entry in series identified by KEY."
+  "Prompt for and jump to an entry in series identified by KEY."
   (let* ((series (cdr (assoc key org-node--series)))
          (sortstr (if (= 2 (plist-get series :version))
                       (funcall (plist-get series :prompter) key)
@@ -2414,52 +2414,42 @@ Only do something if `org-node-proposed-series-key' is non-nil."
   "Visit the previous entry in series identified by KEY.
 If argument NEXT is non-nil, actually visit the next entry."
   (let* ((series (cdr (assoc key org-node--series)))
-         (here (funcall (plist-get series :whereami)))
-         (items (plist-get series :sorted-items))
+         (tail (plist-get series :sorted-items))
          head
-         first-tail)
-    (when here
-      ;; Find our location in the series
-      (cl-loop for item in items
-               if (string> (car item) here)
-               do (push item head)
-               else return (setq first-tail item)))
-    (when (or here
+         here)
+    (unless tail
+      (error "No items in series \"%s\"" (plist-get series :name)))
+    ;; Depending on the design of the :whereami lambda, being in a sub-heading
+    ;; may block discovering that a parent heading is a member of the series,
+    ;; so re-try until the top level
+    (when (derived-mode-p 'org-mode)
+      (save-excursion
+        (without-restriction
+          (while (and (not (setq here (funcall (plist-get series :whereami))))
+                      (org-up-heading-or-point-min))))))
+    (when (or (when here
+                ;; Find our location in the series
+                (cl-loop for item in tail
+                         while (string> (car item) here)
+                         do (push (pop tail) head))
+                (when (string= here (caar tail))
+                  (pop tail))
+                t)
               (when (y-or-n-p
                      (format "Not in series \"%s\".  Jump to latest item in that series?"
                              (plist-get series :name)))
-                (setq head (take 1 items))
+                (setq head (take 1 tail))
                 t))
-      (let* (;; Only 0 if user ran a :creator that did not register the item,
-             ;; which would result in skipping backwards twice if still 1.
-             (1-if-member (if (equal here (car first-tail)) 1 0))
-             (to-check (if next
-                           head
-                         (drop (+ (length head) 1-if-member) items))))
-        ;; Usually this should return on the first try, but sometimes stale
-        ;; items refer to something that has been erased from disk, so
-        ;; deregister each item that TRY-GOTO failed to visit and try again.
-        (cl-loop
-         for item in to-check
-         if (funcall (plist-get series :try-goto) item)
-         return t
-         else do (delete item items)
-         finally return (message "No %s item in series \"%s\""
-                                 (if next "next" "previous")
-                                 (plist-get series :name)))))))
-
-(defun org-node-series-goto (key sortstr)
-  "Visit an entry in series identified by KEY.
-The entry to visit has sort-string SORTSTR.  Create if it does
-not exist."
-  (let* ((series (cdr (assoc key org-node--series)))
-         (item (assoc sortstr (plist-get series :sorted-items))))
-    (when (or (null item)
-              (if (funcall (plist-get series :try-goto) item)
-                  nil
-                (delete item (plist-get series :sorted-items))
-                t))
-      (funcall (plist-get series :creator) sortstr key))))
+      ;; Usually this should return on the first try, but sometimes stale
+      ;; items refer to something that has been erased from disk, so
+      ;; deregister each item that TRY-GOTO failed to visit and try again.
+      (cl-loop for item in (if next head tail)
+               if (funcall (plist-get series :try-goto) item)
+               return t
+               else do (delete item (plist-get series :sorted-items))
+               finally do (message "No %s item in series \"%s\""
+                                   (if next "next" "previous")
+                                   (plist-get series :name))))))
 
 (defun org-node-series-capture-target ()
   "Experimental."
