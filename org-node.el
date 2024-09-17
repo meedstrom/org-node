@@ -2167,11 +2167,22 @@ KEY, NAME and CAPTURE explained in `org-node-series-defs'."
                  (unwind-protect (org-node-create sortstr (org-id-new) key)
                    (remove-hook 'org-node-creation-hook adder))))))
 
+(defvar org-node--guess-daily-dir nil)
 (defun org-node--guess-daily-dir ()
-  "Do not rely on this."
-  (or (bound-and-true-p org-node-fakeroam-daily-dir)
-      (bound-and-true-p org-journal-dir)
-      (file-name-concat org-directory "daily/")))
+  "Do not rely on this.
+Better insert a hardcoded string in your series definition
+instead of calling this function."
+  (with-memoization org-node--guess-daily-dir
+    (or (bound-and-true-p org-node-fakeroam-daily-dir)
+        (bound-and-true-p org-journal-dir)
+        (and (bound-and-true-p org-roam-directory)
+             (seq-find #'file-exists-p
+                       (list (file-name-concat org-roam-directory "daily/")
+                             (file-name-concat org-roam-directory "dailies/"))))
+        (seq-find #'file-exists-p
+                  (list (file-name-concat org-directory "daily/")
+                        (file-name-concat org-directory "dailies/")))
+        (error "Could not guess daily directory; configure `org-node-series-defs'"))))
 
 (defun org-node-helper-try-goto-id (id)
   "Try to visit org-id ID, returning non-nil on success."
