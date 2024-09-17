@@ -1155,10 +1155,12 @@ pass that to FINALIZER."
     (dolist (node nodes)
       (org-node--record-node node))
     ;; (org-id-locations-save) ;; A nicety, but sometimes slow
-    ;; (setq org-node--series (org-node--build-series* org-node-series-defs))
-    (setq org-node--series nil)
+    (setq org-node-built-series nil)
     (dolist (def org-node-series-defs)
-      (org-node--build-series def))
+      (setf (alist-get (car def) org-node-built-series nil nil #'equal)
+            (org-node--build-series def))
+      (org-node--add-series-to-dispatch (car def)
+                                        (plist-get (cdr def) :name)))
     (setq org-node--time-elapsed
           ;; For reproducible profiling: don't count time spent on
           ;; other sentinels, timers or I/O in between these periods
@@ -2129,7 +2131,7 @@ KEY, NAME and CAPTURE explained in `org-node-series-defs'."
                     (when (and sortstr node)
                       (concat sortstr " " (org-node-get-title node))))))
     :prompter (lambda (key)
-                (let ((series (cdr (assoc key org-node--series))))
+                (let ((series (cdr (assoc key org-node-built-series))))
                   (completing-read "Go to: " (plist-get series :sorted-items))))
     :try-goto (lambda (item)
                 (org-node-helper-try-goto-id (cdr item)))
@@ -2252,7 +2254,7 @@ format-constructs occur before these."
                  (let ((time (org-entry-get nil "CREATED" t)))
                    (and time (not (string-blank-p time)) time)))
      :prompter (lambda (key)
-                 (let ((series (cdr (assoc key org-node--series))))
+                 (let ((series (cdr (assoc key org-node-built-series))))
                    (completing-read
                     "Go to: " (plist-get series :sorted-items))))
      :try-goto (lambda (item)
@@ -2291,6 +2293,11 @@ is a date in the format YYYY-MM-DD, but not in the format MM/DD/YY.
 This is what determines the order of items in the series: after
 all nodes have been processed by CLASSIFIER, the non-nil return
 values are sorted by the sort-string, using `string>'.
+
+Aside from returning a single item, CLASSIFIER may also return a list of
+such items.  This can be useful if e.g. you have a special type of node
+that \"defines\" a series by simply containing links to each item that
+should go into it.
 
 Function PROMPTER may be used during jump/capture/refile to
 interactively prompt for a sort-string.  This highlights the
@@ -2336,7 +2343,7 @@ message to remind you to check out the wiki on GitHub and port
 your definitions."
   :type 'alist)
 
-(defvar org-node--series nil
+(defvar org-node-built-series nil
   "Alist describing each node series, internal use.")
 
 (defvar org-node-proposed-series-key nil
@@ -2350,7 +2357,7 @@ variable that need not stay nil, see
 Only do something if `org-node-proposed-series-key' is non-nil."
   (when org-node-proposed-series-key
     (let* ((series (cdr (assoc org-node-proposed-series-key
-                               org-node--series)))
+                               org-node-built-series)))
            (node-here (gethash (org-node-id-at-point) org-nodes))
            (new-item (when node-here
                        (funcall (plist-get series :classifier) node-here))))
@@ -2363,7 +2370,7 @@ Only do something if `org-node-proposed-series-key' is non-nil."
 
 (defun org-node--series-jump (key)
   "Prompt for and jump to an entry in series identified by KEY."
-  (let* ((series (cdr (assoc key org-node--series)))
+  (let* ((series (cdr (assoc key org-node-built-series)))
          (sortstr (if (= 2 (plist-get series :version))
                       (funcall (plist-get series :prompter) key)
                     (funcall (plist-get series :prompter) series)))
@@ -2385,8 +2392,7 @@ Only do something if `org-node-proposed-series-key' is non-nil."
 (defun org-node--series-goto-previous (key &optional next)
   "Visit the previous entry in series identified by KEY.
 If argument NEXT is non-nil, actually visit the next entry."
-  (org-node--series-dedup-maybe)
-  (let* ((series (cdr (assoc key org-node--series)))
+  (let* ((series (cdr (assoc key org-node-built-series)))
          (tail (plist-get series :sorted-items))
          head
          here)
@@ -2405,7 +2411,7 @@ If argument NEXT is non-nil, actually visit the next entry."
                 (cl-loop for item in tail
                          while (string> (car item) here)
                          do (push (pop tail) head))
-                (when (string= here (caar tail))
+                (while (equal here (caar tail))
                   (pop tail))
                 t)
               (when (y-or-n-p
@@ -2442,7 +2448,7 @@ If argument NEXT is non-nil, actually visit the next entry."
                                 (mapcar #'string-to-char valid-keys))))
                    (char-to-string input)))))
     ;; Almost identical to `org-node--series-jump'
-    (let* ((series (cdr (assoc key org-node--series)))
+    (let* ((series (cdr (assoc key org-node-built-series)))
            (sortstr (or org-node-proposed-title
                         (if (= 2 (plist-get series :version))
                             (funcall (plist-get series :prompter) key)
@@ -2456,38 +2462,33 @@ If argument NEXT is non-nil, actually visit the next entry."
           (funcall (plist-get series :creator) sortstr))))))
 
 (defun org-node--build-series (def)
-  "From plist DEF, populate `org-node--series'.
-Then add a corresponding entry to `org-node-series-dispatch'.
-
-DEF is a member of `org-node-series-defs'."
+  "From DEF, make a plist for `org-node-built-series'.
+DEF is a series-definition from `org-node-series-defs'."
   (let ((classifier (org-node--ensure-compiled
                      (plist-get (cdr def) :classifier))))
-    (cl-loop
-     for node being the hash-values of org-node--id<>node
-     as result = (funcall classifier node)
-     if (listp (car result))
-     nconc result into items
-     else collect result into items
-     finally do
-     (setf (alist-get (car def) org-node--series nil nil #'equal)
-           (nconc (cl-loop for elt in (cdr def)
-                           if (functionp elt)
-                           collect (org-node--ensure-compiled elt)
-                           else collect elt)
-                  (list :key (car def)
-                        ;; Using `string>' due to most recent dailies probably
-                        ;; being most relevant, thus cycling thru recent
-                        ;; dailies will have the best perf.
-                        :sorted-items (cl-sort items #'string> :key #'car)))))
-    (org-node--add-series-to-dispatch (car def) (plist-get (cdr def) :name))))
-
-(defvar org-node--time-at-dedup (seconds-to-time 0))
-(defun org-node--series-dedup-maybe ()
-  "If cache was recently reset, de-duplicate `org-node--series'."
-  (when (time-less-p org-node--time-at-dedup org-node--time-at-finalize)
-    (setq org-node--time-at-dedup (current-time))
-    (dolist (series org-node--series)
-      (delete-consecutive-dups (plist-get series :sorted-items)))))
+    (nconc
+     (cl-loop for elt in (cdr def)
+              if (functionp elt)
+              collect (org-node--ensure-compiled elt)
+              else collect elt)
+     (cl-loop for node being the hash-values of org-node--id<>node
+              as result = (funcall classifier node)
+              if (listp (car result))
+              nconc result into items
+              else collect result into items
+              finally return
+              ;; Using `string>' due to most recent dailies probably
+              ;; being most relevant, thus cycling thru recent
+              ;; dailies will have the best perf
+              (list :key (car def)
+                    :sorted-items (delete-consecutive-dups
+                                   (if (< emacs-major-version 30)
+                                       ;; `cl-sort' faster than compat's sort
+                                       (cl-sort items #'string> :key #'car)
+                                     ;; `compat-call' prevents compile warnings
+                                     (compat-call sort items
+                                                  :key #'car :lessp #'string<
+                                                  :reverse t :in-place t))))))))
 
 (defvar org-node-current-series-key nil
   "Key of the series currently being browsed with the menu.")
@@ -2531,7 +2532,7 @@ DEF is a member of `org-node-series-defs'."
   (if args
       (progn (setq org-node-current-series-key (car args))
              (unwind-protect
-                 (let* ((series (cdr (assoc (car args) org-node--series)))
+                 (let* ((series (cdr (assoc (car args) org-node-built-series)))
                         (capture-keys (plist-get series :capture)))
                    (if capture-keys
                        (org-capture nil capture-keys)
@@ -2587,7 +2588,7 @@ Meant to sit on these hooks:
   (calendar-unmark)
   (when org-node-series-that-marks-calendar
     (let* ((series (cdr (assoc org-node-series-that-marks-calendar
-                               org-node--series)))
+                               org-node-built-series)))
            (dates (mapcar #'car (plist-get series :sorted-items)))
            mdy)
       (dolist (date dates)
