@@ -3882,91 +3882,131 @@ heading, else the file-level node, whichever has an ID first."
     (display-warning
      'org-node "Your initfiles use a now-old version of series definitions. Still works, but port them when you can: https://github.com/meedstrom/org-node/wiki")))
 
-(defun org-node--example-daily-creator (sortstr &rest _)
-  "Create a daily-note using SORTSTR as the date."
-  (declare (obsolete nil "2024-08-21"))
-  (org-node--obsolete-series-warn)
-  (if (and (eq org-node-creation-fn 'org-node-new-via-roam-capture)
-           (fboundp 'org-node-fakeroam-daily-create))
-      ;; Assume this user wants to use their roam-dailies templates
-      (progn
-        (setq org-node-proposed-series-key "d")
-        (unwind-protect
-            (org-node-fakeroam-daily-create sortstr
-                                            org-node-proposed-series-key)
-          (setq org-node-proposed-series-key nil)))
-    (let ((org-node-ask-directory
-           (if (require 'org-roam-dailies nil t)
-               (file-name-concat org-roam-directory org-roam-dailies-directory)
-             (file-name-as-directory (file-name-concat org-directory "daily"))))
-          (org-node-datestamp-format "")
-          (org-node-slug-fn #'identity))
-      (org-node-create sortstr (org-id-new) "d"))))
+(let (warned-once)
+  (defun org-node--example-daily-creator (sortstr &rest _)
+    "Create a daily-note using SORTSTR as the date."
+    (declare (obsolete nil "2024-08-21"))
+    (unless warned-once
+      (setq warned-once
+            (display-warning
+             'org-node "Function org-node--example-daily-creator will be REMOVED by Sep 30, change your `org-node-series-defs'")))
+    (org-node--obsolete-series-warn)
+    (if (and (eq org-node-creation-fn 'org-node-fakeroam-new-via-roam-capture)
+             (fboundp 'org-node-fakeroam-daily-create))
+        ;; Assume this user wants to use their roam-dailies templates
+        (progn
+          (setq org-node-proposed-series-key "d")
+          (unwind-protect
+              (org-node-fakeroam-daily-create sortstr
+                                              org-node-proposed-series-key)
+            (setq org-node-proposed-series-key nil)))
+      (let ((org-node-ask-directory
+             (if (require 'org-roam-dailies nil t)
+                 (file-name-concat org-roam-directory org-roam-dailies-directory)
+               (file-name-as-directory (file-name-concat org-directory "daily"))))
+            (org-node-datestamp-format "")
+            (org-node-slug-fn #'identity))
+        (org-node-create sortstr (org-id-new) "d")))))
 
-(defun org-node--series-standard-creator (sortstr &rest _)
-  "Create a node with SORTSTR as the title."
-  (declare (obsolete nil "2024-08-17"))
-  (org-node--obsolete-series-warn)
-  (org-node-create sortstr (org-id-new)))
+(let (warned-once)
+  (defun org-node--series-standard-creator (sortstr &rest _)
+    "Create a node with SORTSTR as the title."
+    (declare (obsolete nil "2024-08-17"))
+    (unless warned-once
+      (setq warned-once
+            (display-warning
+             'org-node "Function org-node--series-standard-creator will be REMOVED by Sep 30, change your `org-node-series-defs'")))
+    (org-node--obsolete-series-warn)
+    (org-node-create sortstr (org-id-new))))
 
-(defun org-node--example-daily-classifier (node)
-  "Classifier for dailies in Roam style.
+(let (warned-once)
+  (defun org-node--example-daily-classifier (node)
+    "Classifier for dailies in Roam style.
 If NODE is in a \"daily\" or \"dailies\" directory, return an
 item using file name base as sort string."
-  (declare (obsolete nil "2024-08-21"))
-  (org-node--obsolete-series-warn)
-  (let ((path (org-node-get-file-path node)))
-    (when (string-match-p "dail\\w+/" path)
-      (cons (file-name-base path) path))))
+    (declare (obsolete nil "2024-08-21"))
+    (org-node--obsolete-series-warn)
+    (unless warned-once
+      (setq warned-once
+            (display-warning
+             'org-node "Function org-node--example-daily-classifier will be REMOVED by Sep 30, change your `org-node-series-defs'")))
+    (let ((path (org-node-get-file-path node)))
+      (when (string-match-p "dail\\w+/" path)
+        (cons (file-name-base path) path)))))
 
-(defun org-node--example-try-goto-file (item)
-  "Assume cdr of ITEM is a filename and try to visit it."
-  (declare (obsolete nil "2024-08-21"))
-  (org-node--obsolete-series-warn)
-  (let ((buf (find-buffer-visiting (cdr item))))
-    (if buf
-        (switch-to-buffer buf)
-      (when (file-readable-p (cdr item))
-        (find-file (cdr item))))))
+(let (warned-once)
+  (defun org-node--example-try-goto-file (item)
+    "Assume cdr of ITEM is a filename and try to visit it."
+    (declare (obsolete nil "2024-08-21"))
+    (org-node--obsolete-series-warn)
+    (unless warned-once
+      (setq warned-once
+            (display-warning
+             'org-node "Function org-node--example-try-goto-file will be REMOVED by Sep 30, change your `org-node-series-defs'")))
+    (let ((buf (find-buffer-visiting (cdr item))))
+      (if buf
+          (switch-to-buffer buf)
+        (when (file-readable-p (cdr item))
+          (find-file (cdr item)))))))
 
-(defun org-node--example-try-goto-id (item)
-  "Assume cdr of ITEM is an org-id and try to visit it."
-  (declare (obsolete nil "2024-08-21"))
-  (org-node--obsolete-series-warn)
-  (let* ((id (cdr item))
-         (node (gethash id org-nodes)))
-    (when node
-      (org-node--goto node)
-      t)))
+(let (warned-once)
+  (defun org-node--example-try-goto-id (item)
+    "Assume cdr of ITEM is an org-id and try to visit it."
+    (declare (obsolete nil "2024-08-21"))
+    (org-node--obsolete-series-warn)
+    (unless warned-once
+      (setq warned-once
+            (display-warning
+             'org-node "Function org-node--example-try-goto-id will be REMOVED by Sep 30, change your `org-node-series-defs'")))
+    (let* ((id (cdr item))
+           (node (gethash id org-nodes)))
+      (when node
+        (org-node--goto node)
+        t))))
 
-(defun org-node--example-daily-whereami ()
-  "Check the filename for a date and return it."
-  (declare (obsolete nil "2024-08-21"))
-  (org-node--obsolete-series-warn)
-  (when-let* ((path (buffer-file-name (buffer-base-buffer)))
-              (clipped-name (file-name-base path)))
-    (if (string-match-p
-         (rx bol (= 4 digit) "-" (= 2 digit) "-" (= 2 digit) eol)
-         clipped-name)
-        clipped-name
-      ;; Even in a non-daily file, pretend it is a daily if possible,
-      ;; to allow entering the series at a more relevant date
-      (when-let ((stamp (org-node-extract-file-name-datestamp path)))
-        (org-node-extract-ymd stamp org-node-datestamp-format)))))
+(let (warned-once)
+  (defun org-node--example-daily-whereami ()
+    "Check the filename for a date and return it."
+    (declare (obsolete nil "2024-08-21"))
+    (org-node--obsolete-series-warn)
+    (unless warned-once
+      (setq warned-once
+            (display-warning
+             'org-node "Function org-node--example-daily-whereami will be REMOVED by Sep 30, change your `org-node-series-defs'")))
+    (when-let* ((path (buffer-file-name (buffer-base-buffer)))
+                (clipped-name (file-name-base path)))
+      (if (string-match-p
+           (rx bol (= 4 digit) "-" (= 2 digit) "-" (= 2 digit) eol)
+           clipped-name)
+          clipped-name
+        ;; Even in a non-daily file, pretend it is a daily if possible,
+        ;; to allow entering the series at a more relevant date
+        (when-let ((stamp (org-node-extract-file-name-datestamp path)))
+          (org-node-extract-ymd stamp org-node-datestamp-format))))))
 
-(defun org-node--example-daily-prompter (series &rest _)
-  "Prompt for a date, return it in YYYY-MM-DD form.
+(let (warned-once)
+  (defun org-node--example-daily-prompter (series &rest _)
+    "Prompt for a date, return it in YYYY-MM-DD form.
 Argument SERIES is the series that called this."
-  (declare (obsolete nil "2024-08-21"))
-  (org-node--obsolete-series-warn)
-  (let ((org-node-series-that-marks-calendar (plist-get series :key)))
-    (org-read-date)))
+    (declare (obsolete nil "2024-08-21"))
+    (unless warned-once
+      (setq warned-once
+            (display-warning
+             'org-node "Function org-node--example-daily-prompter will be REMOVED by Sep 30, change your `org-node-series-defs'")))
+    (org-node--obsolete-series-warn)
+    (let ((org-node-series-that-marks-calendar (plist-get series :key)))
+      (org-read-date))))
 
-(defun org-node--example-prompter (series)
-  "Prompt to go to any of the sort-strings in SERIES."
-  (declare (obsolete nil "2024-08-21"))
-  (org-node--obsolete-series-warn)
-  (completing-read "Go to: " (plist-get series :sorted-items)))
+(let (warned-once)
+  (defun org-node--example-prompter (series)
+    "Prompt to go to any of the sort-strings in SERIES."
+    (declare (obsolete nil "2024-08-21"))
+    (unless warned-once
+      (setq warned-once
+            (display-warning
+             'org-node "Function org-node--example-prompter will be REMOVED by Sep 30, change your `org-node-series-defs'")))
+    (org-node--obsolete-series-warn)
+    (completing-read "Go to: " (plist-get series :sorted-items))))
 
 (provide 'org-node)
 
