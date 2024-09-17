@@ -2413,6 +2413,7 @@ Only do something if `org-node-proposed-series-key' is non-nil."
 (defun org-node--series-goto-previous (key &optional next)
   "Visit the previous entry in series identified by KEY.
 If argument NEXT is non-nil, actually visit the next entry."
+  (org-node--series-dedup-maybe)
   (let* ((series (cdr (assoc key org-node--series)))
          (tail (plist-get series :sorted-items))
          head
@@ -2507,6 +2508,14 @@ DEF is a member of `org-node-series-defs'."
                         ;; dailies will have the best perf.
                         :sorted-items (cl-sort items #'string> :key #'car)))))
     (org-node--add-series-to-dispatch (car def) (plist-get (cdr def) :name))))
+
+(defvar org-node--time-at-dedup (seconds-to-time 0))
+(defun org-node--series-dedup-maybe ()
+  "If cache was recently reset, de-duplicate `org-node--series'."
+  (when (time-less-p org-node--time-at-dedup org-node--time-at-finalize)
+    (setq org-node--time-at-dedup (current-time))
+    (dolist (series org-node--series)
+      (delete-consecutive-dups (plist-get series :sorted-items)))))
 
 (defvar org-node-current-series-key nil
   "Key of the series currently being browsed with the menu.")
