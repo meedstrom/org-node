@@ -58,6 +58,7 @@
 ;;; Code:
 
 (require 'seq)
+(require 'tramp)
 (require 'cl-lib)
 (require 'subr-x)
 (require 'bytecomp)
@@ -608,17 +609,21 @@ When called from Lisp, peek on any hash table HT."
   "Arrange to scan NEWNAME for nodes and links, and forget FILE."
   (when (equal (file-name-extension file) "org")
     (org-node--scan-targeted
-     (seq-remove #'backup-file-name-p (list file newname)))))
+     (thread-last (list file newname)
+                  (seq-remove #'backup-file-name-p)
+                  (seq-remove #'tramp-tramp-file-p)))))
 
 (defun org-node--handle-delete (file &rest _)
   "Arrange to forget nodes and links in FILE."
   (when (and (equal (file-name-extension file) "org"))
-    (org-node--scan-targeted file)))
+    (unless (tramp-tramp-file-p file)
+      (org-node--scan-targeted file))))
 
 (defun org-node--handle-save ()
   "Arrange to re-scan nodes and links in current buffer."
   (when (and (equal (file-name-extension buffer-file-name) "org")
-             (not (backup-file-name-p buffer-file-name)))
+             (not (backup-file-name-p buffer-file-name))
+             (not (tramp-tramp-file-p buffer-file-name)))
     (org-node--scan-targeted buffer-file-name)))
 
 ;; FIXME: Sure, it detects them, but won't run `org-node-rescan-functions' on
