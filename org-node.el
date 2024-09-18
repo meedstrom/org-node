@@ -1028,6 +1028,7 @@ function to update current tables."
                           files org-node-perf-max-jobs))
              (n-jobs (length file-lists))
              (write-region-inhibit-fsync nil) ;; Default t in emacs30
+             (default-directory invocation-directory)
              (print-length nil))
         (dotimes (i n-jobs)
           (write-region (prin1-to-string (pop file-lists))
