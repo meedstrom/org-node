@@ -3859,6 +3859,19 @@ heading, else the file-level node, whichever has an ID first."
                             () () () 'org-node-hist)
            org-node--candidate<>node))
 
+(defun org-node-series-goto (key sortstr)
+  "Visit an entry in series identified by KEY.
+The entry to visit has sort-string SORTSTR.  Create if it does
+not exist."
+  (let* ((series (cdr (assoc key org-node--series)))
+         (item (assoc sortstr (plist-get series :sorted-items))))
+    (when (or (null item)
+              (if (funcall (plist-get series :try-goto) item)
+                  nil
+                (delete item (plist-get series :sorted-items))
+                t))
+      (funcall (plist-get series :creator) sortstr key))))
+
 
 ;;;; Obsolete series functions (for :version 1)
 
