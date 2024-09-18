@@ -2377,17 +2377,17 @@ Only do something if `org-node-proposed-series-key' is non-nil."
 (defun org-node--series-jump (key)
   "Prompt for and jump to an entry in series identified by KEY."
   (let* ((series (cdr (assoc key org-node-built-series)))
-         (sortstr (if (= 2 (plist-get series :version))
+         (sortstr (if (eq 2 (plist-get series :version))
                       (funcall (plist-get series :prompter) key)
                     (funcall (plist-get series :prompter) series)))
          (item (assoc sortstr (plist-get series :sorted-items))))
     (if item
         (unless (funcall (plist-get series :try-goto) item)
           (delete item (plist-get series :sorted-items))
-          (if (= 2 (plist-get series :version))
+          (if (eq 2 (plist-get series :version))
               (funcall (plist-get series :creator) sortstr key)
             (funcall (plist-get series :creator) sortstr)))
-      (if (= 2 (plist-get series :version))
+      (if (eq 2 (plist-get series :version))
           (funcall (plist-get series :creator) sortstr key)
         (funcall (plist-get series :creator) sortstr)))))
 
@@ -2456,14 +2456,14 @@ If argument NEXT is non-nil, actually visit the next entry."
     ;; Almost identical to `org-node--series-jump'
     (let* ((series (cdr (assoc key org-node-built-series)))
            (sortstr (or org-node-proposed-title
-                        (if (= 2 (plist-get series :version))
+                        (if (eq 2 (plist-get series :version))
                             (funcall (plist-get series :prompter) key)
                           (funcall (plist-get series :prompter) series))))
            (item (assoc sortstr (plist-get series :sorted-items))))
       (when (or (null item)
                 (not (funcall (plist-get series :try-goto) item)))
         ;; TODO: Move point after creation to most appropriate place
-        (if (= 2 (plist-get series :version))
+        (if (eq 2 (plist-get series :version))
             (funcall (plist-get series :creator) sortstr key)
           (funcall (plist-get series :creator) sortstr))))))
 
