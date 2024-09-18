@@ -262,9 +262,12 @@ Wouldn't it be nice if, clicking on that link, you automatically visit that node
 #+end_src
 
 ** Limitation: TRAMP
-Working over TRAMP is untested, but I suspect it won't work.  Org-node tries to be very fast, often nulling =file-name-handler-alist=, which TRAMP needs.
+Working with files over TRAMP is unsupported for now.  Org-node tries to be very fast, often nulling =file-name-handler-alist=, which TRAMP needs.
 
 The best way to change this is to [[https://github.com/meedstrom/org-node/issues][file an issue]] to show you care :-)
+
+** Limitation: Encryption
+Encrypted nodes probably won't be found.  Same as above, file an issue.
 
 ** Limitation: Unique titles
 If two ID-nodes exist with the same title, one of them disappears from minibuffer completions.

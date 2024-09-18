@@ -69,6 +69,7 @@
 (require 'org-macs)
 (require 'org-element)
 
+;; External libs
 (require 'dash)
 (require 'compat)
 (require 'persist)
@@ -76,10 +77,10 @@
 (require 'org-node-changes)
 
 ;; Satisfy compiler
+(defvar $i)
 (defvar org-roam-directory)
 (defvar org-roam-dailies-directory)
 (defvar consult-ripgrep-args)
-(defvar $i)
 (defvar org-node-backlink-mode)
 (declare-function org-node-backlink--fix-entry-here "org-node-backlink")
 (declare-function profiler-report "profiler")
@@ -3756,7 +3757,6 @@ Wrap the value in double-brackets if necessary."
 
 ;;;; CAPF (Completion-At-Point Function)
 
-;; REVIEW: is it necessary to limit the effect to file-visiting buffers?
 (define-minor-mode org-node-complete-at-point-mode
   "Use `org-node-complete-at-point' in all Org buffers.
 
@@ -3770,7 +3770,7 @@ Wrap the value in double-brackets if necessary."
           (message "You may want to set `org-roam-completion-everywhere' nil"))
         (dolist (buf (buffer-list))
           (with-current-buffer buf
-            (when (and buffer-file-name (derived-mode-p 'org-mode))
+            (when (derived-mode-p 'org-mode)
               (add-hook 'completion-at-point-functions
                         #'org-node-complete-at-point nil t)))))
     (remove-hook 'org-mode-hook #'org-node--install-capf-in-buffer)
@@ -3782,8 +3782,6 @@ Wrap the value in double-brackets if necessary."
 (defun org-node--install-capf-in-buffer ()
   "Let in-buffer completion try `org-node-complete-at-point'."
   (and buffer-file-name
-       (derived-mode-p 'org-mode)
-       (string-suffix-p "org" buffer-file-name)
        (add-hook 'completion-at-point-functions
                  #'org-node-complete-at-point nil t)))
 
@@ -3792,12 +3790,10 @@ Wrap the value in double-brackets if necessary."
 Designed for `completion-at-point-functions', which see."
   (let ((bounds (bounds-of-thing-at-point 'word)))
     (and bounds
-         ;; For some reason it runs in non-org buffers, like grep results?
-         (derived-mode-p 'org-mode)
-         ;; Any way to skip these checks?
+         ;; For some reason it runs in non-org buffers, like grep results...?
+         ;; (derived-mode-p 'org-mode)
          (not (org-in-src-block-p))
-         (not (save-match-data
-                (org-in-regexp org-link-any-re)))
+         (not (save-match-data (org-in-regexp org-link-any-re)))
          (list (car bounds)
                (cdr bounds)
                org-node--title<>id
