@@ -14,7 +14,7 @@ On [2024-09-02], the git repo history was REWRITTEN!  You may have had to delete
 
 *What was rewritten?*  I've erased the =;; Package-Version:= comment line in file contents, because of Emacs 30's new =(use-package :vc)= keyword, which defaults to installing the /oldest/ commit with a given Package-Version, not the /newest/ commit.
 
-Even if that's 5 years old.  Please [[https://lists.gnu.org/r/emacs-devel/2024-09/msg00427.html][chime in on the mailing list]]!
+Even if that's 5 years old.  Please chime in at the [[https://lists.gnu.org/r/emacs-devel/2024-09/msg00427.html][mailing list discussion]]!
 
 See some [[https://github.com/melpa/melpa/issues/2955#issuecomment-1519154736][loooong related discussions]] about the untrustworthiness of Package-Version, and that's leaving aside the fact the ecosystem [[https://github.com/melpa/melpa/issues/6656][doesn't really make use of the concept of versioned releases]], and when some tools pretend it does instead of taking the newest commit, they make it [[https://old.reddit.com/r/emacs/comments/1f8ok7c/do_you_set_packageinstallupgradebuiltin_to_t/llimwe0/][less stable for all]].
 

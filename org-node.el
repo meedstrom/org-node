@@ -1601,7 +1601,7 @@ non-nil), list the files in a new buffer."
       ;; TODO: Use something like a find-dired buffer
       (org-node--pop-to-tabulated-list
        :buffer "*org-node files*"
-       :format [("File" 0)]
+       :format [("File" 0 t)]
        :entries (cl-loop
                  for file in (org-node-list-files)
                  collect (list file (vector
