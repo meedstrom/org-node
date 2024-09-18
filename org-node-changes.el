@@ -29,10 +29,10 @@
 
 (require 'seq)
 (require 'cl-lib)
+(require 'find-func)
 
 (defvar org-node-changes--new-names
   '((org-node-rescan-hook org-node-rescan-functions)
-    (org-node-series org-node-series-defs "15 September 2024")
     (org-node--series-info org-node-built-series)
     (org-node-mark-days org-node--mark-days))
   "Alist of deprecated symbol names and their new names.")
@@ -109,6 +109,8 @@ hardcoded strings."
 
 ;; 2024-09-17
 ;; NOTE: Marking them as obsolete or whiny has to be done inside that library
+(declare-function org-node-fakeroam-new-via-roam-capture "org-node-fakeroam")
+(declare-function org-node-fakeroam-slugify-via-roam "org-node-fakeroam")
 (defalias 'org-node-new-via-roam-capture #'org-node-fakeroam-new-via-roam-capture)
 (defalias 'org-node-slugify-like-roam-actual #'org-node-fakeroam-slugify-via-roam)
 
