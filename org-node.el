@@ -565,10 +565,13 @@ For use by `org-node-fakeroam--accelerate-get-contents'.")
 (defvar org-node--file<>mtime (make-hash-table :test #'equal)
   "1:1 table mapping files to their last-modification times.")
 
-;; Angle brackets not permitted in Windows file names (bug reported)
+;; 2024-09-19 Clean up deprecated persists
 (unless (memq system-type '(windows-nt ms-dos))
-  (persist--defvar-1 'org-node--file<>mtime nil)
-  (persist--defvar-1 'org-node--file<>previews nil))
+  (dolist (file (list (persist--file-location 'org-node--file<>previews)
+                      (persist--file-location 'org-node--file<>mtime)))
+    (and (file-exists-p file)
+         (file-writable-p file)
+         (delete-file file))))
 
 (defun org-node-get-id-links (node)
   "Get list of ID-link objects pointing to NODE.
