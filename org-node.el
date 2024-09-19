@@ -653,13 +653,19 @@ Override that function to configure timer behavior.")
 If not running, start it."
   (let ((new-delay (* 25 (1+ org-node--time-elapsed))))
     (when (or (not (member org-node--idle-timer timer-idle-list))
-              ;; Don't repeat potentially forever
+              ;; Don't enter an infinite loop (idle timers are footguns)
               (not (> (float-time (or (current-idle-time) 0))
                       new-delay)))
       (cancel-timer org-node--idle-timer)
       (setq org-node--idle-timer
             (run-with-idle-timer new-delay t #'org-node--scan-all)))))
 
+;; FIXME: The idle timer will detect new files appearing, but won't run the
+;;        hook `org-node-rescan-functions' on them, which would be good to do.
+;;        So check for new files and then try to use --scan-targeted, since
+;;        that runs the hook, but it is easy to imagine a pitfall where the
+;;        list of new files is just all files, and then we do not want to run
+;;        the hook.  So use a heuristic cutoff like 10 files.
 ;; (defun org-node--catch-unknown-modifications ()
 ;;   (let ((new (-difference (org-node-list-files) (org-node-list-files t)))))
 ;;   (if (> 10 )
@@ -718,8 +724,6 @@ SYNCHRONOUS t, unless SYNCHRONOUS is the symbol `must-async'."
   (when (hash-table-empty-p org-nodes)
     (setq synchronous (if (eq synchronous 'must-async) nil t))
     (setq force t))
-  ;; (when (not org-node-cache-mode)
-  ;;   (setq force t))
   (when force
     ;; Launch the async processes
     (org-node--scan-all))
@@ -738,8 +742,8 @@ SYNCHRONOUS t, unless SYNCHRONOUS is the symbol `must-async'."
       (funcall (timer--function org-node--retry-timer))
       (mapc #'accept-process-output org-node--processes))))
 
-;; FIXME:
-;; A heisenbug lurks in org-id.  https://emacs.stackexchange.com/questions/81794/
+;; BUG: A heisenbug lurks in (or is revealed by) org-id.
+;; https://emacs.stackexchange.com/questions/81794/
 ;; When it appears, backtrace will show this, which makes no sense -- it's
 ;; CLEARLY called on a list:
 ;;     Debugger entered--Lisp error: (wrong-type-argument listp #<hash-table equal 3142/5277) 0x190d581ba129>
@@ -814,7 +818,7 @@ If FILES is t, do a full reset of the cache."
       (setq org-node--full-scan-requested t)
     (setq org-node--file-queue
           (seq-union org-node--file-queue
-                     (mapcar #'abbreviate-file-name files))))
+                     (org-node-abbrev-file-names files))))
   (let (must-retry)
     (if (seq-some #'process-live-p org-node--processes)
         (progn
@@ -911,13 +915,13 @@ LIB-NAME should be something that works with `find-library-name'."
         elc-path))))
 
 (defcustom org-node-link-types
-  '("http" "https" "file" "id")
+  '("http" "https" "id")
   "Link types that may count as backlinks.
 Types other than \"id\" only result in a backlink when there is
 some node with the same link in its ROAM_REFS property.
 
 Having fewer types results in a faster \\[org-node-reset].
-Tip: eval `(org-link-types)' to see all types.
+Tip: eval `(org-link-types)' to see all possible types.
 
 There is no need to add the \"cite\" type."
   :type '(repeat string))
@@ -941,10 +945,10 @@ function to update current tables."
         (coding-system-for-write org-node-perf-assume-coding-system))
     (setq org-node--time-at-scan-begin (current-time))
     (setq org-node--done-ctr 0)
-    (when (-any-p #'process-live-p org-node--processes)
+    (when (seq-some #'process-live-p org-node--processes)
       ;; We should never end up here, but just in case
       (mapc #'delete-process org-node--processes)
-      (message "org-node processes alive, bug report would be appreciated"))
+      (message "org-node subprocesses alive, a bug report would be welcome"))
     (setq org-node--processes nil)
     (with-current-buffer (get-buffer-create org-node--stderr-name)
       (erase-buffer))
@@ -1004,7 +1008,6 @@ function to update current tables."
                             "backlinks")
                         ":")))))))
 
-    (setq org-node--debug nil)
     (if org-node--debug
         ;; Special case for debugging; run single-threaded so we can step
         ;; through the org-node-parser.el functions with edebug
@@ -1608,7 +1611,7 @@ When called interactively \(automatically making INTERACTIVE
 non-nil), list the files in a new buffer."
   (interactive "i\np")
   (if interactive
-      ;; TODO: Use something like a find-dired buffer
+      ;; TODO: Make something like a find-dired buffer
       (org-node--pop-to-tabulated-list
        :buffer "*org-node files*"
        :format [("File" 0 t)]
@@ -1663,7 +1666,6 @@ sub-directories, sub-sub-directories and so on, with provisos:
             (push (file-name-concat dir file) result)))))
     result))
 
-;; (progn (ignore-errors (native-compile #'org-node-list-files)) (benchmark-call #'org-node-list-files))
 (defvar org-node--homedir nil)
 (defun org-node-abbrev-file-names (path-or-paths)
   "Abbreviate all file paths in PATH-OR-PATHS.
@@ -1682,8 +1684,7 @@ would be safer to process it first with `file-truename', then
 pass the result to this function.
 
 Needless to say, you can also just use `file-truename' on both
-paths to be compared, if not writing performance-critical code
-\(think slow network filesystems)."
+paths to be compared, if not writing performance-critical code."
   (unless org-node--homedir
     (setq org-node--homedir (file-name-as-directory (expand-file-name "~"))))
   (let* ((case-fold-search nil) ;; Assume case-sensitive filesystem
@@ -1701,13 +1702,12 @@ paths to be compared, if not writing performance-critical code
 
 (defun org-node--forget-id-locations (files)
   "Remove references to FILES in `org-id-locations'.
-You might consider \"committing\" the effect afterwards by
-calling `org-id-locations-save', which this function will not do
-for you."
+You might consider committing the effect to disk afterwards by calling
+`org-id-locations-save', which this function will not do for you."
   (when files
     ;; (setq org-id-files (-difference org-id-files files)) ;; Redundant
     (let ((alist (org-id-hash-to-alist org-id-locations)))
-      (cl-loop for file in files do (assoc-delete-all file alist))
+      (cl-loop for file in files do (setq alist (assoc-delete-all file alist)))
       (setq org-id-locations (org-id-alist-to-hash alist)))))
 
 
@@ -2881,7 +2881,7 @@ creation-date as more \"truthful\" than today\\='s date.
         (org-node--dirty-ensure-node-known)
         (push (current-buffer) org-node--not-yet-saved)
         (run-hooks 'org-node-creation-hook)
-        (when org-node-backlink-mode
+        (when (bound-and-true-p org-node-backlink-mode)
           (org-node-backlink--fix-entry-here))))))
 
 ;; "Some people, when confronted with a problem, think
@@ -2968,7 +2968,8 @@ Internal argument INTERACTIVE is automatically set."
           (not (equal "org" (file-name-extension path))))
       (when interactive
         (message "Will only rename Org files")))
-     ((and (not interactive) (null org-node-renames-allowed-dirs))
+     ((and (not interactive)
+           (null org-node-renames-allowed-dirs))
       (message "User option `org-node-renames-allowed-dirs' should be configured"))
      ((or interactive
           (cl-loop
@@ -2988,14 +2989,15 @@ Internal argument INTERACTIVE is automatically set."
                                        (outline-next-heading))
                                    (org-get-heading t t t t))))))
           (message "File has no title nor heading")
+
         (let* ((name (file-name-nondirectory path))
                (date-prefix (or (org-node-extract-file-name-datestamp path)
                                 ;; Couldn't find date prefix, give a new one
                                 (format-time-string org-node-datestamp-format)))
-               (new-name (concat
-                          date-prefix (funcall org-node-slug-fn title) ".org"))
-               (new-path (file-name-concat (file-name-directory path) new-name)))
-
+               (new-name
+                (concat date-prefix (funcall org-node-slug-fn title) ".org"))
+               (new-path
+                (file-name-concat (file-name-directory path) new-name)))
           (cond
            ((equal path new-path)
             (when interactive
@@ -3004,21 +3006,20 @@ Internal argument INTERACTIVE is automatically set."
                 (buffer-modified-p (buffer-base-buffer buf)))
             (when interactive
               (message "Unsaved file, letting it be: %s" path)))
-           ((prog1 nil
-              (when (get-file-buffer new-path)
-                (user-error "Wanted to rename, but a buffer already visits target: %s"
-                            new-path))
-              (unless (file-writable-p path)
-                (user-error "No permissions to rename file: %s"
-                            path))
-              (unless (file-writable-p new-path)
-                (user-error "No permissions to write a new file at: %s"
-                            new-path))
-              ;; A bit unnecessary bc `rename-file' would error too,
-              ;; but at least we didn't kill buffer yet
-              (when (file-exists-p new-path)
-                (user-error "Canceled because a file exists at: %s"
-                            new-path))))
+           ((find-buffer-visiting new-path)
+            (user-error "Wanted to rename, but a buffer already visits target: %s"
+                        new-path))
+           ((not (file-writable-p path))
+            (user-error "No permissions to rename file: %s"
+                        path))
+           ((not (file-writable-p new-path))
+            (user-error "No permissions to write a new file at: %s"
+                        new-path))
+           ;; A bit unnecessary bc `rename-file' would error too,
+           ;; but at least we didn't kill buffer yet
+           ((file-exists-p new-path)
+            (user-error "Canceled because a file exists at: %s"
+                        new-path))
            ((or (not interactive)
                 (y-or-n-p (format "Rename file %s to %s?" name new-name)))
             (let* ((pt (point))
@@ -3028,8 +3029,10 @@ Internal argument INTERACTIVE is automatically set."
               ;; follow the rename
               (kill-buffer buf)
               (rename-file path new-path)
+              ;; REVIEW: Use `find-file'?
               (let ((new-buf (find-file-noselect new-path)))
                 ;; Don't let remaining hooks operate on some random buffer
+                ;; (we are being called from a hook, probably)
                 (set-buffer new-buf)
                 ;; Helpfully go back to where point was
                 (when visible-window
@@ -3037,9 +3040,7 @@ Internal argument INTERACTIVE is automatically set."
                    visible-window new-buf window-start pt))
                 (with-current-buffer new-buf
                   (goto-char pt)
-                  (if (org-at-heading-p)
-                      (org-show-entry)
-                    (org-show-context)))))
+                  (if (org-at-heading-p) (org-show-entry) (org-show-context)))))
             (message "File %s renamed to %s" name new-name)))))))))
 
 ;;;###autoload
@@ -3112,17 +3113,17 @@ so it matches the destination\\='s current title."
 (defun org-node-rename-asset-and-rewrite-links ()
   "Helper for renaming images and all links that point to them.
 
-Prompt for an asset such as an image file to be renamed, then
-search recursively for Org files containing a link to that asset,
-open a wgrep buffer of the search hits, and start an interactive
-search-replace that updates the links.  After the user consents
-to replacing all the links, finally rename the asset file itself."
+Prompt for an asset such as an image file to be renamed, then search
+recursively for Org files containing a link to that asset, open a wgrep
+buffer of the search hits, and start an interactive search-replace that
+updates the links.  After the user consents or doesn\\='t consent to
+replacing all the links, finally rename the asset file itself.  If the
+user quits, do not apply any modifications."
   (interactive)
   (unless (require 'wgrep nil t)
     (user-error "This command requires the wgrep package"))
   (when (and (fboundp 'wgrep-change-to-wgrep-mode)
              (fboundp 'wgrep-finish-edit))
-    ;; (user-error "This command requires the wgrep package")
     (let ((root (car (org-node--root-dirs (org-node-list-files))))
           (default-directory default-directory))
       (or (equal default-directory root)
@@ -3214,17 +3215,16 @@ In case of unsolvable problems, how to wipe org-id-locations:
  (setq org-id-extra-files nil))"
   (interactive "DForget all IDs in directory: ")
   (org-node-cache-ensure t)
-  (let ((files (seq-intersection
-                (mapcar #'abbreviate-file-name
-                        (directory-files-recursively dir "."))
-                (hash-table-values org-id-locations))))
+  (let ((files (seq-intersection (mapcar #'abbreviate-file-name
+                                         (directory-files-recursively dir "."))
+                                 (hash-table-values org-id-locations))))
     (if files
         (progn
           (message "Forgetting all IDs in directory... (%s)" dir)
           (org-node--forget-id-locations files)
           (org-id-locations-save)
           (org-node-reset))
-      (message "No files in: %s" dir))))
+      (message "No IDs known to be in: %s" dir))))
 
 ;;;###autoload
 (defun org-node-grep ()
@@ -3333,8 +3333,7 @@ network to quality-control it.  Rationale:
   (unless (executable-find "Rscript")
     (user-error
      "This command requires GNU R, with R packages tidyverse and igraph"))
-  (let ((feedbacks nil)
-        (r-code "library(stringr)
+  (let ((r-code "library(stringr)
 library(readr)
 library(igraph)
 
@@ -3796,10 +3795,8 @@ Wrap the value in double-brackets if necessary."
 (defun org-node-complete-at-point ()
   "Complete word at point to a known node title, and linkify.
 Designed for `completion-at-point-functions', which see."
-  (let ((bounds (bounds-of-thing-at-point 'word)))
-    (and bounds
-         ;; For some reason it runs in non-org buffers, like grep results...?
-         ;; (derived-mode-p 'org-mode)
+  (when-let ((bounds (bounds-of-thing-at-point 'word)))
+    (and (derived-mode-p 'org-mode)
          (not (org-in-src-block-p))
          (not (save-match-data (org-in-regexp org-link-any-re)))
          (list (car bounds)
@@ -3811,8 +3808,8 @@ Designed for `completion-at-point-functions', which see."
                  (when-let ((id (gethash text org-node--title<>id)))
                    (atomic-change-group
                      (delete-char (- (length text)))
-                     (insert (org-link-make-string
-                              (concat "id:" id) text)))))))))
+                     (insert
+                      (org-link-make-string (concat "id:" id) text)))))))))
 
 
 ;;;; Misc
