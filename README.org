@@ -14,9 +14,9 @@ On [2024-09-19], the git repo history was REWRITTEN!  You may have had to delete
 
 *What was rewritten?*  I've erased the =;; Package-Version:= comment line in file contents, because of Emacs 30's new =(use-package :vc)= keyword, which defaults to installing the /oldest/ commit with a given Package-Version, not the /newest/ commit.
 
-Even if that's 5 years old.  Please chime in at the [[https://lists.gnu.org/r/emacs-devel/2024-09/msg00427.html][mailing list discussion]]!
+Even if that's 5 years old.  Please chime in at the [[https://lists.gnu.org/r/emacs-devel/2024-09/msg00366.html][mailing list discussion]]!
 
-See some [[https://github.com/melpa/melpa/issues/2955#issuecomment-1519154736][loooong related discussions]] about the untrustworthiness of Package-Version, and that's leaving aside the fact the ecosystem [[https://github.com/melpa/melpa/issues/6656][doesn't really make use of the concept of versioned releases]], and when some tools pretend it does instead of taking the newest commit, they make it [[https://old.reddit.com/r/emacs/comments/1f8ok7c/do_you_set_packageinstallupgradebuiltin_to_t/llimwe0/][less stable for all]].
+For more reading, chec out some [[https://github.com/melpa/melpa/issues/2955#issuecomment-1519154736][loooong related discussions]] about the untrustworthiness of Package-Version, and that's leaving aside the fact the ecosystem [[https://github.com/melpa/melpa/issues/6656][doesn't really make use of the concept of versioned releases]], and when some tools pretend it does instead of taking the newest commit, they make it [[https://old.reddit.com/r/emacs/comments/1f8ok7c/do_you_set_packageinstallupgradebuiltin_to_t/llimwe0/][less stable for all]].
 
 Lesson learned -- when /you/ create a package, never commit a file containing a Package-Version line.  Doing so curses the repo for the rest of time, or until you use git-filter-repo to undo the damage.
 
@@ -101,7 +101,7 @@ Assuming your package manager knows about [[https://melpa.org/#/getting-started]
   :config (org-node-cache-mode))
 #+end_src
 
-If you are an org-roam user, you'll want the org-node-fakeroam module as well.  Please check its README to [[https://github.com/meedstrom/org-node-fakeroam][make org-node work with org-roam side-by-side]].
+If you are an org-roam user, you'll want the following module as well.  Please check its README to [[https://github.com/meedstrom/org-node-fakeroam][make org-node work with org-roam side-by-side]].
 
 #+begin_src elisp
 (use-package org-node-fakeroam
@@ -170,6 +170,21 @@ I /think/ the following should work. Totally untested, let me know!
 Bad news: this is currently directed towards people who used [[https://github.com/toshism/org-super-links][org-super-links]] from the beginning, or people who are just now starting to assign IDs, as there is not yet a command to add new BACKLINKS drawers in bulk to preexisting nodes. ([[https://github.com/toshism/org-super-links/issues/93][org-super-links#93]])
 
 * Misc
+** Managing org-id-locations
+
+I find unsatisfactory the config options in org-id (Why? See [[http://edstrom.dev/wjwrl/taking-ownership-of-org-id][Taking ownership of org-id]]), so org-node gives you an extra way to feed data to org-id, making sure we won't run into "ID not found" situations.
+
+Example setting:
+
+#+begin_src elisp
+(setq org-node-extra-id-dirs
+      '("~/org/"
+        "~/Syncthing/"
+        "/mnt/stuff/"))
+#+end_src
+
+Do a =M-x org-node-reset= and see if it can find your notes now.
+
 ** Org-capture
 
 You may have heard that org-roam has its own special set of capture templates: the =org-roam-capture-templates=.
@@ -226,23 +241,15 @@ Define more series in the variable =org-node-series-defs=.
 
 Already included is a definition that approximates the org-roam-dailies defaults, but I encourage you to override it to suit your tastes.  [[https://github.com/meedstrom/org-node/wiki/Configuring-series][Wiki]].
 
-You may be taken aback that defining a new series requires writing 5 lambdas, but once you get the hang of it, you can often reuse those lambdas.  Or just sit this feature out for now; some future version will bring convenient wrappers.
+You may be taken aback that defining a new series requires writing 5 lambdas, but once you get the hang of it, you can often reuse those lambdas.  A future version will bring convenient wrappers.
 
-** Managing org-id-locations
+** An analogue to =org-roam-node-display-template=?
 
-I find unsatisfactory the config options in org-id (Why? See [[http://edstrom.dev/wjwrl/taking-ownership-of-org-id][Taking ownership of org-id]]), so org-node gives you an extra way to feed data to org-id, making sure we won't run into "ID not found" situations.
+To customize how the nodes look in the minibuffer, configure =org-node-affixation-fn=:
 
-Example setting:
+    : M-x customize-variable RET org-node-affixation-fn RET
 
-#+begin_src elisp
-(setq org-node-extra-id-dirs
-      '("/home/kept/org/"
-        "~/Syncthing/project2/"
-        "/mnt/stuff/"))
-#+end_src
-
-** Analogue to org-roam-node-display-template
-Configure =org-node-affixation-fn=.  Read more at https://github.com/meedstrom/org-node/issues/47.
+You may also want to set =org-node-alter-candidates= to t.
 
 ** Completion-at-point
 To complete words at point into known node titles:

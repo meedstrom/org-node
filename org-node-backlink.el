@@ -102,32 +102,23 @@ as the user command \\[org-node-backlink-regret].
 Can be quit midway through and resumed later.  With
 \\[universal-argument], start over instead of resuming."
   (interactive)
-  (when (or (null org-node-backlink--files-to-fix) current-prefix-arg)
-    ;; Start over
-    (org-node-cache-ensure t t)
-    (setq org-node-backlink--fix-ctr 0)
-    (setq org-node-backlink--files-to-fix
-          (seq-uniq (hash-table-values org-id-locations))))
-  (when (or (not (= 0 org-node-backlink--fix-ctr)) ;; resume interrupted
-            (and (y-or-n-p
-                  (format "Edit the %d files found in `org-id-locations'?"
-                          (length org-node-backlink--files-to-fix)))
+  (when (or (equal current-prefix-arg '(4))
+            (and (null org-node-backlink--files-to-fix)
+                 (y-or-n-p (format "Edit %d Org files?"
+                                   (length (org-node-list-files t))))
                  (y-or-n-p
                   (string-fill "You understand that this may trigger your auto git-commit systems and similar because many files are about to be edited and saved?"
                                fill-column))))
-    (let ((file-name-handler-alist nil))
-      ;; Do 500 at a time, because Emacs cries about opening too many file
-      ;; buffers in one loop... even though we close each one as we go
-      (garbage-collect) ;; Reap open file handles
-      (dotimes (_ 500)
-        (when-let ((file (pop org-node-backlink--files-to-fix)))
-          (message "Adding/updating :BACKLINKS:... (you may quit and resume anytime) (%d) %s"
-                   (cl-incf org-node-backlink--fix-ctr) file)
-          (org-node--with-quick-file-buffer file
-            (org-node-backlink--fix-whole-buffer remove?)))))
-    (if org-node-backlink--files-to-fix
-        ;; Keep going
-        (run-with-timer 1 nil #'org-node-backlink-fix-all remove?))))
+    (setq org-node-backlink--files-to-fix (org-node-list-files t)))
+  (when org-node-backlink--files-to-fix
+    (setq org-node-backlink--files-to-fix
+          (org-node--in-files-do
+            :files org-node-backlink--files-to-fix
+            :msg "Adding/updating :BACKLINKS: (you can quit and resume)"
+            :why-recover "About to edit backlinks"
+            :call (if remove?
+                      (lambda () (org-node-backlink--fix-whole-buffer t))
+                    #'org-node-backlink--fix-whole-buffer)))))
 
 (defun org-node-backlink--fix-whole-buffer (&optional remove?)
   "Update :BACKLINKS: property for all nodes in buffer.

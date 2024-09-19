@@ -3,7 +3,7 @@ org-node.texi.
 
 INFO-DIR-SECTION Emacs
 START-INFO-DIR-ENTRY
-* Org-Node: (org-node). Link org-id entries into a network.
+* Org-node: (org-node). Link org-id entries into a network.
 END-INFO-DIR-ENTRY
 
 
@@ -47,10 +47,10 @@ Backlink solution 2: Print inside the file
 
 Misc
 
+* Managing org-id-locations::
 * Org-capture::
 * Node series::
-* Managing org-id-locations::
-* Analogue to org-roam-node-display-template::
+* An analogue to org-roam-node-display-template?::
 * Completion-at-point::
 * Let org-open-at-point detect refs::
 * Limitation TRAMP::
@@ -85,9 +85,9 @@ keyword, which defaults to installing the _oldest_ commit with a given
 Package-Version, not the _newest_ commit.
 
    Even if that's 5 years old.  Please chime in at the mailing list
-discussion (https://lists.gnu.org/r/emacs-devel/2024-09/msg00427.html)!
+discussion (https://lists.gnu.org/r/emacs-devel/2024-09/msg00366.html)!
 
-   See some loooong related discussions
+   For more reading, chec out some loooong related discussions
 (https://github.com/melpa/melpa/issues/2955#issuecomment-1519154736)
 about the untrustworthiness of Package-Version, and that's leaving aside
 the fact the ecosystem doesn't really make use of the concept of
@@ -257,8 +257,8 @@ Assuming your package manager knows about MELPA
        :after org
        :config (org-node-cache-mode))
 
-   If you are an org-roam user, you'll want the org-node-fakeroam module
-as well.  Please check its README to make org-node work with org-roam
+   If you are an org-roam user, you'll want the following module as
+well.  Please check its README to make org-node work with org-roam
 side-by-side (https://github.com/meedstrom/org-node-fakeroam).
 
      (use-package org-node-fakeroam
@@ -394,10 +394,10 @@ File: org-node.info,  Node: Misc,  Next: Appendix,  Prev: Backlinks,  Up: Top
 
 * Menu:
 
+* Managing org-id-locations::
 * Org-capture::
 * Node series::
-* Managing org-id-locations::
-* Analogue to org-roam-node-display-template::
+* An analogue to org-roam-node-display-template?::
 * Completion-at-point::
 * Let org-open-at-point detect refs::
 * Limitation TRAMP::
@@ -408,9 +408,30 @@ File: org-node.info,  Node: Misc,  Next: Appendix,  Prev: Backlinks,  Up: Top
 * Toolbox::
 
 
-File: org-node.info,  Node: Org-capture,  Next: Node series,  Up: Misc
+File: org-node.info,  Node: Managing org-id-locations,  Next: Org-capture,  Up: Misc
 
-5.1 Org-capture
+5.1 Managing org-id-locations
+=============================
+
+I find unsatisfactory the config options in org-id (Why?  See Taking
+ownership of org-id
+(http://edstrom.dev/wjwrl/taking-ownership-of-org-id)), so org-node
+gives you an extra way to feed data to org-id, making sure we won't run
+into "ID not found" situations.
+
+   Example setting:
+
+     (setq org-node-extra-id-dirs
+           '("~/org/"
+             "~/Syncthing/"
+             "/mnt/stuff/"))
+
+   Do a ‘M-x org-node-reset’ and see if it can find your notes now.
+
+
+File: org-node.info,  Node: Org-capture,  Next: Node series,  Prev: Managing org-id-locations,  Up: Misc
+
+5.2 Org-capture
 ===============
 
 You may have heard that org-roam has its own special set of capture
@@ -448,9 +469,9 @@ when they try to create new nodes:
      (setq org-node-creation-fn #'org-capture)
 
 
-File: org-node.info,  Node: Node series,  Next: Managing org-id-locations,  Prev: Org-capture,  Up: Misc
+File: org-node.info,  Node: Node series,  Next: An analogue to org-roam-node-display-template?,  Prev: Org-capture,  Up: Misc
 
-5.2 Node series
+5.3 Node series
 ===============
 
 Do you already know about "daily-notes"?  Then get started with a
@@ -468,7 +489,7 @@ keybinding such as:
 
 File: org-node.info,  Node: What are series?,  Up: Node series
 
-5.2.1 What are series?
+5.3.1 What are series?
 ----------------------
 
 It's easiest to explain series if we use "daily-notes" (or "dailies") as
@@ -495,39 +516,23 @@ your tastes.  Wiki
 
    You may be taken aback that defining a new series requires writing 5
 lambdas, but once you get the hang of it, you can often reuse those
-lambdas.  Or just sit this feature out for now; some future version will
-bring convenient wrappers.
+lambdas.  A future version will bring convenient wrappers.
 
 
-File: org-node.info,  Node: Managing org-id-locations,  Next: Analogue to org-roam-node-display-template,  Prev: Node series,  Up: Misc
+File: org-node.info,  Node: An analogue to org-roam-node-display-template?,  Next: Completion-at-point,  Prev: Node series,  Up: Misc
 
-5.3 Managing org-id-locations
-=============================
+5.4 An analogue to ‘org-roam-node-display-template’?
+====================================================
 
-I find unsatisfactory the config options in org-id (Why?  See Taking
-ownership of org-id
-(http://edstrom.dev/wjwrl/taking-ownership-of-org-id)), so org-node
-gives you an extra way to feed data to org-id, making sure we won't run
-into "ID not found" situations.
+To customize how the nodes look in the minibuffer, configure
+‘org-node-affixation-fn’:
 
-   Example setting:
+     M-x customize-variable RET org-node-affixation-fn RET
 
-     (setq org-node-extra-id-dirs
-           '("/home/kept/org/"
-             "~/Syncthing/project2/"
-             "/mnt/stuff/"))
+   You may also want to set ‘org-node-alter-candidates’ to t.
 
 
-File: org-node.info,  Node: Analogue to org-roam-node-display-template,  Next: Completion-at-point,  Prev: Managing org-id-locations,  Up: Misc
-
-5.4 Analogue to org-roam-node-display-template
-==============================================
-
-Configure ‘org-node-affixation-fn’.  Read more at
-<https://github.com/meedstrom/org-node/issues/47>.
-
-
-File: org-node.info,  Node: Completion-at-point,  Next: Let org-open-at-point detect refs,  Prev: Analogue to org-roam-node-display-template,  Up: Misc
+File: org-node.info,  Node: Completion-at-point,  Next: Let org-open-at-point detect refs,  Prev: An analogue to org-roam-node-display-template?,  Up: Misc
 
 5.5 Completion-at-point
 =======================
@@ -799,36 +804,36 @@ Ensure fresh data                           ‘(org-roam-db-sync)’            
 
 Tag Table:
 Node: Top201
-Node: News1263
-Node: Background2659
-Node: What's all this2829
-Node: What's a "node"?4214
-Node: Features6254
-Node: Setup9142
-Node: Install9281
-Node: Quick start10079
-Node: Backlinks10727
-Node: What are backlinks?10968
-Node: Backlink solution 1 Borrow org-roam's backlink buffer11388
-Node: Backlink solution 2 Print inside the file11950
-Node: Option 2A Let org-node manage a BACKLINKS property12614
-Node: Option 2B Let org-super-links manage a BACKLINKSEND drawer13529
-Node: Misc14391
-Node: Org-capture14810
-Node: Node series16220
-Node: What are series?16675
-Node: Managing org-id-locations17934
-Node: Analogue to org-roam-node-display-template18549
-Node: Completion-at-point18897
-Node: Let org-open-at-point detect refs19266
-Node: Limitation TRAMP19834
-Node: Limitation Encryption20282
-Node: Limitation Unique titles20532
-Node: Limitation Excluding notes21748
-Node: Limitation Org-ref23103
-Node: Toolbox24498
-Node: Appendix28879
-Node: Appendix I Rosetta stone29004
+Node: News1267
+Node: Background2686
+Node: What's all this2856
+Node: What's a "node"?4241
+Node: Features6281
+Node: Setup9169
+Node: Install9308
+Node: Quick start10098
+Node: Backlinks10746
+Node: What are backlinks?10987
+Node: Backlink solution 1 Borrow org-roam's backlink buffer11407
+Node: Backlink solution 2 Print inside the file11969
+Node: Option 2A Let org-node manage a BACKLINKS property12633
+Node: Option 2B Let org-super-links manage a BACKLINKSEND drawer13548
+Node: Misc14410
+Node: Managing org-id-locations14833
+Node: Org-capture15452
+Node: Node series16896
+Node: What are series?17372
+Node: An analogue to org-roam-node-display-template?18590
+Node: Completion-at-point19057
+Node: Let org-open-at-point detect refs19430
+Node: Limitation TRAMP19998
+Node: Limitation Encryption20446
+Node: Limitation Unique titles20696
+Node: Limitation Excluding notes21912
+Node: Limitation Org-ref23267
+Node: Toolbox24662
+Node: Appendix29043
+Node: Appendix I Rosetta stone29168
 
 End Tag Table
 

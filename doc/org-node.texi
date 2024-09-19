@@ -8,7 +8,7 @@
 
 @dircategory Emacs
 @direntry
-* Org-Node: (org-node). Link org-id entries into a network.
+* Org-node: (org-node). Link org-id entries into a network.
 @end direntry
 
 @finalout
@@ -57,10 +57,10 @@ Backlink solution 2: Print inside the file
 
 Misc
 
+* Managing org-id-locations::
 * Org-capture::
 * Node series::
-* Managing org-id-locations::
-* Analogue to org-roam-node-display-template::
+* An analogue to @samp{org-roam-node-display-template}?::
 * Completion-at-point::
 * Let org-open-at-point detect refs::
 * Limitation TRAMP::
@@ -88,9 +88,9 @@ On @emph{[2024-09-19 Thu]}, the git repo history was REWRITTEN@!  You may have h
 
 @strong{What was rewritten?}  I've erased the @samp{;; Package-Version:} comment line in file contents, because of Emacs 30's new @samp{(use-package :vc)} keyword, which defaults to installing the @emph{oldest} commit with a given Package-Version, not the @emph{newest} commit.
 
-Even if that's 5 years old.  Please chime in at the @uref{https://lists.gnu.org/r/emacs-devel/2024-09/msg00427.html, mailing list discussion}!
+Even if that's 5 years old.  Please chime in at the @uref{https://lists.gnu.org/r/emacs-devel/2024-09/msg00366.html, mailing list discussion}!
 
-See some @uref{https://github.com/melpa/melpa/issues/2955#issuecomment-1519154736, loooong related discussions} about the untrustworthiness of Package-Version, and that's leaving aside the fact the ecosystem @uref{https://github.com/melpa/melpa/issues/6656, doesn't really make use of the concept of versioned releases}, and when some tools pretend it does instead of taking the newest commit, they make it @uref{https://old.reddit.com/r/emacs/comments/1f8ok7c/do_you_set_packageinstallupgradebuiltin_to_t/llimwe0/, less stable for all}.
+For more reading, chec out some @uref{https://github.com/melpa/melpa/issues/2955#issuecomment-1519154736, loooong related discussions} about the untrustworthiness of Package-Version, and that's leaving aside the fact the ecosystem @uref{https://github.com/melpa/melpa/issues/6656, doesn't really make use of the concept of versioned releases}, and when some tools pretend it does instead of taking the newest commit, they make it @uref{https://old.reddit.com/r/emacs/comments/1f8ok7c/do_you_set_packageinstallupgradebuiltin_to_t/llimwe0/, less stable for all}.
 
 Lesson learned -- when @emph{you} create a package, never commit a file containing a Package-Version line.  Doing so curses the repo for the rest of time, or until you use git-filter-repo to undo the damage.
 
@@ -294,7 +294,7 @@ Assuming your package manager knows about @uref{https://melpa.org/#/getting-star
   :config (org-node-cache-mode))
 @end lisp
 
-If you are an org-roam user, you'll want the org-node-fakeroam module as well.  Please check its README to @uref{https://github.com/meedstrom/org-node-fakeroam, make org-node work with org-roam side-by-side}.
+If you are an org-roam user, you'll want the following module as well.  Please check its README to @uref{https://github.com/meedstrom/org-node-fakeroam, make org-node work with org-roam side-by-side}.
 
 @lisp
 (use-package org-node-fakeroam
@@ -396,10 +396,10 @@ Bad news: this is currently directed towards people who used @uref{https://githu
 @chapter Misc
 
 @menu
+* Managing org-id-locations::
 * Org-capture::
 * Node series::
-* Managing org-id-locations::
-* Analogue to org-roam-node-display-template::
+* An analogue to @samp{org-roam-node-display-template}?::
 * Completion-at-point::
 * Let org-open-at-point detect refs::
 * Limitation TRAMP::
@@ -409,6 +409,22 @@ Bad news: this is currently directed towards people who used @uref{https://githu
 * Limitation Org-ref::
 * Toolbox::
 @end menu
+
+@node Managing org-id-locations
+@section Managing org-id-locations
+
+I find unsatisfactory the config options in org-id (Why? See @uref{http://edstrom.dev/wjwrl/taking-ownership-of-org-id, Taking ownership of org-id}), so org-node gives you an extra way to feed data to org-id, making sure we won't run into "ID not found" situations.
+
+Example setting:
+
+@lisp
+(setq org-node-extra-id-dirs
+      '("~/org/"
+        "~/Syncthing/"
+        "/mnt/stuff/"))
+@end lisp
+
+Do a @samp{M-x org-node-reset} and see if it can find your notes now.
 
 @node Org-capture
 @section Org-capture
@@ -475,26 +491,19 @@ Define more series in the variable @samp{org-node-series-defs}.
 
 Already included is a definition that approximates the org-roam-dailies defaults, but I encourage you to override it to suit your tastes.  @uref{https://github.com/meedstrom/org-node/wiki/Configuring-series, Wiki}.
 
-You may be taken aback that defining a new series requires writing 5 lambdas, but once you get the hang of it, you can often reuse those lambdas.  Or just sit this feature out for now; some future version will bring convenient wrappers.
+You may be taken aback that defining a new series requires writing 5 lambdas, but once you get the hang of it, you can often reuse those lambdas.  A future version will bring convenient wrappers.
 
-@node Managing org-id-locations
-@section Managing org-id-locations
+@node An analogue to @samp{org-roam-node-display-template}?
+@section An analogue to @samp{org-roam-node-display-template}?
 
-I find unsatisfactory the config options in org-id (Why? See @uref{http://edstrom.dev/wjwrl/taking-ownership-of-org-id, Taking ownership of org-id}), so org-node gives you an extra way to feed data to org-id, making sure we won't run into "ID not found" situations.
+To customize how the nodes look in the minibuffer, configure @samp{org-node-affixation-fn}:
 
-Example setting:
+@example
+M-x customize-variable RET org-node-affixation-fn RET
+@end example
 
-@lisp
-(setq org-node-extra-id-dirs
-      '("/home/kept/org/"
-        "~/Syncthing/project2/"
-        "/mnt/stuff/"))
-@end lisp
 
-@node Analogue to org-roam-node-display-template
-@section Analogue to org-roam-node-display-template
-
-Configure @samp{org-node-affixation-fn}.  Read more at @uref{https://github.com/meedstrom/org-node/issues/47}.
+You may also want to set @samp{org-node-alter-candidates} to t.
 
 @node Completion-at-point
 @section Completion-at-point
