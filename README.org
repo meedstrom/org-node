@@ -243,6 +243,9 @@ Example setting:
         "/mnt/stuff/"))
 #+end_src
 
+** Analogue to org-roam-node-display-template
+Configure =org-node-affixation-fn=.  Read more at https://github.com/meedstrom/org-node/issues/47.
+
 ** Completion-at-point
 To complete words at point into known node titles:
 

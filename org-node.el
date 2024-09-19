@@ -316,9 +316,10 @@ titles: you\\='ll be able to have two headings with the same name so
 long as their prefix or suffix differ.
 
 After changing this setting, please run \\[org-node-reset]."
-  :type 'boolean)
+  :type 'boolean
+  :set #'org-node--set-and-remind-reset)
 
-(defcustom org-node-affixation-fn #'org-node-affix-with-olp
+(defcustom org-node-affixation-fn #'org-node-prefix-with-olp
   "Function to give prefix and suffix to completion candidates.
 
 The results will style the appearance of completions during
@@ -341,16 +342,28 @@ again for every alias, in which case TITLE is actually one of the
 aliases."
   :type '(radio
           (function-item org-node-affix-bare)
-          (function-item org-node-affix-with-olp)
-          function))
+          (function-item org-node-prefix-with-olp)
+          (function-item org-node-prefix-with-tags)
+          (function-item org-node-affix-with-olp-and-tags)
+          function)
+  :set #'org-node--set-and-remind-reset)
 
 (defun org-node-affix-bare (_node title)
   "Use TITLE as-is.
 For use as `org-node-affixation-fn'."
   (list title nil nil))
 
-(defun org-node-affix-with-olp (node title)
-  "Prepend TITLE with NODE's outline path.
+(defun org-node-prefix-with-tags (node title)
+  "Prepend NODE's tags to TITLE.
+For use as `org-node-affixation-fn'."
+  (list title
+        (when-let ((tags (org-node-get-tags node)))
+          (propertize (concat "(" (string-join tags ", ") ") ")
+                      'face 'org-tag))
+        nil))
+
+(defun org-node-prefix-with-olp (node title)
+  "Prepend NODE's outline path to TITLE.
 For use as `org-node-affixation-fn'."
   (list title
         (if (org-node-get-is-subtree node)
@@ -363,6 +376,31 @@ For use as `org-node-affixation-fn'."
               (apply #'concat (nreverse result)))
           nil)
         nil))
+
+(defun org-node-affix-with-olp-and-tags (node title)
+  "Prepend NODE's outline path to TITLE, and append NODE's tags.
+For use as `org-node-affixation-fn'."
+  (let ((prefix-len 0))
+    (list title
+          (when (org-node-get-is-subtree node)
+            (let ((ancestors (cons (org-node-get-file-title-or-basename node)
+                                   (org-node-get-olp node)))
+                  (result nil))
+              (dolist (anc ancestors)
+                (push (propertize anc 'face 'completions-annotations) result)
+                (push " > " result))
+              (setq result (apply #'concat (nreverse result)))
+              (setq prefix-len (length result))
+              result))
+          (when-let ((tags (org-node-get-tags node)))
+            (setq tags (propertize (concat "(" (string-join tags ", ") ") ")
+                                   'face 'org-tag))
+            (concat (make-string
+                     (max (- (default-value 'fill-column)
+                             (+ prefix-len (length title) (length tags)))
+                          2)
+                     32)
+                    tags)))))
 
 (defvar org-node--title<>affixation-triplet (make-hash-table :test #'equal)
   "1:1 table mapping titles or aliases to affixation triplets.")

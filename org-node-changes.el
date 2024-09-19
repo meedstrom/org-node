@@ -114,6 +114,9 @@ hardcoded strings."
 (defalias 'org-node-new-via-roam-capture #'org-node-fakeroam-new-via-roam-capture)
 (defalias 'org-node-slugify-like-roam-actual #'org-node-fakeroam-slugify-via-roam)
 
+(define-obsolete-function-alias
+  'org-node-affix-with-olp 'org-node-prefix-with-olp "2024-09-19")
+
 (define-obsolete-variable-alias
   'org-node--series 'org-node-built-series "2024-09-18")
 
