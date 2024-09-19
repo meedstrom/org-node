@@ -43,19 +43,12 @@ Setup
 
 * Install::
 * Quick start::
-* Use Org-roam at the same time?::
 
 Backlinks
 
 * What are backlinks?::
 * Backlink solution 1 Borrow org-roam's backlink buffer::
 * Backlink solution 2 Print inside the file::
-
-Backlink solution 1: Borrow org-roam's backlink buffer
-
-* Option 1A Let org-roam manage its own DB::
-* Option 1B Tell org-node to write to the org-roam DB::
-* Option 1C Cut out the DB altogether::
 
 Backlink solution 2: Print inside the file
 
@@ -67,9 +60,11 @@ Misc
 * Org-capture::
 * Node series::
 * Managing org-id-locations::
+* Analogue to org-roam-node-display-template::
 * Completion-at-point::
 * Let org-open-at-point detect refs::
 * Limitation TRAMP::
+* Limitation Encryption::
 * Limitation Unique titles::
 * Limitation Excluding notes::
 * Limitation Org-ref::
@@ -89,11 +84,11 @@ Appendix
 @node News
 @chapter News
 
-On @emph{[2024-09-02 Mon]}, the git repo history was REWRITTEN@!  You may have had to delete and reinstall the package.  (Depends on your package manager.)  Sorry about that.
+On @emph{[2024-09-19 Thu]}, the git repo history was REWRITTEN@!  You may have had to delete and reinstall the package.  (Depends on your package manager.)  Sorry about that.
 
 @strong{What was rewritten?}  I've erased the @samp{;; Package-Version:} comment line in file contents, because of Emacs 30's new @samp{(use-package :vc)} keyword, which defaults to installing the @emph{oldest} commit with a given Package-Version, not the @emph{newest} commit.
 
-Even if that's 5 years old.
+Even if that's 5 years old.  Please chime in at the @uref{https://lists.gnu.org/r/emacs-devel/2024-09/msg00427.html, mailing list discussion}!
 
 See some @uref{https://github.com/melpa/melpa/issues/2955#issuecomment-1519154736, loooong related discussions} about the untrustworthiness of Package-Version, and that's leaving aside the fact the ecosystem @uref{https://github.com/melpa/melpa/issues/6656, doesn't really make use of the concept of versioned releases}, and when some tools pretend it does instead of taking the newest commit, they make it @uref{https://old.reddit.com/r/emacs/comments/1f8ok7c/do_you_set_packageinstallupgradebuiltin_to_t/llimwe0/, less stable for all}.
 
@@ -286,7 +281,6 @@ A comparison of three similar systems, which permit relying on org-id and don't 
 @menu
 * Install::
 * Quick start::
-* Use Org-roam at the same time?::
 @end menu
 
 @node Install
@@ -298,6 +292,13 @@ Assuming your package manager knows about @uref{https://melpa.org/#/getting-star
 (use-package org-node
   :after org
   :config (org-node-cache-mode))
+@end lisp
+
+If you are an org-roam user, you'll want the org-node-fakeroam module as well.  Please check its README to @uref{https://github.com/meedstrom/org-node-fakeroam, make org-node work with org-roam side-by-side}.
+
+@lisp
+(use-package org-node-fakeroam
+  :defer)
 @end lisp
 
 It's a very recent addition to MELPA, so you may have to refresh the recipe list first:
@@ -320,16 +321,6 @@ On Straight (I think):
 M-x straight-fetch-all RET
 @end example
 
-
-If you are an org-roam user, you'll want the @uref{https://github.com/meedstrom/org-node-fakeroam, org-node-fakeroam} module as well.  It is not on MELPA yet, so use @uref{https://github.com/radian-software/straight.el, straight.el} or similar and add an init snippet like this:
-
-@lisp
-(use-package org-node-fakeroam
-  :straight (org-node-fakeroam
-             :type git :host github :repo "meedstrom/org-node-fakeroam")
-  :defer)
-@end lisp
-
 @node Quick start
 @section Quick start
 
@@ -345,11 +336,6 @@ Pick some short keys and try them out.
 To browse config options, type @samp{M-x customize-group RET org-node RET}.
 
 Final tip: there's @strong{no separate command} for creating a new node!  Reuse one of the commands above, then type the name of a node that doesn't exist.  Try it and see what happens!
-
-@node Use Org-roam at the same time?
-@section Use Org-roam at the same time?
-
-Check out the README at @uref{https://github.com/meedstrom/org-node-fakeroam}.
 
 @node Backlinks
 @chapter Backlinks
@@ -368,55 +354,9 @@ Backlinks are the butter on the bread of your notes.  If you've ever seen a "Wha
 @node Backlink solution 1 Borrow org-roam's backlink buffer
 @section Backlink solution 1: Borrow org-roam's backlink buffer
 
-As a Roam user, you can just keep using @samp{M-x org-roam-buffer-toggle}, but you get some new ways to keep its data fresh, circumventing Roam's autosync mode.
+As a Roam user, you can keep using @samp{M-x org-roam-buffer-toggle}.
 
-@menu
-* Option 1A Let org-roam manage its own DB::
-* Option 1B Tell org-node to write to the org-roam DB::
-* Option 1C Cut out the DB altogether::
-@end menu
-
-@node Option 1A Let org-roam manage its own DB
-@subsection Option 1A: Let org-roam manage its own DB
-
-If you didn't have laggy saves, this is fine.  In other words, keep variable @samp{org-roam-db-update-on-save} at t.
-
-@node Option 1B Tell org-node to write to the org-roam DB
-@subsection Option 1B: Tell org-node to write to the org-roam DB
-
-Add this init snippet:
-
-@lisp
-(setq org-roam-db-update-on-save nil)
-(org-node-fakeroam-db-feed-mode)
-@end lisp
-
-Unfortunately, it is still a bit slow when I save a file with 400 nodes.  It appears to be all down to EmacSQL -- if someone could help optimize how we call EmacSQL, that'd be much appreciated.  Until then, I recommend Option 1C@.
-
-Related: if you often have reason to full-reset the DB, there is a faster command than @samp{C-u M-x org-roam-db-sync}!  Try @samp{M-x org-node-fakeroam-db-rebuild}.  Benchmark on my device:
-
-@itemize
-@item
-@samp{C-u M-x org-roam-db-sync}: 179 seconds
-@item
-@samp{M-x org-node-fakeroam-db-rebuild}: 6 seconds
-@end itemize
-
-This is also a place where I request help, since 6 seconds seems a lot slower than it needs to be.  I envision running it on every save -- that's obviously not possible yet.
-
-@node Option 1C Cut out the DB altogether
-@subsection Option 1C: Cut out the DB altogether
-
-No more battling SQLite!  Type @samp{M-x org-node-fakeroam-jit-backlinks-mode}, then see what populates your Roam buffer henceforth.  Hopefully you see the same links as before.
-
-If you're happy with the result, you can disable @samp{org-roam-db-autosync-mode} entirely.  Its remaining functionality can be reproduced by @samp{M-x org-node-fakeroam-redisplay-mode}.  As an init snippet:
-
-@lisp
-(org-roam-db-autosync-mode 0)
-(org-node-fakeroam-jit-backlinks-mode) ;; no use roam db to build buffer
-(org-node-fakeroam-fast-render-mode) ;; build the buffer fast
-(org-node-fakeroam-redisplay-mode) ;; always show local backlinks
-@end lisp
+If saving files has been slow, @uref{https://github.com/meedstrom/org-node-fakeroam, org-node-fakeroam} gives you some new ways to keep Roam's DB data fresh, circumventing Roam's "autosync mode".
 
 @node Backlink solution 2 Print inside the file
 @section Backlink solution 2: Print inside the file
@@ -459,9 +399,11 @@ Bad news: this is currently directed towards people who used @uref{https://githu
 * Org-capture::
 * Node series::
 * Managing org-id-locations::
+* Analogue to org-roam-node-display-template::
 * Completion-at-point::
 * Let org-open-at-point detect refs::
 * Limitation TRAMP::
+* Limitation Encryption::
 * Limitation Unique titles::
 * Limitation Excluding notes::
 * Limitation Org-ref::
@@ -527,15 +469,13 @@ Roam's idea of a "daily-note" is the same as an @uref{https://github.com/bastibe
 
 You don't need software for that basic idea, only to make it extra convenient to navigate them and jump back and forth in the series.
 
-Thus, fundamentally, any "journal" or "dailies" software are just operating on a sorted series to navigate through.  I was resisting having to implement an equivalent to the Org-roam option @samp{org-roam-dailies-directory}, so I ended up generalizing the concept and it's really powerful!
-
-You could have series about, let's say, historical events, Star Trek episodes, your school curriculum@dots{}
+Thus, fundamentally, any "journal" or "dailies" software are just operating on a sorted series to navigate through.  You could have series about, let's say, historical events, Star Trek episodes, your school curriculum@dots{}
 
 Define more series in the variable @samp{org-node-series-defs}.
 
-Already included is a definition that approximates the org-roam-dailies defaults, but I encourage you to override it to suit your tastes.
+Already included is a definition that approximates the org-roam-dailies defaults, but I encourage you to override it to suit your tastes.  @uref{https://github.com/meedstrom/org-node/wiki/Configuring-series, Wiki}.
 
-You may be taken aback that defining a new series requires writing 5 lambdas, but once you get the hang of it, you can often reuse those lambdas.
+You may be taken aback that defining a new series requires writing 5 lambdas, but once you get the hang of it, you can often reuse those lambdas.  Or just sit this feature out for now; some future version will bring convenient wrappers.
 
 @node Managing org-id-locations
 @section Managing org-id-locations
@@ -550,6 +490,11 @@ Example setting:
         "~/Syncthing/project2/"
         "/mnt/stuff/"))
 @end lisp
+
+@node Analogue to org-roam-node-display-template
+@section Analogue to org-roam-node-display-template
+
+Configure @samp{org-node-affixation-fn}.  Read more at @uref{https://github.com/meedstrom/org-node/issues/47}.
 
 @node Completion-at-point
 @section Completion-at-point
@@ -576,9 +521,14 @@ Wouldn't it be nice if, clicking on that link, you automatically visit that node
 @node Limitation TRAMP
 @section Limitation: TRAMP
 
-Working over TRAMP is untested, but I suspect it won't work.  Org-node tries to be very fast, often nulling @samp{file-name-handler-alist}, which TRAMP needs.
+Working with files over TRAMP is unsupported for now.  Org-node tries to be very fast, often nulling @samp{file-name-handler-alist}, which TRAMP needs.
 
 The best way to change this is to @uref{https://github.com/meedstrom/org-node/issues, file an issue} to show you care :-)
+
+@node Limitation Encryption
+@section Limitation: Encryption
+
+Encrypted nodes probably won't be found.  Same as above, file an issue.
 
 @node Limitation Unique titles
 @section Limitation: Unique titles
@@ -729,6 +679,8 @@ Auto-rename the file based on the current @samp{#+title}
 @itemize
 @item
 Works as an after-save-hook!  Does nothing until you configure @samp{org-node-renames-allowed-dirs}.
+@item
+Please note that if your filenames have datestamp prefixes, it is important to get @samp{org-node-datestamp-format} right or it may clobber a pre-existing datestamp.
 @end itemize
 @end itemize
 @item

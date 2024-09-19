@@ -36,8 +36,8 @@
 ;; your files have names.
 
 ;; Anyway, that's just the core of it as described to someone not familiar with
-;; zettelkasten.  In fact, out of the simplicity arises something powerful,
-;; more to be experienced than explained.
+;; zettelkasten software.  In fact, out of the simplicity arises something
+;; powerful, more to be experienced than explained.
 
 ;; Compared to other systems:
 
@@ -45,9 +45,9 @@
 ;;   does not depend on SQLite, lets you opt out of file-level property
 ;;   drawers, does not support "roam:" links, and tries to rely in a bare-metal
 ;;   way on upstream org-id and org-capture.  As a drawback, if a heading in
-;;   some Git README has an ID, it's considered part of your collection --
-;;   simply because if it's known to org-id, it's known to org-node.  These
-;;   headings can be filtered after-the-fact.
+;;   some Git README or whatever has an ID, it's considered part of your
+;;   collection -- simply because if it's known to org-id, it's known to
+;;   org-node.  These headings can be filtered after-the-fact.
 
 ;; - denote: Org-node is Org only, no Markdown, no support for "denote:" links.
 ;;   Filenames have no meaning (so could match the Denote format if you like),
@@ -1160,9 +1160,12 @@ pass that to FINALIZER."
                   (erase-buffer)
                   (insert-file-contents results-file)
                   (let* ((result (read (buffer-string)))
-                         (time (car (last result)))
-                         result2)
-                    (nbutlast result)
+                         ;; (time (car (last result)))
+                         (result-tail (nthcdr (- (length result) 2) result))
+                         (time (prog1 (cadr result-tail)
+                                 (setcdr result-tail nil)))
+                         joined)
+                    ;; (nbutlast result)
                     (when (time-less-p
                            org-node--time-at-last-child-done time)
                       (setq org-node--time-at-last-child-done time))
@@ -1170,8 +1173,8 @@ pass that to FINALIZER."
                         (setq merged-result result)
                       (while result
                         (push (nconc (pop result) (pop merged-result))
-                              result2))
-                      (setq merged-result (nreverse result2)))))))
+                              joined))
+                      (setq merged-result (nreverse joined)))))))
           (when editorconfig
             (advice-add #'insert-file-contents :around
                         'editorconfig--advice-insert-file-contents))))
@@ -1254,21 +1257,22 @@ pass that to FINALIZER."
         (cl-loop with ids-of-nodes-scanned = (cl-loop
                                               for node in nodes
                                               collect (org-node-get-id node))
-                 with to-clean = nil
-                 for link-set being the hash-values of org-node--dest<>links
-                 using (hash-keys dest)
+                 with to-update = nil
+                 for dest being each hash-key of org-node--dest<>links
+                 using (hash-values link-set)
                  do (cl-loop
-                     with clean-this-dest = nil
+                     with update-this-dest = nil
                      for link in link-set
-                     if (member (org-node-link-origin link) ids-of-nodes-scanned)
-                     do (setq clean-this-dest t)
-                     else collect link into cleaned-link-set
+                     if (member (org-node-link-origin link)
+                                ids-of-nodes-scanned)
+                     do (setq update-this-dest t)
+                     else collect link into updated-link-set
                      finally do
-                     (when clean-this-dest
-                       (push (cons dest cleaned-link-set) to-clean)))
+                     (when update-this-dest
+                       (push (cons dest updated-link-set) to-update)))
                  finally do
-                 (dolist (pair to-clean)
-                   (puthash (car pair) (cdr pair) org-node--dest<>links)))
+                 (dolist (new to-update)
+                   (puthash (car new) (cdr new) org-node--dest<>links)))
         ;; Having erased the links that were known to originate in the
         ;; re-scanned nodes, it's safe to add them (again).
         (dolist (link links)
@@ -2462,8 +2466,12 @@ If argument NEXT is non-nil, actually visit the next entry."
                 (cl-loop for item in tail
                          while (string> (car item) here)
                          do (push (pop tail) head))
-                (while (equal here (caar tail))
-                  (pop tail))
+                (when (equal here (caar tail))
+                  (pop tail)
+                  ;; Opportunistically clean up duplicate keys
+                  (while (equal here (caar tail))
+                    (setcar tail (cadr tail))
+                    (setcdr tail (cddr tail))))
                 t)
               (when (y-or-n-p
                      (format "Not in series \"%s\".  Jump to latest item in that series?"
@@ -2528,13 +2536,12 @@ DEF is a series-definition from `org-node-series-defs'."
               nconc result into items
               else collect result into items
               finally return
-              ;; Using `string>' due to most recent dailies probably
-              ;; being most relevant, thus cycling thru recent
-              ;; dailies will have the best perf
+              ;; Sort `string>' due to most recent dailies probably being most
+              ;; relevant, thus cycling recent dailies will have the best perf
               (list :key (car def)
                     :sorted-items (delete-consecutive-dups
                                    (if (< emacs-major-version 30)
-                                       ;; `cl-sort' faster than compat's sort
+                                       ;; Faster than compat's sort
                                        (cl-sort items #'string> :key #'car)
                                      ;; `compat-call' prevents compile warnings
                                      (compat-call sort items
@@ -2934,22 +2941,22 @@ out, with any year, month or day.
 
 Memoize the value, so consecutive calls with the same FORMAT only
 need to compute once."
-  (unless (equal format (car org-node--make-regexp-for-time-format))
-    (setq org-node--make-regexp-for-time-format
-          (cons format
-                (let ((example (format-time-string format)))
-                  (if (string-match-p (rx (any "^*+([\\")) example)
-                      (error "org-node: Unable to safely rename with current `org-node-datestamp-format'.  This is not inherent in your choice of format, I am just not smart enough")
-                    (concat "^"
-                            (string-replace
-                             "." "\\."
-                             (replace-regexp-in-string
-                              "[[:digit:]]+" "[[:digit:]]+"
-                              (replace-regexp-in-string
-                               "[[:alpha:]]+" "[[:alpha:]]+"
-                               example t)))))))))
-  ;; Memoize consecutive calls with same input
-  (cdr org-node--make-regexp-for-time-format))
+  (if (equal format (car org-node--make-regexp-for-time-format))
+      ;; Reuse memoized value on consecutive calls with same input
+      (cdr org-node--make-regexp-for-time-format)
+    (cdr (setq org-node--make-regexp-for-time-format
+               (cons format
+                     (let ((example (format-time-string format)))
+                       (if (string-match-p (rx (any "^*+([\\")) example)
+                           (error "org-node: Unable to safely rename with current `org-node-datestamp-format'.  This is not inherent in your choice of format, I am just not smart enough")
+                         (concat "^"
+                                 (string-replace
+                                  "." "\\."
+                                  (replace-regexp-in-string
+                                   "[[:digit:]]+" "[[:digit:]]+"
+                                   (replace-regexp-in-string
+                                    "[[:alpha:]]+" "[[:alpha:]]+"
+                                    example t)))))))))))
 
 ;; This function can be removed if one day we drop support for file-level
 ;; nodes, because then just (org-entry-get nil "ID" t) will suffice.  That
@@ -4032,9 +4039,7 @@ buffer had already been visiting; instead, that buffer is reused."
               ;; Set a reasonable interval between `message' calls, since they
               ;; can be surprisingly expensive.
               (when (> (float-time (time-since start-time)) 0.3)
-                (setq interval (cond ((< ctr 4) ctr)
-                                     ((< ctr 8) 5)
-                                     (t (* 10 (round (/ ctr 10.0))))))))
+                (setq interval ctr)))
             (setq file (pop files))
             (setq was-open (find-buffer-visiting file))
             (setq buf (or was-open
@@ -4056,10 +4061,12 @@ buffer had already been visiting; instead, that buffer is reused."
                     (save-buffer)))
                 (kill-buffer))))
         (( quit )
-         (unless was-open (kill-buffer buf))
+         (unless (or was-open (buffer-modified-p buf))
+           (kill-buffer buf))
          (cons file files))
         (( error )
-         (unless was-open (kill-buffer buf))
+         (unless (or was-open (buffer-modified-p buf))
+           (kill-buffer buf))
          (signal (car err) (cdr err)))))))
 
 ;; Far as I can tell, `insert-file-contents' with VISIT argument is what sets

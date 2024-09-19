@@ -239,11 +239,11 @@ findings to another temp file."
     ;; The variable `$i' was set by the command line that launched this process
     (insert-file-contents (org-node-parser--tmpfile "file-list-%d.eld" $i)))
   (setq $files (read (buffer-string)))
-  (setq buffer-read-only t)
   (when $inlinetask-min-level
     (setq org-node-parser--heading-re
           (rx-to-string
            `(seq bol (repeat 1 ,(1- $inlinetask-min-level) "*") " "))))
+  (setq buffer-read-only t)
   (let ((case-fold-search t)
         result/missing-files
         result/found-nodes
@@ -370,11 +370,11 @@ findings to another temp file."
 
                 ;; NOTE: A plist would be more readable than a record, but then
                 ;; main Emacs has more work to do.  Profiled using:
-                ;; (benchmark-run 10 (setq org-node--done-ctr 6) (org-node--handle-finished-job 7 #'org-node--finalize-full))
+                ;;   (benchmark-run 10 (setq org-node--done-ctr 6) (org-node--handle-finished-job 7 #'org-node--finalize-full))
                 ;; Result when finalizer passes plists to `org-node--make-obj':
-                ;; (8.152532984 15 4.110698459000105)
+                ;;   (8.152532984 15 4.110698459000105)
                 ;; Result when finalizer accepts these premade records:
-                ;; (5.928453786 10 2.7291036080000595)
+                ;;   (5.928453786 10 2.7291036080000595)
                 (push (record 'org-node
                               (split-string-and-unquote
                                (or (cdr (assoc "ROAM_ALIASES" PROPS)) ""))
@@ -442,7 +442,7 @@ findings to another temp file."
                                (buffer-substring HERE (pos-eol)))))
                 ;; Gotta go forward 1 line, see if it is a planning-line, and
                 ;; if it is, then go forward 1 more line, and if that is a
-                ;; :PROPERTIES: line, then we're good
+                ;; :PROPERTIES: line, then we're safe to collect properties
                 (forward-line 1)
                 (setq HERE (point))
                 (setq FAR (pos-eol))

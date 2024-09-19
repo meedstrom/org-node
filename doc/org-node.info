@@ -33,19 +33,12 @@ Setup
 
 * Install::
 * Quick start::
-* Use Org-roam at the same time?::
 
 Backlinks
 
 * What are backlinks?::
 * Backlink solution 1 Borrow org-roam's backlink buffer::
 * Backlink solution 2 Print inside the file::
-
-Backlink solution 1: Borrow org-roam's backlink buffer
-
-* Option 1A Let org-roam manage its own DB::
-* Option 1B Tell org-node to write to the org-roam DB::
-* Option 1C Cut out the DB altogether::
 
 Backlink solution 2: Print inside the file
 
@@ -57,9 +50,11 @@ Misc
 * Org-capture::
 * Node series::
 * Managing org-id-locations::
+* Analogue to org-roam-node-display-template::
 * Completion-at-point::
 * Let org-open-at-point detect refs::
 * Limitation TRAMP::
+* Limitation Encryption::
 * Limitation Unique titles::
 * Limitation Excluding notes::
 * Limitation Org-ref::
@@ -80,7 +75,7 @@ File: org-node.info,  Node: News,  Next: Background,  Prev: Top,  Up: Top
 1 News
 ******
 
-On _[2024-09-02 Mon]_, the git repo history was REWRITTEN!  You may have
+On _[2024-09-19 Thu]_, the git repo history was REWRITTEN!  You may have
 had to delete and reinstall the package.  (Depends on your package
 manager.)  Sorry about that.
 
@@ -89,7 +84,8 @@ line in file contents, because of Emacs 30's new ‘(use-package :vc)’
 keyword, which defaults to installing the _oldest_ commit with a given
 Package-Version, not the _newest_ commit.
 
-   Even if that's 5 years old.
+   Even if that's 5 years old.  Please chime in at the mailing list
+discussion (https://lists.gnu.org/r/emacs-devel/2024-09/msg00427.html)!
 
    See some loooong related discussions
 (https://github.com/melpa/melpa/issues/2955#issuecomment-1519154736)
@@ -247,7 +243,6 @@ File: org-node.info,  Node: Setup,  Next: Backlinks,  Prev: Background,  Up: Top
 
 * Install::
 * Quick start::
-* Use Org-roam at the same time?::
 
 
 File: org-node.info,  Node: Install,  Next: Quick start,  Up: Setup
@@ -262,6 +257,13 @@ Assuming your package manager knows about MELPA
        :after org
        :config (org-node-cache-mode))
 
+   If you are an org-roam user, you'll want the org-node-fakeroam module
+as well.  Please check its README to make org-node work with org-roam
+side-by-side (https://github.com/meedstrom/org-node-fakeroam).
+
+     (use-package org-node-fakeroam
+       :defer)
+
    It's a very recent addition to MELPA, so you may have to refresh the
 recipe list first:
 
@@ -275,19 +277,8 @@ recipe list first:
 
      M-x straight-fetch-all RET
 
-   If you are an org-roam user, you'll want the org-node-fakeroam
-(https://github.com/meedstrom/org-node-fakeroam) module as well.  It is
-not on MELPA yet, so use straight.el
-(https://github.com/radian-software/straight.el) or similar and add an
-init snippet like this:
-
-     (use-package org-node-fakeroam
-       :straight (org-node-fakeroam
-                  :type git :host github :repo "meedstrom/org-node-fakeroam")
-       :defer)
-
 
-File: org-node.info,  Node: Quick start,  Next: Use Org-roam at the same time?,  Prev: Install,  Up: Setup
+File: org-node.info,  Node: Quick start,  Prev: Install,  Up: Setup
 
 3.2 Quick start
 ===============
@@ -306,15 +297,6 @@ RET’.
    Final tip: there's *no separate command* for creating a new node!
 Reuse one of the commands above, then type the name of a node that
 doesn't exist.  Try it and see what happens!
-
-
-File: org-node.info,  Node: Use Org-roam at the same time?,  Prev: Quick start,  Up: Setup
-
-3.3 Use Org-roam at the same time?
-==================================
-
-Check out the README at
-<https://github.com/meedstrom/org-node-fakeroam>.
 
 
 File: org-node.info,  Node: Backlinks,  Next: Misc,  Prev: Setup,  Up: Top
@@ -345,71 +327,11 @@ File: org-node.info,  Node: Backlink solution 1 Borrow org-roam's backlink buffe
 4.2 Backlink solution 1: Borrow org-roam's backlink buffer
 ==========================================================
 
-As a Roam user, you can just keep using ‘M-x org-roam-buffer-toggle’,
-but you get some new ways to keep its data fresh, circumventing Roam's
-autosync mode.
+As a Roam user, you can keep using ‘M-x org-roam-buffer-toggle’.
 
-* Menu:
-
-* Option 1A Let org-roam manage its own DB::
-* Option 1B Tell org-node to write to the org-roam DB::
-* Option 1C Cut out the DB altogether::
-
-
-File: org-node.info,  Node: Option 1A Let org-roam manage its own DB,  Next: Option 1B Tell org-node to write to the org-roam DB,  Up: Backlink solution 1 Borrow org-roam's backlink buffer
-
-4.2.1 Option 1A: Let org-roam manage its own DB
------------------------------------------------
-
-If you didn't have laggy saves, this is fine.  In other words, keep
-variable ‘org-roam-db-update-on-save’ at t.
-
-
-File: org-node.info,  Node: Option 1B Tell org-node to write to the org-roam DB,  Next: Option 1C Cut out the DB altogether,  Prev: Option 1A Let org-roam manage its own DB,  Up: Backlink solution 1 Borrow org-roam's backlink buffer
-
-4.2.2 Option 1B: Tell org-node to write to the org-roam DB
-----------------------------------------------------------
-
-Add this init snippet:
-
-     (setq org-roam-db-update-on-save nil)
-     (org-node-fakeroam-db-feed-mode)
-
-   Unfortunately, it is still a bit slow when I save a file with 400
-nodes.  It appears to be all down to EmacSQL - if someone could help
-optimize how we call EmacSQL, that'd be much appreciated.  Until then, I
-recommend Option 1C.
-
-   Related: if you often have reason to full-reset the DB, there is a
-faster command than ‘C-u M-x org-roam-db-sync’!  Try ‘M-x
-org-node-fakeroam-db-rebuild’.  Benchmark on my device:
-
-   • ‘C-u M-x org-roam-db-sync’: 179 seconds
-   • ‘M-x org-node-fakeroam-db-rebuild’: 6 seconds
-
-   This is also a place where I request help, since 6 seconds seems a
-lot slower than it needs to be.  I envision running it on every save -
-that's obviously not possible yet.
-
-
-File: org-node.info,  Node: Option 1C Cut out the DB altogether,  Prev: Option 1B Tell org-node to write to the org-roam DB,  Up: Backlink solution 1 Borrow org-roam's backlink buffer
-
-4.2.3 Option 1C: Cut out the DB altogether
-------------------------------------------
-
-No more battling SQLite!  Type ‘M-x
-org-node-fakeroam-jit-backlinks-mode’, then see what populates your Roam
-buffer henceforth.  Hopefully you see the same links as before.
-
-   If you're happy with the result, you can disable
-‘org-roam-db-autosync-mode’ entirely.  Its remaining functionality can
-be reproduced by ‘M-x org-node-fakeroam-redisplay-mode’.  As an init
-snippet:
-
-     (org-roam-db-autosync-mode 0)
-     (org-node-fakeroam-jit-backlinks-mode) ;; no use roam db to build buffer
-     (org-node-fakeroam-fast-render-mode) ;; build the buffer fast
-     (org-node-fakeroam-redisplay-mode) ;; always show local backlinks
+   If saving files has been slow, org-node-fakeroam
+(https://github.com/meedstrom/org-node-fakeroam) gives you some new ways
+to keep Roam's DB data fresh, circumventing Roam's "autosync mode".
 
 
 File: org-node.info,  Node: Backlink solution 2 Print inside the file,  Prev: Backlink solution 1 Borrow org-roam's backlink buffer,  Up: Backlinks
@@ -475,9 +397,11 @@ File: org-node.info,  Node: Misc,  Next: Appendix,  Prev: Backlinks,  Up: Top
 * Org-capture::
 * Node series::
 * Managing org-id-locations::
+* Analogue to org-roam-node-display-template::
 * Completion-at-point::
 * Let org-open-at-point detect refs::
 * Limitation TRAMP::
+* Limitation Encryption::
 * Limitation Unique titles::
 * Limitation Excluding notes::
 * Limitation Org-ref::
@@ -558,26 +482,24 @@ title is just today's date.
 convenient to navigate them and jump back and forth in the series.
 
    Thus, fundamentally, any "journal" or "dailies" software are just
-operating on a sorted series to navigate through.  I was resisting
-having to implement an equivalent to the Org-roam option
-‘org-roam-dailies-directory’, so I ended up generalizing the concept and
-it's really powerful!
-
-   You could have series about, let's say, historical events, Star Trek
-episodes, your school curriculum...
+operating on a sorted series to navigate through.  You could have series
+about, let's say, historical events, Star Trek episodes, your school
+curriculum...
 
    Define more series in the variable ‘org-node-series-defs’.
 
    Already included is a definition that approximates the
 org-roam-dailies defaults, but I encourage you to override it to suit
-your tastes.
+your tastes.  Wiki
+(https://github.com/meedstrom/org-node/wiki/Configuring-series).
 
    You may be taken aback that defining a new series requires writing 5
 lambdas, but once you get the hang of it, you can often reuse those
-lambdas.
+lambdas.  Or just sit this feature out for now; some future version will
+bring convenient wrappers.
 
 
-File: org-node.info,  Node: Managing org-id-locations,  Next: Completion-at-point,  Prev: Node series,  Up: Misc
+File: org-node.info,  Node: Managing org-id-locations,  Next: Analogue to org-roam-node-display-template,  Prev: Node series,  Up: Misc
 
 5.3 Managing org-id-locations
 =============================
@@ -596,9 +518,18 @@ into "ID not found" situations.
              "/mnt/stuff/"))
 
 
-File: org-node.info,  Node: Completion-at-point,  Next: Let org-open-at-point detect refs,  Prev: Managing org-id-locations,  Up: Misc
+File: org-node.info,  Node: Analogue to org-roam-node-display-template,  Next: Completion-at-point,  Prev: Managing org-id-locations,  Up: Misc
 
-5.4 Completion-at-point
+5.4 Analogue to org-roam-node-display-template
+==============================================
+
+Configure ‘org-node-affixation-fn’.  Read more at
+<https://github.com/meedstrom/org-node/issues/47>.
+
+
+File: org-node.info,  Node: Completion-at-point,  Next: Let org-open-at-point detect refs,  Prev: Analogue to org-roam-node-display-template,  Up: Misc
+
+5.5 Completion-at-point
 =======================
 
 To complete words at point into known node titles:
@@ -609,7 +540,7 @@ To complete words at point into known node titles:
 
 File: org-node.info,  Node: Let org-open-at-point detect refs,  Next: Limitation TRAMP,  Prev: Completion-at-point,  Up: Misc
 
-5.5 Let org-open-at-point detect refs
+5.6 Let org-open-at-point detect refs
 =====================================
 
 Say there's a link to a web URL, and you've forgotten you also have a
@@ -622,22 +553,30 @@ visit that node first instead of being sent to the web?  Here you go:
                #'org-node-try-visit-ref-node)
 
 
-File: org-node.info,  Node: Limitation TRAMP,  Next: Limitation Unique titles,  Prev: Let org-open-at-point detect refs,  Up: Misc
+File: org-node.info,  Node: Limitation TRAMP,  Next: Limitation Encryption,  Prev: Let org-open-at-point detect refs,  Up: Misc
 
-5.6 Limitation: TRAMP
+5.7 Limitation: TRAMP
 =====================
 
-Working over TRAMP is untested, but I suspect it won't work.  Org-node
-tries to be very fast, often nulling ‘file-name-handler-alist’, which
-TRAMP needs.
+Working with files over TRAMP is unsupported for now.  Org-node tries to
+be very fast, often nulling ‘file-name-handler-alist’, which TRAMP
+needs.
 
    The best way to change this is to file an issue
 (https://github.com/meedstrom/org-node/issues) to show you care :-)
 
 
-File: org-node.info,  Node: Limitation Unique titles,  Next: Limitation Excluding notes,  Prev: Limitation TRAMP,  Up: Misc
+File: org-node.info,  Node: Limitation Encryption,  Next: Limitation Unique titles,  Prev: Limitation TRAMP,  Up: Misc
 
-5.7 Limitation: Unique titles
+5.8 Limitation: Encryption
+==========================
+
+Encrypted nodes probably won't be found.  Same as above, file an issue.
+
+
+File: org-node.info,  Node: Limitation Unique titles,  Next: Limitation Excluding notes,  Prev: Limitation Encryption,  Up: Misc
+
+5.9 Limitation: Unique titles
 =============================
 
 If two ID-nodes exist with the same title, one of them disappears from
@@ -667,8 +606,8 @@ this isn't something you'll ever have to notice.
 
 File: org-node.info,  Node: Limitation Excluding notes,  Next: Limitation Org-ref,  Prev: Limitation Unique titles,  Up: Misc
 
-5.8 Limitation: Excluding notes
-===============================
+5.10 Limitation: Excluding notes
+================================
 
 The option ‘org-node-filter-fn’ works well for excluding TODO items that
 happen to have an ID, and excluding org-drill items and that sort of
@@ -695,8 +634,8 @@ contain "archive" in the name - see the last line here:
 
 File: org-node.info,  Node: Limitation Org-ref,  Next: Toolbox,  Prev: Limitation Excluding notes,  Up: Misc
 
-5.9 Limitation: Org-ref
-=======================
+5.11 Limitation: Org-ref
+========================
 
 Org-node supports the Org 9.5 @citations, but not fully the aftermarket
 org-ref (https://github.com/jkitchin/org-ref) &citations that emulate
@@ -722,7 +661,7 @@ plain ‘citep:...’ since it is not wrapped in brackets.
 
 File: org-node.info,  Node: Toolbox,  Prev: Limitation Org-ref,  Up: Misc
 
-5.10 Toolbox
+5.12 Toolbox
 ============
 
 Basic commands:
@@ -785,6 +724,10 @@ Basic commands:
         • Auto-rename the file based on the current ‘#+title’
              • Works as an after-save-hook!  Does nothing until you
                configure ‘org-node-renames-allowed-dirs’.
+             • Please note that if your filenames have datestamp
+               prefixes, it is important to get
+               ‘org-node-datestamp-format’ right or it may clobber a
+               pre-existing datestamp.
    • ‘org-node-backlink-fix-all’
         • Update ‘BACKLINKS’ property in all nodes
    • ‘org-node-list-feedback-arcs’
@@ -856,38 +799,36 @@ Ensure fresh data                           ‘(org-roam-db-sync)’            
 
 Tag Table:
 Node: Top201
-Node: News1423
-Node: Background2710
-Node: What's all this2880
-Node: What's a "node"?4265
-Node: Features6305
-Node: Setup9193
-Node: Install9367
-Node: Quick start10343
-Node: Use Org-roam at the same time?11030
-Node: Backlinks11270
-Node: What are backlinks?11511
-Node: Backlink solution 1 Borrow org-roam's backlink buffer11931
-Node: Option 1A Let org-roam manage its own DB12541
-Node: Option 1B Tell org-node to write to the org-roam DB12947
-Node: Option 1C Cut out the DB altogether14120
-Node: Backlink solution 2 Print inside the file15034
-Node: Option 2A Let org-node manage a BACKLINKS property15698
-Node: Option 2B Let org-super-links manage a BACKLINKSEND drawer16613
-Node: Misc17475
-Node: Org-capture17821
-Node: Node series19231
-Node: What are series?19686
-Node: Managing org-id-locations20959
-Node: Completion-at-point21551
-Node: Let org-open-at-point detect refs21903
-Node: Limitation TRAMP22471
-Node: Limitation Unique titles22929
-Node: Limitation Excluding notes24140
-Node: Limitation Org-ref25493
-Node: Toolbox26886
-Node: Appendix31040
-Node: Appendix I Rosetta stone31165
+Node: News1263
+Node: Background2659
+Node: What's all this2829
+Node: What's a "node"?4214
+Node: Features6254
+Node: Setup9142
+Node: Install9281
+Node: Quick start10079
+Node: Backlinks10727
+Node: What are backlinks?10968
+Node: Backlink solution 1 Borrow org-roam's backlink buffer11388
+Node: Backlink solution 2 Print inside the file11950
+Node: Option 2A Let org-node manage a BACKLINKS property12614
+Node: Option 2B Let org-super-links manage a BACKLINKSEND drawer13529
+Node: Misc14391
+Node: Org-capture14810
+Node: Node series16220
+Node: What are series?16675
+Node: Managing org-id-locations17934
+Node: Analogue to org-roam-node-display-template18549
+Node: Completion-at-point18897
+Node: Let org-open-at-point detect refs19266
+Node: Limitation TRAMP19834
+Node: Limitation Encryption20282
+Node: Limitation Unique titles20532
+Node: Limitation Excluding notes21748
+Node: Limitation Org-ref23103
+Node: Toolbox24498
+Node: Appendix28879
+Node: Appendix I Rosetta stone29004
 
 End Tag Table
 

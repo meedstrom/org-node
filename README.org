@@ -5,12 +5,12 @@
 #+LANGUAGE: en
 #+STARTUP: content
 #+TEXINFO_DIR_CATEGORY: Emacs
-#+TEXINFO_DIR_TITLE: Org-Node: (org-node).
+#+TEXINFO_DIR_TITLE: Org-node: (org-node).
 #+TEXINFO_DIR_DESC: Link org-id entries into a network.
 #+EXPORT_FILE_NAME: doc/org-node.info
 #+HTML: <a href="https://melpa.org/#/org-node"><img alt="MELPA" src="https://melpa.org/packages/org-node-badge.svg"/></a>
 * News
-On [2024-09-02], the git repo history was REWRITTEN!  You may have had to delete and reinstall the package.  (Depends on your package manager.)  Sorry about that.
+On [2024-09-19], the git repo history was REWRITTEN!  You may have had to delete and reinstall the package.  (Depends on your package manager.)  Sorry about that.
 
 *What was rewritten?*  I've erased the =;; Package-Version:= comment line in file contents, because of Emacs 30's new =(use-package :vc)= keyword, which defaults to installing the /oldest/ commit with a given Package-Version, not the /newest/ commit.
 
@@ -220,15 +220,13 @@ Roam's idea of a "daily-note" is the same as an [[https://github.com/bastibe/org
 
 You don't need software for that basic idea, only to make it extra convenient to navigate them and jump back and forth in the series.
 
-Thus, fundamentally, any "journal" or "dailies" software are just operating on a sorted series to navigate through.  I was resisting having to implement an equivalent to the Org-roam option =org-roam-dailies-directory=, so I ended up generalizing the concept and it's really powerful!
-
-You could have series about, let's say, historical events, Star Trek episodes, your school curriculum...
+Thus, fundamentally, any "journal" or "dailies" software are just operating on a sorted series to navigate through.  You could have series about, let's say, historical events, Star Trek episodes, your school curriculum...
 
 Define more series in the variable =org-node-series-defs=.
 
-Already included is a definition that approximates the org-roam-dailies defaults, but I encourage you to override it to suit your tastes.
+Already included is a definition that approximates the org-roam-dailies defaults, but I encourage you to override it to suit your tastes.  [[https://github.com/meedstrom/org-node/wiki/Configuring-series][Wiki]].
 
-You may be taken aback that defining a new series requires writing 5 lambdas, but once you get the hang of it, you can often reuse those lambdas.
+You may be taken aback that defining a new series requires writing 5 lambdas, but once you get the hang of it, you can often reuse those lambdas.  Or just sit this feature out for now; some future version will bring convenient wrappers.
 
 ** Managing org-id-locations
 

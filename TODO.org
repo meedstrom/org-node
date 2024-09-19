@@ -5,6 +5,8 @@
 - [ ] Refile
 
 * Other
+- [ ] In Oct: drop =persist= dependency
+
 - [ ] Spin out a library for async processing (=org-node--scan= and friends)
 
 - [ ] org-node-series-dispatch: Free up keys "j" "n" "p", "c"
@@ -33,5 +35,6 @@
   - =;;;###autoload (autoload 'org-node-series-dispatch "org-node" nil t)=
     - In Emacs 30, replace with just =;;;###autoload=
   - any usages of =compat-call=
+  - cl-sort
   - =;; Package-Requires: ((transient) (seq))=
   - what the compiler tells you is obsolete
