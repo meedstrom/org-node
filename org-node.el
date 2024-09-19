@@ -617,27 +617,26 @@ When called from Lisp, peek on any hash table HT."
 
 (defun org-node--handle-rename (file newname &rest _)
   "Arrange to scan NEWNAME for nodes and links, and forget FILE."
-  (when (equal (file-name-extension file) "org")
-    (org-node--scan-targeted
-     (thread-last (list file newname)
-                  (seq-remove #'backup-file-name-p)
-                  (seq-remove #'tramp-tramp-file-p)))))
+  (org-node--scan-targeted
+   (thread-last (list file newname)
+                (seq-filter (lambda (file) (string-suffix-p ".org" file)))
+                (seq-remove #'backup-file-name-p)
+                (seq-remove #'tramp-tramp-file-p)
+                (mapcar #'file-truename))))
 
 (defun org-node--handle-delete (file &rest _)
   "Arrange to forget nodes and links in FILE."
-  (when (and (equal (file-name-extension file) "org"))
+  (when (string-suffix-p ".org" file)
     (unless (tramp-tramp-file-p file)
       (org-node--scan-targeted file))))
 
 (defun org-node--handle-save ()
   "Arrange to re-scan nodes and links in current buffer."
-  (when (and (equal (file-name-extension buffer-file-name) "org")
-             (not (backup-file-name-p buffer-file-name))
-             (not (tramp-tramp-file-p buffer-file-name)))
-    (org-node--scan-targeted buffer-file-name)))
+  (when (and (string-suffix-p ".org" buffer-file-truename)
+             (not (backup-file-name-p buffer-file-truename))
+             (not (tramp-tramp-file-p buffer-file-truename)))
+    (org-node--scan-targeted buffer-file-truename)))
 
-;; FIXME: Sure, it detects them, but won't run `org-node-rescan-functions' on
-;;        them
 (defvar org-node--idle-timer (timer-create)
   "Timer for intermittently checking `org-node-extra-id-dirs'.
 for new, changed or deleted files.
