@@ -3327,46 +3327,36 @@ lisp_data <- str_c(\"(\\\"\", as_ids(fas1), \"\\\")\") |>
 
 write_file(lisp_data, file.path(dirname(tsv), \"feedback-arcs.eld\"))")
         (script-file (org-node-parser--tmpfile "analyze_feedback_arcs.R"))
-        (digraph-tsv (org-node-parser--tmpfile "id_node_digraph.tsv")))
-    (write-region r-code nil script-file)
-    (write-region (org-node--make-digraph-tsv-string) nil digraph-tsv)
-    (with-current-buffer (get-buffer-create "*feedback arcs*")
-      (fundamental-mode)
-      (setq-local buffer-read-only nil)
-      (erase-buffer)
-      (unless (= 0 (call-process "Rscript" nil t nil script-file digraph-tsv))
-        (error "%s" (buffer-string)))
-      (erase-buffer)
-      (insert-file-contents (org-node-parser--tmpfile "feedback-arcs.eld"))
-      (setq feedbacks (read (buffer-string)))
+        (input-tsv (org-node-parser--tmpfile "id_node_digraph.tsv")))
+    (write-region r-code () script-file () 'quiet)
+    (write-region (org-node--make-digraph-tsv-string) () input-tsv () 'quiet)
+    (with-temp-buffer
+      (unless (= 0 (call-process "Rscript" () t () script-file input-tsv))
+        (error "%s" (buffer-string))))
+    (let ((feedbacks (with-temp-buffer
+                       (insert-file-contents
+                        (org-node-parser--tmpfile "feedback-arcs.eld"))
+                       (read (buffer-string)))))
       (when (listp feedbacks)
-        (erase-buffer)
-        (tabulated-list-mode)
-        (add-hook 'tabulated-list-revert-hook #'org-node-list-feedback-arcs
-                  nil t)
-        (setq tabulated-list-format
-              [("Node containing link" 39 t)
-               ("Target of link" 0 t)])
-        (tabulated-list-init-header)
-        (setq tabulated-list-entries
-              (cl-loop
-               for (origin . dest) in feedbacks
-               as origin-node = (gethash origin org-node--id<>node)
-               as dest-node = (gethash dest org-node--id<>node)
-               collect
-               (list (cons origin dest)
-                     (vector (list (org-node-get-title origin-node)
-                                   'face 'link
-                                   'action `(lambda (_button)
-                                              (org-node--goto ,origin-node))
-                                   'follow-link t)
-                             (list (org-node-get-title dest-node)
-                                   'face 'link
-                                   'action `(lambda (_button)
-                                              (org-node--goto ,dest-node))
-                                   'follow-link t)))))
-        (tabulated-list-print))
-      (display-buffer (current-buffer)))))
+        (org-node--pop-to-tabulated-list
+         :buffer "*org-node feedback arcs*"
+         :format [("Node containing link" 39 t) ("Target of link" 0 t)]
+         :entries (cl-loop
+                   for (origin . dest) in feedbacks
+                   as origin-node = (gethash origin org-node--id<>node)
+                   as dest-node = (gethash dest org-node--id<>node)
+                   collect
+                   (list (cons origin dest)
+                         (vector (list (org-node-get-title origin-node)
+                                       'face 'link
+                                       'action `(lambda (_button)
+                                                  (org-node--goto ,origin-node))
+                                       'follow-link t)
+                                 (list (org-node-get-title dest-node)
+                                       'face 'link
+                                       'action `(lambda (_button)
+                                                  (org-node--goto ,dest-node))
+                                       'follow-link t)))))))))
 
 ;; TODO: Temp merge all refs into corresponding ID
 (defun org-node--make-digraph-tsv-string ()
@@ -3385,58 +3375,7 @@ from ID links found in `org-node--dest<>links'."
                        collect (concat dest "\t" (org-node-link-origin link)))))
     "\n")))
 
-(defvar org-node--found-systems nil)
-(defvar org-node--list-file-coding-systems-files nil)
-(defun org-node-list-file-coding-systems ()
-  "Check coding systems of files found by `org-node-list-files'.
-This is done by temporarily visiting each file and checking what
-Emacs decides to decode it as.  To start over, run the command
-with \\[universal-argument] prefix."
-  (interactive)
-  (when (equal current-prefix-arg '(4))
-    (setq current-prefix-arg nil)
-    (setq org-node--list-file-coding-systems-files (org-node-list-files t))
-    (setq org-node--found-systems nil))
-  (let ((ok nil)
-        (ctr 0)
-        file)
-    (condition-case err
-        (while (and (< (cl-incf ctr) 500)
-                    (not (null org-node--list-file-coding-systems-files)))
-          (when (= 0 (% ctr 10))
-            (message  "Checking... %d to go (quit and resume anytime)"
-                      (length org-node--list-file-coding-systems-files)))
-          (setq file (pop org-node--list-file-coding-systems-files))
-          (org-node--with-quick-fundamental-buffer file
-            (push (cons file buffer-file-coding-system)
-                  org-node--found-systems)))
-      ((quit)
-       (setq ok t))
-      (:success
-       ;; Reap open file handles & continue if more to do
-       (garbage-collect)
-       (if org-node--list-file-coding-systems-files
-           (run-with-timer .1 nil #'org-node-list-file-coding-systems)
-         (setq ok t)))
-      (t
-       (signal (car err) (cdr err))))
-    (when ok
-      (org-node--pop-to-tabulated-list
-       :buffer "*org file coding systems*"
-       :format [("Coding system" 20 t) ("File" 40 t)]
-       :entries (cl-loop for (file . sys) in org-node--found-systems
-                         collect (list file (vector (symbol-name sys) file)))
-       :reverter #'org-node-list-file-coding-systems))))
-
-(defun org-node-list-file-coding-systems-revert ()
-  "Re-print entries for `org-node-list-file-coding-systems'."
-  (setq tabulated-list-entries
-        (cl-loop for (file . sys) in org-node--found-systems
-                 collect (list file (vector (symbol-name sys) file))))
-  (tabulated-list-print))
-
-(cl-defun org-node--pop-to-tabulated-list
-    (&key buffer format entries reverter)
+(cl-defun org-node--pop-to-tabulated-list (&key buffer format entries reverter)
   "Boilerplate abstraction.
 BUFFER-OR-NAME identifies the buffer.  FORMAT is the value to
 which `tabulated-list-format' should be set.  ENTRIES is the
@@ -3496,40 +3435,36 @@ with \\[universal-argument] prefix."
                                   when (equal "id" (org-node-link-type link))
                                   collect (cons dest link)))))
     (message "%d dead links found" (length dead-links))
-    (pop-to-buffer (get-buffer-create "*Dead Links*"))
-    (tabulated-list-mode)
-    (add-hook 'tabulated-list-revert-hook #'org-node-list-dead-links nil t)
-    (setq tabulated-list-format
-          [("Location" 40 t)
-           ("Unknown ID reference" 40 t)])
-    (tabulated-list-init-header)
-    (setq tabulated-list-entries
-          (cl-loop
-           for (dest . link) in dead-links
-           as origin-node = (gethash (org-node-link-origin link)
-                                     org-node--id<>node)
-           if (not (equal dest (org-node-link-dest link)))
-           do (error "IDs not equal: %s, %s" dest (org-node-link-dest link))
-           else if (not origin-node)
-           do (error "Node not found for ID: %s" (org-node-link-origin link))
-           else
-           collect (list link
-                         (vector
-                          (list (org-node-get-title origin-node)
-                                'face 'link
-                                'action `(lambda (_button)
-                                           (org-node--goto ,origin-node)
-                                           (goto-char ,(org-node-link-pos link)))
-                                'follow-link t)
-                          dest))))
-    (tabulated-list-print)))
+    (org-node--pop-to-tabulated-list
+     :buffer "*dead links*"
+     :format [("Location" 40 t) ("Unknown ID reference" 40 t)]
+     :reverter #'org-node-list-dead-links
+     :entries
+     (cl-loop
+      for (dest . link) in dead-links
+      as origin-node = (gethash (org-node-link-origin link)
+                                org-node--id<>node)
+      if (not (equal dest (org-node-link-dest link)))
+      do (error "IDs not equal: %s, %s" dest (org-node-link-dest link))
+      else if (not origin-node)
+      do (error "Node not found for ID: %s" (org-node-link-origin link))
+      else
+      collect (list link
+                    (vector
+                     (list (org-node-get-title origin-node)
+                           'face 'link
+                           'action `(lambda (_button)
+                                      (org-node--goto ,origin-node)
+                                      (goto-char ,(org-node-link-pos link)))
+                           'follow-link t)
+                     dest))))))
 
 (defun org-node-list-reflinks ()
   "List all reflinks and their locations.
 
 Useful to see how many times you\\='ve inserted a link that is very
 similar to another link, but not identical, so that likely only
-one of them is associated with a ROAM_REFS."
+one of them is associated with a ROAM_REFS property."
   (interactive)
   (let ((plain-links (cl-loop
                       for list being the hash-values of org-node--dest<>links
@@ -3537,22 +3472,19 @@ one of them is associated with a ROAM_REFS."
                               for link in list
                               unless (equal "id" (org-node-link-type link))
                               collect link))))
-    (with-current-buffer (get-buffer-create "*org-node reflinks*")
-      (tabulated-list-mode)
-      (add-hook 'tabulated-list-revert-hook #'org-node-list-reflinks nil t)
-      (setq tabulated-list-format
-            [("REF?" 4 t)
-             ("Inside node" 30 t)
-             ("Potential reflink" 0 t)])
-      (tabulated-list-init-header)
-      (setq tabulated-list-entries nil)
-      (dolist (link plain-links)
-        (let ((type (org-node-link-type link))
-              (dest (org-node-link-dest link))
-              (origin (org-node-link-origin link))
-              (pos (org-node-link-pos link)))
-          (let ((node (gethash origin org-node--id<>node)))
-            (push (list link
+    (org-node--pop-to-tabulated-list
+     :buffer "*org-node reflinks*"
+     :format [("Ref" 4 t) ("Inside node" 30 t) ("Potential reflink" 0 t)]
+     :reverter #'org-node-list-reflinks
+     :entries
+     (cl-loop
+      for link in plain-links
+      collect (let ((type (org-node-link-type link))
+                    (dest (org-node-link-dest link))
+                    (origin (org-node-link-origin link))
+                    (pos (org-node-link-pos link)))
+                (let ((node (gethash origin org-node--id<>node)))
+                  (list link
                         (vector
                          (if (gethash dest org-node--ref<>id) "*" "")
                          (if node
@@ -3566,11 +3498,8 @@ one of them is associated with a ROAM_REFS."
                                    'face 'link
                                    'follow-link t)
                            origin)
-                         (if type (concat type ":" dest) dest)))
-                  tabulated-list-entries))))
-      (switch-to-buffer (current-buffer))
-      (tabulated-list-print)
-      (tabulated-list-sort 2))))
+                         (if type (concat type ":" dest) dest)))))))
+    (tabulated-list-sort 2)))
 
 (defcustom org-node-warn-title-collisions t
   "Whether to print messages on finding duplicate node titles."
@@ -3583,37 +3512,28 @@ one of them is associated with a ROAM_REFS."
 (defun org-node-list-collisions ()
   "Pop up a buffer listing node title collisions."
   (interactive)
-  (with-current-buffer (get-buffer-create "*org-node title collisions*")
-    (tabulated-list-mode)
-    (add-hook 'tabulated-list-revert-hook #'org-node-list-collisions nil t)
-    (setq tabulated-list-format
-          [("Non-unique name" 30 t)
-           ("ID" 37 t)
-           ("Other ID" 0 t)])
-    (tabulated-list-init-header)
-    (setq tabulated-list-entries nil)
-    (dolist (row org-node--collisions)
-      (seq-let (msg id1 id2) row
-        (push (list row
-                    (vector
-                     msg
-                     (list id1
-                           'action `(lambda (_button)
-                                      (org-id-goto ,id1))
-                           'face 'link
-                           'follow-link t)
-                     (list id2
-                           'action `(lambda (_button)
-                                      (org-id-goto ,id2))
-                           'face 'link
-                           'follow-link t)))
-              tabulated-list-entries)))
-    (if tabulated-list-entries
-        (progn
-          (tabulated-list-print)
-          (switch-to-buffer (current-buffer)))
-      (message "Congratulations, no title collisions! (in %d filtered nodes)"
-               (hash-table-count org-node--title<>id)))))
+  (if org-node--collisions
+      (org-node--pop-to-tabulated-list
+       :buffer "*org-node title collisions*"
+       :format [("Non-unique name" 30 t) ("ID" 37 t) ("Other ID" 0 t)]
+       :reverter #'org-node-list-collisions
+       :entries (cl-loop
+                 for row in org-node--collisions
+                 collect (seq-let (msg id1 id2) row
+                           (list row
+                                 (vector msg
+                                         (list id1
+                                               'action `(lambda (_button)
+                                                          (org-id-goto ,id1))
+                                               'face 'link
+                                               'follow-link t)
+                                         (list id2
+                                               'action `(lambda (_button)
+                                                          (org-id-goto ,id2))
+                                               'face 'link
+                                               'follow-link t))))))
+    (message "Congratulations, no title collisions! (in %d filtered nodes)"
+             (hash-table-count org-node--title<>id))))
 
 (defvar org-node--problems nil
   "Alist of errors encountered by org-node-parser.")
@@ -3621,34 +3541,26 @@ one of them is associated with a ROAM_REFS."
 (defun org-node-list-scan-problems ()
   "Pop up a buffer listing errors found by org-node-parser."
   (interactive)
-  (with-current-buffer (get-buffer-create "*org-node scan problems*")
-    (tabulated-list-mode)
-    (add-hook 'tabulated-list-revert-hook #'org-node-list-scan-problems nil t)
-    (setq tabulated-list-format
-          [("Scan choked near position" 27 t)
-           ("Issue (newest on top)" 0 t)])
-    (tabulated-list-init-header)
-    (setq tabulated-list-entries nil)
-    (dolist (problem org-node--problems)
-      (seq-let (file pos signal) problem
-        (push (list problem
-                    (vector
-                     ;; Clickable link
-                     (list (format "%s:%d"
-                                   (file-name-nondirectory file) pos)
-                           'face 'link
-                           'action `(lambda (_button)
-                                      (find-file ,file)
-                                      (goto-char ,pos))
-                           'follow-link t)
-                     (format "%s" signal)))
-              tabulated-list-entries)))
-    (if tabulated-list-entries
-        (progn
-          (tabulated-list-print)
-          (switch-to-buffer (current-buffer)))
-      (message "Congratulations, no problems scanning %d nodes!"
-               (hash-table-count org-node--id<>node)))))
+  (if org-node--problems
+      (org-node--pop-to-tabulated-list
+       :buffer "*org-node scan problems*"
+       :format [("Scan choked near position" 27 t) ("Issue (newest on top)" 0 t)]
+       :reverter #'org-node-list-scan-problems
+       :entries (cl-loop
+                 for problem in org-node--problems
+                 collect (seq-let (file pos signal) problem
+                           (list problem
+                                 (vector (list
+                                          (format "%s:%d"
+                                                  (file-name-nondirectory file) pos)
+                                          'face 'link
+                                          'action `(lambda (_button)
+                                                     (find-file ,file)
+                                                     (goto-char ,pos))
+                                          'follow-link t)
+                                         (format "%s" signal))))))
+    (message "Congratulations, no problems scanning %d nodes!"
+             (hash-table-count org-node--id<>node))))
 
 ;; REVIEW: Is this a sane logic for picking heading?  It does not mirror how
 ;;         org-set-tags picks heading to apply to, and maybe that is the
