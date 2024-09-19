@@ -181,10 +181,10 @@ need other changes to support TRAMP and encryption."
 
 (defun org-node--set-and-remind-reset (sym val)
   "Set SYM to VAL."
-  (unless (bound-and-true-p org-node--first-init)
+  (when (and (boundp 'org-node--first-init) (not org-node--first-init))
     (run-with-timer
      .1 nil #'message
-     "Remember to run `org-node-reset' after configuring %S" sym))
+     "Remember to run M-x org-node-reset after configuring %S" sym))
   (custom-set-default sym val))
 
 (defcustom org-node-filter-fn
