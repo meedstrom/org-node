@@ -86,6 +86,9 @@
 (declare-function profiler-report "profiler")
 (declare-function profiler-stop "profiler")
 (declare-function org-lint "org-lint")
+(declare-function consult--grep "consult")
+(declare-function consult--grep-make-builder "consult")
+(declare-function consult--ripgrep-make-builder "consult")
 
 
 ;;;; Options
@@ -93,13 +96,6 @@
 (defgroup org-node nil
   "Support a zettelkasten of org-id files and subtrees."
   :group 'org)
-
-;; UNUSED: A custom-setter that causes all kinds of compiler warnings
-(defun org-node--set-and-remind-reset (sym val)
-  (when org-node-cache-mode
-    (run-with-timer
-     .1 nil #'message "Remember to run `org-node-reset' after configuring %S" sym))
-  (custom-set-default sym val))
 
 (defcustom org-node-rescan-functions nil
   "Hook run after scanning specific files.
@@ -164,13 +160,16 @@ display strange-looking data."
 (defcustom org-node-perf-keep-file-name-handlers nil
   "Which file handlers to respect while scanning for ID nodes.
 
-Normally, `file-name-handler-alist' reacts specially to seeing
-some file names: TRAMP paths, compressed files or .org.gpg files.
+Normally, `file-name-handler-alist' makes Emacs react specially to
+seeing some file names: TRAMP paths, compressed files or .org.gpg files.
 
 It\\='s infamous for (somewhat) slowing down the access of very
 many files, since it is a series of regexps applied to every file
-name visited.  The smaller this list, the faster
-`org-node-reset'."
+name visited.  The fewer items in this list, the faster
+`org-node-reset'.
+
+There is probably no point customizing this for now, as org-node will
+need other changes to support TRAMP and encryption."
   :type '(choice (const :tag "Keep all" t)
                  (set
                   (function-item jka-compr-handler)
@@ -180,6 +179,14 @@ name visited.  The smaller this list, the faster
                   (function-item tramp-archive-file-name-handler)
                   (function-item file-name-non-special))))
 
+(defun org-node--set-and-remind-reset (sym val)
+  "Set SYM to VAL."
+  (unless (bound-and-true-p org-node--first-init)
+    (run-with-timer
+     .1 nil #'message
+     "Remember to run `org-node-reset' after configuring %S" sym))
+  (custom-set-default sym val))
+
 (defcustom org-node-filter-fn
   (lambda (node)
     (not (assoc "ROAM_EXCLUDE" (org-node-get-properties node))))
@@ -188,7 +195,7 @@ name visited.  The smaller this list, the faster
 The filtering only has an impact on the table
 `org-node--candidate<>node', which forms the basis for
 completions in the minibuffer, and `org-node--title<>id', used
-by the in-buffer `org-node-complete-at-point'.  In other words,
+by `org-node-complete-at-point-mode'.  In other words,
 passing nil means the user cannot autocomplete to the node, but
 Lisp code can still find it in the \"main\" table,
 `org-node--id<>node'.
@@ -209,7 +216,8 @@ directory named \"archive\".
                  (org-node-get-todo node)
                  (string-search \"/archive/\" (org-node-get-file-path node))
                  (member \"drill\" (org-node-get-tags node))))))"
-  :type 'function)
+  :type 'function
+  :set #'org-node--set-and-remind-reset)
 
 (defcustom org-node-insert-link-hook '()
   "Hook run after inserting a link to an Org-ID node.
@@ -220,7 +228,7 @@ Called with point in the new link."
 (defcustom org-node-creation-hook '(org-node-put-created)
   "Hook run with point in the newly created buffer or entry.
 
-Applied only by `org-node-new-file', `org-node-capture-target',
+Applied by `org-node-new-file', `org-node-capture-target',
 `org-node-insert-heading', `org-node-nodeify-entry' and
 `org-node-extract-subtree'.
 
@@ -251,7 +259,8 @@ explicitly.
 To avoid accidentally picking up duplicate files such as
 versioned backups, causing org-id to complain about duplicate
 IDs, configure `org-node-extra-id-dirs-exclude'."
-  :type '(repeat directory))
+  :type '(repeat directory)
+  :set #'org-node--set-and-remind-reset)
 
 ;; TODO: Figure out how to permit .org.gpg and fail gracefully if
 ;;       the EPG settings are insufficient. easier to test with .org.gz first

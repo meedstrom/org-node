@@ -1,9 +1,10 @@
+* Before 1.0
+
+- [ ] Fix =org-node-tag-add=
+
 - [ ] Refile
 
-- [ ] DRY the tabulated-list usages
-
-- [ ] DRY the mass-file-visiting commands (org-node-lint-all-files, org-node-backlink-fix-all, org-node-list-file-coding-systems)
-
+* Other
 - [ ] Spin out a library for async processing (=org-node--scan= and friends)
 
 - [ ] org-node-series-dispatch: Free up keys "j" "n" "p", "c"
@@ -32,4 +33,5 @@
   - =;;;###autoload (autoload 'org-node-series-dispatch "org-node" nil t)=
     - In Emacs 30, replace with just =;;;###autoload=
   - any usages of =compat-call=
+  - =;; Package-Requires: ((transient) (seq))=
   - what the compiler tells you is obsolete
