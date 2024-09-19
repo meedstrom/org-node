@@ -107,7 +107,7 @@ Can be quit midway through and resumed later.  With
     (org-node-cache-ensure t t)
     (setq org-node-backlink--fix-ctr 0)
     (setq org-node-backlink--files-to-fix
-          (-uniq (hash-table-values org-id-locations))))
+          (seq-uniq (hash-table-values org-id-locations))))
   (when (or (not (= 0 org-node-backlink--fix-ctr)) ;; resume interrupted
             (and (y-or-n-p
                   (format "Edit the %d files found in `org-id-locations'?"
@@ -148,10 +148,9 @@ If REMOVE? is non-nil, remove it instead."
         (let* ((sorted-uuids (thread-last
                                (append (org-node-get-id-links node)
                                        (org-node-get-reflinks node))
-                               (-map #'org-node-link-origin)
-                               (-uniq)
-                               (-non-nil) ;; REVIEW: no nils anymore, I hope
-                               (-sort #'string-lessp)))
+                               (mapcar #'org-node-link-origin)
+                               (seq-uniq)
+                               (compat-call sort)))
                (links (cl-loop
                        for origin in sorted-uuids
                        as origin-node = (gethash origin org-node--id<>node)
@@ -358,17 +357,18 @@ it in the nearby :BACKLINKS: property."
           ;; There is an Org builtin `org-entry-add-to-multivalued-property',
           ;; but we cannot use it since the link descriptions may contain
           ;; spaces.  Further, they may contain quotes(!), so we cannot use
-          ;; `split-string-and-unquote'.  That's why we do not bother to wrap
-          ;; the links in quotes.
+          ;; `split-string-and-unquote' even if we had wrapped the links in
+          ;; quotes.
           (let ((links (split-string (replace-regexp-in-string
                                       "]][\s\t]+\\[\\["
                                       "]]\f[["
                                       (string-trim current-backlinks-value))
                                      "\f")))
-            (dolist (dup (--filter (string-search src-id it) links))
-              (setq links (remove dup links)))
+            (cl-loop for link in links
+                     when (string-search src-id link)
+                     do (setq links (delete link links)))
             (push src-link links)
-            (when (-any-p #'null links)
+            (when (seq-some #'null links)
               (org-node--die "nils in %S" links))
             ;; Enforce deterministic order to prevent unnecessarily reordering
             ;; every time a node is linked that already has the backlink

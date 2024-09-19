@@ -18,7 +18,7 @@
 ;; Author:           Martin Edström <meedstrom91@gmail.com>
 ;; Created:          2024-04-13
 ;; Keywords:         org, hypermedia
-;; Package-Requires: ((emacs "28.1") (compat "30") (dash "2.19.1") (transient "0.4.3") (persist "0.6.1"))
+;; Package-Requires: ((emacs "28.1") (compat "30") (transient "0.4.3") (persist "0.6.1") (llama) (seq "2.24"))
 ;; URL:              https://github.com/meedstrom/org-node
 
 ;;; Commentary:
@@ -70,7 +70,7 @@
 (require 'org-element)
 
 ;; External libs
-(require 'dash)
+(require 'llama)
 (require 'compat)
 (require 'persist)
 (require 'org-node-parser)
@@ -1031,15 +1031,16 @@ function to update current tables."
              . ,(rx bol (* space)
                     (or "#+todo: " "#+seq_todo: " "#+typ_todo: ")))
             ($file-name-handler-alist
-             . ,(--keep (rassoc it org-node-perf-keep-file-name-handlers)
-                        file-name-handler-alist))
+             . ,(seq-keep (##rassoc % org-node-perf-keep-file-name-handlers)
+                          file-name-handler-alist))
             ($global-todo-re
              . ,(if (stringp (car org-todo-keywords))
                     (org-node--die "Quit because `org-todo-keywords' is configured with obsolete syntax, please fix")
                   (org-node-parser--make-todo-regexp
-                   (string-join (-mapcat #'cdr
-                                         (default-value 'org-todo-keywords))
-                                " "))))
+                   (string-join
+                    (apply #'append
+                           (mapcar #'cdr (default-value 'org-todo-keywords)))
+                    " "))))
             ($backlink-drawer-re
              . ,(concat "^[[:space:]]*:"
                         (or (and (require 'org-super-links nil t)
@@ -1663,18 +1664,22 @@ non-nil), list the files in a new buffer."
                                                       (find-file ,file))
                                            'face 'link
                                            'follow-link t)))))
-    (if instant
-        (hash-table-keys org-node--file<>mtime)
-      (-union ;; Faster than `seq-union' by 10x: 2000ms -> 200ms
-       (hash-table-values org-id-locations)
-       (let ((file-name-handler-alist nil)) ;; 3x: 200ms -> 70ms
-         ;; Abbreviating file names because org-id does too
-         (org-node-abbrev-file-names ;; 5x: 70ms -> 14ms
-          (cl-loop for dir in org-node-extra-id-dirs
-                   nconc (org-node--dir-files-recursively ;; 2x: 14ms -> 7ms
-                          (file-truename dir)
-                          "org"
-                          org-node-extra-id-dirs-exclude))))))))
+    (when (or (not instant)
+              (hash-table-empty-p org-node--file<>mtime))
+      (cl-loop for file in (let ((file-name-handler-alist nil))
+                             (org-node-abbrev-file-names
+                              (cl-loop
+                               for dir in org-node-extra-id-dirs
+                               nconc (org-node--dir-files-recursively
+                                      (file-truename dir)
+                                      "org"
+                                      org-node-extra-id-dirs-exclude))))
+               unless (gethash file org-node--file<>mtime)
+               do (puthash file 0 org-node--file<>mtime))
+      (cl-loop for file being each hash-value of org-id-locations
+               unless (gethash file org-node--file<>mtime)
+               do (puthash file 0 org-node--file<>mtime)))
+    (hash-table-keys org-node--file<>mtime)))
 
 ;; (progn (ignore-errors (native-compile #'org-node--dir-files-recursively)) (benchmark-run 100 (org-node--dir-files-recursively org-roam-directory "org" '("logseq/"))))
 (defun org-node--dir-files-recursively (dir suffix excludes)
@@ -1789,16 +1794,18 @@ consult the filesystem, just compares substrings to each other."
     ;; /home/roam/ is also a member of the set, throw out the child
     (cl-loop for dir in dirs
              as dirs-aside-from-this-one = (remove dir dirs)
-             when (--any-p (string-prefix-p it dir) dirs-aside-from-this-one)
+             when (cl-loop for aside-dir in dirs-aside-from-this-one
+                           thereis (string-prefix-p aside-dir dir))
              do (delete dir dirs))
     ;; Now sort by count of items inside if we found 2 or more roots
     (if (= (length dirs) 1)
         dirs
       (cl-loop
-       with dir-counters = (--map (cons it 0) dirs)
+       with dir-counters = (cl-loop for dir in dirs collect (cons dir 0))
        for file in files
-       as the-root = (--find (string-prefix-p it file) dirs)
-       do (cl-incf (cdr (assoc the-root dir-counters)))
+       do (cl-loop for dir in dirs
+                   when (string-prefix-p dir file)
+                   return (cl-incf (cdr (assoc dir dir-counters))))
        finally return (mapcar #'car (cl-sort dir-counters #'> :key #'cdr))))))
 
 (defcustom org-node-ask-directory nil
@@ -2260,17 +2267,16 @@ format-constructs occur before these."
               (pos-month (string-search "%m" time-format))
               (pos-day (string-search "%d" time-format))
               (pos-ymd (string-search "%F" time-format)))
-          (if (-none-p #'null (list pos-year pos-month pos-day))
-              (progn
-                (if (> pos-month pos-year) (cl-incf pos-month 2))
-                (if (> pos-day pos-year) (cl-incf pos-day 2))
-                (concat (substring instance pos-year (+ pos-year 4))
-                        "-"
-                        (substring instance pos-month (+ pos-month 2))
-                        "-"
-                        (substring instance pos-day (+ pos-day 2))))
-            (cl-assert pos-ymd)
-            (substring instance pos-ymd (+ pos-ymd 10))))))))
+          (if (seq-some #'null (list pos-year pos-month pos-day))
+              (progn (cl-assert pos-ymd)
+                     (substring instance pos-ymd (+ pos-ymd 10)))
+            (when (> pos-month pos-year) (cl-incf pos-month 2))
+            (when (> pos-day pos-year) (cl-incf pos-day 2))
+            (concat (substring instance pos-year (+ pos-year 4))
+                    "-"
+                    (substring instance pos-month (+ pos-month 2))
+                    "-"
+                    (substring instance pos-day (+ pos-day 2)))))))))
 
 
 ;;;; Series plumbing
@@ -2717,8 +2723,8 @@ Optional argument REGION-AS-INITIAL-INPUT t means behave as
          (id (if node (org-node-get-id node) (org-id-new)))
          (link-desc (or region-text
                         (when (not org-node-alter-candidates) input)
-                        (and node (--find (string-search it input)
-                                          (org-node-get-aliases node)))
+                        (and node (seq-find (##string-search % input)
+                                            (org-node-get-aliases node)))
                         (and node (org-node-get-title node))
                         input)))
     (atomic-change-group
@@ -2873,8 +2879,8 @@ creation-date as more \"truthful\" than today\\='s date.
            (explicit-category (save-excursion
                                 (when (search-forward ":category:" boundary t)
                                   (org-entry-get nil "CATEGORY"))))
-           (properties (--filter (not (equal "CATEGORY" (car it)))
-                                 (org-entry-properties nil 'standard)))
+           (properties (seq-filter (##not (equal "CATEGORY" (car %)))
+                                   (org-entry-properties nil 'standard)))
            (path-to-write
             (file-name-concat
              dir (concat (format-time-string org-node-datestamp-format)
@@ -2909,8 +2915,8 @@ creation-date as more \"truthful\" than today\\='s date.
           (org-map-region #'org-promote (point-min) (point-max))
           (insert
            ":PROPERTIES:\n"
-           (string-join (--map (concat ":" (car it) ": " (cdr it))
-                               properties)
+           (string-join (mapcar (##concat ":" (car %) ": " (cdr %))
+                                properties)
                         "\n")
            "\n:END:"
            (if explicit-category
@@ -3175,8 +3181,8 @@ user quits, do not apply any modifications."
             (setq default-directory
                   (read-directory-name
                    "Directory with Org notes to operate on: "))))
-      (when-let ((bufs (--filter (string-search "*grep*" (buffer-name it))
-                                 (buffer-list))))
+      (when-let ((bufs (seq-filter (##string-search "*grep*" (buffer-name %))
+                                   (buffer-list))))
         (when (yes-or-no-p "Kill other *grep* buffers to be sure this works?")
           (mapc #'kill-buffer bufs)))
       (let* ((filename (file-relative-name (read-file-name "File to rename: ")))
@@ -3189,8 +3195,8 @@ user quits, do not apply any modifications."
         (run-with-timer
          1 nil
          (lambda ()
-           (pop-to-buffer (--find (string-search "*grep*" (buffer-name it))
-                                  (buffer-list)))
+           (pop-to-buffer (seq-find (##string-search "*grep*" (buffer-name %))
+                                    (buffer-list)))
            (wgrep-change-to-wgrep-mode)
            (goto-char (point-min))
            ;; Interactive replaces
