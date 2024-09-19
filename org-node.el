@@ -1568,11 +1568,6 @@ In detail:
                    (save-buffer)))
                (kill-buffer))))))))
 
-(defmacro org-node--with-quick-fundamental-buffer (file &rest body)
-  (declare (indent 1) (debug t))
-  `(let ((auto-mode-alist nil))
-     (org-node--with-quick-file-buffer ,file ,@body)))
-
 (defun org-node--die (format-string &rest args)
   "Like `error' but make sure the user sees it.
 Useful because not everyone has `debug-on-error' t, and then
@@ -3232,88 +3227,70 @@ In case of unsolvable problems, how to wipe org-id-locations:
   (interactive)
   (unless (require 'consult nil t)
     (user-error "This command requires the consult package"))
-  (org-node--init-ids)
-  (when (and (fboundp 'consult--grep)
-             (fboundp 'consult--grep-make-builder)
-             (fboundp 'consult--ripgrep-make-builder)
-             (boundp 'consult-ripgrep-args))
-    (cl-letf (((symbol-function #'file-relative-name)
-               (lambda (name &optional _dir) name)))
-      (let ((consult-ripgrep-args (concat consult-ripgrep-args " --type=org")))
-        (if (executable-find "rg")
-            (consult--grep "Ripgrep in all known Org files: "
-                           #'consult--ripgrep-make-builder
-                           (org-node--root-dirs (org-node-list-files t))
-                           nil)
-          ;; Much slower, no --type=org means must target thousands of files
-          ;; and not a handful of dirs
-          (consult--grep "Grep in all known Org files: "
-                         #'consult--grep-make-builder
-                         (org-node-list-files)
-                         nil))))))
+  (require 'consult)
+  (org-node-cache-ensure)
+  ;; Prevent consult from turning the names relative, with such enlightening
+  ;; directory paths as ../../../../../../.
+  (cl-letf (((symbol-function #'file-relative-name)
+             (lambda (name &optional _dir) name)))
+    (let ((consult-ripgrep-args (concat consult-ripgrep-args " --type=org")))
+      (if (executable-find "rg")
+          (consult--grep "Ripgrep in all known Org files: "
+                         #'consult--ripgrep-make-builder
+                         (org-node--root-dirs (org-node-list-files t))
+                         nil)
+        ;; Much slower, no --type=org means must target thousands of files
+        ;; and not a handful of dirs
+        (consult--grep "Grep in all known Org files: "
+                       #'consult--grep-make-builder
+                       (org-node-list-files)
+                       nil)))))
 
-(defvar org-node--linted nil
-  "List of files linted so far.")
-
-;;;###autoload
-(defun org-node-lint-all-files (&optional restart)
+(defvar org-node--unlinted nil)
+(defvar org-node--lint-warnings nil)
+(defun org-node-lint-all-files ()
   "Run `org-lint' on all known Org files, and report results.
 
 If last run was interrupted, resume working through the file list
-from where it stopped.  With prefix argument RESTART, start over
+from where it stopped.  With prefix argument, start over
 from the beginning."
-  (interactive "P")
+  (interactive)
   (require 'org-lint)
   (org-node--init-ids)
-  (let* ((warnings nil)
-         (report-buffer (get-buffer-create "*org-node lint report*"))
-         (files (seq-difference (org-node-list-files) org-node--linted))
-         (ctr (length org-node--linted))
-         (ctrmax (+ (length files) (length org-node--linted))))
-    (with-current-buffer report-buffer
-      (when (or (null files) restart)
-        ;; Start over
-        (when (y-or-n-p "Wipe the previous lint results? ")
-          (setq files (org-node-list-files))
-          (setq org-node--linted nil)
-          (setq tabulated-list-entries nil)
-          (let ((inhibit-read-only t))
-            (erase-buffer))))
-      (tabulated-list-mode)
-      (add-hook 'tabulated-list-revert-hook #'org-node-lint-all-files nil t)
-      (setq tabulated-list-format
-            [("File" 35 t)
-             ("Line" 5 t)
-             ("Trust" 5 t)
-             ("Explanation" 100 t)])
-      (tabulated-list-init-header)
-      (unwind-protect
-          (dolist (file files)
-            (message "Linting file... (you may quit and resume anytime) (%d/%d) %s"
-                     (cl-incf ctr) ctrmax file)
-            (org-node--with-quick-file-buffer file
-              (setq warnings (org-lint)))
-            (dolist (warning warnings)
-              (let ((array (cadr warning)))
-                (push (list warning
-                            (vector
-                             (list (file-name-nondirectory file)
-                                   'face 'link
-                                   'action `(lambda (_button)
-                                              (find-file ,file)
-                                              (goto-line
-                                               ,(string-to-number (elt array 0))))
-                                   'follow-link t)
-                             (elt array 0)
-                             (elt array 1)
-                             (elt array 2)))
-                      tabulated-list-entries)))
-            (push file org-node--linted))
-        (display-buffer report-buffer)
-        (tabulated-list-print t t)
-        (tabulated-list-sort 2))
-      (when (null tabulated-list-entries)
-        (message "All good, no lint warnings!")))))
+  (when (or (equal current-prefix-arg '(4))
+            (and (null org-node--unlinted)
+                 (y-or-n-p (format "Lint %d files?"
+                                   (length (org-node-list-files t))))))
+    (setq org-node--unlinted (org-node-list-files t))
+    (setq org-node--lint-warnings nil))
+  (setq org-node--unlinted
+        (org-node--in-files-do
+          :files org-node--unlinted
+          :msg "Running org-lint (quit and resume anytime)"
+          :why-recover "About to visit a file to run org-lint"
+          :call (lambda ()
+                  (when-let ((warning (org-lint)))
+                    (push (cons buffer-file-name (car warning))
+                          org-node--lint-warnings)))))
+  (org-node--pop-to-tabulated-list
+   :buffer "*org lint results*"
+   :format [("File" 30 t) ("Line" 5 t) ("Trust" 5 t) ("Explanation" 0 t)]
+   :reverter #'org-node-lint-all-files
+   :entries (cl-loop
+             for (file . warning) in org-node--lint-warnings
+             collect (let ((array (cadr warning)))
+                       (list warning
+                             (vector
+                              (list (file-name-nondirectory file)
+                                    'face 'link
+                                    'action `(lambda (_button)
+                                               (find-file ,file)
+                                               (goto-line ,(string-to-number
+                                                            (elt array 0))))
+                                    'follow-link t)
+                              (elt array 0)
+                              (elt array 1)
+                              (elt array 2)))))))
 
 (defun org-node-list-feedback-arcs ()
   "Show a feedback-arc-set of forward id-links.
@@ -3477,6 +3454,36 @@ Optional argument REVERTER is a function to add to
   (setq tabulated-list-entries entries)
   (when reverter (add-hook 'tabulated-list-revert-hook reverter nil t))
   (tabulated-list-print t))
+
+(defvar org-node--found-systems nil)
+(defvar org-node--list-file-coding-systems-files nil)
+(defun org-node-list-file-coding-systems ()
+  "Check coding systems of files found by `org-node-list-files'.
+This is done by temporarily visiting each file and checking what
+Emacs decides to decode it as.  To start over, run the command
+with \\[universal-argument] prefix."
+  (interactive)
+  (when (or (equal current-prefix-arg '(4))
+            (and (null org-node--list-file-coding-systems-files)
+                 (y-or-n-p (format "Check coding systems in %d files?  They will not be modified."
+                                   (length (org-node-list-files t))))))
+    (setq org-node--list-file-coding-systems-files (org-node-list-files t))
+    (setq org-node--found-systems nil))
+  (setq org-node--list-file-coding-systems-files
+        (org-node--in-files-do
+          :files org-node--list-file-coding-systems-files
+          :fundamental-mode t
+          :msg "Checking file coding systems (quit and resume anytime)"
+          :why-recover "About to check file coding system"
+          :call (lambda ()
+                  (push (cons buffer-file-name buffer-file-coding-system)
+                        org-node--found-systems))))
+  (org-node--pop-to-tabulated-list
+   :buffer "*org file coding systems*"
+   :format [("Coding system" 20 t) ("File" 40 t)]
+   :entries (cl-loop for (file . sys) in org-node--found-systems
+                     collect (list file (vector (symbol-name sys) file)))
+   :reverter #'org-node-list-file-coding-systems))
 
 (defun org-node-list-dead-links ()
   "List links that lead to no known ID."
@@ -4009,6 +4016,158 @@ Argument SERIES is the series that called this."
              'org-node "Function org-node--example-prompter will be REMOVED by Sep 30, change your `org-node-series-defs'")))
     (org-node--obsolete-series-warn)
     (completing-read "Go to: " (plist-get series :sorted-items))))
+
+(cl-defun org-node--in-files-do
+    (&key files fundamental-mode literally msg why-recover call)
+  "Temporarily visit each file in FILES and call function CALL.
+
+Take care!  This function presumes that FILES satisfy the assumptions
+made by `org-node--find-file-noselect'.  This is safe if FILES is
+the output of `org-node-list-files', but easily violated otherwise.
+
+While the loop runs, print a message every now and then, composed of MSG
+and a counter for the amount of files left to visit.
+
+On running across a file that has a fresh auto-save, prompt the user
+to recover it using WHY-RECOVER as a reason, else break the loop.
+
+If the user quits mid-way through the loop, return the remainder of
+FILES that have not yet been visited.
+
+In each file visited, the behavior is much like
+`org-node--with-quick-file-buffer'.
+
+The files need not be Org files, and if optional argument
+FUNDAMENTAL-MODE is t, visit the files in fundamental mode.
+
+Optional argument LITERALLY means visit the files literally \(see
+`find-file-literally').  For such files, `buffer-read-only' is set.
+
+Neither FUNDAMENTAL-MODE nor LITERALLY take effect for files that a
+buffer had already been visiting; instead, that buffer is reused."
+  (declare (indent defun))
+  (cl-assert (and msg files call why-recover))
+  (let ((enable-local-variables :safe)
+        (org-inhibit-startup t) ;; Don't apply startup #+options
+        file-name-handler-alist
+        ;; (coding-system-for-read org-node-perf-assume-coding-system)
+        find-file-hook
+        after-save-hook
+        before-save-hook
+        org-agenda-files
+        kill-buffer-hook ;; Inhibit save-place etc
+        kill-buffer-query-functions
+        buffer-list-update-hook
+        interval
+        file
+        was-open
+        buf
+        (start-time (current-time))
+        (ctr 0))
+    (setq call (org-node--ensure-compiled call))
+    ;; The cache has been buggy since the 9.5 rewrite, disable to be safe
+    (org-element-with-disabled-cache
+      (condition-case err
+          (while files
+            (cl-incf ctr)
+            (when (zerop (% ctr 300))
+              ;; Reap open file handles (max 1024, Emacs bug keeps them open)
+              (garbage-collect))
+            (if interval
+                (when (zerop (% ctr interval))
+                  (message "%s... %d files to go" msg (length files)))
+              ;; Set a reasonable interval between `message' calls, since they
+              ;; can be surprisingly expensive.
+              (when (> (float-time (time-since start-time)) 0.3)
+                (setq interval (cond ((< ctr 4) ctr)
+                                     ((< ctr 8) 5)
+                                     (t (* 10 (round (/ ctr 10.0))))))))
+            (setq file (pop files))
+            (setq was-open (find-buffer-visiting file))
+            (setq buf (or was-open
+                          (if fundamental-mode
+                              (let (auto-mode-alist)
+                                (org-node--find-file-noselect
+                                 file why-recover literally))
+                            (delay-mode-hooks
+                              (org-node--find-file-noselect
+                               file why-recover literally)))))
+            (with-current-buffer buf
+              (save-excursion
+                (without-restriction
+                  (funcall call)))
+              (unless was-open
+                (when (buffer-modified-p)
+                  (let ((save-silently t)
+                        (inhibit-message t))
+                    (save-buffer)))
+                (kill-buffer))))
+        (( quit )
+         (unless was-open (kill-buffer buf))
+         (cons file files))
+        (( error )
+         (unless was-open (kill-buffer buf))
+         (signal (car err) (cdr err)))))))
+
+;; Far as I can tell, `insert-file-contents' with VISIT argument is what sets
+;; `buffer-file-name'.  Let's hope it does not modify the path because we
+;; assume it remains the same as ABBR-TRUENAME.
+(defun org-node--find-file-noselect (abbr-truename why-recover rawfile)
+  "Read file ABBR-TRUENAME into a buffer and return the buffer.
+
+Very presumptive!  Like `find-file-noselect' but intended as a
+subroutine for a loop that has already ensured that ABBR-TRUENAME:
+
+- is an abbreviated file truename dissatisfying `backup-file-name-p'
+- is not being visited by any other buffer
+- is not a directory
+
+Argument RAWFILE as in `find-file-noselect'.
+
+Argument WHY-RECOVER as in `org-node--in-files-do'."
+  (let ((attrs (file-attributes abbr-truename))
+        (buf (create-file-buffer abbr-truename)))
+    (when (and large-file-warning-threshold
+               (> (file-attribute-size attrs) large-file-warning-threshold))
+      (error "Stopped because file exceeds `large-file-warning-threshold': %s"
+             abbr-truename))
+    (with-current-buffer buf
+      (condition-case nil
+          (if rawfile
+	      (let ((enable-local-variables nil))
+		(insert-file-contents-literally abbr-truename t))
+            (insert-file-contents abbr-truename t)
+            (set-buffer-multibyte t))
+	(file-error
+         (kill-buffer buf)
+         (error "Problems reading file: %s" buffer-file-name)))
+      (setq buffer-file-truename abbr-truename)
+      (setq buffer-file-number (file-attribute-file-identifier attrs))
+      (setq default-directory (file-name-directory buffer-file-name))
+      (if rawfile
+	  (let ((enable-local-variables nil))
+	    (set-buffer-multibyte nil)
+	    (setq buffer-file-coding-system 'no-conversion)
+	    (set-buffer-major-mode buf)
+	    (setq-local find-file-literally t)
+            ;; It's probably not meant to be edited, and we did not check for
+            ;; auto-saves so it definitely should not be edited
+            (setq-local buffer-read-only t))
+        ;; If you'll read the original `find-file-noselect-1', it only calls
+        ;; `after-find-file' (that checks for auto-saves), if RAWFILE is nil!
+        ;; Questionable, but keep the same behavior so we don't have to
+        ;; rewrite `after-find-file'.
+        (and (not (and buffer-file-name auto-save-visited-file-name))
+             (file-newer-than-file-p (or buffer-auto-save-file-name
+				         (make-auto-save-file-name))
+			             buffer-file-name)
+             (if (y-or-n-p
+                  (format "%s, but file has auto save data; recover? %s"
+                          why-recover (file-name-nondirectory buffer-file-name)))
+                 (recover-file buffer-file-name)
+               (error "Stopped due to not recovering auto-save data")))
+        (normal-mode t))
+      (current-buffer))))
 
 (provide 'org-node)
 
