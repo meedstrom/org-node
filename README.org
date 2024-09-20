@@ -237,11 +237,14 @@ You don't need software for that basic idea, only to make it extra convenient to
 
 Thus, fundamentally, any "journal" or "dailies" software are just operating on a sorted series to navigate through.  You could have series about, let's say, historical events, Star Trek episodes, your school curriculum...
 
-Define more series in the variable =org-node-series-defs=.
+Define more series in the variable =org-node-series-defs=.  Already included is a definition that approximates the org-roam-dailies defaults, but I encourage you to override it to suit your tastes.  [[https://github.com/meedstrom/org-node/wiki/Configuring-series][Wiki]].
 
-Already included is a definition that approximates the org-roam-dailies defaults, but I encourage you to override it to suit your tastes.  [[https://github.com/meedstrom/org-node/wiki/Configuring-series][Wiki]].
+You may be taken aback that defining a new series requires writing 5 lambdas, but once you get the hang of it, you can often reuse those lambdas.
 
-You may be taken aback that defining a new series requires writing 5 lambdas, but once you get the hang of it, you can often reuse those lambdas.  A future version will bring convenient wrappers.
+*** Future
+A future version will likely bring convenient wrappers that let you define a series in 1-2 lines.
+
+It's also possible we just redesign this completely.  Input welcome.  How would you like to define a series?  Where should the information be stored?
 
 ** An analogue to =org-roam-node-display-template=?
 
@@ -258,6 +261,22 @@ To complete words at point into known node titles:
 (org-node-complete-at-point-mode)
 (setq org-roam-completion-everywhere nil) ;; Prevent Roam's variant
 #+end_src
+
+** Grep
+
+If you have Ripgrep installed on the computer and [[https://github.com/minad/consult][consult]] installed on Emacs, you can use this command to grep across all your Org files at any time.
+
+#+begin_src elisp
+(keymap-set global-map "M-s M-g" #'org-node-grep) ;; Requires consult
+#+end_src
+
+This is can be a real power tool for mass edits.  Say you want to rename some Org tag =:math:= to =:Math:= absolutely everywhere.  Then you could follow a procedure such as:
+
+1. Use =org-node-grep= and type =:math:=
+2. Use =embark-export= (see [[https://github.com/oantolin/embark][embark]])
+3. Use =wgrep-change-to-wgrep-mode= (see [[https://github.com/mhayashi1120/Emacs-wgrep][wgrep]])
+4. Do a query-replace (~M-%~) to replace all =:math:= with =:Math:=
+5. Type ~C-c C-c~ to apply the changes
 
 ** Let org-open-at-point detect refs
 Say there's a link to a web URL, and you've forgotten you also have a node listing that exact URL in its =ROAM_REFS= property.
@@ -337,8 +356,6 @@ Basic commands:
   - (Trivial) Shortcut for =org-insert-heading= + =org-node-nodeify-entry=
 - =org-node-grep=
   - (Requires [[https://github.com/minad/consult][consult]]) Grep across all known Org files.
-    - Very useful combined with [[https://github.com/oantolin/embark][embark]]-export & [[https://github.com/mhayashi1120/Emacs-wgrep][wgrep]], to search-and-replace a given string everywhere in every directory, for example to rename a tag once and for all.
-    - This will use ripgrep if installed, otherwise it is very slow.
 - =org-node-fakeroam-show-roam-buffer=
   - A different way to invoke the Roam buffer: display the buffer /or/ refresh it if it was already visible.  And a plot twist, if it was not visible, do not refresh until the second invocation.
     - Useful if you have disabled the automatic redisplay, because the Roam command =org-roam-buffer-toggle= is not meant for that.

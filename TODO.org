@@ -5,9 +5,15 @@
 - [ ] Refile
 
 * Other
-- [ ] Spin out a library for async processing (=org-node--scan= and friends)
+- [ ] Spin out a library for async processing (replace most of =org-node--scan= and friends)
 
 - [ ] org-node-series-dispatch: Free up keys "j" "n" "p", "c"
+
+- [ ] org-node-series-defs wrappers to:
+
+  - [ ] Define a series as simply the files in a given subdirectory
+
+  - [ ] Define a series as the links in an ordered list in the body text of a node with a tag such as :series:
 
 - [ ] A workflow to allow pseudo-untitled (numeric-titled) nodes
 

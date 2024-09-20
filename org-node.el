@@ -2078,7 +2078,7 @@ In simple terms, let\\='s say you have configured
 targets `(function org-node-capture-target)'.  Now here\\='s a
 possible workflow:
 
-1. Run org-capture
+1. Run `org-capture'
 2. Select your template
 3. Type name of known or unknown node
 4a. If it was known, it will capture into that node.
@@ -2185,10 +2185,9 @@ KEY, NAME and CAPTURE explained in `org-node-series-defs'."
                       (cons (concat sortstr " " (org-node-get-title node))
                             (org-node-get-id node)))))
     :whereami (lambda ()
-                (let ((sortstr (org-entry-get nil ,prop t))
-                      (node (gethash (org-node-id-at-point) org-nodes)))
-                  (when (and sortstr node)
-                    (concat sortstr " " (org-node-get-title node)))))
+                (when-let* ((sortstr (org-entry-get nil ,prop t))
+                            (node (gethash (org-node-id-at-point) org-nodes)))
+                  (concat sortstr " " (org-node-get-title node))))
     :prompter (lambda (key)
                 (let ((series (cdr (assoc key org-node-built-series))))
                   (completing-read "Go to: " (plist-get series :sorted-items))))
@@ -3328,7 +3327,7 @@ In case of unsolvable problems, how to wipe org-id-locations:
              (lambda (name &optional _dir) name)))
     (let ((consult-ripgrep-args (concat consult-ripgrep-args " --type=org")))
       (if (executable-find "rg")
-          (consult--grep "Ripgrep in all known Org files: "
+          (consult--grep "Grep in all known Org files: "
                          #'consult--ripgrep-make-builder
                          (org-node--root-dirs (org-node-list-files t))
                          nil)
@@ -3656,8 +3655,8 @@ one of them is associated with a ROAM_REFS property."
              (hash-table-count org-node--id<>node))))
 
 ;; REVIEW: Is this a sane logic for picking heading?  It does not mirror how
-;;         org-set-tags picks heading to apply to, and maybe that is the
-;;         behavior to model.
+;;         org-set-tags-command picks heading to apply to, and maybe that is
+;;         the behavior to model.
 (defun org-node--call-at-nearest-node (function &rest args)
   "With point at the relevant heading, call FUNCTION with ARGS.
 
