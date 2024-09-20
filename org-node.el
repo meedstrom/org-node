@@ -2235,7 +2235,7 @@ KEY, NAME and CAPTURE explained in `org-node-series-defs'."
                (let ((adder (lambda ()
                               (org-entry-put nil ,prop sortstr)
                               (dolist (tag (split-string ,tags ":" t))
-                                (org-node-tag-add ,tag)))))
+                                (org-node-tag-add tag)))))
                  (add-hook 'org-node-creation-hook adder)
                  (unwind-protect (org-node-create sortstr (org-id-new) key)
                    (remove-hook 'org-node-creation-hook adder))))))
