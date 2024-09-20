@@ -3602,6 +3602,7 @@ one of them is associated with a ROAM_REFS property."
                               for link in list
                               unless (equal "id" (org-node-link-type link))
                               collect link))))
+    ;; (cl-letf ((truncate-string-ellipsis " "))
     (org-node--pop-to-tabulated-list
      :buffer "*org-node reflinks*"
      :format [("Ref" 4 t) ("Inside node" 30 t) ("Potential reflink" 0 t)]
@@ -3691,6 +3692,162 @@ one of them is associated with a ROAM_REFS property."
                                          (format "%s" signal))))))
     (message "Congratulations, no problems scanning %d nodes!"
              (hash-table-count org-node--id<>node))))
+
+(cl-defun org-node--in-files-do
+    (&key files fundamental-mode literally msg why-recover call)
+  "Temporarily visit each file in FILES and call function CALL.
+
+Take care!  This function presumes that FILES satisfy the assumptions
+made by `org-node--find-file-noselect'.  This is safe if FILES is
+the output of `org-node-list-files', but easily violated otherwise.
+
+While the loop runs, print a message every now and then, composed of MSG
+and a counter for the amount of files left to visit.
+
+On running across a file that has a fresh auto-save, prompt the user
+to recover it using WHY-RECOVER as a reason, else break the loop.
+
+If the user quits mid-way through the loop, return the remainder of
+FILES that have not yet been visited.
+
+In each file visited, the behavior is much like
+`org-node--with-quick-file-buffer'.
+
+The files need not be Org files, and if optional argument
+FUNDAMENTAL-MODE is t, visit the files in fundamental mode.
+
+Optional argument LITERALLY means visit the files literally \(see
+`find-file-literally').  For such files, `buffer-read-only' is set.
+
+Neither FUNDAMENTAL-MODE nor LITERALLY take effect for files that a
+buffer had already been visiting; instead, that buffer is reused."
+  (declare (indent defun))
+  (cl-assert (and msg files call why-recover))
+  (let ((enable-local-variables :safe)
+        (org-inhibit-startup t) ;; Don't apply startup #+options
+        file-name-handler-alist
+        ;; (coding-system-for-read org-node-perf-assume-coding-system)
+        find-file-hook
+        after-save-hook
+        before-save-hook
+        org-agenda-files
+        kill-buffer-hook ;; Inhibit save-place etc
+        kill-buffer-query-functions
+        buffer-list-update-hook
+        interval
+        file
+        was-open
+        buf
+        (start-time (current-time))
+        (ctr 0))
+    (setq call (org-node--ensure-compiled call))
+    ;; The cache has been buggy since the 9.5 rewrite, disable to be safe
+    (org-element-with-disabled-cache
+      (condition-case err
+          (while files
+            (cl-incf ctr)
+            (when (zerop (% ctr 300))
+              ;; Reap open file handles (max 1024, Emacs bug keeps them open)
+              (garbage-collect))
+            (if interval
+                (when (zerop (% ctr interval))
+                  (message "%s... %d files to go" msg (length files)))
+              ;; Set a reasonable interval between `message' calls, since they
+              ;; can be surprisingly expensive.
+              (when (> (float-time (time-since start-time)) 0.3)
+                (setq interval ctr)))
+            (setq file (pop files))
+            (setq was-open (find-buffer-visiting file))
+            (setq buf (or was-open
+                          (if fundamental-mode
+                              (let (auto-mode-alist)
+                                (org-node--find-file-noselect
+                                 file why-recover literally))
+                            (delay-mode-hooks
+                              (org-node--find-file-noselect
+                               file why-recover literally)))))
+            (with-current-buffer buf
+              (save-excursion
+                (without-restriction
+                  (funcall call)))
+              (unless was-open
+                (when (buffer-modified-p)
+                  (let ((save-silently t)
+                        (inhibit-message t))
+                    (save-buffer)))
+                (kill-buffer))))
+        (( quit )
+         (unless (or was-open (buffer-modified-p buf))
+           (kill-buffer buf))
+         (cons file files))
+        (( error )
+         (unless (or was-open (buffer-modified-p buf))
+           (kill-buffer buf))
+         (lwarn 'org-node :error "Loop interrupted by signal: %S" err)
+         (cons file files))))))
+
+;; Far as I can tell, `insert-file-contents' with VISIT argument is what sets
+;; `buffer-file-name'.  Let's hope it does not modify the path because we
+;; assume it remains the same as ABBR-TRUENAME.
+(defun org-node--find-file-noselect (abbr-truename why-recover rawfile)
+  "Read file ABBR-TRUENAME into a buffer and return the buffer.
+
+Very presumptive!  Like `find-file-noselect' but intended as a
+subroutine for a loop that has already ensured that ABBR-TRUENAME:
+
+- is an abbreviated file truename dissatisfying `backup-file-name-p'
+- is not being visited by any other buffer
+- is not a directory
+
+Argument RAWFILE as in `find-file-noselect'.
+
+Argument WHY-RECOVER as in `org-node--in-files-do'."
+  (let ((attrs (file-attributes abbr-truename))
+        (buf (create-file-buffer abbr-truename)))
+    (when (and large-file-warning-threshold
+               (> (file-attribute-size attrs) large-file-warning-threshold))
+      (error "Stopped because file exceeds `large-file-warning-threshold': %s"
+             abbr-truename))
+    (with-current-buffer buf
+      (condition-case nil
+          (if rawfile
+	      (let ((enable-local-variables nil))
+		(insert-file-contents-literally abbr-truename t))
+            (insert-file-contents abbr-truename t)
+            (set-buffer-multibyte t))
+	(file-error
+         (kill-buffer buf)
+         (error "Problems reading file: %s" buffer-file-name)))
+      (setq buffer-file-truename abbr-truename)
+      (setq buffer-file-number (file-attribute-file-identifier attrs))
+      (setq default-directory (file-name-directory buffer-file-name))
+      (if rawfile
+	  (let ((enable-local-variables nil))
+	    (set-buffer-multibyte nil)
+	    (setq buffer-file-coding-system 'no-conversion)
+	    (set-buffer-major-mode buf)
+	    (setq-local find-file-literally t)
+            ;; It's probably not meant to be edited, and we did not check for
+            ;; auto-saves so it definitely should not be edited
+            (setq-local buffer-read-only t))
+        ;; If you'll read the original `find-file-noselect-1', it only calls
+        ;; `after-find-file' (that checks for auto-saves), if RAWFILE is nil!
+        ;; Questionable, but keep the same behavior so we don't have to
+        ;; rewrite `after-find-file'.
+        (and (not (and buffer-file-name auto-save-visited-file-name))
+             (file-newer-than-file-p (or buffer-auto-save-file-name
+				         (make-auto-save-file-name))
+			             buffer-file-name)
+             (if (y-or-n-p
+                  (format "%s, but file has auto save data; recover? %s"
+                          why-recover (file-name-nondirectory buffer-file-name)))
+                 (recover-file buffer-file-name)
+               (error "Stopped due to not recovering auto-save data")))
+        (normal-mode t))
+      (current-buffer))))
+
+
+;;;; Commands to add tags/refs/alias
 
 ;; REVIEW: Is this a sane logic for picking heading?  It does not mirror how
 ;;         org-set-tags-command picks heading to apply to, and maybe that is
@@ -4059,158 +4216,6 @@ Argument SERIES is the series that called this."
              'org-node "Function org-node--example-prompter will be REMOVED by Sep 30, change your `org-node-series-defs'")))
     (org-node--obsolete-series-warn)
     (completing-read "Go to: " (plist-get series :sorted-items))))
-
-(cl-defun org-node--in-files-do
-    (&key files fundamental-mode literally msg why-recover call)
-  "Temporarily visit each file in FILES and call function CALL.
-
-Take care!  This function presumes that FILES satisfy the assumptions
-made by `org-node--find-file-noselect'.  This is safe if FILES is
-the output of `org-node-list-files', but easily violated otherwise.
-
-While the loop runs, print a message every now and then, composed of MSG
-and a counter for the amount of files left to visit.
-
-On running across a file that has a fresh auto-save, prompt the user
-to recover it using WHY-RECOVER as a reason, else break the loop.
-
-If the user quits mid-way through the loop, return the remainder of
-FILES that have not yet been visited.
-
-In each file visited, the behavior is much like
-`org-node--with-quick-file-buffer'.
-
-The files need not be Org files, and if optional argument
-FUNDAMENTAL-MODE is t, visit the files in fundamental mode.
-
-Optional argument LITERALLY means visit the files literally \(see
-`find-file-literally').  For such files, `buffer-read-only' is set.
-
-Neither FUNDAMENTAL-MODE nor LITERALLY take effect for files that a
-buffer had already been visiting; instead, that buffer is reused."
-  (declare (indent defun))
-  (cl-assert (and msg files call why-recover))
-  (let ((enable-local-variables :safe)
-        (org-inhibit-startup t) ;; Don't apply startup #+options
-        file-name-handler-alist
-        ;; (coding-system-for-read org-node-perf-assume-coding-system)
-        find-file-hook
-        after-save-hook
-        before-save-hook
-        org-agenda-files
-        kill-buffer-hook ;; Inhibit save-place etc
-        kill-buffer-query-functions
-        buffer-list-update-hook
-        interval
-        file
-        was-open
-        buf
-        (start-time (current-time))
-        (ctr 0))
-    (setq call (org-node--ensure-compiled call))
-    ;; The cache has been buggy since the 9.5 rewrite, disable to be safe
-    (org-element-with-disabled-cache
-      (condition-case err
-          (while files
-            (cl-incf ctr)
-            (when (zerop (% ctr 300))
-              ;; Reap open file handles (max 1024, Emacs bug keeps them open)
-              (garbage-collect))
-            (if interval
-                (when (zerop (% ctr interval))
-                  (message "%s... %d files to go" msg (length files)))
-              ;; Set a reasonable interval between `message' calls, since they
-              ;; can be surprisingly expensive.
-              (when (> (float-time (time-since start-time)) 0.3)
-                (setq interval ctr)))
-            (setq file (pop files))
-            (setq was-open (find-buffer-visiting file))
-            (setq buf (or was-open
-                          (if fundamental-mode
-                              (let (auto-mode-alist)
-                                (org-node--find-file-noselect
-                                 file why-recover literally))
-                            (delay-mode-hooks
-                              (org-node--find-file-noselect
-                               file why-recover literally)))))
-            (with-current-buffer buf
-              (save-excursion
-                (without-restriction
-                  (funcall call)))
-              (unless was-open
-                (when (buffer-modified-p)
-                  (let ((save-silently t)
-                        (inhibit-message t))
-                    (save-buffer)))
-                (kill-buffer))))
-        (( quit )
-         (unless (or was-open (buffer-modified-p buf))
-           (kill-buffer buf))
-         (cons file files))
-        (( error )
-         (unless (or was-open (buffer-modified-p buf))
-           (kill-buffer buf))
-         (signal (car err) (cdr err)))))))
-
-;; Far as I can tell, `insert-file-contents' with VISIT argument is what sets
-;; `buffer-file-name'.  Let's hope it does not modify the path because we
-;; assume it remains the same as ABBR-TRUENAME.
-(defun org-node--find-file-noselect (abbr-truename why-recover rawfile)
-  "Read file ABBR-TRUENAME into a buffer and return the buffer.
-
-Very presumptive!  Like `find-file-noselect' but intended as a
-subroutine for a loop that has already ensured that ABBR-TRUENAME:
-
-- is an abbreviated file truename dissatisfying `backup-file-name-p'
-- is not being visited by any other buffer
-- is not a directory
-
-Argument RAWFILE as in `find-file-noselect'.
-
-Argument WHY-RECOVER as in `org-node--in-files-do'."
-  (let ((attrs (file-attributes abbr-truename))
-        (buf (create-file-buffer abbr-truename)))
-    (when (and large-file-warning-threshold
-               (> (file-attribute-size attrs) large-file-warning-threshold))
-      (error "Stopped because file exceeds `large-file-warning-threshold': %s"
-             abbr-truename))
-    (with-current-buffer buf
-      (condition-case nil
-          (if rawfile
-	      (let ((enable-local-variables nil))
-		(insert-file-contents-literally abbr-truename t))
-            (insert-file-contents abbr-truename t)
-            (set-buffer-multibyte t))
-	(file-error
-         (kill-buffer buf)
-         (error "Problems reading file: %s" buffer-file-name)))
-      (setq buffer-file-truename abbr-truename)
-      (setq buffer-file-number (file-attribute-file-identifier attrs))
-      (setq default-directory (file-name-directory buffer-file-name))
-      (if rawfile
-	  (let ((enable-local-variables nil))
-	    (set-buffer-multibyte nil)
-	    (setq buffer-file-coding-system 'no-conversion)
-	    (set-buffer-major-mode buf)
-	    (setq-local find-file-literally t)
-            ;; It's probably not meant to be edited, and we did not check for
-            ;; auto-saves so it definitely should not be edited
-            (setq-local buffer-read-only t))
-        ;; If you'll read the original `find-file-noselect-1', it only calls
-        ;; `after-find-file' (that checks for auto-saves), if RAWFILE is nil!
-        ;; Questionable, but keep the same behavior so we don't have to
-        ;; rewrite `after-find-file'.
-        (and (not (and buffer-file-name auto-save-visited-file-name))
-             (file-newer-than-file-p (or buffer-auto-save-file-name
-				         (make-auto-save-file-name))
-			             buffer-file-name)
-             (if (y-or-n-p
-                  (format "%s, but file has auto save data; recover? %s"
-                          why-recover (file-name-nondirectory buffer-file-name)))
-                 (recover-file buffer-file-name)
-               (error "Stopped due to not recovering auto-save data")))
-        (normal-mode t))
-      (current-buffer))))
 
 (provide 'org-node)
 
