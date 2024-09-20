@@ -23,6 +23,11 @@
 
 ;;; Commentary:
 
+;; DO NOT USE MELPA STABLE
+;; https://old.reddit.com/r/emacs/comments/etikbz/
+
+;; -------------------------------------------------------------------------
+
 ;; If you were the sort of person to prefer "id:" links over "file:" links or
 ;; any other type of link, you're in the right place!  Now you can rely on IDs
 ;; and worry less about mentally tracking your subtree hierarchies and
@@ -497,6 +502,7 @@ or you can visit the homepage:
   (todo       nil :read-only t :type string :documentation
               "Returns node's TODO state."))
 
+;; Used to be in the struct
 (defun org-node-get-file-title-or-basename (node)
   (or (org-node-get-file-title node)
       (file-name-nondirectory (org-node-get-file-path node))))
@@ -3901,7 +3907,7 @@ heading, else the file-level node, whichever has an ID first."
   "Visit an entry in series identified by KEY.
 The entry to visit has sort-string SORTSTR.  Create if it does
 not exist."
-  (let* ((series (cdr (assoc key org-node--series)))
+  (let* ((series (cdr (assoc key org-node-built-series)))
          (item (assoc sortstr (plist-get series :sorted-items))))
     (when (or (null item)
               (if (funcall (plist-get series :try-goto) item)
