@@ -3733,7 +3733,6 @@ Wrap the value in double-brackets if necessary."
                         "]]")))
     (org-node--add-to-property-keep-space "ROAM_REFS" ref)))
 
-;; FIXME: Does not work correctly in an ID-less entry
 (defun org-node-tag-add (tag-or-tags)
   "Add TAG-OR-TAGS to the entry at point."
   (interactive
@@ -3770,8 +3769,10 @@ Wrap the value in double-brackets if necessary."
                 (goto-char (point-max)))
               (newline)
               (insert "#+filetags: :" (string-join new-tags ":") ":")))))
-    (org-set-tags (seq-uniq (append (ensure-list tag-or-tags)
-                                    (org-get-tags))))))
+    (save-excursion
+      (org-back-to-heading)
+      (org-set-tags (seq-uniq (append (ensure-list tag-or-tags)
+                                      (org-get-tags)))))))
 
 
 ;;;; CAPF (Completion-At-Point Function)
