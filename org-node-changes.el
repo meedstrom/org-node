@@ -72,12 +72,17 @@ value."
      return (lwarn 'org-node :warning
                    "Hook `org-node-insert-link-hook' has changed, now passes no arguments, but function expects them: %s"
                    fn))
-    (when (and (featurep 'org-roam)
-               (when-let ((fakeroam-path (find-library-name "org-node-fakeroam")))
-                 (equal (file-name-directory (file-truename fakeroam-path))
-                        (file-name-directory
-                         (file-truename (find-library-name "org-node"))))))
-      (message "org-node-fakeroam now has its own repo. If you need it, use the new MELPA recipe!"))))
+    ;; 2024-09-19 Clean up deprecated persists
+    (unless (memq system-type '(windows-nt ms-dos))
+      (cl-loop
+       for sym in '(org-node--file<>mtime
+                    org-node--file<>previews)
+       as dir = (or (get sym 'persist-location)
+                    (bound-and-true-p persist--directory-location))
+       as file = (expand-file-name (symbol-name sym) dir)
+       when dir do (and (file-exists-p file)
+                        (file-writable-p file)
+                        (delete-file file))))))
 
 (defmacro org-node-changes--def-whiny-alias (old new &optional when interactive removed-by)
   "Define OLD as effectively an alias for NEW.
@@ -97,6 +102,10 @@ hardcoded strings."
          (lwarn 'org-node :warning "Your initfiles use old function name: %S, which will be REMOVED by %s.  Please use new name: %S"
                 ,old ,(or removed-by "30 September 2024") ,new))
        (apply ,new args))))
+
+(org-node-changes--def-whiny-alias
+ 'org-node-mk-series-on-tag-sorted-by-property
+ 'org-node-mk-series-on-tags-sorted-by-property)
 
 ;; (define-obsolete-variable-alias
 ;;   'org-node-creation-fn 'org-node-new-node-fn "2024-08-22")

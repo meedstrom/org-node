@@ -562,18 +562,6 @@ For use by `org-node-fakeroam--accelerate-get-contents'.")
 (defvar org-node--file<>mtime (make-hash-table :test #'equal)
   "1:1 table mapping files to their last-modification times.")
 
-;; 2024-09-19 Clean up deprecated persists
-(unless (memq system-type '(windows-nt ms-dos))
-  (cl-loop for sym in '(org-node--file<>mtime
-                        org-node--file<>previews)
-           as file = (expand-file-name
-                      (symbol-name sym)
-                      (or (get sym 'persist-location)
-                          (bound-and-true-p persist--directory-location)))
-           do (and (file-exists-p file)
-                   (file-writable-p file)
-                   (delete-file file))))
-
 (defun org-node-get-id-links (node)
   "Get list of ID-link objects pointing to NODE.
 Each object is of type `org-node-link' with these fields:
@@ -2182,10 +2170,40 @@ to false positives, if you have been changing formats over time."
              name)
         (match-string 0 name)))))
 
-(defun org-node-mk-series-on-tag-sorted-by-property
-    (key name tag prop &optional capture)
-  "Quick-define a series filtered by TAG sorted by property PROP.
-This would be a series of ID-nodes, not files.
+(defun org-node-mk-series-sorted-by-property
+    (key name prop &optional capture)
+  "Define a series of ID-nodes sorted by property PROP.
+If an ID-node does not have property PROP, it is excluded.
+KEY, NAME and CAPTURE explained in `org-node-series-defs'."
+  `(,key
+    :name ,name
+    :version 2
+    :capture ,capture
+    :classifier (lambda (node)
+                  (let ((sortstr (cdr (assoc ,prop (org-node-get-props node)))))
+                    (when (and sortstr (not (string-blank-p sortstr)))
+                      (cons (concat sortstr " " (org-node-get-title node))
+                            (org-node-get-id node)))))
+    :whereami (lambda ()
+                (let ((sortstr (org-entry-get nil ,prop t))
+                      (node (gethash (org-node-id-at-point) org-nodes)))
+                  (when (and sortstr node)
+                    (concat sortstr " " (org-node-get-title node)))))
+    :prompter (lambda (key)
+                (let ((series (cdr (assoc key org-node-built-series))))
+                  (completing-read "Go to: " (plist-get series :sorted-items))))
+    :try-goto (lambda (item)
+                (org-node-helper-try-goto-id (cdr item)))
+    :creator (lambda (sortstr key)
+               (let ((adder (lambda () (org-entry-put nil ,prop sortstr))))
+                 (add-hook 'org-node-creation-hook adder)
+                 (unwind-protect (org-node-create sortstr (org-id-new) key)
+                   (remove-hook 'org-node-creation-hook adder))))))
+
+(defun org-node-mk-series-on-tags-sorted-by-property
+    (key name tags prop &optional capture)
+  "Define a series filtered by TAGS sorted by property PROP.
+TAGS is a string of tags separated by colons.
 KEY, NAME and CAPTURE explained in `org-node-series-defs'."
   `(,key
     :name ,name
@@ -2193,12 +2211,14 @@ KEY, NAME and CAPTURE explained in `org-node-series-defs'."
     :capture ,capture
     :classifier (lambda (node)
                   (let ((sortstr (cdr (assoc ,prop (org-node-get-props node))))
-                        (tagged (member ,tag (org-node-get-tags node))))
+                        (tagged (seq-intersection (split-string ,tags ":" t)
+                                                  (org-node-get-tags node))))
                     (when (and sortstr tagged (not (string-blank-p sortstr)))
                       (cons (concat sortstr " " (org-node-get-title node))
                             (org-node-get-id node)))))
     :whereami (lambda ()
-                (when (member ,tag (org-get-tags))
+                (when (seq-intersection (split-string ,tags ":" t)
+                                        (org-node-get-tags node))
                   (let ((sortstr (org-entry-get nil ,prop t))
                         (node (gethash (org-node-id-at-point) org-nodes)))
                     (when (and sortstr node)
@@ -2208,8 +2228,15 @@ KEY, NAME and CAPTURE explained in `org-node-series-defs'."
                   (completing-read "Go to: " (plist-get series :sorted-items))))
     :try-goto (lambda (item)
                 (org-node-helper-try-goto-id (cdr item)))
+    ;; NOTE: The sortstr should not necessarily become the title, but we make
+    ;;       it so anyway and the user can edit afterwards.
+    ;; REVIEW: This should probably change, better to prompt for title.  But
+    ;;         how?
     :creator (lambda (sortstr key)
-               (let ((adder (lambda () (org-node-tag-add ,tag))))
+               (let ((adder (lambda ()
+                              (org-entry-put nil ,prop sortstr)
+                              (dolist (tag (split-string ,tags ":" t))
+                                (org-node-tag-add ,tag)))))
                  (add-hook 'org-node-creation-hook adder)
                  (unwind-protect (org-node-create sortstr (org-id-new) key)
                    (remove-hook 'org-node-creation-hook adder))))))
