@@ -1,10 +1,6 @@
-* Before 1.0
 
-- [ ] Fix =org-node-tag-add=
+- [ ] Manage org-super-links drawers
 
-- [ ] Refile
-
-* Other
 - [ ] Spin out a library for async processing (replace most of =org-node--scan= and friends)
 
 - [ ] org-node-series-dispatch: Free up keys "j" "n" "p", "c"
@@ -18,6 +14,8 @@
 - [ ] A workflow to allow pseudo-untitled (numeric-titled) nodes
 
   Already =org-node-grep= can be considered an equivalent to =org-node-find=, so we "just" need an equivalent to =org-node-insert-link=.  Basically, capture, refile, and insert-link would probably all use the same mechanism for *identifying a node by a grep result.*
+
+- [ ] Unify some subroutines for capture/refile/extract/insert/find
 
 - [ ] Accept more ref variants as the same ref
 

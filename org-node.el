@@ -1355,6 +1355,10 @@ The reason for default t is better experience with
             (puthash title node org-node--candidate<>node)
             (puthash title affx org-node--title<>affixation-triplet)))))))
 
+(defvar org-node--compile-timers nil)
+(defvar org-node--compiled-lambdas (make-hash-table :test #'equal)
+  "1:1 table mapping lambda expressions to compiled bytecode.")
+
 (defun org-node--ensure-compiled (fn)
   "Try to return FN as a compiled function.
 
@@ -1386,10 +1390,6 @@ The reason for default t is better experience with
                                   `(lambda ()
                                      (puthash ,fn (native-compile ,fn)
                                               org-node--compiled-lambdas))))))))
-
-(defvar org-node--compile-timers nil)
-(defvar org-node--compiled-lambdas (make-hash-table :test #'equal)
-  "1:1 table mapping lambda expressions to compiled bytecode.")
 
 
 ;;;; "Dirty" functions
@@ -2865,6 +2865,31 @@ adding keywords to the things to exclude:
       (goto-char (marker-position m1))
       (set-marker m1 nil)
       (run-hooks 'org-node-insert-link-hook))))
+
+;;;###autoload
+(defun org-node-refile ()
+  "Experimental."
+  (interactive nil org-mode)
+  (unless (derived-mode-p 'org-mode)
+    (user-error "This command expects an org-mode buffer"))
+  (org-node-cache-ensure)
+  (when (org-invisible-p)
+    (user-error "Better not run this command in an invisible region"))
+  (let* ((input (completing-read "Refile into ID-node: " #'org-node-collection
+                                 () () () 'org-node-hist))
+         (node (gethash input org-node--candidate<>node)))
+    (unless node
+      (error "Node not found %s" input))
+    (org-back-to-heading t)
+    (when (org-invisible-p) ;; IDK...
+      (user-error "Better not run this command in an invisible region"))
+    (org-cut-subtree)
+    (org-node--goto node)
+    (widen)
+    (when (outline-next-heading)
+      (backward-char 1))
+    (org-paste-subtree)
+    (org-node--dirty-ensure-node-known)))
 
 ;;;###autoload
 (defun org-node-extract-subtree ()
