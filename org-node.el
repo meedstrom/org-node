@@ -3692,7 +3692,7 @@ Optional keyword argument ABOUT-TO-DO as in
                  (kill-buffer)))))))))
 
 (cl-defun org-node--in-files-do
-    (&key files fundamental-mode literally msg about-to-do call)
+    (&key files fundamental-mode msg about-to-do call)
   "Temporarily visit each file in FILES and call function CALL.
 
 Take care!  This function presumes that FILES satisfy the assumptions
@@ -3716,8 +3716,8 @@ In each file visited, the behavior is much like
 The files need not be Org files, and if optional argument
 FUNDAMENTAL-MODE is t, visit the files in fundamental mode.
 
-Neither FUNDAMENTAL-MODE nor LITERALLY take effect for files that a
-buffer had already been visiting; instead, that buffer is reused."
+If a buffer had already been visiting FILE, reuse that buffer.
+Naturally, FUNDAMENTAL-MODE has no effect in that case."
   (declare (indent defun))
   (cl-assert (and msg files call about-to-do))
   (setq call (org-node--ensure-compiled call))
@@ -3755,14 +3755,13 @@ buffer had already been visiting; instead, that buffer is reused."
                 (setq interval ctr)))
             (setq file (pop files))
             (setq was-open (find-buffer-visiting file))
-            (setq buf-or-issue (or was-open
-                                   (if fundamental-mode
-                                       (let (auto-mode-alist)
-                                         (org-node--find-file-noselect
-                                          file about-to-do literally))
-                                     (delay-mode-hooks
-                                       (org-node--find-file-noselect
-                                        file about-to-do literally)))))
+            (setq buf-or-issue
+                  (or was-open
+                      (if fundamental-mode
+                          (let (auto-mode-alist)
+                            (org-node--find-file-noselect file about-to-do))
+                        (delay-mode-hooks
+                          (org-node--find-file-noselect file about-to-do)))))
             (if (bufferp buf-or-issue)
                 (with-current-buffer buf-or-issue
                   (save-excursion
@@ -3787,7 +3786,7 @@ buffer had already been visiting; instead, that buffer is reused."
          (lwarn 'org-node :error "Loop interrupted by signal: %S" err)
          (cons file files))))))
 
-(defun org-node--find-file-noselect (abbr-truename about-to-do rawfile)
+(defun org-node--find-file-noselect (abbr-truename about-to-do)
   "Read file ABBR-TRUENAME into a buffer and return the buffer.
 If there's a problem, query the user to proceed with string
 ABOUT-TO-DO, and return that string if user declines.  See
@@ -3798,9 +3797,7 @@ subroutine for a loop that has already ensured that ABBR-TRUENAME:
 
 - is an abbreviated file truename dissatisfying `backup-file-name-p'
 - is not being visited by any other buffer
-- is not a directory
-
-Argument RAWFILE as in `find-file-noselect'."
+- is not a directory"
   (let ((attrs (file-attributes abbr-truename))
         (buf (create-file-buffer abbr-truename)))
     (if (or (not (and large-file-warning-threshold
@@ -3814,40 +3811,24 @@ Argument RAWFILE as in `find-file-noselect'."
                               large-file-warning-threshold))))
         (with-current-buffer buf
           (condition-case nil
-              (if rawfile
-	          (let ((enable-local-variables nil))
-		    (insert-file-contents-literally abbr-truename t))
-                (insert-file-contents abbr-truename t)
-                (set-buffer-multibyte t))
-	    (file-error
+              (progn (insert-file-contents abbr-truename t)
+                     (set-buffer-multibyte t))
+	    (( file-error )
              (kill-buffer buf)
              (error "Problems reading file: %s" abbr-truename)))
           (setq buffer-file-truename abbr-truename)
           (setq buffer-file-number (file-attribute-file-identifier attrs))
           (setq default-directory (file-name-directory buffer-file-name))
-          ;; `after-find-file' (that checks for auto-saves) if RAWFILE is nil,
-          ;; not if it is t!  Questionable, but keep the same behavior and use
-          ;; buffer read-only as a safeguard.
-          (if rawfile
-	      (let ((enable-local-variables nil))
-	        (set-buffer-multibyte nil)
-	        (setq buffer-file-coding-system 'no-conversion)
-	        (set-buffer-major-mode buf)
-	        (setq-local find-file-literally t)
-                ;; It's probably not meant to be edited, and we did not check for
-                ;; auto-saves so it definitely should not be edited
-                (setq-local buffer-read-only t)
-                (current-buffer))
-            (if (and (not (and buffer-file-name auto-save-visited-file-name))
-                     (file-newer-than-file-p (or buffer-auto-save-file-name
-				                 (make-auto-save-file-name))
-			                     buffer-file-name))
-                ;; Could try to call `recover-file' here, but have not checked
-                ;; that the result would be sane, so just bail
-                (message "%s, but skipped because it has an auto-save file: %s"
-                         about-to-do buffer-file-name)
-              (normal-mode t)
-              (current-buffer))))
+          (if (and (not (and buffer-file-name auto-save-visited-file-name))
+                   (file-newer-than-file-p (or buffer-auto-save-file-name
+				               (make-auto-save-file-name))
+			                   buffer-file-name))
+              ;; Could try to call `recover-file' here, but have not checked
+              ;; that the result would be sane, so just bail
+              (message "%s, but skipped because it has an auto-save file: %s"
+                       about-to-do buffer-file-name)
+            (normal-mode t)
+            (current-buffer)))
       (message "%s, but skipped because file exceeds `large-file-warning-threshold': %s"
                about-to-do buffer-file-name))))
 
