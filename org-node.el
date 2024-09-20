@@ -18,7 +18,7 @@
 ;; Author:           Martin Edström <meedstrom91@gmail.com>
 ;; Created:          2024-04-13
 ;; Keywords:         org, hypermedia
-;; Package-Requires: ((emacs "28.1") (compat "30") (transient "0.4.3") (persist "0.6.1") (llama) (seq "2.24"))
+;; Package-Requires: ((emacs "28.1") (compat "30") (llama))
 ;; URL:              https://github.com/meedstrom/org-node
 
 ;;; Commentary:
@@ -57,8 +57,8 @@
 
 ;;; Code:
 
+;; Built-in
 (require 'seq)
-(require 'tramp)
 (require 'cl-lib)
 (require 'subr-x)
 (require 'bytecomp)
@@ -69,10 +69,9 @@
 (require 'org-macs)
 (require 'org-element)
 
-;; External libs
+;; External
 (require 'llama)
 (require 'compat)
-(require 'persist)
 (require 'org-node-parser)
 (require 'org-node-changes)
 
@@ -85,6 +84,7 @@
 (declare-function org-node-backlink--fix-entry-here "org-node-backlink")
 (declare-function profiler-report "profiler")
 (declare-function profiler-stop "profiler")
+(declare-function tramp-tramp-file-p "tramp")
 (declare-function org-lint "org-lint")
 (declare-function consult--grep "consult")
 (declare-function consult--grep-make-builder "consult")
@@ -342,9 +342,9 @@ again for every alias, in which case TITLE is actually one of the
 aliases."
   :type '(radio
           (function-item org-node-affix-bare)
+          (function-item org-node-affix-with-olp-and-tags)
           (function-item org-node-prefix-with-olp)
           (function-item org-node-prefix-with-tags)
-          (function-item org-node-affix-with-olp-and-tags)
           function)
   :set #'org-node--set-and-remind-reset)
 
@@ -366,15 +366,14 @@ For use as `org-node-affixation-fn'."
   "Prepend NODE's outline path to TITLE.
 For use as `org-node-affixation-fn'."
   (list title
-        (if (org-node-get-is-subtree node)
-            (let ((ancestors (cons (org-node-get-file-title-or-basename node)
-                                   (org-node-get-olp node)))
-                  (result nil))
-              (dolist (anc ancestors)
-                (push (propertize anc 'face 'completions-annotations) result)
-                (push " > " result))
-              (apply #'concat (nreverse result)))
-          nil)
+        (when (org-node-get-is-subtree node)
+          (let ((ancestors (cons (org-node-get-file-title-or-basename node)
+                                 (org-node-get-olp node)))
+                (result nil))
+            (dolist (anc ancestors)
+              (push (propertize anc 'face 'completions-annotations) result)
+              (push " > " result))
+            (apply #'concat (nreverse result))))
         nil))
 
 (defun org-node-affix-with-olp-and-tags (node title)
@@ -389,17 +388,15 @@ For use as `org-node-affixation-fn'."
               (dolist (anc ancestors)
                 (push (propertize anc 'face 'completions-annotations) result)
                 (push " > " result))
-              (setq result (apply #'concat (nreverse result)))
-              (setq prefix-len (length result))
-              result))
+              (prog1 (setq result (apply #'concat (nreverse result)))
+                (setq prefix-len (length result)))))
           (when-let ((tags (org-node-get-tags node)))
-            (setq tags (propertize (concat "(" (string-join tags ", ") ") ")
+            (setq tags (propertize (concat (string-join tags ":"))
                                    'face 'org-tag))
             (concat (make-string
-                     (max (- (default-value 'fill-column)
-                             (+ prefix-len (length title) (length tags)))
-                          2)
-                     32)
+                     (max 2 (- (default-value 'fill-column)
+                               (+ prefix-len (length title) (length tags))))
+                     ?\s)
                     tags)))))
 
 (defvar org-node--title<>affixation-triplet (make-hash-table :test #'equal)
@@ -567,11 +564,15 @@ For use by `org-node-fakeroam--accelerate-get-contents'.")
 
 ;; 2024-09-19 Clean up deprecated persists
 (unless (memq system-type '(windows-nt ms-dos))
-  (dolist (file (list (persist--file-location 'org-node--file<>previews)
-                      (persist--file-location 'org-node--file<>mtime)))
-    (and (file-exists-p file)
-         (file-writable-p file)
-         (delete-file file))))
+  (cl-loop for sym in '(org-node--file<>mtime
+                        org-node--file<>previews)
+           as file = (expand-file-name
+                      (symbol-name sym)
+                      (or (get sym 'persist-location)
+                          (bound-and-true-p persist--directory-location)))
+           do (and (file-exists-p file)
+                   (file-writable-p file)
+                   (delete-file file))))
 
 (defun org-node-get-id-links (node)
   "Get list of ID-link objects pointing to NODE.
@@ -656,26 +657,32 @@ When called from Lisp, peek on any hash table HT."
     (advice-remove 'rename-file #'org-node--handle-rename)
     (advice-remove 'delete-file #'org-node--handle-delete)))
 
+;; On the assumption there cannot have appeared a tramp file path if tramp is
+;; not loaded, no need to load tramp just to run this package
+(defun org-node--tramp-file-p (file)
+  (when (featurep 'tramp)
+    (tramp-tramp-file-p file)))
+
 (defun org-node--handle-rename (file newname &rest _)
   "Arrange to scan NEWNAME for nodes and links, and forget FILE."
   (org-node--scan-targeted
    (thread-last (list file newname)
                 (seq-filter (lambda (file) (string-suffix-p ".org" file)))
                 (seq-remove #'backup-file-name-p)
-                (seq-remove #'tramp-tramp-file-p)
+                (seq-remove #'org-node--tramp-file-p)
                 (mapcar #'file-truename))))
 
 (defun org-node--handle-delete (file &rest _)
   "Arrange to forget nodes and links in FILE."
   (when (string-suffix-p ".org" file)
-    (unless (tramp-tramp-file-p file)
+    (unless (org-node--tramp-file-p file)
       (org-node--scan-targeted file))))
 
 (defun org-node--handle-save ()
   "Arrange to re-scan nodes and links in current buffer."
   (when (and (string-suffix-p ".org" buffer-file-truename)
              (not (backup-file-name-p buffer-file-truename))
-             (not (tramp-tramp-file-p buffer-file-truename)))
+             (not (org-node--tramp-file-p buffer-file-truename)))
     (org-node--scan-targeted buffer-file-truename)))
 
 (defvar org-node--idle-timer (timer-create)
@@ -1031,8 +1038,9 @@ function to update current tables."
              . ,(rx bol (* space)
                     (or "#+todo: " "#+seq_todo: " "#+typ_todo: ")))
             ($file-name-handler-alist
-             . ,(seq-keep (##rassoc % org-node-perf-keep-file-name-handlers)
-                          file-name-handler-alist))
+             . ,(cl-remove-if-not
+                 (##memq (cdr %) org-node-perf-keep-file-name-handlers)
+                 file-name-handler-alist))
             ($global-todo-re
              . ,(if (stringp (car org-todo-keywords))
                     (org-node--die "Quit because `org-todo-keywords' is configured with obsolete syntax, please fix")
@@ -1711,6 +1719,9 @@ sub-directories, sub-sub-directories and so on, with provisos:
             (push (file-name-concat dir file) result)))))
     result))
 
+;; REVIEW: Org-id uses `abbreviate-file-name', could this result in
+;;         disagreement with org-node filenames on Windows or single-user
+;;         Linux?
 (defvar org-node--homedir nil)
 (defun org-node-abbrev-file-names (path-or-paths)
   "Abbreviate all file paths in PATH-OR-PATHS.
@@ -2402,7 +2413,8 @@ updates the series definition language, old versions may still
 work, but this is not heavily tested, so it will start printing a
 message to remind you to check out the wiki on GitHub and port
 your definitions."
-  :type 'alist)
+  :type 'alist
+  :set #'org-node--set-and-remind-reset)
 
 (defvar org-node-built-series nil
   "Alist describing each node series, internal use.")
