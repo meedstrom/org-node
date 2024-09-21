@@ -1,6 +1,6 @@
 \input texinfo    @c -*- texinfo -*-
 @c %**start of header
-@setfilename doc/org-node.info
+@setfilename org-node.info
 @settitle org-node
 @documentencoding UTF-8
 @documentlanguage en
@@ -23,7 +23,6 @@
 @end ifnottex
 
 @menu
-* News::
 * Background::
 * Setup::
 * Backlinks::
@@ -62,6 +61,7 @@ Misc
 * Node series::
 * An analogue to @samp{org-roam-node-display-template}?::
 * Completion-at-point::
+* Grep::
 * Let org-open-at-point detect refs::
 * Limitation TRAMP::
 * Limitation Encryption::
@@ -73,6 +73,7 @@ Misc
 Node series
 
 * What are series?::
+* Future::
 
 Appendix
 
@@ -80,19 +81,6 @@ Appendix
 
 @end detailmenu
 @end menu
-
-@node News
-@chapter News
-
-On @emph{[2024-09-19 Thu]}, the git repo history was REWRITTEN@!  You may have had to delete and reinstall the package.  (Depends on your package manager.)  Sorry about that.
-
-@strong{What was rewritten?}  I've erased the @samp{;; Package-Version:} comment line in file contents, because of Emacs 30's new @samp{(use-package :vc)} keyword, which defaults to installing the @emph{oldest} commit with a given Package-Version, not the @emph{newest} commit.
-
-Even if that's 5 years old.  Please chime in at the @uref{https://lists.gnu.org/r/emacs-devel/2024-09/msg00366.html, mailing list discussion}!
-
-For more reading, chec out some @uref{https://github.com/melpa/melpa/issues/2955#issuecomment-1519154736, loooong related discussions} about the untrustworthiness of Package-Version, and that's leaving aside the fact the ecosystem @uref{https://github.com/melpa/melpa/issues/6656, doesn't really make use of the concept of versioned releases}, and when some tools pretend it does instead of taking the newest commit, they make it @uref{https://old.reddit.com/r/emacs/comments/1f8ok7c/do_you_set_packageinstallupgradebuiltin_to_t/llimwe0/, less stable for all}.
-
-Lesson learned -- when @emph{you} create a package, never commit a file containing a Package-Version line.  Doing so curses the repo for the rest of time, or until you use git-filter-repo to undo the damage.
 
 @node Background
 @chapter Background
@@ -301,25 +289,16 @@ If you are an org-roam user, you'll want the following module as well.  Please c
   :defer)
 @end lisp
 
-It's a very recent addition to MELPA, so you may have to refresh the recipe list first:
+Both are recent additions to MELPA, so you may have to refresh the recipe list first:
 
-@example
-M-x package-refresh-contents RET
-@end example
-
-
-On Elpaca:
-
-@example
-C-u M-x elpaca-update-menus RET
-@end example
-
-
-On Straight (I think):
-
-@example
-M-x straight-fetch-all RET
-@end example
+@itemize
+@item
+On package.el: @code{M-x package-refresh-contents RET}
+@item
+On Elpaca: @code{C-u M-x elpaca-update-menus RET}
+@item
+On Straight (I think): @code{M-x straight-fetch-all RET}
+@end itemize
 
 @node Quick start
 @section Quick start
@@ -356,7 +335,7 @@ Backlinks are the butter on the bread of your notes.  If you've ever seen a "Wha
 
 As a Roam user, you can keep using @samp{M-x org-roam-buffer-toggle}.
 
-If saving files has been slow, @uref{https://github.com/meedstrom/org-node-fakeroam, org-node-fakeroam} gives you some new ways to keep Roam's DB data fresh, circumventing Roam's "autosync mode".
+If it has been slow, or saving files has been slow, @uref{https://github.com/meedstrom/org-node-fakeroam, org-node-fakeroam} gives you some new ways to keep Roam's DB data fresh, circumventing Roam's "autosync mode".
 
 @node Backlink solution 2 Print inside the file
 @section Backlink solution 2: Print inside the file
@@ -379,7 +358,7 @@ Then start using the minor mode @samp{org-node-backlink-mode}, which keeps these
 (add-hook 'org-mode-hook #'org-node-backlink-mode)
 @end lisp
 
-NOTE:  I hadn't even realized this, but people who @emph{don't} use visual-line-mode may not find this solution very scalable, since Org properties must stay on one line.  This marks the second time I distribute software that assumes visual-line-mode :-)
+NOTE:  I hadn't even realized this, but people who @emph{don't} use visual-line-mode may not find this solution very scalable, since Org properties must stay on one line.  This marks the second time I distribute software that presumes soft-wrapped text buffers :-)
 
 @node Option 2B Let org-super-links manage a @samp{BACKLINKSEND} drawer
 @subsection Option 2B: Let org-super-links manage a @samp{:BACKLINKS:...:END:} drawer
@@ -401,6 +380,7 @@ Bad news: this is currently directed towards people who used @uref{https://githu
 * Node series::
 * An analogue to @samp{org-roam-node-display-template}?::
 * Completion-at-point::
+* Grep::
 * Let org-open-at-point detect refs::
 * Limitation TRAMP::
 * Limitation Encryption::
@@ -474,6 +454,7 @@ and configure @samp{org-node-series-defs} if needed.  See @uref{https://github.c
 
 @menu
 * What are series?::
+* Future::
 @end menu
 
 @node What are series?
@@ -487,11 +468,16 @@ You don't need software for that basic idea, only to make it extra convenient to
 
 Thus, fundamentally, any "journal" or "dailies" software are just operating on a sorted series to navigate through.  You could have series about, let's say, historical events, Star Trek episodes, your school curriculum@dots{}
 
-Define more series in the variable @samp{org-node-series-defs}.
+Define more series in the variable @samp{org-node-series-defs}.  Already included is a definition that approximates the org-roam-dailies defaults, but I encourage you to override it to suit your tastes.  @uref{https://github.com/meedstrom/org-node/wiki/Configuring-series, Wiki}.
 
-Already included is a definition that approximates the org-roam-dailies defaults, but I encourage you to override it to suit your tastes.  @uref{https://github.com/meedstrom/org-node/wiki/Configuring-series, Wiki}.
+You may be taken aback that defining a new series requires writing 5 lambdas, but once you get the hang of it, you can often reuse those lambdas.
 
-You may be taken aback that defining a new series requires writing 5 lambdas, but once you get the hang of it, you can often reuse those lambdas.  A future version will bring convenient wrappers.
+@node Future
+@subsection Future
+
+A future version will likely bring convenient wrappers that let you define a series in 1-2 lines.
+
+It's also possible we just redesign this completely.  Input welcome.  How would you like to define a series?  Where should the information be stored?
 
 @node An analogue to @samp{org-roam-node-display-template}?
 @section An analogue to @samp{org-roam-node-display-template}?
@@ -514,6 +500,30 @@ To complete words at point into known node titles:
 (org-node-complete-at-point-mode)
 (setq org-roam-completion-everywhere nil) ;; Prevent Roam's variant
 @end lisp
+
+@node Grep
+@section Grep
+
+If you have Ripgrep installed on the computer and @uref{https://github.com/minad/consult, consult} installed on Emacs, you can use this command to grep across all your Org files at any time.
+
+@lisp
+(keymap-set global-map "M-s M-g" #'org-node-grep) ;; Requires consult
+@end lisp
+
+This is can be a real power tool for mass edits.  Say you want to rename some Org tag @samp{:math:} to @samp{:Math:} absolutely everywhere.  Then you could follow a procedure such as:
+
+@enumerate
+@item
+Use @samp{org-node-grep} and type @samp{:math:}
+@item
+Use @samp{embark-export} (see @uref{https://github.com/oantolin/embark, embark})
+@item
+Use @samp{wgrep-change-to-wgrep-mode} (see @uref{https://github.com/mhayashi1120/Emacs-wgrep, wgrep})
+@item
+Do a query-replace (@code{M-%}) to replace all @samp{:math:} with @samp{:Math:}
+@item
+Type @code{C-c C-c} to apply the changes
+@end enumerate
 
 @node Let org-open-at-point detect refs
 @section Let org-open-at-point detect refs
@@ -606,6 +616,8 @@ Basic commands:
 @item
 @samp{org-node-visit-random}
 @item
+@samp{org-node-refile}
+@item
 @samp{org-node-series-dispatch}
 @itemize
 @item
@@ -634,12 +646,6 @@ A bizarro counterpart to @samp{org-roam-extract-subtree}.  Export the subtree at
 @itemize
 @item
 (Requires @uref{https://github.com/minad/consult, consult}) Grep across all known Org files.
-@itemize
-@item
-Very useful combined with @uref{https://github.com/oantolin/embark, embark}-export & @uref{https://github.com/mhayashi1120/Emacs-wgrep, wgrep}, to search-and-replace a given string everywhere in every directory, for example to rename a tag once and for all.
-@item
-This will use ripgrep if installed, otherwise it is very slow.
-@end itemize
 @end itemize
 @item
 @samp{org-node-fakeroam-show-roam-buffer}
