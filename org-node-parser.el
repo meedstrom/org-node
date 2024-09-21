@@ -23,13 +23,6 @@
 
 ;;; Code:
 
-;; TODO: Find ways to do fewer regexp searches.  Could e.g. write an
-;;       autoformatter that removes indentation for :PROPERTIES: drawers,
-;;       recommend its use, then just do (search-forward "\n:END:")
-;;       instead of (re-search-forward "^[[:space:]]*:END:").
-;;       Same autoformatter would also reduce the need for `string-trim' and
-;;       such things.
-
 (eval-when-compile
   (require 'cl-lib)
   (require 'subr-x))

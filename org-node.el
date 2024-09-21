@@ -1170,12 +1170,9 @@ pass that to FINALIZER."
                   (erase-buffer)
                   (insert-file-contents results-file)
                   (let* ((result (read (buffer-string)))
-                         ;; (time (car (last result)))
-                         (result-tail (nthcdr (- (length result) 2) result))
-                         (time (prog1 (cadr result-tail)
-                                 (setcdr result-tail nil)))
-                         joined)
-                    ;; (nbutlast result)
+                         (time (car (last result)))
+                         new-merged-result)
+                    (nbutlast result)
                     (when (time-less-p
                            org-node--time-at-last-child-done time)
                       (setq org-node--time-at-last-child-done time))
@@ -1183,13 +1180,12 @@ pass that to FINALIZER."
                         (setq merged-result result)
                       (while result
                         (push (nconc (pop result) (pop merged-result))
-                              joined))
-                      (setq merged-result (nreverse joined)))))))
+                              new-merged-result))
+                      (setq merged-result (nreverse new-merged-result)))))))
           (when editorconfig
             (advice-add #'insert-file-contents :around
                         'editorconfig--advice-insert-file-contents))))
       (funcall finalizer merged-result))))
-
 
 (defvar org-node-before-update-tables-hook nil
   "Hook run just before processing results from scan.")
@@ -1197,11 +1193,6 @@ pass that to FINALIZER."
 
 ;;;; Scan-finalizers
 
-;; TODO: Some perf ideas:
-;;       produce minimal garbage with hand-written `while' loops,
-;;       look for places to do fewer remhash/clrhash if possible,
-;;       define inline functions,
-;;       let the parser pre-collect list of links for each dest
 (defun org-node--finalize-full (results)
   "Wipe tables and repopulate from data in RESULTS."
   (run-hooks 'org-node-before-update-tables-hook)
@@ -1492,6 +1483,8 @@ also necessary is `org-node--dirty-ensure-link-known' elsewhere."
               :refs (org-node-parser--split-refs-field
                      (cdr (assoc "ROAM_REFS" props)))
               :pos (if heading (org-entry-beginning-position) 1)
+              ;; NOTE: Don't use `org-reduced-level' since org-node-parser.el
+              ;;       also does not correct for that
               :level (or (org-current-level) 0)
               :olp (org-get-outline-path)
               ;; Less important
