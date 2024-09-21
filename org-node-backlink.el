@@ -94,9 +94,9 @@ See Info node `(org-node)'.
   (org-node-backlink-fix-all 'remove))
 
 ;;;###autoload
-(defun org-node-backlink-fix-all (&optional remove?)
+(defun org-node-backlink-fix-all (&optional remove)
   "Add :BACKLINKS: property to all known nodes.
-Optional argument REMOVE? t means remove them instead, the same
+Optional argument REMOVE t means remove them instead, the same
 as the user command \\[org-node-backlink-regret].
 
 Can be quit midway through and resumed later.  With
@@ -115,23 +115,23 @@ Can be quit midway through and resumed later.  With
           (org-node--in-files-do
             :files org-node-backlink--files-to-fix
             :msg "Adding/updating :BACKLINKS: (you can quit and resume)"
-            :why-recover "About to edit backlinks"
-            :call (if remove?
+            :about-to-do "About to edit backlinks"
+            :call (if remove
                       (lambda () (org-node-backlink--fix-whole-buffer t))
                     #'org-node-backlink--fix-whole-buffer)))))
 
-(defun org-node-backlink--fix-whole-buffer (&optional remove?)
+(defun org-node-backlink--fix-whole-buffer (&optional remove)
   "Update :BACKLINKS: property for all nodes in buffer.
-If REMOVE? is non-nil, remove the property."
+If REMOVE is non-nil, remove the property."
   (goto-char (point-min))
   (let ((case-fold-search t))
     (while (re-search-forward "^[[:space:]]*:id: " nil t)
-      (org-node-backlink--fix-entry-here remove?))))
+      (org-node-backlink--fix-entry-here remove))))
 
-(defun org-node-backlink--fix-entry-here (&optional remove?)
+(defun org-node-backlink--fix-entry-here (&optional remove)
   "Update the :BACKLINKS: property in the current entry.
-If REMOVE? is non-nil, remove it instead."
-  (if remove?
+If REMOVE is non-nil, remove it instead."
+  (if remove
       (org-entry-delete nil "BACKLINKS")
     (when-let* ((id (org-entry-get nil "ID"))
                 (node (gethash id org-node--id<>node)))
