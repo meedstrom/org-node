@@ -2533,10 +2533,11 @@ DEF is a series-definition from `org-node-series-defs'."
                                    (if (< emacs-major-version 30)
                                        ;; Faster than compat's sort
                                        (cl-sort items #'string> :key #'car)
-                                     ;; `compat-call' prevents compile warnings
-                                     (compat-call sort items
-                                                  :key #'car :lessp #'string<
-                                                  :reverse t :in-place t))))))))
+                                     ;; Prevent compile warnings
+                                     (when (fboundp 'sort)
+                                       (sort items
+                                             :key #'car :lessp #'string<
+                                             :reverse t :in-place t)))))))))
 
 (defvar org-node-current-series-key nil
   "Key of the series currently being browsed with the menu.")
