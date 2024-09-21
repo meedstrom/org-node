@@ -60,8 +60,7 @@ See Info node `(org-node)'.
         ;; Advices cannot be buffer-local, so we leave this advice on even
         ;; after the mode is disabled.  It no-ops where the mode is inactive.
         (advice-add 'org-insert-link :after
-                    #'org-node-backlink--add-in-target)
-        (org-node-cache-ensure 'must-async))
+                    #'org-node-backlink--add-in-target))
     (remove-hook 'org-roam-post-node-insert-hook
                  #'org-node-backlink--add-in-target t)
     (remove-hook 'org-node-insert-link-hook
@@ -103,23 +102,30 @@ as the user command \\[org-node-backlink-regret].
 Can be quit midway through and resumed later.  With
 \\[universal-argument], start over instead of resuming."
   (interactive)
-  (when (or (equal current-prefix-arg '(4))
-            (and (null org-node-backlink--files-to-fix)
-                 (y-or-n-p (format "Edit %d Org files?"
-                                   (length (org-node-list-files t))))
-                 (y-or-n-p
-                  (string-fill "You understand that this may trigger your auto git-commit systems and similar because many files are about to be edited and saved?"
-                               fill-column))))
-    (setq org-node-backlink--files-to-fix (org-node-list-files t)))
+  (let (files)
+    (when (or (equal current-prefix-arg '(4))
+              (and (null org-node-backlink--files-to-fix)
+                   (y-or-n-p (format "Edit %d Org files?"
+                                     (length
+                                      (setq files (org-node-list-files)))))
+                   (y-or-n-p
+                    (string-fill "You understand that this may trigger your auto git-commit systems and similar because many files are about to be edited and saved?"
+                                 (default-value 'fill-column)))))
+      (setq org-node-backlink--files-to-fix files)))
   (when org-node-backlink--files-to-fix
-    (setq org-node-backlink--files-to-fix
-          (org-node--in-files-do
-            :files org-node-backlink--files-to-fix
-            :msg "Adding/updating :BACKLINKS: (you can quit and resume)"
-            :about-to-do "About to edit backlinks"
-            :call (if remove
-                      (lambda () (org-node-backlink--fix-whole-buffer t))
-                    #'org-node-backlink--fix-whole-buffer)))))
+    (if remove
+        (setq org-node-backlink--files-to-fix
+              (org-node--in-files-do
+                :files org-node-backlink--files-to-fix
+                :msg "Removing :BACKLINKS: (you may quit and resume anytime)"
+                :about-to-do "About to remove backlinks"
+                :call (lambda () (org-node-backlink--fix-whole-buffer t) )))
+      (setq org-node-backlink--files-to-fix
+            (org-node--in-files-do
+              :files org-node-backlink--files-to-fix
+              :msg "Adding/updating :BACKLINKS: (you may quit and resume anytime)"
+              :about-to-do "About to edit backlinks"
+              :call #'org-node-backlink--fix-whole-buffer)))))
 
 (defun org-node-backlink--fix-whole-buffer (&optional remove)
   "Update :BACKLINKS: property for all nodes in buffer.

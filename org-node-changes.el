@@ -78,10 +78,11 @@ value."
                     org-node--file<>previews)
        as dir = (or (get sym 'persist-location)
                     (bound-and-true-p persist--directory-location))
-       as file = (expand-file-name (symbol-name sym) dir)
-       when dir do (and (file-exists-p file)
-                        (file-writable-p file)
-                        (delete-file file))))))
+       when dir do
+       (let ((file (expand-file-name (symbol-name sym) dir)))
+         (and (file-exists-p file)
+              (file-writable-p file)
+              (delete-file file)))))))
 
 (defmacro org-node-changes--def-whiny-alias (old new &optional when interactive removed-by)
   "Define OLD as effectively an alias for NEW.
