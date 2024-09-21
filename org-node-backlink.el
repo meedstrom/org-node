@@ -26,6 +26,7 @@
 
 (require 'org-node)
 (require 'cl-lib)
+(require 'compat)
 
 (let (warned-once)
   (defun org-node-backlinks-mode (&rest args)

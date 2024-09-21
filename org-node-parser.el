@@ -28,7 +28,8 @@
 
 (eval-when-compile
   (require 'cl-lib)
-  (require 'subr-x))
+  (require 'subr-x)
+  (require 'compat))
 
 ;; Tell compiler these aren't free variables
 (defvar $plain-re)
