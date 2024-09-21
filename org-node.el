@@ -1580,8 +1580,13 @@ operation."
 ;; => (1.488666741 1 0.23508516499999388)
 (defun org-node-list-files (&optional instant interactive)
   "List files in `org-id-locations' or `org-node-extra-id-dirs'.
+Also include any Org files ever saved while `org-node-cache-mode' was
+active, that were neither backup nor remote files.  This is not
+necessary for org-node to function, just a consequence of
+implementation.
+
 With optional argument INSTANT t, return already known files
-instead of checking the filesystem.
+instead of checking the filesystem again.
 
 When called interactively \(automatically making INTERACTIVE
 non-nil), list the files in a new buffer."

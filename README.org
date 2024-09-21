@@ -16,7 +16,7 @@ I found org-roam too slow, so I made [[https://github.com/meedstrom/quickroam][q
 
 - *If you were using org-roam*, there is nothing to migrate.  You can use both packages.  It's exactly the same on-disk format: "notes" are identified by their org-id.
 
-  With optional [[https://github.com/meedstrom/org-node-fakeroam][shims]], you can even *skip syncing the org-roam DB* and continue using its rich backlinks buffer and org-roam-capture!
+  With optional shims, you can even *skip syncing the org-roam DB* and continue using its rich backlinks buffer!
 
   In pursuit of being "just org-id", this package has no equivalent setting to =org-roam-directory= -- it just looks up =org-id-locations=.
 
@@ -26,7 +26,7 @@ I found org-roam too slow, so I made [[https://github.com/meedstrom/quickroam][q
 
 ** What's a "node"?
 
-My life can be divided into two periods "*before org-roam*" and "*after org-roam*".  I crossed a kind of gap once I got a good way to link between my notes.  It's odd to remember when I just relied on browsing subtrees and folders -- what a strange way to work!
+My life can be divided into two periods "*before org-roam*" and "*after org-roam*".  I crossed a kind of gap once I got a good way to link between my notes.  It's odd to remember when I just relied on browsing subtrees and the filesystem -- what a strange way to work!
 
 I used to lose track of things I had written, under some forgotten heading in a forgotten file in a forgotten directory.  The org-roam method let me *find* and *build on* my own work, instead of [[https://en.wikipedia.org/wiki/Cryptomnesia][recreating my work all the time]].
 
@@ -50,6 +50,7 @@ A comparison of three similar systems, which permit relying on org-id and don't 
 | Node search and insert         | yes      | yes                | -- (suggests [[https://github.com/alphapapa/org-ql][org-ql]]) |
 | Node aliases                   | yes      | yes                | --                   |
 | Node exclusion                 | yes      | limited            | not applicable       |
+| Refile                         | yes      | yes                | --                   |
 | Rich backlinks buffer          | yes      | yes (org-roam's)   | --                   |
 | Customize how backlinks shown  | yes      | yes (org-roam's)   | yes                  |
 | Reflinks                       | yes      | yes (as backlinks) | --                   |
@@ -68,10 +69,9 @@ A comparison of three similar systems, which permit relying on org-id and don't 
 | Rename file when title changes | --       | yes                | --                   |
 | Warn about duplicate titles    | --       | yes                | --                   |
 | Principled "related-section"   | --       | --                 | yes                  |
-| Refile                         | yes      | --                 | --                   |
 | Untitled notes                 | --       | --                 | --                   |
-| Support =roam:= links            | yes      | -- (wontfix)       | not applicable       |
-| Can have separate note piles   | yes      | -- (wontfix)       | not applicable       |
+| Support =roam:= links            | yes      | -- (WONTFIX)       | not applicable       |
+| Can have separate note piles   | yes      | -- (WONTFIX)       | not applicable       |
 |--------------------------------+----------+--------------------+----------------------|
 | Some query-able cache          | EmacSQL  | hash tables        | --                   |
 | Async cache rebuild            | --       | yes                | not applicable       |

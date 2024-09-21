@@ -21,6 +21,9 @@
 ;; to compile quickly, and the compiled artifact should load no libraries at
 ;; runtime.
 
+;; The child processes are expected to execute
+;; `org-node-parser--collect-dangerously', then die.
+
 ;;; Code:
 
 (eval-when-compile
@@ -130,18 +133,17 @@ What this means?  See test/org-node-test.el."
 
 (defun org-node-parser--collect-links-until (end id-here)
   "From here to buffer position END, look for forward-links.
-vArgument ID-HERE is the ID of the subtree where this function is
+Argument ID-HERE is the ID of the subtree where this function is
 being executed (or that of an ancestor heading, if the current
 subtree has none), to be included in each link's metadata.
 
 It is important that END does not extend past any sub-heading, as
-the subheading potentially has an ID of its own.
-
-Argument PLAIN-RE is expected to be the value of
-`org-link-plain-re', and MERGED-RE a regexp that merges that with
-`org-link-bracket-re'."
+the subheading potentially has an ID of its own."
   (let ((beg (point))
         link-type path)
+    ;; Here it may help to know that:
+    ;; - `$plain-re' will be set to basically `org-link-plain-re'
+    ;; - `$merged-re' to a combination of that and `org-link-bracket-re'
     (while (re-search-forward $merged-re end t)
       (if (setq path (match-string 1))
           ;; Link is the [[bracketed]] kind.  Is there an URI: style link
@@ -307,7 +309,7 @@ findings to another temp file."
               ;; level front matter, can jump somewhat too far but that's ok
               (setq FAR (if (re-search-forward "^ *?[^#:]" nil t)
                             (1- (point))
-                          ;; No content other than front matter
+                          ;; There's no content other than front matter
                           (point-max)))
               (goto-char 1)
               (setq PROPS
@@ -362,12 +364,12 @@ findings to another temp file."
                 (org-node-parser--collect-links-until END FILE-ID)
 
                 ;; NOTE: A plist would be more readable than a record, but then
-                ;; main Emacs has more work to do.  Profiled using:
-                ;;   (benchmark-run 10 (setq org-node--done-ctr 6) (org-node--handle-finished-job 7 #'org-node--finalize-full))
-                ;; Result when finalizer passes plists to `org-node--make-obj':
-                ;;   (8.152532984 15 4.110698459000105)
-                ;; Result when finalizer accepts these premade records:
-                ;;   (5.928453786 10 2.7291036080000595)
+                ;;       the mother Emacs has more work to do.  Profiled using:
+                ;; (benchmark-run 10 (setq org-node--done-ctr 6) (org-node--handle-finished-job 7 #'org-node--finalize-full))
+                ;;       Result when finalizer passes plists to `org-node--make-obj':
+                ;; (8.152532984 15 4.110698459000105)
+                ;;       Result when finalizer accepts these premade records:
+                ;; (5.928453786 10 2.7291036080000595)
                 (push (record 'org-node
                               (split-string-and-unquote
                                (or (cdr (assoc "ROAM_ALIASES" PROPS)) ""))
@@ -496,7 +498,7 @@ findings to another temp file."
                                 TODO-STATE)
                         result/found-nodes))
 
-                ;; Heading recorded, now collect links in the entry body!
+                ;; Heading analyzed, now collect links in entry body!
                 (setq ID-HERE
                       (or ID
                           (cl-loop for crumb in OLPATH thereis (caddr crumb))

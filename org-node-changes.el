@@ -20,7 +20,7 @@
 ;; I rename things a lot.  That would break things for users unless I make
 ;; aliases.  But `define-obsolete-variable-alias' does not warn users about
 ;; user options, which means they can blissfully keep referring to a
-;; thrice-deprecated variable name for years and not even know.
+;; thrice-deprecated variable name for years and not know.
 
 ;; Thus this file.  Actually tell the user, once, for each old symbol that
 ;; they set or call.
@@ -29,7 +29,6 @@
 
 (require 'seq)
 (require 'cl-lib)
-(require 'find-func)
 
 (defvar org-node-changes--new-names
   '((org-node-rescan-hook org-node-rescan-functions)
