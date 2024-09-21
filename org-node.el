@@ -148,6 +148,18 @@ Report an issue on https://github.com/meedstrom/org-node/issues
 or drop me a line on Mastodon: @meedstrom@hachyderm.io"
   :type 'alist)
 
+(defcustom org-node-link-types
+  '("http" "https" "id")
+  "Link types that may count as backlinks.
+Types other than \"id\" only result in a backlink when there is
+some node with the same link in its ROAM_REFS property.
+
+Having fewer types results in a faster \\[org-node-reset].
+Tip: eval `(org-link-types)' to see all possible types.
+
+There is no need to add the \"cite\" type."
+  :type '(repeat string))
+
 (defcustom org-node-perf-assume-coding-system nil
   "Coding system to assume while scanning ID nodes.
 
@@ -962,18 +974,6 @@ LIB-NAME should be something that works with `find-library-name'."
           (let ((byte-compile-dest-file-function `(lambda (&rest _) ,elc-path)))
             (byte-compile-file lib)))
         elc-path))))
-
-(defcustom org-node-link-types
-  '("http" "https" "id")
-  "Link types that may count as backlinks.
-Types other than \"id\" only result in a backlink when there is
-some node with the same link in its ROAM_REFS property.
-
-Having fewer types results in a faster \\[org-node-reset].
-Tip: eval `(org-link-types)' to see all possible types.
-
-There is no need to add the \"cite\" type."
-  :type '(repeat string))
 
 (defvar org-node--debug nil)
 (defun org-node--scan (files finalizer)
@@ -3311,7 +3311,7 @@ In case of unsolvable problems, how to wipe org-id-locations:
 
 (defvar org-node--unlinted nil)
 (defvar org-node--lint-warnings nil)
-(defun org-node-lint-all-files ()
+(defun org-node-lint-all ()
   "Run `org-lint' on all known Org files, and report results.
 
 If last run was interrupted, resume working through the file list
@@ -3338,7 +3338,7 @@ from the beginning."
   (org-node--pop-to-tabulated-list
    :buffer "*org lint results*"
    :format [("File" 30 t) ("Line" 5 t) ("Trust" 5 t) ("Explanation" 0 t)]
-   :reverter #'org-node-lint-all-files
+   :reverter #'org-node-lint-all
    :entries (cl-loop
              for (file . warning) in org-node--lint-warnings
              collect (let ((array (cadr warning)))
@@ -3354,6 +3354,9 @@ from the beginning."
                               (elt array 0)
                               (elt array 1)
                               (elt array 2)))))))
+
+(define-obsolete-function-alias
+  'org-node-lint-all-files #'org-node-lint-all "2024-09-21")
 
 (defun org-node-list-feedback-arcs ()
   "Show a feedback-arc-set of forward id-links.
@@ -3626,10 +3629,9 @@ one of them is associated with a ROAM_REFS property."
     (message "Congratulations, no problems scanning %d nodes!"
              (hash-table-count org-node--id<>node))))
 
-
-;; NOTE Very important macro for the backlink mode, because backlink insertion
-;;      opens the target Org file in the background, and if doing that is
-;;      laggy, then every link insertion is laggy.
+;; NOTE: Very important macro for the backlink mode, because backlink insertion
+;;       opens the target Org file in the background, and if doing that is
+;;       laggy, then every link insertion is laggy.
 (defmacro org-node--with-quick-file-buffer (file &rest body)
   "Pseudo-backport of Emacs 29 `org-with-file-buffer'.
 Also integrates `org-with-wide-buffer' behavior, and tries to

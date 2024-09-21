@@ -16,7 +16,7 @@ I found org-roam too slow, so I made [[https://github.com/meedstrom/quickroam][q
 
 - *If you were using org-roam*, there is nothing to migrate.  You can use both packages.  It's exactly the same on-disk format: "notes" are identified by their org-id.
 
-  With optional shims, you can even *skip syncing the org-roam DB* and continue using its rich backlinks buffer and org-roam-capture!
+  With optional [[https://github.com/meedstrom/org-node-fakeroam][shims]], you can even *skip syncing the org-roam DB* and continue using its rich backlinks buffer and org-roam-capture!
 
   In pursuit of being "just org-id", this package has no equivalent setting to =org-roam-directory= -- it just looks up =org-id-locations=.
 
@@ -314,11 +314,11 @@ While a big selling point of IDs is that you avoid depending on filenames, it's 
 
 Org-node supports the Org 9.5 @citations, but not fully the aftermarket [[https://github.com/jkitchin/org-ref][org-ref]] &citations that emulate LaTeX look-and-feel, since it nearly doubles my scan time if I amend =org-link-plain-re= to match all of =org-ref-cite-types=.
 
-What works is bracketed Org-ref v3 citations that start with "cite", e.g. =[[citep:...]]=, =[[citealt:...]]=, =[[citeauthor:...]]=, since org-node-parser.el is able to pick them up for free.  What doesn't work is e.g. =[[Citealt*:...]]= since it doesn't start with "cite", nor plain =citep:...= since it is not wrapped in brackets.
+What works is bracketed Org-ref v3 citations that start with "cite", e.g. =[[citep:...]]=, =[[citealt:...]]=, =[[citeauthor:...]]=, since org-node-parser.el is able to pick them up for free.  What doesn't work is e.g. =[[bibentry:...]]= since it doesn't start with "cite", nor plain =citep:...= since it is not wrapped in brackets.
 
 If you need more of Org-ref, you have at least two options:
 - Use org-roam - see discussions on boosting its performance [[https://org-roam.discourse.group/t/rewriting-org-roam-node-list-for-speed-it-is-not-sqlite/3475/92][here]] and [[https://org-roam.discourse.group/t/improving-performance-of-node-find-et-al/3326/33][here]]
-- Get your elbows dirty and try to update the archived branch [[https://github.com/meedstrom/org-node/branches]["orgref"]], see relevant [[https://github.com/meedstrom/org-node/commit/90b0e503ac75428a5d3ca6a4c8c51b5e075064d3][commit]].
+- Get your elbows dirty and try to revive the archived branch [[https://github.com/meedstrom/org-node/branches]["orgref"]], see relevant [[https://github.com/meedstrom/org-node/commit/90b0e503ac75428a5d3ca6a4c8c51b5e075064d3][commit]].
 
 ** Toolbox
 
@@ -333,7 +333,7 @@ Basic commands:
 - =org-node-series-dispatch=
   - Browse node series -- see README
 - =org-node-extract-subtree=
-  - A bizarro counterpart to =org-roam-extract-subtree=.  Export the subtree at point into a file-level node, *leave a link where the subtree was*, and show the new file as current buffer.
+  - A bizarro counterpart to =org-roam-extract-subtree=.  Export the subtree at point into a file-level node, *leave a link in the outline parent of where the subtree was*, and show the new file as current buffer.
 - =org-node-nodeify-entry=
   - (Trivial) Give an ID to the subtree at point, and run the hook =org-node-creation-hook=
 - =org-node-insert-heading=
@@ -346,22 +346,25 @@ Basic commands:
 
 Rarer commands:
 
-- =org-node-lint-all-files=
-  - Can help you fix a broken setup: it runs org-lint on all known files and generates a report of syntax problems, for you to correct at will.  Org-node [[https://github.com/meedstrom/org-node/issues/8#issuecomment-2101316447][assumes all files have valid syntax]], though many of the problems reported by org-lint are survivable.
-- =org-node-list-dead-links=
-  - List links where the destination ID could not be found
-- =org-node-list-reflinks=
-  - List citations and non-ID links
+- =org-node-lint-all=
+  - Can help you fix a broken setup: it runs org-lint on all known files and generates a report of syntax problems, for you to correct manually.  Org-node [[https://github.com/meedstrom/org-node/issues/8#issuecomment-2101316447][assumes all files have valid syntax]], though many of the problems reported by org-lint are survivable.
 - =org-node-rewrite-links-ask=
   - Look for link descriptions that got out of sync with the corresponding node title, then prompt at each link to update it
 - =org-node-rename-file-by-title=
   - Auto-rename the file based on the current =#+title=
     - Works as an after-save-hook!  Does nothing until you configure =org-node-renames-allowed-dirs=.
     - Please note that if your filenames have datestamp prefixes, it is important to get =org-node-datestamp-format= right or it may clobber a pre-existing datestamp.
+- =org-node-list-dead-links=
+  - List links where the destination ID could not be found
+- =org-node-list-reflinks=
+  - List citations and non-ID links
+    - Can be interesting for seeing which links have an associated node and which don't (usually, most don't)
 - =org-node-backlink-fix-all=
   - Update =BACKLINKS= property in all nodes
 - =org-node-list-feedback-arcs=
-  - (Requires GNU R) Explore [[https://en.wikipedia.org/wiki/Feedback_arc_set][feedback arcs]] in your ID link network.  Can be a nice [[https://edstrom.dev/zvjjm/slipbox-workflow#ttqyc][occasional QA routine]].
+  - (Requires GNU R with R packages tidyverse and igraph)
+
+    Explore [[https://en.wikipedia.org/wiki/Feedback_arc_set][feedback arcs]] in your ID link network.  Can be a sort of [[https://edstrom.dev/zvjjm/slipbox-workflow#ttqyc][occasional QA routine]].
 - =org-node-rename-asset-and-rewrite-links=
   - Interactively rename an asset such as an image file and try to update all Org links to them.  Requires [[https://github.com/mhayashi1120/Emacs-wgrep][wgrep]].
     - NOTE: For now, it only looks for links inside the root directory that it prompts you for, and sub and sub-subdirectories and so on -- but won't find a link outside that root directory.

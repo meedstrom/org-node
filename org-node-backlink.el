@@ -313,12 +313,9 @@ headings but you have only done work under one of them."
                   ;; `org-node-backlink--fix-flagged-parts-of-buffer' will not
                   ;; later remove the backlink we're adding
                   (org-node--dirty-ensure-node-known)
-                  (let ((org-node--imminent-recovery-msg
-                         (string-fill "Org-node going to add a backlink to the target of the link you just inserted, but it's likely you will first get a prompt to recover an auto-save file, ready? "
-                                      fill-column)))
-                    (org-node--with-quick-file-buffer file
-                      (org-node-backlink--add-at
-                       id src-title src-id))))))))))))
+                  (org-node--with-quick-file-buffer file
+                    :about-to-do "Org-node going to add backlink to the target of the link you just inserted"
+                    (org-node-backlink--add-at id src-title src-id)))))))))))
 
 (defun org-node-backlink--add-at (target-id src-title src-id)
   "Add a backlink at TARGET-ID.
