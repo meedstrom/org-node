@@ -91,6 +91,7 @@ See Info node `(org-node)'.
 (defun org-node-backlink-regret ()
   "Visit all `org-id-locations' and remove :BACKLINKS: property."
   (interactive)
+  (org-node-backlink-global-mode 0)
   (org-node-backlink-fix-all 'remove))
 
 ;;;###autoload
@@ -102,16 +103,15 @@ as the user command \\[org-node-backlink-regret].
 Can be quit midway through and resumed later.  With
 \\[universal-argument], start over instead of resuming."
   (interactive)
-  (let (files)
-    (when (or (equal current-prefix-arg '(4))
-              (and (null org-node-backlink--files-to-fix)
-                   (y-or-n-p (format "Edit %d Org files?"
-                                     (length
-                                      (setq files (org-node-list-files)))))
-                   (y-or-n-p
-                    (string-fill "You understand that this may trigger your auto git-commit systems and similar because many files are about to be edited and saved?"
-                                 (default-value 'fill-column)))))
-      (setq org-node-backlink--files-to-fix files)))
+  (org-node-cache-ensure)
+  (when (or (equal current-prefix-arg '(4))
+            (and (null org-node-backlink--files-to-fix)
+                 (y-or-n-p (format "Edit %d Org files?"
+                                   (length (org-node-list-files t))))
+                 (y-or-n-p
+                  (string-fill "You understand that this may trigger your auto git-commit systems and similar because many files are about to be edited and saved?"
+                               (default-value 'fill-column)))))
+    (setq org-node-backlink--files-to-fix (org-node-list-files t)))
   (when org-node-backlink--files-to-fix
     (if remove
         (setq org-node-backlink--files-to-fix
@@ -119,17 +119,22 @@ Can be quit midway through and resumed later.  With
                 :files org-node-backlink--files-to-fix
                 :msg "Removing :BACKLINKS: (you may quit and resume anytime)"
                 :about-to-do "About to remove backlinks"
-                :call (lambda () (org-node-backlink--fix-whole-buffer t) )))
+                :call (lambda () (org-node-backlink-fix-whole-buffer t))
+                :too-many-files-hack t))
       (setq org-node-backlink--files-to-fix
             (org-node--in-files-do
               :files org-node-backlink--files-to-fix
               :msg "Adding/updating :BACKLINKS: (you may quit and resume anytime)"
               :about-to-do "About to edit backlinks"
-              :call #'org-node-backlink--fix-whole-buffer)))))
+              :call #'org-node-backlink-fix-whole-buffer
+              :too-many-files-hack t)))
+    (when (null org-node-backlink--files-to-fix)
+      (message "Done editing :BACKLINKS: properties!"))))
 
-(defun org-node-backlink--fix-whole-buffer (&optional remove)
+(defun org-node-backlink-fix-whole-buffer (&optional remove)
   "Update :BACKLINKS: property for all nodes in buffer.
 If REMOVE is non-nil, remove the property."
+  (interactive)
   (goto-char (point-min))
   (let ((case-fold-search t))
     (while (re-search-forward "^[[:space:]]*:id: " nil t)
@@ -192,7 +197,7 @@ Look for areas flagged by
 `org-node-backlink--flag-buffer-modification' and run
 `org-node-backlink--fix-entry-here' at each affected heading.
 For a huge file, this is much faster than using
-`org-node-backlink--fix-whole-buffer' -- imagine a thousand
+`org-node-backlink-fix-whole-buffer' -- imagine a thousand
 headings but you have only done work under one of them."
   (unless (derived-mode-p 'org-mode)
     (error "Backlink function called in non-Org buffer"))
@@ -274,7 +279,7 @@ headings but you have only done work under one of them."
 ;;    should check the current file but rather visit and edit the target file.
 ;;    If we didn't have the below code, we'd have save the current buffer (in
 ;;    order to update tables) and then open the target file and run
-;;    `org-node-backlink--fix-whole-buffer', which can easily take a while for
+;;    `org-node-backlink-fix-whole-buffer', which can easily take a while for
 ;;    a big target file.
 
 ;; TODO: Report when it has members

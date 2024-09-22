@@ -100,7 +100,7 @@ I found org-roam too slow, so I made @uref{https://github.com/meedstrom/quickroa
 @item
 @strong{If you were using org-roam}, there is nothing to migrate.  You can use both packages.  It's exactly the same on-disk format: "notes" are identified by their org-id.
 
-With optional @uref{https://github.com/meedstrom/org-node-fakeroam, shims}, you can even @strong{skip syncing the org-roam DB} and continue using its rich backlinks buffer and org-roam-capture!
+With optional shims, you can even @strong{skip syncing the org-roam DB} and continue using its rich backlinks buffer!
 
 In pursuit of being "just org-id", this package has no equivalent setting to @samp{org-roam-directory} -- it just looks up @samp{org-id-locations}.
 
@@ -113,7 +113,7 @@ If you were the sort of person to prefer ID-links over file links or any other t
 @node What's a "node"?
 @section What's a "node"?
 
-My life can be divided into two periods "@strong{before org-roam}" and "@strong{after org-roam}".  I crossed a kind of gap once I got a good way to link between my notes.  It's odd to remember when I just relied on browsing subtrees and folders -- what a strange way to work!
+My life can be divided into two periods "@strong{before org-roam}" and "@strong{after org-roam}".  I crossed a kind of gap once I got a good way to link between my notes.  It's odd to remember when I just relied on browsing subtrees and the filesystem -- what a strange way to work!
 
 I used to lose track of things I had written, under some forgotten heading in a forgotten file in a forgotten directory.  The org-roam method let me @strong{find} and @strong{build on} my own work, instead of @uref{https://en.wikipedia.org/wiki/Cryptomnesia, recreating my work all the time}.
 
@@ -153,6 +153,10 @@ A comparison of three similar systems, which permit relying on org-id and don't 
 @tab yes
 @tab limited
 @tab not applicable
+@item Refile
+@tab yes
+@tab yes
+@tab --
 @item Rich backlinks buffer
 @tab yes
 @tab yes (org-roam's)
@@ -225,21 +229,17 @@ A comparison of three similar systems, which permit relying on org-id and don't 
 @tab --
 @tab --
 @tab yes
-@item Refile
-@tab yes
-@tab --
-@tab --
 @item Untitled notes
 @tab --
 @tab --
 @tab --
 @item Support @samp{roam:} links
 @tab yes
-@tab -- (wontfix)
+@tab -- (WONTFIX)
 @tab not applicable
 @item Can have separate note piles
 @tab yes
-@tab -- (wontfix)
+@tab -- (WONTFIX)
 @tab not applicable
 @item Some query-able cache
 @tab EmacSQL

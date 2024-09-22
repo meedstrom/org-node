@@ -3354,9 +3354,6 @@ from the beginning."
                               (elt array 1)
                               (elt array 2)))))))
 
-(define-obsolete-function-alias
-  'org-node-lint-all-files #'org-node-lint-all "2024-09-21")
-
 (defun org-node-list-feedback-arcs ()
   "Show a feedback-arc-set of forward id-links.
 
@@ -3692,8 +3689,11 @@ Optional keyword argument ABOUT-TO-DO as in
                      (save-buffer)))
                  (kill-buffer)))))))))
 
+(define-error 'org-node-must-retry "Unexpected signal org-node-must-retry")
+
+;; TODO: Maybe have it prompt to kill all buffers prior to start
 (cl-defun org-node--in-files-do
-    (&key files fundamental-mode msg about-to-do call)
+    (&key files fundamental-mode msg about-to-do call too-many-files-hack)
   "Temporarily visit each file in FILES and call function CALL.
 
 Take care!  This function presumes that FILES satisfy the assumptions
@@ -3722,49 +3722,57 @@ Naturally, FUNDAMENTAL-MODE has no effect in that case."
   (declare (indent defun))
   (cl-assert (and msg files call about-to-do))
   (setq call (org-node--ensure-compiled call))
-  (let ((enable-local-variables :safe)
-        (org-inhibit-startup t) ;; Don't apply startup #+options
-        file-name-handler-alist
-        ;; (coding-system-for-read org-node-perf-assume-coding-system)
-        find-file-hook
-        after-save-hook
-        before-save-hook
-        org-agenda-files
-        kill-buffer-hook ;; Inhibit save-place etc
-        kill-buffer-query-functions
-        buffer-list-update-hook
-        interval
-        file
-        was-open
-        buf-or-issue
-        (start-time (current-time))
-        (ctr 0))
-    ;; The cache has been buggy since the 9.5 rewrite, disable to be safe
-    (org-element-with-disabled-cache
-      (condition-case err
-          (while files
-            (cl-incf ctr)
-            (when (zerop (% ctr 300))
-              ;; Reap open file handles (max 1024, Emacs bug keeps them open)
-              (garbage-collect))
-            (if interval
-                (when (zerop (% ctr interval))
-                  (message "%s... %d files to go" msg (length files)))
-              ;; Set a reasonable interval between `message' calls, since they
-              ;; can be surprisingly expensive.
-              (when (> (float-time (time-since start-time)) 0.3)
-                (setq interval ctr)))
-            (setq file (pop files))
-            (setq was-open (find-buffer-visiting file))
-            (setq buf-or-issue
-                  (or was-open
-                      (if fundamental-mode
-                          (let (auto-mode-alist)
-                            (org-node--find-file-noselect file about-to-do))
-                        (delay-mode-hooks
-                          (org-node--find-file-noselect file about-to-do)))))
-            (if (bufferp buf-or-issue)
-                (with-current-buffer buf-or-issue
+  (cl-letf ((enable-local-variables :safe)
+            (org-inhibit-startup t) ;; Don't apply startup #+options
+            (file-name-handler-alist nil)
+            ;; (coding-system-for-read org-node-perf-assume-coding-system)
+            (find-file-hook nil)
+            (after-save-hook nil)
+            (before-save-hook nil)
+            (org-agenda-files nil)
+            (kill-buffer-hook nil) ;; Inhibit save-place etc
+            (kill-buffer-query-functions nil)
+            (write-file-functions nil) ;; recentf-track-opened-file
+            (buffer-list-update-hook nil))
+    (let ((files* files)
+          interval
+          file
+          was-open
+          buf
+          (start-time (current-time))
+          (ctr 0))
+      ;; The cache has been buggy since the 9.5 rewrite, disable to be safe
+      (org-element-with-disabled-cache
+        (condition-case err
+            (while files*
+              (cl-incf ctr)
+              (when (zerop (% ctr 200))
+                ;; Reap open file handles (max is 1024, and Emacs bug can keep
+                ;; them open during the loop despite killed buffers)
+                (garbage-collect)
+                (when too-many-files-hack
+                  ;; Sometimes necessary to drop the call stack to avoid the
+                  ;; too many files error, sometimes not.  Don't understand it.
+                  (signal 'org-node-must-retry nil)))
+              (if interval
+                  (when (zerop (% ctr interval))
+                    (message "%s... %d files to go" msg (length files*)))
+                ;; Set a reasonable interval between `message' calls, since they
+                ;; can be surprisingly expensive.
+                (when (> (float-time (time-since start-time)) 0.3)
+                  (setq interval ctr)))
+              (setq file (pop files*))
+              (setq was-open (find-buffer-visiting file))
+              (setq buf (or was-open
+                            (if fundamental-mode
+                                (let (auto-mode-alist)
+                                  (org-node--find-file-noselect
+                                   file about-to-do))
+                              (delay-mode-hooks
+                                (org-node--find-file-noselect
+                                 file about-to-do)))))
+              (when buf
+                (with-current-buffer buf
                   (save-excursion
                     (without-restriction
                       (funcall call)))
@@ -3773,19 +3781,33 @@ Naturally, FUNDAMENTAL-MODE has no effect in that case."
                       (let ((save-silently t)
                             (inhibit-message t))
                         (save-buffer)))
-                    (kill-buffer)))
-              (error "%s" buf-or-issue)))
-        (( quit )
-         (when (bufferp buf-or-issue)
-           (unless (or was-open (buffer-modified-p buf-or-issue))
-             (kill-buffer buf-or-issue)))
-         (cons file files))
-        (( error )
-         (when (bufferp buf-or-issue)
-           (unless (or was-open (buffer-modified-p buf-or-issue))
-             (kill-buffer buf-or-issue)))
-         (lwarn 'org-node :error "Loop interrupted by signal: %S" err)
-         (cons file files))))))
+                    (kill-buffer)))))
+          (( org-node-must-retry )
+           (run-with-timer .1 nil #'org-node--in-files-do
+                           :msg msg
+                           :about-to-do about-to-do
+                           :fundamental-mode fundamental-mode
+                           :files files*
+                           :call call
+                           :too-many-files-hack too-many-files-hack)
+           ;; Because of the hack, the caller only receives `files*' once, and
+           ;; each timer run after that won't modify
+           ;; `org-node-backlink--files-to-fix', so try as a nicety.
+           (setcar files (car files*))
+           (setcdr files (cdr files*))
+           files*)
+          (( quit )
+           (unless (or was-open (not buf) (buffer-modified-p buf))
+             (kill-buffer buf))
+           (cons file files*))
+          (( error )
+           (lwarn 'org-node :warning "Loop interrupted by signal %S\n\tBuffer: %s\n\tFile: %s\n\tNext file: %s\n\tValue of ctr: %d"
+                  err buf file (car files*) ctr)
+           (unless (or was-open (not buf) (buffer-modified-p buf))
+             (kill-buffer buf))
+           ;; In case FILE was the problem, do not add it back on the list for
+           ;; next time user tries the command (unlike on a quit)
+           files*))))))
 
 (defun org-node--find-file-noselect (abbr-truename about-to-do)
   "Read file ABBR-TRUENAME into a buffer and return the buffer.
@@ -3801,6 +3823,9 @@ subroutine for a loop that has already ensured that ABBR-TRUENAME:
 - is not a directory"
   (let ((attrs (file-attributes abbr-truename))
         (buf (create-file-buffer abbr-truename)))
+    (when (null attrs)
+      (kill-buffer buf)
+      (error "File appears to be gone/renamed: %s" abbr-truename))
     (if (or (not (and large-file-warning-threshold
                       (> (file-attribute-size attrs)
                          large-file-warning-threshold)))
@@ -3826,12 +3851,15 @@ subroutine for a loop that has already ensured that ABBR-TRUENAME:
 			                   buffer-file-name))
               ;; Could try to call `recover-file' here, but have not checked
               ;; that the result would be sane, so just bail
-              (message "%s, but skipped because it has an auto-save file: %s"
-                       about-to-do buffer-file-name)
+              (progn
+                (message "%s, but skipped because it has an auto-save file: %s"
+                         about-to-do buffer-file-name)
+                nil)
             (normal-mode t)
             (current-buffer)))
       (message "%s, but skipped because file exceeds `large-file-warning-threshold': %s"
-               about-to-do buffer-file-name))))
+               about-to-do buffer-file-name)
+      nil)))
 
 
 ;;;; Commands to add tags/refs/alias
