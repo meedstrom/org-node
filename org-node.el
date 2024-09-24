@@ -2256,28 +2256,7 @@ format-constructs occur before these."
 
 ;;;; Series plumbing
 
-(defcustom org-node-series-defs
-  (list
-   ;; Obviously, this series works best if you have `org-node-put-created' on
-   ;; `org-node-creation-hook'.
-   '("a" :name "All ID-nodes by property :CREATED:"
-     :version 2
-     :classifier (lambda (node)
-                   (let ((time (cdr (assoc "CREATED" (org-node-get-props node)))))
-                     (when (and time (not (string-blank-p time)))
-                       (cons time (org-node-get-id node)))))
-     :whereami (lambda ()
-                 (let ((time (org-entry-get nil "CREATED" t)))
-                   (and time (not (string-blank-p time)) time)))
-     :prompter (lambda (key)
-                 (let ((series (cdr (assoc key org-node-built-series))))
-                   (completing-read
-                    "Go to: " (plist-get series :sorted-items))))
-     :try-goto (lambda (item)
-                 (when (org-node-helper-try-goto-id (cdr item))
-                   t))
-     :creator (lambda (sortstr key)
-                (org-node-create sortstr (org-id-new) key))))
+(defcustom org-node-series-defs nil
   "Alist defining each node series.
 
 Each item looks like
@@ -2361,27 +2340,49 @@ your definitions."
   :set #'org-node--set-and-remind-reset)
 
 ;; Fix #48 (dailies are optional)
-(when (org-node--guess-daily-dir)
-  (add-to-list 'org-node-series-defs
-               '("d" :name "Daily-files"
-                 :version 2
-                 :classifier (lambda (node)
-                               (let ((path (org-node-get-file-path node)))
-                                 (when (string-search (org-node--guess-daily-dir) path)
-                                   (let ((ymd (org-node-helper-filename->ymd path)))
-                                     (when ymd
-                                       (cons ymd path))))))
-                 :whereami (lambda ()
-                             (org-node-helper-filename->ymd buffer-file-name))
-                 :prompter (lambda (key)
-                             (let ((org-node-series-that-marks-calendar key))
-                               (org-read-date)))
-                 :try-goto (lambda (item)
-                             (org-node-helper-try-visit-file (cdr item)))
-                 :creator (lambda (sortstr key)
-                            (let ((org-node-datestamp-format "")
-                                  (org-node-ask-directory (org-node--guess-daily-dir)))
-                              (org-node-create sortstr (org-id-new) key))))))
+(when (null org-node-series-defs)
+  ;; Obviously, this series works best if you have `org-node-put-created' on
+  ;; `org-node-creation-hook'.
+  (setq org-node-series-defs
+        '(("a" :name "All ID-nodes by property :CREATED:"
+           :version 2
+           :classifier (lambda (node)
+                         (let ((time (cdr (assoc "CREATED" (org-node-get-props node)))))
+                           (when (and time (not (string-blank-p time)))
+                             (cons time (org-node-get-id node)))))
+           :whereami (lambda ()
+                       (let ((time (org-entry-get nil "CREATED" t)))
+                         (and time (not (string-blank-p time)) time)))
+           :prompter (lambda (key)
+                       (let ((series (cdr (assoc key org-node-built-series))))
+                         (completing-read
+                          "Go to: " (plist-get series :sorted-items))))
+           :try-goto (lambda (item)
+                       (when (org-node-helper-try-goto-id (cdr item))
+                         t))
+           :creator (lambda (sortstr key)
+                      (org-node-create sortstr (org-id-new) key)))))
+  (when (org-node--guess-daily-dir)
+    (push '("d" :name "Daily-files"
+            :version 2
+            :classifier (lambda (node)
+                          (let ((path (org-node-get-file-path node)))
+                            (when (string-search (org-node--guess-daily-dir) path)
+                              (let ((ymd (org-node-helper-filename->ymd path)))
+                                (when ymd
+                                  (cons ymd path))))))
+            :whereami (lambda ()
+                        (org-node-helper-filename->ymd buffer-file-name))
+            :prompter (lambda (key)
+                        (let ((org-node-series-that-marks-calendar key))
+                          (org-read-date)))
+            :try-goto (lambda (item)
+                        (org-node-helper-try-visit-file (cdr item)))
+            :creator (lambda (sortstr key)
+                       (let ((org-node-datestamp-format "")
+                             (org-node-ask-directory (org-node--guess-daily-dir)))
+                         (org-node-create sortstr (org-id-new) key))))
+          org-node-series-defs)))
 
 (defvar org-node-built-series nil
   "Alist describing each node series, internal use.")
