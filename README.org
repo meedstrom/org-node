@@ -134,13 +134,17 @@ I rarely have the screen space to display a backlink buffer.  Because it needs m
 
 For a first-time run, type =M-x org-node-backlink-fix-all=.  (Don't worry, if you change your mind, you can undo with =M-x org-node-backlink-regret=.)
 
+#+begin_quote
+ASIDE: To be clear, this never generates new IDs.  That's your own business.  This only edits :BACKLINKS: properties, and no backlink will appear from places where there was no ID among any outline ancestor.
+#+end_quote
+
 Then start using the minor mode =org-node-backlink-mode=, which keeps these properties updated.  Init snippet:
 
 #+begin_src elisp
 (add-hook 'org-mode-hook #'org-node-backlink-mode)
 #+end_src
 
-NOTE:  I hadn't even realized this, but people who /don't/ use visual-line-mode may not find this solution very scalable, since Org properties must stay on one line.  This marks the second time I distribute software that presumes soft-wrapped text buffers :-)
+NOTE:  People who /don't/ use visual-line-mode or other soft-wrap modes may not find this solution very scalable, since Org properties are always a single logical line.
 
 *** Option 2B: Let org-super-links manage a =:BACKLINKS:...:END:= drawer
 
