@@ -23,11 +23,6 @@
 
 ;;; Commentary:
 
-;; DO NOT USE MELPA STABLE
-;; https://old.reddit.com/r/emacs/comments/etikbz/
-
-;; -------------------------------------------------------------------------
-
 ;; What is Org-node?
 
 ;; If you were the sort of person to prefer "id:" links over "file:" links or
@@ -2198,8 +2193,7 @@ instead of calling this function."
                              (file-name-concat org-roam-directory "dailies/"))))
         (seq-find #'file-exists-p
                   (list (file-name-concat org-directory "daily/")
-                        (file-name-concat org-directory "dailies/")))
-        (error "Could not guess daily directory; configure `org-node-series-defs'"))))
+                        (file-name-concat org-directory "dailies/"))))))
 
 (defun org-node-helper-try-goto-id (id)
   "Try to visit org-id ID, returning non-nil on success."
@@ -2264,26 +2258,6 @@ format-constructs occur before these."
 
 (defcustom org-node-series-defs
   (list
-   '("d" :name "Daily-files"
-     :version 2
-     :classifier (lambda (node)
-                   (let ((path (org-node-get-file-path node)))
-                     (when (string-search (org-node--guess-daily-dir) path)
-                       (let ((ymd (org-node-helper-filename->ymd path)))
-                         (when ymd
-                           (cons ymd path))))))
-     :whereami (lambda ()
-                 (org-node-helper-filename->ymd buffer-file-name))
-     :prompter (lambda (key)
-                 (let ((org-node-series-that-marks-calendar key))
-                   (org-read-date)))
-     :try-goto (lambda (item)
-                 (org-node-helper-try-visit-file (cdr item)))
-     :creator (lambda (sortstr key)
-                (let ((org-node-datestamp-format "")
-                      (org-node-ask-directory (org-node--guess-daily-dir)))
-                  (org-node-create sortstr (org-id-new) key))))
-
    ;; Obviously, this series works best if you have `org-node-put-created' on
    ;; `org-node-creation-hook'.
    '("a" :name "All ID-nodes by property :CREATED:"
@@ -2385,6 +2359,29 @@ message to remind you to check out the wiki on GitHub and port
 your definitions."
   :type 'alist
   :set #'org-node--set-and-remind-reset)
+
+;; Fix #48 (dailies are optional)
+(when (org-node--guess-daily-dir)
+  (add-to-list 'org-node-series-defs
+               '("d" :name "Daily-files"
+                 :version 2
+                 :classifier (lambda (node)
+                               (let ((path (org-node-get-file-path node)))
+                                 (when (string-search (org-node--guess-daily-dir) path)
+                                   (let ((ymd (org-node-helper-filename->ymd path)))
+                                     (when ymd
+                                       (cons ymd path))))))
+                 :whereami (lambda ()
+                             (org-node-helper-filename->ymd buffer-file-name))
+                 :prompter (lambda (key)
+                             (let ((org-node-series-that-marks-calendar key))
+                               (org-read-date)))
+                 :try-goto (lambda (item)
+                             (org-node-helper-try-visit-file (cdr item)))
+                 :creator (lambda (sortstr key)
+                            (let ((org-node-datestamp-format "")
+                                  (org-node-ask-directory (org-node--guess-daily-dir)))
+                              (org-node-create sortstr (org-id-new) key))))))
 
 (defvar org-node-built-series nil
   "Alist describing each node series, internal use.")
