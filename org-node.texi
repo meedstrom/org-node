@@ -350,15 +350,23 @@ I rarely have the screen space to display a backlink buffer.  Because it needs m
 @node Option 2A Let org-node manage a @samp{BACKLINKS} property
 @subsection Option 2A: Let org-node manage a @samp{:BACKLINKS:} property
 
-For a first-time run, type @samp{M-x org-node-backlink-fix-all}.  (Don't worry, if you change your mind, you can undo with @samp{M-x org-node-backlink-regret}.)
+For a first-time run, type @samp{M-x org-node-backlink-fix-all}.  (Don't worry if you change your mind; undo with @samp{M-x org-node-backlink-regret}.)
 
-Then start using the minor mode @samp{org-node-backlink-mode}, which keeps these properties updated.  Init snippet:
+Then start using the following mode, which keeps these properties updated.
 
 @lisp
-(add-hook 'org-mode-hook #'org-node-backlink-mode)
+(org-node-backlink-mode)
 @end lisp
 
-NOTE:  I hadn't even realized this, but people who @emph{don't} use visual-line-mode may not find this solution very scalable, since Org properties must stay on one line.  This marks the second time I distribute software that presumes soft-wrapped text buffers :-)
+NOTE 1: To be clear, this never generates new IDs.  That's your own business.  This only adds/edits :BACKLINKS: properties, and no backlink will appear that correspond to a link if the context for that link has no ID among any outline ancestor.
+
+NOTE 2: By default, the setting @samp{org-node-backlink-aggressive} is nil, so that stale backlinks are not cleaned until you carry out some edits under an affected heading and then save the file, which fixes that heading's :BACKLINKS: property.  Flip the setting if you'd like it to be more proactive:
+
+@lisp
+(setq org-node-backlink-aggressive t)
+@end lisp
+
+NOTE 3:  People who @emph{don't} use visual-line-mode or other soft-wrap modes may not find this way of displaying backlinks very scalable, since Org places properties on a single logical line.
 
 @node Option 2B Let org-super-links manage a @samp{BACKLINKSEND} drawer
 @subsection Option 2B: Let org-super-links manage a @samp{:BACKLINKS:...:END:} drawer

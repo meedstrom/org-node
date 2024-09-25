@@ -418,9 +418,9 @@ while fixing backlinks."
                              (file-writable-p file))
                    do (org-node--with-quick-file-buffer file
                         :about-to-do "About to fix backlinks"
-                        (goto-char (point-min))
                         (let ((was-modified (buffer-modified-p)))
                           (dolist (id (delete-dups ids))
+                            (goto-char (point-min))
                             (when (re-search-forward (concat "^[[:space:]]*:id: +"
                                                              (regexp-quote id))
                                                      nil t)
