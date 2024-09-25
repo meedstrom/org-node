@@ -142,13 +142,13 @@ Then start using the following mode, which keeps these properties updated.
 
 NOTE 1: To be clear, this never generates new IDs.  That's your own business.  This only adds/edits :BACKLINKS: properties, and no backlink will appear that correspond to a link if the context for that link has no ID among any outline ancestor.
 
-NOTE 2: By default, the setting `org-node-backlink-aggressive` is nil, so that stale backlinks are not cleaned until you carry out any edits under the affected headings and then save the file.  Flip the setting if you'd like it to be more proactive:
+NOTE 2: By default, the setting =org-node-backlink-aggressive= is nil, so that stale backlinks are not cleaned until you carry out some edits under an affected heading and then save the file, which fixes that heading's :BACKLINKS: property.  Flip the setting if you'd like it to be more proactive:
 
 #+begin_src elisp
 (setq org-node-backlink-aggressive t)
 #+end_src
 
-NOTE 3:  People who /don't/ use visual-line-mode or other soft-wrap modes may not find this solution very scalable, since Org places properties on a single logical line.
+NOTE 3:  People who /don't/ use visual-line-mode or other soft-wrap modes may not find this way of displaying backlinks very scalable, since Org places properties on a single logical line.
 
 *** Option 2B: Let org-super-links manage a =:BACKLINKS:...:END:= drawer
 

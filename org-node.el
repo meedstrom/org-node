@@ -639,31 +639,31 @@ When called from Lisp, peek on any hash table HT."
   (remove-hook 'org-mode-hook #'org-node-cache-mode)
   (if org-node-cache-mode
       (progn
-        (add-hook 'after-save-hook #'org-node--handle-save)
-        (add-hook 'org-node-creation-hook #'org-node--dirty-ensure-node-known -50)
-        (add-hook 'org-node-creation-hook #'org-node--add-series-item 90)
-        (add-hook 'org-node-insert-link-hook #'org-node--dirty-ensure-link-known -50)
+        (add-hook 'org-node-creation-hook         #'org-node--add-series-item 90)
+        (add-hook 'org-node-creation-hook         #'org-node--dirty-ensure-node-known -50)
+        (add-hook 'org-node-insert-link-hook      #'org-node--dirty-ensure-link-known -50)
         (add-hook 'org-roam-post-node-insert-hook #'org-node--dirty-ensure-link-known -50)
-        (add-hook 'calendar-today-invisible-hook #'org-node--mark-days 5)
-        (add-hook 'calendar-today-visible-hook #'org-node--mark-days 5)
+        (advice-add 'org-insert-link :after       #'org-node--dirty-ensure-link-known)
+        (add-hook 'calendar-today-invisible-hook  #'org-node--mark-days 5)
+        (add-hook 'calendar-today-visible-hook    #'org-node--mark-days 5)
         (add-hook 'window-buffer-change-functions #'org-node--kill-blank-unsaved-buffers)
-        (advice-add 'org-insert-link :after #'org-node--dirty-ensure-link-known)
-        (advice-add 'rename-file :after #'org-node--handle-rename)
-        (advice-add 'delete-file :after #'org-node--handle-delete)
+        (add-hook 'after-save-hook                #'org-node--handle-save)
+        (advice-add 'rename-file :after           #'org-node--handle-rename)
+        (advice-add 'delete-file :after           #'org-node--handle-delete)
         (org-node-cache-ensure 'must-async t)
         (org-node--maybe-adjust-idle-timer))
     (cancel-timer org-node--idle-timer)
-    (remove-hook 'after-save-hook #'org-node--handle-save)
-    (remove-hook 'org-node-creation-hook #'org-node--dirty-ensure-node-known)
-    (remove-hook 'org-node-creation-hook #'org-node--add-series-item)
-    (remove-hook 'org-node-insert-link-hook #'org-node--dirty-ensure-link-known)
-    (remove-hook 'org-roam-post-node-insert-hook #'org-node--dirty-ensure-link-known)
-    (remove-hook 'calendar-today-invisible-hook #'org-node--mark-days)
-    (remove-hook 'calendar-today-visible-hook #'org-node--mark-days)
-    (remove-hook 'window-buffer-change-functions #'org-node--kill-blank-unsaved-buffers)
-    (advice-remove 'org-insert-link #'org-node--dirty-ensure-link-known)
-    (advice-remove 'rename-file #'org-node--handle-rename)
-    (advice-remove 'delete-file #'org-node--handle-delete)))
+    (remove-hook 'org-node-creation-hook          #'org-node--add-series-item)
+    (remove-hook 'org-node-creation-hook          #'org-node--dirty-ensure-node-known)
+    (remove-hook 'org-node-insert-link-hook       #'org-node--dirty-ensure-link-known)
+    (remove-hook 'org-roam-post-node-insert-hook  #'org-node--dirty-ensure-link-known)
+    (advice-remove 'org-insert-link               #'org-node--dirty-ensure-link-known)
+    (remove-hook 'calendar-today-invisible-hook   #'org-node--mark-days)
+    (remove-hook 'calendar-today-visible-hook     #'org-node--mark-days)
+    (remove-hook 'window-buffer-change-functions  #'org-node--kill-blank-unsaved-buffers)
+    (remove-hook 'after-save-hook                 #'org-node--handle-save)
+    (advice-remove 'rename-file                   #'org-node--handle-rename)
+    (advice-remove 'delete-file                   #'org-node--handle-delete)))
 
 ;; On the assumption there cannot have appeared a tramp file path if tramp is
 ;; not loaded, no need to load tramp just to run this package
@@ -1655,13 +1655,13 @@ sub-directories, sub-sub-directories and so on, with provisos:
 ;;         disagreement with org-node filenames on Windows or single-user
 ;;         Linux?
 (defvar org-node--homedir nil)
-(defun org-node-abbrev-file-names (path-or-paths)
-  "Abbreviate all file paths in PATH-OR-PATHS.
-PATH-OR-PATHS can be a single path or a list, and are presumed to
+(defun org-node-abbrev-file-names (paths)
+  "Abbreviate all file paths in PATHS.
+PATHS can be a single path or a list, and are presumed to
 be absolute paths.
 
 Faster than calling `abbreviate-file-name' once for each item in
-a list.  Also faster than `consult--fast-abbreviate-file-name'.
+a list.
 
 It is a good idea to abbreviate a path when you don\\='t know
 where it came from.  That ensures that it is comparable to a path
@@ -1677,14 +1677,14 @@ paths to be compared, if not writing performance-critical code."
     (setq org-node--homedir (file-name-as-directory (expand-file-name "~"))))
   (let* ((case-fold-search nil) ;; Assume case-sensitive filesystem
          (result (cl-loop
-                  for path in (ensure-list path-or-paths)
+                  for path in (ensure-list paths)
                   do (setq path (directory-abbrev-apply path))
                   and collect
                   (if (string-prefix-p org-node--homedir path)
                       (concat
                        "~" (substring path (1- (length org-node--homedir))))
                     path))))
-    (if (listp path-or-paths)
+    (if (listp paths)
         result
       (car result))))
 
@@ -2344,7 +2344,6 @@ your definitions."
   :type 'alist
   :set #'org-node--set-and-remind-reset)
 
-;; Fix #48 (dailies are optional)
 (when (null org-node-series-defs)
   ;; Obviously, this series works best if you have `org-node-put-created' on
   ;; `org-node-creation-hook'.
@@ -2367,6 +2366,7 @@ your definitions."
                          t))
            :creator (lambda (sortstr key)
                       (org-node-create sortstr (org-id-new) key)))))
+  ;; Fix #48 (dailies are optional)
   (when (org-node--guess-daily-dir)
     (push '("d" :name "Daily-files"
             :version 2
