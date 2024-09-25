@@ -264,17 +264,21 @@ findings to another temp file."
     (dolist (FILE $files)
       (condition-case err
           (catch 'file-done
-            (when (or (not (file-readable-p FILE))
-                      (file-symlink-p FILE))
+            (when (or (not (file-readable-p FILE)))
               ;; If FILE does not exist (not readable), user probably deleted
               ;; or renamed a file.  If it was a rename, hopefully the new name
               ;; is also in the file list.  Else, like if it was done outside
               ;; Emacs by typing `mv' on the command line, it gets picked up on
               ;; next scan.
-              ;; And symlinks... (Who symlinks a note?)  Skip for two reasons:
-              ;; - Causes duplicates if the true file is also in the file list.
-              ;; - For performance, the codebase rarely uses `file-truename'.
               (push FILE result/missing-files)
+              (throw 'file-done t))
+            ;; Skip symlinks for two reasons:
+            ;; - Causes duplicates if the true file is also in the file list.
+            ;; - For performance, the codebase rarely uses `file-truename'.
+            ;; Note that symlinks should not count as missing files, since they
+            ;; get re-picked up every time by `org-node-list-files', leading to
+            ;; pointlessly repeating `org-node--forget-id-locations'.
+            (when (file-symlink-p FILE)
               (throw 'file-done t))
             (push (cons FILE (floor
                               (time-to-seconds
