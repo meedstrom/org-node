@@ -1311,7 +1311,7 @@ normal usage!  What\\='s left undone til idle:
 2. :pos values can desync, which can affect the org-roam buffer
 
 An user of `org-node-backlink-mode' is recommended to enable this as
-well as `org-node-backlink-clean-aggressively'."
+well as `org-node-backlink-aggressive'."
   :group 'org-node
   :type 'boolean)
 

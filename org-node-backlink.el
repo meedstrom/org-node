@@ -377,10 +377,15 @@ it in the nearby :BACKLINKS: property."
             (setq new-value (string-join links "  ")))
         (setq new-value src-link))
       (unless (equal current-backlinks-value new-value)
-        (let ((after-change-functions
+        (let ((user-is-editing (buffer-modified-p))
+              (after-change-functions
                (remq 'org-node-backlink--flag-buffer-modification
                      after-change-functions)))
-          (org-entry-put nil "BACKLINKS" new-value))))))
+          (org-entry-put nil "BACKLINKS" new-value)
+          (unless user-is-editing
+            (let (before-save-hook
+                  after-save-hook)
+              (save-buffer))))))))
 
 
 ;;;; Aggressive visit-and-fix
@@ -418,16 +423,18 @@ while fixing backlinks."
                              (file-writable-p file))
                    do (org-node--with-quick-file-buffer file
                         :about-to-do "About to fix backlinks"
-                        (let ((was-modified (buffer-modified-p)))
+                        (let ((user-is-editing (buffer-modified-p)))
                           (dolist (id (delete-dups ids))
                             (goto-char (point-min))
                             (when (re-search-forward (concat "^[[:space:]]*:id: +"
                                                              (regexp-quote id))
                                                      nil t)
                               (org-node-backlink--fix-entry-here)))
-                          (unless was-modified
-                            (save-buffer)))
-                        ;; Because the cache gets confused by the modification
+                          (unless user-is-editing
+                            (let (before-save-hook
+                                  after-save-hook)
+                              (save-buffer))))
+                        ;; Because the cache gets confused by the change
                         (org-element-cache-reset))))
       (message "Option `org-node-backlink-aggressive' has no effect when `org-node-perf-eagerly-update-link-tables' is nil"))))
 
