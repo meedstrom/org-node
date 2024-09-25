@@ -4033,8 +4033,8 @@ Designed for `completion-at-point-functions', which see."
                  (when-let ((id (gethash text org-node--title<>id)))
                    (atomic-change-group
                      (delete-char (- (length text)))
-                     (insert
-                      (org-link-make-string (concat "id:" id) text)))))))))
+                     (insert (org-link-make-string (concat "id:" id) text)))
+                   (run-hooks 'org-node-insert-link-hook)))))))
 
 
 ;;;; Misc
