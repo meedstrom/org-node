@@ -636,7 +636,7 @@ When called from Lisp, peek on any hash table HT."
 
 -----"
   :global t
-  (remove-hook 'org-mode-hook #'org-node-cache-mode)
+  (remove-hook 'org-mode-hook #'org-node-cache-mode) ;; Old install instruction
   (if org-node-cache-mode
       (progn
         (add-hook 'org-node-creation-hook         #'org-node--add-series-item 90)
@@ -1616,9 +1616,18 @@ non-nil), list the files in a new buffer."
                                       org-node-extra-id-dirs-exclude))))
                unless (gethash file org-node--file<>mtime)
                do (puthash file 0 org-node--file<>mtime))
-      (cl-loop for file being each hash-value of org-id-locations
-               unless (gethash file org-node--file<>mtime)
-               do (puthash file 0 org-node--file<>mtime)))
+      (if org-id-locations-file-relative
+          ;; Experimental support
+          (let ((dir (file-truename
+                      (file-name-directory org-id-locations-file))))
+            (cl-loop for relname being each hash-value of org-id-locations
+                     as file = (org-node-abbrev-file-names
+                                (file-name-concat dir relname))
+                     unless (gethash file org-node--file<>mtime)
+                     do (puthash file 0 org-node--file<>mtime)))
+        (cl-loop for file being each hash-value of org-id-locations
+                 unless (gethash file org-node--file<>mtime)
+                 do (puthash file 0 org-node--file<>mtime))))
     (hash-table-keys org-node--file<>mtime)))
 
 ;; (progn (ignore-errors (native-compile #'org-node--dir-files-recursively)) (benchmark-run 100 (org-node--dir-files-recursively org-roam-directory "org" '("logseq/"))))
@@ -1651,17 +1660,16 @@ sub-directories, sub-sub-directories and so on, with provisos:
             (push (file-name-concat dir file) result)))))
     result))
 
-;; REVIEW: Org-id uses `abbreviate-file-name', could this result in
-;;         disagreement with org-node filenames on Windows or single-user
-;;         Linux?
+;; REVIEW: Org-id uses `abbreviate-file-name' which may behave sliiightly
+;;         different, could this result in disagreement between org-id and
+;;         org-node filenames on Windows or on single-user Linux?
 (defvar org-node--homedir nil)
 (defun org-node-abbrev-file-names (paths)
   "Abbreviate all file paths in PATHS.
 PATHS can be a single path or a list, and are presumed to
 be absolute paths.
 
-Faster than calling `abbreviate-file-name' once for each item in
-a list.
+Faster than `abbreviate-file-name'.
 
 It is a good idea to abbreviate a path when you don\\='t know
 where it came from.  That ensures that it is comparable to a path
@@ -1675,18 +1683,18 @@ Needless to say, you can also just use `file-truename' on both
 paths to be compared, if not writing performance-critical code."
   (unless org-node--homedir
     (setq org-node--homedir (file-name-as-directory (expand-file-name "~"))))
-  (let* ((case-fold-search nil) ;; Assume case-sensitive filesystem
-         (result (cl-loop
-                  for path in (ensure-list paths)
-                  do (setq path (directory-abbrev-apply path))
-                  and collect
-                  (if (string-prefix-p org-node--homedir path)
-                      (concat
-                       "~" (substring path (1- (length org-node--homedir))))
-                    path))))
+  ;; Assume a case-sensitive filesystem.  I believe this fails gracefully.
+  (let ((case-fold-search nil))
     (if (listp paths)
-        result
-      (car result))))
+        (cl-loop for path in paths
+                 do (setq path (directory-abbrev-apply path))
+                 if (string-prefix-p org-node--homedir path)
+                 collect (concat "~" (substring path (1- (length org-node--homedir))))
+                 else collect path)
+      (setq paths (directory-abbrev-apply paths))
+      (if (string-prefix-p org-node--homedir paths)
+          (concat "~" (substring paths (1- (length org-node--homedir))))
+        paths))))
 
 (defun org-node--forget-id-locations (files)
   "Remove references to FILES in `org-id-locations'.
@@ -2716,8 +2724,8 @@ Optional argument REGION-AS-INITIAL-INPUT t means behave as
     (atomic-change-group
       (when region-text
         (delete-region beg end))
-      (insert (org-link-make-string (concat "id:" id) link-desc))
-      (run-hooks 'org-node-insert-link-hook))
+      (insert (org-link-make-string (concat "id:" id) link-desc)))
+    (run-hooks 'org-node-insert-link-hook)
     ;; TODO: Delete the link if a node was not created
     (unless node
       (org-node-create input id))))
@@ -3450,7 +3458,7 @@ Optional argument REVERTER is a function to add to
 `tabulated-list-revert-hook'."
   (unless (and buffer format entries)
     (user-error
-     "org-node--pop-to-tabulated-list needs buffer, format, entries"))
+     "org-node--pop-to-tabulated-list: Mandatory arguments are buffer, format, entries"))
   (pop-to-buffer (get-buffer-create buffer))
   (tabulated-list-mode)
   (setq tabulated-list-format format)
@@ -3662,15 +3670,15 @@ Optional keyword argument ABOUT-TO-DO as in
   (let ((why (if (eq (car body) :about-to-do)
                  (progn (pop body) (pop body))
                "Org-node is about to look inside a file")))
-    `(let (find-file-hook
-           after-save-hook
-           before-save-hook
-           (enable-local-variables :safe)
+    `(let ((enable-local-variables :safe)
            (org-inhibit-startup t) ;; Don't apply startup #+options
-           org-agenda-files
-           kill-buffer-hook ;; Inhibit save-place etc
-           kill-buffer-query-functions
-           buffer-list-update-hook)
+           (find-file-hook nil)
+           (after-save-hook nil)
+           (before-save-hook nil)
+           (org-agenda-files nil)
+           (kill-buffer-hook nil) ;; Inhibit save-place etc
+           (kill-buffer-query-functions nil)
+           (buffer-list-update-hook nil))
        ;; The cache has been buggy since the 9.5 rewrite, disable to be safe
        (org-element-with-disabled-cache
          (let* ((-was-open- (find-buffer-visiting ,file))
@@ -3725,18 +3733,18 @@ Naturally, FUNDAMENTAL-MODE has no effect in that case."
   (declare (indent defun))
   (cl-assert (and msg files call about-to-do))
   (setq call (org-node--ensure-compiled call))
-  (cl-letf ((enable-local-variables :safe)
-            (org-inhibit-startup t) ;; Don't apply startup #+options
-            (file-name-handler-alist nil)
-            ;; (coding-system-for-read org-node-perf-assume-coding-system)
-            (find-file-hook nil)
-            (after-save-hook nil)
-            (before-save-hook nil)
-            (org-agenda-files nil)
-            (kill-buffer-hook nil) ;; Inhibit save-place etc
-            (kill-buffer-query-functions nil)
-            (write-file-functions nil) ;; recentf-track-opened-file
-            (buffer-list-update-hook nil))
+  (let ((enable-local-variables :safe)
+        (org-inhibit-startup t) ;; Don't apply startup #+options
+        (file-name-handler-alist nil)
+        ;; (coding-system-for-read org-node-perf-assume-coding-system)
+        (find-file-hook nil)
+        (after-save-hook nil)
+        (before-save-hook nil)
+        (org-agenda-files nil)
+        (kill-buffer-hook nil) ;; Inhibit save-place etc
+        (kill-buffer-query-functions nil)
+        (write-file-functions nil) ;; recentf-track-opened-file
+        (buffer-list-update-hook nil))
     (let ((files* files)
           interval
           file

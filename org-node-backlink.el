@@ -185,13 +185,12 @@ If REMOVE is non-nil, remove it instead."
 Designed for `after-change-functions', so this effectively flags
 all areas where text is added/changed/deleted.  Where text was
 purely deleted, it flags the preceding and succeeding char."
-  (when (derived-mode-p 'org-mode)
-    (with-silent-modifications
-      (if (= beg end)
-          (put-text-property (max (1- beg) (point-min))
-                             (min (1+ end) (point-max))
-                             'org-node-flag t)
-        (put-text-property beg end 'org-node-flag t)))))
+  (with-silent-modifications
+    (if (= beg end)
+        (put-text-property (max (1- beg) (point-min))
+                           (min (1+ end) (point-max))
+                           'org-node-flag t)
+      (put-text-property beg end 'org-node-flag t))))
 
 (defun org-node-backlink--fix-flagged-parts-of-buffer ()
   "Fix backlinks around parts of buffer that have been modified.
