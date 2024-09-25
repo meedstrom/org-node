@@ -46,43 +46,48 @@
 See Info node `(org-node)'.
 
 -----"
+  :global t
   :group 'org-node
   (if org-node-backlink-mode
       (progn
-        (add-hook 'org-roam-post-node-insert-hook
-                  #'org-node-backlink--add-in-target nil t)
-        (add-hook 'org-node-insert-link-hook
-                  #'org-node-backlink--add-in-target nil t)
-        (add-hook 'after-change-functions
-                  #'org-node-backlink--flag-buffer-modification nil t)
-        (add-hook 'before-save-hook
-                  #'org-node-backlink--fix-flagged-parts-of-buffer nil t)
-        ;; Advices cannot be buffer-local, so we leave this advice on even
-        ;; after the mode is disabled.  It no-ops where the mode is inactive.
-        (advice-add 'org-insert-link :after
-                    #'org-node-backlink--add-in-target))
-    (remove-hook 'org-roam-post-node-insert-hook
-                 #'org-node-backlink--add-in-target t)
-    (remove-hook 'org-node-insert-link-hook
-                 #'org-node-backlink--add-in-target t)
-    (remove-hook 'after-change-functions
-                 #'org-node-backlink--flag-buffer-modification t)
-    (remove-hook 'before-save-hook
-                 #'org-node-backlink--fix-flagged-parts-of-buffer t)))
+        (advice-add 'org-insert-link :after  #'org-node-backlink--add-in-target)
+        (add-hook 'org-node-rescan-functions #'org-node-backlink--maybe-fix-aggressively)
+        (add-hook 'org-mode-hook             #'org-node-backlink--local-mode)
+        (dolist (buf (buffer-list))
+          (with-current-buffer buf
+            (when (derived-mode-p 'org-mode)
+              (org-node-backlink--local-mode)))))
+    (advice-remove 'org-insert-link          #'org-node-backlink--add-in-target)
+    (remove-hook 'org-node-rescan-functions  #'org-node-backlink--maybe-fix-aggressively)
+    (remove-hook 'org-mode-hook              #'org-node-backlink--local-mode)
+    (dolist (buf (buffer-list))
+      (with-current-buffer buf
+        (org-node-backlink--local-mode 0)))))
 
-(defun org-node-backlink--enable-mode-if-org ()
-  "Enable `org-node-backlink-mode' if buffer is Org-mode."
-  (when (derived-mode-p 'org-mode)
-    (org-node-backlink-mode)))
+;; Not sure if it is recommended to add all hooks globally rather than make a
+;; local mode like this just to setup buffers locally.  Going by what I'd
+;; prefer, which is to not see so many potential no-ops on hooks.
+(define-minor-mode org-node-backlink--local-mode
+  "Buffer-local part of `org-node-backlink-mode'."
+  :interactive nil
+  (if org-node-backlink--local-mode
+      (progn
+        (add-hook 'org-roam-post-node-insert-hook #'org-node-backlink--add-in-target nil t)
+        (add-hook 'org-node-insert-link-hook      #'org-node-backlink--add-in-target nil t)
+        (add-hook 'after-change-functions         #'org-node-backlink--flag-buffer-modification nil t)
+        (add-hook 'before-save-hook               #'org-node-backlink--fix-flagged-parts-of-buffer nil t))
+
+    (remove-hook 'org-roam-post-node-insert-hook  #'org-node-backlink--add-in-target t)
+    (remove-hook 'org-node-insert-link-hook       #'org-node-backlink--add-in-target t)
+    (remove-hook 'after-change-functions          #'org-node-backlink--flag-buffer-modification t)
+    (remove-hook 'before-save-hook                #'org-node-backlink--fix-flagged-parts-of-buffer t)))
 
 ;;;###autoload
-(define-globalized-minor-mode org-node-backlink-global-mode
-  org-node-backlink-mode
-  org-node-backlink--enable-mode-if-org
-  :group 'org-node)
+(define-obsolete-function-alias
+  'org-node-backlink-global-mode #'org-node-backlink-mode "2024-09-25")
 
 
-;;;; Validation of one buffer at a time
+;;;; Buffer validation
 
 (defvar org-node-backlink--fix-ctr 0)
 (defvar org-node-backlink--files-to-fix nil)
@@ -91,11 +96,11 @@ See Info node `(org-node)'.
 (defun org-node-backlink-regret ()
   "Visit all `org-id-locations' and remove :BACKLINKS: property."
   (interactive)
-  (org-node-backlink-global-mode 0)
-  (org-node-backlink-fix-all 'remove))
+  (org-node-backlink-mode 0)
+  (org-node-backlink-fix-all-files 'remove))
 
 ;;;###autoload
-(defun org-node-backlink-fix-all (&optional remove)
+(defun org-node-backlink-fix-all-files (&optional remove)
   "Add :BACKLINKS: property to all known nodes.
 Optional argument REMOVE t means remove them instead, the same
 as the user command \\[org-node-backlink-regret].
@@ -119,19 +124,19 @@ Can be quit midway through and resumed later.  With
                 :files org-node-backlink--files-to-fix
                 :msg "Removing :BACKLINKS: (you may quit and resume anytime)"
                 :about-to-do "About to remove backlinks"
-                :call (lambda () (org-node-backlink-fix-whole-buffer t))
+                :call (lambda () (org-node-backlink-fix-buffer t))
                 :too-many-files-hack t))
       (setq org-node-backlink--files-to-fix
             (org-node--in-files-do
               :files org-node-backlink--files-to-fix
               :msg "Adding/updating :BACKLINKS: (you may quit and resume anytime)"
               :about-to-do "About to edit backlinks"
-              :call #'org-node-backlink-fix-whole-buffer
+              :call #'org-node-backlink-fix-buffer
               :too-many-files-hack t)))
     (when (null org-node-backlink--files-to-fix)
       (message "Done editing :BACKLINKS: properties!"))))
 
-(defun org-node-backlink-fix-whole-buffer (&optional remove)
+(defun org-node-backlink-fix-buffer (&optional remove)
   "Update :BACKLINKS: property for all nodes in buffer.
 If REMOVE is non-nil, remove the property."
   (interactive)
@@ -180,9 +185,7 @@ If REMOVE is non-nil, remove it instead."
 Designed for `after-change-functions', so this effectively flags
 all areas where text is added/changed/deleted.  Where text was
 purely deleted, it flags the preceding and succeeding char."
-  (unless (derived-mode-p 'org-mode)
-    (error "Backlink function called in non-Org buffer"))
-  (when org-node-backlink-mode
+  (when (derived-mode-p 'org-mode)
     (with-silent-modifications
       (if (= beg end)
           (put-text-property (max (1- beg) (point-min))
@@ -197,11 +200,9 @@ Look for areas flagged by
 `org-node-backlink--flag-buffer-modification' and run
 `org-node-backlink--fix-entry-here' at each affected heading.
 For a huge file, this is much faster than using
-`org-node-backlink-fix-whole-buffer' -- imagine a thousand
+`org-node-backlink-fix-buffer' -- imagine a thousand
 headings but you have only done work under one of them."
-  (unless (derived-mode-p 'org-mode)
-    (error "Backlink function called in non-Org buffer"))
-  (when org-node-backlink-mode
+  (when (derived-mode-p 'org-mode)
     ;; Catch any error because this runs at `before-save-hook' which MUST fail
     ;; gracefully and let the user save anyway
     (condition-case err
@@ -251,7 +252,7 @@ headings but you have only done work under one of them."
                 (set-marker start (marker-position end)))
               (set-marker start nil)
               (set-marker end nil))))
-      (( error debug )
+      (( t error debug )
        (message "org-node: Updating backlinks ran into an issue: %S" err)
        (remove-text-properties (point-min) (point-max) 'org-node-flag)
        ;; Provide backtrace even tho we don't signal an error
@@ -267,7 +268,7 @@ headings but you have only done work under one of them."
 ;; navel-gaze its own content to see if it looks correct according to current
 ;; links tables.  Technically, that would be enough to result in correct
 ;; backlinks everywhere if you just run it on all files, and that's
-;; more-or-less how `org-node-backlink-fix-all' works, but we don't want to do
+;; more-or-less how `org-node-backlink-fix-all-files' works, but we don't want to do
 ;; that on every save.
 
 ;; By contrast, the below code does not look up tables, just reacts to the
@@ -279,7 +280,7 @@ headings but you have only done work under one of them."
 ;;    should check the current file but rather visit and edit the target file.
 ;;    If we didn't have the below code, we'd have save the current buffer (in
 ;;    order to update tables) and then open the target file and run
-;;    `org-node-backlink-fix-whole-buffer', which can easily take a while for
+;;    `org-node-backlink-fix-buffer', which can easily take a while for
 ;;    a big target file.
 
 ;; TODO: Report when it has members
@@ -380,6 +381,55 @@ it in the nearby :BACKLINKS: property."
                (remq 'org-node-backlink--flag-buffer-modification
                      after-change-functions)))
           (org-entry-put nil "BACKLINKS" new-value))))))
+
+
+;;;; Aggressive visit-and-fix
+
+(defcustom org-node-backlink-aggressive nil
+  "On save, fix backlinks for added/deleted links.
+Needs `org-node-perf-eagerly-update-link-tables' to be t.
+
+Side effect: the org-element cache gets reset in the destination buffers
+while fixing backlinks."
+  :group 'org-node
+  :type 'boolean)
+
+(defun org-node-backlink--maybe-fix-aggressively (_)
+  "Designed for `org-node-rescan-hook'."
+  (when org-node-backlink-aggressive
+    (if org-node-perf-eagerly-update-link-tables
+        (let (affected-dests)
+          (cl-loop
+           for (dest . old-links) in org-node--old-link-sets
+           when (cl-set-exclusive-or
+                 (mapcar #'org-node-link-origin old-links)
+                 (mapcar #'org-node-link-origin
+                         (gethash dest org-node--dest<>links))
+                 :test #'equal)
+           do (let* ((id dest)
+                     (node (or (gethash id org-node--id<>node)
+                               (and (setq id (gethash dest org-node--ref<>id))
+                                    (gethash id org-node--id<>node)))))
+                (push id (alist-get (org-node-get-file-path node)
+                                    affected-dests nil nil #'equal))))
+          (setq org-node--old-link-sets nil)
+          (cl-loop for (file . ids) in affected-dests
+                   when (and (file-readable-p file)
+                             (file-writable-p file))
+                   do (org-node--with-quick-file-buffer file
+                        :about-to-do "About to fix backlinks"
+                        (goto-char (point-min))
+                        (let ((was-modified (buffer-modified-p)))
+                          (dolist (id (delete-dups ids))
+                            (when (re-search-forward (concat "^[[:space:]]*:id: +"
+                                                             (regexp-quote id))
+                                                     nil t)
+                              (org-node-backlink--fix-entry-here)))
+                          (unless was-modified
+                            (save-buffer)))
+                        ;; Because the cache gets confused by the modification
+                        (org-element-cache-reset))))
+      (message "Option `org-node-backlink-aggressive' has no effect when `org-node-perf-eagerly-update-link-tables' is nil"))))
 
 (provide 'org-node-backlink)
 

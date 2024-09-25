@@ -1237,6 +1237,7 @@ pass that to FINALIZER."
       (message "Scan had problems, see M-x org-node-list-scan-problems"))
     (setq org-node--first-init nil)))
 
+(defvar org-node--old-link-sets nil)
 (defun org-node--finalize-modified (results)
   "Use RESULTS to update tables."
   (run-hooks 'org-node-before-update-tables-hook)
@@ -1250,10 +1251,11 @@ pass that to FINALIZER."
       ;; In case a title was edited: don't persist old revisions of the title
       (org-node--dirty-forget-completions-in found-files)
       (when org-node-perf-eagerly-update-link-tables
+        (setq org-node--old-link-sets nil)
         (cl-loop with ids-of-nodes-scanned = (cl-loop
                                               for node in nodes
                                               collect (org-node-get-id node))
-                 with to-update = nil
+                 with reduced-link-sets = nil
                  for dest being each hash-key of org-node--dest<>links
                  using (hash-values link-set)
                  do (cl-loop
@@ -1262,15 +1264,18 @@ pass that to FINALIZER."
                      if (member (org-node-link-origin link)
                                 ids-of-nodes-scanned)
                      do (setq update-this-dest t)
-                     else collect link into updated-link-set
+                     else collect link into reduced-link-set
                      finally do
                      (when update-this-dest
-                       (push (cons dest updated-link-set) to-update)))
+                       (push (cons dest reduced-link-set) reduced-link-sets)))
                  finally do
-                 (dolist (new to-update)
-                   (puthash (car new) (cdr new) org-node--dest<>links)))
-        ;; Having erased the links that were known to originate in the
-        ;; re-scanned nodes, it's safe to add them (again).
+                 (cl-loop
+                  for (dest . links) in reduced-link-sets do
+                  (push (cons dest (gethash dest org-node--dest<>links))
+                        org-node--old-link-sets)
+                  (puthash dest links org-node--dest<>links)))
+        ;; Having discarded the links that were known to originate in the
+        ;; re-scanned nodes, it's safe to record them (again).
         (dolist (link links)
           (push link (gethash (org-node-link-dest link) org-node--dest<>links))))
       (cl-loop for (path . type) in path.type
@@ -1305,8 +1310,8 @@ normal usage!  What\\='s left undone til idle:
 1. deleted links remain in the table, leading to undead backlinks
 2. :pos values can desync, which can affect the org-roam buffer
 
-The reason for default t is better experience with
-`org-node-backlink-mode'."
+An user of `org-node-backlink-mode' is recommended to enable this as
+well as `org-node-backlink-clean-aggressively'."
   :group 'org-node
   :type 'boolean)
 
