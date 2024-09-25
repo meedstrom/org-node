@@ -2161,7 +2161,7 @@ KEY, NAME and CAPTURE explained in `org-node-series-defs'."
                             (org-node-get-id node)))))
     :whereami (lambda ()
                 (when (seq-intersection (split-string ,tags ":" t)
-                                        (org-node-get-tags node))
+                                        (org-get-tags))
                   (let ((sortstr (org-entry-get nil ,prop t))
                         (node (gethash (org-node-id-at-point) org-nodes)))
                     (when (and sortstr node)
