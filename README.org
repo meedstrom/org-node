@@ -13,7 +13,7 @@
 ** Breaking changes [2024-09-26]
 - User option =org-node-series-defs= now ships an empty default value. Check the [[https://github.com/meedstrom/org-node/wiki/Configuring-series][wiki]] to configure it.
 
-  This was done for several reasons, not the least being that people actually use it :-)  I do not want to support what was meant to be an example, and it's cleaner this way.
+  This was done for several reasons, not the least being that people actually use the default value :-)  I do not want to support what was meant to be an example, and it's cleaner this way.
 
 * Background
 ** What's all this

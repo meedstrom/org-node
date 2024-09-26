@@ -23,6 +23,7 @@
 @end ifnottex
 
 @menu
+* News::
 * Background::
 * Setup::
 * Backlinks::
@@ -31,6 +32,10 @@
 
 @detailmenu
 --- The Detailed Node Listing ---
+
+News
+
+* Breaking changes @emph{[2024-09-26 Thu]}::
 
 Background
 
@@ -82,6 +87,23 @@ Appendix
 @end detailmenu
 @end menu
 
+@node News
+@chapter News
+
+@menu
+* Breaking changes @emph{[2024-09-26 Thu]}::
+@end menu
+
+@node Breaking changes @emph{[2024-09-26 Thu]}
+@section Breaking changes @emph{[2024-09-26 Thu]}
+
+@itemize
+@item
+User option @samp{org-node-series-defs} now ships an empty default value. Check the @uref{https://github.com/meedstrom/org-node/wiki/Configuring-series, wiki} to configure it.
+
+This was done for several reasons, not the least being that people actually use the default value :-)  I do not want to support what was meant to be an example, and it's cleaner this way.
+@end itemize
+
 @node Background
 @chapter Background
 
@@ -94,7 +116,7 @@ Appendix
 @node What's all this
 @section What's all this
 
-I found org-roam too slow, so I made @uref{https://github.com/meedstrom/quickroam, quickroam}.  And that idea spun off into this package, a standalone thing.  I hope it's also easier to pick up than org-roam.
+I like @uref{https://github.com/org-roam/org-roam, org-roam} but found it too slow, so I made @uref{https://github.com/meedstrom/quickroam, quickroam}.  And that idea spun off into this package, a standalone thing.  By accident, I believe it's also easier to pick up than org-roam.
 
 @itemize
 @item
@@ -107,7 +129,7 @@ In pursuit of being "just org-id", this package has no equivalent setting to @sa
 @item
 @strong{If you were not using org-roam}, maybe think of it as somewhat like @uref{https://github.com/alphapapa/org-recent-headings, org-recent-headings} beefed-up to the extent that you won't need other methods of browsing.
 
-If you were the sort of person to prefer ID-links over file links or any other type of link, you're in the right place!  Now you can rely on IDs, and---if you want---stop worrying about filenames, directories and subtree hierarchies.  As long as you've assigned an ID to a heading, you can find it later.
+If you were the sort of person to prefer ID-links over file links or any other type of link, you're in the right place!  Now you can rely on IDs, and---if you want---stop worrying about filenames, directories and subtree hierarchies.  As long as you've assigned an ID to a heading or file, you can find it later.
 @end itemize
 
 @node What's a "node"?
@@ -458,7 +480,7 @@ Do you already know about "daily-notes"?  Then get started with a keybinding suc
 (keymap-set global-map "M-s s" #'org-node-series-dispatch)
 @end lisp
 
-and configure @samp{org-node-series-defs} if needed.  See @uref{https://github.com/meedstrom/org-node/wiki/Configuring-series, wiki}.
+and configure @samp{org-node-series-defs}.  See @uref{https://github.com/meedstrom/org-node/wiki/Configuring-series, wiki}.
 
 @menu
 * What are series?::
@@ -475,8 +497,6 @@ Roam's idea of a "daily-note" is the same as an @uref{https://github.com/bastibe
 You don't need software for that basic idea, only to make it extra convenient to navigate them and jump back and forth in the series.
 
 Thus, fundamentally, any "journal" or "dailies" software are just operating on a sorted series to navigate through.  You could have series about, let's say, historical events, Star Trek episodes, your school curriculum@dots{}
-
-Define more series in the variable @samp{org-node-series-defs}.  Already included is a definition that approximates the org-roam-dailies defaults, but I encourage you to override it to suit your tastes.  @uref{https://github.com/meedstrom/org-node/wiki/Configuring-series, Wiki}.
 
 You may be taken aback that defining a new series requires writing 5 lambdas, but once you get the hang of it, you can often reuse those lambdas.
 
