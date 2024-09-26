@@ -22,9 +22,11 @@
 ;; runtime.
 
 ;; The child processes are expected to execute
-;; `org-node-parser--collect-dangerously', then die.
+;; `org-node-parser--collect-dangerously' once and die.
 
 ;;; Code:
+
+;; TODO: Drop the @ from @citations (needs change in several places)
 
 (eval-when-compile
   (require 'cl-lib)

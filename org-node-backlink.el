@@ -25,6 +25,7 @@
 ;; TODO: Reuse much of this logic to make org-super-links drawers
 
 (require 'org-node)
+(require 'org-node-changes)
 (require 'cl-lib)
 (require 'compat)
 
@@ -48,6 +49,7 @@ See Info node `(org-node)'.
 -----"
   :global t
   :group 'org-node
+  (remove-hook 'org-mode-hook #'org-node-backlink-mode) ;; Used to be local
   (if org-node-backlink-mode
       (progn
         (advice-add 'org-insert-link :after  #'org-node-backlink--add-in-target)
@@ -85,6 +87,9 @@ See Info node `(org-node)'.
 ;;;###autoload
 (define-obsolete-function-alias
   'org-node-backlink-global-mode #'org-node-backlink-mode "2024-09-25")
+;; ;;;###autoload (autoload 'org-node-backlink-global-mode "org-node-backlink" nil t)
+;; (org-node-changes--def-whiny-alias
+;;   'org-node-backlink-global-mode #'org-node-backlink-mode "2024-09-25")
 
 
 ;;;; Buffer validation
@@ -185,13 +190,12 @@ If REMOVE is non-nil, remove it instead."
 Designed for `after-change-functions', so this effectively flags
 all areas where text is added/changed/deleted.  Where text was
 purely deleted, it flags the preceding and succeeding char."
-  (when (derived-mode-p 'org-mode)
-    (with-silent-modifications
-      (if (= beg end)
-          (put-text-property (max (1- beg) (point-min))
-                             (min (1+ end) (point-max))
-                             'org-node-flag t)
-        (put-text-property beg end 'org-node-flag t)))))
+  (with-silent-modifications
+    (if (= beg end)
+        (put-text-property (max (1- beg) (point-min))
+                           (min (1+ end) (point-max))
+                           'org-node-flag t)
+      (put-text-property beg end 'org-node-flag t))))
 
 (defun org-node-backlink--fix-flagged-parts-of-buffer ()
   "Fix backlinks around parts of buffer that have been modified.

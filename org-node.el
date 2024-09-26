@@ -636,7 +636,7 @@ When called from Lisp, peek on any hash table HT."
 
 -----"
   :global t
-  (remove-hook 'org-mode-hook #'org-node-cache-mode)
+  (remove-hook 'org-mode-hook #'org-node-cache-mode) ;; Old install instruction
   (if org-node-cache-mode
       (progn
         (add-hook 'org-node-creation-hook         #'org-node--add-series-item 90)
@@ -1194,7 +1194,7 @@ pass that to FINALIZER."
   (clrhash org-node--candidate<>node)
   (clrhash org-node--title<>id)
   (clrhash org-node--ref<>id)
-  (setq org-node--collisions nil) ;; To be populated by `org-node--record-node'
+  (setq org-node--collisions nil) ;; To be populated by `org-node--record-nodes'
   (seq-let (missing-files found.mtime nodes path.type links problems) results
     (org-node--forget-id-locations missing-files)
     (dolist (file missing-files)
@@ -1208,8 +1208,7 @@ pass that to FINALIZER."
                   (puthash file mtime org-node--file<>mtime)
                   ;; Expire stale previews
                   (remhash file org-node--file<>previews)))
-    (dolist (node nodes)
-      (org-node--record-node node))
+    (org-node--record-nodes nodes)
     ;; (org-id-locations-save) ;; A nicety, but sometimes slow
     (setq org-node-built-series nil)
     (dolist (def org-node-series-defs)
@@ -1283,8 +1282,7 @@ pass that to FINALIZER."
                     (puthash file mtime org-node--file<>mtime)
                     ;; Expire stale previews
                     (remhash file org-node--file<>previews)))
-      (dolist (node nodes)
-        (org-node--record-node node))
+      (org-node--record-nodes nodes)
       (dolist (prob problems)
         (push prob org-node--problems))
       (when problems
@@ -1313,49 +1311,51 @@ well as `org-node-backlink-aggressive'."
   :group 'org-node
   :type 'boolean)
 
-(defun org-node--record-node (node)
-  "Add NODE to `org-nodes' and related info to other tables."
-  (let* ((id (org-node-get-id node))
-         (path (org-node-get-file-path node))
-         (refs (org-node-get-refs node)))
-    ;; Share id location with org-id & do so with manual `puthash' and `push'
-    ;; because `org-id-add-location' would run heavy logic we've already done.
-    (puthash id path org-id-locations)
-    (unless (member path org-id-files)
-      (push path org-id-files))
-    ;; Register the node
-    (puthash id node org-node--id<>node)
-    (dolist (ref refs)
-      (puthash ref id org-node--ref<>id))
-    ;; Setup completion candidates
-    (when (funcall (org-node--ensure-compiled org-node-filter-fn) node)
-      ;; Let refs work as aliases
-      (dolist (ref refs)
-        (puthash ref node org-node--candidate<>node)
-        (puthash ref
-                 (list (propertize ref 'face 'org-cite)
-                       (let ((type (gethash ref org-node--uri-path<>uri-type)))
-                         (when type
-                           (propertize
-                            (concat type ":") 'face 'completions-annotations)))
-                       nil)
-                 org-node--title<>affixation-triplet))
-      (dolist (title (cons (org-node-get-title node)
-                           (org-node-get-aliases node)))
-        (let ((collision (gethash title org-node--title<>id)))
-          (when (and collision (not (equal id collision)))
-            (push (list title id collision) org-node--collisions)))
-        (puthash title id org-node--title<>id)
-        (let ((affx (funcall (org-node--ensure-compiled org-node-affixation-fn)
-                             node title)))
-          (if org-node-alter-candidates
-              ;; Absorb the affixations into one candidate string
-              (puthash (concat (nth 1 affx) (nth 0 affx) (nth 2 affx))
-                       node
-                       org-node--candidate<>node)
-            ;; Only title as candidate, to be affixated by `org-node-collection'
-            (puthash title node org-node--candidate<>node)
-            (puthash title affx org-node--title<>affixation-triplet)))))))
+(defun org-node--record-nodes (nodes)
+  "Add NODES to `org-nodes' and related info to other tables."
+  (let ((affixator (org-node--ensure-compiled org-node-affixation-fn))
+        (filterer (org-node--ensure-compiled org-node-filter-fn)))
+    (dolist (node nodes)
+      (let* ((id (org-node-get-id node))
+             (path (org-node-get-file-path node))
+             (refs (org-node-get-refs node)))
+        ;; Share location with org-id & do so with manual `puthash' and `push'
+        ;; because `org-id-add-location' would run logic we've already done
+        (puthash id path org-id-locations)
+        (unless (member path org-id-files)
+          (push path org-id-files))
+        ;; Register the node
+        (puthash id node org-node--id<>node)
+        (dolist (ref refs)
+          (puthash ref id org-node--ref<>id))
+        ;; Setup completion candidates
+        (when (funcall filterer node)
+          ;; Let refs work as aliases
+          (dolist (ref refs)
+            (puthash ref node org-node--candidate<>node)
+            (puthash ref
+                     (let ((type (gethash ref org-node--uri-path<>uri-type)))
+                       (list (propertize ref 'face 'org-cite)
+                             (when type
+                               (propertize (concat type ":")
+                                           'face 'completions-annotations))
+                             nil))
+                     org-node--title<>affixation-triplet))
+          (dolist (title (cons (org-node-get-title node)
+                               (org-node-get-aliases node)))
+            (let ((collision (gethash title org-node--title<>id)))
+              (when (and collision (not (equal id collision)))
+                (push (list title id collision) org-node--collisions)))
+            (puthash title id org-node--title<>id)
+            (let ((affx (funcall affixator node title)))
+              (if org-node-alter-candidates
+                  ;; Absorb the affixations into one candidate string
+                  (puthash (concat (nth 1 affx) (nth 0 affx) (nth 2 affx))
+                           node
+                           org-node--candidate<>node)
+                ;; Only title as candidate, to be affixated by `org-node-collection'
+                (puthash title node org-node--candidate<>node)
+                (puthash title affx org-node--title<>affixation-triplet)))))))))
 
 (defvar org-node--compile-timers nil)
 (defvar org-node--compiled-lambdas (make-hash-table :test #'equal)
@@ -1470,27 +1470,28 @@ also necessary is `org-node--dirty-ensure-link-known' elsewhere."
                 (ftitle (cadar (org-collect-keywords '("TITLE")))))
             (when heading
               (setq heading (substring-no-properties heading)))
-            (org-node--record-node
-             (org-node--make-obj
-              :title (or heading ftitle)
-              :id id
-              :file-path fpath
-              :file-title ftitle
-              :aliases (split-string-and-unquote
-                        (or (cdr (assoc "ROAM_ALIASES" props)) ""))
-              :refs (org-node-parser--split-refs-field
-                     (cdr (assoc "ROAM_REFS" props)))
-              :pos (if heading (org-entry-beginning-position) 1)
-              ;; NOTE: Don't use `org-reduced-level' since org-node-parser.el
-              ;;       also does not correct for that
-              :level (or (org-current-level) 0)
-              :olp (org-get-outline-path)
-              ;; Less important
-              :properties props
-              :tags (org-get-tags)
-              :todo (if heading (org-get-todo-state))
-              :deadline (cdr (assoc "DEADLINE" props))
-              :scheduled (cdr (assoc "SCHEDULED" props))))))))))
+            (org-node--record-nodes
+             (list
+              (org-node--make-obj
+               :title (or heading ftitle)
+               :id id
+               :file-path fpath
+               :file-title ftitle
+               :aliases (split-string-and-unquote
+                         (or (cdr (assoc "ROAM_ALIASES" props)) ""))
+               :refs (org-node-parser--split-refs-field
+                      (cdr (assoc "ROAM_REFS" props)))
+               :pos (if heading (org-entry-beginning-position) 1)
+               ;; NOTE: Don't use `org-reduced-level' since org-node-parser.el
+               ;;       also does not correct for that
+               :level (or (org-current-level) 0)
+               :olp (org-get-outline-path)
+               ;; Less important
+               :properties props
+               :tags (org-get-tags)
+               :todo (if heading (org-get-todo-state))
+               :deadline (cdr (assoc "DEADLINE" props))
+               :scheduled (cdr (assoc "SCHEDULED" props)))))))))))
 
 
 ;;;; Scanning: Etc
@@ -1606,12 +1607,11 @@ non-nil), list the files in a new buffer."
               (hash-table-empty-p org-node--file<>mtime))
       (cl-loop for file in (let ((file-name-handler-alist nil))
                              (org-node-abbrev-file-names
-                              (cl-loop
-                               for dir in org-node-extra-id-dirs
-                               nconc (org-node--dir-files-recursively
-                                      (file-truename dir)
-                                      "org"
-                                      org-node-extra-id-dirs-exclude))))
+                              (cl-loop for dir in org-node-extra-id-dirs
+                                       nconc (org-node--dir-files-recursively
+                                              (file-truename dir)
+                                              "org"
+                                              org-node-extra-id-dirs-exclude))))
                unless (gethash file org-node--file<>mtime)
                do (puthash file 0 org-node--file<>mtime))
       (cl-loop for file being each hash-value of org-id-locations
@@ -1649,52 +1649,55 @@ sub-directories, sub-sub-directories and so on, with provisos:
             (push (file-name-concat dir file) result)))))
     result))
 
-;; REVIEW: Org-id uses `abbreviate-file-name', could this result in
-;;         disagreement with org-node filenames on Windows or single-user
-;;         Linux?
+;; REVIEW: Org-id uses `abbreviate-file-name', ensure it returns exactly the
+;;         same in all cases (e.g. on Windows or on single-user mode Linux)
 (defvar org-node--homedir nil)
 (defun org-node-abbrev-file-names (paths)
   "Abbreviate all file paths in PATHS.
-PATHS can be a single path or a list, and are presumed to
-be absolute paths.
+Faster than `abbreviate-file-name', especially for many paths.
 
-Faster than calling `abbreviate-file-name' once for each item in
-a list.
+PATHS can be a single path or a list, and are presumed to be absolute
+paths.
 
-It is a good idea to abbreviate a path when you don\\='t know
-where it came from.  That ensures that it is comparable to a path
-provided in either `org-id-locations' or an `org-node' object.
+It is a good idea to abbreviate a path when you don\\='t know where it
+came from.  That helps ensure that it is comparable to a path provided
+in either `org-id-locations' or an `org-node' object.
 
-If the wild path may be a symlink or not an absolute path, it
-would be safer to process it first with `file-truename', then
-pass the result to this function.
+If the wild path may be a symlink or not an absolute path, it would be
+safer to process it first with `file-truename', then pass the result to
+this function.
 
-Needless to say, you can also just use `file-truename' on both
-paths to be compared, if not writing performance-critical code."
+Needless to say, you can also just use `file-truename' on both paths to
+be compared, if not writing performance-critical code."
   (unless org-node--homedir
     (setq org-node--homedir (file-name-as-directory (expand-file-name "~"))))
-  (let* ((case-fold-search nil) ;; Assume case-sensitive filesystem
-         (result (cl-loop
-                  for path in (ensure-list paths)
-                  do (setq path (directory-abbrev-apply path))
-                  and collect
-                  (if (string-prefix-p org-node--homedir path)
-                      (concat
-                       "~" (substring path (1- (length org-node--homedir))))
-                    path))))
+  ;; Assume a case-sensitive filesystem.  I believe this fails gracefully.
+  (let ((case-fold-search nil))
     (if (listp paths)
-        result
-      (car result))))
+        (cl-loop
+         for path in paths
+         do (setq path (directory-abbrev-apply path))
+         if (string-prefix-p org-node--homedir path)
+         collect (concat "~" (substring path (1- (length org-node--homedir))))
+         else collect path)
+      (setq paths (directory-abbrev-apply paths))
+      (if (string-prefix-p org-node--homedir paths)
+          (concat "~" (substring paths (1- (length org-node--homedir))))
+        paths))))
 
 (defun org-node--forget-id-locations (files)
   "Remove references to FILES in `org-id-locations'.
 You might consider committing the effect to disk afterwards by calling
-`org-id-locations-save', which this function will not do for you."
+`org-id-locations-save', which this function will not do for you.
+
+FILES are assumed to be abbreviated truenames."
   (when files
-    ;; (setq org-id-files (-difference org-id-files files)) ;; Redundant
-    (let ((alist (org-id-hash-to-alist org-id-locations)))
-      (cl-loop for file in files do (setq alist (assoc-delete-all file alist)))
-      (setq org-id-locations (org-id-alist-to-hash alist)))))
+    (if (listp org-id-locations)
+        (message "org-node--forget-id-locations: Surprised that `org-id-locations' is an alist at this time")
+      (maphash (lambda (id file)
+                 (when (member file files)
+                   (remhash id org-id-locations)))
+               org-id-locations))))
 
 
 ;;;; Filename functions
@@ -1834,10 +1837,10 @@ that, configure `org-node-datestamp-format'."
 (defun org-node-slugify-for-web (title)
   "From TITLE, make a string meant to look nice as URL component.
 
-A title like \"Löb\\='s Theorem\" becomes \"lobs-theorem\".  Note
-that while diacritical marks are stripped, it retains most
-symbols that belong to the Unicode alphabetic category,
-preserving for example kanji and Greek letters."
+A title like \"Löb\\='s Theorem\" becomes \"lobs-theorem\".  Note that
+while diacritical marks are stripped, it retains most symbols that
+belong to the Unicode alphabetic category, preserving for example kanji
+and Greek letters."
   (thread-last title
                (org-node--strip-diacritics)
                (downcase)
@@ -2342,51 +2345,6 @@ your definitions."
   :type 'alist
   :set #'org-node--set-and-remind-reset)
 
-(when (null org-node-series-defs)
-  ;; Obviously, this series works best if you have `org-node-put-created' on
-  ;; `org-node-creation-hook'.
-  (setq org-node-series-defs
-        '(("a" :name "All ID-nodes by property :CREATED:"
-           :version 2
-           :classifier (lambda (node)
-                         (let ((time (cdr (assoc "CREATED" (org-node-get-props node)))))
-                           (when (and time (not (string-blank-p time)))
-                             (cons time (org-node-get-id node)))))
-           :whereami (lambda ()
-                       (let ((time (org-entry-get nil "CREATED" t)))
-                         (and time (not (string-blank-p time)) time)))
-           :prompter (lambda (key)
-                       (let ((series (cdr (assoc key org-node-built-series))))
-                         (completing-read
-                          "Go to: " (plist-get series :sorted-items))))
-           :try-goto (lambda (item)
-                       (when (org-node-helper-try-goto-id (cdr item))
-                         t))
-           :creator (lambda (sortstr key)
-                      (org-node-create sortstr (org-id-new) key)))))
-  ;; Fix #48 (dailies are optional)
-  (when (org-node--guess-daily-dir)
-    (push '("d" :name "Daily-files"
-            :version 2
-            :classifier (lambda (node)
-                          (let ((path (org-node-get-file-path node)))
-                            (when (string-search (org-node--guess-daily-dir) path)
-                              (let ((ymd (org-node-helper-filename->ymd path)))
-                                (when ymd
-                                  (cons ymd path))))))
-            :whereami (lambda ()
-                        (org-node-helper-filename->ymd buffer-file-name))
-            :prompter (lambda (key)
-                        (let ((org-node-series-that-marks-calendar key))
-                          (org-read-date)))
-            :try-goto (lambda (item)
-                        (org-node-helper-try-visit-file (cdr item)))
-            :creator (lambda (sortstr key)
-                       (let ((org-node-datestamp-format "")
-                             (org-node-ask-directory (org-node--guess-daily-dir)))
-                         (org-node-create sortstr (org-id-new) key))))
-          org-node-series-defs)))
-
 (defvar org-node-built-series nil
   "Alist describing each node series, internal use.")
 
@@ -2714,8 +2672,8 @@ Optional argument REGION-AS-INITIAL-INPUT t means behave as
     (atomic-change-group
       (when region-text
         (delete-region beg end))
-      (insert (org-link-make-string (concat "id:" id) link-desc))
-      (run-hooks 'org-node-insert-link-hook))
+      (insert (org-link-make-string (concat "id:" id) link-desc)))
+    (run-hooks 'org-node-insert-link-hook)
     ;; TODO: Delete the link if a node was not created
     (unless node
       (org-node-create input id))))
@@ -3273,9 +3231,10 @@ In case of unsolvable problems, how to wipe org-id-locations:
  (setq org-id-extra-files nil))"
   (interactive "DForget all IDs in directory: ")
   (org-node-cache-ensure t)
-  (let ((files (seq-intersection (mapcar #'abbreviate-file-name
-                                         (directory-files-recursively dir "."))
-                                 (hash-table-values org-id-locations))))
+  (let ((files (seq-intersection
+                (mapcar #'abbreviate-file-name
+                        (directory-files-recursively (file-truename dir) "."))
+                (hash-table-values org-id-locations))))
     (if files
         (progn
           (message "Forgetting all IDs in directory... (%s)" dir)
@@ -3448,7 +3407,7 @@ Optional argument REVERTER is a function to add to
 `tabulated-list-revert-hook'."
   (unless (and buffer format entries)
     (user-error
-     "org-node--pop-to-tabulated-list needs buffer, format, entries"))
+     "org-node--pop-to-tabulated-list: Mandatory arguments are buffer, format, entries"))
   (pop-to-buffer (get-buffer-create buffer))
   (tabulated-list-mode)
   (setq tabulated-list-format format)
@@ -3660,15 +3619,15 @@ Optional keyword argument ABOUT-TO-DO as in
   (let ((why (if (eq (car body) :about-to-do)
                  (progn (pop body) (pop body))
                "Org-node is about to look inside a file")))
-    `(let (find-file-hook
-           after-save-hook
-           before-save-hook
-           (enable-local-variables :safe)
+    `(let ((enable-local-variables :safe)
            (org-inhibit-startup t) ;; Don't apply startup #+options
-           org-agenda-files
-           kill-buffer-hook ;; Inhibit save-place etc
-           kill-buffer-query-functions
-           buffer-list-update-hook)
+           (find-file-hook nil)
+           (after-save-hook nil)
+           (before-save-hook nil)
+           (org-agenda-files nil)
+           (kill-buffer-hook nil) ;; Inhibit save-place etc
+           (kill-buffer-query-functions nil)
+           (buffer-list-update-hook nil))
        ;; The cache has been buggy since the 9.5 rewrite, disable to be safe
        (org-element-with-disabled-cache
          (let* ((-was-open- (find-buffer-visiting ,file))
@@ -3723,18 +3682,18 @@ Naturally, FUNDAMENTAL-MODE has no effect in that case."
   (declare (indent defun))
   (cl-assert (and msg files call about-to-do))
   (setq call (org-node--ensure-compiled call))
-  (cl-letf ((enable-local-variables :safe)
-            (org-inhibit-startup t) ;; Don't apply startup #+options
-            (file-name-handler-alist nil)
-            ;; (coding-system-for-read org-node-perf-assume-coding-system)
-            (find-file-hook nil)
-            (after-save-hook nil)
-            (before-save-hook nil)
-            (org-agenda-files nil)
-            (kill-buffer-hook nil) ;; Inhibit save-place etc
-            (kill-buffer-query-functions nil)
-            (write-file-functions nil) ;; recentf-track-opened-file
-            (buffer-list-update-hook nil))
+  (let ((enable-local-variables :safe)
+        (org-inhibit-startup t) ;; Don't apply startup #+options
+        (file-name-handler-alist nil)
+        ;; (coding-system-for-read org-node-perf-assume-coding-system)
+        (find-file-hook nil)
+        (after-save-hook nil)
+        (before-save-hook nil)
+        (org-agenda-files nil)
+        (kill-buffer-hook nil) ;; Inhibit save-place etc
+        (kill-buffer-query-functions nil)
+        (write-file-functions nil) ;; recentf-track-opened-file
+        (buffer-list-update-hook nil))
     (let ((files* files)
           interval
           file
