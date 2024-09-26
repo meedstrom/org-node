@@ -3294,25 +3294,26 @@ from the beginning."
                   (when-let ((warning (org-lint)))
                     (push (cons buffer-file-name (car warning))
                           org-node--lint-warnings)))))
-  (org-node--pop-to-tabulated-list
-   :buffer "*org lint results*"
-   :format [("File" 30 t) ("Line" 5 t) ("Trust" 5 t) ("Explanation" 0 t)]
-   :reverter #'org-node-lint-all
-   :entries (cl-loop
-             for (file . warning) in org-node--lint-warnings
-             collect (let ((array (cadr warning)))
-                       (list warning
-                             (vector
-                              (list (file-name-nondirectory file)
-                                    'face 'link
-                                    'action `(lambda (_button)
-                                               (find-file ,file)
-                                               (goto-line ,(string-to-number
-                                                            (elt array 0))))
-                                    'follow-link t)
-                              (elt array 0)
-                              (elt array 1)
-                              (elt array 2)))))))
+  (when org-node--lint-warnings
+    (org-node--pop-to-tabulated-list
+     :buffer "*org lint results*"
+     :format [("File" 30 t) ("Line" 5 t) ("Trust" 5 t) ("Explanation" 0 t)]
+     :reverter #'org-node-lint-all
+     :entries (cl-loop
+               for (file . warning) in org-node--lint-warnings
+               collect (let ((array (cadr warning)))
+                         (list warning
+                               (vector
+                                (list (file-name-nondirectory file)
+                                      'face 'link
+                                      'action `(lambda (_button)
+                                                 (find-file ,file)
+                                                 (goto-line ,(string-to-number
+                                                              (elt array 0))))
+                                      'follow-link t)
+                                (elt array 0)
+                                (elt array 1)
+                                (elt array 2))))))))
 
 (defun org-node-list-feedback-arcs ()
   "Show a feedback-arc-set of forward id-links.
