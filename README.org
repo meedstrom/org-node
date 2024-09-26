@@ -9,10 +9,16 @@
 #+TEXINFO_DIR_DESC: Link org-id entries into a network.
 #+EXPORT_FILE_NAME: org-node
 #+HTML: <a href="https://melpa.org/#/org-node"><img alt="MELPA" src="https://melpa.org/packages/org-node-badge.svg"/></a>
+* News
+** Breaking changes [2024-09-26]
+- User option =org-node-series-defs= now ships an empty default value. Check the [[https://github.com/meedstrom/org-node/wiki/Configuring-series][wiki]] to configure it.
+
+  This was done for several reasons, not the least being that people actually use it :-)  I do not want to support what was meant to be an example, and it's cleaner this way.
+
 * Background
 ** What's all this
 
-I like org-roam but found it too slow, so I made [[https://github.com/meedstrom/quickroam][quickroam]].  And that idea spun off into this package, a standalone thing.  By accident, I believe it's also easier to pick up than org-roam.
+I like [[https://github.com/org-roam/org-roam][org-roam]] but found it too slow, so I made [[https://github.com/meedstrom/quickroam][quickroam]].  And that idea spun off into this package, a standalone thing.  By accident, I believe it's also easier to pick up than org-roam.
 
 - *If you were using org-roam*, there is nothing to migrate.  You can use both packages.  It's exactly the same on-disk format: "notes" are identified by their org-id.
 
@@ -217,7 +223,7 @@ Do you already know about "daily-notes"?  Then get started with a keybinding suc
 (keymap-set global-map "M-s s" #'org-node-series-dispatch)
 #+end_src
 
-and configure =org-node-series-defs= if needed.  See [[https://github.com/meedstrom/org-node/wiki/Configuring-series][wiki]].
+and configure =org-node-series-defs=.  See [[https://github.com/meedstrom/org-node/wiki/Configuring-series][wiki]].
 
 *** What are series?
 It's easiest to explain series if we use "daily-notes" (or "dailies") as an example of a series.
@@ -227,8 +233,6 @@ Roam's idea of a "daily-note" is the same as an [[https://github.com/bastibe/org
 You don't need software for that basic idea, only to make it extra convenient to navigate them and jump back and forth in the series.
 
 Thus, fundamentally, any "journal" or "dailies" software are just operating on a sorted series to navigate through.  You could have series about, let's say, historical events, Star Trek episodes, your school curriculum...
-
-Define more series in the variable =org-node-series-defs=.  Already included is a definition that approximates the org-roam-dailies defaults, but I encourage you to override it to suit your tastes.  [[https://github.com/meedstrom/org-node/wiki/Configuring-series][Wiki]].
 
 You may be taken aback that defining a new series requires writing 5 lambdas, but once you get the hang of it, you can often reuse those lambdas.
 
