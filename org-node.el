@@ -823,8 +823,6 @@ In broad strokes:
   (require 'org-id)
   (when (not org-id-track-globally)
     (user-error "Org-node requires `org-id-track-globally'"))
-  (when org-id-locations-file-relative
-    (user-error "Org-node requires nil `org-id-locations-file-relative'"))
   (when (null org-id-locations)
     (when (file-exists-p org-id-locations-file)
       (ignore-errors (org-id-locations-load))))
