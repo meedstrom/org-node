@@ -1610,7 +1610,7 @@ non-nil), list the files in a new buffer."
                               (cl-loop for dir in org-node-extra-id-dirs
                                        nconc (org-node--dir-files-recursively
                                               (file-truename dir)
-                                              "org"
+                                              ".org"
                                               org-node-extra-id-dirs-exclude))))
                unless (gethash file org-node--file<>mtime)
                do (puthash file 0 org-node--file<>mtime))
