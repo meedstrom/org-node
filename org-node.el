@@ -3770,9 +3770,8 @@ Naturally, FUNDAMENTAL-MODE has no effect in that case."
                   err buf file (car files*) ctr)
            (unless (or was-open (not buf) (buffer-modified-p buf))
              (kill-buffer buf))
-           ;; In case FILE was the problem, do not add it back on the list for
-           ;; next time user tries the command (unlike on a quit)
-           files*))))))
+           ;; Restart
+           nil))))))
 
 (defun org-node--find-file-noselect (abbr-truename about-to-do)
   "Read file ABBR-TRUENAME into a buffer and return the buffer.
