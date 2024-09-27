@@ -3406,9 +3406,11 @@ value to which `tabulated-list-entries' should be set.
 
 Optional argument REVERTER is a function to add to
 `tabulated-list-revert-hook'."
-  (unless (and buffer format entries)
+  (unless (and buffer format)
     (user-error
      "org-node--pop-to-tabulated-list: Mandatory arguments are buffer, format, entries"))
+  (when (null entries)
+    (message "No entries to tabulate"))
   (pop-to-buffer (get-buffer-create buffer))
   (tabulated-list-mode)
   (setq tabulated-list-format format)
@@ -3458,29 +3460,30 @@ with \\[universal-argument] prefix."
                                   when (equal "id" (org-node-link-type link))
                                   collect (cons dest link)))))
     (message "%d dead links found" (length dead-links))
-    (org-node--pop-to-tabulated-list
-     :buffer "*dead links*"
-     :format [("Location" 40 t) ("Unknown ID reference" 40 t)]
-     :reverter #'org-node-list-dead-links
-     :entries
-     (cl-loop
-      for (dest . link) in dead-links
-      as origin-node = (gethash (org-node-link-origin link)
-                                org-node--id<>node)
-      if (not (equal dest (org-node-link-dest link)))
-      do (error "IDs not equal: %s, %s" dest (org-node-link-dest link))
-      else if (not origin-node)
-      do (error "Node not found for ID: %s" (org-node-link-origin link))
-      else
-      collect (list link
-                    (vector
-                     (list (org-node-get-title origin-node)
-                           'face 'link
-                           'action `(lambda (_button)
-                                      (org-node--goto ,origin-node)
-                                      (goto-char ,(org-node-link-pos link)))
-                           'follow-link t)
-                     dest))))))
+    (when dead-links
+      (org-node--pop-to-tabulated-list
+       :buffer "*dead links*"
+       :format [("Location" 40 t) ("Unknown ID reference" 40 t)]
+       :reverter #'org-node-list-dead-links
+       :entries
+       (cl-loop
+        for (dest . link) in dead-links
+        as origin-node = (gethash (org-node-link-origin link)
+                                  org-node--id<>node)
+        if (not (equal dest (org-node-link-dest link)))
+        do (error "IDs not equal: %s, %s" dest (org-node-link-dest link))
+        else if (not origin-node)
+        do (error "Node not found for ID: %s" (org-node-link-origin link))
+        else collect
+        (list link
+              (vector
+               (list (org-node-get-title origin-node)
+                     'face 'link
+                     'action `(lambda (_button)
+                                (org-node--goto ,origin-node)
+                                (goto-char ,(org-node-link-pos link)))
+                     'follow-link t)
+               dest)))))))
 
 (defun org-node-list-reflinks ()
   "List all reflinks and their locations.
@@ -3496,34 +3499,35 @@ one of them is associated with a ROAM_REFS property."
                               unless (equal "id" (org-node-link-type link))
                               collect link))))
     ;; (cl-letf ((truncate-string-ellipsis " "))
-    (org-node--pop-to-tabulated-list
-     :buffer "*org-node reflinks*"
-     :format [("Ref" 4 t) ("Inside node" 30 t) ("Potential reflink" 0 t)]
-     :reverter #'org-node-list-reflinks
-     :entries
-     (cl-loop
-      for link in plain-links
-      collect (let ((type (org-node-link-type link))
-                    (dest (org-node-link-dest link))
-                    (origin (org-node-link-origin link))
-                    (pos (org-node-link-pos link)))
-                (let ((node (gethash origin org-node--id<>node)))
-                  (list link
-                        (vector
-                         (if (gethash dest org-node--ref<>id) "*" "")
-                         (if node
-                             (list (org-node-get-title node)
-                                   'action `(lambda (_button)
-                                              (org-id-goto ,origin)
-                                              (goto-char ,pos)
-                                              (if (org-at-heading-p)
-                                                  (org-show-entry)
-                                                (org-show-context)))
-                                   'face 'link
-                                   'follow-link t)
-                           origin)
-                         (if type (concat type ":" dest) dest)))))))
-    (tabulated-list-sort 2)))
+    (if plain-links
+        (org-node--pop-to-tabulated-list
+         :buffer "*org-node reflinks*"
+         :format [("Ref" 4 t) ("Inside node" 30 t) ("Potential reflink" 0 t)]
+         :reverter #'org-node-list-reflinks
+         :entries
+         (cl-loop
+          for link in plain-links
+          collect (let ((type (org-node-link-type link))
+                        (dest (org-node-link-dest link))
+                        (origin (org-node-link-origin link))
+                        (pos (org-node-link-pos link)))
+                    (let ((node (gethash origin org-node--id<>node)))
+                      (list link
+                            (vector
+                             (if (gethash dest org-node--ref<>id) "*" "")
+                             (if node
+                                 (list (org-node-get-title node)
+                                       'action `(lambda (_button)
+                                                  (org-id-goto ,origin)
+                                                  (goto-char ,pos)
+                                                  (if (org-at-heading-p)
+                                                      (org-show-entry)
+                                                    (org-show-context)))
+                                       'face 'link
+                                       'follow-link t)
+                               origin)
+                             (if type (concat type ":" dest) dest)))))))
+      (message "No links found"))))
 
 (defcustom org-node-warn-title-collisions t
   "Whether to print messages on finding duplicate node titles."
