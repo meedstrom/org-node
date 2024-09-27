@@ -3957,34 +3957,6 @@ Wrap the value in double-brackets if necessary."
 
 ;;;; CAPF (Completion-At-Point Function)
 
-(define-minor-mode org-node-complete-at-point-mode
-  "Use `org-node-complete-at-point' in all Org buffers.
-
------"
-  :global t
-  :require 'org-node
-  (if org-node-complete-at-point-mode
-      (progn
-        (add-hook 'org-mode-hook #'org-node--install-capf-in-buffer)
-        (when (bound-and-true-p org-roam-completion-everywhere)
-          (message "You may want to set `org-roam-completion-everywhere' nil"))
-        (dolist (buf (buffer-list))
-          (with-current-buffer buf
-            (when (derived-mode-p 'org-mode)
-              (add-hook 'completion-at-point-functions
-                        #'org-node-complete-at-point nil t)))))
-    (remove-hook 'org-mode-hook #'org-node--install-capf-in-buffer)
-    (dolist (buf (buffer-list))
-      (with-current-buffer buf
-        (remove-hook 'completion-at-point-functions
-                     #'org-node-complete-at-point t)))))
-
-(defun org-node--install-capf-in-buffer ()
-  "Let in-buffer completion try `org-node-complete-at-point'."
-  (and buffer-file-name
-       (add-hook 'completion-at-point-functions
-                 #'org-node-complete-at-point nil t)))
-
 (defun org-node-complete-at-point ()
   "Complete word at point to a known node title, and linkify.
 Designed for `completion-at-point-functions', which see."
@@ -4003,6 +3975,30 @@ Designed for `completion-at-point-functions', which see."
                      (delete-char (- (length text)))
                      (insert (org-link-make-string (concat "id:" id) text)))
                    (run-hooks 'org-node-insert-link-hook)))))))
+
+(define-minor-mode org-node-complete-at-point-local-mode
+  "Let completion at point insert links to nodes.
+
+-----"
+  :require 'org-node
+  (if org-node-complete-at-point-local-mode
+      (add-hook 'completion-at-point-functions
+                #'org-node-complete-at-point nil t)
+    (remove-hook 'completion-at-point-functions
+                 #'org-node-complete-at-point t)))
+
+(defun org-node-complete-at-point--enable-if-org ()
+  "Enable `org-node-backlink-mode' if buffer is Org-mode."
+  (when (derived-mode-p 'org-mode)
+    (org-node-complete-at-point-local-mode)))
+
+(define-globalized-minor-mode org-node-complete-at-point-global-mode
+  org-node-complete-at-point-local-mode
+  org-node-complete-at-point--enable-if-org)
+
+(define-obsolete-function-alias
+  'org-node-complete-at-point-mode
+  #'org-node-complete-at-point-global-mode "2024-09-27")
 
 
 ;;;; Misc
