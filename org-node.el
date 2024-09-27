@@ -3232,13 +3232,16 @@ In case of unsolvable problems, how to wipe org-id-locations:
   (interactive "DForget all IDs in directory: ")
   (org-node-cache-ensure t)
   (let ((files (seq-intersection
-                (mapcar #'abbreviate-file-name
-                        (directory-files-recursively (file-truename dir) "."))
+                (org-node-abbrev-file-names
+                 (directory-files-recursively (file-truename dir) "."))
                 (hash-table-values org-id-locations))))
     (if files
         (progn
-          (message "Forgetting all IDs in directory... (%s)" dir)
+          (message "Forgetting all IDs in directory %s..." dir)
+          (redisplay)
           (org-node--forget-id-locations files)
+          (dolist (file files)
+            (remhash file org-node--file<>mtime))
           (org-id-locations-save)
           (org-node-reset))
       (message "No IDs known to be in: %s" dir))))
@@ -3771,6 +3774,10 @@ Naturally, FUNDAMENTAL-MODE has no effect in that case."
            (unless (or was-open (not buf) (buffer-modified-p buf))
              (kill-buffer buf))
            ;; Restart
+           nil)
+          (:success
+           (when too-many-files-hack
+             (message "%s... done" msg))
            nil))))))
 
 (defun org-node--find-file-noselect (abbr-truename about-to-do)

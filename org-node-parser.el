@@ -282,6 +282,10 @@ findings to another temp file."
             ;; pointlessly repeating `org-node--forget-id-locations'.
             (when (file-symlink-p FILE)
               (throw 'file-done t))
+            ;; Transitional cleanup due to bug fixed in commit f900975
+            (unless (string-suffix-p ".org" FILE)
+              (push FILE result/missing-files)
+              (throw 'file-done t))
             (push (cons FILE (floor
                               (time-to-seconds
                                (file-attribute-modification-time
