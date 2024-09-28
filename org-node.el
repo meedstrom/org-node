@@ -1085,18 +1085,25 @@ function to update current tables."
             (org-node--handle-finished-job 1 finalizer)))
 
       ;; If not debugging, split the work over many child processes
-      (let* ((file-lists (org-node--split-into-n-sublists
+      (let* ((file-lists (org-node--split-file-list
                           files org-node-perf-max-jobs))
              (n-jobs (length file-lists))
              (write-region-inhibit-fsync nil) ;; Default t in emacs30
              (default-directory invocation-directory)
-             (print-length nil))
+             (print-length nil)
+             (rm (executable-find "rm")))
         (dotimes (i n-jobs)
           (write-region (prin1-to-string (pop file-lists))
                         nil
                         (org-node-parser--tmpfile "file-list-%d.eld" i)
                         nil
                         'quiet)
+          ;; Delete old result in order to then detect failure to generate a
+          ;; new result.  Do not use Elisp `delete-file' since it can have all
+          ;; sorts of slow advices.
+          (when rm
+            (call-process rm nil nil nil
+                          (org-node-parser--tmpfile "results-%d.eld" i)))
           ;; TODO: Maybe prepend a "timeout 30"
           (push (make-process
                  :name (format "org-node-%d" i)
@@ -1195,19 +1202,27 @@ pass that to FINALIZER."
   (clrhash org-node--title<>id)
   (clrhash org-node--ref<>id)
   (setq org-node--collisions nil) ;; To be populated by `org-node--record-nodes'
-  (seq-let (missing-files found.mtime nodes path.type links problems) results
+  (seq-let (missing-files found.mtime nodes path.type links problems file.size) results
     (org-node--forget-id-locations missing-files)
     (dolist (file missing-files)
       (remhash file org-node--file<>mtime))
+    (cl-loop for (file . size) in file.size
+             do (puthash file size org-node--file<>size))
     (dolist (link links)
       (push link (gethash (org-node-link-dest link) org-node--dest<>links)))
     (cl-loop for (path . type) in path.type
              do (puthash path type org-node--uri-path<>uri-type))
-    (cl-loop for (file . mtime) in found.mtime
-             do (unless (eq mtime (gethash file org-node--file<>mtime))
-                  (puthash file mtime org-node--file<>mtime)
-                  ;; Expire stale previews
-                  (remhash file org-node--file<>previews)))
+    ;; PERF HACK: Add potentially too many files to `org-id-files', which is
+    ;; fine because `org-id-update-id-locations' would clean it up before it
+    ;; matters.  The old clean way was a pushnew operation inside
+    ;; `org-node--record-nodes', but that is slow when repeated for every file.
+    (setq org-id-files nil)
+    (cl-loop for (file . mtime) in found.mtime do
+             (push file org-id-files)
+             (unless (eq mtime (gethash file org-node--file<>mtime))
+               (puthash file mtime org-node--file<>mtime)
+               ;; Expire stale previews
+               (remhash file org-node--file<>previews)))
     (org-node--record-nodes nodes)
     ;; (org-id-locations-save) ;; A nicety, but sometimes slow
     (setq org-node-built-series nil)
@@ -1243,6 +1258,8 @@ pass that to FINALIZER."
       (org-node--forget-id-locations missing-files)
       (dolist (file missing-files)
         (remhash file org-node--file<>mtime))
+      (cl-loop for (file . size) in file.size
+               do (puthash file size org-node--file<>size))
       (org-node--dirty-forget-files missing-files)
       (org-node--dirty-forget-completions-in missing-files)
       ;; In case a title was edited: don't persist old revisions of the title
@@ -1280,8 +1297,9 @@ pass that to FINALIZER."
       (cl-loop for (file . mtime) in found.mtime
                do (unless (eq mtime (gethash file org-node--file<>mtime))
                     (puthash file mtime org-node--file<>mtime)
-                    ;; Expire stale previews
-                    (remhash file org-node--file<>previews)))
+                    (remhash file org-node--file<>previews)
+                    (unless (assoc file org-id-files)
+                      (push file org-id-files))))
       (org-node--record-nodes nodes)
       (dolist (prob problems)
         (push prob org-node--problems))
@@ -1319,11 +1337,9 @@ well as `org-node-backlink-aggressive'."
       (let* ((id (org-node-get-id node))
              (path (org-node-get-file-path node))
              (refs (org-node-get-refs node)))
-        ;; Share location with org-id & do so with manual `puthash' and `push'
+        ;; Share location with org-id & do so with manual `puthash'
         ;; because `org-id-add-location' would run logic we've already done
         (puthash id path org-id-locations)
-        (unless (member path org-id-files)
-          (push path org-id-files))
         ;; Register the node
         (puthash id node org-node--id<>node)
         (dolist (ref refs)
@@ -1529,21 +1545,55 @@ be misleading."
                n-reflinks
                org-node--time-elapsed))))
 
-(defun org-node--split-into-n-sublists (big-list n)
-  "Split BIG-LIST into a list of N sublists.
+(defvar org-node--file<>size (make-hash-table :test #'equal))
+(defun org-node--split-file-list (files n)
+  "Split FILES into a list of N lists of files.
 
-In the unlikely case where BIG-LIST contains N or fewer elements,
-the return value is just like BIG-LIST except that each element
-is wrapped in its own list."
-  (let ((sublist-length (max 1 (/ (length big-list) n)))
-        result)
-    (dotimes (i n)
-      (if (= i (1- n))
-          ;; Let the last iteration just take what's left
-          (push big-list result)
-        (push (take sublist-length big-list) result)
-        (setq big-list (nthcdr sublist-length big-list))))
-    (delq nil result)))
+Take their file-sizes into account, so that a third of those N lists are
+short lists of big files, while the other two-thirds are long lists of
+small files.  The single biggest file will be isolated into a list of
+one member.
+
+Since each sublist is meant to be given to one child process, this
+balancing reduces the risk that one process takes noticably longer due
+to being saddled with a mega-file in addition to the average workload."
+  ;; TODO: Refactor for readability
+  (let ((max-reserved-cores (/ n 3))
+        (biggest 0)
+        big-files
+        small-files
+        lists-of-big-files
+        lists-of-small-files)
+    (setq n (- n max-reserved-cores))
+    (if (= 0 max-reserved-cores)
+        (setq small-files files)
+      ;; Construct a little list BIG-FILES which will definitely have the
+      ;; biggest files as members on top, and some stragglers at the bottom
+      (dolist (file files)
+        (let ((size (or (gethash file org-node--file<>size) -1)))
+          (if (> biggest size)
+              (push file small-files)
+            (setq biggest size)
+            (push (cons size file) big-files))))
+      ;; Reserve some cores for scanning the biggest files
+      (while (and big-files (> max-reserved-cores (length lists-of-big-files)))
+        (let (sublist)
+          (while (and big-files
+                      (>= biggest
+                          (apply #'+ (caar big-files) (mapcar #'car sublist))))
+            (push (pop big-files) sublist))
+          (push (mapcar #'cdr sublist) lists-of-big-files))))
+    ;; Make lists of the rest
+    (let ((len (/ (length small-files) n)))
+      (dotimes (i n)
+        (let ((sublist (if (= i (- n 1))
+                           ;; Let the last iteration just take what's left
+                           small-files
+                         (prog1 (take len small-files)
+                           (setq small-files (-drop len small-files))))))
+          (when sublist (push sublist lists-of-small-files))))
+      (nconc lists-of-big-files
+             lists-of-small-files))))
 
 
 ;;;; Etc
@@ -1579,10 +1629,6 @@ operation."
 ;; => (1.488666741 1 0.23508516499999388)
 (defun org-node-list-files (&optional instant interactive)
   "List files in `org-id-locations' or `org-node-extra-id-dirs'.
-Also include any Org files ever saved while `org-node-cache-mode' was
-active, that were neither backup nor remote files.  This is not
-necessary for org-node to function, just a consequence of
-implementation.
 
 With optional argument INSTANT t, return already known files
 instead of checking the filesystem again.

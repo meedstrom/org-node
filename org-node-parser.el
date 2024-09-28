@@ -247,6 +247,7 @@ findings to another temp file."
         result/found-nodes
         result/mtimes
         result/problems
+        result/sizes
         ;; Perf
         (file-name-handler-alist $file-name-handler-alist)
         (coding-system-for-read $assume-coding-system)
@@ -257,7 +258,7 @@ findings to another temp file."
         ;; time.  Suspect it makes no diff now that we nix GC, but I'm not
         ;; gonna convert back to local `let' forms as it still matters if you
         ;; wanna run this code synchronously.
-        HEADING-POS HERE FAR END ID-HERE OLPATH
+        HEADING-POS HERE FAR END ID-HERE OLPATH ATTRS
         DRAWER-BEG DRAWER-END
         TITLE FILE-TITLE
         TODO-STATE TODO-RE FILE-TODO-SETTINGS
@@ -266,7 +267,7 @@ findings to another temp file."
     (dolist (FILE $files)
       (condition-case err
           (catch 'file-done
-            (when (or (not (file-readable-p FILE)))
+            (when (not (file-readable-p FILE))
               ;; If FILE does not exist (not readable), user probably deleted
               ;; or renamed a file.  If it was a rename, hopefully the new name
               ;; is also in the file list.  Else, like if it was done outside
@@ -286,11 +287,6 @@ findings to another temp file."
             (unless (string-suffix-p ".org" FILE)
               (push FILE result/missing-files)
               (throw 'file-done t))
-            (push (cons FILE (floor
-                              (time-to-seconds
-                               (file-attribute-modification-time
-                                (file-attributes FILE)))))
-                  result/mtimes)
             ;; NOTE: Don't use `insert-file-contents-literally'!  It causes
             ;;       wrong values for HEADING-POS when there is any Unicode in
             ;;       the file.  Just overriding `coding-system-for-read' and
@@ -300,7 +296,14 @@ findings to another temp file."
               (insert-file-contents FILE))
             ;; Verify there is at least one ID-node
             (unless (re-search-forward "^[[:space:]]*:id: " nil t)
+              (push FILE result/missing-files) ;; Also transitional 2024-09-28
               (throw 'file-done t))
+            (setq ATTRS (file-attributes FILE))
+            (push (cons FILE (file-attribute-size ATTRS)) result/sizes)
+            (push (cons FILE (floor
+                              (time-to-seconds
+                               (file-attribute-modification-time ATTRS))))
+                  result/mtimes)
             (goto-char 1)
 
             ;; If the very first line of file is a heading (typical for people
@@ -553,6 +556,7 @@ findings to another temp file."
                               org-node-parser--paths-types
                               org-node-parser--found-links
                               result/problems
+                              result/sizes
                               (current-time)))
        nil
        (org-node-parser--tmpfile "results-%d.eld" $i)))))
