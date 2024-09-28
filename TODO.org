@@ -1,30 +1,8 @@
-- [ ] Respect save-place
-
-- [ ] Manage org-super-links drawers
+* To reduce LoC
 
 - [ ] Spin out a library for async processing (replace most of =org-node--scan= and friends)
 
-- [ ] org-node-series-dispatch: Free up keys "j" "n" "p", "c"
-
-- [ ] org-node-series-defs wrappers to:
-
-  - [ ] Define a series as simply the files in a given subdirectory
-
-  - [ ] Define a series as the links in an ordered list in the body text of a node with a tag such as :series:
-
-- [ ] A workflow to allow pseudo-untitled (numeric-titled) nodes
-
-  Already =org-node-grep= can be considered an equivalent to =org-node-find=, so we "just" need an equivalent to =org-node-insert-link=.  Basically, capture, refile, and insert-link would probably all use the same mechanism for *identifying a node by a grep result.*
-
 - [ ] Unify some subroutines for capture/refile/extract/insert/find
-
-- [ ] Accept more ref variants as the same ref
-
-  If a roam-ref exists like =//www.website.com=, allow counting a link =//www.website.com?key=val&key2=val2#hash= as a reflink to the same, unless the latter has a roam-ref of its own.
-
-  Would prolly be a fairly expensive operation.  After building tables ref<>id and dest<>links, run thru every dest and check if an existing ref is a prefix of it, then simply nconc the value with the value for the corresponding dest.  But having to check for other dests that may also be a prefix is where it would get expensive... O(n^2) I guess.
-
-  Hm... Sort all dests alphabetically.  All near-matches will be very close to each other, and indeed an alphabetic sort even results in a sort-by-length within each possible "group". So just run down progressively shorter prefixes until the length goes up again, then we know we're in another group.  Rough idea, but O(n^2) looks beatable.
 
 - [ ] In 2025: drop Emacs 28
 
@@ -40,3 +18,41 @@
   - any usages of =compat-call=
   - cl-sort
   - what the compiler tells you is obsolete
+
+* Other
+
+- [ ] (Perf) Export some parser subroutines into own functions to allow profiler to tell us where time is most spent
+
+- [ ] (Perf) Improve file list balancer based on size of results
+  - instead of file<>size table, file<>last-result-size
+    - how is size of result measured tho? I believe N of nodes weighs heavier than N of links, lets say 4x.  maybe make a "collect-node" func and verify this
+
+- [X] (Perf) Balance file lists based on (cached) file size info
+
+- [X] (Perf) Don't pushnew to =org-id-files=, just set the entire thing from the keys of file<>mtime
+
+- [ ] Accept an empty org-id-locations
+
+- [ ] Respect save-place
+
+- [ ] Manage org-super-links drawers
+
+- [ ] org-node-series-dispatch: Free up keys "j" "n" "p", "c"
+
+- [ ] org-node-series-defs wrappers to:
+
+  - [ ] Define a series as simply the files in a given subdirectory
+
+  - [ ] Define a series as the links in an ordered list in the body text of a node with a tag such as :series:
+
+- [ ] A workflow to allow pseudo-untitled (numeric-titled) nodes
+
+  Already =org-node-grep= can be considered an equivalent to =org-node-find=, so we "just" need an equivalent to =org-node-insert-link=.  Basically, capture, refile, and insert-link would probably all use the same mechanism for *identifying a node by a grep result.*
+
+- [ ] Accept more ref variants as the same ref
+
+  If a roam-ref exists like =//www.website.com=, allow counting a link =//www.website.com?key=val&key2=val2#hash= as a reflink to the same, unless the latter has a roam-ref of its own.
+
+  Would prolly be a fairly expensive operation.  After building tables ref<>id and dest<>links, run thru every dest and check if an existing ref is a prefix of it, then simply nconc the value with the value for the corresponding dest.  But having to check for other dests that may also be a prefix is where it would get expensive... O(n^2) I guess.
+
+  Hm... Sort all dests alphabetically.  All near-matches will be very close to each other, and indeed an alphabetic sort even results in a sort-by-length within each possible "group". So just run down progressively shorter prefixes until the length goes up again, then we know we're in another group.  Rough idea, but O(n^2) looks beatable.

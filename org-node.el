@@ -214,10 +214,11 @@ need other changes to support TRAMP and encryption."
 The filtering only has an impact on the table
 `org-node--candidate<>node', which forms the basis for
 completions in the minibuffer, and `org-node--title<>id', used
-by `org-node-complete-at-point-mode'.  In other words,
-passing nil means the user cannot autocomplete to the node, but
-Lisp code can still find it in the \"main\" table,
-`org-node--id<>node'.
+by `org-node-complete-at-point-mode'.
+
+In other words, passing nil means the user cannot autocomplete to the
+node, but Lisp code can still find it in the \"main\" table
+`org-node--id<>node', and backlinks are discovered normally.
 
 This function is applied once for every org-id node found, and
 receives the node data as a single argument: an object which form
@@ -290,26 +291,25 @@ IDs, configure `org-node-extra-id-dirs-exclude'."
     ".sync-conflict-")
   "Path substrings of files that should not be searched for IDs.
 
-This option only influences which files under
-`org-node-extra-id-dirs' should be scanned.  It is meant as a way
-to avoid collecting IDs inside versioned backup files causing
-org-id to complain about duplicate IDs.
+This option only influences which files under `org-node-extra-id-dirs'
+should be scanned.  It is meant as a way to avoid collecting IDs inside
+versioned backup files or other noise.
 
-For all other \"excludey\" purposes, you probably mean to
-configure `org-node-filter-fn' instead.
+For all other \"excludey\" purposes, you probably mean to configure
+`org-node-filter-fn' instead.
 
-If you have accidentally let org-id add a directory of backup
-files, try \\[org-node-forget-dir].
+If you have accidentally let org-id add a directory of backup files, try
+\\[org-node-forget-dir].
 
-It is not necessary to exclude backups or autosaves that end in ~
-or # or .bak, since the workhorse `org-node-list-files' only
-considers files that end in precisely \".org\" anyway.
+It is not necessary to exclude backups or autosaves that end in ~ or #
+or .bak, since the workhorse `org-node-list-files' only considers files
+that end in precisely \".org\" anyway.
 
-You can eke out a performance boost by excluding directories with
-a humongous amount of files, such as the infamous
-\"node_modules\", even if they contain no Org files.  However,
-directories that start with a period are always ignored, so no
-need to specify e.g. \"~/.local/\" or \".git/\" for that reason."
+You can eke out a performance boost by excluding directories with a
+humongous amount of files, such as the infamous \"node_modules\", even
+if they contain no Org files.  However, directories that start with a
+period are always ignored, so no need to specify e.g. \"~/.local/\" or
+\".git/\" for that reason."
   :type '(repeat string))
 
 
@@ -839,7 +839,10 @@ In broad strokes:
       (when (and (hash-table-empty-p org-id-locations)
                  (null org-node-extra-id-dirs))
         (org-node--die
-         "org-id-locations empty, try `org-id-update-id-locations' or `org-roam-update-org-id-locations'")))))
+         (concat
+          "No org-ids found.  If this was unexpected, try `org-id-update-id-locations' or `org-roam-update-org-id-locations'."
+          "\nIf this is your first time with org-id, first assign an org-id to some random heading"
+          "\n with `org-id-get-create', then do `org-node-reset' and it should work from then on."))))))
 
 
 ;;;; Scanning
@@ -1249,7 +1252,9 @@ pass that to FINALIZER."
       (message "Scan had problems, see M-x org-node-list-scan-problems"))
     (setq org-node--first-init nil)))
 
-(defvar org-node--old-link-sets nil)
+(defvar org-node--old-link-sets nil
+  "For use by `org-node-backlink-aggressive'.")
+
 (defun org-node--finalize-modified (results)
   "Use RESULTS to update tables."
   (run-hooks 'org-node-before-update-tables-hook)
@@ -3828,8 +3833,8 @@ Naturally, FUNDAMENTAL-MODE has no effect in that case."
 
 (defun org-node--find-file-noselect (abbr-truename about-to-do)
   "Read file ABBR-TRUENAME into a buffer and return the buffer.
-If there's a problem, query the user to proceed with string
-ABOUT-TO-DO, and return that string if user declines.  See
+If there's a problem such as an auto-save file being newer, query the
+user to proceed with string ABOUT-TO-DO, else return that string.  See
 `org-node--in-files-do'.
 
 Very presumptive!  Like `find-file-noselect' but intended as a
