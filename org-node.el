@@ -4012,8 +4012,7 @@ Wrap the value in double-brackets if necessary."
   "Complete word at point to a known node title, and linkify.
 Designed for `completion-at-point-functions', which see."
   (when-let ((bounds (bounds-of-thing-at-point 'word)))
-    (and (derived-mode-p 'org-mode)
-         (not (org-in-src-block-p))
+    (and (not (org-in-src-block-p))
          (not (save-match-data (org-in-regexp org-link-any-re)))
          (list (car bounds)
                (cdr bounds)
@@ -4039,17 +4038,19 @@ Designed for `completion-at-point-functions', which see."
                  #'org-node-complete-at-point t)))
 
 (defun org-node-complete-at-point--enable-if-org ()
-  "Enable `org-node-backlink-mode' if buffer is Org-mode."
-  (when (derived-mode-p 'org-mode)
-    (org-node-complete-at-point-local-mode)))
+  "Enable `org-node-complete-at-point-local-mode' in Org buffer."
+  (and (derived-mode-p 'org-mode)
+       buffer-file-name
+       (org-node-complete-at-point-local-mode)))
 
-(define-globalized-minor-mode org-node-complete-at-point-global-mode
+(define-globalized-minor-mode org-node-complete-at-point-mode
   org-node-complete-at-point-local-mode
   org-node-complete-at-point--enable-if-org)
 
+;; Existed for 1 day
 (define-obsolete-function-alias
-  'org-node-complete-at-point-mode
-  #'org-node-complete-at-point-global-mode "2024-09-27")
+  'org-node-complete-at-point-global-mode
+  #'org-node-complete-at-point-mode "2024-09-28")
 
 
 ;;;; Misc
