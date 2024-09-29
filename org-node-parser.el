@@ -245,9 +245,8 @@ findings to another temp file."
   (let ((case-fold-search t)
         result/missing-files
         result/found-nodes
-        result/mtimes
+        result/file-info
         result/problems
-        result/sizes
         ;; Perf
         (file-name-handler-alist $file-name-handler-alist)
         (coding-system-for-read $assume-coding-system)
@@ -258,7 +257,8 @@ findings to another temp file."
         ;; time.  Suspect it makes no diff now that we nix GC, but I'm not
         ;; gonna convert back to local `let' forms as it still matters if you
         ;; wanna run this code synchronously.
-        HEADING-POS HERE FAR END ID-HERE OLPATH ATTRS
+        HEADING-POS HERE FAR END ID-HERE OLPATH
+        FILE-START-TIME
         DRAWER-BEG DRAWER-END
         TITLE FILE-TITLE
         TODO-STATE TODO-RE FILE-TODO-SETTINGS
@@ -287,6 +287,7 @@ findings to another temp file."
             (unless (string-suffix-p ".org" FILE)
               (push FILE result/missing-files)
               (throw 'file-done t))
+            (setq FILE-START-TIME (current-time))
             ;; NOTE: Don't use `insert-file-contents-literally'!  It causes
             ;;       wrong values for HEADING-POS when there is any Unicode in
             ;;       the file.  Just overriding `coding-system-for-read' and
@@ -296,14 +297,8 @@ findings to another temp file."
               (insert-file-contents FILE))
             ;; Verify there is at least one ID-node
             (unless (re-search-forward "^[[:space:]]*:id: " nil t)
-              (push FILE result/missing-files) ;; Also transitional 2024-09-28
+              (push FILE result/missing-files) ;; Transitional cleanup
               (throw 'file-done t))
-            (setq ATTRS (file-attributes FILE))
-            (push (cons FILE (file-attribute-size ATTRS)) result/sizes)
-            (push (cons FILE (floor
-                              (time-to-seconds
-                               (file-attribute-modification-time ATTRS))))
-                  result/mtimes)
             (goto-char 1)
 
             ;; If the very first line of file is a heading (typical for people
@@ -538,7 +533,14 @@ findings to another temp file."
                 (goto-char (or DRAWER-END HERE))
                 (org-node-parser--collect-links-until (point-max) ID-HERE))
               (goto-char (point-max))
-              (widen)))
+              (widen))
+
+            (push (cons FILE
+                        (cons (floor (float-time
+                                      (file-attribute-modification-time
+                                       (file-attributes FILE))))
+                              (float-time (time-since FILE-START-TIME))))
+                  result/file-info))
 
         ;; Don't crash the process when there is an error signal,
         ;; report it and continue to the next file
@@ -551,12 +553,11 @@ findings to another temp file."
           (print-level nil))
       (write-region
        (prin1-to-string (list result/missing-files
-                              result/mtimes
+                              result/file-info
                               result/found-nodes
                               org-node-parser--paths-types
                               org-node-parser--found-links
                               result/problems
-                              result/sizes
                               (current-time)))
        nil
        (org-node-parser--tmpfile "results-%d.eld" $i)))))

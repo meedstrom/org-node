@@ -558,7 +558,7 @@ can demonstrate the data format.  See also the type `org-node'.")
 (defvar org-node--ref<>id (make-hash-table :test #'equal)
   "1:1 table mapping ROAM_REFS members to the ID property near.")
 
-(defvar org-node--uri-path<>uri-type (make-hash-table :test #'equal)
+(defvar org-node--ref-path<>ref-type (make-hash-table :test #'equal)
   "1:1 table mapping //paths to types:.
 
 While the same path can be found with multiple types \(e.g. http
@@ -1093,8 +1093,7 @@ function to update current tables."
              (n-jobs (length file-lists))
              (write-region-inhibit-fsync nil) ;; Default t in emacs30
              (default-directory invocation-directory)
-             (print-length nil)
-             (rm (executable-find "rm")))
+             (print-length nil))
         (dotimes (i n-jobs)
           (write-region (prin1-to-string (pop file-lists))
                         nil
@@ -1102,11 +1101,12 @@ function to update current tables."
                         nil
                         'quiet)
           ;; Delete old result in order to then detect failure to generate a
-          ;; new result.  Do not use Elisp `delete-file' since it can have all
-          ;; sorts of slow advices.
-          (when rm
-            (call-process rm nil nil nil
-                          (org-node-parser--tmpfile "results-%d.eld" i)))
+          ;; new result.  Do not use Elisp `delete-file' since it can be
+          ;; carrying all sorts of slow advices.
+          (let ((result-file (org-node-parser--tmpfile "results-%d.eld" i)))
+            (when-let ((buf (find-buffer-visiting result-file)))
+              (kill-buffer buf))
+            (delete-file-internal result-file))
           ;; TODO: Maybe prepend a "timeout 30"
           (push (make-process
                  :name (format "org-node-%d" i)
@@ -1204,28 +1204,31 @@ pass that to FINALIZER."
   (clrhash org-node--candidate<>node)
   (clrhash org-node--title<>id)
   (clrhash org-node--ref<>id)
+  (clrhash org-node--file<>elapsed)
   (setq org-node--collisions nil) ;; To be populated by `org-node--record-nodes'
-  (seq-let (missing-files found.mtime nodes path.type links problems file.size) results
+  (seq-let (missing-files file-info nodes path.type links problems) results
     (org-node--forget-id-locations missing-files)
     (dolist (file missing-files)
       (remhash file org-node--file<>mtime))
-    (cl-loop for (file . size) in file.size
-             do (puthash file size org-node--file<>size))
     (dolist (link links)
       (push link (gethash (org-node-link-dest link) org-node--dest<>links)))
+    ;; REVIEW: Some way to reduce garbage?  Cannot just look up the links table
+    ;; since no link may exist to the ref.  Maybe parser can put a cons cell in
+    ;; the node's :refs, and then at record-nodes time, replace the cell with
+    ;; its cdr, while putting the car in the affixations.  That would make the
+    ;; code more intricate to read, though.
     (cl-loop for (path . type) in path.type
-             do (puthash path type org-node--uri-path<>uri-type))
-    ;; PERF HACK: Add potentially too many files to `org-id-files', which is
-    ;; fine because `org-id-update-id-locations' would clean it up before it
-    ;; matters.  The old clean way was a pushnew operation inside
-    ;; `org-node--record-nodes', but that is slow when repeated for every file.
-    (setq org-id-files nil)
-    (cl-loop for (file . mtime) in found.mtime do
-             (push file org-id-files)
+             do (puthash path type org-node--ref-path<>ref-type))
+    (cl-loop for (file mtime . elapsed) in file-info do
+             (puthash file elapsed org-node--file<>elapsed)
              (unless (eq mtime (gethash file org-node--file<>mtime))
                (puthash file mtime org-node--file<>mtime)
                ;; Expire stale previews
                (remhash file org-node--file<>previews)))
+    ;; PERF HACK: Don't manage `org-id-files' at all.  This could affect
+    ;; downstream uses of org-id which assume the variable to be correct.
+    ;; Uncomment to improve.
+    ;; (setq org-id-files (mapcar #'car file-info))
     (org-node--record-nodes nodes)
     ;; (org-id-locations-save) ;; A nicety, but sometimes slow
     (setq org-node-built-series nil)
@@ -1258,13 +1261,11 @@ pass that to FINALIZER."
 (defun org-node--finalize-modified (results)
   "Use RESULTS to update tables."
   (run-hooks 'org-node-before-update-tables-hook)
-  (seq-let (missing-files found.mtime nodes path.type links problems) results
-    (let ((found-files (mapcar #'car found.mtime)))
+  (seq-let (missing-files file-info nodes path.type links problems) results
+    (let ((found-files (mapcar #'car file-info)))
       (org-node--forget-id-locations missing-files)
       (dolist (file missing-files)
         (remhash file org-node--file<>mtime))
-      (cl-loop for (file . size) in file.size
-               do (puthash file size org-node--file<>size))
       (org-node--dirty-forget-files missing-files)
       (org-node--dirty-forget-completions-in missing-files)
       ;; In case a title was edited: don't persist old revisions of the title
@@ -1298,13 +1299,12 @@ pass that to FINALIZER."
         (dolist (link links)
           (push link (gethash (org-node-link-dest link) org-node--dest<>links))))
       (cl-loop for (path . type) in path.type
-               do (puthash path type org-node--uri-path<>uri-type))
-      (cl-loop for (file . mtime) in found.mtime
-               do (unless (eq mtime (gethash file org-node--file<>mtime))
-                    (puthash file mtime org-node--file<>mtime)
-                    (remhash file org-node--file<>previews)
-                    (unless (assoc file org-id-files)
-                      (push file org-id-files))))
+               do (puthash path type org-node--ref-path<>ref-type))
+      (cl-loop for (file mtime . elapsed) in file-info do
+               (puthash file elapsed org-node--file<>elapsed)
+               (unless (eq mtime (gethash file org-node--file<>mtime))
+                 (puthash file mtime org-node--file<>mtime)
+                 (remhash file org-node--file<>previews)))
       (org-node--record-nodes nodes)
       (dolist (prob problems)
         (push prob org-node--problems))
@@ -1343,7 +1343,7 @@ well as `org-node-backlink-aggressive'."
              (path (org-node-get-file-path node))
              (refs (org-node-get-refs node)))
         ;; Share location with org-id & do so with manual `puthash'
-        ;; because `org-id-add-location' would run logic we've already done
+        ;; because `org-id-add-location' would run logic we've already run
         (puthash id path org-id-locations)
         ;; Register the node
         (puthash id node org-node--id<>node)
@@ -1355,7 +1355,7 @@ well as `org-node-backlink-aggressive'."
           (dolist (ref refs)
             (puthash ref node org-node--candidate<>node)
             (puthash ref
-                     (let ((type (gethash ref org-node--uri-path<>uri-type)))
+                     (let ((type (gethash ref org-node--ref-path<>ref-type)))
                        (list (propertize ref 'face 'org-cite)
                              (when type
                                (propertize (concat type ":")
@@ -1374,7 +1374,8 @@ well as `org-node-backlink-aggressive'."
                   (puthash (concat (nth 1 affx) (nth 0 affx) (nth 2 affx))
                            node
                            org-node--candidate<>node)
-                ;; Only title as candidate, to be affixated by `org-node-collection'
+                ;; Bare title as candidate, to be affixated in realtime by
+                ;; `org-node-collection'
                 (puthash title node org-node--candidate<>node)
                 (puthash title affx org-node--title<>affixation-triplet)))))))))
 
@@ -1550,55 +1551,78 @@ be misleading."
                n-reflinks
                org-node--time-elapsed))))
 
-(defvar org-node--file<>size (make-hash-table :test #'equal))
+(defvar org-node--file<>elapsed (make-hash-table :test #'equal)
+  "1:1 table mapping files to the time it last took to scan them.")
+
 (defun org-node--split-file-list (files n)
   "Split FILES into a list of N lists of files.
 
-Take their file-sizes into account, so that a third of those N lists are
-short lists of big files, while the other two-thirds are long lists of
-small files.  The single biggest file will be isolated into a list of
-one member.
+Take into account how long it took to scan each file last time, to
+return balanced lists that can each take around the same amount of
+wall-time to process.
 
-Since each sublist is meant to be given to one child process, this
-balancing reduces the risk that one process takes noticably longer due
-to being saddled with a mega-file in addition to the average workload."
-  ;; TODO: Refactor for readability
-  (let ((max-reserved-cores (/ n 3))
-        (biggest 0)
-        big-files
-        small-files
-        lists-of-big-files
-        lists-of-small-files)
-    (setq n (- n max-reserved-cores))
-    (if (= 0 max-reserved-cores)
-        (setq small-files files)
-      ;; Construct a little list BIG-FILES which will definitely have the
-      ;; biggest files as members on top, and some stragglers at the bottom
-      (dolist (file files)
-        (let ((size (or (gethash file org-node--file<>size) -1)))
-          (if (> biggest size)
-              (push file small-files)
-            (setq biggest size)
-            (push (cons size file) big-files))))
-      ;; Reserve some cores for scanning the biggest files
-      (while (and big-files (> max-reserved-cores (length lists-of-big-files)))
-        (let (sublist)
-          (while (and big-files
-                      (>= biggest
-                          (apply #'+ (caar big-files) (mapcar #'car sublist))))
-            (push (pop big-files) sublist))
-          (push (mapcar #'cdr sublist) lists-of-big-files))))
-    ;; Make lists of the rest
-    (let ((len (/ (length small-files) n)))
-      (dotimes (i n)
-        (let ((sublist (if (= i (- n 1))
-                           ;; Let the last iteration just take what's left
-                           small-files
-                         (prog1 (take len small-files)
-                           (setq small-files (-drop len small-files))))))
-          (when sublist (push sublist lists-of-small-files))))
-      (nconc lists-of-big-files
-             lists-of-small-files))))
+This reduces the risk that one process takes noticably longer due to
+being saddled with a mega-file in addition to the average workload."
+  (setq n (min n (length files)))
+  (if (= 1 n)
+      (list files)
+    (let ((total 0))
+      (maphash (lambda (_ v) (if v (cl-incf total v))) org-node--file<>elapsed)
+      ;; Special case for first time
+      (if (= total 0)
+          (org-node--split-into-n-sublists files n)
+        (let ((max-per-core (/ total n))
+              (sublist-sum 0)
+              sublists
+              sublist
+              unsized
+              size)
+          (catch 'full
+            (while-let ((file (pop files)))
+              (setq size (gethash file org-node--file<>elapsed))
+              (if (null size)
+                  (push file unsized)
+                ;; Dedicate huge files to their own cores
+                (if (> size max-per-core)
+                    (push (list file) sublists)
+                  (if (< size (- max-per-core sublist-sum))
+                      (progn
+                        (push file sublist)
+                        (setq sublist-sum (+ sublist-sum size)))
+                    (push sublist sublists)
+                    (setq sublist-sum 0)
+                    (setq sublist nil)
+                    (push file files)
+                    (when (= (length sublists) n)
+                      (throw 'full t)))))))
+          ;; Let last sublist absorb all unsized
+          (if sublist
+              (progn
+                (push (nconc unsized sublist) sublists)
+                (when files
+                  (message "org-node: FILES surprisingly not empty: %s" files)))
+            ;; Last sublist already hit size limit, spread leftovers equally
+            (let ((ctr 0)
+                  (max (length sublists)))
+              (dolist (file (nconc unsized files))
+                (push file (nth (% (cl-incf ctr) max) sublists)))))
+          sublists)))))
+
+(defun org-node--split-into-n-sublists (big-list n)
+  "Split BIG-LIST into a list of N sublists.
+
+In the unlikely case where BIG-LIST contains N or fewer elements,
+the return value is just like BIG-LIST except that each element
+is wrapped in its own list."
+  (let ((sublist-length (max 1 (/ (length big-list) n)))
+        result)
+    (dotimes (i n)
+      (if (= i (1- n))
+          ;; Let the last iteration just take what's left
+          (push big-list result)
+        (push (take sublist-length big-list) result)
+        (setq big-list (nthcdr sublist-length big-list))))
+    (delq nil result)))
 
 
 ;;;; Etc
@@ -3811,7 +3835,8 @@ Naturally, FUNDAMENTAL-MODE has no effect in that case."
                            :too-many-files-hack too-many-files-hack)
            ;; Because of the hack, the caller only receives `files*' once, and
            ;; each timer run after that won't modify
-           ;; `org-node-backlink--files-to-fix', so try as a nicety.
+           ;; `org-node-backlink--files-to-fix', so try as a nicety.  This
+           ;; works until the last iteration.
            (setcar files (car files*))
            (setcdr files (cdr files*))
            files*)
@@ -3820,8 +3845,8 @@ Naturally, FUNDAMENTAL-MODE has no effect in that case."
              (kill-buffer buf))
            (cons file files*))
           (( error )
-           (lwarn 'org-node :warning "Loop interrupted by signal %S\n\tBuffer: %s\n\tFile: %s\n\tNext file: %s\n\tValue of ctr: %d"
-                  err buf file (car files*) ctr)
+           (lwarn 'org-node :warning "%s: Loop interrupted by signal %S\n\tBuffer: %s\n\tFile: %s\n\tNext file: %s\n\tValue of ctr: %d"
+                  (format-time-string "%T") err buf file (car files*) ctr)
            (unless (or was-open (not buf) (buffer-modified-p buf))
              (kill-buffer buf))
            ;; Restart
