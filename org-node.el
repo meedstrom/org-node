@@ -3306,20 +3306,19 @@ In case of unsolvable problems, how to wipe org-id-locations:
  (setq org-id-extra-files nil))"
   (interactive "DForget all IDs in directory: ")
   (org-node-cache-ensure t)
-  (let ((files (seq-intersection
-                (org-node-abbrev-file-names
-                 (directory-files-recursively (file-truename dir) "."))
-                (hash-table-values org-id-locations))))
-    (if files
-        (progn
-          (message "Forgetting all IDs in directory %s..." dir)
-          (redisplay)
-          (org-node--forget-id-locations files)
-          (dolist (file files)
-            (remhash file org-node--file<>mtime))
-          (org-id-locations-save)
-          (org-node-reset))
-      (message "No IDs known to be in: %s" dir))))
+  (let ((files
+         (org-node-abbrev-file-names
+          (nconc
+           (org-node--dir-files-recursively (file-truename dir) ".org_exclude" nil)
+           (org-node--dir-files-recursively (file-truename dir) ".org" nil)))))
+    (when files
+      (message "Forgetting all IDs in directory %s..." dir)
+      (redisplay)
+      (org-node--forget-id-locations files)
+      (dolist (file files)
+        (remhash file org-node--file<>mtime))
+      (org-id-locations-save)
+      (org-node-reset))))
 
 ;;;###autoload
 (defun org-node-grep ()
@@ -3849,8 +3848,7 @@ Naturally, FUNDAMENTAL-MODE has no effect in that case."
                   (format-time-string "%T") err buf file (car files*) ctr)
            (unless (or was-open (not buf) (buffer-modified-p buf))
              (kill-buffer buf))
-           ;; Restart
-           nil)
+           files*)
           (:success
            (when too-many-files-hack
              (message "%s... done" msg))
