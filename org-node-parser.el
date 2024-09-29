@@ -321,7 +321,7 @@ findings to another temp file."
                 (goto-char 1))
               ;; Rough equivalent of `org-end-of-meta-data' for the file
               ;; level front matter, can jump somewhat too far but that's ok
-              (setq FAR (if (re-search-forward "^ *?[^#:]" nil t)
+              (setq FAR (if (re-search-forward "^ *?[^#:\n]" nil t)
                             (1- (point))
                           ;; There's no content other than front matter
                           (point-max)))
