@@ -1093,7 +1093,8 @@ function to update current tables."
              (n-jobs (length file-lists))
              (write-region-inhibit-fsync nil) ;; Default t in emacs30
              (default-directory invocation-directory)
-             (print-length nil))
+             (print-length nil)
+             (rm (executable-find "rm")))
         (dotimes (i n-jobs)
           (write-region (prin1-to-string (pop file-lists))
                         nil
@@ -1103,10 +1104,11 @@ function to update current tables."
           ;; Delete old result in order to then detect failure to generate a
           ;; new result.  Do not use Elisp `delete-file' since it can be
           ;; carrying all sorts of slow advices.
-          (let ((result-file (org-node-parser--tmpfile "results-%d.eld" i)))
-            (when-let ((buf (find-buffer-visiting result-file)))
-              (kill-buffer buf))
-            (delete-file-internal result-file))
+          (when rm
+            (let ((result-file (org-node-parser--tmpfile "results-%d.eld" i)))
+              (when-let ((buf (find-buffer-visiting result-file)))
+                (kill-buffer buf))
+              (start-process rm nil rm result-file)))
           ;; TODO: Maybe prepend a "timeout 30"
           (push (make-process
                  :name (format "org-node-%d" i)
