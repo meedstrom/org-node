@@ -104,7 +104,7 @@ If you are an org-roam user, you'll want the following module as well.  Please c
 
 Both are recent additions to MELPA, so you may have to refresh the recipe list first:
 
-- On package.el: ~M-x package-refresh-contents RET~
+- On built-in package.el: ~M-x package-refresh-contents RET~
 - On Elpaca: ~C-u M-x elpaca-update-menus RET~
 - On Straight (I think): ~M-x straight-fetch-all RET~
 
@@ -215,30 +215,13 @@ With that done, you can optionally configure the everyday commands =org-node-fin
 (setq org-node-creation-fn #'org-capture)
 #+end_src
 
-** Node series
-Do you already know about "daily-notes"?  Then get started with a keybinding such as:
+** Completion-at-point
+To complete words at point into known node titles:
 
 #+begin_src elisp
-(keymap-set global-map "M-s s" #'org-node-series-dispatch)
+(org-node-complete-at-point-mode)
+(setq org-roam-completion-everywhere nil) ;; Prevent Roam's variant
 #+end_src
-
-and configure =org-node-series-defs=.  See [[https://github.com/meedstrom/org-node/wiki/Configuring-series][wiki]].
-
-*** What are series?
-It's easiest to explain series if we use "daily-notes" (or "dailies") as an example of a series.
-
-Roam's idea of a "daily-note" is the same as an [[https://github.com/bastibe/org-journal][org-journal]] entry: a file/entry where the title is just today's date.
-
-You don't need software for that basic idea, only to make it extra convenient to navigate them and jump back and forth in the series.
-
-Thus, fundamentally, any "journal" or "dailies" software are just operating on a sorted series to navigate through.  You could have series about, let's say, historical events, Star Trek episodes, your school curriculum...
-
-You may be taken aback that defining a new series requires writing 5 lambdas, but once you get the hang of it, you can often reuse those lambdas.
-
-*** Future
-A future version will likely bring convenient wrappers that let you define a series in 1-2 lines.
-
-It's also possible we just redesign this completely.  Input welcome.  How would you like to define a series?  Where should the information be stored?
 
 ** An analogue to =org-roam-node-display-template=?
 
@@ -247,14 +230,6 @@ To customize how the nodes look in the minibuffer, configure =org-node-affixatio
     : M-x customize-variable RET org-node-affixation-fn RET
 
 You may also want to set =org-node-alter-candidates= to t.
-
-** Completion-at-point
-To complete words at point into known node titles:
-
-#+begin_src elisp
-(org-node-complete-at-point-mode)
-(setq org-roam-completion-everywhere nil) ;; Prevent Roam's variant
-#+end_src
 
 ** Grep
 
@@ -381,6 +356,31 @@ Rarer commands:
     - NOTE: For now, it only looks for links inside the root directory that it prompts you for, and sub and sub-subdirectories and so on -- but won't find a link outside that root directory.
 
       Like if you have Org files under /mnt linking to assets in /home, those links won't be updated.  Neither if you choose ~/org/subdir as the root directory will links in ~/org/file.org be updated.
+
+** Experimental: Node series
+Do you already know about "daily-notes"?  Then get started with a keybinding such as:
+
+#+begin_src elisp
+(keymap-set global-map "M-s s" #'org-node-series-dispatch)
+#+end_src
+
+and configure =org-node-series-defs=.  See [[https://github.com/meedstrom/org-node/wiki/Configuring-series][wiki]].
+
+*** What are series?
+It's easiest to explain series if we use "daily-notes" (or "dailies") as an example of a series.
+
+Roam's idea of a "daily-note" is the same as an [[https://github.com/bastibe/org-journal][org-journal]] entry: a file/entry where the title is just today's date.
+
+You don't need software for that basic idea, only to make it extra convenient to navigate them and jump back and forth in the series.
+
+Thus, fundamentally, any "journal" or "dailies" software are just operating on a sorted series to navigate through.  You could have series about, let's say, historical events, Star Trek episodes, your school curriculum...
+
+You may be taken aback that defining a new series requires writing 5 lambdas, but once you get the hang of it, you can often reuse those lambdas.
+
+*** Future
+A future version will likely bring convenient wrappers that let you define a series in 1-2 lines.
+
+It's also possible we just redesign this completely.  Input welcome.  How would you like to define a series?  Where should the information be stored?
 
 * Appendix
 ** Appendix I: Rosetta stone

@@ -21,19 +21,9 @@
 
 * Other
 
-- [ ] (Perf) Export some parser subroutines into own functions to allow profiler to tell us where time is most spent
-
-- [ ] (Perf) Improve file list balancer based on size of results
-  - instead of file<>size table, file<>last-result-size
-    - how is size of result measured tho? I believe N of nodes weighs heavier than N of links, lets say 4x.  maybe make a "collect-node" func and verify this
-
-- [X] (Perf) Balance file lists based on (cached) file size info
-
-- [X] (Perf) Don't pushnew to =org-id-files=, just set the entire thing from the keys of file<>mtime
-
 - [ ] Accept an empty org-id-locations
 
-- [ ] Respect save-place
+- [ ] Let org-node--goto respect save-place
 
 - [ ] Manage org-super-links drawers
 
