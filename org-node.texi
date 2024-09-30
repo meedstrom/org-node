@@ -23,7 +23,7 @@
 @end ifnottex
 
 @menu
-* News::
+* Breaking changes::
 * Background::
 * Setup::
 * Backlinks::
@@ -32,10 +32,6 @@
 
 @detailmenu
 --- The Detailed Node Listing ---
-
-News
-
-* Breaking changes @emph{[2024-09-26 Thu]}::
 
 Background
 
@@ -63,9 +59,8 @@ Misc
 
 * Managing org-id-locations::
 * Org-capture::
-* Node series::
-* An analogue to @samp{org-roam-node-display-template}?::
 * Completion-at-point::
+* An analogue to @samp{org-roam-node-display-template}?::
 * Grep::
 * Let org-open-at-point detect refs::
 * Limitation TRAMP::
@@ -74,8 +69,9 @@ Misc
 * Limitation Excluding notes::
 * Limitation Org-ref::
 * Toolbox::
+* Experimental Node series::
 
-Node series
+Experimental: Node series
 
 * What are series?::
 * Future::
@@ -87,19 +83,12 @@ Appendix
 @end detailmenu
 @end menu
 
-@node News
-@chapter News
-
-@menu
-* Breaking changes @emph{[2024-09-26 Thu]}::
-@end menu
-
-@node Breaking changes @emph{[2024-09-26 Thu]}
-@section Breaking changes @emph{[2024-09-26 Thu]}
+@node Breaking changes
+@chapter Breaking changes
 
 @itemize
 @item
-User option @samp{org-node-series-defs} now ships an empty default value. Check the @uref{https://github.com/meedstrom/org-node/wiki/Configuring-series, wiki} to configure it.
+@emph{[2024-09-26 Thu] } User option @samp{org-node-series-defs} now ships an @strong{empty} default value.  To configure it, check the @uref{https://github.com/meedstrom/org-node/wiki/Configuring-series, wiki}.
 
 This was done for several reasons, not the least being that people actually use the default value :-)  I do not want to support what was meant to be an example, and it's cleaner this way.
 @end itemize
@@ -116,7 +105,7 @@ This was done for several reasons, not the least being that people actually use 
 @node What's all this
 @section What's all this
 
-I like @uref{https://github.com/org-roam/org-roam, org-roam} but found it too slow, so I made @uref{https://github.com/meedstrom/quickroam, quickroam}.  And that idea spun off into this package, a standalone thing.  By accident, I believe it's also easier to pick up than org-roam.
+I like @uref{https://github.com/org-roam/org-roam, org-roam} but found it too slow, so I made @uref{https://github.com/meedstrom/quickroam, quickroam}.  And that idea spun off into this package, a standalone thing.  It may also be easier to pick up than org-roam.
 
 @itemize
 @item
@@ -315,7 +304,7 @@ Both are recent additions to MELPA, so you may have to refresh the recipe list f
 
 @itemize
 @item
-On package.el: @code{M-x package-refresh-contents RET}
+On built-in package.el: @code{M-x package-refresh-contents RET}
 @item
 On Elpaca: @code{C-u M-x elpaca-update-menus RET}
 @item
@@ -407,9 +396,8 @@ Bad news: this is currently directed towards people who used @uref{https://githu
 @menu
 * Managing org-id-locations::
 * Org-capture::
-* Node series::
-* An analogue to @samp{org-roam-node-display-template}?::
 * Completion-at-point::
+* An analogue to @samp{org-roam-node-display-template}?::
 * Grep::
 * Let org-open-at-point detect refs::
 * Limitation TRAMP::
@@ -418,6 +406,7 @@ Bad news: this is currently directed towards people who used @uref{https://githu
 * Limitation Excluding notes::
 * Limitation Org-ref::
 * Toolbox::
+* Experimental Node series::
 @end menu
 
 @node Managing org-id-locations
@@ -471,41 +460,15 @@ With that done, you can optionally configure the everyday commands @samp{org-nod
 (setq org-node-creation-fn #'org-capture)
 @end lisp
 
-@node Node series
-@section Node series
+@node Completion-at-point
+@section Completion-at-point
 
-Do you already know about "daily-notes"?  Then get started with a keybinding such as:
+To complete words at point into known node titles:
 
 @lisp
-(keymap-set global-map "M-s s" #'org-node-series-dispatch)
+(org-node-complete-at-point-mode)
+(setq org-roam-completion-everywhere nil) ;; Prevent Roam's variant
 @end lisp
-
-and configure @samp{org-node-series-defs}.  See @uref{https://github.com/meedstrom/org-node/wiki/Configuring-series, wiki}.
-
-@menu
-* What are series?::
-* Future::
-@end menu
-
-@node What are series?
-@subsection What are series?
-
-It's easiest to explain series if we use "daily-notes" (or "dailies") as an example of a series.
-
-Roam's idea of a "daily-note" is the same as an @uref{https://github.com/bastibe/org-journal, org-journal} entry: a file/entry where the title is just today's date.
-
-You don't need software for that basic idea, only to make it extra convenient to navigate them and jump back and forth in the series.
-
-Thus, fundamentally, any "journal" or "dailies" software are just operating on a sorted series to navigate through.  You could have series about, let's say, historical events, Star Trek episodes, your school curriculum@dots{}
-
-You may be taken aback that defining a new series requires writing 5 lambdas, but once you get the hang of it, you can often reuse those lambdas.
-
-@node Future
-@subsection Future
-
-A future version will likely bring convenient wrappers that let you define a series in 1-2 lines.
-
-It's also possible we just redesign this completely.  Input welcome.  How would you like to define a series?  Where should the information be stored?
 
 @node An analogue to @samp{org-roam-node-display-template}?
 @section An analogue to @samp{org-roam-node-display-template}?
@@ -518,16 +481,6 @@ M-x customize-variable RET org-node-affixation-fn RET
 
 
 You may also want to set @samp{org-node-alter-candidates} to t.
-
-@node Completion-at-point
-@section Completion-at-point
-
-To complete words at point into known node titles:
-
-@lisp
-(org-node-complete-at-point-mode)
-(setq org-roam-completion-everywhere nil) ;; Prevent Roam's variant
-@end lisp
 
 @node Grep
 @section Grep
@@ -757,6 +710,42 @@ Like if you have Org files under /mnt linking to assets in /home, those links wo
 @end itemize
 @end itemize
 @end itemize
+
+@node Experimental Node series
+@section Experimental: Node series
+
+Do you already know about "daily-notes"?  Then get started with a keybinding such as:
+
+@lisp
+(keymap-set global-map "M-s s" #'org-node-series-dispatch)
+@end lisp
+
+and configure @samp{org-node-series-defs}.  See @uref{https://github.com/meedstrom/org-node/wiki/Configuring-series, wiki}.
+
+@menu
+* What are series?::
+* Future::
+@end menu
+
+@node What are series?
+@subsection What are series?
+
+It's easiest to explain series if we use "daily-notes" (or "dailies") as an example of a series.
+
+Roam's idea of a "daily-note" is the same as an @uref{https://github.com/bastibe/org-journal, org-journal} entry: a file/entry where the title is just today's date.
+
+You don't need software for that basic idea, only to make it extra convenient to navigate them and jump back and forth in the series.
+
+Thus, fundamentally, any "journal" or "dailies" software are just operating on a sorted series to navigate through.  You could have series about, let's say, historical events, Star Trek episodes, your school curriculum@dots{}
+
+You may be taken aback that defining a new series requires writing 5 lambdas, but once you get the hang of it, you can often reuse those lambdas.
+
+@node Future
+@subsection Future
+
+A future version will likely bring convenient wrappers that let you define a series in 1-2 lines.
+
+It's also possible we just redesign this completely.  Input welcome.  How would you like to define a series?  Where should the information be stored?
 
 @node Appendix
 @chapter Appendix
