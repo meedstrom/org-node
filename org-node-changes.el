@@ -31,9 +31,7 @@
 (require 'cl-lib)
 
 (defvar org-node-changes--new-names
-  '((org-node-rescan-hook org-node-rescan-functions)
-    (org-node--series-info org-node-built-series)
-    (org-node-mark-days org-node--mark-days))
+  '((org-node--series org-node-built-series))
   "Alist of deprecated symbol names and their new names.")
 
 (defvar org-node-changes--warned-once nil)
@@ -46,7 +44,7 @@ value."
   (while-let ((row (pop org-node-changes--new-names)))
     (seq-let (old new removed-by) row
       (unless removed-by
-        (setq removed-by "30 September 2024"))
+        (setq removed-by "30 October 2024"))
       (when (boundp old)
         (if new
             (progn
@@ -62,16 +60,7 @@ value."
                  old)))))
   (unless org-node-changes--warned-once
     (setq org-node-changes--warned-once t)
-    (cl-loop
-     for fn in (bound-and-true-p org-node-insert-link-hook)
-     when (and (not (eq t fn))
-               (help-function-arglist fn)
-               (not (member (car-safe (help-function-arglist fn))
-                            '(&optional &rest &body))))
-     return (lwarn 'org-node :warning
-                   "Hook `org-node-insert-link-hook' has changed, now passes no arguments, but function expects them: %s"
-                   fn))
-    ;; 2024-09-19 Clean up deprecated persists
+    ;; 2024-09-19 Clean up deprecated persist-defvars
     (unless (memq system-type '(windows-nt ms-dos))
       (cl-loop
        for sym in '(org-node--file<>mtime
@@ -100,12 +89,8 @@ hardcoded strings."
        (unless warned-once
          (setq warned-once t)
          (lwarn 'org-node :warning "Your initfiles use old function name: %S, which will be REMOVED by %s.  Please use new name: %S"
-                ,old ,(or removed-by "30 September 2024") ,new))
+                ,old ,(or removed-by "30 October 2024") ,new))
        (apply ,new args))))
-
-(org-node-changes--def-whiny-alias
- 'org-node-mk-series-on-tag-sorted-by-property
- 'org-node-mk-series-on-tags-sorted-by-property)
 
 ;; (define-obsolete-variable-alias
 ;;   'org-node-creation-fn 'org-node-new-node-fn "2024-08-22")
@@ -123,11 +108,12 @@ hardcoded strings."
 (defalias 'org-node-new-via-roam-capture #'org-node-fakeroam-new-via-roam-capture)
 (defalias 'org-node-slugify-like-roam-actual #'org-node-fakeroam-slugify-via-roam)
 
-(define-obsolete-function-alias
-  'org-node-affix-with-olp 'org-node-prefix-with-olp "2024-09-19")
+(org-node-changes--def-whiny-alias
+ 'org-node-affix-with-olp 'org-node-prefix-with-olp "2024-09-19")
 
-(define-obsolete-variable-alias
-  'org-node--series 'org-node-built-series "2024-09-18")
+(org-node-changes--def-whiny-alias
+ 'org-node-complete-at-point-global-mode
+ 'org-node-complete-at-point-mode "2024-09-29")
 
 (provide 'org-node-changes)
 
