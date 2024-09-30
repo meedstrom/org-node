@@ -60,6 +60,8 @@ value."
                  old)))))
   (unless org-node-changes--warned-once
     (setq org-node-changes--warned-once t)
+    (display-warning
+     'org-node "This package is no longer updated on the \"melpa\" branch, but \"main\"; change your package recipe")
     ;; 2024-09-19 Clean up deprecated persist-defvars
     (unless (memq system-type '(windows-nt ms-dos))
       (cl-loop
