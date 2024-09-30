@@ -2943,7 +2943,7 @@ creation-date as more \"truthful\" than today\\='s date.
             (open-line 1)
             (insert "\n"
                     (format-time-string
-                     (format "%s Created " (org-time-stamp-format nil t)))
+                     (format "%s Created " (org-time-stamp-format t t)))
                     (org-link-make-string (concat "id:" id) title)
                     "\n")
             (org-node--dirty-ensure-link-known id)))
