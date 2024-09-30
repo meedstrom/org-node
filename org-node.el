@@ -1564,6 +1564,7 @@ being saddled with a mega-file in addition to the average workload."
   (if (= 1 n)
       (list files)
     (let ((total 0))
+      ;; TODO: Think about how it behaves on --scan-targeted
       (maphash (lambda (_ v) (if v (cl-incf total v))) org-node--file<>elapsed)
       ;; Special case for first time
       (if (= total 0)
@@ -1601,8 +1602,11 @@ being saddled with a mega-file in addition to the average workload."
             ;; Last sublist already hit size limit, spread leftovers equally
             (let ((ctr 0)
                   (max (length sublists)))
-              (dolist (file (nconc unsized files))
-                (push file (nth (% (cl-incf ctr) max) sublists)))))
+              (if (= max 0)
+                  ;; All files are unsized
+                  (setq sublists (org-node--split-into-n-sublists unsized n))
+                (dolist (file (nconc unsized files))
+                  (push file (nth (% (cl-incf ctr) max) sublists))))))
           sublists)))))
 
 (defun org-node--split-into-n-sublists (big-list n)
