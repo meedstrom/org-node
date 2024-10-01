@@ -798,7 +798,10 @@ API cheatsheet between org-roam and org-node.
 @tab @samp{(org-node-get-id NODE)}
 @item Get tags
 @tab @samp{(org-roam-node-tags NODE)}
-@tab @samp{(org-node-get-tags NODE)}, no inheritance
+@tab @samp{(org-node-get-tags-with-inheritance NODE)}
+@item Get local tags
+@tab 
+@tab @samp{(org-node-get-tags NODE)}
 @item Get outline level
 @tab @samp{(org-roam-node-level NODE)}
 @tab @samp{(org-node-get-level NODE)}

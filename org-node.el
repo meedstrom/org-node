@@ -376,7 +376,9 @@ For use as `org-node-affixation-fn'."
   "Prepend NODE's tags to TITLE.
 For use as `org-node-affixation-fn'."
   (list title
-        (when-let ((tags (org-node-get-tags node)))
+        (when-let ((tags (if org-use-tag-inheritance
+                             (org-node-get-tags-with-inheritance node)
+                           (org-node-get-tags node))))
           (propertize (concat "(" (string-join tags ", ") ") ")
                       'face 'org-tag))
         nil))
@@ -511,6 +513,8 @@ or you can visit the homepage:
               "Returns node's SCHEDULED state.")
   (tags       nil :read-only t :type list :documentation
               "Returns list of tags local to the node.")
+  (tags-with-inheritance  nil :read-only t :type list :documentation
+                          "List of tags, including tags inherited.")
   (title      nil :read-only t :type string :documentation
               "Returns the node's heading, or #+title if it is not a subtree.")
   (todo       nil :read-only t :type string :documentation
@@ -1507,7 +1511,8 @@ also necessary is `org-node--dirty-ensure-link-known' elsewhere."
                :olp (org-get-outline-path)
                ;; Less important
                :properties props
-               :tags (org-get-tags)
+               :tags (org-get-tags nil t)
+               :tags-with-inheritance (org-get-tags)
                :todo (if heading (org-get-todo-state))
                :deadline (cdr (assoc "DEADLINE" props))
                :scheduled (cdr (assoc "SCHEDULED" props)))))))))))

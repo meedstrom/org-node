@@ -395,6 +395,7 @@ findings to another temp file."
                                (cdr (assoc "ROAM_REFS" PROPS)))
                               nil
                               FILE-TAGS
+                              FILE-TAGS
                               ;; Title mandatory
                               (or FILE-TITLE (file-name-nondirectory FILE))
                               nil)
@@ -485,7 +486,7 @@ findings to another temp file."
                 (setq ID (cdr (assoc "ID" PROPS)))
                 (cl-loop until (> LEVEL (or (caar OLPATH) 0))
                          do (pop OLPATH)
-                         finally do (push (list LEVEL TITLE ID) OLPATH))
+                         finally do (push (list LEVEL TITLE ID TAGS) OLPATH))
                 (when ID
                   (push (record 'org-node
                                 (split-string-and-unquote
@@ -503,6 +504,10 @@ findings to another temp file."
                                  (cdr (assoc "ROAM_REFS" PROPS)))
                                 SCHED
                                 TAGS
+                                (delete-dups
+                                 (apply #'append
+                                        (cons FILE-TAGS
+                                              (mapcar #'cadddr OLPATH))))
                                 TITLE
                                 TODO-STATE)
                         result/found-nodes))
