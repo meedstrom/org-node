@@ -291,7 +291,7 @@ findings to another temp file."
             ;; NOTE: Don't use `insert-file-contents-literally'!  It causes
             ;;       wrong values for HEADING-POS when there is any Unicode in
             ;;       the file.  Just overriding `coding-system-for-read' and
-            ;;       `file-name-handler-alist' grants similar performance.
+            ;;       esp. `file-name-handler-alist' grants similar performance.
             (let ((inhibit-read-only t))
               (erase-buffer)
               (insert-file-contents FILE))
@@ -331,15 +331,14 @@ findings to another temp file."
                                (pos-bol)
                              (error "Couldn't find :END: of drawer"))))
                       nil))
-              (setq DRAWER-END (point))
-              (goto-char 1)
+              (setq HERE (point))
               (setq FILE-TAGS
                     (if (re-search-forward "^#\\+filetags: " FAR t)
                         (split-string
                          (buffer-substring (point) (pos-eol))
                          ":" t)
                       nil))
-              (goto-char 1)
+              (goto-char HERE)
               (setq TODO-RE
                     (if (re-search-forward $file-todo-option-re FAR t)
                         (progn
@@ -353,20 +352,21 @@ findings to another temp file."
                           (org-node-parser--make-todo-regexp
                            (string-join FILE-TODO-SETTINGS " ")))
                       $global-todo-re))
-              (goto-char 1)
+              (goto-char HERE)
               (setq FILE-TITLE (when (re-search-forward "^#\\+title: " FAR t)
                                  (org-node-parser--org-link-display-format
                                   (buffer-substring (point) (pos-eol)))))
               (setq FILE-ID (cdr (assoc "ID" PROPS)))
               (when FILE-ID
-                (goto-char DRAWER-END)
-                (setq HERE (point))
+                (goto-char HERE)
                 ;; Don't count org-super-links backlinks as forward links
+                ;; TODO: Rewrite more readably
                 (if (re-search-forward $backlink-drawer-re nil t)
                     (progn
                       (setq END (point))
                       (unless (search-forward ":end:" nil t)
                         (error "Couldn't find :END: of drawer"))
+                      ;; Collect from end of backlinks drawer to first heading
                       (org-node-parser--collect-links-until nil FILE-ID))
                   (setq END (point-max)))
                 (goto-char HERE)
@@ -516,11 +516,10 @@ findings to another temp file."
                 (setq HERE (point))
                 ;; Don't count org-super-links backlinks
                 ;; TODO: Generalize this mechanism to skip src blocks too
-                (if (setq DRAWER-BEG
-                          (re-search-forward $backlink-drawer-re nil t))
-                    (unless (setq DRAWER-END (search-forward ":end:" nil t))
-                      (error "Couldn't find :END: of drawer"))
-                  ;; Danger, Robinson
+                (setq DRAWER-BEG (re-search-forward $backlink-drawer-re nil t))
+                (if DRAWER-BEG
+                    (or (setq DRAWER-END (search-forward ":end:" nil t))
+                        (error "Couldn't find :END: of drawer"))
                   (setq DRAWER-END nil))
                 ;; Collect links inside the heading
                 (goto-char HEADING-POS)

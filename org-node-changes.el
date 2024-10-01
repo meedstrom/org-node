@@ -31,7 +31,7 @@
 (require 'cl-lib)
 
 (defvar org-node-changes--new-names
-  '((org-node--series org-node-built-series))
+  '()
   "Alist of deprecated symbol names and their new names.")
 
 (defvar org-node-changes--warned-once nil)
@@ -108,12 +108,11 @@ hardcoded strings."
 (defalias 'org-node-new-via-roam-capture #'org-node-fakeroam-new-via-roam-capture)
 (defalias 'org-node-slugify-like-roam-actual #'org-node-fakeroam-slugify-via-roam)
 
-(org-node-changes--def-whiny-alias
- 'org-node-affix-with-olp 'org-node-prefix-with-olp "2024-09-19")
+(org-node-changes--def-whiny-alias 'org-node-affix-with-olp
+                                   'org-node-prefix-with-olp)
 
-(org-node-changes--def-whiny-alias
- 'org-node-complete-at-point-global-mode
- 'org-node-complete-at-point-mode "2024-09-29")
+(org-node-changes--def-whiny-alias 'org-node-complete-at-point-global-mode
+                                   'org-node-complete-at-point-mode)
 
 (provide 'org-node-changes)
 
