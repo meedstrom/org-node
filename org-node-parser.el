@@ -143,11 +143,12 @@ subtree has none), to be included in each link's metadata.
 It is important that END does not extend past any sub-heading, as
 the subheading potentially has an ID of its own."
   (let ((beg (point))
-        link-type path)
+        link-type path link-pos)
     ;; Here it may help to know that:
     ;; - `$plain-re' will be set to basically `org-link-plain-re'
     ;; - `$merged-re' to a combination of that and `org-link-bracket-re'
     (while (re-search-forward $merged-re end t)
+      (setq link-pos (- (match-end 0) 1)) ;; Agree with `org-roam-db-map-links'
       (if (setq path (match-string 1))
           ;; Link is the [[bracketed]] kind.  Is there an URI: style link
           ;; inside?  Here is the magic that allows links to have spaces, it is
@@ -167,7 +168,7 @@ the subheading potentially has an ID of its own."
                   (looking-at-p "[[:space:]]*# "))
           (push (record 'org-node-link
                         id-here
-                        (point)
+                        link-pos
                         link-type
                         (string-replace "%20" " " path))
                 org-node-parser--found-links))))
@@ -180,6 +181,8 @@ the subheading potentially has an ID of its own."
             ;; The regexp is a modified `org-element-citation-key-re'
             (while (re-search-forward "[&@][!#-+./:<>-@^-`{-~[:word:]-]+"
                                       closing-bracket t)
+              ;; Agree with `org-roam-db-map-citations'
+              (setq link-pos (1+ (match-beginning 0)))
               (if (save-excursion
                     (goto-char (pos-bol))
                     (looking-at-p "[[:space:]]*# "))
@@ -187,7 +190,7 @@ the subheading potentially has an ID of its own."
                   (goto-char closing-bracket)
                 (push (record 'org-node-link
                               id-here
-                              (point)
+                              link-pos
                               nil
                               ;; Replace & with @
                               (concat "@" (substring (match-string 0) 1)))
