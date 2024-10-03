@@ -64,9 +64,9 @@ value."
     (unless (memq system-type '(windows-nt ms-dos))
       (cl-loop for sym in '(org-node--file<>mtime
                             org-node--file<>previews)
-               (let ((file (org-node-changes--guess-persist-filename sym)))
-                 (when (file-exists-p file)
-                   (delete-file file)))))))
+               do (let ((file (org-node-changes--guess-persist-filename sym)))
+                    (when (file-exists-p file)
+                      (delete-file file)))))))
 
 (defun org-node-changes--guess-persist-filename (sym)
   (let ((dir (or (get sym 'persist-location)
