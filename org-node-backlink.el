@@ -428,8 +428,10 @@ where backlinks are fixed."
                      (node (or (gethash id org-node--id<>node)
                                (and (setq id (gethash dest org-node--ref<>id))
                                     (gethash id org-node--id<>node)))))
-                (push id (alist-get (org-node-get-file-path node)
-                                    affected-dests nil nil #'equal))))
+                ;; (#59) This could be an empty link [[id:]]
+                (when node
+                  (push id (alist-get (org-node-get-file-path node)
+                                      affected-dests nil nil #'equal)))))
           (setq org-node--old-link-sets nil)
           (cl-loop for (file . ids) in affected-dests
                    when (and (file-readable-p file)
