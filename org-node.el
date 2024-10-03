@@ -2693,7 +2693,9 @@ To behave like `org-roam-node-find' when creating new nodes, set
          (node (gethash input org-node--candidate<>node)))
     (if node
         (org-node--goto node)
-      (org-node-create input (org-id-new)))))
+      (if (string-blank-p input)
+          (message "Won't create untitled node")
+        (org-node-create input (org-id-new))))))
 
 ;;;###autoload
 (defun org-node-visit-random ()
@@ -2750,7 +2752,9 @@ Optional argument REGION-AS-INITIAL-INPUT t means behave as
     (run-hooks 'org-node-insert-link-hook)
     ;; TODO: Delete the link if a node was not created
     (unless node
-      (org-node-create input id))))
+      (if (string-blank-p input)
+          (message "Won't create untitled node")
+        (org-node-create input id)))))
 
 ;;;###autoload
 (defun org-node-insert-link* ()
