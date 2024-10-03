@@ -62,16 +62,17 @@ value."
     (setq org-node-changes--warned-once t)
     ;; 2024-09-19 Clean up deprecated persist-defvars
     (unless (memq system-type '(windows-nt ms-dos))
-      (cl-loop
-       for sym in '(org-node--file<>mtime
-                    org-node--file<>previews)
-       as dir = (or (get sym 'persist-location)
-                    (bound-and-true-p persist--directory-location))
-       when dir do
-       (let ((file (expand-file-name (symbol-name sym) dir)))
-         (and (file-exists-p file)
-              (file-writable-p file)
-              (delete-file file)))))))
+      (cl-loop for sym in '(org-node--file<>mtime
+                            org-node--file<>previews)
+               (let ((file (org-node-changes--guess-persist-filename sym)))
+                 (when (file-exists-p file)
+                   (delete-file file)))))))
+
+(defun org-node-changes--guess-persist-filename (sym)
+  (let ((dir (or (get sym 'persist-location)
+                 (bound-and-true-p persist--directory-location)
+                 (locate-user-emacs-file "persist"))))
+    (expand-file-name (symbol-name sym) dir)))
 
 (defmacro org-node-changes--def-whiny-alias (old new &optional when interactive removed-by)
   "Define OLD as effectively an alias for NEW.
