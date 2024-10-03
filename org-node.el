@@ -584,10 +584,6 @@ as from which ID-node the link originates.  See
 MTIME is the file\\='s last-modification time and ELAPSED how
 long it took to scan the file last time.")
 
-;; DEPRECATED
-(defvar org-node--file<>mtime (make-hash-table :test #'equal)
-  "1:1 table mapping files to their last-modification times.")
-
 (defun org-node-get-id-links (node)
   "Get list of ID-link objects pointing to NODE.
 Each object is of type `org-node-link' with these fields:
@@ -952,6 +948,7 @@ that same function."
                    "1")))))
        1))
 
+;; REVIEW: Will it work right on Guix? Lib is always timestamped 1970.
 (defun org-node--ensure-compiled-lib (lib-name)
   "Return path to freshly compiled version of LIB-NAME.
 Recompile if needed, in case the user\\='s package manager
@@ -1221,9 +1218,7 @@ pass that to FINALIZER."
     (cl-loop for (path . type) in path.type
              do (puthash path type org-node--ref-path<>ref-type))
     (cl-loop for (file . mtime.elapsed) in file-info
-             do (puthash file mtime.elapsed org-node--file<>mtime.elapsed)
-             ;; Transitional 2024-10-03 (remove in a couple of days)
-             (puthash file (car mtime.elapsed) org-node--file<>mtime))
+             do (puthash file mtime.elapsed org-node--file<>mtime.elapsed))
     ;; PERF HACK: Don't manage `org-id-files' at all.  This could affect
     ;; downstream uses of org-id which assume the variable to be correct.
     ;; Uncomment to improve.
@@ -1300,9 +1295,7 @@ pass that to FINALIZER."
       (cl-loop for (path . type) in path.type
                do (puthash path type org-node--ref-path<>ref-type))
       (cl-loop for (file . mtime.elapsed) in file-info
-               do (puthash file mtime.elapsed org-node--file<>mtime.elapsed)
-               ;; Transitional 2024-10-03 (remove in a couple of days)
-               (puthash file (car mtime.elapsed) org-node--file<>mtime))
+               do (puthash file mtime.elapsed org-node--file<>mtime.elapsed))
       (org-node--record-nodes nodes)
       (dolist (prob problems)
         (push prob org-node--problems))
