@@ -579,10 +579,12 @@ records describing each link to that destination, with info such
 as from which ID-node the link originates.  See
 `org-node-get-id-links' for more info.")
 
-(defvar org-node--file<>previews (make-hash-table :test #'equal)
-  "1:N table mapping files to previews of backlink contexts.
-For use by `org-node-fakeroam--accelerate-get-contents'.")
+(defvar org-node--file<>mtime.elapsed (make-hash-table :test #'equal)
+  "1:1 table mapping files to values (MTIME . ELAPSED).
+MTIME is the file\\='s last-modification time and ELAPSED how
+long it took to scan the file last time.")
 
+;; DEPRECATED
 (defvar org-node--file<>mtime (make-hash-table :test #'equal)
   "1:1 table mapping files to their last-modification times.")
 
@@ -1210,22 +1212,18 @@ pass that to FINALIZER."
   (clrhash org-node--candidate<>node)
   (clrhash org-node--title<>id)
   (clrhash org-node--ref<>id)
-  (clrhash org-node--file<>elapsed)
+  (clrhash org-node--file<>mtime.elapsed)
   (setq org-node--collisions nil) ;; To be populated by `org-node--record-nodes'
   (seq-let (missing-files file-info nodes path.type links problems) results
     (org-node--forget-id-locations missing-files)
-    (dolist (file missing-files)
-      (remhash file org-node--file<>mtime))
     (dolist (link links)
       (push link (gethash (org-node-link-dest link) org-node--dest<>links)))
     (cl-loop for (path . type) in path.type
              do (puthash path type org-node--ref-path<>ref-type))
-    (cl-loop for (file mtime . elapsed) in file-info do
-             (puthash file elapsed org-node--file<>elapsed)
-             (unless (eq mtime (gethash file org-node--file<>mtime))
-               (puthash file mtime org-node--file<>mtime)
-               ;; Expire stale previews
-               (remhash file org-node--file<>previews)))
+    (cl-loop for (file . mtime.elapsed) in file-info
+             do (puthash file mtime.elapsed org-node--file<>mtime.elapsed)
+             ;; Transitional 2024-10-03 (remove in a couple of days)
+             (puthash file (car mtime.elapsed) org-node--file<>mtime))
     ;; PERF HACK: Don't manage `org-id-files' at all.  This could affect
     ;; downstream uses of org-id which assume the variable to be correct.
     ;; Uncomment to improve.
@@ -1266,7 +1264,7 @@ pass that to FINALIZER."
     (let ((found-files (mapcar #'car file-info)))
       (org-node--forget-id-locations missing-files)
       (dolist (file missing-files)
-        (remhash file org-node--file<>mtime))
+        (remhash file org-node--file<>mtime.elapsed))
       (org-node--dirty-forget-files missing-files)
       (org-node--dirty-forget-completions-in missing-files)
       ;; In case a title was edited: don't persist old revisions of the title
@@ -1301,11 +1299,10 @@ pass that to FINALIZER."
           (push link (gethash (org-node-link-dest link) org-node--dest<>links))))
       (cl-loop for (path . type) in path.type
                do (puthash path type org-node--ref-path<>ref-type))
-      (cl-loop for (file mtime . elapsed) in file-info do
-               (puthash file elapsed org-node--file<>elapsed)
-               (unless (eq mtime (gethash file org-node--file<>mtime))
-                 (puthash file mtime org-node--file<>mtime)
-                 (remhash file org-node--file<>previews)))
+      (cl-loop for (file . mtime.elapsed) in file-info
+               do (puthash file mtime.elapsed org-node--file<>mtime.elapsed)
+               ;; Transitional 2024-10-03 (remove in a couple of days)
+               (puthash file (car mtime.elapsed) org-node--file<>mtime))
       (org-node--record-nodes nodes)
       (dolist (prob problems)
         (push prob org-node--problems))
@@ -1553,9 +1550,6 @@ be misleading."
                n-reflinks
                org-node--time-elapsed))))
 
-(defvar org-node--file<>elapsed (make-hash-table :test #'equal)
-  "1:1 table mapping files to the time it last took to scan them.")
-
 (defun org-node--split-file-list (files n)
   "Split FILES into a list of N lists of files.
 
@@ -1570,7 +1564,8 @@ being saddled with a mega-file in addition to the average workload."
       (list files)
     (let ((total 0))
       ;; TODO: Think about how it behaves on --scan-targeted
-      (maphash (lambda (_ v) (if v (cl-incf total v))) org-node--file<>elapsed)
+      (maphash (lambda (_ v) (cl-incf total (cdr v)))
+               org-node--file<>mtime.elapsed)
       ;; Special case for first time
       (if (= total 0)
           (org-node--split-into-n-sublists files n)
@@ -1582,7 +1577,7 @@ being saddled with a mega-file in addition to the average workload."
               size)
           (catch 'full
             (while-let ((file (pop files)))
-              (setq size (gethash file org-node--file<>elapsed))
+              (setq size (cdr (gethash file org-node--file<>mtime.elapsed)))
               (if (null size)
                   (push file unsized)
                 ;; Dedicate huge files to their own cores
@@ -1685,7 +1680,7 @@ non-nil), list the files in a new buffer."
                                            'face 'link
                                            'follow-link t)))))
     (when (or (not instant)
-              (hash-table-empty-p org-node--file<>mtime))
+              (hash-table-empty-p org-node--file<>mtime.elapsed))
       (cl-loop for file in (let ((file-name-handler-alist nil))
                              (org-node-abbrev-file-names
                               (cl-loop for dir in org-node-extra-id-dirs
@@ -1693,12 +1688,12 @@ non-nil), list the files in a new buffer."
                                               (file-truename dir)
                                               ".org"
                                               org-node-extra-id-dirs-exclude))))
-               unless (gethash file org-node--file<>mtime)
-               do (puthash file 0 org-node--file<>mtime))
+               do (or (gethash file org-node--file<>mtime.elapsed)
+                      (puthash file (cons 0 0) org-node--file<>mtime.elapsed)))
       (cl-loop for file being each hash-value of org-id-locations
-               unless (gethash file org-node--file<>mtime)
-               do (puthash file 0 org-node--file<>mtime)))
-    (hash-table-keys org-node--file<>mtime)))
+               do (or (gethash file org-node--file<>mtime.elapsed)
+                      (puthash file (cons 0 0) org-node--file<>mtime.elapsed))))
+    (hash-table-keys org-node--file<>mtime.elapsed)))
 
 ;; (progn (ignore-errors (native-compile #'org-node--dir-files-recursively)) (benchmark-run 100 (org-node--dir-files-recursively org-roam-directory "org" '("logseq/"))))
 (defun org-node--dir-files-recursively (dir suffix excludes)
@@ -2571,9 +2566,9 @@ DEF is a series-definition from `org-node-series-defs'."
                                    (if (< emacs-major-version 30)
                                        ;; Faster than compat's sort
                                        (cl-sort items #'string> :key #'car)
-                                     (sort items
-                                           :key #'car :lessp #'string<
-                                           :reverse t :in-place t))))))))
+                                     (compat-call sort items
+                                                  :key #'car :lessp #'string<
+                                                  :reverse t :in-place t))))))))
 
 (defvar org-node-current-series-key nil
   "Key of the series currently being browsed with the menu.")
@@ -3320,7 +3315,7 @@ In case of unsolvable problems, how to wipe org-id-locations:
       (redisplay)
       (org-node--forget-id-locations files)
       (dolist (file files)
-        (remhash file org-node--file<>mtime))
+        (remhash file org-node--file<>mtime.elapsed))
       (org-id-locations-save)
       (org-node-reset))))
 
