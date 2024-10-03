@@ -1679,6 +1679,9 @@ non-nil), list the files in a new buffer."
                                                       (find-file ,file))
                                            'face 'link
                                            'follow-link t)))))
+    (when (stringp org-node-extra-id-dirs)
+      (setq org-node-extra-id-dirs (list org-node-extra-id-dirs))
+      (message "Option `org-node-extra-id-dirs' should be a list, changed it for you this time"))
     (when (or (not instant)
               (hash-table-empty-p org-node--file<>mtime.elapsed))
       (cl-loop for file in (let ((file-name-handler-alist nil))
