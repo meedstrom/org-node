@@ -1918,10 +1918,9 @@ that, configure `org-node-datestamp-format'."
 (defun org-node-slugify-for-web (title)
   "From TITLE, make a string meant to look nice as URL component.
 
-A title like \"Löb\\='s Theorem\" becomes \"lobs-theorem\".  Note that
-while diacritical marks are stripped, it retains most symbols that
-belong to the Unicode alphabetic category, preserving for example kanji
-and Greek letters."
+A title like \"Löb\\='s Theorem\" becomes \"lobs-theorem\".
+Diacritical marks are stripped, as are most symbols not
+categorized by Unicode as alphabetic or numeric."
   (thread-last title
                (org-node--strip-diacritics)
                (downcase)
@@ -1935,12 +1934,18 @@ and Greek letters."
 
 (defun org-node-slugify-like-roam-default (title)
   "From TITLE, make a filename slug in default org-roam style.
-Does not require org-roam installed."
+Does not require org-roam installed.
+
+A title like \"Löb\\='s Theorem\" becomes \"lob_s_theorem\".
+Diacritical marks are stripped, as are most symbols not
+categorized by Unicode as alphabetic or numeric.
+
+You may also want to configure `org-node-datestamp-format'."
   (thread-last title
                (org-node--strip-diacritics)
                (downcase)
                (string-trim)
-               (replace-regexp-in-string "[^[:alnum:][:digit:]]" "_")
+               (replace-regexp-in-string "[^[:alnum:]]" "_")
                (replace-regexp-in-string "__*" "_")
                (replace-regexp-in-string "^_" "")
                (replace-regexp-in-string "_$" "")))
@@ -3053,11 +3058,12 @@ a file is not there, it is not considered in any case."
 Also attempt to check for a prefix in the style of
 `org-node-datestamp-format', and avoid overwriting it.
 
-Suitable at the end of `after-save-hook'.  If called from a
-hook, only operate on files in `org-node-renames-allowed-dirs'.
-When called interactively, always prompt for confirmation.
+Suitable at the end of `after-save-hook'.  If called from a hook
+\(or from Lisp in general), only operate on files in
+`org-node-renames-allowed-dirs'.  When called interactively as a
+command, always prompt for confirmation.
 
-Internal argument INTERACTIVE is automatically set."
+Argument INTERACTIVE automatically set."
   (interactive "p" org-mode)
   (let ((path buffer-file-truename)
         (buf (current-buffer))
@@ -3131,7 +3137,7 @@ Internal argument INTERACTIVE is automatically set."
               ;; REVIEW: Use `find-file'?
               (let ((new-buf (find-file-noselect new-path)))
                 ;; Don't let remaining hooks operate on some random buffer
-                ;; (we are being called from a hook, probably)
+                ;; (we are possibly being called in the middle of a hook)
                 (set-buffer new-buf)
                 ;; Helpfully go back to where point was
                 (when visible-window

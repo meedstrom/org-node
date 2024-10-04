@@ -338,7 +338,7 @@ Rarer commands:
   - Look for link descriptions that got out of sync with the corresponding node title, then prompt at each link to update it
 - =org-node-rename-file-by-title=
   - Auto-rename the file based on the current =#+title=
-    - Works as an after-save-hook!  Does nothing until you configure =org-node-renames-allowed-dirs=.
+    - Also works as an after-save-hook!  Does nothing as such until you configure =org-node-renames-allowed-dirs=.
     - Please note that if your filenames have datestamp prefixes, it is important to get =org-node-datestamp-format= right or it may clobber a pre-existing datestamp.
 - =org-node-list-dead-links=
   - List links where the destination ID could not be found
