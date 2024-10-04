@@ -70,7 +70,6 @@
 (require 'subr-x)
 (require 'bytecomp)
 (require 'transient)
-(require 'find-func)
 (require 'org)
 (require 'org-id)
 (require 'org-macs)
@@ -982,9 +981,21 @@ When finished, pass a list of scan results to the FINALIZER
 function to update current tables."
   (when (= 0 org-node-perf-max-jobs)
     (setq org-node-perf-max-jobs (org-node--count-logical-cores)))
+  ;; Attempt to restrict access to the work files.  Will matter more if we
+  ;; extend this package to read encrypted files, although then the real
+  ;; solution is probably to reuse the encryption method and never write
+  ;; plaintext to disk, or else return results through IPC like async.el, but
+  ;; that was slow the last time I tried it.
+  (let* ((file-name-handler-alist nil)
+         (tmpdir (org-node-parser--tmpfile)))
+    (if (file-exists-p tmpdir)
+        (unless (file-writable-p tmpdir)
+          (error "Directory seems to have been created by a different user: %s"
+                 tmpdir))
+      (mkdir tmpdir)
+      (chmod tmpdir (file-modes-symbolic-to-number "u+rwx" 0))))
   ;; FIXME: When working on a checked-out repo, the developer has to paste the
-  ;;        checked-out library path here.  Without a full path, it just looks
-  ;;        in load-path.
+  ;;        checked-out library path here, else it just looks in load-path.
   (let ((compiled-lib (org-node--ensure-compiled-lib "org-node-parser"))
         (file-name-handler-alist nil)
         (coding-system-for-read org-node-perf-assume-coding-system)
