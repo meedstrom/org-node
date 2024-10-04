@@ -237,7 +237,7 @@ headings but you have only done work under one of them."
                   ;; subtree's property drawer, likely placed long before
                   ;; START, so search back for it
                   (save-excursion
-                    (let ((id-here (org-entry-get nil "ID" t)))
+                    (let ((id-here (org-entry-get-with-inheritance "ID")))
                       (and id-here
                            (re-search-backward
                             (concat "^[[:space:]]*:id: +"
@@ -317,7 +317,7 @@ headings but you have only done work under one of them."
             (push id org-node-backlink--fails))
           (when (and id file)
             (let ((case-fold-search t)
-                  (src-id (org-entry-get nil "ID" t)))
+                  (src-id (org-entry-get-with-inheritance "ID")))
               (when (and src-id (not (equal src-id id)))
                 (let ((src-title
                        (save-excursion

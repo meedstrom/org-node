@@ -2904,7 +2904,8 @@ creation-date as more \"truthful\" than today\\='s date.
 
 \(advice-add \\='org-node-extract-subtree :around
             (defun my-inherit-creation-date (orig-fn &rest args)
-                   (let ((parent-creation (org-entry-get nil \"CREATED\" t)))
+                   (let ((parent-creation
+                          (org-entry-get-with-inheritance \"CREATED\")))
                      (apply orig-fn args)
                      ;; Now in the new buffer
                      (org-entry-put nil \"CREATED\"
@@ -3020,21 +3021,21 @@ need to compute once."
                                     example t)))))))))))
 
 ;; This function can be removed if one day we drop support for file-level
-;; nodes, because then just (org-entry-get nil "ID" t) will suffice.  That
-;; demonstrates the maintenance burden of file-level anything: `org-entry-get'
+;; nodes, because then just (org-entry-get-with-inheritance "ID") will suffice.
+;; That demonstrates the maintenance burden of file-level code: `org-entry-get'
 ;; /can/ get the file-level ID but only sometimes.  Don't know where's the bug
-;; in this case, but file-level property drawers were a mistake, they create
-;; the need for special-case code all over the place, which leads to many new
-;; bugs, and bring nothing to the table.  Even here, this function had a bug
-;; earlier due to how I wrote it, but I shouldn't have had to write the
-;; function at all.
+;; in that case, but it's not an important bug; file-level property drawers
+;; were a mistake, they create the need for special-case code all over the
+;; place, which leads to new bugs, and bring very little to the table.  Even
+;; this workaround had a bug earlier, but we shouldn't need to write
+;; workarounds in the first place.
 (defun org-node-id-at-point ()
   "Get ID for current entry or up the outline tree."
   (save-excursion
     (without-restriction
-      (or (org-entry-get nil "ID" t)
+      (or (org-entry-get-with-inheritance "ID")
           (progn (goto-char (point-min))
-                 (org-entry-get nil "ID" t))))))
+                 (org-entry-get-with-inheritance "ID"))))))
 
 (defcustom org-node-renames-allowed-dirs nil
   "Dirs in which files may be auto-renamed.
