@@ -115,6 +115,12 @@ hardcoded strings."
 (org-node-changes--def-whiny-alias 'org-node-complete-at-point-global-mode
                                    'org-node-complete-at-point-mode)
 
+(define-obsolete-function-alias
+  'org-node-get-id-links 'org-node-get-id-links-to "2024-10-04")
+
+(define-obsolete-function-alias
+  'org-node-get-reflinks 'org-node-get-reflinks-to "2024-10-04")
+
 (provide 'org-node-changes)
 
 ;;; org-node-changes.el ends here

@@ -159,8 +159,8 @@ If REMOVE is non-nil, remove it instead."
                 (node (gethash id org-node--id<>node)))
       (catch 'break
         (let* ((sorted-uuids (thread-last
-                               (append (org-node-get-id-links node)
-                                       (org-node-get-reflinks node))
+                               (append (org-node-get-id-links-to node)
+                                       (org-node-get-reflinks-to node))
                                (mapcar #'org-node-link-origin)
                                (seq-uniq)
                                (compat-call sort)))

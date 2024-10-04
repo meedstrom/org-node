@@ -391,10 +391,10 @@ API cheatsheet between org-roam and org-node.
 |-----------------------------------------+------------------------------------+-----------------------------------------------------------------------|
 | Get ID near point                       | =(org-roam-id-at-point)=             | =(org-id-get nil nil nil t)=                                            |
 | Get node at point                       | =(org-roam-node-at-point)=           | =(org-node-at-point)=                                                   |
-| Get list of files                       | =(org-roam-list-files)=              | =(org-node-list-files)=                                                      |
+| Get list of files                       | =(org-roam-list-files)=              | =(org-node-list-files)=                                                 |
 | Prompt user to pick a node              | =(org-roam-node-read)=               | =(org-node-read)=                                                       |
-| Get backlink objects                    | =(org-roam-backlinks-get NODE)=      | =(org-node-get-backlinks NODE)=                                         |
-| Get reflink objects                     | =(org-roam-reflinks-get NODE)=       | =(org-node-get-reflinks NODE)=                                          |
+| Get backlink objects                    | =(org-roam-backlinks-get NODE)=      | =(org-node-get-id-links-to NODE)=                                       |
+| Get reflink objects                     | =(org-roam-reflinks-get NODE)=       | =(org-node-get-reflinks-to NODE)=                                       |
 | Get title                               | =(org-roam-node-title NODE)=         | =(org-node-get-title NODE)=                                             |
 | Get title of file where NODE is         | =(org-roam-node-file-title NODE)=    | =(org-node-get-file-title NODE)=                                        |
 | Get title /or/ name of file where NODE is |                                    | =(org-node-get-file-title-or-basename NODE)=                            |
@@ -414,4 +414,4 @@ API cheatsheet between org-roam and org-node.
 | Get =ROAM_REFS=                           | =(org-roam-node-refs NODE)=          | =(org-node-get-refs NODE)=                                              |
 | Get =ROAM_ALIASES=                        | =(org-roam-node-aliases NODE)=       | =(org-node-get-aliases NODE)=                                           |
 | Get =ROAM_EXCLUDE=                        |                                    | =(assoc "ROAM_EXCLUDE" (org-node-get-properties NODE))=, no inheritance |
-| Ensure fresh data                       | =(org-roam-db-sync)=                 | =(org-node-cache-ensure t t)=                                         |
+| Ensure fresh data                       | =(org-roam-db-sync)=                 | =(org-node-cache-ensure t t)=                                           |

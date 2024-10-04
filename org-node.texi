@@ -662,7 +662,7 @@ Look for link descriptions that got out of sync with the corresponding node titl
 Auto-rename the file based on the current @samp{#+title}
 @itemize
 @item
-Works as an after-save-hook!  Does nothing until you configure @samp{org-node-renames-allowed-dirs}.
+Also works as an after-save-hook!  Does nothing as such until you configure @samp{org-node-renames-allowed-dirs}.
 @item
 Please note that if your filenames have datestamp prefixes, it is important to get @samp{org-node-datestamp-format} right or it may clobber a pre-existing datestamp.
 @end itemize
@@ -777,10 +777,10 @@ API cheatsheet between org-roam and org-node.
 @tab @samp{(org-node-read)}
 @item Get backlink objects
 @tab @samp{(org-roam-backlinks-get NODE)}
-@tab @samp{(org-node-get-backlinks NODE)}
+@tab @samp{(org-node-get-id-links-to NODE)}
 @item Get reflink objects
 @tab @samp{(org-roam-reflinks-get NODE)}
-@tab @samp{(org-node-get-reflinks NODE)}
+@tab @samp{(org-node-get-reflinks-to NODE)}
 @item Get title
 @tab @samp{(org-roam-node-title NODE)}
 @tab @samp{(org-node-get-title NODE)}

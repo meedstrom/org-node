@@ -536,7 +536,7 @@ or you can visit the homepage:
 
 (cl-defstruct (org-node-link (:constructor org-node-link--make-obj)
                              (:copier nil))
-  "Please see docstring of `org-node-get-id-links'."
+  "Please see docstring of `org-node-get-id-links-to'."
   origin
   pos
   type
@@ -576,14 +576,14 @@ The table keys are destinations (uuids, uri paths or citekeys),
 and the corresponding table value is a list of `org-node-link'
 records describing each link to that destination, with info such
 as from which ID-node the link originates.  See
-`org-node-get-id-links' for more info.")
+`org-node-get-id-links-to' for more info.")
 
 (defvar org-node--file<>mtime.elapsed (make-hash-table :test #'equal)
   "1:1 table mapping files to values (MTIME . ELAPSED).
 MTIME is the file\\='s last-modification time and ELAPSED how
 long it took to scan the file last time.")
 
-(defun org-node-get-id-links (node)
+(defun org-node-get-id-links-to (node)
   "Get list of ID-link objects pointing to NODE.
 Each object is of type `org-node-link' with these fields:
 
@@ -596,17 +596,17 @@ type - link type, such as \"https\", \"ftp\", \"info\" or
 
 This function only returns ID-links, so you can expect the :dest
 to always equal the ID of NODE.  To see other link types, use
-`org-node-get-reflinks'."
+`org-node-get-reflinks-to'."
   (gethash (org-node-get-id node) org-node--dest<>links))
 
-(defun org-node-get-reflinks (node)
+(defun org-node-get-reflinks-to (node)
   "Get list of reflink objects pointing to NODE.
 Typical reflinks are URLs or @citekeys occurring in any document,
 and they are considered to point to NODE when NODE has a
 :ROAM_REFS: property that includes that same string.
 
 The reflink object has the same shape as an ID-link object (see
-`org-node-get-id-links'), but instead of an ID in the DEST field,
+`org-node-get-id-links-to'), but instead of an ID in the DEST field,
 you have a ref string such an URL.  Common gotcha: for a web
 address such as \"http://gnu.org\", the DEST field holds only
 \"//gnu.org\", and the \"http\" part goes into the TYPE
