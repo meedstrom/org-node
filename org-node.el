@@ -667,9 +667,9 @@ When called from Lisp, peek on any hash table HT."
     (advice-remove 'rename-file                   #'org-node--handle-rename)
     (advice-remove 'delete-file                   #'org-node--handle-delete)))
 
-;; On the assumption there cannot have appeared a tramp file path if tramp is
-;; not loaded, no need to load tramp just to run this package
 (defun org-node--tramp-file-p (file)
+  "Wrapper for `tramp-tramp-file-p'.
+Always returns nil if Tramp is not loaded."
   (when (featurep 'tramp)
     (tramp-tramp-file-p file)))
 
@@ -948,31 +948,29 @@ that same function."
                    "1")))))
        1))
 
-;; REVIEW: Will it work right on Guix? Lib is always timestamped 1970.
-(defun org-node--ensure-compiled-lib (lib-name)
-  "Return path to freshly compiled version of LIB-NAME.
+(defun org-node--ensure-compiled-lib (lib-basename)
+  "Return path to freshly compiled version of LIB-BASENAME.
 Recompile if needed, in case the user\\='s package manager
-didn\\='t do so already, or local changes have been made.
-
-LIB-NAME should be something that works with `find-library-name'."
+didn\\='t do so already, or local changes have been made."
   (let* ((file-name-handler-alist nil)
-         (lib (find-library-name lib-name))
-         (native-path (when (native-comp-available-p)
-                        (comp-el-to-eln-filename lib)))
-         (byte-compile-warnings '(not free-vars)))
-    (mkdir (org-node-parser--tmpfile) t)
-    (if (and native-path (file-newer-than-file-p native-path lib))
-        ;; The .eln is fresh, use it
-        native-path
-      (when native-path (native-compile-async (list lib)))
+         (el (locate-library (concat lib-basename ".el")))
+         (eln (when (native-comp-available-p)
+                (comp-el-to-eln-filename el))))
+    (if (and eln (file-newer-than-file-p eln el))
+        ;; The .eln is fresh, use it.  We know this even on Nix/Guix with their
+        ;; 1970 timestamps, because `comp-el-to-eln-filename' hashes the
+        ;; content of the source file.
+        eln
       ;; Use an .elc this time, as it compiles much faster
-      (let ((elc-path (org-node-parser--tmpfile
-                       (concat (file-name-base lib-name) ".elc"))))
-        (unless (file-newer-than-file-p elc-path lib)
-          ;; Must compile. Ensure the .elc won't clutter some source directory.
-          (let ((byte-compile-dest-file-function `(lambda (&rest _) ,elc-path)))
-            (byte-compile-file lib)))
-        elc-path))))
+      (when eln (native-compile-async (list el)))
+      (let ((elc (locate-library "org-node-parser.elc")))
+        (unless (and elc (file-newer-than-file-p elc el))
+          (unless (file-writable-p elc)
+            (setq elc (org-node-parser--tmpfile (concat lib-basename ".elc"))))
+          (unless (file-newer-than-file-p elc el)
+            (let ((byte-compile-dest-file-function `(lambda (&rest _) ,elc)))
+              (byte-compile-file el))))
+        elc))))
 
 (defvar org-node--debug nil)
 (defun org-node--scan (files finalizer)
