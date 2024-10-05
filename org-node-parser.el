@@ -202,22 +202,21 @@ the subheading potentially has an ID of its own."
   "Collect Org properties between BEG and END into an alist.
 Assumes BEG and END delimit the region in between
 a :PROPERTIES: and :END: string."
-  (let (result)
+  (let (result pos-start pos-eol)
     (goto-char beg)
     (while (< (point) end)
       (skip-chars-forward "[:space:]")
       (unless (looking-at-p ":")
         (error "Possibly malformed property drawer"))
       (forward-char)
-      (push (cons (upcase
-                   (buffer-substring
-                    (point)
-                    (1- (or (search-forward ":" (pos-eol) t)
-                            (error "Possibly malformed property drawer")))))
-                  (string-trim
-                   (buffer-substring
-                    (1+ (point)) (pos-eol))))
-            result)
+      (setq pos-start (point))
+      (setq pos-eol (pos-eol))
+      (or (search-forward ":" pos-eol t)
+          (error "Possibly malformed property drawer"))
+      (unless (= 0 (- pos-eol (point)))
+        (push (cons (upcase (buffer-substring pos-start (1- (point))))
+                    (string-trim (buffer-substring (1+ (point)) pos-eol)))
+              result))
       (forward-line 1))
     result))
 
