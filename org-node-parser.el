@@ -507,9 +507,7 @@ findings to another temp file."
                                 SCHED
                                 TAGS
                                 (delete-dups
-                                 (apply #'append
-                                        (cons FILE-TAGS
-                                              (mapcar #'cadddr OLPATH))))
+                                 (append FILE-TAGS (mapcar #'cadddr OLPATH)))
                                 TITLE
                                 TODO-STATE)
                         result/found-nodes))
@@ -524,10 +522,11 @@ findings to another temp file."
                 ;; Don't count org-super-links backlinks
                 ;; TODO: Generalize this mechanism to skip src blocks too
                 (setq DRAWER-BEG (re-search-forward $backlink-drawer-re nil t))
-                (if DRAWER-BEG
-                    (or (setq DRAWER-END (search-forward ":end:" nil t))
-                        (error "Couldn't find :END: of drawer"))
-                  (setq DRAWER-END nil))
+                (setq DRAWER-END
+                      (and DRAWER-BEG
+                           (or (search-forward ":end:" nil t)
+                               (error "Couldn't find :END: of drawer"))))
+
                 ;; Collect links inside the heading
                 (goto-char HEADING-POS)
                 (org-node-parser--collect-links-until (pos-eol) ID-HERE)
