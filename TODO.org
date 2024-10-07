@@ -16,7 +16,7 @@
   - =;;;###autoload (autoload 'org-node-series-dispatch "org-node" nil t)=
     - In Emacs 30, replace with just =;;;###autoload=
   - any usages of =compat-call=
-  - cl-sort
+  - =cl-sort=
   - what the compiler tells you is obsolete
 
 * Other

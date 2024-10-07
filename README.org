@@ -33,7 +33,7 @@ I like [[https://github.com/org-roam/org-roam][org-roam]] but found it too slow,
 
 My life can be divided into two periods "*before org-roam*" and "*after org-roam*".  I crossed a kind of gap once I got a good way to link between my notes.  It's odd to remember when I just relied on browsing subtrees and the filesystem -- what a strange way to work!
 
-I used to lose track of things I had written, under some forgotten heading in a forgotten file in a forgotten directory.  The org-roam method let me *find* and *build on* my own work, instead of [[https://en.wikipedia.org/wiki/Cryptomnesia][recreating my work all the time]].
+I used to lose track of things I had written, under some forgotten heading in a forgotten file in a forgotten directory.  The org-roam method let me *find* and *build on* my own work, instead of [[https://en.wikipedia.org/wiki/Cryptomnesia][recreating it all the time]].
 
 At the core, all the "notetaking packages" ([[https://github.com/rtrppl/orgrr][orgrr]]/[[https://github.com/localauthor/zk][zk]]/[[https://github.com/EFLS/zetteldeft][zetteldeft]]/[[https://github.com/org-roam/org-roam][org-roam]]/[[https://github.com/protesilaos/denote][denote]]/[[https://github.com/kaorahi/howm][howm]]/[[https://github.com/kisaragi-hiu/minaduki][minaduki]]/...) try to help you with this: make it easy to link between notes and explore them.
 
@@ -405,7 +405,7 @@ API cheatsheet between org-roam and org-node.
 | Get outline level                       | =(org-roam-node-level NODE)=         | =(org-node-get-level NODE)=                                             |
 | Get whether this is a subtree           | =(zerop (org-roam-node-level NODE))= | =(org-node-get-is-subtree NODE)=                                        |
 | Get char position                       | =(org-roam-node-point NODE)=         | =(org-node-get-pos NODE)=                                               |
-| Get properties                          | =(org-roam-node-properties NODE)=    | =(org-node-get-properties NODE)=, no inheritance                        |
+| Get properties                          | =(org-roam-node-properties NODE)=    | =(org-node-get-properties NODE)=, only includes explicit properties     |
 | Get subtree TODO state                  | =(org-roam-node-todo NODE)=          | =(org-node-get-todo NODE)=                                              |
 | Get subtree SCHEDULED                   | =(org-roam-node-scheduled NODE)=     | =(org-node-get-scheduled NODE)=                                         |
 | Get subtree DEADLINE                    | =(org-roam-node-deadline NODE)=      | =(org-node-get-deadline NODE)=                                          |

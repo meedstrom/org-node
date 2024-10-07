@@ -121,6 +121,9 @@ hardcoded strings."
 (define-obsolete-function-alias
   'org-node-get-reflinks 'org-node-get-reflinks-to "2024-10-04")
 
+(define-obsolete-variable-alias
+  'org-node--series 'org-node-built-series "2024-10-07")
+
 (provide 'org-node-changes)
 
 ;;; org-node-changes.el ends here

@@ -488,17 +488,8 @@ findings to another temp file."
                 (setq ID (cdr (assoc "ID" PROPS)))
                 (cl-loop until (> LEVEL (or (caar OLPATH) 0))
                          do (pop OLPATH)
-                         ;; finally do (push (list LEVEL TITLE ID TAGS PROPS)
                          finally do (push (list LEVEL TITLE ID TAGS)
                                           OLPATH))
-                ;; TODO: Uncomment when we bump major version
-                ;; (setq PROPS-WITH-INHERITANCE PROPS)
-                ;; ;; NOTE: List is in reverse order so deepest of same property
-                ;; ;;       automatically gets precedence
-                ;; (dolist (crumb (cdr OLPATH))
-                ;;   (dolist (prop (nth 4 crumb))
-                ;;     (unless (assoc (car prop) PROPS-WITH-INHERITANCE)
-                ;;       (push prop PROPS-WITH-INHERITANCE))))
                 (when ID
                   (push (record 'org-node
                                 (split-string-and-unquote
@@ -551,9 +542,10 @@ findings to another temp file."
               (widen))
 
             (push (cons FILE
-                        (cons (floor (float-time
-                                      (file-attribute-modification-time
-                                       (file-attributes FILE))))
+                        ;; Convert mtime to integer to do `eq' operations
+                        (cons (truncate (float-time
+                                         (file-attribute-modification-time
+                                          (file-attributes FILE))))
                               (float-time (time-since FILE-START-TIME))))
                   result/file-info))
 

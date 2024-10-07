@@ -564,24 +564,33 @@ can demonstrate the data format.  See also the type `org-node'.")
 (defvar org-node--ref-path<>ref-type (make-hash-table :test #'equal)
   "1:1 table mapping //paths to types:.
 
-While the same path can be found with multiple types \(e.g. http
-and https), this table will store only one of these \(random).
+While the same path can be found with multiple types \(e.g. http and
+https), this table will in that case store a random one of these, since
+that is good enough to make completions look less outlandish.
+
+This is a smaller table than you might think, since it only contains
+entries for links found in a :ROAM_REFS: field, instead of all links
+found anywhere.
 
 To see all links found, try \\[org-node-list-reflinks].")
 
 (defvar org-node--dest<>links (make-hash-table :test #'equal)
   "1:N table of links.
 
-The table keys are destinations (uuids, uri paths or citekeys),
+The table keys are destinations (org-ids, URI paths or citekeys),
 and the corresponding table value is a list of `org-node-link'
 records describing each link to that destination, with info such
 as from which ID-node the link originates.  See
 `org-node-get-id-links-to' for more info.")
 
+;; As of 2024-10-06, the MTIME is not used for anything except supporting
+;; `org-node-fakeroam-db-feed-mode'.  However, it has many conceivable
+;; downstream or future applications.
 (defvar org-node--file<>mtime.elapsed (make-hash-table :test #'equal)
   "1:1 table mapping files to values (MTIME . ELAPSED).
-MTIME is the file\\='s last-modification time and ELAPSED how
-long it took to scan the file last time.")
+MTIME is the file\\='s last-modification time \(as an integer)
+and ELAPSED how long it took to scan the file last time \(as a
+float).")
 
 (defun org-node-get-id-links-to (node)
   "Get list of ID-link objects pointing to NODE.
@@ -2758,6 +2767,9 @@ Optional argument REGION-AS-INITIAL-INPUT t means behave as
     (atomic-change-group
       (when region-text
         (delete-region beg end))
+      ;; TODO: When inserting a citation, insert a [cite:] instead of a normal
+      ;;       link
+      ;; (if (string-prefix-p "@" input))
       (insert (org-link-make-string (concat "id:" id) link-desc)))
     (run-hooks 'org-node-insert-link-hook)
     ;; TODO: Delete the link if a node was not created
@@ -3595,7 +3607,7 @@ one of them is associated with a ROAM_REFS property."
     (if plain-links
         (org-node--pop-to-tabulated-list
          :buffer "*org-node reflinks*"
-         :format [("Ref" 4 t) ("Inside node" 30 t) ("Potential reflink" 0 t)]
+         :format [("Ref" 4 t) ("Inside node" 30 t) ("Link" 0 t)]
          :reverter #'org-node-list-reflinks
          :entries
          (cl-loop
