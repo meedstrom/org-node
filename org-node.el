@@ -854,6 +854,18 @@ In broad strokes:
           "\nIf this is your first time with org-id, first assign an org-id to some random heading"
           "\n with `org-id-get-create', then do `org-node-reset' and it should work from then on."))))))
 
+(define-advice org-id-locations-load
+    (:after () org-node--abbrev-org-id-locations)
+  "Maybe abbreviate all filenames in `org-id-locations'.
+
+Due to an oversight, org-id does not abbreviate after reconstructing
+filenames if `org-id-locations-file-relative' is t.
+https://lists.gnu.org/archive/html/emacs-orgmode/2024-09/msg00305.html"
+  (when org-id-locations-file-relative
+    (maphash (lambda (id file)
+               (puthash id (org-node-abbrev-file-names file) org-id-locations))
+             org-id-locations)))
+
 
 ;;;; Scanning
 
