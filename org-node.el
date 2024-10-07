@@ -1897,7 +1897,8 @@ that, configure `org-node-datestamp-format'."
       ;; Emacs 29+ solution
       (thread-last input-string
                    (string-glyph-decompose)
-                   (seq-remove (lambda (char) (< 767 char 818)))
+                   ;; https://www.unicode.org/charts/PDF/U0300.pdf
+                   (seq-remove (lambda (char) (<= #x0300 char #x036F)))
                    (concat)
                    (string-glyph-compose))
     ;; Emacs 25+ solution  https://irreal.org/blog/?p=11896
