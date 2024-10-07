@@ -17,12 +17,11 @@
 
 ;;; Commentary:
 
-;; This file is worker code meant for child processes.  It should be designed
-;; to compile quickly, and the compiled artifact should load no libraries at
-;; runtime.
+;; This file is worker code meant for child processes.  It should load no
+;; libraries at runtime.
 
-;; The child processes are expected to execute
-;; `org-node-parser--collect-dangerously' once and die.
+;; The child processes are expected to load this, execute
+;; `org-node-parser--collect-dangerously' once, and die.
 
 ;;; Code:
 
@@ -99,6 +98,7 @@ strip the brackets."
   "Split a ROAM-REFS field correctly.
 What this means?  See test/org-node-test.el."
   (when roam-refs
+    ;; TODO: Use `with-work-buffer' in Emacs 31
     (with-temp-buffer
       (insert roam-refs)
       (goto-char 1)
@@ -542,7 +542,7 @@ findings to another temp file."
               (widen))
 
             (push (cons FILE
-                        ;; Convert mtime to integer to do `eq' operations
+                        ;; Convert mtime into integer for `eq' operations
                         (cons (truncate (float-time
                                          (file-attribute-modification-time
                                           (file-attributes FILE))))

@@ -968,6 +968,7 @@ that same function."
                    "1")))))
        1))
 
+;; TODO: Maybe check if the running org-node is actually an outdated elc
 (defun org-node--ensure-compiled-lib (lib-basename)
   "Return path to freshly compiled version of LIB-BASENAME.
 Recompile if needed, in case the user\\='s package manager
@@ -983,7 +984,7 @@ didn\\='t do so already, or local changes have been made."
         eln
       ;; Use an .elc this time, as it compiles much faster
       (when eln (native-compile-async (list el)))
-      (let ((elc (locate-library "org-node-parser.elc")))
+      (let ((elc (locate-library (concat lib-basename ".elc"))))
         (unless (and elc (file-newer-than-file-p elc el))
           (unless (file-writable-p elc)
             (setq elc (org-node-parser--tmpfile (concat lib-basename ".elc"))))
@@ -1577,59 +1578,61 @@ be misleading."
   "Split FILES into a list of N lists of files.
 
 Take into account how long it took to scan each file last time, to
-return balanced lists that can each take around the same amount of
+return balanced lists that should each take around the same amount of
 wall-time to process.
 
-This reduces the risk that one process takes noticably longer due to
+This reduces the risk that one subprocess takes noticably longer due to
 being saddled with a mega-file in addition to the average workload."
-  (setq n (min n (length files)))
-  (if (= 1 n)
-      (list files)
-    (let ((total 0))
-      ;; TODO: Think about how it behaves on --scan-targeted
-      (maphash (lambda (_ v) (cl-incf total (cdr v)))
+  (if (<= (length files) n)
+      (org-node--split-into-n-sublists files n)
+    (let ((total-time 0))
+      ;; NOTE: In the rare case of running `org-node--scan-targeted' with >n
+      ;;       items, the end result will probably be just 1 sublist, but it's
+      ;;       so rare it's not worth optimizing
+      (maphash (lambda (_k v) (setq total-time (+ total-time (cdr v))))
                org-node--file<>mtime.elapsed)
       ;; Special case for first time
-      (if (= total 0)
+      (if (= total-time 0)
           (org-node--split-into-n-sublists files n)
-        (let ((max-per-core (/ total n))
-              (sublist-sum 0)
+        (let ((max-per-core (/ total-time n))
+              (this-sublist-sum 0)
               sublists
-              sublist
-              unsized
-              size)
-          (catch 'full
+              this-sublist
+              untimed
+              time)
+          (catch 'filled
             (while-let ((file (pop files)))
-              (setq size (cdr (gethash file org-node--file<>mtime.elapsed)))
-              (if (null size)
-                  (push file unsized)
+              (setq time (cdr (gethash file org-node--file<>mtime.elapsed)))
+              (if (or (null time) (= 0 time))
+                  (push file untimed)
                 ;; Dedicate huge files to their own cores
-                (if (> size max-per-core)
+                (if (> time max-per-core)
                     (push (list file) sublists)
-                  (if (< size (- max-per-core sublist-sum))
+                  (if (< time (- max-per-core this-sublist-sum))
                       (progn
-                        (push file sublist)
-                        (setq sublist-sum (+ sublist-sum size)))
-                    (push sublist sublists)
-                    (setq sublist-sum 0)
-                    (setq sublist nil)
+                        (push file this-sublist)
+                        (setq this-sublist-sum (+ this-sublist-sum time)))
+                    (push this-sublist sublists)
+                    (setq this-sublist-sum 0)
+                    (setq this-sublist nil)
                     (push file files)
                     (when (= (length sublists) n)
-                      (throw 'full t)))))))
-          ;; Let last sublist absorb all unsized
-          (if sublist
+                      (throw 'filled t)))))))
+          ;; Let last sublist absorb all untimed
+          (if this-sublist
               (progn
-                (push (nconc unsized sublist) sublists)
+                (push (nconc untimed this-sublist) sublists)
                 (when files
                   (message "org-node: FILES surprisingly not empty: %s" files)))
-            ;; Last sublist already hit size limit, spread leftovers equally
+            ;; Last sublist already hit time limit, spread leftovers equally
             (let ((ctr 0)
-                  (max (length sublists)))
-              (if (= max 0)
-                  ;; All files are unsized
-                  (setq sublists (org-node--split-into-n-sublists unsized n))
-                (dolist (file (nconc unsized files))
-                  (push file (nth (% (cl-incf ctr) max) sublists))))))
+                  (len (length sublists)))
+              (if (= len 0)
+                  ;; All files are untimed
+                  ;; REVIEW: Code never ends up here, right?
+                  (setq sublists (org-node--split-into-n-sublists untimed n))
+                (dolist (file (nconc untimed files))
+                  (push file (nth (% (cl-incf ctr) len) sublists))))))
           sublists)))))
 
 (defun org-node--split-into-n-sublists (big-list n)
