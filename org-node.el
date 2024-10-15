@@ -2969,7 +2969,11 @@ creation-date as more \"truthful\" than today\\='s date.
             (file-name-concat
              dir (concat (format-time-string org-node-datestamp-format)
                          (funcall org-node-slug-fn title)
-                         ".org"))))
+                         ".org")))
+           (parent-pos (save-excursion
+                         (without-restriction
+                           (org-up-heading-or-point-min)
+                           (point)))))
       (if (file-exists-p path-to-write)
           (message "A file already exists named %s" path-to-write)
         (org-cut-subtree)
@@ -2977,7 +2981,7 @@ creation-date as more \"truthful\" than today\\='s date.
         ;; ID of subheading that was extracted.
         (unless (bound-and-true-p org-capture-mode)
           (widen)
-          (org-up-heading-or-point-min)
+          (goto-char parent-pos)
           (goto-char (org-entry-end-position))
           (if (org-invisible-p)
               (message "Invisible area, not inserting link to extracted")
