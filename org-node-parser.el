@@ -473,8 +473,8 @@ findings to another temp file."
                   ;; Alright, so there was a planning-line, meaning any
                   ;; :PROPERTIES: are not on this line but the next.
                   (forward-line 1)
-                  (skip-chars-forward "\t\s")
                   (setq FAR (pos-eol)))
+                (skip-chars-forward "\t\s")
                 (setq PROPS
                       (if (looking-at-p ":properties:")
                           (progn
