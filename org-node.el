@@ -3099,7 +3099,8 @@ command, always prompt for confirmation.
 
 Argument INTERACTIVE automatically set."
   (interactive "p" org-mode)
-  (let ((path buffer-file-truename)
+  ;; Apparently the variable `buffer-file-truename' returns an abbreviated path
+  (let ((path (file-truename buffer-file-name))
         (buf (current-buffer))
         (title nil))
     (cond
