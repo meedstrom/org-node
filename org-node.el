@@ -195,6 +195,9 @@ need other changes to support TRAMP and encryption."
                   (function-item tramp-file-name-handler)
                   (function-item tramp-completion-file-name-handler)
                   (function-item tramp-archive-file-name-handler)
+                  ;; TODO: Maybe force-load Tramp if the above three is in
+                  ;;       this list
+                  (function-item tramp-archive-autoload-file-name-handler)
                   (function-item file-name-non-special))))
 
 (defun org-node--set-and-remind-reset (sym val)
@@ -1010,6 +1013,29 @@ opportunistically compile it and return the newly compiled file instead."
           ;; cannot assume the source .el is equivalent code.
           (loaded))))
 
+(defun org-node--make-plain-re (link-types)
+  "Build a moral equivalent of `org-link-plain-re'.
+Make it target only LINK-TYPES instead of all the cars of
+`org-link-parameters'."
+  ;; Copied from `org-link-make-regexps'
+  (let* ((non-space-bracket "[^][ \t\n()<>]")
+         (parenthesis
+	  `(seq (any "<([")
+		(0+ (or (regex ,non-space-bracket)
+			(seq (any "<([")
+			     (0+ (regex ,non-space-bracket))
+			     (any "])>"))))
+		(any "])>"))))
+    (rx-to-string
+     `(seq word-start
+	   (regexp ,(regexp-opt link-types t))
+	   ":"
+           (group
+	    (1+ (or (regex ,non-space-bracket)
+		    ,parenthesis))
+	    (or (regexp "[^[:punct:][:space:]\n]")
+                ?- ?/ ,parenthesis))))))
+
 (defvar org-node--debug nil)
 (defun org-node--scan (files finalizer)
   "Begin async scanning FILES for id-nodes and links.
@@ -1053,25 +1079,7 @@ function to update current tables."
       (let ((standard-output (current-buffer))
             (print-length nil)
             (print-level nil)
-            (reduced-plain-re
-             ;; Copied from `org-link-make-regexps'
-             (let* ((non-space-bracket "[^][ \t\n()<>]")
-                    (parenthesis
-		     `(seq (any "<([")
-		           (0+ (or (regex ,non-space-bracket)
-			           (seq (any "<([")
-				        (0+ (regex ,non-space-bracket))
-				        (any "])>"))))
-		           (any "])>"))))
-	       (rx-to-string
-	        `(seq word-start
-		      (regexp ,(regexp-opt org-node-link-types t))
-		      ":"
-                      (group
-		       (1+ (or (regex ,non-space-bracket)
-			       ,parenthesis))
-		       (or (regexp "[^[:punct:][:space:]\n]")
-                           ?- ?/ ,parenthesis)))))))
+            (reduced-plain-re (org-node--make-plain-re org-node-link-types)))
         (prin1
          ;; NOTE The $sigils in the names are to visually distinguish these
          ;;      "external" variables in the body of
@@ -1087,9 +1095,9 @@ function to update current tables."
              . ,(rx bol (* space)
                     (or "#+todo: " "#+seq_todo: " "#+typ_todo: ")))
             ($file-name-handler-alist
-             . ,(cl-remove-if-not
-                 (##memq (cdr %) org-node-perf-keep-file-name-handlers)
-                 file-name-handler-alist))
+             . ,(cl-remove-if-not (##memq % org-node-perf-keep-file-name-handlers)
+                                  file-name-handler-alist
+                                  :key #'cdr))
             ($global-todo-re
              . ,(if (stringp (car org-todo-keywords))
                     (org-node--die "Quit because `org-todo-keywords' is configured with obsolete syntax, please fix")
