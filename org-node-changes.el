@@ -66,7 +66,13 @@ value."
                             org-node--file<>previews)
                do (let ((file (org-node-changes--guess-persist-filename sym)))
                     (when (file-exists-p file)
-                      (delete-file file)))))))
+                      (delete-file file)))))
+    ;; 2024-10-18
+    (with-eval-after-load 'org-roam-id
+      (when (eq (org-link-get-parameter "id" :follow) 'org-roam-id-open)
+        (message "%s" "Note: org-roam overrides ID-link behavior, you may want to revert to vanilla Org by evalling:
+    (org-link-set-parameters
+     \"id\" :follow #'org-id-open :store #'org-id-store-link-maybe)")))))
 
 (defun org-node-changes--guess-persist-filename (sym)
   (let ((dir (or (get sym 'persist-location)

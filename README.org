@@ -181,6 +181,19 @@ Example setting:
 
 Do a =M-x org-node-reset= and see if it can find your notes now.
 
+**** Undoing a Roam hack
+
+If you have org-roam loaded, opening a link can sometimes send you to an outdated file path due to [[https://github.com/org-roam/org-roam/blob/2a630476b3d49d7106f582e7f62b515c62430714/org-roam-id.el#L91][a line in org-roam-id.el]] that causes org-id to /preferentially/ look up the org-roam DB instead of org-id's own table!
+
+Either revert that with the following snippet, or simply delete the "~/.emacs.d/org-roam.db" file if [[https://github.com/meedstrom/org-node-fakeroam][Fakeroam]] can cover your needs.
+
+#+begin_src elisp
+;; Undo a Roam override
+(with-eval-after-load 'org-roam-id
+  (org-link-set-parameters
+   "id" :follow #'org-id-open :store #'org-id-store-link-maybe))
+#+end_src
+
 ** Org-capture
 
 You may have heard that org-roam has its own special set of capture templates: the =org-roam-capture-templates=.

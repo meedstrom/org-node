@@ -425,6 +425,23 @@ Example setting:
 
 Do a @samp{M-x org-node-reset} and see if it can find your notes now.
 
+@enumerate
+@item
+@anchor{Undoing a Roam hack}Undoing a Roam hack
+
+
+If you have org-roam loaded, opening a link can sometimes send you to an outdated file path due to @uref{https://github.com/org-roam/org-roam/blob/2a630476b3d49d7106f582e7f62b515c62430714/org-roam-id.el#L91, a line in org-roam-id.el} that causes org-id to @emph{preferentially} look up the org-roam DB instead of its own table(!).
+
+Either revert that with the following snippet, or simply delete the "~/.emacs.d/org-roam.db" file if @uref{https://github.com/meedstrom/org-node-fakeroam, Fakeroam} can cover your needs.
+
+@lisp
+;; Undo a Roam override
+(with-eval-after-load 'org-roam-id
+  (org-link-set-parameters
+   "id" :follow #'org-id-open :store #'org-id-store-link-maybe))
+@end lisp
+@end enumerate
+
 @node Org-capture
 @section Org-capture
 
