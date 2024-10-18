@@ -974,37 +974,41 @@ the first time."
                    "1")))))
        1))
 
-;; TODO: Maybe check if the running org-node is actually an outdated elc
-(defun org-node--ensure-compiled-lib (lib-basename)
-  "Return path to freshly compiled version of LIB-BASENAME.
-Recompile if needed, in case the user\\='s package manager
-didn\\='t do so already, or local changes have been made."
-  (let* ((file-name-handler-alist nil)
-         (el (locate-library (concat lib-basename ".el")))
-         (elc (locate-library (concat lib-basename ".elc")))
-         (eln (when (and (native-comp-available-p)
-                         ;; If the running version of org-node is actually an
-                         ;; outdated elc, we should likewise use the outdated
-                         ;; elc version of the parser rather than compile new
-                         (if (and elc load-prefer-newer)
-                             (file-newer-than-file-p el elc)
-                           t))
-                (comp-el-to-eln-filename el))))
-    (if (and eln (file-newer-than-file-p eln el))
-        ;; The .eln is fresh, use it.  We know this even on Nix/Guix with their
-        ;; 1970 timestamps, because `comp-el-to-eln-filename' hashes the
-        ;; content of the source file.
-        eln
-      ;; Use an .elc this time, as it compiles much faster
-      (when eln (native-compile-async (list el)))
-      (let ((elc (locate-library (concat lib-basename ".elc"))))
-        (unless (and elc (file-newer-than-file-p elc el))
-          (unless (file-writable-p elc)
-            (setq elc (org-node-parser--tmpfile (concat lib-basename ".elc"))))
-          (unless (file-newer-than-file-p elc el)
-            (let ((byte-compile-dest-file-function `(lambda (&rest _) ,elc)))
-              (byte-compile-file el))))
-        elc))))
+(defun org-node--ensure-compiled-lib ()
+  "Return full path to org-node-parser.el, .elc or .eln.
+
+Guess which one of those three was in fact loaded by the current Emacs,
+and return it if it is .elc or .eln.  If it is .el, then
+opportunistically compile it and return the newly compiled file instead."
+  (let* ((file-name-handler-alist nil) ;; perf
+         (loaded (or (ignore-errors
+                       (symbol-file 'org-node-parser--collect-dangerously nil t))
+                     (symbol-file 'org-node-parser--collect-dangerously))))
+    (cond ((not loaded)
+           (error "%s" "Need file org-node-parser[.el/.elc/.eln] in load-path with code that matches current Lisp definitions"))
+          ((string-suffix-p ".el" loaded)
+           (or (when (native-comp-available-p)
+                 ;; If we built an .eln last time, use it now even though
+                 ;; the current Emacs process is still running interpreted .el.
+                 (comp-lookup-eln loaded))
+               (let* ((elc (org-node-parser--tmpfile "org-node-parser.elc"))
+                      (byte-compile-dest-file-function
+                       `(lambda (&rest _) ,elc)))
+                 (when (native-comp-available-p)
+                   (native-compile-async (list loaded)))
+                 ;; Native comp may take a while, so return elc this time
+                 (if (or (file-newer-than-file-p elc loaded)
+                         (byte-compile-file loaded))
+                     ;; NOTE: On Guix we should never end up here, but if we
+                     ;;       do, that'd be a problem as Guix will probably
+                     ;;       reuse the first .elc we ever made forever
+                     elc
+                   loaded))))
+          ;; Either .eln or .elc was loaded, so use the same for the
+          ;; subprocesses.  We should not opportunistically build an .eln if
+          ;; Emacs had loaded an .elc for the current process, because we
+          ;; cannot assume the source .el is equivalent code.
+          (loaded))))
 
 (defvar org-node--debug nil)
 (defun org-node--scan (files finalizer)
@@ -1016,22 +1020,23 @@ When finished, pass a list of scan results to the FINALIZER
 function to update current tables."
   (when (= 0 org-node-perf-max-jobs)
     (setq org-node-perf-max-jobs (org-node--count-logical-cores)))
-  ;; Attempt to restrict access to the work files.  Will matter more if we
-  ;; extend this package to read encrypted files, although then the real
+  ;; Create our /tmp subdir, and attempt to restrict access.  Will matter more
+  ;; if we extend this package to read encrypted files, although then the real
   ;; solution is probably to reuse the encryption method and never write
-  ;; plaintext to disk, or else return results through IPC like async.el, but
-  ;; that was slow the last time I tried it.
-  (let* ((file-name-handler-alist nil)
-         (tmpdir (org-node-parser--tmpfile)))
+  ;; plaintext to disk, or else return results through IPC like async.el does,
+  ;; but that was slow the last time I tried it.
+  ;;
+  ;; (Maybe it wasn't slow due to sending megabytes of data, but due to running
+  ;;  uncompiled lambdas?  TODO: Try again.)
+  (let ((file-name-handler-alist nil)
+        (tmpdir (org-node-parser--tmpfile)))
     (if (file-exists-p tmpdir)
-        (unless (file-writable-p tmpdir)
+        (unless (file-accessible-directory-p tmpdir)
           (error "Directory seems to have been created by a different user: %s"
                  tmpdir))
       (mkdir tmpdir)
       (chmod tmpdir (file-modes-symbolic-to-number "u+rwx" 0))))
-  ;; FIXME: When working on a checked-out repo, the developer has to paste the
-  ;;        checked-out library path here, else it just looks in load-path.
-  (let ((compiled-lib (org-node--ensure-compiled-lib "org-node-parser"))
+  (let ((compiled-lib (org-node--ensure-compiled-lib))
         (file-name-handler-alist nil)
         (coding-system-for-read org-node-perf-assume-coding-system)
         (coding-system-for-write org-node-perf-assume-coding-system))
@@ -1163,7 +1168,7 @@ function to update current tables."
                  :stderr (get-buffer-create org-node--stderr-name)
                  :command
                  ;; Ensure the children run the same binary executable as
-                 ;; current Emacs, so the compiled-lib fits
+                 ;; current Emacs, so the `compiled-lib' bytecode fits
                  (list (file-name-concat invocation-directory invocation-name)
                        "--quick"
                        "--batch"

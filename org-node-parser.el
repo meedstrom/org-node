@@ -20,8 +20,10 @@
 ;; This file is worker code meant for child processes.  It should load no
 ;; libraries at runtime.
 
-;; The child processes are expected to load this, execute
-;; `org-node-parser--collect-dangerously' once, and die.
+;; The child processes are expected to load this file, execute
+;; `org-node-parser--collect-dangerously', then die.
+
+;; NOTE: While developing, use eval-buffer instead of specific defuns.
 
 ;;; Code:
 
