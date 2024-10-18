@@ -126,7 +126,7 @@ If you were the sort of person to prefer ID-links over file links or any other t
 
 My life can be divided into two periods "@strong{before org-roam}" and "@strong{after org-roam}".  I crossed a kind of gap once I got a good way to link between my notes.  It's odd to remember when I just relied on browsing subtrees and the filesystem -- what a strange way to work!
 
-I used to lose track of things I had written, under some forgotten heading in a forgotten file in a forgotten directory.  The org-roam method let me @strong{find} and @strong{build on} my own work, instead of @uref{https://en.wikipedia.org/wiki/Cryptomnesia, recreating my work all the time}.
+I used to lose track of things I had written, under some forgotten heading in a forgotten file in a forgotten directory.  The org-roam method let me @strong{find} and @strong{build on} my own work, instead of @uref{https://en.wikipedia.org/wiki/Cryptomnesia, recreating it all the time}.
 
 At the core, all the "notetaking packages" (@uref{https://github.com/rtrppl/orgrr, orgrr}/@uref{https://github.com/localauthor/zk, zk}/@uref{https://github.com/EFLS/zetteldeft, zetteldeft}/@uref{https://github.com/org-roam/org-roam, org-roam}/@uref{https://github.com/protesilaos/denote, denote}/@uref{https://github.com/kaorahi/howm, howm}/@uref{https://github.com/kisaragi-hiu/minaduki, minaduki}/@dots{}) try to help you with this: make it easy to link between notes and explore them.
 
@@ -813,7 +813,7 @@ API cheatsheet between org-roam and org-node.
 @tab @samp{(org-node-get-pos NODE)}
 @item Get properties
 @tab @samp{(org-roam-node-properties NODE)}
-@tab @samp{(org-node-get-properties NODE)}, no inheritance
+@tab @samp{(org-node-get-properties NODE)}, only includes explicit properties
 @item Get subtree TODO state
 @tab @samp{(org-roam-node-todo NODE)}
 @tab @samp{(org-node-get-todo NODE)}

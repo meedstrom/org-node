@@ -587,10 +587,11 @@ as from which ID-node the link originates.  See
 ;; `org-node-fakeroam-db-feed-mode'.  However, it has many conceivable
 ;; downstream or future applications.
 (defvar org-node--file<>mtime.elapsed (make-hash-table :test #'equal)
-  "1:1 table mapping files to values (MTIME . ELAPSED).
-MTIME is the file\\='s last-modification time \(as an integer)
-and ELAPSED how long it took to scan the file last time \(as a
-float).")
+  "1:1 table mapping file paths to values (MTIME . ELAPSED).
+
+MTIME is the file\\='s last-modification time \(as an integer Unix
+epoch) and ELAPSED how long it took to scan the file last time \(as a
+float, usually a tiny fraction of a second).")
 
 (defun org-node-get-id-links-to (node)
   "Get list of ID-link objects pointing to NODE.
@@ -808,10 +809,10 @@ SYNCHRONOUS t, unless SYNCHRONOUS is the symbol `must-async'."
       (funcall (timer--function org-node--retry-timer))
       (mapc #'accept-process-output org-node--processes))))
 
-;; BUG: A heisenbug lurks in (or is revealed by) org-id.
+;; BUG: A heisenbug lurks inside (or is revealed by) org-id.
 ;; https://emacs.stackexchange.com/questions/81794/
 ;; When it appears, backtrace will show this, which makes no sense -- it's
-;; CLEARLY called on a list:
+;; clearly called on a list:
 ;;     Debugger entered--Lisp error: (wrong-type-argument listp #<hash-table equal 3142/5277) 0x190d581ba129>
 ;;       org-id-alist-to-hash((("/home/kept/roam/semantic-tabs-in-2024.org" "f21c984c-13f3-428c-8223-0dc1a2a694df") ("/home/kept/roam/semicolons-make-javascript-h..." "b40a0757-bff4-4188-b212-e17e3fc54e13") ...))
 ;;       org-node--init-ids()
@@ -824,12 +825,12 @@ In broad strokes:
 - Ensure `org-id-locations' is a hash table and not an alist.
 - Throw error if `org-id-locations' is still empty after this,
   unless `org-node-extra-id-dirs' has members.
-- Wipe `org-id-locations' if it appears afflicted by a bug that
-  makes the symbol value an indeterminate superposition of one of
-  two possible values \(a hash table or an alist) depending on
-  which code accesses it -- like Schrödinger\\='s cat -- and tell
-  the user to rebuild the value, since even org-id\\='s internal
-  functions are unable to fix it."
+- Wipe `org-id-locations' if it appears afflicted by a known bug that
+  makes the symbol value an indeterminate superposition of one of two
+  possible values \(a hash table or an alist) depending on which code
+  accesses it -- like Schrödinger\\='s cat -- and tell the user to
+  rebuild the value, since even org-id\\='s internal functions are
+  unable to fix it."
   (require 'org-id)
   (when (not org-id-track-globally)
     (user-error "Org-node requires `org-id-track-globally'"))
@@ -850,9 +851,10 @@ In broad strokes:
                  (null org-node-extra-id-dirs))
         (org-node--die
          (concat
-          "No org-ids found.  If this was unexpected, try `org-id-update-id-locations' or `org-roam-update-org-id-locations'."
-          "\nIf this is your first time with org-id, first assign an org-id to some random heading"
-          "\n with `org-id-get-create', then do `org-node-reset' and it should work from then on."))))))
+          "No org-ids found.  If this was unexpected, try M-x `org-id-update-id-locations' or M-x `org-roam-update-org-id-locations'.
+\tIf this is your first time using org-id, first assign an ID to some
+\trandom heading with M-x `org-id-get-create', so that at least one exists
+\ton disk, then do M-x `org-node-reset' and it should work from then on."))))))
 
 (define-advice org-id-locations-load
     (:after () org-node--abbrev-org-id-locations)
@@ -886,13 +888,17 @@ https://lists.gnu.org/archive/html/emacs-orgmode/2024-09/msg00305.html"
 ;; I'd like to remove this code, but complexity arises elsewhere if I do.
 ;; This makes things easy to reason about.
 (defun org-node--try-launch-scan (&optional files)
-  "Launch processes to scan FILES, or wait if processes active.
+  "Launch processes to scan FILES, or reschedule if processes active.
+The rescheduling tries again every second, until the active processes
+have finished, and then launches the new processes.
 
-This ensures that multiple calls occurring in a short time \(like
-when multiple files are being renamed) will be handled eventually
-and not dropped, making `org-node-rescan-functions' trustworthy.
+This ensures that multiple calls occurring in a short time \(like when
+multiple files are being renamed in Dired) will be handled eventually
+and not dropped, letting you trust that `org-node-rescan-functions' will
+in fact run for all affected files.
 
-If FILES is t, do a full reset of the cache."
+If FILES is t, do a full reset, scanning all files discovered by
+`org-node-list-files'."
   (if (eq t files)
       (setq org-node--full-scan-requested t)
     (setq org-node--file-queue
@@ -945,8 +951,8 @@ If left at 0, will be set at runtime to the result of
 `org-node--count-logical-cores'.
 
 Affects the speed of \\[org-node-reset], which mainly matters at
-the first-time init, since it may block Emacs while executing
-that same function."
+first-time init, since it may block Emacs while populating tables for
+the first time."
   :type 'natnum)
 
 (defun org-node--count-logical-cores ()
@@ -2093,8 +2099,8 @@ the function is called: `org-node-proposed-title' and
 
 (defun org-node-new-file ()
   "Create a file-level node.
-Meant to be called indirectly as `org-node-creation-fn', during
-which it gets some necessary variables."
+Meant to be called indirectly as `org-node-creation-fn', so that some
+necessary variables are set."
   (if (or (null org-node-proposed-title)
           (null org-node-proposed-id))
       (message "org-node-new-file is meant to be called indirectly")
@@ -2142,7 +2148,7 @@ possible workflow:
     capture into there.
 
 Additionally, with (setq org-node-creation-fn #\\='org-capture),
-commands like `org-node-find' will outsource to org-capture when you
+commands like `org-node-find' will outsource to `org-capture' when you
 type the name of a node that does not exist.  That enables this
 \"inverted\" workflow:
 
@@ -2284,7 +2290,7 @@ KEY, NAME and CAPTURE explained in `org-node-series-defs'."
     :try-goto (lambda (item)
                 (org-node-helper-try-goto-id (cdr item)))
     ;; NOTE: The sortstr should not necessarily become the title, but we make
-    ;;       it so anyway and the user can edit afterwards.
+    ;;       it so anyway, and the user can edit afterwards.
     ;; REVIEW: This should probably change, better to prompt for title.  But
     ;;         how?
     :creator (lambda (sortstr key)
@@ -2467,7 +2473,8 @@ variable that need not stay nil, see
 
 (defun org-node--add-series-item ()
   "Look at node near point to maybe add an item to a series.
-Only do something if `org-node-proposed-series-key' is non-nil."
+Only do something if `org-node-proposed-series-key' is non-nil
+currently."
   (when org-node-proposed-series-key
     (let* ((series (cdr (assoc org-node-proposed-series-key
                                org-node-built-series)))
@@ -3806,10 +3813,12 @@ In each file visited, the behavior is much like
 `org-node--with-quick-file-buffer'.
 
 The files need not be Org files, and if optional argument
-FUNDAMENTAL-MODE is t, visit the files in fundamental mode.
+FUNDAMENTAL-MODE is t, do not activate any major mode.
 
 If a buffer had already been visiting FILE, reuse that buffer.
-Naturally, FUNDAMENTAL-MODE has no effect in that case."
+Naturally, FUNDAMENTAL-MODE has no effect in that case.
+
+For explanation of TOO-MANY-FILES-HACK, see code comments."
   (declare (indent defun))
   (cl-assert (and msg files call about-to-do))
   (setq call (org-node--ensure-compiled call))
@@ -3842,8 +3851,10 @@ Naturally, FUNDAMENTAL-MODE has no effect in that case."
                 ;; them open during the loop despite killed buffers)
                 (garbage-collect)
                 (when too-many-files-hack
-                  ;; Sometimes necessary to drop the call stack to avoid the
-                  ;; too many files error, sometimes not.  Don't understand it.
+                  ;; Sometimes necessary to drop the call stack to actually
+                  ;; reap file handles, sometimes not.  Don't understand it.
+                  ;; E.g. `org-node-lint-all' does not seem to need this hack,
+                  ;; but `org-node-backlink-fix-all-files' does.
                   (signal 'org-node-must-retry nil)))
               (if interval
                   (when (zerop (% ctr interval))
@@ -3883,8 +3894,9 @@ Naturally, FUNDAMENTAL-MODE has no effect in that case."
                            :too-many-files-hack too-many-files-hack)
            ;; Because of the hack, the caller only receives `files*' once, and
            ;; each timer run after that won't modify
-           ;; `org-node-backlink--files-to-fix', so try as a nicety.  This
-           ;; works until the last iteration.
+           ;; `org-node-backlink--files-to-fix', so try to modify as a nicety.
+           ;; This works until the last iteration, because a cons cell cannot
+           ;; be destructively reassigned to nil.
            (setcar files (car files*))
            (setcdr files (cdr files*))
            files*)
@@ -3903,14 +3915,20 @@ Naturally, FUNDAMENTAL-MODE has no effect in that case."
              (message "%s... done" msg))
            nil))))))
 
+;; Somewhat faster than `find-file-noselect', not benchmarked.
+;; More importantly, the way it fails is better suited for loop usage, IMO.
+;; Also better for silent background usage.  The argument ABOUT-TO-DO clarifies
+;; what would otherwise be a mysterious error that's difficult for the user to
+;; track down to this package.
 (defun org-node--find-file-noselect (abbr-truename about-to-do)
   "Read file ABBR-TRUENAME into a buffer and return the buffer.
-If there's a problem such as an auto-save file being newer, query the
-user to proceed with string ABOUT-TO-DO, else return that string.  See
-`org-node--in-files-do'.
+If there's a problem such as an auto-save file being newer, prompt the
+user to proceed with a message based on string ABOUT-TO-DO, else do
+nothing and return nil.
 
 Very presumptive!  Like `find-file-noselect' but intended as a
-subroutine for a loop that has already ensured that ABBR-TRUENAME:
+subroutine for `org-node--in-files-do' or any program that has
+already ensured that ABBR-TRUENAME:
 
 - is an abbreviated file truename dissatisfying `backup-file-name-p'
 - is not being visited by any other buffer
@@ -3943,8 +3961,8 @@ subroutine for a loop that has already ensured that ABBR-TRUENAME:
                    (file-newer-than-file-p (or buffer-auto-save-file-name
 				               (make-auto-save-file-name))
 			                   buffer-file-name))
-              ;; Could try to call `recover-file' here, but have not checked
-              ;; that the result would be sane, so just bail
+              ;; Could try to call `recover-file' here, but I'm not sure the
+              ;; resulting behavior would be sane, so just bail
               (progn
                 (message "%s, but skipped because it has an auto-save file: %s"
                          about-to-do buffer-file-name)
@@ -3961,6 +3979,7 @@ subroutine for a loop that has already ensured that ABBR-TRUENAME:
 ;; REVIEW: Is this a sane logic for picking heading?  It does not mirror how
 ;;         org-set-tags-command picks heading to apply to, and maybe that is
 ;;         the behavior to model.
+;;         Maybe simplify it for v2.
 (defun org-node--call-at-nearest-node (function &rest args)
   "With point at the relevant heading, call FUNCTION with ARGS.
 
@@ -4021,7 +4040,7 @@ as \"%20\", wrap the value in quotes if it has spaces."
   (org-node--add-to-property-keep-space
    "ROAM_ALIASES" (string-trim (read-string "Alias: "))))
 
-;; FIXME: What if user yanks a [cite: ... ...]
+;; FIXME: What if user yanks a [cite:... ... ...]?
 (defun org-node-ref-add ()
   "Add to ROAM_REFS in nearest relevant property drawer.
 Wrap the value in double-brackets if necessary."

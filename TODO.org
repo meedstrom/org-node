@@ -4,6 +4,8 @@
 
 - [ ] Unify some subroutines for capture/refile/extract/insert/find
 
+- [ ] See comments at =org-node--call-at-nearest-node=
+
 - [ ] In 2025: drop Emacs 28
 
   Seems that Debian stable will be stuck on Emacs 28 until mid-2025,
@@ -21,19 +23,15 @@
 
 * Other
 
-- [ ] Accept an empty org-id-locations
-
-- [ ] Let org-node--goto respect save-place
-
 - [ ] Manage org-super-links drawers
 
 - [ ] org-node-series-dispatch: Free up keys "j" "n" "p", "c"
 
-- [ ] org-node-series-defs wrappers to:
+- [ ] More org-node-series-defs wrappers:
 
-  - [ ] Define a series as simply the files in a given subdirectory
+  - [ ] Define a series as simply the files in a subdirectory with a given name
 
-  - [ ] Define a series as the links in an ordered list in the body text of a node with a tag such as :series:
+  - [ ] Define a series from the links the body text of a single master node if that node has a tag such as :series:
 
 - [ ] A workflow to allow pseudo-untitled (numeric-titled) nodes
 
