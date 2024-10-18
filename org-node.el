@@ -862,6 +862,7 @@ In broad strokes:
 
 Due to an oversight, org-id does not abbreviate after reconstructing
 filenames if `org-id-locations-file-relative' is t.
+
 https://lists.gnu.org/archive/html/emacs-orgmode/2024-09/msg00305.html"
   (when org-id-locations-file-relative
     (maphash (lambda (id file)
@@ -913,10 +914,9 @@ If FILES is t, do a full reset, scanning all files discovered by
               ;; Timeout subprocess stuck in some infinite loop
               (progn
                 (setq org-node--wait-start nil)
-                (message
-                 "org-node: processes worked longer than 30 sec, killing")
-                (while-let ((old-process (pop org-node--processes)))
-                  (delete-process old-process)))
+                (message "org-node: Worked longer than 30 sec, killing")
+                (mapc #'delete-process org-node--processes)
+                (setq org-node--processes nil))
             (setq must-retry t)))
       ;; All clear, scan now
       (setq org-node--wait-start nil)
@@ -981,7 +981,14 @@ Recompile if needed, in case the user\\='s package manager
 didn\\='t do so already, or local changes have been made."
   (let* ((file-name-handler-alist nil)
          (el (locate-library (concat lib-basename ".el")))
-         (eln (when (native-comp-available-p)
+         (elc (locate-library (concat lib-basename ".elc")))
+         (eln (when (and (native-comp-available-p)
+                         ;; If the running version of org-node is actually an
+                         ;; outdated elc, we should likewise use the outdated
+                         ;; elc version of the parser rather than compile new
+                         (if (and elc load-prefer-newer)
+                             (file-newer-than-file-p el elc)
+                           t))
                 (comp-el-to-eln-filename el))))
     (if (and eln (file-newer-than-file-p eln el))
         ;; The .eln is fresh, use it.  We know this even on Nix/Guix with their
@@ -1516,7 +1523,7 @@ also necessary is `org-node--dirty-ensure-link-known' elsewhere."
           (re-search-forward (concat "^[[:space:]]*:id: +" id))
           (let ((props (org-entry-properties))
                 (heading (org-get-heading t t t t))
-                (fpath (abbreviate-file-name (file-truename buffer-file-name)))
+                (fpath buffer-file-truename) ;; Abbreviated
                 (ftitle (cadar (org-collect-keywords '("TITLE")))))
             (when heading
               (setq heading (substring-no-properties heading)))
@@ -2004,8 +2011,8 @@ You may also want to configure `org-node-datestamp-format'."
   (if node
       (let ((file (org-node-get-file-path node)))
         (if (backup-file-name-p file)
+            ;; Transitional; handle-save doesn't record backup files anymore
             (progn
-              ;; FIXME: How to prevent this from happening?
               (message "org-node: Somehow recorded backup file, resetting...")
               (org-node--purge-backup-file-names)
               (push (lambda ()
@@ -2019,14 +2026,17 @@ You may also want to configure `org-node-datestamp-format'."
                 (let ((pos (org-node-get-pos node)))
                   (find-file file)
                   (widen)
-                  ;; Move point to node heading, unless heading is already
-                  ;; inside visible part of buffer and point is at or under it
+                  ;; Now `save-place-find-file-hook' has potentially already
+                  ;; moved point, and that could be good enough.  So: move
+                  ;; point to node heading, unless heading is already inside
+                  ;; visible part of buffer and point is at or under it
                   (if (org-node-get-is-subtree node)
                       (progn
                         (unless (and (pos-visible-in-window-p pos)
                                      (not (org-invisible-p pos))
                                      (equal (org-node-get-title node)
                                             (org-get-heading t t t t)))
+
                           (goto-char pos)
                           (if (org-at-heading-p)
                               (org-show-entry)
@@ -2665,10 +2675,8 @@ DEF is a series-definition from `org-node-series-defs'."
 
 ;;;###autoload (autoload 'org-node-series-dispatch "org-node" nil t)
 (transient-define-prefix org-node-series-dispatch ()
-  :incompatible '(("d"))
   ["Series"
-   ("|" "Invisible" "Placeholder" :if-nil t)
-   ("d" "Dailies" "d")]
+   ("|" "Invisible" "Placeholder" :if-nil t)]
   ["Navigation"
    ("p" "Previous in series" org-node--series-goto-previous* :transient t)
    ("n" "Next in series" org-node--series-goto-next* :transient t)
@@ -2711,13 +2719,15 @@ Meant to sit on these hooks:
   (when org-node-series-that-marks-calendar
     (let* ((series (cdr (assoc org-node-series-that-marks-calendar
                                org-node-built-series)))
-           (dates (mapcar #'car (plist-get series :sorted-items)))
+           (sortstrs (mapcar #'car (plist-get series :sorted-items)))
            mdy)
-      (dolist (date dates)
-        (setq mdy (seq-let (_ _ _ d m y _ _ _) (org-parse-time-string date)
-                    (list m d y)))
-        (when (calendar-date-is-visible-p mdy)
-          (calendar-mark-visible-date mdy))))))
+      (dolist (date sortstrs)
+        (setq date (parse-time-string date))
+        (when (seq-find #'natnump date) ;; Basic check that it could be parsed
+          (setq mdy (seq-let (_ _ _ d m y _ _ _) date
+                      (list m d y)))
+          (when (calendar-date-is-visible-p mdy)
+            (calendar-mark-visible-date mdy)))))))
 
 
 ;;;; Commands
@@ -2964,14 +2974,16 @@ creation-date as more \"truthful\" than today\\='s date.
            (boundary (save-excursion
                        (org-end-of-meta-data t)
                        (point)))
+           (case-fold-search t)
            ;; Why is CATEGORY autocreated by `org-entry-properties'...  It's
            ;; an invisible property that's always present and usually not
            ;; interesting, unless user has entered some explicit value
            (explicit-category (save-excursion
                                 (when (search-forward ":category:" boundary t)
                                   (org-entry-get nil "CATEGORY"))))
-           (properties (seq-filter (##not (equal "CATEGORY" (car %)))
-                                   (org-entry-properties nil 'standard)))
+           (properties (seq-remove
+                        (##string-equal-ignore-case "CATEGORY" (car %))
+                        (org-entry-properties nil 'standard)))
            (path-to-write
             (file-name-concat
              dir (concat (format-time-string org-node-datestamp-format)
