@@ -34,6 +34,7 @@
   '()
   "Alist of deprecated symbol names and their new names.")
 
+(defvar org-node-changes--warned-roam-id nil)
 (defvar org-node-changes--warned-once nil)
 (defun org-node-changes--warn-and-copy ()
   "Maybe print one-shot warnings, then become a no-op.
@@ -66,13 +67,16 @@ value."
                             org-node--file<>previews)
                do (let ((file (org-node-changes--guess-persist-filename sym)))
                     (when (file-exists-p file)
-                      (delete-file file)))))
-    ;; 2024-10-18
-    (with-eval-after-load 'org-roam-id
-      (when (eq (org-link-get-parameter "id" :follow) 'org-roam-id-open)
-        (message "%s" "Note: org-roam overrides ID-link behavior, you may want to revert to vanilla Org by evalling:
+                      (delete-file file))))))
+  ;; 2024-10-18
+  (unless org-node-changes--warned-roam-id
+    (when (eq (org-link-get-parameter "id" :follow) 'org-roam-id-open)
+      (setq org-node-changes--warned-roam-id t)
+      (message
+       "%s" "Note: org-roam overrides ID-link behavior, you may want to
+      revert to vanilla by evalling:
     (org-link-set-parameters
-     \"id\" :follow #'org-id-open :store #'org-id-store-link-maybe)")))))
+     \"id\" :follow #'org-id-open :store #'org-id-store-link-maybe)"))))
 
 (defun org-node-changes--guess-persist-filename (sym)
   (let ((dir (or (get sym 'persist-location)
