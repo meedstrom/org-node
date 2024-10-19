@@ -3215,6 +3215,8 @@ Argument INTERACTIVE automatically set."
                   (if (org-at-heading-p) (org-show-entry) (org-show-context)))))
             (message "File %s renamed to %s" name new-name)))))))))
 
+;; FIXME: Kill opened buffers.  First make sure it can pick up where it left off.
+;;        Maybe use `org-node--in-files-do'.
 ;;;###autoload
 (defun org-node-rewrite-links-ask (&optional files)
   "Update desynced link descriptions, interactively.
@@ -3234,52 +3236,57 @@ so it matches the destination\\='s current title."
     "Face for use in `org-node-rewrite-links-ask'.")
   (org-node-cache-ensure)
   (when (org-node--consent-to-bothersome-modes-for-mass-edit)
-    (dolist (file (or files (org-node-list-files t)))
-      (with-current-buffer (find-file-noselect file)
-        (save-excursion
-          (without-restriction
-            (goto-char (point-min))
-            (while-let ((end (re-search-forward org-link-bracket-re nil t)))
-              (let* ((beg (match-beginning 0))
-                     (link (substring-no-properties (match-string 0)))
-                     (exact-link (rx (literal link)))
-                     (parts (split-string link "]\\["))
-                     (target (substring (car parts) 2))
-                     (desc (when (cadr parts)
-                             (substring (cadr parts) 0 -2)))
-                     (id (when (string-prefix-p "id:" target)
-                           (substring target 3)))
-                     (node (gethash id org-node--id<>node))
-                     (true-title (when node
-                                   (org-node-get-title node)))
-                     (answered-yes nil))
-                (when (and id node desc
-                           (not (string-equal-ignore-case desc true-title))
-                           (not (member-ignore-case
-                                 desc (org-node-get-aliases node))))
-                  (switch-to-buffer (current-buffer))
-                  (goto-char end)
-                  (if (org-at-heading-p)
-                      (org-show-entry)
-                    (org-show-context))
-                  (recenter)
-                  (highlight-regexp exact-link 'org-node--rewrite-face)
-                  (unwind-protect
-                      (setq answered-yes
-                            (y-or-n-p
-                             (format "Rewrite link? Will become:  \"%s\""
-                                     true-title)))
-                    (unhighlight-regexp exact-link))
-                  (when answered-yes
-                    (goto-char beg)
-                    (atomic-change-group
-                      (delete-region beg end)
-                      (insert (org-link-make-string target true-title)))
-                    ;; Give user a moment to glimpse the result before hopping
-                    ;; to the next link in case of a replacement gone wrong
-                    (redisplay)
-                    (sleep-for .15))
-                  (goto-char end))))))))))
+    (let ((n-links 0)
+          (n-files 0))
+      (dolist (file (or files (org-node-list-files t)))
+        (cl-incf n-files)
+        (with-current-buffer (delay-mode-hooks (find-file-noselect file))
+          (save-excursion
+            (without-restriction
+              (goto-char (point-min))
+              (while-let ((end (re-search-forward org-link-bracket-re nil t)))
+                (message "Checking... link %d (file #%d)"
+                         (cl-incf n-links) n-files)
+                (let* ((beg (match-beginning 0))
+                       (link (substring-no-properties (match-string 0)))
+                       (exact-link (rx (literal link)))
+                       (parts (split-string link "]\\["))
+                       (target (substring (car parts) 2))
+                       (desc (when (cadr parts)
+                               (substring (cadr parts) 0 -2)))
+                       (id (when (string-prefix-p "id:" target)
+                             (substring target 3)))
+                       (node (gethash id org-node--id<>node))
+                       (true-title (when node
+                                     (org-node-get-title node)))
+                       (answered-yes nil))
+                  (when (and id node desc
+                             (not (string-equal-ignore-case desc true-title))
+                             (not (member-ignore-case
+                                   desc (org-node-get-aliases node))))
+                    (switch-to-buffer (current-buffer))
+                    (goto-char end)
+                    (if (org-at-heading-p)
+                        (org-show-entry)
+                      (org-show-context))
+                    (recenter)
+                    (highlight-regexp exact-link 'org-node--rewrite-face)
+                    (unwind-protect
+                        (setq answered-yes
+                              (y-or-n-p
+                               (format "Rewrite link? Will become:  \"%s\""
+                                       true-title)))
+                      (unhighlight-regexp exact-link))
+                    (when answered-yes
+                      (goto-char beg)
+                      (atomic-change-group
+                        (delete-region beg end)
+                        (insert (org-link-make-string target true-title)))
+                      ;; Give user a moment to glimpse the result before hopping
+                      ;; to the next link in case of a replacement gone wrong
+                      (redisplay)
+                      (sleep-for .15))
+                    (goto-char end)))))))))))
 
 ;;;###autoload
 (defun org-node-rename-asset-and-rewrite-links ()
