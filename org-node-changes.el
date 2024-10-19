@@ -29,6 +29,7 @@
 
 (require 'seq)
 (require 'cl-lib)
+(require 'ol)
 
 (defvar org-node-changes--new-names
   '()
@@ -75,8 +76,8 @@ value."
       (message
        "%s" "Note: org-roam overrides ID-link behavior, you may want to
       revert to vanilla by evalling:
-    (org-link-set-parameters
-     \"id\" :follow #'org-id-open :store #'org-id-store-link-maybe)"))))
+      (org-link-set-parameters
+       \"id\" :follow #'org-id-open :store #'org-id-store-link-maybe)"))))
 
 (defun org-node-changes--guess-persist-filename (sym)
   (let ((dir (or (get sym 'persist-location)

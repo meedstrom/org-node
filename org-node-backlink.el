@@ -396,18 +396,23 @@ it in the nearby :BACKLINKS: property."
 
 (defcustom org-node-backlink-aggressive nil
   "On save, detect links added/deleted and fix backlinks.
-Normally, only links added via a link-insertion command will generate a
+
+Normally, links added via a link-insertion command will also insert a
 backlink in real time, but stale backlinks are not cleaned until you
-carry out some edits under the heading that has the stale backlinks and
+carry out some edits under the heading that has the stale backlink and
 save that buffer.
+
+When t, all affected nodes will be visited silently to update the
+:BACKLINKS: properties.
 
 To clarify, this is about the textual contents of :BACKLINKS: properties;
 the underlying link tables are up to date anyway.  This defaults to
 nil to avoid unnecessary file visitations.
 
-If t, `org-node-perf-eagerly-update-link-tables' must be t as well.
+If t, `org-node-perf-eagerly-update-link-tables' must be t as well
+\(default).  These two options may be merged in the future.
 
-Side effect: the org-element cache gets reset in the buffers
+Minor side effect: `org-element-cache-reset' is called in the buffers
 where backlinks are fixed."
   :group 'org-node
   :type 'boolean)

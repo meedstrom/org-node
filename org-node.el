@@ -266,21 +266,24 @@ prove useful later on, e.g. when publishing to a blog."
 (defcustom org-node-extra-id-dirs nil
   "Directories in which to search Org files for IDs.
 
-Unlike variable `org-id-extra-files', accept directories.  Unlike
-variable `org-agenda-files', directories are checked again over
-time in order to find new files that have appeared.
+Essentially like variable `org-id-extra-files', but take directories.
 
-These directories are only checked as long as
-`org-node-cache-mode' is active.  They are checked
-recursively (looking in subdirectories, sub-subdirectories etc).
+You could already do this by adding directories to `org-agenda-files',
+but that only checks the directories once.  This variable causes the
+directories to be checked again over time in order to find new files
+that have appeared, e.g. files moved by terminal commands or created by
+other instances of Emacs.
 
-EXCEPTION: Subdirectories that start with a dot, such as
-\".emacs.d/\", are not checked.  To check these, add them
-explicitly.
+These directories are only checked as long as `org-node-cache-mode' is
+active.  They are checked recursively (looking in subdirectories,
+sub-subdirectories etc).
 
-To avoid accidentally picking up duplicate files such as
-versioned backups, causing org-id to complain about duplicate
-IDs, configure `org-node-extra-id-dirs-exclude'."
+EXCEPTION: Subdirectories that start with a dot, such as \".emacs.d/\",
+are not checked.  To check these, add them explicitly.
+
+To avoid accidentally picking up duplicate files such as versioned
+backups, causing org-id to complain about duplicate IDs, configure
+`org-node-extra-id-dirs-exclude'."
   :type '(repeat directory)
   :set #'org-node--set-and-remind-reset)
 
@@ -320,17 +323,18 @@ period are always ignored, so no need to specify e.g. \"~/.local/\" or
 (defcustom org-node-alter-candidates nil
   "Whether to alter completion candidates instead of affixating.
 
-This means that org-node will concatenate the result of
-`org-node-affixation-fn' into a single string, so what the
-user types in the minibuffer can match against the prefix and
-suffix as well as against the node title.
+This means that org-node will concatenate the results of
+`org-node-affixation-fn' into a single string, so what the user types in
+the minibuffer can match against the prefix and suffix as well as
+against the node title.
 
-In other words: with the default `org-node-affixation-fn', you
-can match against the node's outline path.
+In other words: you can match against the node's outline path, at least
+so long as `org-node-affixation-fn' is set to `org-node-prefix-with-olp'
+\(default).
 
-\(Tip: users of the orderless library on versions from 2024-07-11
-can match the prefix and suffix via `orderless-annotation',
-without need for this setting.)
+\(Tip: users of the orderless library from July 2024 do not need this
+setting, they can match the prefix and suffix via
+`orderless-annotation', bound to the character \& by default.)
 
 Another consequence is it lifts the uniqueness constraint on note
 titles: you\\='ll be able to have two headings with the same name so
@@ -426,16 +430,16 @@ For use as `org-node-affixation-fn'."
   "1:1 table mapping titles or aliases to affixation triplets.")
 
 (defun org-node--affixate-collection (coll)
-  "Take COLL and return precomputed affixations for each member."
+  "From list COLL, make an alist of affixated members."
   (cl-loop for title in coll
            collect (gethash title org-node--title<>affixation-triplet)))
 
-;; TODO: Assign a category 'org-node, then add an embark action to embark
+;; TODO: Assign a category `org-node', then add an embark action to embark?
 ;; TODO: Bind a custom exporter to `embark-export'
 (defun org-node-collection (str pred action)
   "Custom COLLECTION for `completing-read'.
 
-Ahead of time, org-node takes titles/aliases from
+Ahead of time, org-node takes titles and aliases from
 `org-node--title<>id', runs `org-node-affixation-fn' on each, and
 depending on the user option `org-node-alter-candidates' it
 either saves the affixed thing directly into
@@ -477,57 +481,54 @@ For each slot, there exists a getter function
 For example, the field \"deadline\" has a getter
 `org-node-get-deadline'.  So you would type
 \"(org-node-get-deadline NODE)\", where NODE is one of the
-elements of the `hash-table-values' of `org-node--id<>node'.
+elements of \"(hash-table-values org-node--id<>node)\".
 
 For real-world usage of these getters, see examples in the
-documentation of `org-node-filter-fn' or the package README.
-
-You may be able to find the README by typing:
-
-    M-x find-library RET org-node RET
-
-or you can visit the homepage:
-
-    https://github.com/meedstrom/org-node"
+documentation of `org-node-filter-fn' or Info node `(org-node)'."
   (aliases    nil :read-only t :type list :documentation
-              "Returns list of ROAM_ALIASES registered on the node.")
+              "Return list of ROAM_ALIASES registered on the node.")
   (deadline   nil :read-only t :type string :documentation
-              "Returns node's DEADLINE state.")
+              "Return node's DEADLINE state.")
   (file-path  nil :read-only t :type string :documentation
-              "Returns node's full file path.")
+              "Return node's full file path.")
   (file-title nil :read-only t :type string :documentation
-              "Returns the #+title of the file where this node is. May be nil.")
+              "Return the #+title of the file where this node is. May be nil.")
   (id         nil :read-only t :type string :documentation
-              "Returns node's ID property.")
+              "Return node's ID property.")
   (level      nil :read-only t :type integer :documentation
-              "Returns number of stars in the node heading. File-level node always 0.")
+              "Return number of stars in the node heading. File-level node always 0.")
   (olp        nil :read-only t :type list :documentation
-              "Returns list of ancestor headings to this node.")
+              "Return list of ancestor headings to this node.")
   (pos        nil :read-only t :type integer :documentation
-              "Returns char position of the node. File-level node always 1.")
+              "Return char position of the node. File-level node always 1.")
   (priority   nil :read-only t :type string :documentation
-              "Returns priority such as [#A], as a string.")
+              "Return priority such as [#A], as a string.")
   (properties nil :read-only t :type alist :documentation
-              "Returns alist of properties from the :PROPERTIES: drawer.")
+              "Return alist of properties from the :PROPERTIES: drawer.")
   (refs       nil :read-only t :type list :documentation
-              "Returns list of ROAM_REFS registered on the node.")
+              "Return list of ROAM_REFS registered on the node.")
   (scheduled  nil :read-only t :type string :documentation
-              "Returns node's SCHEDULED state.")
+              "Return node's SCHEDULED state.")
   (tags       nil :read-only t :type list :documentation
-              "Returns list of tags local to the node.")
+              "Return list of tags local to the node.")
+  ;; REVIEW: Maybe this can be a function that combines tags with a new field
+  ;;         called inherited-tags.  That might cause slowdowns
+  ;;         though due to consing on every call.
   (tags-with-inheritance  nil :read-only t :type list :documentation
-                          "List of tags, including tags inherited.")
+                          "Return list of tags, including inherited tags.")
   (title      nil :read-only t :type string :documentation
-              "Returns the node's heading, or #+title if it is not a subtree.")
+              "Return the node's heading, or #+title if it is not a subtree.")
   (todo       nil :read-only t :type string :documentation
-              "Returns node's TODO state."))
+              "Return node's TODO state."))
 
-;; Used to be in the struct
+;; Used to be part of the struct
 (defun org-node-get-file-title-or-basename (node)
+  "Return either the #+title of file where NODE is, or bare file name."
   (or (org-node-get-file-title node)
       (file-name-nondirectory (org-node-get-file-path node))))
 
 (defun org-node-get-is-subtree (node)
+  "Return t if NODE is a subtree instead of a file."
   (> (org-node-get-level node) 0))
 
 ;; It's safe to alias an accessor, because they are all read only
@@ -730,12 +731,13 @@ If not running, start it."
       (setq org-node--idle-timer
             (run-with-idle-timer new-delay t #'org-node--scan-all)))))
 
-;; FIXME: The idle timer will detect new files appearing, but won't run the
-;;        hook `org-node-rescan-functions' on them, which would be good to do.
-;;        So check for new files and then try to use --scan-targeted, since
-;;        that runs the hook, but it is easy to imagine a pitfall where the
-;;        list of new files is just all files, and then we do not want to run
-;;        the hook.  So use a heuristic cutoff like 10 files.
+;; FIXME: The idle timer will detect new files appearing, created by other
+;;        emacsen, but won't run the hook `org-node-rescan-functions' on them,
+;;        which would be good to do.  So check for new files and then try to
+;;        use `org-node--scan-targeted', since that runs the hook, but it is
+;;        easy to imagine a pitfall where the list of new files is just all
+;;        files, and then we do NOT want to run the hook.  So use a heuristic
+;;        cutoff like 10 files.
 ;; (defun org-node--catch-unknown-modifications ()
 ;;   (let ((new (-difference (org-node-list-files) (org-node-list-files t)))))
 ;;   (if (> 10 )
