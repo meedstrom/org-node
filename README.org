@@ -25,15 +25,15 @@ I like [[https://github.com/org-roam/org-roam][org-roam]] but found it too slow,
 
   In pursuit of being "just org-id", this package has no equivalent setting to =org-roam-directory= -- it just looks up =org-id-locations=.
 
-- *If you were not using org-roam*, maybe think of it as somewhat like [[https://github.com/alphapapa/org-recent-headings][org-recent-headings]] beefed-up to the extent that you won't need other methods of browsing.
+- *If you were not using org-roam*, maybe think of it as somewhat like [[https://github.com/alphapapa/org-recent-headings][org-recent-headings]] beefed-up to the extent that you won't need other methods of browsing, as long as you give IDs to all objects of interest.
 
   If you were the sort of person to prefer ID-links over file links or any other type of link, you're in the right place!  Now you can rely on IDs, and---if you want---stop worrying about filenames, directories and subtree hierarchies.  As long as you've assigned an ID to a heading or file, you can find it later.
 
 ** What's a "node"?
 
-My life can be divided into two periods "*before org-roam*" and "*after org-roam*".  I crossed a kind of gap once I got a good way to link between my notes.  It's odd to remember when I just relied on browsing subtrees and the filesystem -- what a strange way to work!
+My life can be divided into two periods "*before org-roam*" and "*after org-roam*".  I crossed a kind of gap once I got a good way to link between my notes.  It's odd to remember when I just relied on browsing subtrees and filesystem directories -- what a strange way to work!
 
-I used to lose track of things I had written, under some forgotten heading in a forgotten file in a forgotten directory.  The org-roam method let me *find* and *build on* my own work, instead of [[https://en.wikipedia.org/wiki/Cryptomnesia][recreating it all the time]].
+I used to lose track of things I had written, under some forgotten heading in a forgotten file in a forgotten directory.  The org-roam method let me *find and build on* my own work, instead of [[https://en.wikipedia.org/wiki/Cryptomnesia][recreating it all the time]].
 
 At the core, all the "notetaking packages" ([[https://github.com/rtrppl/orgrr][orgrr]]/[[https://github.com/localauthor/zk][zk]]/[[https://github.com/EFLS/zetteldeft][zetteldeft]]/[[https://github.com/org-roam/org-roam][org-roam]]/[[https://github.com/protesilaos/denote][denote]]/[[https://github.com/kaorahi/howm][howm]]/[[https://github.com/kisaragi-hiu/minaduki][minaduki]]/...) try to help you with this: make it easy to link between notes and explore them.
 
@@ -110,7 +110,7 @@ Both are recent additions to MELPA, so you may have to refresh the recipe list f
 
 ** Quick start
 
-If you're new to these concepts, fear not.  The main things for day-to-day operation are two verbs: "find" and "link".
+If you're new to these concepts, fear not.  The main things for day-to-day operation are two verbs: "find" and "insert".
 
 Pick some short keys and try them out.
 
@@ -121,7 +121,7 @@ Pick some short keys and try them out.
 
 To browse config options, type =M-x customize-group RET org-node RET=.
 
-Final tip: there's *no separate command* for creating a new node!  Reuse one of the commands above, then type the name of a node that doesn't exist.  Try it and see what happens!
+Final tip: there's *no separate command* for creating a new node!  Reuse one of the commands above, and type the name of a node that doesn't exist.  Try it and see what happens!
 
 * Backlinks
 ** What are backlinks?
@@ -130,7 +130,18 @@ Backlinks are the butter on the bread of your notes.  If you've ever seen a "Wha
 ** Backlink solution 1: Borrow org-roam's backlink buffer
 As a Roam user, you can keep using =M-x org-roam-buffer-toggle=.
 
-If it has been slow, or saving files has been slow, [[https://github.com/meedstrom/org-node-fakeroam][org-node-fakeroam]] gives you some new ways to keep Roam's DB data fresh, circumventing Roam's "autosync mode".
+TIP: If it has been slow, or saving files has been slow, [[https://github.com/meedstrom/org-node-fakeroam][org-node-fakeroam]] gives you ways to speed it up.
+
+TIP: If you have not done so yet, I recommend binding some short key sequences.  I spent many months waffling on where to bind them, so here's an example:
+
+#+begin_src elisp
+;; Either this...
+(keymap-set org-mode-map "M-s M-r" #'org-roam-buffer-toggle)
+(keymap-set global-map "M-s M-d" #'org-roam-buffer-display-dedicated)
+
+;; ...or just this for a different behavior
+(keymap-set global-map "M-s M-r" #'org-node-fakeroam-show-roam-buffer)
+#+end_src
 
 ** Backlink solution 2: Print inside the file
 I rarely have the screen space to display a backlink buffer.  Because it needs my active involvement to keep visible, I go long periods seeing no backlinks.  This solution can be a great complement (or even stand alone).

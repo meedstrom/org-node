@@ -464,6 +464,12 @@ read more at Info node `(elisp)Programmed Completion'."
 (defvar org-node-hist nil
   "Minibuffer history.")
 
+;; Boost this completion hist to at least 1000 elements, unless user has nerfed
+;; the global `history-length'.
+(and (>= history-length (car (get 'history-length 'standard-value)))
+     (< history-length 1000)
+     (put 'org-node-hist 'history-length 1000))
+
 
 ;;;; The metadata struct
 
@@ -1735,18 +1741,22 @@ non-nil), list the files in a new buffer."
                                            'follow-link t)))))
     (when (stringp org-node-extra-id-dirs)
       (setq org-node-extra-id-dirs (list org-node-extra-id-dirs))
-      (message "Option `org-node-extra-id-dirs' should be a list, changed it for you this time"))
+      (message
+       "Option `org-node-extra-id-dirs' must be a list, changed it for you"))
+
     (when (or (not instant)
               (hash-table-empty-p org-node--file<>mtime.elapsed))
-      (cl-loop for file in (let ((file-name-handler-alist nil))
-                             (org-node-abbrev-file-names
-                              (cl-loop for dir in org-node-extra-id-dirs
+      (let* ((file-name-handler-alist nil)
+             (dirs-to-scan (delete-dups
+                            (mapcar #'file-truename org-node-extra-id-dirs))))
+        (cl-loop for file in (org-node-abbrev-file-names
+                              (cl-loop for dir in dirs-to-scan
                                        nconc (org-node--dir-files-recursively
-                                              (file-truename dir)
+                                              dir
                                               ".org"
-                                              org-node-extra-id-dirs-exclude))))
-               do (or (gethash file org-node--file<>mtime.elapsed)
-                      (puthash file (cons 0 0) org-node--file<>mtime.elapsed)))
+                                              org-node-extra-id-dirs-exclude)))
+                 do (or (gethash file org-node--file<>mtime.elapsed)
+                        (puthash file (cons 0 0) org-node--file<>mtime.elapsed))))
       (cl-loop for file being each hash-value of org-id-locations
                do (or (gethash file org-node--file<>mtime.elapsed)
                       (puthash file (cons 0 0) org-node--file<>mtime.elapsed))))
