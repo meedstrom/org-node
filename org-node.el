@@ -1468,7 +1468,7 @@ well as `org-node-backlink-aggressive'."
                (unless (alist-get fn org-node--compile-timers)
                  (setf (alist-get fn org-node--compile-timers)
                        (run-with-idle-timer
-                        (+ 10 (random 10)) nil #'native-compile fn)))
+                        (+ 5 (random 10)) nil #'native-compile fn)))
              (byte-compile fn))
            ;; May actually use entirely uncompiled until native is available
            fn))
@@ -1476,7 +1476,7 @@ well as `org-node-backlink-aggressive'."
         ((prog1 (puthash fn (byte-compile fn) org-node--compiled-lambdas)
            (when (and (native-comp-available-p)
                       (not (eq 'closure (car-safe fn))))
-             (run-with-idle-timer (+ 10 (random 10))
+             (run-with-idle-timer (+ 5 (random 10))
                                   nil
                                   `(lambda ()
                                      (puthash ,fn (native-compile ,fn)
@@ -1486,13 +1486,14 @@ well as `org-node-backlink-aggressive'."
 ;;;; "Dirty" functions
 ;; Help keep the cache reasonably in sync without having to do a full reset
 
+;; See `org-node--finalize-modified' for forgetting links
 (defun org-node--dirty-forget-files (files)
   "Remove from cache info about nodes/refs in FILES.
 You should also run `org-node--dirty-forget-completions-in' for a
 thorough cleanup."
   (when files
     (cl-loop
-     for node being the hash-values of org-node--id<>node
+     for node being each hash-value of org-node--id<>node
      when (member (org-node-get-file-path node) files)
      collect (org-node-get-id node) into ids
      and append (org-node-get-refs node) into refs
@@ -1511,7 +1512,7 @@ thorough cleanup."
   "Remove the completion candidates for all nodes in FILES."
   (when files
     (cl-loop
-     for candidate being the hash-keys of org-node--candidate<>node
+     for candidate being each hash-key of org-node--candidate<>node
      using (hash-values node)
      when (member (org-node-get-file-path node) files)
      do (remhash candidate org-node--candidate<>node))))

@@ -19,7 +19,7 @@
 
 I like [[https://github.com/org-roam/org-roam][org-roam]] but found it too slow, so I made [[https://github.com/meedstrom/quickroam][quickroam]].  And that idea spun off into this package, a standalone thing.  It may also be easier to pick up than org-roam.
 
-- *If you were using org-roam*, there is nothing to migrate.  You can use both packages.  It's exactly the same on-disk format: "notes" are identified by their org-id.
+- *If you were using org-roam*, there is nothing to migrate.  You can use both packages.  It's the same on-disk format: "notes" are identified by their org-id.
 
   With optional shims, you can even *skip syncing the org-roam DB* and continue using its rich backlinks buffer!
 
@@ -140,7 +140,7 @@ TIP: If you have not done so yet, I recommend binding some short key sequences. 
 (keymap-set global-map "M-s M-d" #'org-roam-buffer-display-dedicated)
 
 ;; ...or just this for a different behavior
-(keymap-set global-map "M-s M-r" #'org-node-fakeroam-show-roam-buffer)
+(keymap-set global-map "M-s M-r" #'org-node-fakeroam-show-buffer)
 #+end_src
 
 ** Backlink solution 2: Print inside the file
@@ -192,7 +192,7 @@ Example setting:
 
 Do a =M-x org-node-reset= and see if it can find your notes now.
 
-**** Undoing a Roam hack
+*** Undoing a Roam hack
 
 If you have org-roam loaded, opening a link can sometimes send you to an outdated file path due to [[https://github.com/org-roam/org-roam/blob/2a630476b3d49d7106f582e7f62b515c62430714/org-roam-id.el#L91][a line in org-roam-id.el]] that causes org-id to /preferentially/ look up the org-roam DB instead of org-id's own table!
 
@@ -201,7 +201,7 @@ Either revert that with the following snippet, or if [[https://github.com/meedst
 #+begin_src elisp
 ;; Undo a Roam override
 (with-eval-after-load 'org-roam-id
-  ;; Default for Org 9.1 through 9.7
+  ;; Default for Org 9.1 through 9.7+
   (org-link-set-parameters
    "id" :follow #'org-id-open :store #'org-id-store-link-maybe))
 #+end_src
@@ -298,7 +298,7 @@ To complete words at point into known node titles:
 (setq org-roam-completion-everywhere nil) ;; Prevent Roam's variant
 #+end_src
 
-** An analogue to =org-roam-node-display-template=?
+** Any analogue to =org-roam-node-display-template=?
 
 To customize how the nodes look in the minibuffer, configure =org-node-affixation-fn=:
 
@@ -314,7 +314,7 @@ If you have Ripgrep installed on the computer and [[https://github.com/minad/con
 (keymap-set global-map "M-s M-g" #'org-node-grep) ;; Requires consult
 #+end_src
 
-This is can be a real power tool for mass edits.  Say you want to rename some Org tag =:math:= to =:Math:= absolutely everywhere.  Then you could follow a procedure such as:
+This is can be a power tool for mass edits.  Say you want to rename some Org tag =:math:= to =:Math:= absolutely everywhere.  Then you could follow a procedure such as:
 
 1. Use =org-node-grep= and type =:math:=
 2. Use =embark-export= (from [[https://github.com/oantolin/embark][embark]])
@@ -404,7 +404,7 @@ Rarer commands:
 - =org-node-list-reflinks=
   - List citations and non-ID links
     - Can be interesting for seeing which links have an associated node and which don't (usually, most don't)
-- =org-node-backlink-fix-all=
+- =org-node-backlink-fix-all-files=
   - Update =BACKLINKS= property in all nodes
 - =org-node-list-feedback-arcs=
   - (Requires GNU R with R packages tidyverse and igraph)
