@@ -177,9 +177,9 @@ I /think/ the following should work. Totally untested, let me know!
 Bad news: this is currently directed towards people who used [[https://github.com/toshism/org-super-links][org-super-links]] from the beginning, or people who are just now starting to assign IDs, as there is not yet a command to add new BACKLINKS drawers in bulk to preexisting nodes. ([[https://github.com/toshism/org-super-links/issues/93][org-super-links#93]])
 
 * Misc
-** Managing org-id-locations
+** Manage org-id-locations
 
-I find unsatisfactory the config options in org-id (Why? See [[http://edstrom.dev/wjwrl/taking-ownership-of-org-id][Taking ownership of org-id]]), so org-node gives you an extra way to feed data to org-id, making sure we won't run into "ID not found" situations.
+I find unsatisfactory the config options in org-id (Why? See [[http://edstrom.dev/wjwrl/taking-ownership-of-org-id][Taking ownership of org-id]]), so org-node gives you an extra way to feed data to org-id.  That helps ensure that you never run into "ID not found" situations.
 
 Example setting:
 
@@ -196,13 +196,63 @@ Do a =M-x org-node-reset= and see if it can find your notes now.
 
 If you have org-roam loaded, opening a link can sometimes send you to an outdated file path due to [[https://github.com/org-roam/org-roam/blob/2a630476b3d49d7106f582e7f62b515c62430714/org-roam-id.el#L91][a line in org-roam-id.el]] that causes org-id to /preferentially/ look up the org-roam DB instead of org-id's own table!
 
-Either revert that with the following snippet, or simply delete the "~/.emacs.d/org-roam.db" file if [[https://github.com/meedstrom/org-node-fakeroam][Fakeroam]] can cover your needs.
+Either revert that with the following snippet, or if [[https://github.com/meedstrom/org-node-fakeroam][Fakeroam]] can cover your needs, simply delete the Roam DB (at "~/.emacs.d/org-roam.db").
 
 #+begin_src elisp
 ;; Undo a Roam override
 (with-eval-after-load 'org-roam-id
+  ;; Default for Org 9.1 through 9.7
   (org-link-set-parameters
    "id" :follow #'org-id-open :store #'org-id-store-link-maybe))
+#+end_src
+
+
+** Exclude uninteresting nodes
+
+One user had over a thousand project-nodes, but only just began to do a knowledge base, and wished to avoid seeing the project nodes.
+
+This could work by excluding a "project" tag or any note that has a TODO state:
+
+#+begin_src elisp
+(setq org-node-filter-fn
+      (lambda (node)
+        (not
+         (or (org-node-get-todo node)
+             (member "project"
+                     (org-node-get-tags-with-inheritance node))
+             (assoc "ROAM_EXCLUDE" (org-node-get-properties node))))))
+#+end_src
+
+You can also use a whitelist approach, allowing only nodes from a certain directory "my-wiki":
+
+#+begin_src elisp
+(setq org-node-filter-fn
+      (lambda (node)
+        (and (string-search "/my-wiki/" (org-node-get-file-path node))
+             (not (assoc "ROAM_EXCLUDE" (org-node-get-properties node))))))
+#+end_src
+
+*** Limitation: =ROAM_EXCLUDE=
+
+Let's say you have a big archive file, fulla IDs, and you want all the nodes within out of sight.  Putting a =:ROAM_EXCLUDE: t= at the top won't do it.  Unlike in org-roam, *child ID nodes of an excluded node are not excluded!*  The =org-node-filter-fn= applies its ruleset to each node in isolation.
+
+However, nodes in isolation do still have inherited tags.  So you can use that, or the file name or outline path.
+
+While a big selling point of IDs is that you avoid depending on filenames, it's often pragmatic to let up on purism just a bit :-) It works well for me to filter out any file or directory that happens to contain "archive" in the name:
+
+#+begin_src elisp
+(setq org-node-filter-fn
+      (lambda (node)
+        (not (string-search "archive" (org-node-get-file-path node)))))
+#+end_src
+
+Or put something like =#+filetags: :wiki_exclude:= at the top of each file:
+
+#+begin_src elisp
+(setq org-node-filter-fn
+      (lambda (node)
+        (not (member "wiki_exclude"
+                     (org-node-get-tags-with-inheritance node))))))
 #+end_src
 
 ** Org-capture
@@ -226,9 +276,10 @@ The secret sauce is =(function org-node-capture-target)=:
          :jump-to-captured t
          :immediate-finish t)
 
-        ;; Sometimes handy after `org-node-insert-link' to
-        ;; make a stub you plan to fill in later
-        ("q" "Make quick stub ID node"
+        ;; Sometimes handy after `org-node-insert-link', to
+        ;; make a stub you plan to fill in later, without
+        ;; leaving the current buffer for now
+        ("s" "Make quick stub ID node"
          plain (function org-node-capture-target) nil
          :immediate-finish t)))
 #+end_src
@@ -266,8 +317,8 @@ If you have Ripgrep installed on the computer and [[https://github.com/minad/con
 This is can be a real power tool for mass edits.  Say you want to rename some Org tag =:math:= to =:Math:= absolutely everywhere.  Then you could follow a procedure such as:
 
 1. Use =org-node-grep= and type =:math:=
-2. Use =embark-export= (see [[https://github.com/oantolin/embark][embark]])
-3. Use =wgrep-change-to-wgrep-mode= (see [[https://github.com/mhayashi1120/Emacs-wgrep][wgrep]])
+2. Use =embark-export= (from [[https://github.com/oantolin/embark][embark]])
+3. Use =wgrep-change-to-wgrep-mode= (from [[https://github.com/mhayashi1120/Emacs-wgrep][wgrep]])
 4. Do a query-replace (~M-%~) to replace all =:math:= with =:Math:=
 5. Type ~C-c C-c~ to apply the changes
 
@@ -287,14 +338,14 @@ Working with files over TRAMP is unsupported for now.  Org-node tries to be very
 The best way to change this is to [[https://github.com/meedstrom/org-node/issues][file an issue]] to show you care :-)
 
 ** Limitation: Encryption
-Encrypted nodes probably won't be found.  Same as above, file an issue.
+Encrypted nodes probably won't be found.  As above, file an issue.
 
 ** Limitation: Unique titles
 If two ID-nodes exist with the same title, one of them disappears from minibuffer completions.
 
-That's just the nature of completion.  Other packages such as Roam have the same limitation.  Much can be said for embracing the uniqueness constraint, and org-node will print messages telling you about title collisions.
+That's just the nature of completion.  Much can be said for embracing the uniqueness constraint, and org-node will print messages calling attention to any collisions.
 
-Anyway... there's a workaround.  Assuming you leave =org-node-affixation-fn= at its default setting, just add to initfiles:
+Anyway... there's a workaround.  Assuming you leave =org-node-affixation-fn= at its default setting, adding this to initfiles tends to do the trick:
 
 #+begin_src elisp
 (setq org-node-alter-candidates t)
@@ -302,23 +353,7 @@ Anyway... there's a workaround.  Assuming you leave =org-node-affixation-fn= at 
 
 This lets you match against the node outline path and not only the title, which resolves most conflicts given that the most likely source of conflict is subheadings in disparate files, that happen to be named the same.  [[https://fosstodon.org/@nickanderson/112249581810196258][Some people]] make this trick part of their workflow.
 
-NB: this workaround won't help the in-buffer completions provided by =org-node-complete-at-point-mode=, but with a light peppering of luck this isn't something you'll ever have to notice.
-
-** Limitation: Excluding notes
-The option =org-node-filter-fn= works well for excluding TODO items that happen to have an ID, and excluding org-drill items and that sort of thing, but beyond that, it has limited utility because unlike org-roam, *child ID nodes of an excluded node are not excluded!*
-
-So let's say you have a big archive file, fulla IDs, and you want to exclude all of them from appearing in the minibuffer.  Putting a =:ROAM_EXCLUDE: t= at the top won't do it.  As it stands, what I'd suggest is to use the file name.
-
-While a big selling point of IDs is that you avoid depending on filenames, it's often pragmatic to let up on purism just a bit :-) It works well for me to filter out any file or directory that happens to contain "archive" in the name -- see the last line here:
-
-#+begin_src elisp
-(setq org-node-filter-fn
-      (lambda (node)
-        (not (or (org-node-get-todo node) ;; Ignore headings with todo state
-                 (member "drill" (org-node-get-tags node)) ;; Ignore :drill:
-                 (assoc "ROAM_EXCLUDE" (org-node-get-properties node))
-                 (string-search "archive" (org-node-get-file-path node))))))
-#+end_src
+NB: for users of =org-node-complete-at-point-mode=, this workaround won't help those completions.  With some luck you'll rarely insert the wrong link, but it's worth being aware of. ([[https://github.com/meedstrom/org-node/issues/62][#62]])
 
 ** Limitation: Org-ref
 
@@ -328,7 +363,7 @@ What works is bracketed Org-ref v3 citations that start with "cite", e.g. =[[cit
 
 If you need more of Org-ref, you have at least two options:
 - Use org-roam - see discussions on boosting its performance [[https://org-roam.discourse.group/t/rewriting-org-roam-node-list-for-speed-it-is-not-sqlite/3475/92][here]] and [[https://org-roam.discourse.group/t/improving-performance-of-node-find-et-al/3326/33][here]]
-- Get your elbows dirty and try to revive the archived branch [[https://github.com/meedstrom/org-node/branches]["orgref"]], see relevant [[https://github.com/meedstrom/org-node/commit/90b0e503ac75428a5d3ca6a4c8c51b5e075064d3][commit]].
+- Get your elbows dirty and try to revive the archived branch [[https://github.com/meedstrom/org-node/branches]["orgref"]], see [[https://github.com/meedstrom/org-node/commit/90b0e503ac75428a5d3ca6a4c8c51b5e075064d3][relevant commit]].
 
 ** Toolbox
 
@@ -425,7 +460,7 @@ API cheatsheet between org-roam and org-node.
 | Get name of file where NODE is          | =(org-roam-node-file NODE)=          | =(org-node-get-file-path NODE)=                                         |
 | Get ID                                  | =(org-roam-node-id NODE)=            | =(org-node-get-id NODE)=                                                |
 | Get tags                                | =(org-roam-node-tags NODE)=          | =(org-node-get-tags-with-inheritance NODE)=                             |
-| Get local tags                          |                                    | =(org-node-get-tags NODE)=                                              |
+| Get local tags                          |                                    | =(org-node-get-tags-local NODE)=                                              |
 | Get outline level                       | =(org-roam-node-level NODE)=         | =(org-node-get-level NODE)=                                             |
 | Get whether this is a subtree           | =(zerop (org-roam-node-level NODE))= | =(org-node-get-is-subtree NODE)=                                        |
 | Get char position                       | =(org-roam-node-point NODE)=         | =(org-node-get-pos NODE)=                                               |

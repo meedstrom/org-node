@@ -237,7 +237,7 @@ directory named \"archive\".
         (not (or (assoc \"ROAM_EXCLUDE\" (org-node-get-properties node))
                  (org-node-get-todo node)
                  (string-search \"/archive/\" (org-node-get-file-path node))
-                 (member \"drill\" (org-node-get-tags node))))))"
+                 (member \"drill\" (org-node-get-tags-local node))))))"
   :type 'function
   :set #'org-node--set-and-remind-reset)
 
@@ -384,7 +384,7 @@ For use as `org-node-affixation-fn'."
   (list title
         (when-let ((tags (if org-use-tag-inheritance
                              (org-node-get-tags-with-inheritance node)
-                           (org-node-get-tags node))))
+                           (org-node-get-tags-local node))))
           (propertize (concat "(" (string-join tags ", ") ") ")
                       'face 'org-tag))
         nil))
@@ -417,7 +417,7 @@ For use as `org-node-affixation-fn'."
                 (push " > " result))
               (prog1 (setq result (apply #'concat (nreverse result)))
                 (setq prefix-len (length result)))))
-          (when-let ((tags (org-node-get-tags node)))
+          (when-let ((tags (org-node-get-tags-local node)))
             (setq tags (propertize (concat (string-join tags ":"))
                                    'face 'org-tag))
             (concat (make-string
@@ -515,13 +515,13 @@ documentation of `org-node-filter-fn' or Info node `(org-node)'."
               "Return list of ROAM_REFS registered on the node.")
   (scheduled  nil :read-only t :type string :documentation
               "Return node's SCHEDULED state.")
-  (tags       nil :read-only t :type list :documentation
+  (tags-local nil :read-only t :type list :documentation
               "Return list of tags local to the node.")
   ;; REVIEW: Maybe this can be a function that combines tags with a new field
   ;;         called inherited-tags.  That might cause slowdowns
   ;;         though due to consing on every call.
-  (tags-with-inheritance  nil :read-only t :type list :documentation
-                          "Return list of tags, including inherited tags.")
+  (tags-with-inheritance nil :read-only t :type list :documentation
+                         "Return list of tags, including inherited tags.")
   (title      nil :read-only t :type string :documentation
               "Return the node's heading, or #+title if it is not a subtree.")
   (todo       nil :read-only t :type string :documentation
@@ -543,6 +543,10 @@ documentation of `org-node-filter-fn' or Info node `(org-node)'."
 ;; (defalias 'org-node-get-sched #'org-node-get-scheduled)
 ;; (defalias 'org-node-get-file #'org-node-get-file-path)
 ;; (defalias 'org-node-get-lvl #'org-node-get-level)
+
+;; API transition underway: get-tags will include inherited tags in future
+(define-obsolete-function-alias 'org-node-get-tags #'org-node-get-tags-local
+  "2024-10-22")
 
 (cl-defstruct (org-node-link (:constructor org-node-link--make-obj)
                              (:copier nil))
@@ -2315,7 +2319,7 @@ KEY, NAME and CAPTURE explained in `org-node-series-defs'."
     :classifier (lambda (node)
                   (let ((sortstr (cdr (assoc ,prop (org-node-get-props node))))
                         (tagged (seq-intersection (split-string ,tags ":" t)
-                                                  (org-node-get-tags node))))
+                                                  (org-node-get-tags-local node))))
                     (when (and sortstr tagged (not (string-blank-p sortstr)))
                       (cons (concat sortstr " " (org-node-get-title node))
                             (org-node-get-id node)))))
@@ -4118,7 +4122,7 @@ Wrap the value in double-brackets if necessary."
           "Tag: "
           (cl-union
            (cl-loop for node being the hash-values of org-nodes
-                    append (org-node-get-tags node))
+                    append (org-node-get-tags-local node))
            (cl-remove-if #'keywordp
                          (mapcar #'car (append org-tag-persistent-alist
                                                org-tag-alist)))

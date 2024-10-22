@@ -57,7 +57,8 @@ Backlink solution 2: Print inside the file
 
 Misc
 
-* Managing org-id-locations::
+* Manage org-id-locations::
+* Exclude uninteresting nodes::
 * Org-capture::
 * Completion-at-point::
 * An analogue to @samp{org-roam-node-display-template}?::
@@ -66,10 +67,13 @@ Misc
 * Limitation TRAMP::
 * Limitation Encryption::
 * Limitation Unique titles::
-* Limitation Excluding notes::
 * Limitation Org-ref::
 * Toolbox::
 * Experimental Node series::
+
+Exclude uninteresting nodes
+
+* Limitation @samp{ROAM_EXCLUDE}::
 
 Experimental: Node series
 
@@ -116,7 +120,7 @@ With optional shims, you can even @strong{skip syncing the org-roam DB} and cont
 In pursuit of being "just org-id", this package has no equivalent setting to @samp{org-roam-directory} -- it just looks up @samp{org-id-locations}.
 
 @item
-@strong{If you were not using org-roam}, maybe think of it as somewhat like @uref{https://github.com/alphapapa/org-recent-headings, org-recent-headings} beefed-up to the extent that you won't need other methods of browsing.
+@strong{If you were not using org-roam}, maybe think of it as somewhat like @uref{https://github.com/alphapapa/org-recent-headings, org-recent-headings} beefed-up to the extent that you won't need other methods of browsing, as long as you give IDs to all objects of interest.
 
 If you were the sort of person to prefer ID-links over file links or any other type of link, you're in the right place!  Now you can rely on IDs, and---if you want---stop worrying about filenames, directories and subtree hierarchies.  As long as you've assigned an ID to a heading or file, you can find it later.
 @end itemize
@@ -124,9 +128,9 @@ If you were the sort of person to prefer ID-links over file links or any other t
 @node What's a "node"?
 @section What's a "node"?
 
-My life can be divided into two periods "@strong{before org-roam}" and "@strong{after org-roam}".  I crossed a kind of gap once I got a good way to link between my notes.  It's odd to remember when I just relied on browsing subtrees and the filesystem -- what a strange way to work!
+My life can be divided into two periods "@strong{before org-roam}" and "@strong{after org-roam}".  I crossed a kind of gap once I got a good way to link between my notes.  It's odd to remember when I just relied on browsing subtrees and filesystem directories -- what a strange way to work!
 
-I used to lose track of things I had written, under some forgotten heading in a forgotten file in a forgotten directory.  The org-roam method let me @strong{find} and @strong{build on} my own work, instead of @uref{https://en.wikipedia.org/wiki/Cryptomnesia, recreating it all the time}.
+I used to lose track of things I had written, under some forgotten heading in a forgotten file in a forgotten directory.  The org-roam method let me @strong{find and build on} my own work, instead of @uref{https://en.wikipedia.org/wiki/Cryptomnesia, recreating it all the time}.
 
 At the core, all the "notetaking packages" (@uref{https://github.com/rtrppl/orgrr, orgrr}/@uref{https://github.com/localauthor/zk, zk}/@uref{https://github.com/EFLS/zetteldeft, zetteldeft}/@uref{https://github.com/org-roam/org-roam, org-roam}/@uref{https://github.com/protesilaos/denote, denote}/@uref{https://github.com/kaorahi/howm, howm}/@uref{https://github.com/kisaragi-hiu/minaduki, minaduki}/@dots{}) try to help you with this: make it easy to link between notes and explore them.
 
@@ -314,7 +318,7 @@ On Straight (I think): @code{M-x straight-fetch-all RET}
 @node Quick start
 @section Quick start
 
-If you're new to these concepts, fear not.  The main things for day-to-day operation are two verbs: "find" and "link".
+If you're new to these concepts, fear not.  The main things for day-to-day operation are two verbs: "find" and "insert".
 
 Pick some short keys and try them out.
 
@@ -325,7 +329,7 @@ Pick some short keys and try them out.
 
 To browse config options, type @samp{M-x customize-group RET org-node RET}.
 
-Final tip: there's @strong{no separate command} for creating a new node!  Reuse one of the commands above, then type the name of a node that doesn't exist.  Try it and see what happens!
+Final tip: there's @strong{no separate command} for creating a new node!  Reuse one of the commands above, and type the name of a node that doesn't exist.  Try it and see what happens!
 
 @node Backlinks
 @chapter Backlinks
@@ -346,7 +350,18 @@ Backlinks are the butter on the bread of your notes.  If you've ever seen a "Wha
 
 As a Roam user, you can keep using @samp{M-x org-roam-buffer-toggle}.
 
-If it has been slow, or saving files has been slow, @uref{https://github.com/meedstrom/org-node-fakeroam, org-node-fakeroam} gives you some new ways to keep Roam's DB data fresh, circumventing Roam's "autosync mode".
+TIP: If it has been slow, or saving files has been slow, @uref{https://github.com/meedstrom/org-node-fakeroam, org-node-fakeroam} gives you ways to speed it up.
+
+TIP: If you have not done so yet, I recommend binding some short key sequences.  I spent many months waffling on where to bind them, so here's an example:
+
+@lisp
+;; Either this...
+(keymap-set org-mode-map "M-s M-r" #'org-roam-buffer-toggle)
+(keymap-set global-map "M-s M-d" #'org-roam-buffer-display-dedicated)
+
+;; ...or just this for a different behavior
+(keymap-set global-map "M-s M-r" #'org-node-fakeroam-show-roam-buffer)
+@end lisp
 
 @node Backlink solution 2 Print inside the file
 @section Backlink solution 2: Print inside the file
@@ -394,7 +409,8 @@ Bad news: this is currently directed towards people who used @uref{https://githu
 @chapter Misc
 
 @menu
-* Managing org-id-locations::
+* Manage org-id-locations::
+* Exclude uninteresting nodes::
 * Org-capture::
 * Completion-at-point::
 * An analogue to @samp{org-roam-node-display-template}?::
@@ -403,16 +419,15 @@ Bad news: this is currently directed towards people who used @uref{https://githu
 * Limitation TRAMP::
 * Limitation Encryption::
 * Limitation Unique titles::
-* Limitation Excluding notes::
 * Limitation Org-ref::
 * Toolbox::
 * Experimental Node series::
 @end menu
 
-@node Managing org-id-locations
-@section Managing org-id-locations
+@node Manage org-id-locations
+@section Manage org-id-locations
 
-I find unsatisfactory the config options in org-id (Why? See @uref{http://edstrom.dev/wjwrl/taking-ownership-of-org-id, Taking ownership of org-id}), so org-node gives you an extra way to feed data to org-id, making sure we won't run into "ID not found" situations.
+I find unsatisfactory the config options in org-id (Why? See @uref{http://edstrom.dev/wjwrl/taking-ownership-of-org-id, Taking ownership of org-id}), so org-node gives you an extra way to feed data to org-id.  That helps ensure that you never run into "ID not found" situations.
 
 Example setting:
 
@@ -430,17 +445,72 @@ Do a @samp{M-x org-node-reset} and see if it can find your notes now.
 @anchor{Undoing a Roam hack}Undoing a Roam hack
 
 
-If you have org-roam loaded, opening a link can sometimes send you to an outdated file path due to @uref{https://github.com/org-roam/org-roam/blob/2a630476b3d49d7106f582e7f62b515c62430714/org-roam-id.el#L91, a line in org-roam-id.el} that causes org-id to @emph{preferentially} look up the org-roam DB instead of its own table(!).
+If you have org-roam loaded, opening a link can sometimes send you to an outdated file path due to @uref{https://github.com/org-roam/org-roam/blob/2a630476b3d49d7106f582e7f62b515c62430714/org-roam-id.el#L91, a line in org-roam-id.el} that causes org-id to @emph{preferentially} look up the org-roam DB instead of org-id's own table!
 
-Either revert that with the following snippet, or simply delete the "~/.emacs.d/org-roam.db" file if @uref{https://github.com/meedstrom/org-node-fakeroam, Fakeroam} can cover your needs.
+Either revert that with the following snippet, or if @uref{https://github.com/meedstrom/org-node-fakeroam, Fakeroam} can cover your needs, simply delete the Roam DB (at "~/.emacs.d/org-roam.db").
 
 @lisp
 ;; Undo a Roam override
 (with-eval-after-load 'org-roam-id
+  ;; Default for Org 9.1 through 9.7
   (org-link-set-parameters
    "id" :follow #'org-id-open :store #'org-id-store-link-maybe))
 @end lisp
 @end enumerate
+
+@node Exclude uninteresting nodes
+@section Exclude uninteresting nodes
+
+One user had over a thousand project-nodes, but only just began to do a knowledge base, and wished to avoid seeing the project nodes.
+
+This could work by excluding a "project" tag or any note that has a TODO state:
+
+@lisp
+(setq org-node-filter-fn
+      (lambda (node)
+        (not
+         (or (org-node-get-todo node)
+             (member "project"
+                     (org-node-get-tags-with-inheritance node))
+             (assoc "ROAM_EXCLUDE" (org-node-get-properties node))))))
+@end lisp
+
+You can also use a whitelist approach, allowing only nodes from a certain directory "my-wiki":
+
+@lisp
+(setq org-node-filter-fn
+      (lambda (node)
+        (and (string-search "/my-wiki/" (org-node-get-file-path node))
+             (not (assoc "ROAM_EXCLUDE" (org-node-get-properties node))))))
+@end lisp
+
+@menu
+* Limitation @samp{ROAM_EXCLUDE}::
+@end menu
+
+@node Limitation @samp{ROAM_EXCLUDE}
+@subsection Limitation: @samp{ROAM_EXCLUDE}
+
+Let's say you have a big archive file, fulla IDs, and you want all the nodes within out of sight.  Putting a @samp{:ROAM_EXCLUDE: t} at the top won't do it.  Unlike in org-roam, @strong{child ID nodes of an excluded node are not excluded!}  The @samp{org-node-filter-fn} applies its ruleset to each node in isolation.
+
+However, nodes in isolation do still have inherited tags.  So you can use that, or the file name or outline path.
+
+While a big selling point of IDs is that you avoid depending on filenames, it's often pragmatic to let up on purism just a bit :-) It works well for me to filter out any file or directory that happens to contain "archive" in the name:
+
+@lisp
+(setq org-node-filter-fn
+      (lambda (node)
+        (not (string-search "archive" (org-node-get-file-path node)))))
+@end lisp
+
+Or put something like @samp{#+filetags: :wiki_exclude:} at the top of each file:
+
+@lisp
+(setq org-node-filter-fn
+      (lambda (node)
+        (not (member "wiki_exclude"
+                     (org-node-get-tags-with-inheritance node))))))
+@end lisp
 
 @node Org-capture
 @section Org-capture
@@ -464,9 +534,10 @@ The secret sauce is @samp{(function org-node-capture-target)}:
          :jump-to-captured t
          :immediate-finish t)
 
-        ;; Sometimes handy after `org-node-insert-link' to
-        ;; make a stub you plan to fill in later
-        ("q" "Make quick stub ID node"
+        ;; Sometimes handy after `org-node-insert-link', to
+        ;; make a stub you plan to fill in later, without
+        ;; leaving the current buffer for now
+        ("s" "Make quick stub ID node"
          plain (function org-node-capture-target) nil
          :immediate-finish t)))
 @end lisp
@@ -514,9 +585,9 @@ This is can be a real power tool for mass edits.  Say you want to rename some Or
 @item
 Use @samp{org-node-grep} and type @samp{:math:}
 @item
-Use @samp{embark-export} (see @uref{https://github.com/oantolin/embark, embark})
+Use @samp{embark-export} (from @uref{https://github.com/oantolin/embark, embark})
 @item
-Use @samp{wgrep-change-to-wgrep-mode} (see @uref{https://github.com/mhayashi1120/Emacs-wgrep, wgrep})
+Use @samp{wgrep-change-to-wgrep-mode} (from @uref{https://github.com/mhayashi1120/Emacs-wgrep, wgrep})
 @item
 Do a query-replace (@code{M-%}) to replace all @samp{:math:} with @samp{:Math:}
 @item
@@ -545,16 +616,16 @@ The best way to change this is to @uref{https://github.com/meedstrom/org-node/is
 @node Limitation Encryption
 @section Limitation: Encryption
 
-Encrypted nodes probably won't be found.  Same as above, file an issue.
+Encrypted nodes probably won't be found.  As above, file an issue.
 
 @node Limitation Unique titles
 @section Limitation: Unique titles
 
 If two ID-nodes exist with the same title, one of them disappears from minibuffer completions.
 
-That's just the nature of completion.  Other packages such as Roam have the same limitation.  Much can be said for embracing the uniqueness constraint, and org-node will print messages telling you about title collisions.
+That's just the nature of completion.  Much can be said for embracing the uniqueness constraint, and org-node will print messages calling attention to any collisions.
 
-Anyway@dots{} there's a workaround.  Assuming you leave @samp{org-node-affixation-fn} at its default setting, just add to initfiles:
+Anyway@dots{} there's a workaround.  Assuming you leave @samp{org-node-affixation-fn} at its default setting, adding this to initfiles tends to do the trick:
 
 @lisp
 (setq org-node-alter-candidates t)
@@ -562,25 +633,7 @@ Anyway@dots{} there's a workaround.  Assuming you leave @samp{org-node-affixatio
 
 This lets you match against the node outline path and not only the title, which resolves most conflicts given that the most likely source of conflict is subheadings in disparate files, that happen to be named the same.  @uref{https://fosstodon.org/@@nickanderson/112249581810196258, Some people} make this trick part of their workflow.
 
-NB: this workaround won't help the in-buffer completions provided by @samp{org-node-complete-at-point-mode}, but with a light peppering of luck this isn't something you'll ever have to notice.
-
-@node Limitation Excluding notes
-@section Limitation: Excluding notes
-
-The option @samp{org-node-filter-fn} works well for excluding TODO items that happen to have an ID, and excluding org-drill items and that sort of thing, but beyond that, it has limited utility because unlike org-roam, @strong{child ID nodes of an excluded node are not excluded!}
-
-So let's say you have a big archive file, fulla IDs, and you want to exclude all of them from appearing in the minibuffer.  Putting a @samp{:ROAM_EXCLUDE: t} at the top won't do it.  As it stands, what I'd suggest is to use the file name.
-
-While a big selling point of IDs is that you avoid depending on filenames, it's often pragmatic to let up on purism just a bit :-) It works well for me to filter out any file or directory that happens to contain "archive" in the name -- see the last line here:
-
-@lisp
-(setq org-node-filter-fn
-      (lambda (node)
-        (not (or (org-node-get-todo node) ;; Ignore headings with todo state
-                 (member "drill" (org-node-get-tags node)) ;; Ignore :drill:
-                 (assoc "ROAM_EXCLUDE" (org-node-get-properties node))
-                 (string-search "archive" (org-node-get-file-path node))))))
-@end lisp
+NB: for users of @samp{org-node-complete-at-point-mode}, this workaround won't help those completions.  With some luck you'll rarely insert the wrong link, but it's worth being aware of. (@uref{https://github.com/meedstrom/org-node/issues/62, #62})
 
 @node Limitation Org-ref
 @section Limitation: Org-ref
@@ -594,7 +647,7 @@ If you need more of Org-ref, you have at least two options:
 @item
 Use org-roam - see discussions on boosting its performance @uref{https://org-roam.discourse.group/t/rewriting-org-roam-node-list-for-speed-it-is-not-sqlite/3475/92, here} and @uref{https://org-roam.discourse.group/t/improving-performance-of-node-find-et-al/3326/33, here}
 @item
-Get your elbows dirty and try to revive the archived branch @uref{https://github.com/meedstrom/org-node/branches, "orgref"}, see relevant @uref{https://github.com/meedstrom/org-node/commit/90b0e503ac75428a5d3ca6a4c8c51b5e075064d3, commit}.
+Get your elbows dirty and try to revive the archived branch @uref{https://github.com/meedstrom/org-node/branches, "orgref"}, see @uref{https://github.com/meedstrom/org-node/commit/90b0e503ac75428a5d3ca6a4c8c51b5e075064d3, relevant commit}.
 @end itemize
 
 @node Toolbox
@@ -818,7 +871,7 @@ API cheatsheet between org-roam and org-node.
 @tab @samp{(org-node-get-tags-with-inheritance NODE)}
 @item Get local tags
 @tab 
-@tab @samp{(org-node-get-tags NODE)}
+@tab @samp{(org-node-get-tags-local NODE)}
 @item Get outline level
 @tab @samp{(org-roam-node-level NODE)}
 @tab @samp{(org-node-get-level NODE)}
