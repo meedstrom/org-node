@@ -257,8 +257,8 @@ headings but you have only done work under one of them."
               (set-marker start nil)
               (set-marker end nil))))
       (( t error debug )
-       (message "org-node: Updating backlinks ran into an issue: %S" err)
        (remove-text-properties (point-min) (point-max) 'org-node-flag)
+       (message "org-node: Updating backlinks ran into an issue: %S" err)
        ;; Provide backtrace even tho we don't signal an error
        (when debug-on-error
          (message "org-node: Printing backtrace")
@@ -334,62 +334,64 @@ headings but you have only done work under one of them."
                     :about-to-do "Org-node going to add backlink to the target of the link you just inserted"
                     (org-node-backlink--add-at id src-title src-id)))))))))))
 
+;; REVIEW: rename target/src to dest/origin for consistency?
 (defun org-node-backlink--add-at (target-id src-title src-id)
   "Add a backlink at TARGET-ID.
 Seek the :ID: property in current buffer that matches TARGET-ID,
 then compose a link string out of SRC-ID and SRC-TITLE and insert
 it in the nearby :BACKLINKS: property."
   (goto-char (point-min))
-  (if (not (re-search-forward
-            (concat "^[ \t]*:id: +" (regexp-quote target-id))
-            nil t))
-      (push target-id org-node-backlink--fails)
-    (when (get-text-property (point) 'read-only)
-      ;; If for some reason the search landed us in a transclude region or
-      ;; other read-only area...  Note that `org-entry-put' inhibits read-only,
-      ;; so it wouldn't signal any error.
-      (error "org-node: Property drawer seems to be read-only at %d in %s"
-             (point) (buffer-name)))
-    (let ((current-backlinks-value (org-entry-get nil "BACKLINKS"))
-          (src-link (org-link-make-string (concat "id:" src-id) src-title))
-          new-value)
-      (and current-backlinks-value
-           (string-search "\f" current-backlinks-value)
-           (error "Form-feed character in BACKLINKS property near %d in %s"
-                  (point) (buffer-name)))
-      (if current-backlinks-value
-          ;; Build a temp list to check we don't add the same link twice.
-          ;; There is an Org builtin `org-entry-add-to-multivalued-property',
-          ;; but we cannot use it since the link descriptions may contain
-          ;; spaces.  Further, they may contain quotes(!), so we cannot use
-          ;; `split-string-and-unquote' even if we had wrapped the links in
-          ;; quotes.
-          (let ((links (split-string (replace-regexp-in-string
-                                      "]][\s\t]+\\[\\["
-                                      "]]\f[["
-                                      (string-trim current-backlinks-value))
-                                     "\f")))
-            (cl-loop for link in links
-                     when (string-search src-id link)
-                     do (setq links (delete link links)))
-            (push src-link links)
-            (when (seq-some #'null links)
-              (org-node--die "nils in %S" links))
-            ;; Enforce deterministic order to prevent unnecessarily reordering
-            ;; every time a node is linked that already has the backlink
-            (sort links #'string-lessp)
-            (setq new-value (string-join links "  ")))
-        (setq new-value src-link))
-      (unless (equal current-backlinks-value new-value)
-        (let ((user-is-editing (buffer-modified-p))
-              (after-change-functions
-               (remq 'org-node-backlink--flag-buffer-modification
-                     after-change-functions)))
-          (org-entry-put nil "BACKLINKS" new-value)
-          (unless user-is-editing
-            (let (before-save-hook
-                  after-save-hook)
-              (save-buffer))))))))
+  (let ((case-fold-search t))
+    (if (not (re-search-forward
+              (concat "^[ \t]*:id: +" (regexp-quote target-id))
+              nil t))
+        (push target-id org-node-backlink--fails)
+      (when (get-text-property (point) 'read-only)
+        ;; If for some reason the search landed us in a transclude region or
+        ;; other read-only area...  Note that `org-entry-put' inhibits
+        ;; read-only, so it wouldn't signal any error.
+        (error "org-node: Property drawer seems to be read-only at %d in %s"
+               (point) (buffer-name)))
+      (let ((current-backlinks-value (org-entry-get nil "BACKLINKS"))
+            (src-link (org-link-make-string (concat "id:" src-id) src-title))
+            new-value)
+        (and current-backlinks-value
+             (string-search "\f" current-backlinks-value)
+             (error "Form-feed character in BACKLINKS property near %d in %s"
+                    (point) (buffer-name)))
+        (if current-backlinks-value
+            ;; Build a temp list to check we don't add the same link twice.
+            ;; There is an Org builtin `org-entry-add-to-multivalued-property',
+            ;; but we cannot use it since the link descriptions may contain
+            ;; spaces.  Further, they may contain quotes(!), so we cannot use
+            ;; `split-string-and-unquote' even if we had wrapped the links in
+            ;; quotes.
+            (let ((links (split-string (replace-regexp-in-string
+                                        "]][\s\t]+\\[\\["
+                                        "]]\f[["
+                                        (string-trim current-backlinks-value))
+                                       "\f")))
+              (cl-loop for link in links
+                       when (string-search src-id link)
+                       do (setq links (delete link links)))
+              (push src-link links)
+              (when (seq-some #'null links)
+                (org-node--die "nils in %S" links))
+              ;; Enforce deterministic order to prevent unnecessarily reordering
+              ;; every time a node is linked that already has the backlink
+              (sort links #'string-lessp)
+              (setq new-value (string-join links "  ")))
+          (setq new-value src-link))
+        (unless (equal current-backlinks-value new-value)
+          (let ((user-is-editing (buffer-modified-p))
+                (after-change-functions
+                 (remq 'org-node-backlink--flag-buffer-modification
+                       after-change-functions)))
+            (org-entry-put nil "BACKLINKS" new-value)
+            (unless user-is-editing
+              (let (before-save-hook
+                    after-save-hook)
+                (save-buffer)))))))))
 
 
 ;;;; Aggressive visit-and-fix
@@ -433,29 +435,31 @@ where backlinks are fixed."
                      (node (or (gethash id org-node--id<>node)
                                (and (setq id (gethash dest org-node--ref<>id))
                                     (gethash id org-node--id<>node)))))
-                ;; (#59) This could be an empty link [[id:]]
+                ;; (#59) This could be an empty link like [[id:]]
                 (when node
                   (push id (alist-get (org-node-get-file-path node)
                                       affected-dests nil nil #'equal)))))
           (setq org-node--old-link-sets nil)
-          (cl-loop for (file . ids) in affected-dests
-                   when (and (file-readable-p file)
-                             (file-writable-p file))
-                   do (org-node--with-quick-file-buffer file
-                        :about-to-do "About to fix backlinks"
-                        (let ((user-is-editing (buffer-modified-p)))
-                          (dolist (id (delete-dups ids))
-                            (goto-char (point-min))
-                            (when (re-search-forward (concat "^[[:space:]]*:id: +"
-                                                             (regexp-quote id))
-                                                     nil t)
-                              (org-node-backlink--fix-entry-here)))
-                          (unless user-is-editing
-                            (let (before-save-hook
-                                  after-save-hook)
-                              (save-buffer))))
-                        ;; Because the cache gets confused by the change
-                        (org-element-cache-reset))))
+          (cl-loop
+           for (file . ids) in affected-dests
+           when (and (file-readable-p file)
+                     (file-writable-p file))
+           do (org-node--with-quick-file-buffer file
+                :about-to-do "About to fix backlinks"
+                (let ((user-is-editing (buffer-modified-p))
+                      (case-fold-search t))
+                  (dolist (id (delete-dups ids))
+                    (goto-char (point-min))
+                    (when (re-search-forward
+                           (concat "^[[:space:]]*:id: +" (regexp-quote id))
+                           nil t)
+                      (org-node-backlink--fix-entry-here)))
+                  (unless user-is-editing
+                    (let ((before-save-hook nil)
+                          (after-save-hook nil))
+                      (save-buffer))))
+                ;; Because the cache gets confused by the change
+                (org-element-cache-reset))))
       (message "Option `org-node-backlink-aggressive' has no effect when `org-node-perf-eagerly-update-link-tables' is nil"))))
 
 (provide 'org-node-backlink)
