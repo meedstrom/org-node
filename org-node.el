@@ -3828,19 +3828,21 @@ Optional keyword argument ABOUT-TO-DO as in
            (buffer-list-update-hook nil))
        ;; The cache has been buggy since the 9.5 rewrite, disable to be safe
        (org-element-with-disabled-cache
-         (let* ((-was-open- (find-buffer-visiting ,file))
-                (-file- (org-node-abbrev-file-names (file-truename ,file)))
-                (_ (if (file-directory-p -file-)
-                       (error "Is a directory: %s" -file-)))
-                (-buf- (or -was-open-
-                           (delay-mode-hooks
-                             (org-node--find-file-noselect -file- ,why)))))
-           (when (bufferp -buf-)
-             (with-current-buffer -buf-
+         (let* ((--was-open-- (find-buffer-visiting ,file))
+                (--file-- (org-node-abbrev-file-names (file-truename ,file)))
+                (_ (if (file-directory-p --file--)
+                       (error "Is a directory: %s" --file--)))
+                (--buf-- (or --was-open--
+                             (delay-mode-hooks
+                               (org-node--find-file-noselect --file-- ,why)))))
+           (when (bufferp --buf--)
+             (with-current-buffer --buf--
                (save-excursion
                  (without-restriction
                    ,@body))
-               (unless -was-open-
+               (if --was-open--
+                   ;; Because the cache gets confused by changes
+                   (org-element-cache-reset)
                  (when (buffer-modified-p)
                    (let ((save-silently t)
                          (inhibit-message t))

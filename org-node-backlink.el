@@ -390,8 +390,8 @@ it in the nearby :BACKLINKS: property."
                        after-change-functions)))
             (org-entry-put nil "BACKLINKS" new-value)
             (unless user-is-editing
-              (let (before-save-hook
-                    after-save-hook)
+              (let ((before-save-hook nil)
+                    (after-save-hook nil))
                 (save-buffer)))))))))
 
 
@@ -456,11 +456,11 @@ where backlinks are fixed."
                            nil t)
                       (org-node-backlink--fix-entry-here)))
                   (unless user-is-editing
+                    ;; Normally, `org-node--with-quick-file-buffer' only saves
+                    ;; buffers it had to open itself
                     (let ((before-save-hook nil)
                           (after-save-hook nil))
-                      (save-buffer))))
-                ;; Because the cache gets confused by the change
-                (org-element-cache-reset))))
+                      (save-buffer)))))))
       (message "Option `org-node-backlink-aggressive' has no effect when `org-node-perf-eagerly-update-link-tables' is nil"))))
 
 (provide 'org-node-backlink)
