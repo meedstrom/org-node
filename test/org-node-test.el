@@ -28,7 +28,7 @@
 ;; (-all-p #'org-node-link-p (apply #'append (hash-table-values org-node--dest<>links)))
 
 (ert-deftest org-node/test-split-refs-field ()
-  (setq org-node-parser--result-paths-types nil)
+  (setq org-node-parser--paths-types nil)
   (let ((result
          (org-node-parser--split-refs-field
           (concat " \"[cite:@citekey abcd ; @citekey2 cdefgh;@citekey3]\""
@@ -48,13 +48,13 @@
                        "//gnu.org/A Link With Spaces/index2.htm"
                        "//gnu.org")))
     (should (equal "https" (cdr (assoc "//gnu.org/A Link With Spaces/index.htm"
-                                       org-node-parser--result-paths-types))))
+                                       org-node-parser--paths-types))))
     (should (equal "https" (cdr (assoc "//gnu.org"
-                                       org-node-parser--result-paths-types))))
+                                       org-node-parser--paths-types))))
     (should (equal nil (cdr (assoc "@citekey"
-                                   org-node-parser--result-paths-types))))
+                                   org-node-parser--paths-types))))
     (should (equal nil (cdr (assoc "citekey"
-                                   org-node-parser--result-paths-types))))))
+                                   org-node-parser--paths-types))))))
 
 (ert-deftest org-node/test-time-format-hacks ()
   (let ((fmt "Wild%Y--%m%dexample%H%M%S-"))
@@ -86,6 +86,7 @@
   (write-region "" nil "/tmp/org-node/test2/emptyfile2.org")
   (write-region "" nil "/tmp/org-node/test1/emptyfile3.org")
   (let ((org-id-locations (make-hash-table :test #'equal))
+        (org-node--file<>mtime.elapsed (make-hash-table :test #'equal))
         (org-node-extra-id-dirs '("/tmp/org-node/test1/"
                                   "/tmp/org-node/test2/"))
         (org-node-ask-directory nil))
@@ -136,9 +137,9 @@
         ;; NOTE you should manually test the other creation-fns
         (org-node-creation-fn #'org-node-new-file))
     (delete-directory org-node-ask-directory t)
-    ;; (should-error (org-node--create "New node" "not-an-uuid1234"))
+    ;; (should-error (org-node-create "New node" "not-an-uuid1234"))
     (mkdir org-node-ask-directory t)
-    (org-node--create "New node" "not-an-uuid1234")
+    (org-node-create "New node" "not-an-uuid1234")
     (org-node-cache-ensure t)
     (let ((node (gethash "not-an-uuid1234" org-node--id<>node)))
       (org-node--goto node)
@@ -148,11 +149,14 @@
       (should (equal (org-node-get-title node) "New node"))
       (should (equal (org-node-get-file-title node) "New node"))
       (should (equal (org-node-get-file-title-or-basename node) "New node")))
-    (let ((org-node-prefer-file-level-nodes nil))
-      (org-node--create "A top-level heading" "not-an-uuid5678")
+    (let ((org-node-prefer-with-heading nil))
+      (org-node-create "A top-level heading" "not-an-uuid5678")
       (org-node-cache-ensure t)
       (let ((node (gethash "not-an-uuid5678" org-node--id<>node))
-            (expected-filename (funcall org-node-filename-fn "A top-level heading")))
+            (expected-filename
+             (concat (format-time-string org-node-datestamp-format)
+                     (funcall org-node-slug-fn "A top-level heading")
+                     ".org")))
         (should (equal (org-node-get-title node) "A top-level heading"))
         (should (equal (org-node-get-file-title node) nil))
         (should (equal (org-node-get-file-title-or-basename node)
