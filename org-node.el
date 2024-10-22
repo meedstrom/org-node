@@ -1572,12 +1572,12 @@ also necessary is `org-node--dirty-ensure-link-known' elsewhere."
                       (cdr (assoc "ROAM_REFS" props)))
                :pos (if heading (org-entry-beginning-position) 1)
                ;; NOTE: Don't use `org-reduced-level' since org-node-parser.el
-               ;;       also does not correct for that
+               ;;       also does not correct for that (not needed)
                :level (or (org-current-level) 0)
                :olp (org-get-outline-path)
                ;; Less important
                :properties props
-               :tags (org-get-tags nil t)
+               :tags-local (org-get-tags nil t)
                :tags-with-inheritance (org-get-tags)
                :todo (if heading (org-get-todo-state))
                :deadline (cdr (assoc "DEADLINE" props))
