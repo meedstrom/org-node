@@ -367,9 +367,9 @@ again for every alias, in which case TITLE is actually one of the
 aliases."
   :type '(radio
           (function-item org-node-affix-bare)
-          (function-item org-node-affix-with-olp-and-tags)
           (function-item org-node-prefix-with-olp)
           (function-item org-node-prefix-with-tags)
+          (function-item org-node-affix-with-olp-and-tags)
           function)
   :set #'org-node--set-and-remind-reset)
 
@@ -978,23 +978,26 @@ the first time."
                (shell-command-to-string "sysctl -n hw.logicalcpu_max"))
               ;; No idea if this works
               ((or 'cygwin 'windows-nt 'ms-dos)
-               (or (ignore-errors
-                     (with-temp-buffer
-                       (call-process "echo" nil t nil "%NUMBER_OF_PROCESSORS%")
-                       (buffer-string)))
-                   "1")))))
+               (ignore-errors
+                 (with-temp-buffer
+                   (call-process "echo" nil t nil "%NUMBER_OF_PROCESSORS%")
+                   (buffer-string)))))))
        1))
 
 (defun org-node--ensure-compiled-lib ()
-  "Return full path to org-node-parser.el, .elc or .eln.
+  "Look for org-node-parser.el, .elc or .eln.
 
 Guess which one of those three was in fact loaded by the current Emacs,
 and return it if it is .elc or .eln.  If it is .el, then
 opportunistically compile it and return the newly compiled file instead."
   (let* ((file-name-handler-alist nil) ;; perf
-         (loaded (or (ignore-errors
-                       (symbol-file 'org-node-parser--collect-dangerously nil t))
-                     (symbol-file 'org-node-parser--collect-dangerously))))
+         (loaded (or (and (subr-native-elisp-p
+                           (symbol-function #'org-node-parser--tmpfile))
+                          ;; To find .eln, it's most reliable to check a defun
+                          (ignore-errors
+                            (symbol-file 'org-node-parser--tmpfile 'defun t)))
+                     ;; Simply look for a `provide' in `load-history'
+                     (symbol-file 'org-node-parser))))
     (cond ((not loaded)
            (error "%s" "Need file org-node-parser[.el/.elc/.eln] in load-path with code that matches current Lisp definitions"))
           ((string-suffix-p ".el" loaded)
@@ -1011,7 +1014,7 @@ opportunistically compile it and return the newly compiled file instead."
                  (if (or (file-newer-than-file-p elc loaded)
                          (byte-compile-file loaded))
                      ;; NOTE: On Guix we should never end up here, but if we
-                     ;;       do, that'd be a problem as Guix will probably
+                     ;;       did, that'd be a problem as Guix will probably
                      ;;       reuse the first .elc we ever made forever
                      elc
                    loaded))))
@@ -2754,8 +2757,9 @@ Meant to sit on these hooks:
            (sortstrs (mapcar #'car (plist-get series :sorted-items)))
            mdy)
       (dolist (date sortstrs)
+        ;; Use `parse-time-string' rather than `iso8601-parse' to fail quietly
         (setq date (parse-time-string date))
-        (when (seq-find #'natnump date) ;; Basic check that it could be parsed
+        (when (seq-some #'natnump date) ;; Basic check that it could be parsed
           (setq mdy (seq-let (_ _ _ d m y _ _ _) date
                       (list m d y)))
           (when (calendar-date-is-visible-p mdy)
