@@ -115,6 +115,7 @@ include deleted files."
 (defcustom org-node-prefer-with-heading nil
   "Make a heading even when creating isolated file nodes.
 If nil, write a #+TITLE and a file-level property-drawer instead.
+
 In other words:
 
 - if nil, make file with no heading (outline level 0)
@@ -123,10 +124,9 @@ In other words:
 This affects the behavior of `org-node-new-file',
 `org-node-extract-subtree', and `org-node-capture-target'.
 
-If you change your mind about this setting, the Org-roam commands
-`org-roam-promote-entire-buffer' and
-`org-roam-demote-entire-buffer' can help you transition the
-files you already have."
+If you change your mind about this setting, you can
+transition the files you already have with the Org-roam commands
+`org-roam-promote-entire-buffer' and `org-roam-demote-entire-buffer'."
   :type 'boolean)
 
 (defcustom org-node-inject-variables (list)
@@ -350,7 +350,7 @@ After changing this setting, please run \\[org-node-reset]."
 The results will style the appearance of completions during
 \\[org-node-find], \\[org-node-insert-link] et al.
 
-To read more about affixations, see docstring
+To read more about affixations, see docstring of
 `completion-extra-properties', however this function operates on
 one candidate at a time, not the whole collection.
 
@@ -1022,7 +1022,7 @@ opportunistically compile it and return the newly compiled file instead."
           (loaded))))
 
 (defun org-node--make-plain-re (link-types)
-  "Build a moral equivalent of `org-link-plain-re'.
+  "Build a moral equivalent to `org-link-plain-re'.
 Make it target only LINK-TYPES instead of all the cars of
 `org-link-parameters'."
   ;; Copied from `org-link-make-regexps'
@@ -1315,7 +1315,11 @@ pass that to FINALIZER."
     (setq org-node--first-init nil)))
 
 (defvar org-node--old-link-sets nil
-  "For use by `org-node-backlink-aggressive'.")
+  "For use by `org-node-backlink-aggressive'.
+
+Alist of ((DEST . LINKS) (DEST . LINKS) ...), where LINKS is a set of
+links with destination DEST minus those that recently changed, allowing
+for a diff operation against the current set.")
 
 (defun org-node--finalize-modified (results)
   "Use RESULTS to update tables."
@@ -1926,7 +1930,7 @@ Example from Denote: %Y%m%dT%H%M%S--"
   :type 'string)
 
 (defcustom org-node-slug-fn #'org-node-slugify-for-web
-  "Function taking a node title and returning a filename.
+  "Function taking a node title and returning a filename component.
 Receives one argument: the value of an Org #+TITLE keyword, or
 the first heading in a file that has no #+TITLE.
 
@@ -1979,7 +1983,7 @@ that, configure `org-node-datestamp-format'."
 ;; (org-node-slugify-for-web "칹え🐛")
 
 (defun org-node-slugify-for-web (title)
-  "From TITLE, make a string meant to look nice as URL component.
+  "From TITLE, make a filename slug meant to look nice as URL component.
 
 A title like \"Löb\\='s Theorem\" becomes \"lobs-theorem\".
 Diacritical marks are stripped, as are most symbols not
@@ -2417,6 +2421,9 @@ format-constructs occur before these."
 (defcustom org-node-series-defs nil
   "Alist defining each node series.
 
+This functionality is still experimental, and likely to have
+higher-level wrappers in the future.
+
 Each item looks like
 
 \(KEY :name NAME
@@ -2724,7 +2731,7 @@ Customize this mainly if you want a given series to always be
 indicated, any time Org pops up a calendar for you.
 
 The sort-strings in the series that corresponds to this key
-should be correctly parseable by `org-parse-time-string'."
+should be correctly parseable by `parse-time-string'."
   :type '(choice key (const nil)))
 
 ;; (defface org-node-calendar-marked
@@ -3227,8 +3234,8 @@ Argument INTERACTIVE automatically set."
                   (if (org-at-heading-p) (org-show-entry) (org-show-context)))))
             (message "File %s renamed to %s" name new-name)))))))))
 
-;; FIXME: Kill opened buffers.  First make sure it can pick up where it left off.
-;;        Maybe use `org-node--in-files-do'.
+;; FIXME: Kill opened buffers.  First make sure it can pick up where it left
+;;        off.  Maybe use `org-node--in-files-do'.
 ;;;###autoload
 (defun org-node-rewrite-links-ask (&optional files)
   "Update desynced link descriptions, interactively.

@@ -272,8 +272,8 @@ headings but you have only done work under one of them."
 ;; navel-gaze its own content to see if it looks correct according to current
 ;; links tables.  Technically, that would be enough to result in correct
 ;; backlinks everywhere if you just run it on all files, and that's
-;; more-or-less how `org-node-backlink-fix-all-files' works, but we don't want to do
-;; that on every save.
+;; more-or-less how `org-node-backlink-fix-all-files' works, but we don't want
+;; to do that on every save.
 
 ;; By contrast, the below code does not look up tables, just reacts to the
 ;; exact link being inserted, which has two benefits:
@@ -418,7 +418,7 @@ where backlinks are fixed."
   :type 'boolean)
 
 (defun org-node-backlink--maybe-fix-aggressively (_)
-  "Designed for `org-node-rescan-hook'."
+  "Designed for `org-node-rescan-functions'."
   (when org-node-backlink-aggressive
     (if org-node-perf-eagerly-update-link-tables
         (let (affected-dests)

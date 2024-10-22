@@ -23,7 +23,9 @@
 ;; The child processes are expected to load this file, execute
 ;; `org-node-parser--collect-dangerously', then die.
 
-;; NOTE: While developing, use eval-buffer instead of specific defuns.
+;; NOTE: While developing, use `eval-buffer' instead of evalling specific
+;; defuns.  Why, because `org-node--ensure-compiled-lib' only looks up one
+;; of the defuns.
 
 ;;; Code:
 

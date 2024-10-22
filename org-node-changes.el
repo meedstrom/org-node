@@ -79,6 +79,7 @@ value."
       (org-link-set-parameters
        \"id\" :follow #'org-id-open :store #'org-id-store-link-maybe)"))))
 
+;; Remove in Dec or so
 (defun org-node-changes--guess-persist-filename (sym)
   (let ((dir (or (get sym 'persist-location)
                  (bound-and-true-p persist--directory-location)
