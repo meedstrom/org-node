@@ -510,7 +510,8 @@ findings to another temp file."
                                 SCHED
                                 TAGS
                                 (delete-dups
-                                 (append FILE-TAGS (mapcar #'cadddr OLPATH)))
+                                 (apply #'append FILE-TAGS
+                                        (mapcar #'cadddr OLPATH)))
                                 TITLE
                                 TODO-STATE)
                         result/found-nodes))
