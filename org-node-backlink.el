@@ -49,7 +49,10 @@ See Info node `(org-node)'.
 -----"
   :global t
   :group 'org-node
-  (remove-hook 'org-mode-hook #'org-node-backlink-mode) ;; Used to be local
+  (when (member #'org-node-backlink-mode org-mode-hook)
+    ;; 2024-10-22
+    (message "Now a global mode: `org-node-backlink-mode'")
+    (remove-hook 'org-mode-hook #'org-node-backlink-mode))
   (if org-node-backlink-mode
       (progn
         (advice-add 'org-insert-link :after  #'org-node-backlink--add-in-target)
@@ -84,12 +87,10 @@ See Info node `(org-node)'.
     (remove-hook 'after-change-functions          #'org-node-backlink--flag-buffer-modification t)
     (remove-hook 'before-save-hook                #'org-node-backlink--fix-flagged-parts-of-buffer t)))
 
-;;;###autoload
-(define-obsolete-function-alias
-  'org-node-backlink-global-mode #'org-node-backlink-mode "2024-09-25")
-;; ;;;###autoload (autoload 'org-node-backlink-global-mode "org-node-backlink" nil t)
-;; (org-node-changes--def-whiny-alias
-;;   'org-node-backlink-global-mode #'org-node-backlink-mode "2024-09-25")
+;;;###autoload (autoload 'org-node-backlink-global-mode "org-node-backlink" nil t)
+(org-node-changes--def-whiny-alias 'org-node-backlink-global-mode
+                                   #'org-node-backlink-mode
+                                   "2024-10-22" nil "15 December 2024")
 
 
 ;;;; Buffer validation
