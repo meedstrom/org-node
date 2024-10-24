@@ -202,10 +202,13 @@ need other changes to support TRAMP and encryption."
 
 (defun org-node--set-and-remind-reset (sym val)
   "Set SYM to VAL."
-  (when (and (boundp 'org-node--first-init) (not org-node--first-init))
-    (run-with-timer
-     .1 nil #'message
-     "Remember to run M-x org-node-reset after configuring %S" sym))
+  (let ((caller (cadr (backtrace-frame 5))))
+    (when (and (boundp 'org-node--first-init)
+               (not org-node--first-init)
+               (not (eq caller 'custom-theme-recalc-variable)))
+      (run-with-timer
+       .1 nil #'message
+       "Remember to run M-x org-node-reset after configuring %S" sym)))
   (custom-set-default sym val))
 
 (defcustom org-node-filter-fn
