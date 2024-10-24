@@ -1182,6 +1182,7 @@ function to update current tables."
           ;; Delete old result in order to then detect failure to generate a
           ;; new result.  Do not use Elisp `delete-file' since it can be
           ;; carrying all sorts of slow advices.
+          ;; TODO: In Emacs 30+, try `delete-file-internal'.
           (when rm
             (let ((result-file (org-node-parser--tmpfile "results-%d.eld" i)))
               (when-let ((buf (find-buffer-visiting result-file)))
@@ -1210,8 +1211,8 @@ function to update current tables."
                 org-node--processes))))))
 
 (defvar org-node--first-init t
-  "Non-nil if org-node has not been initialized yet.
-Muffles some messages.")
+  "Non-nil until org-node has been initialized, then nil.
+Mainly for muffling some messages.")
 
 (defun org-node--handle-finished-job (n-jobs finalizer)
   "If called by the last sentinel, run FINALIZER.
@@ -1616,7 +1617,7 @@ be misleading."
           (n-reflinks (cl-loop
                        for ref being the hash-keys of org-node--ref<>id
                        sum (length (gethash ref org-node--dest<>links)))))
-      (message "org-node read %d files, %d subtrees, %d ID-links, %d reflinks in %.2fs"
+      (message "Saw %d file-nodes, %d subtree-nodes, %d ID-links, %d reflinks in %.2fs"
                (- (hash-table-count org-node--id<>node) n-subtrees)
                n-subtrees
                n-backlinks
@@ -1624,7 +1625,7 @@ be misleading."
                org-node--time-elapsed))))
 
 (defun org-node--split-file-list (files n)
-  "Split FILES into a list of N lists of files.
+  "Split FILES into N lists of files.
 
 Take into account how long it took to scan each file last time, to
 return balanced lists that should each take around the same amount of
@@ -1654,8 +1655,8 @@ being saddled with a mega-file in addition to the average workload."
               (setq time (cdr (gethash file org-node--file<>mtime.elapsed)))
               (if (or (null time) (= 0 time))
                   (push file untimed)
-                ;; Dedicate huge files to their own cores
                 (if (> time max-per-core)
+                    ;; Dedicate huge files to their own cores
                     (push (list file) sublists)
                   (if (< time (- max-per-core this-sublist-sum))
                       (progn
@@ -1679,17 +1680,19 @@ being saddled with a mega-file in addition to the average workload."
               (if (= len 0)
                   ;; All files are untimed
                   ;; REVIEW: Code never ends up here, right?
-                  (setq sublists (org-node--split-into-n-sublists untimed n))
+                  (progn
+                    (setq sublists (org-node--split-into-n-sublists untimed n))
+                    (message "org-node: Unexpected code path. Not fatal, but report appreciated"))
                 (dolist (file (nconc untimed files))
                   (push file (nth (% (cl-incf ctr) len) sublists))))))
           sublists)))))
 
 (defun org-node--split-into-n-sublists (big-list n)
-  "Split BIG-LIST into a list of N sublists.
+  "Split BIG-LIST equally into a list of N sublists.
 
 In the unlikely case where BIG-LIST contains N or fewer elements,
-the return value is just like BIG-LIST except that each element
-is wrapped in its own list."
+that results in a value just like BIG-LIST except that
+each element is wrapped in its own list."
   (let ((sublist-length (max 1 (/ (length big-list) n)))
         result)
     (dotimes (i n)
