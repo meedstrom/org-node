@@ -4125,6 +4125,22 @@ Wrap the value in double-brackets if necessary."
     (org-node--add-to-property-keep-space "ROAM_REFS" ref)))
 
 (defun org-node-tag-add (tag-or-tags)
+  "Add TAG-OR-TAGS to the node at point.
+To always operate on the local entry, try `org-node-tag-add*'."
+  (interactive
+   (list (completing-read-multiple
+          "Tag: "
+          (cl-union
+           (cl-loop for node being the hash-values of org-nodes
+                    append (org-node-get-tags-local node))
+           (cl-remove-if #'keywordp
+                         (mapcar #'car (append org-tag-persistent-alist
+                                               org-tag-alist)))
+           :test #'equal)))
+   org-mode)
+  (org-node--call-at-nearest-node #'org-node-tag-add* tag-or-tags))
+
+(defun org-node-tag-add* (tag-or-tags)
   "Add TAG-OR-TAGS to the entry at point."
   (interactive
    (list (completing-read-multiple
