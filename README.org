@@ -148,9 +148,9 @@ I rarely have the screen space to display a backlink buffer.  Because it needs m
 
 *** Option 2A: Let org-node manage a =:BACKLINKS:= property
 
-For a first-time run, type =M-x org-node-backlink-fix-all=.  (Don't worry if you change your mind; undo with =M-x org-node-backlink-regret=.)
+For a first-time run, type =M-x org-node-backlink-fix-all-files=.  (Don't worry if you change your mind; undo with =M-x org-node-backlink-regret=.)
 
-Then start using the following mode, which keeps these properties updated.
+Then enable the following global mode, which keeps these properties updated.
 
 #+begin_src elisp
 (org-node-backlink-mode)
@@ -164,7 +164,7 @@ NOTE 2: By default, the setting =org-node-backlink-aggressive= is nil, so that s
 (setq org-node-backlink-aggressive t)
 #+end_src
 
-NOTE 3:  People who /don't/ use visual-line-mode or other soft-wrap modes may not find this way of displaying backlinks very scalable, since Org places properties on a single logical line.
+NOTE 3:  People who prefer to hard-wrap text instead of enabling =visual-line-mode= or similar may not find this way of displaying backlinks very scalable, since Org places properties on a single logical line.
 
 *** Option 2B: Let org-super-links manage a =:BACKLINKS:...:END:= drawer
 
@@ -211,7 +211,7 @@ Either revert that with the following snippet, or if [[https://github.com/meedst
 
 One user had over a thousand project-nodes, but only just began to do a knowledge base, and wished to avoid seeing the project nodes.
 
-This could work by excluding a "project" tag or any note that has a TODO state:
+This could work by, for example, excluding a "project" tag or any note that has a TODO state:
 
 #+begin_src elisp
 (setq org-node-filter-fn
@@ -234,7 +234,7 @@ You can also use a whitelist approach, allowing only nodes from a certain direct
 
 *** Limitation: =ROAM_EXCLUDE=
 
-Let's say you have a big archive file, fulla IDs, and you want all the nodes within out of sight.  Putting a =:ROAM_EXCLUDE: t= at the top won't do it.  Unlike in org-roam, *child ID nodes of an excluded node are not excluded!*  The =org-node-filter-fn= applies its ruleset to each node in isolation.
+Let's say you have a big archive file, fulla IDs, and you want all the nodes within out of sight.  Putting a =:ROAM_EXCLUDE: t= at the top won't do it, because unlike in org-roam, *child ID nodes of an excluded node are not excluded!*  The =org-node-filter-fn= applies its ruleset to each node in isolation.
 
 However, nodes in isolation do still have inherited tags.  So you can use that, or the file name or outline path.
 
@@ -246,7 +246,7 @@ While a big selling point of IDs is that you avoid depending on filenames, it's 
         (not (string-search "archive" (org-node-get-file-path node)))))
 #+end_src
 
-Or put something like =#+filetags: :wiki_exclude:= at the top of each file:
+Or put something like =#+filetags: :wiki_exclude:= at the top of each file, and set:
 
 #+begin_src elisp
 (setq org-node-filter-fn
@@ -462,7 +462,7 @@ API cheatsheet between org-roam and org-node.
 | Get tags                                | =(org-roam-node-tags NODE)=          | =(org-node-get-tags-with-inheritance NODE)=                             |
 | Get local tags                          |                                    | =(org-node-get-tags-local NODE)=                                              |
 | Get outline level                       | =(org-roam-node-level NODE)=         | =(org-node-get-level NODE)=                                             |
-| Get whether this is a subtree           | =(zerop (org-roam-node-level NODE))= | =(org-node-get-is-subtree NODE)=                                        |
+| Get whether this is a subtree           | =(=< 0 (org-roam-node-level NODE))= | =(org-node-get-is-subtree NODE)=                                        |
 | Get char position                       | =(org-roam-node-point NODE)=         | =(org-node-get-pos NODE)=                                               |
 | Get properties                          | =(org-roam-node-properties NODE)=    | =(org-node-get-properties NODE)=, only includes explicit properties     |
 | Get subtree TODO state                  | =(org-roam-node-todo NODE)=          | =(org-node-get-todo NODE)=                                              |
