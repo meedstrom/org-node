@@ -1232,12 +1232,12 @@ pass that to FINALIZER."
     (setq org-node--time-at-finalize (current-time))
     (setq org-node--time-at-last-child-done nil)
     (let ((file-name-handler-alist nil)
-          (coding-system-for-read org-node-perf-assume-coding-system)
+          (coding-system-for-read  org-node-perf-assume-coding-system)
           (coding-system-for-write org-node-perf-assume-coding-system)
           ;; Advised by `editorconfig-mode' & who knows what else
           (real-insert-file-contents
            (org-node--fn-sans-advice #'insert-file-contents))
-          merged-result)
+          (merged-result nil))
       (with-temp-buffer
         (dotimes (i n-jobs)
           (let ((results-file (org-node-parser--tmpfile "results-%d.eld" i)))
@@ -1272,11 +1272,11 @@ pass that to FINALIZER."
                   (setq merged-result (nreverse new-merged-result))))))))
       (funcall finalizer merged-result))))
 
-(defvar org-node-before-update-tables-hook nil
-  "Hook run just before processing results from scan.")
-
 
 ;;;; Scan-finalizers
+
+(defvar org-node-before-update-tables-hook nil
+  "Hook run just before processing results from scan.")
 
 (defun org-node--finalize-full (results)
   "Wipe tables and repopulate from data in RESULTS."
@@ -2517,6 +2517,7 @@ work, but this is not heavily tested, so it will start printing a
 message to remind you to check out the wiki on GitHub and port
 your definitions."
   :type 'alist
+  :package-version '(org-node . "1.0.10")
   :set #'org-node--set-and-remind-reset)
 
 (defvar org-node-built-series nil
@@ -3488,7 +3489,7 @@ from the beginning."
   (setq org-node--unlinted
         (org-node--in-files-do
           :files org-node--unlinted
-          :msg "Running org-lint (quit and resume anytime)"
+          :msg "Running org-lint (you may quit and resume anytime)"
           :about-to-do "About to visit a file to run org-lint"
           :call (lambda ()
                   (when-let ((warning (org-lint)))
@@ -3518,7 +3519,7 @@ from the beginning."
 (defun org-node-list-feedback-arcs ()
   "Show a feedback-arc-set of forward id-links.
 
-Requires GNU R installed, with R packages tidyverse and igraph.
+Requires GNU R installed, with R packages stringr, readr, igraph.
 
 A feedback arc set is a set of links such that if they are all
 cut (though sometimes it suffices to reverse the direction rather
@@ -3532,7 +3533,7 @@ network to quality-control it.  Rationale:
   (interactive)
   (unless (executable-find "Rscript")
     (user-error
-     "This command requires GNU R, with R packages tidyverse and igraph"))
+     "This command requires GNU R, with R packages: stringr, readr, igraph"))
   (let ((r-code "library(stringr)
 library(readr)
 library(igraph)
@@ -3600,11 +3601,11 @@ from ID links found in `org-node--dest<>links'."
 
 (cl-defun org-node--pop-to-tabulated-list (&key buffer format entries reverter)
   "Boilerplate abstraction.
-BUFFER-OR-NAME identifies the buffer.  FORMAT is the value to
-which `tabulated-list-format' should be set.  ENTRIES is the
-value to which `tabulated-list-entries' should be set.
+BUFFER is a buffer or buffer name where the list should be created.
+FORMAT is the value to which `tabulated-list-format' should be set.
+ENTRIES is the value to which `tabulated-list-entries' should be set.
 
-Optional argument REVERTER is a function to add to
+Optional argument REVERTER is a function to add locally to
 `tabulated-list-revert-hook'."
   (unless (and buffer format)
     (user-error

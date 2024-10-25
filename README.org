@@ -25,7 +25,7 @@ I like [[https://github.com/org-roam/org-roam][org-roam]] but found it too slow,
 
   In pursuit of being "just org-id", this package has no equivalent setting to =org-roam-directory= -- it just looks up =org-id-locations=.
 
-- *If you were not using org-roam*, maybe think of it as somewhat like [[https://github.com/alphapapa/org-recent-headings][org-recent-headings]] beefed-up to the extent that you won't need other methods of browsing, as long as you give IDs to all objects of interest.
+- *If you were not using org-roam*, maybe think of it as somewhat like [[https://github.com/alphapapa/org-recent-headings][org-recent-headings]] tooled-up to the extent that you won't need other methods of browsing, as long as you give IDs to all objects of interest.
 
   If you were the sort of person to prefer ID-links over file links or any other type of link, you're in the right place!  Now you can rely on IDs, and---if you want---stop worrying about filenames, directories and subtree hierarchies.  As long as you've assigned an ID to a heading or file, you can find it later.
 
@@ -101,12 +101,6 @@ If you are an org-roam user, you'll want the following module as well.  Please c
 (use-package org-node-fakeroam
   :defer)
 #+end_src
-
-Both are recent additions to MELPA, so you may have to refresh the recipe list first:
-
-- On built-in package.el: ~M-x package-refresh-contents RET~
-- On Elpaca: ~C-u M-x elpaca-update-menus RET~
-- On Straight (I think): ~M-x straight-fetch-all RET~
 
 ** Quick start
 
