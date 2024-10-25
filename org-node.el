@@ -4115,43 +4115,40 @@ Wrap the value in double-brackets if necessary."
   (let ((ref (string-trim (read-string "Ref: "))))
     (when (and (string-match-p " " ref)
                (string-match-p org-link-plain-re ref))
-      ;; If it is a link, it should not only be enclosed in quotes, but
-      ;; brackets too.  (Technically, org-node-parser doesn't need quotes,
-      ;; but it makes programming easier for everyone since they can use
-      ;; `split-string-and-unquote'.)
+      ;; If it is a link, it should be enclosed in brackets
       (setq ref (concat "[[" (string-trim ref (rx "[[") (rx "]]"))
                         "]]")))
     (org-node--add-to-property-keep-space "ROAM_REFS" ref)))
 
+(defun org-node--read-tag ()
+  "Prompt for an Org tag.
+Pre-fill completions by collecting tags from all known ID-nodes, as well
+as the members of `org-tag-persistent-alist' and `org-tag-alist'.
+
+Also collect current buffer tags, but only if `org-element-use-cache' is
+non-nil, because it can cause noticeable latency."
+  (completing-read-multiple
+   "Tag: "
+   (delete-dups
+    (nconc (thread-last (append org-tag-persistent-alist
+                                org-tag-alist
+                                (when org-element-use-cache
+                                  (org-get-buffer-tags)))
+                        (mapcar #'car)
+                        (mapcar #'substring-no-properties)
+                        (cl-remove-if #'keywordp))
+           (cl-loop for node being each hash-value of org-node--id<>node
+                    append (org-node-get-tags-with-inheritance node))))))
+
 (defun org-node-tag-add (tag-or-tags)
   "Add TAG-OR-TAGS to the node at point.
 To always operate on the local entry, try `org-node-tag-add*'."
-  (interactive
-   (list (completing-read-multiple
-          "Tag: "
-          (cl-union
-           (cl-loop for node being the hash-values of org-nodes
-                    append (org-node-get-tags-local node))
-           (cl-remove-if #'keywordp
-                         (mapcar #'car (append org-tag-persistent-alist
-                                               org-tag-alist)))
-           :test #'equal)))
-   org-mode)
+  (interactive (list (org-node--read-tag)) org-mode)
   (org-node--call-at-nearest-node #'org-node-tag-add* tag-or-tags))
 
 (defun org-node-tag-add* (tag-or-tags)
   "Add TAG-OR-TAGS to the entry at point."
-  (interactive
-   (list (completing-read-multiple
-          "Tag: "
-          (cl-union
-           (cl-loop for node being the hash-values of org-nodes
-                    append (org-node-get-tags-local node))
-           (cl-remove-if #'keywordp
-                         (mapcar #'car (append org-tag-persistent-alist
-                                               org-tag-alist)))
-           :test #'equal)))
-   org-mode)
+  (interactive (list (org-node--read-tag)) org-mode)
   (if (= (org-outline-level) 0)
       ;; There's no Org builtin to set filetags yet
       (let* ((tags (cl-loop
