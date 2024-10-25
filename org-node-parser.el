@@ -564,13 +564,13 @@ findings to another temp file."
           (print-length nil)
           (print-level nil))
       (write-region
-       (prin1-to-string (list result/missing-files
+       (prin1-to-string (list (current-time)
+                              result/missing-files
                               result/file-info
                               result/found-nodes
                               org-node-parser--paths-types
                               org-node-parser--found-links
-                              result/problems
-                              (current-time)))
+                              result/problems))
        nil
        (org-node-parser--tmpfile "results-%d.eld" $i)))))
 

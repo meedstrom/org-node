@@ -1254,11 +1254,8 @@ pass that to FINALIZER."
               (erase-buffer)
               (funcall real-insert-file-contents results-file)
               (let* ((result (read (buffer-string)))
-                     (time (car (last result)))
+                     (time (pop result))
                      new-merged-result)
-                ;; Last item is the time the process finished
-                ;; TODO: let it be first item
-                (nbutlast result)
                 (when (time-less-p
                        org-node--time-at-last-child-done time)
                   (setq org-node--time-at-last-child-done time))
