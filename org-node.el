@@ -1125,7 +1125,7 @@ function to update current tables."
                            (mapcar #'cdr (default-value 'org-todo-keywords)))
                     " "))))
             ($backlink-drawer-re
-             . ,(concat "^[[:space:]]*:"
+             . ,(concat "^[\t\s]*:"
                         (or (and (require 'org-super-links nil t)
                                  (boundp 'org-super-links-backlink-into-drawer)
                                  (stringp org-super-links-backlink-into-drawer)
@@ -1557,7 +1557,7 @@ also necessary is `org-node--dirty-ensure-link-known' elsewhere."
       (save-excursion
         (without-restriction
           (goto-char (point-min))
-          (re-search-forward (concat "^[[:space:]]*:id: +" id))
+          (re-search-forward (concat "^[\t\s]*:id: +" id))
           (let ((props (org-entry-properties))
                 (heading (org-get-heading t t t t))
                 (fpath buffer-file-truename) ;; Abbreviated

@@ -148,7 +148,7 @@ If REMOVE is non-nil, remove the property."
   (interactive)
   (goto-char (point-min))
   (let ((case-fold-search t))
-    (while (re-search-forward "^[[:space:]]*:id: " nil t)
+    (while (re-search-forward "^[\t\s]*:id: " nil t)
       (org-node-backlink--fix-entry-here remove))))
 
 (defun org-node-backlink--fix-entry-here (&optional remove)
@@ -241,7 +241,7 @@ headings but you have only done work under one of them."
                     (let ((id-here (org-entry-get-with-inheritance "ID")))
                       (and id-here
                            (re-search-backward
-                            (concat "^[[:space:]]*:id: +"
+                            (concat "^[\t\s]*:id: +"
                                     (regexp-quote id-here))
                             nil t)
                            (org-node-backlink--fix-entry-here))))
@@ -250,7 +250,7 @@ headings but you have only done work under one of them."
                   ;; within
                   (while (and (< (point) end)
                               (re-search-forward
-                               "^[[:space:]]*:id: +" end t))
+                               "^[\t\s]*:id: +" end t))
                     (org-node-backlink--fix-entry-here))
                   (remove-text-properties start end 'org-node-flag))
                 ;; This change-area dealt with, move on
@@ -452,7 +452,7 @@ where backlinks are fixed."
                   (dolist (id (delete-dups ids))
                     (goto-char (point-min))
                     (when (re-search-forward
-                           (concat "^[[:space:]]*:id: +" (regexp-quote id))
+                           (concat "^[\t\s]*:id: +" (regexp-quote id))
                            nil t)
                       (org-node-backlink--fix-entry-here)))
                   (unless user-is-editing

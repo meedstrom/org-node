@@ -169,7 +169,7 @@ the subheading potentially has an ID of its own."
         (unless (save-excursion
                   ;; If point is on a # comment line, skip
                   (goto-char (pos-bol))
-                  (looking-at-p "[[:space:]]*# "))
+                  (looking-at-p "[\t\s]*# "))
           (push (record 'org-node-link
                         id-here
                         link-pos
@@ -189,7 +189,7 @@ the subheading potentially has an ID of its own."
               (setq link-pos (1+ (match-beginning 0)))
               (if (save-excursion
                     (goto-char (pos-bol))
-                    (looking-at-p "[[:space:]]*# "))
+                    (looking-at-p "[\t\s]*# "))
                   ;; On a # comment, skip citation
                   (goto-char closing-bracket)
                 (push (record 'org-node-link
@@ -209,7 +209,7 @@ a :PROPERTIES: and :END: string."
   (let (result pos-start pos-eol)
     (goto-char beg)
     (while (< (point) end)
-      (skip-chars-forward "[:space:]")
+      (skip-chars-forward "\t\s")
       (unless (looking-at-p ":")
         (error "Possibly malformed property drawer"))
       (forward-char)
@@ -302,7 +302,7 @@ findings to another temp file."
               (erase-buffer)
               (insert-file-contents FILE))
             ;; Verify there is at least one ID-node
-            (unless (re-search-forward "^[[:space:]]*:id: " nil t)
+            (unless (re-search-forward "^[\t\s]*:id: " nil t)
               (push FILE result/missing-files) ;; Transitional cleanup
               (throw 'file-done t))
             (goto-char 1)
@@ -328,12 +328,12 @@ findings to another temp file."
                           (point-max)))
               (goto-char 1)
               (setq PROPS
-                    (if (re-search-forward "^[[:space:]]*:properties:" FAR t)
+                    (if (re-search-forward "^[\t\s]*:properties:" FAR t)
                         (progn
                           (forward-line 1)
                           (org-node-parser--collect-properties
                            (point)
-                           (if (re-search-forward "^[[:space:]]*:end:" FAR t)
+                           (if (re-search-forward "^[\t\s]*:end:" FAR t)
                                (pos-bol)
                              (error "Couldn't find :END: of drawer"))))
                       nil))
@@ -458,14 +458,14 @@ findings to another temp file."
                 (setq HERE (point))
                 (setq FAR (pos-eol))
                 (setq SCHED
-                      (if (re-search-forward "[[:space:]]*SCHEDULED: +" FAR t)
+                      (if (re-search-forward "[\t\s]*SCHEDULED: +" FAR t)
                           (prog1 (buffer-substring
                                   (point)
                                   (+ 1 (point) (skip-chars-forward "^]>\n")))
                             (goto-char HERE))
                         nil))
                 (setq DEADLINE
-                      (if (re-search-forward "[[:space:]]*DEADLINE: +" FAR t)
+                      (if (re-search-forward "[\t\s]*DEADLINE: +" FAR t)
                           (prog1 (buffer-substring
                                   (point)
                                   (+ 1 (point) (skip-chars-forward "^]>\n")))
@@ -473,7 +473,7 @@ findings to another temp file."
                         nil))
                 (when (or SCHED
                           DEADLINE
-                          (re-search-forward "[[:space:]]*CLOSED: +" FAR t))
+                          (re-search-forward "[\t\s]*CLOSED: +" FAR t))
                   ;; Alright, so there was a planning-line, meaning any
                   ;; :PROPERTIES: are not on this line but the next.
                   (forward-line 1)
@@ -485,7 +485,7 @@ findings to another temp file."
                             (forward-line 1)
                             (org-node-parser--collect-properties
                              (point)
-                             (if (re-search-forward "^[[:space:]]*:end:" nil t)
+                             (if (re-search-forward "^[\t\s]*:end:" nil t)
                                  (pos-bol)
                                (error "Couldn't find :END: of drawer"))))
                         nil))
