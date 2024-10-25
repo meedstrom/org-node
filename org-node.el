@@ -1057,7 +1057,9 @@ Make it target only LINK-TYPES instead of all the cars of
   "Get original function defined at SYM, sans advices."
   (if (advice--p (symbol-function sym))
       (advice--cd*r (symbol-function sym))
-    (ad-get-orig-definition sym)))
+    (if (fboundp #'ad-get-orig-definition)
+        (ad-get-orig-definition sym)
+      sym)))
 
 (defvar org-node--debug nil)
 (defun org-node--scan (files finalizer)
@@ -1228,50 +1230,45 @@ pass that to FINALIZER."
     (let ((file-name-handler-alist nil)
           (coding-system-for-read org-node-perf-assume-coding-system)
           (coding-system-for-write org-node-perf-assume-coding-system)
-          ;; TODO: General way to inhibit advices on `'insert-file-contents'?
-          (editorconfig
-           (when (advice-member-p 'editorconfig--advice-insert-file-contents
-                                  #'insert-file-contents)
-             (advice-remove #'insert-file-contents
-                            'editorconfig--advice-insert-file-contents)
-             t))
+          ;; Advised by `editorconfig-mode' & who knows what else
+          (real-insert-file-contents
+           (org-node--fn-sans-advice #'insert-file-contents))
           merged-result)
       (with-temp-buffer
-        (unwind-protect
-            (dotimes (i n-jobs)
-              (let ((results-file (org-node-parser--tmpfile "results-%d.eld" i)))
-                (if (not (file-exists-p results-file))
-                    (progn
-                      ;; Had 1+ errors, so unhide stderr buffer from now on
-                      (when-let (buf (get-buffer " *org-node*"))
-                        (setq org-node--stderr-name "*org-node errors*")
-                        (with-current-buffer buf
-                          (rename-buffer org-node--stderr-name)))
-                      ;; Don't warn on first run, for better UX.  First-time
-                      ;; init thru autoloads can have bugs for seemingly
-                      ;; magical reasons that go away afterwards (e.g. it says
-                      ;; the files aren't on disk but they are).
-                      (unless org-node--first-init
-                        (message "An org-node worker failed to produce %s.  See buffer %s"
-                                 results-file org-node--stderr-name)))
-                  (erase-buffer)
-                  (insert-file-contents results-file)
-                  (let* ((result (read (buffer-string)))
-                         (time (car (last result)))
-                         new-merged-result)
-                    (nbutlast result)
-                    (when (time-less-p
-                           org-node--time-at-last-child-done time)
-                      (setq org-node--time-at-last-child-done time))
-                    (if (= i 0)
-                        (setq merged-result result)
-                      (while result
-                        (push (nconc (pop result) (pop merged-result))
-                              new-merged-result))
-                      (setq merged-result (nreverse new-merged-result)))))))
-          (when editorconfig
-            (advice-add #'insert-file-contents :around
-                        'editorconfig--advice-insert-file-contents))))
+        (dotimes (i n-jobs)
+          (let ((results-file (org-node-parser--tmpfile "results-%d.eld" i)))
+            (if (not (file-exists-p results-file))
+                (progn
+                  ;; Had 1+ errors, so unhide stderr buffer from now on
+                  (when-let (buf (get-buffer " *org-node*"))
+                    (setq org-node--stderr-name "*org-node errors*")
+                    (with-current-buffer buf
+                      (rename-buffer org-node--stderr-name)))
+                  ;; Don't warn on first run, for better UX.  First-time
+                  ;; init thru autoloads can have bugs for seemingly
+                  ;; magical reasons that go away afterwards (e.g. it says
+                  ;; the files aren't on disk but they are).
+                  (unless org-node--first-init
+                    (message "An org-node worker failed to produce %s.  See buffer %s"
+                             results-file org-node--stderr-name)))
+              (erase-buffer)
+              (funcall real-insert-file-contents results-file)
+              (let* ((result (read (buffer-string)))
+                     (time (car (last result)))
+                     new-merged-result)
+                ;; Last item is the time the process finished
+                ;; TODO: let it be first item
+                (nbutlast result)
+                (when (time-less-p
+                       org-node--time-at-last-child-done time)
+                  (setq org-node--time-at-last-child-done time))
+                (if (= i 0)
+                    (setq merged-result result)
+                  ;; Zip lists pairwise
+                  (while result
+                    (push (nconc (pop result) (pop merged-result))
+                          new-merged-result))
+                  (setq merged-result (nreverse new-merged-result))))))))
       (funcall finalizer merged-result))))
 
 (defvar org-node-before-update-tables-hook nil
