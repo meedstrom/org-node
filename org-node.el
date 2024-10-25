@@ -1061,6 +1061,20 @@ Make it target only LINK-TYPES instead of all the cars of
         (ad-get-orig-definition sym)
       sym)))
 
+(defun org-node--write-eld (object file)
+  "Write text representation of Lisp OBJECT into FILE.
+Overwrites what was in that file.
+
+Kill any buffer that may have been visiting FILE, to prevent an error
+signal from a bug in `userlock--ask-user-about-supersession-threat'
+that presumes that the current buffer is visiting FILE."
+  ;; There is the broader `find-buffer-visiting', but `get-truename-buffer'
+  ;; appears to be what's used in filelock.c (in Emacs 30+).
+  (when-let ((buf (get-truename-buffer file)))
+    (kill-buffer buf))
+  (write-region (prin1-to-string object nil '((length . nil) (level . nil)))
+                nil file nil 'quiet))
+
 (defvar org-node--debug nil)
 (defun org-node--scan (files finalizer)
   "Begin async scanning FILES for id-nodes and links.
@@ -1144,14 +1158,9 @@ function to update current tables."
         ;; Special case for debugging; run single-threaded so we can step
         ;; through the org-node-parser.el functions with edebug
         (let (($i 0)
-              (write-region-inhibit-fsync nil)
-              (print-length nil))
-          (write-region (prin1-to-string
-                         (sort files (lambda (_ _) (natnump (random)))))
-                        nil
-                        (org-node-parser--tmpfile "file-list-0.eld")
-                        nil
-                        'quiet)
+              (write-region-inhibit-fsync nil))
+          (org-node--write-eld (sort files (lambda (_ _) (natnump (random))))
+                               (org-node-parser--tmpfile "file-list-0.eld"))
           (setq org-node-parser--found-links nil)
           (setq org-node-parser--paths-types nil)
           (setq org-node--first-init nil)
@@ -1181,18 +1190,13 @@ function to update current tables."
              (print-length nil)
              (del (org-node--fn-sans-advice #'delete-file)))
         (dotimes (i n-jobs)
-          (write-region (prin1-to-string (pop file-lists))
-                        nil
-                        (org-node-parser--tmpfile "file-list-%d.eld" i)
-                        nil
-                        'quiet)
-          ;; Delete old result in order to then detect failure to generate a
-          ;; new result.
+          (org-node--write-eld (pop file-lists)
+                               (org-node-parser--tmpfile "file-list-%d.eld" i))
+          ;; Clean old result in order to spot failure to make a new result
           (let ((result-file (org-node-parser--tmpfile "results-%d.eld" i)))
-            (when-let ((buf (find-buffer-visiting result-file)))
+            (when-let ((buf (get-truename-buffer result-file)))
               (kill-buffer buf))
-            ;; TODO: In Emacs 30+, use `delete-file-internal'?
-            (funcall del result-file))
+            (funcall del result-file)) ;; Maybe use `delete-file-internal'?
           ;; TODO: Maybe prepend a "timeout 30"
           (push (make-process
                  :name (format "org-node-%d" i)

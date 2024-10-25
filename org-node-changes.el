@@ -68,7 +68,10 @@ value."
                             org-node--file<>previews)
                do (let ((file (org-node-changes--guess-persist-filename sym)))
                     (when (file-exists-p file)
-                      (delete-file file))))))
+                      (delete-file file)))))
+    ;; 2024-10-25
+    (unless (fboundp 'get-truename-buffer)
+      (user-error "Update compat.el to use this version of org-node")))
   ;; 2024-10-18
   (unless org-node-changes--warned-roam-id
     (when (eq (org-link-get-parameter "id" :follow) 'org-roam-id-open)
