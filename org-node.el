@@ -1053,6 +1053,12 @@ Make it target only LINK-TYPES instead of all the cars of
 	    (or (regexp "[^[:punct:][:space:]\n]")
                 ?- ?/ ,parenthesis))))))
 
+(defun org-node--fn-sans-advice (sym)
+  "Get original function defined at SYM, sans advices."
+  (if (advice--p (symbol-function sym))
+      (advice--cd*r (symbol-function sym))
+    (ad-get-orig-definition sym)))
+
 (defvar org-node--debug nil)
 (defun org-node--scan (files finalizer)
   "Begin async scanning FILES for id-nodes and links.
@@ -1171,7 +1177,7 @@ function to update current tables."
              (write-region-inhibit-fsync nil) ;; Default t in emacs30
              (default-directory invocation-directory)
              (print-length nil)
-             (rm (executable-find "rm")))
+             (del (org-node--fn-sans-advice #'delete-file)))
         (dotimes (i n-jobs)
           (write-region (prin1-to-string (pop file-lists))
                         nil
@@ -1179,14 +1185,12 @@ function to update current tables."
                         nil
                         'quiet)
           ;; Delete old result in order to then detect failure to generate a
-          ;; new result.  Do not use Elisp `delete-file' since it can be
-          ;; carrying all sorts of slow advices.
-          ;; TODO: In Emacs 30+, try `delete-file-internal'.
-          (when rm
-            (let ((result-file (org-node-parser--tmpfile "results-%d.eld" i)))
-              (when-let ((buf (find-buffer-visiting result-file)))
-                (kill-buffer buf))
-              (start-process rm nil rm result-file)))
+          ;; new result.
+          (let ((result-file (org-node-parser--tmpfile "results-%d.eld" i)))
+            (when-let ((buf (find-buffer-visiting result-file)))
+              (kill-buffer buf))
+            ;; TODO: In Emacs 30+, use `delete-file-internal'?
+            (funcall del result-file))
           ;; TODO: Maybe prepend a "timeout 30"
           (push (make-process
                  :name (format "org-node-%d" i)
