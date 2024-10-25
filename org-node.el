@@ -192,12 +192,11 @@ need other changes to support TRAMP and encryption."
                  (set
                   (function-item jka-compr-handler)
                   (function-item epa-file-handler)
+                  ;; REVIEW: Why does
+                  ;; `tramp-archive-autoload-file-name-handler' exist, when
+                  ;; these already have autoloads?
                   (function-item tramp-file-name-handler)
-                  (function-item tramp-completion-file-name-handler)
                   (function-item tramp-archive-file-name-handler)
-                  ;; TODO: Maybe force-load Tramp if the above three is in
-                  ;;       this list
-                  (function-item tramp-archive-autoload-file-name-handler)
                   (function-item file-name-non-special))))
 
 (defun org-node--set-and-remind-reset (sym val)
@@ -1093,45 +1092,45 @@ function to update current tables."
     (setq org-node--processes nil)
     (with-current-buffer (get-buffer-create org-node--stderr-name)
       (erase-buffer))
+    ;; REVIEW: How's the performance of `write-region' + `prin1-to-string'
+    ;;         vs `with-temp-file'?
     (with-temp-file (org-node-parser--tmpfile "work-variables.eld")
       (let ((standard-output (current-buffer))
             (print-length nil)
             (print-level nil)
             (reduced-plain-re (org-node--make-plain-re org-node-link-types)))
         (prin1
-         ;; NOTE The $sigils in the names are to visually distinguish these
-         ;;      "external" variables in the body of
-         ;;      `org-node-parser--collect-dangerously'.
+         ;; NOTE: The $sigil-prefixed names visually distinguish these
+         ;;       externally-provided variables in the body of
+         ;;       `org-node-parser--collect-dangerously'.
          (append
           org-node-inject-variables
-          `(($plain-re . ,reduced-plain-re)
-            ($merged-re . ,(concat org-link-bracket-re "\\|" reduced-plain-re))
-            ($assume-coding-system . ,org-node-perf-assume-coding-system)
-            ($inlinetask-min-level
-             . ,(bound-and-true-p org-inlinetask-min-level))
-            ($file-todo-option-re
-             . ,(rx bol (* space)
-                    (or "#+todo: " "#+seq_todo: " "#+typ_todo: ")))
-            ($file-name-handler-alist
-             . ,(cl-remove-if-not (##memq % org-node-perf-keep-file-name-handlers)
-                                  file-name-handler-alist
-                                  :key #'cdr))
-            ($global-todo-re
-             . ,(if (stringp (car org-todo-keywords))
-                    (org-node--die "Quit because `org-todo-keywords' is configured with obsolete syntax, please fix")
-                  (org-node-parser--make-todo-regexp
-                   (string-join
-                    (apply #'append
-                           (mapcar #'cdr (default-value 'org-todo-keywords)))
-                    " "))))
-            ($backlink-drawer-re
-             . ,(concat "^[\t\s]*:"
-                        (or (and (require 'org-super-links nil t)
-                                 (boundp 'org-super-links-backlink-into-drawer)
-                                 (stringp org-super-links-backlink-into-drawer)
-                                 org-super-links-backlink-into-drawer)
-                            "backlinks")
-                        ":")))))))
+          (list
+           (cons '$plain-re reduced-plain-re)
+           (cons '$merged-re (concat org-link-bracket-re "\\|" reduced-plain-re))
+           (cons '$assume-coding-system org-node-perf-assume-coding-system)
+           (cons '$inlinetask-min-level (bound-and-true-p org-inlinetask-min-level))
+           (cons '$file-todo-option-re
+                 (rx bol (* space) (or "#+todo: " "#+seq_todo: " "#+typ_todo: ")))
+           (cons '$global-todo-re
+                 (let ((default (default-value 'org-todo-keywords)))
+                   (org-node-parser--make-todo-regexp
+                    (string-join (if (stringp (car default))
+                                     default
+                                   (apply #'append (mapcar #'cdr default)))
+                                 " "))))
+           (cons '$file-name-handler-alist
+                 (cl-remove-if-not
+                  (##memq % org-node-perf-keep-file-name-handlers)
+                  file-name-handler-alist :key #'cdr))
+           (cons '$backlink-drawer-re
+                 (concat "^[\t\s]*:"
+                         (or (and (require 'org-super-links nil t)
+                                  (boundp 'org-super-links-backlink-into-drawer)
+                                  (stringp org-super-links-backlink-into-drawer)
+                                  org-super-links-backlink-into-drawer)
+                             "backlinks")
+                         ":")))))))
 
     (if org-node--debug
         ;; Special case for debugging; run single-threaded so we can step
@@ -1139,8 +1138,8 @@ function to update current tables."
         (let (($i 0)
               (write-region-inhibit-fsync nil)
               (print-length nil))
-          (write-region (prin1-to-string (sort files (lambda (_ _)
-                                                       (natnump (random)))))
+          (write-region (prin1-to-string
+                         (sort files (lambda (_ _) (natnump (random)))))
                         nil
                         (org-node-parser--tmpfile "file-list-0.eld")
                         nil
@@ -1308,7 +1307,7 @@ pass that to FINALIZER."
       (org-node--add-series-to-dispatch (car def)
                                         (plist-get (cdr def) :name)))
     (setq org-node--time-elapsed
-          ;; For reproducible profiling: don't count time spent on
+          ;; For more reproducible profiling: don't count time spent on
           ;; other sentinels, timers or I/O in between these periods
           (+ (float-time
               (time-subtract (current-time)
@@ -1330,7 +1329,7 @@ pass that to FINALIZER."
 
 Alist of ((DEST . LINKS) (DEST . LINKS) ...), where LINKS is a set of
 links with destination DEST minus those that recently changed, allowing
-for a diff operation against the current set.")
+for a diff operation against the up-to-date set.")
 
 (defun org-node--finalize-modified (results)
   "Use RESULTS to update tables."
