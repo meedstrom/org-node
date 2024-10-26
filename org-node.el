@@ -204,7 +204,10 @@ need other changes to support TRAMP and encryption."
   (let ((caller (cadr (backtrace-frame 5))))
     (when (and (boundp 'org-node--first-init)
                (not org-node--first-init)
-               (not (eq caller 'custom-theme-recalc-variable)))
+               ;; TIL: loading a theme calls ALL custom-setters?!
+               (not (memq caller '(custom-theme-recalc-variable load-theme))))
+      (lwarn 'org-node :debug
+             "org-node--set-and-remind-reset called by %s" caller)
       (run-with-timer
        .1 nil #'message
        "Remember to run M-x org-node-reset after configuring %S" sym)))
