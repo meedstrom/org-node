@@ -95,7 +95,7 @@ Assuming your package manager knows about [[https://melpa.org/#/getting-started]
   :config (org-node-cache-mode))
 #+end_src
 
-If you are an org-roam user, you'll want the following module as well.  Please check its README to [[https://github.com/meedstrom/org-node-fakeroam][make org-node work with org-roam side-by-side]].
+If you are an org-roam user, you'll want the following module as well.  Check its README to [[https://github.com/meedstrom/org-node-fakeroam][make org-node work with org-roam side-by-side]].
 
 #+begin_src elisp
 (use-package org-node-fakeroam

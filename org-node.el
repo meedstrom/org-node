@@ -192,9 +192,9 @@ need other changes to support TRAMP and encryption."
                  (set
                   (function-item jka-compr-handler)
                   (function-item epa-file-handler)
-                  ;; REVIEW: Why does
-                  ;; `tramp-archive-autoload-file-name-handler' exist, when
-                  ;; these already have autoloads?
+                  ;; REVIEW: Chesterton's Fence.  I don't understand why
+                  ;; `tramp-archive-autoload-file-name-handler' exists
+                  ;; (check emacs -Q), when these two already have autoloads?
                   (function-item tramp-file-name-handler)
                   (function-item tramp-archive-file-name-handler)
                   (function-item file-name-non-special))))
@@ -696,8 +696,7 @@ When called from Lisp, peek on any hash table HT."
     (advice-remove 'delete-file                   #'org-node--handle-delete)))
 
 (defun org-node--tramp-file-p (file)
-  "Wrapper for `tramp-tramp-file-p'.
-Always returns nil if Tramp is not loaded."
+  "Pass FILE to `tramp-tramp-file-p' if Tramp is loaded."
   (when (featurep 'tramp)
     (tramp-tramp-file-p file)))
 
@@ -705,7 +704,7 @@ Always returns nil if Tramp is not loaded."
   "Arrange to scan NEWNAME for nodes and links, and forget FILE."
   (org-node--scan-targeted
    (thread-last (list file newname)
-                (seq-filter (lambda (file) (string-suffix-p ".org" file)))
+                (seq-filter (##string-suffix-p ".org" %))
                 (seq-remove #'backup-file-name-p)
                 (seq-remove #'org-node--tramp-file-p)
                 (mapcar #'file-truename))))
@@ -1070,7 +1069,7 @@ Overwrites what was in that file.
 
 Kill any buffer that may have been visiting FILE, to prevent an error
 signal from a bug in `userlock--ask-user-about-supersession-threat'
-that presumes that the current buffer is visiting FILE."
+that presumes in some cases that the current buffer is visiting FILE."
   ;; There is the broader `find-buffer-visiting', but `get-truename-buffer'
   ;; appears to be what's used in filelock.c (in Emacs 30+).
   (when-let ((buf (get-truename-buffer file)))
@@ -3794,9 +3793,6 @@ one of them is associated with a ROAM_REFS property."
     (message "Congratulations, no problems scanning %d nodes!"
              (hash-table-count org-node--id<>node))))
 
-;; NOTE: Very important macro for the backlink mode, because backlink insertion
-;;       opens the target Org file in the background, and if doing that is
-;;       laggy, then every link insertion is laggy.
 (defmacro org-node--with-quick-file-buffer (file &rest body)
   "Pseudo-backport of Emacs 29 `org-with-file-buffer'.
 Also integrates `org-with-wide-buffer' behavior, and tries to
