@@ -669,6 +669,8 @@ When called from Lisp, peek on any hash table HT."
   (remove-hook 'org-mode-hook #'org-node-cache-mode) ;; Old install instruction
   (if org-node-cache-mode
       (progn
+        ;; FIXME: A dirty-added node eventually disappears if its buffer is
+        ;;        never saved, and then the series stops working
         (add-hook 'org-node-creation-hook         #'org-node--add-series-item 90)
         (add-hook 'org-node-creation-hook         #'org-node--dirty-ensure-node-known -50)
         (add-hook 'org-node-insert-link-hook      #'org-node--dirty-ensure-link-known -50)
@@ -2376,6 +2378,40 @@ KEY, NAME and CAPTURE explained in `org-node-series-defs'."
                  (unwind-protect (org-node-create sortstr (org-id-new) key)
                    (remove-hook 'org-node-creation-hook adder))))))
 
+(defun org-node-mk-series-on-filepath-sorted-by-basename
+    (key name dir &optional capture date-picker)
+  "Define a series of files located under DIR.
+KEY, NAME and CAPTURE explained in `org-node-series-defs'.
+
+When optional argument DATE-PICKER is non-nil, let the prompter use the
+Org date picker.  This needs file basenames in YYYY-MM-DD format."
+  (setq dir (abbreviate-file-name (file-truename dir)))
+  `(,key
+    :name ,name
+    :version 2
+    :capture ,capture
+    :classifier (lambda (node)
+                  (when (string-prefix-p ,dir (org-node-get-file-path node))
+                    (let* ((path (org-node-get-file-path node))
+                           (sortstr (file-name-base path)))
+                      (cons sortstr path))))
+    :whereami (lambda ()
+                (when (string-prefix-p ,dir buffer-file-truename)
+                  (file-name-base buffer-file-truename)))
+    :prompter (lambda (key)
+                ;; Tip: Consider `org-read-date-prefer-future' nil
+                (if ,date-picker
+                    (let ((org-node-series-that-marks-calendar key))
+                      (org-read-date))
+                  (let ((series (cdr (assoc key org-node-built-series))))
+                    (completing-read "Go to: " (plist-get series :sorted-items)))))
+    :try-goto (lambda (item)
+                (org-node-helper-try-visit-file (cdr item)))
+    :creator (lambda (sortstr key)
+               (let ((org-node-creation-fn #'org-node-new-file)
+                     (org-node-ask-directory ,dir))
+                 (org-node-create sortstr (org-id-new) key)))))
+
 (defvar org-node--guess-daily-dir nil)
 (defun org-node--guess-daily-dir ()
   "Do not rely on this.
@@ -2400,10 +2436,13 @@ instead of calling this function."
       t)))
 
 (defun org-node-helper-try-visit-file (file)
-  "Visit FILE if it exists and return non-nil.
-Do not create FILE if it does not exist, just return nil."
-  (when (file-readable-p file)
-    (find-file file)))
+  "If FILE exists or a buffer has it as filename, visit that.
+On success, return non-nil; otherwise nil.  Never create FILE."
+  (let ((buf (find-buffer-visiting file)))
+    (if buf
+        (switch-to-buffer buf)
+      (when (file-readable-p file)
+        (find-file file)))))
 
 (defun org-node-helper-filename->ymd (path)
   "Check the filename PATH for a date and return it.
@@ -2546,12 +2585,12 @@ Automatically set, should be nil most of the time.  For a
 variable that need not stay nil, see
 `org-node-current-series-key'.")
 
-(defun org-node--add-series-item ()
+(defun org-node--add-series-item (&optional key)
   "Look at node near point to maybe add an item to a series.
 Only do something if `org-node-proposed-series-key' is non-nil
 currently."
-  (when org-node-proposed-series-key
-    (let* ((series (cdr (assoc org-node-proposed-series-key
+  (when (or key org-node-proposed-series-key)
+    (let* ((series (cdr (assoc (or key org-node-proposed-series-key)
                                org-node-built-series)))
            (node-here (gethash (org-node-id-at-point) org-nodes))
            (new-item (when node-here
