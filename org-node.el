@@ -25,42 +25,48 @@
 
 ;; What is Org-node?
 
-;; If you were the sort of person to prefer "id:" links over "file:" links or
-;; any other type of link, you're in the right place!
+;; If you were the sort of person to prefer "id:" links over "file:"
+;; links or any other type of link, you're in the right place!
 
-;; Now you can rely on IDs and worry less about mentally tracking your subtree
-;; hierarchies and directory structures.  As long as you've assigned an ID to
-;; something, you can find it later.
+;; Now you can rely on IDs and worry less about mentally tracking your
+;; subtree hierarchies and directory structures.  As long as you've
+;; assigned an ID to something, you can find it later.
 
-;; The philosophy is the same as org-roam: if you assign an ID every time you
-;; make an entry that you know you might want to link to from elsewhere, then
-;; it tends to work out that the `org-node-find' command can jump to more or
-;; less every entry you'd ever want to jump to.  Pretty soon you've forgot that
-;; your files have names.
+;; The philosophy is the same as org-roam: if you assign an ID every
+;; time you make an entry that you know you might want to link to from
+;; elsewhere, then it tends to work out that the `org-node-find' command
+;; can jump to more or less every entry you'd ever want to jump to.
+;; Pretty soon you've forgot that your files have names.
 
-;; Anyway, that's just the core of it as described to someone not familiar with
-;; zettelkasten software.  In fact, out of the simplicity arises something
-;; powerful, more to be experienced than explained.
+;; Anyway, that's just the core of it as described to someone not
+;; familiar with zettelkasten-ish packages.  In fact, out of the
+;; simplicity arises something powerful, more to be experienced than
+;; explained.
 
 ;; Compared to org-roam:
 
-;;   Same idea, compatible disk format(!), but org-node is fast, does not need
-;;   SQLite, lets you opt out of file-level property drawers, does not support
-;;   "roam:" links, and tries to rely in a bare-metal way on upstream org-id
-;;   and org-capture.
+;;   - Same idea, compatible disk format
+;;   - Faster
+;;   - Does not need SQLite
+;;   - Does not support "roam:" links
+;;   - Lets you opt out of those file-level property drawers
+;;   - Ships extra commands to e.g. auto-rename files and links
+;;   - Tries to rely in a bare-metal way on upstream org-id and org-capture
 
-;;     As a drawback, if a heading in some Git README or whatever has an ID,
-;;     it's considered part of your collection -- simply because if it's known
-;;     to org-id, it's known to org-node.  These headings can be filtered
-;;     after-the-fact.
+;;   As a drawback of relying on org-id-locations, if a heading in some
+;;   vendor README.org or whatever has an ID, it's considered part of
+;;   your collection -- simply because if it's known to org-id, it's
+;;   known to org-node.
+;;   These headings can be filtered after-the-fact.
 
 ;; Compared to denote:
 
-;;   Org-node is Org only, no Markdown, no support for "denote:" links.
-;;   Filenames have no meaning (so could match the Denote format if you like),
-;;   and you can have as many "notes" as you want inside one file.  You could
-;;   possibly use Denote to search just files and org-node as a more granular
-;;   search.
+;;   - Org only, no Markdown nor other file types
+;;   - Does not support "denote:" links
+;;   - Filenames have no meaning (can match the Denote format if you like)
+;;   - You can have as many "notes" as you want inside one file.  You
+;;     could possibly use Denote to search files and org-node
+;;     as a more granular search.
 
 ;;; Code:
 
@@ -70,6 +76,7 @@
 (require 'subr-x)
 (require 'bytecomp)
 (require 'transient)
+(require 'ucs-normalize)
 (require 'org)
 (require 'org-id)
 (require 'org-macs)
@@ -160,6 +167,10 @@ There is no need to add the \"cite\" type."
 Picking a specific coding system can speed up `org-node-reset'.
 Set nil to let Emacs figure it out anew on every file.
 
+For now, this setting is likely only impactful if
+`org-node-perf-max-jobs' is very low.  Otherwise overhead is a much
+larger component of the execute time.
+
 On MS Windows this probably should be nil.  Same if you access
 your files from multiple platforms.
 
@@ -178,26 +189,51 @@ display strange-looking data."
 (defcustom org-node-perf-keep-file-name-handlers nil
   "Which file handlers to respect while scanning for ID nodes.
 
-Normally, `file-name-handler-alist' makes Emacs react specially to
-seeing some file names: TRAMP paths, compressed files or .org.gpg files.
+Normally, `file-name-handler-alist' changes the behavior of many Emacs
+functions when passed some file names: TRAMP paths, compressed files or
+.org.gpg files.
 
-It\\='s infamous for (somewhat) slowing down the access of very
-many files, since it is a series of regexps applied to every file
-name visited.  The fewer items in this list, the faster
-`org-node-reset'.
+It slows down the access of very many files, since it is a series of
+regexps applied to every file name passed.  The fewer items in this
+list, the faster `org-node-reset'.
 
-There is probably no point customizing this for now, as org-node will
+There is probably no point adding items for now, as org-node will
 need other changes to support TRAMP and encryption."
-  :type '(choice (const :tag "Keep all" t)
-                 (set
-                  (function-item jka-compr-handler)
-                  (function-item epa-file-handler)
-                  ;; REVIEW: Chesterton's Fence.  I don't understand why
-                  ;; `tramp-archive-autoload-file-name-handler' exists
-                  ;; (check emacs -Q), when these two already have autoloads?
-                  (function-item tramp-file-name-handler)
-                  (function-item tramp-archive-file-name-handler)
-                  (function-item file-name-non-special))))
+  :type '(set
+          (function-item jka-compr-handler)
+          (function-item epa-file-handler)
+          ;; REVIEW: Chesterton's Fence.  I don't understand why
+          ;; `tramp-archive-autoload-file-name-handler' exists
+          ;; (check emacs -Q), when these two already have autoloads?
+          (function-item tramp-file-name-handler)
+          (function-item tramp-archive-file-name-handler)
+          (function-item file-name-non-special)))
+
+;; To compare perf with and without the setting, eval this in a large file.
+;; (progn (add-hook 'org-node--temp-extra-fns
+;;                  (lambda ()
+;;                    (print (float-time (time-since org-node--time-at-begin-launch)))))
+;;        (org-node--scan-targeted buffer-file-truename))
+(defcustom org-node-perf-eagerly-update-link-tables t
+  "Update backlink tables on every save.
+
+A setting of t MAY slow down saving a big file containing
+thousands of links on constrained devices.
+
+Fortunately it is rarely needed, since the insert-link advices of
+`org-node-cache-mode' will already record links added during
+normal usage!
+
+Other issues are corrected after `org-node--idle-timer' fires.
+These temporary issues are:
+
+1. deleted links remain in the table, leading to undead backlinks
+2. link positions can desync, which can affect the org-roam buffer
+
+A user of `org-node-backlink-mode' is recommended to enable this as
+well as `org-node-backlink-aggressive'."
+  :group 'org-node
+  :type 'boolean)
 
 (defun org-node--set-and-remind-reset (sym val)
   "Set SYM to VAL."
@@ -375,7 +411,7 @@ aliases."
           (function-item org-node-prefix-with-olp)
           (function-item org-node-prefix-with-tags)
           (function-item org-node-affix-with-olp-and-tags)
-          function)
+          (function :tag "Custom function"))
   :set #'org-node--set-and-remind-reset)
 
 (defun org-node-affix-bare (_node title)
@@ -709,7 +745,8 @@ When called from Lisp, peek on any hash table HT."
                 (seq-filter (##string-suffix-p ".org" %))
                 (seq-remove #'backup-file-name-p)
                 (seq-remove #'org-node--tramp-file-p)
-                (mapcar #'file-truename))))
+                (mapcar #'file-truename)
+                (org-node-abbrev-file-names))))
 
 (defun org-node--handle-delete (file &rest _)
   "Arrange to forget nodes and links in FILE."
@@ -726,7 +763,7 @@ When called from Lisp, peek on any hash table HT."
 
 (defvar org-node--idle-timer (timer-create)
   "Timer for intermittently checking `org-node-extra-id-dirs'.
-for new, changed or deleted files.
+for new, changed or deleted files, then resetting the cache.
 
 This redundant behavior helps detect changes made by something
 other than the current instance of Emacs, such as an user typing
@@ -941,6 +978,8 @@ If FILES is t, do a full reset, scanning all files discovered by
             (setq must-retry t)))
       ;; All clear, scan now
       (setq org-node--wait-start nil)
+      (setq org-node--time-at-begin-launch (current-time))
+      (setq org-node--gc-at-begin-launch gc-elapsed)
       (if org-node--full-scan-requested
           (progn
             (setq org-node--full-scan-requested nil)
@@ -959,9 +998,6 @@ If FILES is t, do a full reset, scanning all files discovered by
 
 (defvar org-node--processes nil
   "List of subprocesses.")
-
-(defvar org-node--done-ctr 0
-  "Count of finished subprocesses.")
 
 (defvar org-node--stderr-name " *org-node*"
   "Name of buffer for the subprocesses shared stderr.")
@@ -994,51 +1030,79 @@ the first time."
                    (buffer-string)))))))
        1))
 
-(defun org-node--ensure-compiled-lib ()
-  "Look for org-node-parser.el, .elc or .eln.
+(defun org-node--ensure-compiled-lib (feature)
+  "Look for .eln, .elc or .el file corresponding to FEATURE.
+FEATURE is a symbol as it shows up in `features'.
 
-Guess which one of those three was in fact loaded by the current Emacs,
-and return it if it is .elc or .eln.  If it is .el, then
-opportunistically compile it and return the newly compiled file instead."
-  (let* ((file-name-handler-alist nil) ;; perf
-         (loaded (or (and (subr-native-elisp-p
-                           (symbol-function #'org-node-parser--tmpfile))
-                          ;; To find .eln, it's most reliable to check a defun
-                          (ignore-errors
-                            (symbol-file 'org-node-parser--tmpfile 'defun t)))
-                     ;; Simply look for a `provide' in `load-history'
-                     (symbol-file 'org-node-parser))))
-    (cond ((not loaded)
-           (error "%s" "Need file org-node-parser[.el/.elc/.eln] in load-path with code that matches current Lisp definitions"))
-          ((string-suffix-p ".el" loaded)
-           (or (when (native-comp-available-p)
-                 ;; If we built an .eln last time, use it now even though
-                 ;; the current Emacs process is still running interpreted .el.
-                 (comp-lookup-eln loaded))
-               (let* ((elc (org-node-parser--tmpfile "org-node-parser.elc"))
-                      (byte-compile-dest-file-function
-                       `(lambda (&rest _) ,elc)))
-                 (when (native-comp-available-p)
-                   (native-compile-async (list loaded)))
-                 ;; Native comp may take a while, so return elc this time
-                 (if (or (file-newer-than-file-p elc loaded)
-                         (byte-compile-file loaded))
-                     ;; NOTE: On Guix we should never end up here, but if we
-                     ;;       did, that'd be a problem as Guix will probably
-                     ;;       reuse the first .elc we ever made forever
-                     elc
-                   loaded))))
-          ;; Either .eln or .elc was loaded, so use the same for the
-          ;; subprocesses.  We should not opportunistically build an .eln if
-          ;; Emacs had loaded an .elc for the current process, because we
-          ;; cannot assume the source .el is equivalent code.
-          (loaded))))
+Guess which one was in fact loaded by the current Emacs,
+and return it if it is .elc or .eln.
 
+If it is .el, then opportunistically compile it and return the newly
+compiled file instead.  This returns an .elc on the first call, then an
+.eln on future calls."
+  (let* ((hit (cl-loop
+               for (file . elems) in load-history
+               when (eq feature (cdr (assq 'provide elems)))
+               return
+               (cons file (cl-loop
+                           for elem in elems
+                           when (and (consp elem)
+                                     (eq 'defun (car elem))
+                                     (not (consp (symbol-function (cdr elem))))
+                                     (not (function-alias-p (cdr elem))))
+                           return (cdr elem)))))
+         (file-name-handler-alist '(("\\.gz\\'" . jka-compr-handler))) ;; perf
+         (loaded (or (and (ignore-errors
+                            (expand-file-name ;; REVIEW: `symbol-file' source
+                             (native-comp-unit-file
+                              (subr-native-comp-unit
+                               (symbol-function (cdr hit)))))))
+                     (car hit))))
+    (unless loaded
+      (error "Current Lisp definitions need to come from a file %S[.el/.elc/.eln]"
+             feature))
+    ;; HACK: Sometimes comp.el makes freefn- temp files; pretend we found .el.
+    (when (string-search "freefn-" loaded)
+      (setq loaded
+            (locate-file (symbol-name feature) load-path '(".el" ".el.gz"))))
+    (if (or (string-suffix-p ".el" loaded)
+            (string-suffix-p ".el.gz" loaded))
+        (or (when (native-comp-available-p)
+              ;; If we built an .eln last time, use it now even though
+              ;; the current Emacs process is still running interpreted .el.
+              (comp-lookup-eln loaded))
+            (let* ((elc (file-name-concat temporary-file-directory
+                                          (concat (symbol-name feature)
+                                                  ".elc")))
+                   (byte-compile-dest-file-function
+                    `(lambda (&rest _) ,elc)))
+              (when (native-comp-available-p)
+                (native-compile-async (list loaded)))
+              ;; Native comp may take a while, so return elc this time.
+              ;; We should not pick an .elc from load path if Emacs is now
+              ;; running interpreted code, since the code's likely newer.
+              (if (or (file-newer-than-file-p elc loaded)
+                      (byte-compile-file loaded))
+                  ;; NOTE: On Guix we should never end up here, but if we
+                  ;;       did, that'd be a problem as Guix will probably
+                  ;;       reuse the first .elc we ever made forever, even
+                  ;;       after upgrades to .el, due to 1970 timestamps.
+                  elc
+                loaded)))
+      ;; Either .eln or .elc was loaded, so use the same for the
+      ;; subprocesses.  We should not opportunistically build an .eln if
+      ;; Emacs had loaded an .elc for the current process, because we
+      ;; cannot assume the source .el is equivalent code.
+      ;; The .el could be in-development, newer than .elc, so subprocesses
+      ;; should use the same .elc for compatibility right up until the point
+      ;; the developer actually evals the .el buffer.
+      loaded)))
+
+;; Copied from part of `org-link-make-regexps'
 (defun org-node--make-plain-re (link-types)
   "Build a moral equivalent to `org-link-plain-re'.
 Make it target only LINK-TYPES instead of all the cars of
 `org-link-parameters'."
-  ;; Copied from `org-link-make-regexps'
   (let* ((non-space-bracket "[^][ \t\n()<>]")
          (parenthesis
 	  `(seq (any "<([")
@@ -1057,72 +1121,39 @@ Make it target only LINK-TYPES instead of all the cars of
 	    (or (regexp "[^[:punct:][:space:]\n]")
                 ?- ?/ ,parenthesis))))))
 
-(defun org-node--fn-sans-advice (sym)
-  "Get original function defined at SYM, sans advices."
-  (if (advice--p (symbol-function sym))
-      (advice--cd*r (symbol-function sym))
-    (if (fboundp 'ad-get-orig-definition)
-        (ad-get-orig-definition sym)
-      sym)))
+(defun org-node--mk-work-variables ()
+  "Return an alist of symbols and values to set in subprocesses."
+  (let ((reduced-plain-re (org-node--make-plain-re org-node-link-types)))
+    (list
+     ;; NOTE: The $sigil-prefixed names visually distinguish these
+     ;; variables in the body of `org-node-parser--collect-dangerously'.
+     (cons '$plain-re reduced-plain-re)
+     (cons '$merged-re (concat org-link-bracket-re "\\|" reduced-plain-re))
+     (cons '$assume-coding-system org-node-perf-assume-coding-system)
+     (cons '$inlinetask-min-level (bound-and-true-p org-inlinetask-min-level))
+     (cons '$file-todo-option-re
+           (rx bol (* space) (or "#+todo: " "#+seq_todo: " "#+typ_todo: ")))
+     (cons '$global-todo-re
+           (let ((default (default-value 'org-todo-keywords)))
+             (org-node-parser--make-todo-regexp
+              (string-join (if (stringp (car default))
+                               default
+                             (apply #'append (mapcar #'cdr default)))
+                           " "))))
+     (cons '$file-name-handler-alist
+           (cl-remove-if-not
+            (##memq % org-node-perf-keep-file-name-handlers)
+            file-name-handler-alist :key #'cdr))
+     (cons '$backlink-drawer-re
+           (concat "^[\t\s]*:"
+                   (or (and (require 'org-super-links nil t)
+                            (boundp 'org-super-links-backlink-into-drawer)
+                            (stringp org-super-links-backlink-into-drawer)
+                            org-super-links-backlink-into-drawer)
+                       "backlinks")
+                   ":")))))
 
-(defun org-node--delete-eld (file)
-  "Delete FILE, killing its buffer if it has one.
-See `org-node--write-eld' for reason to kill the buffer.
-
-Also use the unadvised `delete-file', since it can be bogged
-down by slow advices."
-  (cl-assert (file-name-absolute-p file))
-  (let ((real-delete (org-node--fn-sans-advice #'delete-file))
-        (buf (if (>= emacs-major-version 30)
-                 (get-truename-buffer file)
-               (get-file-buffer file))))
-    (and buf (kill-buffer buf))
-    ;; REVIEW: Would it be sane to use Emacs 30 `delete-file-internal'?
-    (funcall real-delete file)))
-
-(defun org-node--write-eld (file object)
-  "Write text representation of Lisp OBJECT into FILE.
-Overwrites what was in that file.
-
-Kill any buffer that may have been visiting FILE, to prevent an error
-signal from a bug in `userlock--ask-user-about-supersession-threat'
-that presumes in some cases that the current buffer is visiting FILE."
-  ;; Transitional 2024-10-27: Flip argument order
-  (when (stringp object)
-    (let ((obj object))
-      (setq object file)
-      (setq file obj)))
-  ;; There is the broader `find-buffer-visiting', but `get-truename-buffer'
-  ;; appears to be what's used in filelock.c.
-  ;; TODO: Clone blobless emacs repo and check what 28/29 filelock.c use
-  (when-let ((buf (if (>= emacs-major-version 30)
-                      (get-truename-buffer file)
-                    (get-file-buffer file))))
-    (kill-buffer buf))
-  (write-region (prin1-to-string object nil '((length . nil) (level . nil)))
-                nil file nil 'quiet))
-
-;; TODO: If we extend this package to read encrypted files, filesystem
-;; permissions will be inadequate.  Figure out either:
-;;
-;; 1. how to reuse the user's encryption method, never writing plaintext to disk
-;; 2. how to return results through IPC (i.e. use async.el)
-;;
-;; Method 2 was slow the last time I tried it, which was either due to large
-;; amounts of data, or now that I think about it, more likely due to running
-;; uncompiled lambdas.  Worth another shot: pass only a small lambda to the
-;; async.el subprocesses, that loads org-node-parser.eln off disk.
-(defun org-node--ensure-tmpdir ()
-  "Create our /tmp subdir, and attempt to restrict access to it."
-  (let ((file-name-handler-alist nil)
-        (tmpdir (org-node-parser--tmpfile)))
-    (if (file-exists-p tmpdir)
-        (unless (file-accessible-directory-p tmpdir)
-          (error "Directory seems to have been created by a different user: %s"
-                 tmpdir))
-      (mkdir tmpdir)
-      (chmod tmpdir (file-modes-symbolic-to-number "u+rwx" 0)))))
-
+(defvar org-node--gc-at-begin-launch 0)
 (defvar org-node--debug nil)
 (defun org-node--scan (files finalizer)
   "Begin async scanning FILES for id-nodes and links.
@@ -1133,13 +1164,12 @@ When finished, pass a list of scan results to the FINALIZER
 function to update current tables."
   (when (= 0 org-node-perf-max-jobs)
     (setq org-node-perf-max-jobs (org-node--count-logical-cores)))
-  (org-node--ensure-tmpdir)
-  (let ((compiled-lib (org-node--ensure-compiled-lib))
+  (mkdir (org-node--tmpfile) t)
+  (let ((compiled-lib (org-node--ensure-compiled-lib 'org-node-parser))
         (file-name-handler-alist nil)
         (coding-system-for-read org-node-perf-assume-coding-system)
-        (coding-system-for-write org-node-perf-assume-coding-system))
-    (setq org-node--time-at-scan-begin (current-time))
-    (setq org-node--done-ctr 0)
+        (vars (append org-node-inject-variables
+                      (org-node--mk-work-variables))))
     (when (seq-some #'process-live-p org-node--processes)
       ;; We should never end up here
       (mapc #'delete-process org-node--processes)
@@ -1147,51 +1177,18 @@ function to update current tables."
     (setq org-node--processes nil)
     (with-current-buffer (get-buffer-create org-node--stderr-name)
       (erase-buffer))
-    (org-node--write-eld
-     (org-node-parser--tmpfile "work-variables.eld")
-     ;; NOTE: The $sigil-prefixed names visually distinguish these variables
-     ;;       in the body of `org-node-parser--collect-dangerously'.
-     (let ((reduced-plain-re (org-node--make-plain-re org-node-link-types)))
-       (append
-        org-node-inject-variables
-        (list
-         (cons '$plain-re reduced-plain-re)
-         (cons '$merged-re (concat org-link-bracket-re "\\|" reduced-plain-re))
-         (cons '$assume-coding-system org-node-perf-assume-coding-system)
-         (cons '$inlinetask-min-level (bound-and-true-p org-inlinetask-min-level))
-         (cons '$file-todo-option-re
-               (rx bol (* space) (or "#+todo: " "#+seq_todo: " "#+typ_todo: ")))
-         (cons '$global-todo-re
-               (let ((default (default-value 'org-todo-keywords)))
-                 (org-node-parser--make-todo-regexp
-                  (string-join (if (stringp (car default))
-                                   default
-                                 (apply #'append (mapcar #'cdr default)))
-                               " "))))
-         (cons '$file-name-handler-alist
-               (cl-remove-if-not
-                (##memq % org-node-perf-keep-file-name-handlers)
-                file-name-handler-alist :key #'cdr))
-         (cons '$backlink-drawer-re
-               (concat "^[\t\s]*:"
-                       (or (and (require 'org-super-links nil t)
-                                (boundp 'org-super-links-backlink-into-drawer)
-                                (stringp org-super-links-backlink-into-drawer)
-                                org-super-links-backlink-into-drawer)
-                           "backlinks")
-                       ":"))))))
 
     (if org-node--debug
-        ;; Special case for debugging; run single-threaded so we can step
-        ;; through the org-node-parser.el functions with edebug
-        (let (($i 0)
-              (write-region-inhibit-fsync nil))
-          (org-node--write-eld (org-node-parser--tmpfile "file-list-0.eld")
-                               (sort files (lambda (_ _) (natnump (random)))))
+        ;; Special case for debugging; run inside main process so we can step
+        ;; through the org-node-parser.el functions with edebug.
+        (let ((write-region-inhibit-fsync nil))
           (setq org-node-parser--found-links nil)
           (setq org-node-parser--paths-types nil)
           (setq org-node--first-init nil)
-          (setq org-node--time-at-scan-begin (current-time))
+          (setq org-node--time-at-after-launch (current-time))
+          (dolist (var vars)
+            (set (car var) (cdr var)))
+          (setq $files files)
           (with-current-buffer (get-buffer-create "*org-node debug*")
             (setq buffer-read-only nil)
             (when (eq 'show org-node--debug)
@@ -1209,90 +1206,79 @@ function to update current tables."
             (org-node--handle-finished-job 1 finalizer)))
 
       ;; If not debugging, split the work over many child processes
-      (let* ((file-lists (org-node--split-file-list
-                          files org-node-perf-max-jobs))
+      (let* ((file-lists
+              (org-node--split-file-list files org-node-perf-max-jobs))
              (n-jobs (length file-lists))
-             (write-region-inhibit-fsync nil) ;; Default t in emacs30
+             ;; Ensure working directory is not remote (messes things up)
              (default-directory invocation-directory))
+        (setq org-node--results nil)
         (dotimes (i n-jobs)
-          (org-node--write-eld (org-node-parser--tmpfile "file-list-%d.eld" i)
-                               (pop file-lists))
-          ;; Remove old result in order to spot failure to make new result
-          (org-node--delete-eld (org-node-parser--tmpfile "results-%d.eld" i))
-          (push (make-process
-                 :name (format "org-node-%d" i)
-                 :noquery t
-                 :stderr (get-buffer-create org-node--stderr-name)
-                 :command
-                 ;; TODO: Maybe prepend a "timeout 30"
-                 ;; Ensure the children run the same binary executable as
-                 ;; current Emacs, so the `compiled-lib' bytecode fits
-                 (list (file-name-concat invocation-directory invocation-name)
-                       "--quick"
-                       "--batch"
-                       "--eval" (format "(setq $i %d)" i)
-                       "--eval" (format "(setq gc-cons-threshold %d)"
-                                        (* 1000 1000 1000))
-                       "--eval" (format "(setq temporary-file-directory \"%s\")"
-                                        temporary-file-directory)
-                       "--load" compiled-lib
-                       "--funcall" "org-node-parser--collect-dangerously")
-                 :sentinel (lambda (_process _event)
-                             (org-node--handle-finished-job n-jobs finalizer)))
-                org-node--processes))))))
+          (push
+           (make-process
+            :name (format "org-node-%d" i)
+            :noquery t
+            :stderr (get-buffer-create " *org-node-stderr*" t)
+            :buffer (with-current-buffer
+                        (get-buffer-create (format " *org-node-%d*" i) t)
+                      (erase-buffer)
+                      (current-buffer))
+            :connection-type 'pipe
+            :command
+            ;; TODO: Maybe prepend a "timeout 30"
+            ;; Ensure the children run the same binary executable as
+            ;; current Emacs, so the `compiled-lib' bytecode fits
+            (list (file-name-concat invocation-directory invocation-name)
+                  "--quick"
+                  "--batch"
+                  "--eval" (prin1-to-string
+                            `(progn
+                               (setq gc-cons-threshold (* 1000 1000 1000))
+                               (dolist (var ',vars)
+                                 (set (car var) (cdr var)))
+                               (setq $files ',(pop file-lists))))
+                  "--load" compiled-lib
+                  "--funcall" "org-node-parser--collect-dangerously")
+            :sentinel (lambda (proc _event)
+                        (org-node--handle-finished-job
+                         proc n-jobs finalizer)))
+           org-node--processes))
+        (setq org-node--time-at-after-launch (current-time))))))
 
+(defun org-node--handle-finished-job (proc n-jobs finalizer)
+  "Read output of process PROC.
+Add that to `org-node--results'.
+
+Count each call up to N-JOBS, then on the last call, pass the merged
+results to function FINALIZER."
+  (when (eq 'exit (process-status proc))
+    (with-current-buffer (process-buffer proc)
+      (push (read (buffer-string)) org-node--results))
+    (when (= (length org-node--results) n-jobs)
+      (setq org-node--time-at-finalize (current-time))
+      (let ((merged-result (pop org-node--results)))
+        ;; First result is last done.  Did test this.
+        (setq org-node--time-at-last-child-done (pop merged-result))
+        ;; Absorb the rest of the results
+        (dolist (result org-node--results)
+          (pop result) ;; Remove its timestamp
+          (let (new-merged-result)
+            ;; Zip lists pairwise. Like (-zip-with #'nconc list1 list2).
+            (while result
+              (push (nconc (pop result) (pop merged-result))
+                    new-merged-result))
+            (setq merged-result (nreverse new-merged-result))))
+        (funcall finalizer merged-result)))))
+
+(defvar org-node--results nil)
 (defvar org-node--first-init t
   "Non-nil until org-node has been initialized, then nil.
 Mainly for muffling some messages.")
 
-(defun org-node--handle-finished-job (n-jobs finalizer)
-  "If called by the last sentinel, run FINALIZER.
-In detail: count up to N-JOBS, then if this call is the one that hits
-N-JOBS, read contents of all result files into a merged variable and
-pass that to FINALIZER."
-  (when (eq (cl-incf org-node--done-ctr) n-jobs)
-    (setq org-node--time-at-finalize (current-time))
-    (setq org-node--time-at-last-child-done nil)
-    (let ((file-name-handler-alist nil)
-          (coding-system-for-read  org-node-perf-assume-coding-system)
-          (coding-system-for-write org-node-perf-assume-coding-system)
-          ;; Advised by `editorconfig-mode' & who knows what else
-          (real-insert-file-contents
-           (org-node--fn-sans-advice #'insert-file-contents))
-          (merged-result nil))
-      (with-temp-buffer
-        (dotimes (i n-jobs)
-          (let ((results-file (org-node-parser--tmpfile "results-%d.eld" i)))
-            (if (not (file-exists-p results-file))
-                (progn
-                  ;; Had 1+ errors, so unhide stderr buffer from now on
-                  (when-let (buf (get-buffer " *org-node*"))
-                    (setq org-node--stderr-name "*org-node errors*")
-                    (with-current-buffer buf
-                      (rename-buffer org-node--stderr-name)))
-                  ;; Don't warn on first run, for better UX.  First-time
-                  ;; init thru autoloads can have bugs for seemingly
-                  ;; magical reasons that go away afterwards (e.g. it says
-                  ;; the files aren't on disk but they are).
-                  (unless org-node--first-init
-                    (message "An org-node worker failed to produce %s.  See buffer %s"
-                             results-file org-node--stderr-name)))
-              (erase-buffer)
-              (funcall real-insert-file-contents results-file)
-              (let* ((result (read (buffer-string)))
-                     (time (pop result))
-                     new-merged-result)
-                (when (time-less-p
-                       org-node--time-at-last-child-done time)
-                  (setq org-node--time-at-last-child-done time))
-                (if (= i 0)
-                    (setq merged-result result)
-                  ;; Zip lists pairwise
-                  (while result
-                    (push (nconc (pop result) (pop merged-result))
-                          new-merged-result))
-                  (setq merged-result (nreverse new-merged-result))))))))
-      (funcall finalizer merged-result))))
+(defun org-node-kill ()
+  "Kill any stuck subprocesses."
+  (interactive)
+  (while-let ((proc (pop org-node--processes)))
+    (delete-process proc)))
 
 
 ;;;; Scan-finalizers
@@ -1318,9 +1304,9 @@ pass that to FINALIZER."
              do (puthash path type org-node--ref-path<>ref-type))
     (cl-loop for (file . mtime.elapsed) in file-info
              do (puthash file mtime.elapsed org-node--file<>mtime.elapsed))
-    ;; PERF HACK: Don't manage `org-id-files' at all.  This could affect
-    ;; downstream uses of org-id which assume the variable to be correct.
-    ;; Uncomment to improve.
+    ;; HACK: Don't manage `org-id-files' at all.  Reduces GC, but could
+    ;; affect downstream uses of org-id which assume the variable to be
+    ;; correct.  Uncomment to improve.
     ;; (setq org-id-files (mapcar #'car file-info))
     (org-node--record-nodes nodes)
     ;; (org-id-locations-save) ;; A nicety, but sometimes slow
@@ -1338,7 +1324,7 @@ pass that to FINALIZER."
                              org-node--time-at-finalize))
              (float-time
               (time-subtract org-node--time-at-last-child-done
-                             org-node--time-at-scan-begin))))
+                             org-node--time-at-begin-launch))))
     (org-node--maybe-adjust-idle-timer)
     (while-let ((fn (pop org-node--temp-extra-fns)))
       (funcall fn))
@@ -1351,9 +1337,10 @@ pass that to FINALIZER."
 (defvar org-node--old-link-sets nil
   "For use by `org-node-backlink-aggressive'.
 
-Alist of ((DEST . LINKS) (DEST . LINKS) ...), where LINKS is a set of
-links with destination DEST minus those that recently changed, allowing
-for a diff operation against the up-to-date set.")
+Alist of ((DEST . LINKS) (DEST . LINKS) ...), where LINKS is are sets of
+links with destination DEST.  These reflect a past state of
+`org-node--dest<>links', allowing for a diff operation against the
+up-to-date set.")
 
 (defun org-node--finalize-modified (results)
   "Use RESULTS to update tables."
@@ -1367,8 +1354,8 @@ for a diff operation against the up-to-date set.")
       (org-node--dirty-forget-completions-in missing-files)
       ;; In case a title was edited: don't persist old revisions of the title
       (org-node--dirty-forget-completions-in found-files)
+      (setq org-node--old-link-sets nil)
       (when org-node-perf-eagerly-update-link-tables
-        (setq org-node--old-link-sets nil)
         (cl-loop with ids-of-nodes-scanned = (cl-loop
                                               for node in nodes
                                               collect (org-node-get-id node))
@@ -1388,45 +1375,27 @@ for a diff operation against the up-to-date set.")
                  finally do
                  (cl-loop
                   for (dest . links) in reduced-link-sets do
-                  (push (cons dest (gethash dest org-node--dest<>links))
-                        org-node--old-link-sets)
-                  (puthash dest links org-node--dest<>links)))
-        ;; Having discarded the links that were known to originate in the
-        ;; re-scanned nodes, it's safe to record them (again).
-        (dolist (link links)
-          (push link (gethash (org-node-link-dest link) org-node--dest<>links))))
+                  (when (bound-and-true-p org-node-backlink-aggressive)
+                    (push (cons dest (gethash dest org-node--dest<>links))
+                          org-node--old-link-sets))
+                  (puthash dest links org-node--dest<>links))))
+      ;; Having discarded the links that were known to originate in the
+      ;; re-scanned nodes, it's safe to record them (again).
+      (dolist (link links)
+        (push link (gethash (org-node-link-dest link) org-node--dest<>links)))
       (cl-loop for (path . type) in path.type
                do (puthash path type org-node--ref-path<>ref-type))
       (cl-loop for (file . mtime.elapsed) in file-info
                do (puthash file mtime.elapsed org-node--file<>mtime.elapsed))
       (org-node--record-nodes nodes)
+      (while-let ((fn (pop org-node--temp-extra-fns)))
+        (funcall fn))
       (dolist (prob problems)
         (push prob org-node--problems))
       (when problems
         (message "Scan had problems, see M-x org-node-list-scan-problems"))
       (run-hook-with-args 'org-node-rescan-functions
                           (append missing-files found-files)))))
-
-(defcustom org-node-perf-eagerly-update-link-tables t
-  "Update backlink tables on every save.
-
-Note that no matter this value, the tables will be corrected
-anyway on idle, via `org-node--idle-timer'.
-
-A setting of t MAY slow down saving a big file containing
-thousands of links on constrained devices.
-
-Fortunately it is rarely needed, since the insert-link advices of
-`org-node-cache-mode' will already record links added during
-normal usage!  What\\='s left undone til idle:
-
-1. deleted links remain in the table, leading to undead backlinks
-2. :pos values can desync, which can affect the org-roam buffer
-
-An user of `org-node-backlink-mode' is recommended to enable this as
-well as `org-node-backlink-aggressive'."
-  :group 'org-node
-  :type 'boolean)
 
 (defun org-node--record-nodes (nodes)
   "Add NODES to `org-nodes' and related info to other tables."
@@ -1470,8 +1439,8 @@ well as `org-node-backlink-aggressive'."
                            org-node--candidate<>node)
                 ;; Bare title as candidate, to be affixated in realtime by
                 ;; `org-node-collection'
-                (puthash title node org-node--candidate<>node)
-                (puthash title affx org-node--title<>affixation-triplet)))))))))
+                (puthash title affx org-node--title<>affixation-triplet)
+                (puthash title node org-node--candidate<>node)))))))))
 
 (defvar org-node--compile-timers nil)
 (defvar org-node--compiled-lambdas (make-hash-table :test #'equal)
@@ -1577,6 +1546,9 @@ also necessary is `org-node--dirty-ensure-link-known' elsewhere."
   (let ((id (org-node-id-at-point))
         (case-fold-search t))
     (unless (gethash id org-node--id<>node)
+      (unless (gethash buffer-file-truename org-node--file<>mtime.elapsed)
+        (when (file-exists-p buffer-file-truename)
+          (puthash buffer-file-truename (cons 0 0) org-node--file<>mtime.elapsed)))
       (save-excursion
         (without-restriction
           (goto-char (point-min))
@@ -1600,7 +1572,7 @@ also necessary is `org-node--dirty-ensure-link-known' elsewhere."
                       (cdr (assoc "ROAM_REFS" props)))
                :pos (if heading (org-entry-beginning-position) 1)
                ;; NOTE: Don't use `org-reduced-level' since org-node-parser.el
-               ;;       also does not correct for that (not needed)
+               ;;       also does not correct for that
                :level (or (org-current-level) 0)
                :olp (org-get-outline-path)
                ;; Less important
@@ -1617,7 +1589,9 @@ also necessary is `org-node--dirty-ensure-link-known' elsewhere."
 (defvar org-node--time-elapsed 1.0
   "Duration of the last cache reset.")
 
+(defvar org-node--time-at-begin-launch nil)
 (defvar org-node--time-at-scan-begin nil)
+(defvar org-node--time-at-after-launch nil)
 (defvar org-node--time-at-last-child-done nil)
 (defvar org-node--time-at-finalize nil)
 
@@ -1640,12 +1614,13 @@ be misleading."
           (n-reflinks (cl-loop
                        for ref being the hash-keys of org-node--ref<>id
                        sum (length (gethash ref org-node--dest<>links)))))
-      (message "Saw %d file-nodes, %d subtree-nodes, %d ID-links, %d reflinks in %.2fs"
+      (message "Saw %d file-nodes, %d subtree-nodes, %d ID-links, %d reflinks in %.2fs (wall-time %.2fs)"
                (- (hash-table-count org-node--id<>node) n-subtrees)
                n-subtrees
                n-backlinks
                n-reflinks
-               org-node--time-elapsed))))
+               org-node--time-elapsed
+               (float-time (time-since org-node--time-at-begin-launch))))))
 
 (defun org-node--split-file-list (files n)
   "Split FILES into N lists of files.
@@ -1833,15 +1808,16 @@ sub-directories, sub-sub-directories and so on, with provisos:
             (push (file-name-concat dir file) result)))))
     result))
 
-;; REVIEW: Org-id uses `abbreviate-file-name', ensure it returns exactly the
-;;         same in all cases (e.g. on Windows or on single-user mode Linux)
-(defvar org-node--homedir nil)
+(defvar org-node--userhome nil)
 (defun org-node-abbrev-file-names (paths)
   "Abbreviate all file paths in PATHS.
-Faster than `abbreviate-file-name', especially for many paths.
+Faster than `abbreviate-file-name', especially if you have to run
+it for many paths.
 
-PATHS can be a single path or a list, and are presumed to be absolute
-paths.
+May in some corner-cases give different results.  For instance, it
+disregards file name handlers, affecting TRAMP.
+
+PATHS can be a single path or a list, and are presumed to be absolute.
 
 It is a good idea to abbreviate a path when you don\\='t know where it
 came from.  That helps ensure that it is comparable to a path provided
@@ -1851,22 +1827,24 @@ If the wild path may be a symlink or not an absolute path, it would be
 safer to process it first with `file-truename', then pass the result to
 this function.
 
-Needless to say, you can also just use `file-truename' on both paths to
-be compared, if not writing performance-critical code."
-  (unless org-node--homedir
-    (setq org-node--homedir (file-name-as-directory (expand-file-name "~"))))
-  ;; Assume a case-sensitive filesystem.  I believe this fails gracefully.
+Tip: the inexactly named buffer-local variable `buffer-file-truename'
+already contains an abbreviated truename."
+  (unless org-node--userhome
+    (setq org-node--userhome (file-name-as-directory (expand-file-name "~"))))
+  ;; Assume a case-sensitive filesystem.
+  ;; REVIEW: Not sure if it fails gracefully on NTFS/FAT/HFS+/APFS.
   (let ((case-fold-search nil))
     (if (listp paths)
         (cl-loop
          for path in paths
          do (setq path (directory-abbrev-apply path))
-         if (string-prefix-p org-node--homedir path)
-         collect (concat "~" (substring path (1- (length org-node--homedir))))
+         if (string-prefix-p org-node--userhome path)
+         ;; REVIEW: Sane in single-user mode Linux?
+         collect (concat "~" (substring path (1- (length org-node--userhome))))
          else collect path)
       (setq paths (directory-abbrev-apply paths))
-      (if (string-prefix-p org-node--homedir paths)
-          (concat "~" (substring paths (1- (length org-node--homedir))))
+      (if (string-prefix-p org-node--userhome paths)
+          (concat "~" (substring paths (1- (length org-node--userhome))))
         paths))))
 
 (defun org-node--forget-id-locations (files)
@@ -1885,6 +1863,17 @@ FILES are assumed to be abbreviated truenames."
 
 
 ;;;; Filename functions
+
+(defun org-node--tmpfile (&optional basename &rest args)
+  "Return a path that puts BASENAME in a temporary directory.
+As a nicety, `format' BASENAME with ARGS too.
+
+On most systems, the resulting string will be
+/tmp/org-node/BASENAME, but it depends on
+OS and variable `temporary-file-directory'."
+  (file-name-concat temporary-file-directory
+                    "org-node"
+                    (when basename (apply #'format basename args))))
 
 ;; (progn (byte-compile #'org-node--root-dirs) (benchmark-run 10 (org-node--root-dirs (hash-table-values org-id-locations))))
 (defun org-node--root-dirs (file-list)
@@ -1917,21 +1906,24 @@ itself contains no direct members of FILE-LIST.
 FILE-LIST must be a list of full paths; this function does not
 consult the filesystem, just compares substrings to each other."
   (let* ((files (seq-uniq file-list))
-         (dirs (seq-uniq (mapcar #'file-name-directory files))))
+         (dirs (sort (delete-consecutive-dups
+                      (sort (mapcar #'file-name-directory files) #'string<))
+                     (##length< %1 (length %2))))
+         roots)
     ;; Example: if there is /home/roam/courses/Math1A/, but ancestor dir
     ;; /home/roam/ is also a member of the set, throw out the child
-    (cl-loop for dir in dirs
-             as dirs-aside-from-this-one = (remove dir dirs)
-             when (cl-loop for aside-dir in dirs-aside-from-this-one
-                           thereis (string-prefix-p aside-dir dir))
-             do (delete dir dirs))
+    (while-let ((dir (car (last dirs))))
+      (cl-loop for other-dir in (setq dirs (nbutlast dirs))
+               when (string-prefix-p other-dir dir)
+               return (delete dir dirs)
+               finally return (push dir roots)))
     ;; Now sort by count of items inside if we found 2 or more roots
-    (if (= (length dirs) 1)
-        dirs
+    (if (= (length roots) 1)
+        roots
       (cl-loop
-       with dir-counters = (cl-loop for dir in dirs collect (cons dir 0))
+       with dir-counters = (cl-loop for dir in roots collect (cons dir 0))
        for file in files
-       do (cl-loop for dir in dirs
+       do (cl-loop for dir in roots
                    when (string-prefix-p dir file)
                    return (cl-incf (cdr (assoc dir dir-counters))))
        finally return (mapcar #'car (cl-sort dir-counters #'> :key #'cdr))))))
@@ -1982,29 +1974,53 @@ that, configure `org-node-datestamp-format'."
           (function-item org-node-slugify-for-web)
           (function-item org-node-slugify-like-roam-default)
           (function-item org-node-fakeroam-slugify-via-roam)
-          function))
+          (function :tag "Custom function")))
 
-;; To be removed in 2025 when Debian bumps stable
-(defun org-node--strip-diacritics (input-string)
-  "Strip diacritics from INPUT-STRING."
-  (if (>= emacs-major-version 29)
-      ;; Emacs 29+ solution
-      (thread-last input-string
-                   (string-glyph-decompose)
-                   ;; https://www.unicode.org/charts/PDF/U0300.pdf
-                   (seq-remove (lambda (char) (<= #x0300 char #x036F)))
-                   (concat)
-                   (string-glyph-compose))
-    ;; Emacs 25+ solution  https://irreal.org/blog/?p=11896
-    (let ((diacritics-alist
-           (seq-mapn
-            (lambda (a b) (cons a b))
-            "ÀÁÂÃÄÅàáâãäåÒÓÔÕÕÖØòóôõöøÈÉÊËèéêëðÇçÐÌÍÎÏìíîïÙÚÛÜùúûüÑñŠšŸÿýŽž"
-            "AAAAAAaaaaaaOOOOOOOooooooEEEEeeeeeCcDIIIIiiiiUUUUuuuuNnSsYyyZz")))
-      (concat (seq-map (lambda (char)
-                         (or (alist-get char diacritics-alist)
-                             char))
-                       input-string)))))
+(defun org-node-slugify-like-roam-default (title)
+  "From TITLE, make a filename slug in default org-roam style.
+Does not require org-roam installed.
+
+A title like \"Löb\\='s Theorem\" becomes \"lob_s_theorem\".
+
+Diacritical marks U+0300 to U+0331 are stripped \(mostly used with Latin
+alphabets).  Also stripped are all glyphs not categorized in Unicode as
+belonging to some alphabet or number system.
+
+If you seek to emulate org-roam filenames, you may also want to
+configure `org-node-datestamp-format'."
+  (thread-last title
+               (ucs-normalize-NFD-string)
+               (seq-remove (lambda (char) (<= #x300 char #x331)))
+               (concat)
+               (ucs-normalize-NFC-string)
+               (downcase)
+               (string-trim)
+               (replace-regexp-in-string "[^[:alnum:]]" "_")
+               (replace-regexp-in-string "__*" "_")
+               (replace-regexp-in-string "^_" "")
+               (replace-regexp-in-string "_$" "")))
+
+(defun org-node-slugify-for-web (title)
+  "From TITLE, make a filename slug meant to look nice as URL component.
+
+A title like \"Löb\\='s Theorem\" becomes \"lobs-theorem\".
+
+Diacritical marks U+0300 to U+0331 are stripped \(mostly used with Latin
+alphabets).  Also stripped are all glyphs not categorized in Unicode as
+belonging to some alphabet or number system."
+  (thread-last title
+               (ucs-normalize-NFD-string)
+               (seq-remove (lambda (char) (<= #x300 char #x331)))
+               (concat)
+               (ucs-normalize-NFC-string)
+               (downcase)
+               (string-trim)
+               (replace-regexp-in-string "[[:space:]]+" "-")
+               (replace-regexp-in-string "[^[:alnum:]\\/-]" "")
+               (replace-regexp-in-string "\\/" "-")
+               (replace-regexp-in-string "--*" "-")
+               (replace-regexp-in-string "^-" "")
+               (replace-regexp-in-string "-$" "")))
 
 ;; Useful test cases if you want to hack on this!
 
@@ -2018,41 +2034,6 @@ that, configure `org-node-datestamp-format'."
 ;; (org-node-slugify-for-web "Slimline/\"pizza box\" computer chassis")
 ;; (org-node-slugify-for-web "#emacs")
 ;; (org-node-slugify-for-web "칹え🐛")
-
-(defun org-node-slugify-for-web (title)
-  "From TITLE, make a filename slug meant to look nice as URL component.
-
-A title like \"Löb\\='s Theorem\" becomes \"lobs-theorem\".
-Diacritical marks are stripped, as are most symbols not
-categorized by Unicode as alphabetic or numeric."
-  (thread-last title
-               (org-node--strip-diacritics)
-               (downcase)
-               (string-trim)
-               (replace-regexp-in-string "[[:space:]]+" "-")
-               (replace-regexp-in-string "[^[:alnum:]\\/-]" "")
-               (replace-regexp-in-string "\\/" "-")
-               (replace-regexp-in-string "--*" "-")
-               (replace-regexp-in-string "^-" "")
-               (replace-regexp-in-string "-$" "")))
-
-(defun org-node-slugify-like-roam-default (title)
-  "From TITLE, make a filename slug in default org-roam style.
-Does not require org-roam installed.
-
-A title like \"Löb\\='s Theorem\" becomes \"lob_s_theorem\".
-Diacritical marks are stripped, as are most symbols not
-categorized by Unicode as alphabetic or numeric.
-
-You may also want to configure `org-node-datestamp-format'."
-  (thread-last title
-               (org-node--strip-diacritics)
-               (downcase)
-               (string-trim)
-               (replace-regexp-in-string "[^[:alnum:]]" "_")
-               (replace-regexp-in-string "__*" "_")
-               (replace-regexp-in-string "^_" "")
-               (replace-regexp-in-string "_$" "")))
 
 
 ;;;; How to create new nodes
@@ -2171,7 +2152,7 @@ the function is called: `org-node-proposed-title' and
           (function-item org-node-new-file)
           (function-item org-node-fakeroam-new-via-roam-capture)
           (function-item org-capture)
-          function))
+          (function :tag "Custom function")))
 
 (defun org-node-new-file ()
   "Create a file-level node.
@@ -3606,8 +3587,8 @@ lisp_data <- str_c(\"(\\\"\", as_ids(fas1), \"\\\")\") |>
   })()
 
 write_file(lisp_data, file.path(dirname(tsv), \"feedback-arcs.eld\"))")
-        (script-file (org-node-parser--tmpfile "analyze_feedback_arcs.R"))
-        (input-tsv (org-node-parser--tmpfile "id_node_digraph.tsv")))
+        (script-file (org-node--tmpfile "analyze_feedback_arcs.R"))
+        (input-tsv (org-node--tmpfile "id_node_digraph.tsv")))
     (write-region r-code () script-file () 'quiet)
     (write-region (org-node--make-digraph-tsv-string) () input-tsv () 'quiet)
     (with-temp-buffer
@@ -3615,7 +3596,7 @@ write_file(lisp_data, file.path(dirname(tsv), \"feedback-arcs.eld\"))")
         (error "%s" (buffer-string))))
     (let ((feedbacks (with-temp-buffer
                        (insert-file-contents
-                        (org-node-parser--tmpfile "feedback-arcs.eld"))
+                        (org-node--tmpfile "feedback-arcs.eld"))
                        (read (buffer-string)))))
       (when (listp feedbacks)
         (org-node--pop-to-tabulated-list

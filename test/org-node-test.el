@@ -162,4 +162,16 @@
         (should (equal (org-node-get-file-title-or-basename node)
                        expected-filename))))))
 
+
+
+;; (org-node--get-compiled-lib 'em-cmpl)
+;; (org-node--get-compiled-lib 'edebug)
+;; (org-node--get-compiled-lib 'misc)
+;; (org-node--get-compiled-lib 'misc-lang)
+;; (org-node--get-compiled-lib 'image)
+;; (org-node--get-compiled-lib 'tramp)
+;; (org-node--get-compiled-lib 'gnus)
+;; (org-node--get-compiled-lib 'eww)
+;; (org-node--get-compiled-lib 'magit-worktree)
+
 ;;; org-node-test.el ends here

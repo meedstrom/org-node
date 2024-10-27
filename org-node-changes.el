@@ -32,7 +32,9 @@
 (require 'ol)
 
 (defvar org-node-changes--new-names
-  '()
+  '(
+    ;; (org-node-perf-eagerly-update-link-tables)
+    )
   "Alist of deprecated symbol names and their new names.")
 
 (defvar org-node-changes--warned-roam-id nil)
@@ -65,7 +67,8 @@ value."
     ;; 2024-09-19 Clean up deprecated persist-defvars
     (unless (memq system-type '(windows-nt ms-dos))
       (cl-loop for sym in '(org-node--file<>mtime
-                            org-node--file<>previews)
+                            org-node--file<>previews
+                            org-node-fakeroam--saved-previews)
                do (let ((file (org-node-changes--guess-persist-filename sym)))
                     (when (file-exists-p file)
                       (delete-file file)))))
@@ -82,7 +85,7 @@ value."
       (org-link-set-parameters
        \"id\" :follow #'org-id-open :store #'org-id-store-link-maybe)"))))
 
-;; Remove in Dec or so
+;; Remove in Nov or so
 (defun org-node-changes--guess-persist-filename (sym)
   (let ((dir (or (get sym 'persist-location)
                  (bound-and-true-p persist--directory-location)
@@ -124,11 +127,28 @@ hardcoded strings."
 (defalias 'org-node-new-via-roam-capture #'org-node-fakeroam-new-via-roam-capture)
 (defalias 'org-node-slugify-like-roam-actual #'org-node-fakeroam-slugify-via-roam)
 
+(defun org-node--write-eld (file object)
+  (message "Please update org-node-fakeroam also when updating org-node")
+  (if (stringp object)
+      (let ((obj file))
+        (setq file object)
+        (setq object obj)))
+  (when-let ((buf (if (>= emacs-major-version 30)
+                      (get-truename-buffer file)
+                    (get-file-buffer file))))
+    (kill-buffer buf))
+  (write-region (prin1-to-string object nil '((length . nil) (level . nil)))
+                nil file nil 'quiet))
+
 (org-node-changes--def-whiny-alias 'org-node-affix-with-olp
                                    'org-node-prefix-with-olp)
 
 (org-node-changes--def-whiny-alias 'org-node-complete-at-point-global-mode
                                    'org-node-complete-at-point-mode)
+
+(define-obsolete-function-alias 'org-node-parser--tmpfile
+  'org-node--tmpfile
+  "2024-10-28")
 
 (define-obsolete-function-alias
   'org-node-get-id-links 'org-node-get-id-links-to "2024-10-04")

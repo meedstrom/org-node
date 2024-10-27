@@ -413,7 +413,7 @@ the underlying link tables are up to date anyway.  This defaults to
 nil to avoid unnecessary file visitations.
 
 If t, `org-node-perf-eagerly-update-link-tables' must be t as well
-\(default).  These two options may be merged in the future.
+\(default).
 
 Minor side effect: `org-element-cache-reset' is called in the buffers
 where backlinks are fixed."

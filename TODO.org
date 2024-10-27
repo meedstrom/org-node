@@ -1,10 +1,12 @@
 * To reduce LoC
 
-- [ ] Spin out a library for async processing (replace most of =org-node--scan= and friends)
-
 - [ ] Unify some subroutines for capture/refile/extract/insert/find
 
-- [ ] See comments at =org-node--call-at-nearest-node=
+- [ ] See comments at =org-node--call-at-nearest-node=, maybe remove these subroutines
+
+- [ ] Remove try-launch-scan
+
+- [ ] Spin out all series-related business into own file
 
 - [ ] In 2025: drop Emacs 28
 
@@ -14,9 +16,9 @@
   List of 28-isms and 29-isms to drop in future
 
   - =(cadar (org-collect-keywords "TITLE"))= -> =(org-get-title)=
-  - simplify =(org-node--strip-diacritics)=
   - =;;;###autoload (autoload 'org-node-series-dispatch "org-node" nil t)=
     - In Emacs 30, replace with just =;;;###autoload=
+  - any code gated on =emacs-major-version=
   - any usages of =compat-call=
   - =cl-sort=
   - what the compiler tells you is obsolete
@@ -25,6 +27,14 @@
 
 - [ ] Manage org-super-links drawers
 
+- [ ] With the above fixed, it'll be close at hand to make a RELATED-drawer, another concept from org-super-links
+
+- [ ] A workflow to allow untitled nodes (e.g. numeric-titled)
+
+  Already =org-node-grep= can be considered an equivalent to =org-node-find= (except it does not create new nodes) so we "just" need an equivalent to =org-node-insert-link=.  Basically, capture, refile, and insert-link would probably all reuse a subroutine for *identifying a node by a grep result.*
+
+- [ ] For even more perf (unnecessary): keep subprocesses alive, or track all data that came from each file so as to not re-scan if mtime has not changed, or both
+
 - [ ] org-node-series-dispatch: Free up keys "j" "n" "p", "c"
 
 - [ ] More org-node-series-defs wrappers:
@@ -32,10 +42,6 @@
   - [ ] Define a series as simply the files in a subdirectory with a given name
 
   - [ ] Define a series from the links the body text of a single master node if that node has a tag such as :series:
-
-- [ ] A workflow to allow pseudo-untitled (numeric-titled) nodes
-
-  Already =org-node-grep= can be considered an equivalent to =org-node-find=, so we "just" need an equivalent to =org-node-insert-link=.  Basically, capture, refile, and insert-link would probably all use the same mechanism for *identifying a node by a grep result.*
 
 - [ ] Accept more ref variants as the same ref
 

@@ -49,22 +49,10 @@
 (defvar $global-todo-re)
 (defvar $backlink-drawer-re)
 (defvar $inlinetask-min-level)
-(defvar $i)
 (defvar $files)
 
 (defvar org-node-parser--paths-types nil)
 (defvar org-node-parser--found-links nil)
-
-(defun org-node-parser--tmpfile (&optional basename &rest args)
-  "Return a path that puts BASENAME in a temporary directory.
-As a nicety, `format' BASENAME with ARGS too.
-
-On most systems, the resulting string will be
-/tmp/org-node/BASENAME, but it depends on
-OS and variable `temporary-file-directory'."
-  (file-name-concat temporary-file-directory
-                    "org-node"
-                    (when basename (apply #'format basename args))))
 
 (defun org-node-parser--make-todo-regexp (keywords-string)
   "Build a regexp from KEYWORDS-STRING.
@@ -228,6 +216,7 @@ a :PROPERTIES: and :END: string."
       (forward-line 1))
     result))
 
+
 
 ;;; Main
 
@@ -238,14 +227,6 @@ Taking info out of the temp files prepared by `org-node--scan',
 which includes info such as a list of Org files, visit all those
 files to look for ID-nodes and links, then finish by writing the
 findings to another temp file."
-  (let ((file-name-handler-alist nil))
-    (insert-file-contents (org-node-parser--tmpfile "work-variables.eld"))
-    (dolist (var (read (buffer-string)))
-      (set (car var) (cdr var)))
-    (erase-buffer)
-    ;; The variable `$i' was set by the command line that launched this process
-    (insert-file-contents (org-node-parser--tmpfile "file-list-%d.eld" $i)))
-  (setq $files (read (buffer-string)))
   (when $inlinetask-min-level
     (setq org-node-parser--heading-re
           (rx-to-string
@@ -563,19 +544,20 @@ findings to another temp file."
          (push (list FILE (point) err) result/problems))))
 
     ;; All done
-    (let ((write-region-inhibit-fsync nil) ;; Default t in batch mode
-          (print-length nil)
-          (print-level nil))
-      (write-region
-       (prin1-to-string (list (current-time)
-                              result/missing-files
-                              result/file-info
-                              result/found-nodes
-                              org-node-parser--paths-types
-                              org-node-parser--found-links
-                              result/problems))
-       nil
-       (org-node-parser--tmpfile "results-%d.eld" $i)))))
+
+    (let ((print-length nil)
+          (print-level nil)
+          (print-symbols-bare t)
+          ;; (print-circle t)
+          )
+      (prin1 (list (current-time)
+                   result/missing-files
+                   result/file-info
+                   result/found-nodes
+                   org-node-parser--paths-types
+                   org-node-parser--found-links
+                   result/problems
+                   )))))
 
 (provide 'org-node-parser)
 
