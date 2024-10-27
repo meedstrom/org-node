@@ -1059,23 +1059,67 @@ Make it target only LINK-TYPES instead of all the cars of
   "Get original function defined at SYM, sans advices."
   (if (advice--p (symbol-function sym))
       (advice--cd*r (symbol-function sym))
-    (if (fboundp #'ad-get-orig-definition)
+    (if (fboundp 'ad-get-orig-definition)
         (ad-get-orig-definition sym)
       sym)))
 
-(defun org-node--write-eld (object file)
+(defun org-node--delete-eld (file)
+  "Delete FILE, killing its buffer if it has one.
+See `org-node--write-eld' for reason to kill the buffer.
+
+Also use the unadvised `delete-file', since it can be bogged
+down by slow advices."
+  (cl-assert (file-name-absolute-p file))
+  (let ((real-delete (org-node--fn-sans-advice #'delete-file))
+        (buf (if (>= emacs-major-version 30)
+                 (get-truename-buffer file)
+               (get-file-buffer file))))
+    (and buf (kill-buffer buf))
+    ;; REVIEW: Would it be sane to use Emacs 30 `delete-file-internal'?
+    (funcall real-delete file)))
+
+(defun org-node--write-eld (file object)
   "Write text representation of Lisp OBJECT into FILE.
 Overwrites what was in that file.
 
 Kill any buffer that may have been visiting FILE, to prevent an error
 signal from a bug in `userlock--ask-user-about-supersession-threat'
 that presumes in some cases that the current buffer is visiting FILE."
+  ;; Transitional 2024-10-27: Flip argument order
+  (when (stringp object)
+    (let ((obj object))
+      (setq object file)
+      (setq file obj)))
   ;; There is the broader `find-buffer-visiting', but `get-truename-buffer'
-  ;; appears to be what's used in filelock.c (in Emacs 30+).
-  (when-let ((buf (get-truename-buffer file)))
+  ;; appears to be what's used in filelock.c.
+  ;; TODO: Clone blobless emacs repo and check what 28/29 filelock.c use
+  (when-let ((buf (if (>= emacs-major-version 30)
+                      (get-truename-buffer file)
+                    (get-file-buffer file))))
     (kill-buffer buf))
   (write-region (prin1-to-string object nil '((length . nil) (level . nil)))
                 nil file nil 'quiet))
+
+;; TODO: If we extend this package to read encrypted files, filesystem
+;; permissions will be inadequate.  Figure out either:
+;;
+;; 1. how to reuse the user's encryption method, never writing plaintext to disk
+;; 2. how to return results through IPC (i.e. use async.el)
+;;
+;; Method 2 was slow the last time I tried it, which was either due to large
+;; amounts of data, or now that I think about it, more likely due to running
+;; uncompiled lambdas.  Worth another shot: pass only a small lambda to the
+;; async.el subprocesses, that loads org-node-parser.eln off disk.
+(defun org-node--ensure-tmpdir ()
+  "Create our /tmp subdir, and attempt to restrict access to it."
+  (let ((file-name-handler-alist nil)
+        (tmpdir (org-node-parser--tmpfile)))
+    (if (file-exists-p tmpdir)
+        (unless (file-accessible-directory-p tmpdir)
+          (error "Directory seems to have been created by a different user: %s"
+                 tmpdir))
+      (mkdir tmpdir)
+      (chmod tmpdir (file-modes-symbolic-to-number "u+rwx" 0)))))
 
 (defvar org-node--debug nil)
 (defun org-node--scan (files finalizer)
@@ -1087,22 +1131,7 @@ When finished, pass a list of scan results to the FINALIZER
 function to update current tables."
   (when (= 0 org-node-perf-max-jobs)
     (setq org-node-perf-max-jobs (org-node--count-logical-cores)))
-  ;; Create our /tmp subdir, and attempt to restrict access.  Will matter more
-  ;; if we extend this package to read encrypted files, although then the real
-  ;; solution is probably to reuse the encryption method and never write
-  ;; plaintext to disk, or else return results through IPC like async.el does,
-  ;; but that was slow the last time I tried it.
-  ;;
-  ;; (Maybe it wasn't slow due to sending megabytes of data, but due to running
-  ;;  uncompiled lambdas?  TODO: Try again.)
-  (let ((file-name-handler-alist nil)
-        (tmpdir (org-node-parser--tmpfile)))
-    (if (file-exists-p tmpdir)
-        (unless (file-accessible-directory-p tmpdir)
-          (error "Directory seems to have been created by a different user: %s"
-                 tmpdir))
-      (mkdir tmpdir)
-      (chmod tmpdir (file-modes-symbolic-to-number "u+rwx" 0))))
+  (org-node--ensure-tmpdir)
   (let ((compiled-lib (org-node--ensure-compiled-lib))
         (file-name-handler-alist nil)
         (coding-system-for-read org-node-perf-assume-coding-system)
@@ -1110,59 +1139,53 @@ function to update current tables."
     (setq org-node--time-at-scan-begin (current-time))
     (setq org-node--done-ctr 0)
     (when (seq-some #'process-live-p org-node--processes)
-      ;; We should never end up here, but just in case
+      ;; We should never end up here
       (mapc #'delete-process org-node--processes)
       (message "org-node subprocesses alive, a bug report would be welcome"))
     (setq org-node--processes nil)
     (with-current-buffer (get-buffer-create org-node--stderr-name)
       (erase-buffer))
-    ;; REVIEW: How's the performance of `write-region' + `prin1-to-string'
-    ;;         vs `with-temp-file'?
-    (with-temp-file (org-node-parser--tmpfile "work-variables.eld")
-      (let ((standard-output (current-buffer))
-            (print-length nil)
-            (print-level nil)
-            (reduced-plain-re (org-node--make-plain-re org-node-link-types)))
-        (prin1
-         ;; NOTE: The $sigil-prefixed names visually distinguish these
-         ;;       externally-provided variables in the body of
-         ;;       `org-node-parser--collect-dangerously'.
-         (append
-          org-node-inject-variables
-          (list
-           (cons '$plain-re reduced-plain-re)
-           (cons '$merged-re (concat org-link-bracket-re "\\|" reduced-plain-re))
-           (cons '$assume-coding-system org-node-perf-assume-coding-system)
-           (cons '$inlinetask-min-level (bound-and-true-p org-inlinetask-min-level))
-           (cons '$file-todo-option-re
-                 (rx bol (* space) (or "#+todo: " "#+seq_todo: " "#+typ_todo: ")))
-           (cons '$global-todo-re
-                 (let ((default (default-value 'org-todo-keywords)))
-                   (org-node-parser--make-todo-regexp
-                    (string-join (if (stringp (car default))
-                                     default
-                                   (apply #'append (mapcar #'cdr default)))
-                                 " "))))
-           (cons '$file-name-handler-alist
-                 (cl-remove-if-not
-                  (##memq % org-node-perf-keep-file-name-handlers)
-                  file-name-handler-alist :key #'cdr))
-           (cons '$backlink-drawer-re
-                 (concat "^[\t\s]*:"
-                         (or (and (require 'org-super-links nil t)
-                                  (boundp 'org-super-links-backlink-into-drawer)
-                                  (stringp org-super-links-backlink-into-drawer)
-                                  org-super-links-backlink-into-drawer)
-                             "backlinks")
-                         ":")))))))
+    (org-node--write-eld
+     (org-node-parser--tmpfile "work-variables.eld")
+     ;; NOTE: The $sigil-prefixed names visually distinguish these variables
+     ;;       in the body of `org-node-parser--collect-dangerously'.
+     (let ((reduced-plain-re (org-node--make-plain-re org-node-link-types)))
+       (append
+        org-node-inject-variables
+        (list
+         (cons '$plain-re reduced-plain-re)
+         (cons '$merged-re (concat org-link-bracket-re "\\|" reduced-plain-re))
+         (cons '$assume-coding-system org-node-perf-assume-coding-system)
+         (cons '$inlinetask-min-level (bound-and-true-p org-inlinetask-min-level))
+         (cons '$file-todo-option-re
+               (rx bol (* space) (or "#+todo: " "#+seq_todo: " "#+typ_todo: ")))
+         (cons '$global-todo-re
+               (let ((default (default-value 'org-todo-keywords)))
+                 (org-node-parser--make-todo-regexp
+                  (string-join (if (stringp (car default))
+                                   default
+                                 (apply #'append (mapcar #'cdr default)))
+                               " "))))
+         (cons '$file-name-handler-alist
+               (cl-remove-if-not
+                (##memq % org-node-perf-keep-file-name-handlers)
+                file-name-handler-alist :key #'cdr))
+         (cons '$backlink-drawer-re
+               (concat "^[\t\s]*:"
+                       (or (and (require 'org-super-links nil t)
+                                (boundp 'org-super-links-backlink-into-drawer)
+                                (stringp org-super-links-backlink-into-drawer)
+                                org-super-links-backlink-into-drawer)
+                           "backlinks")
+                       ":"))))))
 
     (if org-node--debug
         ;; Special case for debugging; run single-threaded so we can step
         ;; through the org-node-parser.el functions with edebug
         (let (($i 0)
               (write-region-inhibit-fsync nil))
-          (org-node--write-eld (sort files (lambda (_ _) (natnump (random))))
-                               (org-node-parser--tmpfile "file-list-0.eld"))
+          (org-node--write-eld (org-node-parser--tmpfile "file-list-0.eld")
+                               (sort files (lambda (_ _) (natnump (random)))))
           (setq org-node-parser--found-links nil)
           (setq org-node-parser--paths-types nil)
           (setq org-node--first-init nil)
@@ -1188,23 +1211,18 @@ function to update current tables."
                           files org-node-perf-max-jobs))
              (n-jobs (length file-lists))
              (write-region-inhibit-fsync nil) ;; Default t in emacs30
-             (default-directory invocation-directory)
-             (print-length nil)
-             (del (org-node--fn-sans-advice #'delete-file)))
+             (default-directory invocation-directory))
         (dotimes (i n-jobs)
-          (org-node--write-eld (pop file-lists)
-                               (org-node-parser--tmpfile "file-list-%d.eld" i))
-          ;; Clean old result in order to spot failure to make a new result
-          (let ((result-file (org-node-parser--tmpfile "results-%d.eld" i)))
-            (when-let ((buf (get-truename-buffer result-file)))
-              (kill-buffer buf))
-            (funcall del result-file)) ;; Maybe use `delete-file-internal'?
-          ;; TODO: Maybe prepend a "timeout 30"
+          (org-node--write-eld (org-node-parser--tmpfile "file-list-%d.eld" i)
+                               (pop file-lists))
+          ;; Remove old result in order to spot failure to make new result
+          (org-node--delete-eld (org-node-parser--tmpfile "results-%d.eld" i))
           (push (make-process
                  :name (format "org-node-%d" i)
                  :noquery t
                  :stderr (get-buffer-create org-node--stderr-name)
                  :command
+                 ;; TODO: Maybe prepend a "timeout 30"
                  ;; Ensure the children run the same binary executable as
                  ;; current Emacs, so the `compiled-lib' bytecode fits
                  (list (file-name-concat invocation-directory invocation-name)
@@ -2382,13 +2400,10 @@ instead of calling this function."
       t)))
 
 (defun org-node-helper-try-visit-file (file)
-  "Visit FILE if it exists or if a buffer exists on that file.
-Return non-nil on success."
-  (let ((buf (find-buffer-visiting file)))
-    (if buf
-        (switch-to-buffer buf)
-      (when (file-readable-p file)
-        (find-file file)))))
+  "Visit FILE if it exists and return non-nil.
+Do not create FILE if it does not exist, just return nil."
+  (when (file-readable-p file)
+    (find-file file)))
 
 (defun org-node-helper-filename->ymd (path)
   "Check the filename PATH for a date and return it.
@@ -2571,7 +2586,7 @@ currently."
 
 (defun org-node--series-goto-previous (key &optional next)
   "Visit the previous entry in series identified by KEY.
-If argument NEXT is non-nil, actually visit the next entry."
+If argument NEXT is non-nil, visit the next entry instead."
   (let* ((series (cdr (assoc key org-node-built-series)))
          (tail (plist-get series :sorted-items))
          head

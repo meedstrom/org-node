@@ -31,6 +31,10 @@
 
 ;; TODO: Drop the @ from @citations (needs change in several places)
 
+;; REVIEW: Should all regexp char classes including \n (newline) also include
+;; \r (carriage return)?  Looking at quite a bit of Org code, they don't seem
+;; to bother.  The regexp engine translates anyway in DOS-coded buffers?
+
 (eval-when-compile
   (require 'cl-lib)
   (require 'subr-x)
@@ -77,12 +81,12 @@ keywords within."
                (regexp-opt)))
 
 ;; ;; Ok, it seems plenty fast enough
-;; (benchmark-run 1000 (org-node-parser--org-link-display-format " OUTCOME Made enough progress on [[id:f42d4ea8-ce6a-4ecb-bbcd-22dcb4c18671][Math blah]] to blah"))
+;; (benchmark-run 1000 (org-node-parser--org-link-display-format "DONE Made enough progress on [[id:f42d4ea8-ce6a-4ecb-bbcd-22dcb4c18671][Math blah]] to blah"))
 (defun org-node-parser--org-link-display-format (s)
   "Copy of `org-link-display-format'.
-Format string S for display - this means replace every link in S
-with only their description if they have one, and in any case
-strip the brackets."
+Format string S for display - this means replace every link inside S
+with only their description if they have one, and in any case strip the
+brackets."
   (replace-regexp-in-string
    ;; The regexp is `org-link-bracket-re'
    "\\[\\[\\(\\(?:[^][\\]\\|\\\\\\(?:\\\\\\\\\\)*[][]\\|\\\\+[^][]\\)+\\)]\\(?:\\[\\([^z-a]+?\\)]\\)?]"
@@ -228,10 +232,9 @@ a :PROPERTIES: and :END: string."
 ;;; Main
 
 (defun org-node-parser--collect-dangerously ()
-  "Dangerous!
-Overwrites the current buffer!
+  "Dangerous - overwrites the current buffer!
 
-Taking info from the temp files prepared by `org-node--scan',
+Taking info out of the temp files prepared by `org-node--scan',
 which includes info such as a list of Org files, visit all those
 files to look for ID-nodes and links, then finish by writing the
 findings to another temp file."

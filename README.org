@@ -1,7 +1,6 @@
 #+TITLE: org-node
 #+AUTHOR: Martin Edström
 #+EMAIL: meedstrom91@gmail.com
-#+DATE: 2024
 #+LANGUAGE: en
 #+STARTUP: content
 #+TEXINFO_DIR_CATEGORY: Emacs
