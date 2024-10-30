@@ -20,6 +20,7 @@
     - In Emacs 30, replace with just =;;;###autoload=
   - any code gated on =emacs-major-version=
   - any usages of =compat-call=
+  - =org-element-with-disabled-cache=, it may be safe to remove in 30
   - =cl-sort=
   - what the compiler tells you is obsolete
 

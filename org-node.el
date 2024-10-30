@@ -1039,11 +1039,18 @@ and return it if it is .elc or .eln.
 
 If it is .el, then opportunistically compile it and return the newly
 compiled file instead.  This returns an .elc on the first call, then an
-.eln on future calls."
+.eln on future calls.
+
+Note: if you are currently editing the source code for FEATURE, use
+`eval-buffer' and save to ensure this finds the correct file."
   (let* ((hit (cl-loop
                for (file . elems) in load-history
                when (eq feature (cdr (assq 'provide elems)))
                return
+               ;; Want two pieces of info: the file path according to
+               ;; `load-history', and some function supposedly defined
+               ;; there.  The function is a better source of info, for
+               ;; discovering an .eln.
                (cons file (cl-loop
                            for elem in elems
                            when (and (consp elem)
@@ -1052,8 +1059,11 @@ compiled file instead.  This returns an .elc on the first call, then an
                                      (not (function-alias-p (cdr elem))))
                            return (cdr elem)))))
          (file-name-handler-alist '(("\\.gz\\'" . jka-compr-handler))) ;; perf
-         (loaded (or (and (ignore-errors
-                            (expand-file-name ;; REVIEW: `symbol-file' source
+         (loaded (or (and (native-comp-available-p)
+                          (ignore-errors
+                            ;; REVIEW: `symbol-file' uses expand-file-name,
+                            ;;         but I'm not convinced it is needed
+                            (expand-file-name
                              (native-comp-unit-file
                               (subr-native-comp-unit
                                (symbol-function (cdr hit)))))))
@@ -1062,13 +1072,15 @@ compiled file instead.  This returns an .elc on the first call, then an
       (error "Current Lisp definitions need to come from a file %S[.el/.elc/.eln]"
              feature))
     ;; HACK: Sometimes comp.el makes freefn- temp files; pretend we found .el.
+    ;;       Not a good hack, because load-path is NOT as trustworthy as
+    ;;       load-history.
     (when (string-search "freefn-" loaded)
       (setq loaded
             (locate-file (symbol-name feature) load-path '(".el" ".el.gz"))))
     (if (or (string-suffix-p ".el" loaded)
             (string-suffix-p ".el.gz" loaded))
         (or (when (native-comp-available-p)
-              ;; If we built an .eln last time, use it now even though
+              ;; If we built an .eln last time, return it now even though
               ;; the current Emacs process is still running interpreted .el.
               (comp-lookup-eln loaded))
             (let* ((elc (file-name-concat temporary-file-directory
@@ -1078,7 +1090,7 @@ compiled file instead.  This returns an .elc on the first call, then an
                     `(lambda (&rest _) ,elc)))
               (when (native-comp-available-p)
                 (native-compile-async (list loaded)))
-              ;; Native comp may take a while, so return elc this time.
+              ;; Native comp may take a while, so return .elc this time.
               ;; We should not pick an .elc from load path if Emacs is now
               ;; running interpreted code, since the code's likely newer.
               (if (or (file-newer-than-file-p elc loaded)
@@ -1097,6 +1109,12 @@ compiled file instead.  This returns an .elc on the first call, then an
       ;; should use the same .elc for compatibility right up until the point
       ;; the developer actually evals the .el buffer.
       loaded)))
+
+(defun org-node-kill ()
+  "Kill any stuck subprocesses."
+  (interactive)
+  (while-let ((proc (pop org-node--processes)))
+    (delete-process proc)))
 
 ;; Copied from part of `org-link-make-regexps'
 (defun org-node--make-plain-re (link-types)
@@ -1153,7 +1171,11 @@ Make it target only LINK-TYPES instead of all the cars of
                        "backlinks")
                    ":")))))
 
-(defvar org-node--gc-at-begin-launch 0)
+(defvar org-node--first-init t
+  "Non-nil until org-node has been initialized, then nil.
+Mainly for muffling some messages.")
+
+(defvar org-node--results nil)
 (defvar org-node--debug nil)
 (defun org-node--scan (files finalizer)
   "Begin async scanning FILES for id-nodes and links.
@@ -1235,7 +1257,8 @@ function to update current tables."
                                (setq gc-cons-threshold (* 1000 1000 1000))
                                (dolist (var ',vars)
                                  (set (car var) (cdr var)))
-                               (setq $files ',(pop file-lists))))
+                               (setq $files ',(pop file-lists)))
+                            nil '((length) (level)))
                   "--load" compiled-lib
                   "--funcall" "org-node-parser--collect-dangerously")
             :sentinel (lambda (proc _event)
@@ -1268,17 +1291,6 @@ results to function FINALIZER."
                     new-merged-result))
             (setq merged-result (nreverse new-merged-result))))
         (funcall finalizer merged-result)))))
-
-(defvar org-node--results nil)
-(defvar org-node--first-init t
-  "Non-nil until org-node has been initialized, then nil.
-Mainly for muffling some messages.")
-
-(defun org-node-kill ()
-  "Kill any stuck subprocesses."
-  (interactive)
-  (while-let ((proc (pop org-node--processes)))
-    (delete-process proc)))
 
 
 ;;;; Scan-finalizers
@@ -1589,6 +1601,7 @@ also necessary is `org-node--dirty-ensure-link-known' elsewhere."
 (defvar org-node--time-elapsed 1.0
   "Duration of the last cache reset.")
 
+(defvar org-node--gc-at-begin-launch 0)
 (defvar org-node--time-at-begin-launch nil)
 (defvar org-node--time-at-scan-begin nil)
 (defvar org-node--time-at-after-launch nil)
@@ -3828,6 +3841,9 @@ one of them is associated with a ROAM_REFS property."
     (message "Congratulations, no problems scanning %d nodes!"
              (hash-table-count org-node--id<>node))))
 
+;; Very important macro for the backlink mode, because backlink insertion opens
+;; the target Org file in the background, and if doing that is laggy, then
+;; every link insertion is laggy.
 (defmacro org-node--with-quick-file-buffer (file &rest body)
   "Pseudo-backport of Emacs 29 `org-with-file-buffer'.
 Also integrates `org-with-wide-buffer' behavior, and tries to
@@ -3868,7 +3884,7 @@ Optional keyword argument ABOUT-TO-DO as in
            (kill-buffer-hook nil) ;; Inhibit save-place etc
            (kill-buffer-query-functions nil)
            (buffer-list-update-hook nil))
-       ;; The cache has been buggy since the 9.5 rewrite, disable to be safe
+       ;; The cache is buggy, disable to be safe
        (org-element-with-disabled-cache
          (let* ((--was-open-- (find-buffer-visiting ,file))
                 (--file-- (org-node-abbrev-file-names (file-truename ,file)))
@@ -3945,7 +3961,7 @@ For explanation of TOO-MANY-FILES-HACK, see code comments."
           buf
           (start-time (current-time))
           (ctr 0))
-      ;; The cache has been buggy since the 9.5 rewrite, disable to be safe
+      ;; The cache is buggy, disable to be safe
       (org-element-with-disabled-cache
         (condition-case err
             (while files*
