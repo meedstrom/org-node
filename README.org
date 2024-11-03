@@ -15,7 +15,7 @@
   This was done for several reasons, not the least being that people actually use the default value :-)  I do not want to support what was meant to be an example, and it's cleaner this way.
 
 ** How to rollback
-Here are instructions in case you need to downgrade this package (or any package) to an older version, let's say 1.6.2:
+Here is how to downgrade this package (or any package) to an older version, let's say 1.6.2:
 
 With [[https://github.com/slotThe/vc-use-package][vc-use-package]] (built into Emacs from Emacs 30+):
 #+begin_src elisp
@@ -31,7 +31,7 @@ With [[https://github.com/quelpa/quelpa][Quelpa]]:
                     :commit "6ed833d1025d5163137904f2a1f6d80d930610b4"))
 #+end_src
 
-With [[https://github.com/progfolio/elpaca][Elpaca]] as follows.  Though note that such recipe modifications only take effect after you do =M-x elpaca-delete= and it re-clones -- the idea is that Elpaca users will prefer to do it manually inside the cloned repo.
+With [[https://github.com/progfolio/elpaca][Elpaca]] as follows.  Note that such recipe modifications only take effect after you do =M-x elpaca-delete= and it re-clones -- the idea is that Elpaca users will prefer to do it manually inside the cloned repo.
 #+begin_src elisp
 (use-package org-node
   :ensure (:fetcher github :repo "meedstrom/org-node"
