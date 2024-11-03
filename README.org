@@ -50,10 +50,15 @@ In this project, you can skip the above since I did create a few branches that S
                       :branch "v1.6"))
 #+end_src
 
-** Match fakeroam version
+*** Match fakeroam version
 The package [[https://github.com/meedstrom/org-node-fakeroam][org-node-fakeroam]] has been tightly coupled with specific versions of org-node, but hopefully I've made it warn if it has the wrong version.  Then you can use similar procedures as above.
 
-** Find out installed version
+- For org-node main, use fakeroam main
+- For org-node =v1.7=, use fakeroam =v1.5=
+- For org-node =v1.6=, use fakeroam =v1.4=
+- For org-node =v1.5=, use fakeroam =v1.3=
+
+*** Find out installed version
 This depends on the package manager.  I do not embed version in the source code.
 
 - With Elpaca, =M-x elpaca-info RET org-node RET=
