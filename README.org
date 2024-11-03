@@ -17,13 +17,6 @@
 ** How to rollback
 Here are instructions in case you need to downgrade this package (or any package) to an older version, let's say 1.6.2:
 
-With [[https://github.com/progfolio/elpaca][Elpaca]]:
-#+begin_src elisp
-(use-package org-node
-  :ensure (:fetcher github :repo "meedstrom/org-node"
-           :tag "1.6.2"))
-#+end_src
-
 With [[https://github.com/slotThe/vc-use-package][vc-use-package]] (built into Emacs from Emacs 30+):
 #+begin_src elisp
 (use-package org-node
@@ -38,11 +31,18 @@ With [[https://github.com/quelpa/quelpa][Quelpa]]:
                     :commit "6ed833d1025d5163137904f2a1f6d80d930610b4"))
 #+end_src
 
+With [[https://github.com/progfolio/elpaca][Elpaca]] as follows.  Though note that such recipe modifications only take effect after you do =M-x elpaca-delete= and it re-clones -- the idea is that Elpaca users will prefer to do it manually inside the cloned repo.
+#+begin_src elisp
+(use-package org-node
+  :ensure (:fetcher github :repo "meedstrom/org-node"
+           :tag "1.6.2"))
+#+end_src
+
 With Straight, it's a bit different.  Either create a [[https://github.com/radian-software/straight.el?tab=readme-ov-file#lockfile-management][Straight lockfile]],
 
-or if you know about Git, enter the cloned repo (=M-x find-library RET org-node RET=) and check out an old commit manually.  Before that's possible, it must've been cloned with =:depth full=, or else you can first run the Git command =git fetch --unshallow=.
+or if you know about Git, enter the cloned repo (=M-x find-library RET org-node RET=) and check out an old commit manually.  If you cannot see any old commits because it was not cloned with =:depth full=, you can first run the Git command =git fetch --unshallow=.
 
-In this project, you can skip the above since I did create a few branches that Straight can target directly with the =:branch= keyword -- v1.7, v1.6, v1.5:
+*You can skip the above* in this project since I did create a few branches that Straight can target directly with the =:branch= keyword -- v1.7, v1.6, v1.5:
 
 #+begin_src elisp
 (use-package org-node
@@ -51,7 +51,7 @@ In this project, you can skip the above since I did create a few branches that S
 #+end_src
 
 *** Match fakeroam version
-The package [[https://github.com/meedstrom/org-node-fakeroam][org-node-fakeroam]] has been tightly coupled with specific versions of org-node, but hopefully I've made it warn if it has the wrong version.  Then you can use similar procedures as above.
+The package [[https://github.com/meedstrom/org-node-fakeroam][org-node-fakeroam]] has been tightly coupled with specific versions of org-node, but hopefully I've made it warn about having the wrong version.  Then you can use a similar procedure as above.
 
 - For org-node =v1.7=, use fakeroam =v1.5=
 - For org-node =v1.6=, use fakeroam =v1.4=
