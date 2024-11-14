@@ -939,6 +939,10 @@ https://lists.gnu.org/archive/html/emacs-orgmode/2024-09/msg00305.html"
   (when files
     (org-node--try-launch-scan (ensure-list files))))
 
+(defun org-node--delete-process (process)
+  (when-let ((buf (process-buffer process)))
+    (kill-buffer buf)))
+
 (defvar org-node--retry-timer (timer-create))
 (defvar org-node--file-queue nil)
 (defvar org-node--wait-start nil)
@@ -973,7 +977,7 @@ If FILES is t, do a full reset, scanning all files discovered by
               (progn
                 (setq org-node--wait-start nil)
                 (message "org-node: Worked longer than 30 sec, killing")
-                (mapc #'delete-process org-node--processes)
+                (mapc #'org-node--delete-process org-node--processes)
                 (setq org-node--processes nil))
             (setq must-retry t)))
       ;; All clear, scan now
@@ -999,7 +1003,7 @@ If FILES is t, do a full reset, scanning all files discovered by
 (defvar org-node--processes nil
   "List of subprocesses.")
 
-(defvar org-node--stderr-name " *org-node*"
+(defvar org-node--stderr-name " *org-node-stderr*"
   "Name of buffer for the subprocesses shared stderr.")
 
 (defcustom org-node-perf-max-jobs 0
@@ -1114,7 +1118,7 @@ Note: if you are currently editing the source code for FEATURE, use
   "Kill any stuck subprocesses."
   (interactive)
   (while-let ((proc (pop org-node--processes)))
-    (delete-process proc)))
+    (org-node--delete-process proc)))
 
 ;; Copied from part of `org-link-make-regexps'
 (defun org-node--make-plain-re (link-types)
@@ -1194,7 +1198,7 @@ function to update current tables."
                       (org-node--mk-work-variables))))
     (when (seq-some #'process-live-p org-node--processes)
       ;; We should never end up here
-      (mapc #'delete-process org-node--processes)
+      (mapc #'org-node--delete-process org-node--processes)
       (message "org-node subprocesses alive, a bug report would be welcome"))
     (setq org-node--processes nil)
     (with-current-buffer (get-buffer-create org-node--stderr-name)
@@ -1239,7 +1243,7 @@ function to update current tables."
            (make-process
             :name (format "org-node-%d" i)
             :noquery t
-            :stderr (get-buffer-create " *org-node-stderr*" t)
+            :stderr (get-buffer-create org-node--stderr-name t)
             :buffer (with-current-buffer
                         (get-buffer-create (format " *org-node-%d*" i) t)
                       (erase-buffer)
@@ -1261,36 +1265,41 @@ function to update current tables."
                             nil '((length) (level)))
                   "--load" compiled-lib
                   "--funcall" "org-node-parser--collect-dangerously")
-            :sentinel (lambda (proc _event)
+            :sentinel (lambda (proc event)
                         (org-node--handle-finished-job
-                         proc n-jobs finalizer)))
+                         proc event n-jobs finalizer)))
            org-node--processes))
         (setq org-node--time-at-after-launch (current-time))))))
 
-(defun org-node--handle-finished-job (proc n-jobs finalizer)
+(defun org-node--handle-finished-job (proc event n-jobs finalizer)
   "Read output of process PROC.
 Add that to `org-node--results'.
 
 Count each call up to N-JOBS, then on the last call, pass the merged
 results to function FINALIZER."
-  (when (eq 'exit (process-status proc))
-    (with-current-buffer (process-buffer proc)
-      (push (read (buffer-string)) org-node--results))
-    (when (= (length org-node--results) n-jobs)
-      (setq org-node--time-at-finalize (current-time))
-      (let ((merged-result (pop org-node--results)))
-        ;; First result is last done.  Did test this.
-        (setq org-node--time-at-last-child-done (pop merged-result))
-        ;; Absorb the rest of the results
-        (dolist (result org-node--results)
-          (pop result) ;; Remove its timestamp
-          (let (new-merged-result)
-            ;; Zip lists pairwise. Like (-zip-with #'nconc list1 list2).
-            (while result
-              (push (nconc (pop result) (pop merged-result))
-                    new-merged-result))
-            (setq merged-result (nreverse new-merged-result))))
-        (funcall finalizer merged-result)))))
+  (with-current-buffer (process-buffer proc)
+    (if (not (and (eq 'exit (process-status proc))
+                  (eq 0 (process-exit-status proc))
+                  (equal "finished\n" event)))
+        (progn
+          (rename-buffer (string-trim (buffer-name))) ;; unhide the buffer
+          (message "Subprocess had a problem, check buffer %s" (buffer-name)))
+      (push (read (buffer-string)) org-node--results)
+      (when (= (length org-node--results) n-jobs)
+        (setq org-node--time-at-finalize (current-time))
+        (let ((merged-result (pop org-node--results)))
+          ;; First result is last done.  Did test this.
+          (setq org-node--time-at-last-child-done (pop merged-result))
+          ;; Absorb the rest of the results
+          (dolist (result org-node--results)
+            (pop result) ;; Remove its timestamp
+            (let (new-merged-result)
+              ;; Zip lists pairwise. Like (-zip-with #'nconc list1 list2).
+              (while result
+                (push (nconc (pop result) (pop merged-result))
+                      new-merged-result))
+              (setq merged-result (nreverse new-merged-result))))
+          (funcall finalizer merged-result))))))
 
 
 ;;;; Scan-finalizers
