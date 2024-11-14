@@ -31,6 +31,9 @@
 (require 'cl-lib)
 (require 'ol)
 
+(unless (fboundp 'el-job-launch)
+  (message "Org-node has a new dependency el-job, update your package repositories"))
+
 (defvar org-node-changes--new-names
   '(
     ;; (org-node-perf-eagerly-update-link-tables)
