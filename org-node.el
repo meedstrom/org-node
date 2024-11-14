@@ -1264,8 +1264,12 @@ results to function FINALIZER."
                   (eq 0 (process-exit-status proc))
                   (equal "finished\n" event)))
         (progn
-          (rename-buffer (string-trim (buffer-name))) ;; unhide the buffer
-          (message "Subprocess had a problem, check buffer %s" (buffer-name)))
+          ;; Unhide the buffer for easier user inspection
+          (rename-buffer (string-trim-left (buffer-name)))
+          (message "Subprocess had a problem, check buffer %s" (buffer-name))
+          (with-current-buffer org-node--stderr-name
+            (setq org-node--stderr-name (string-trim-left (buffer-name)))
+            (rename-buffer org-node--stderr-name)))
       (push (read (buffer-string)) org-node--results)
       (when (= (length org-node--results) n-jobs)
         (setq org-node--time-at-finalize (current-time))
@@ -2221,8 +2225,8 @@ type the name of a node that does not exist.  That enables this
   (let (title node id)
     (if org-node-proposed-title
         ;; Was called from `org-node-create', so the user had typed the
-        ;; title and no such node exists yet, or it is during capture
-        ;; and the title and id are proposed.
+        ;; title and no such node exists yet, or was invoked externally
+        ;; by something that pre-set the title and id
         (progn
           (setq title org-node-proposed-title)
           (setq id org-node-proposed-id)
