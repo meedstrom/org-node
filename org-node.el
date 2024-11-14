@@ -2230,10 +2230,12 @@ type the name of a node that does not exist.  That enables this
   (let (title node id)
     (if org-node-proposed-title
         ;; Was called from `org-node-create', so the user had typed the
-        ;; title and no such node exists yet
+        ;; title and no such node exists yet, or it is during capture
+        ;; and the title and id are proposed.
         (progn
           (setq title org-node-proposed-title)
-          (setq id org-node-proposed-id))
+          (setq id org-node-proposed-id)
+          (setq node (gethash title org-node--candidate<>node)))
       ;; Was called from `org-capture', which means the user has not yet typed
       ;; the title; let them type it now
       (let ((input (completing-read "Node: " #'org-node-collection
