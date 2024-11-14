@@ -1009,30 +1009,12 @@ If FILES is t, do a full reset, scanning all files discovered by
 (defcustom org-node-perf-max-jobs 0
   "Number of subprocesses to run.
 If left at 0, will be set at runtime to the result of
-`org-node--count-logical-cores'.
+`num-processors' minus 1.
 
 Affects the speed of \\[org-node-reset], which mainly matters at
 first-time init, since it may block Emacs while populating tables for
 the first time."
   :type 'natnum)
-
-(defun org-node--count-logical-cores ()
-  "Return sum of available processor cores, minus 1."
-  (max (1- (string-to-number
-            (pcase system-type
-              ((or 'gnu 'gnu/linux 'gnu/kfreebsd 'berkeley-unix)
-               (if (executable-find "nproc")
-                   (shell-command-to-string "nproc --all")
-                 (shell-command-to-string "lscpu -p | egrep -v '^#' | wc -l")))
-              ((or 'darwin)
-               (shell-command-to-string "sysctl -n hw.logicalcpu_max"))
-              ;; No idea if this works
-              ((or 'cygwin 'windows-nt 'ms-dos)
-               (ignore-errors
-                 (with-temp-buffer
-                   (call-process "echo" nil t nil "%NUMBER_OF_PROCESSORS%")
-                   (buffer-string)))))))
-       1))
 
 (defun org-node--ensure-compiled-lib (feature)
   "Look for .eln, .elc or .el file corresponding to FEATURE.
@@ -1189,7 +1171,7 @@ actually launches the processes - the rubber hits the road.
 When finished, pass a list of scan results to the FINALIZER
 function to update current tables."
   (when (= 0 org-node-perf-max-jobs)
-    (setq org-node-perf-max-jobs (org-node--count-logical-cores)))
+    (setq org-node-perf-max-jobs (max (1- (num-processors)) 1)))
   (mkdir (org-node--tmpfile) t)
   (let ((compiled-lib (org-node--ensure-compiled-lib 'org-node-parser))
         (file-name-handler-alist nil)
