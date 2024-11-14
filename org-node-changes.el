@@ -48,7 +48,7 @@ value."
   (while-let ((row (pop org-node-changes--new-names)))
     (seq-let (old new removed-by) row
       (unless removed-by
-        (setq removed-by "30 October 2024"))
+        (setq removed-by "15 December 2024"))
       (when (boundp old)
         (if new
             (progn
@@ -133,7 +133,7 @@ hardcoded strings."
       (let ((obj file))
         (setq file object)
         (setq object obj)))
-  (when-let ((buf (if (>= emacs-major-version 30)
+  (when-let ((buf (if (fboundp 'get-truename-buffer) ;; Emacs 30
                       (get-truename-buffer file)
                     (get-file-buffer file))))
     (kill-buffer buf))
@@ -146,15 +146,14 @@ hardcoded strings."
 (org-node-changes--def-whiny-alias 'org-node-complete-at-point-global-mode
                                    'org-node-complete-at-point-mode)
 
-(define-obsolete-function-alias 'org-node-parser--tmpfile
-  'org-node--tmpfile
-  "2024-10-28")
+(org-node-changes--def-whiny-alias
+ 'org-node-parser--tmpfile 'org-node--tmpfile "2024-10-28")
 
-(define-obsolete-function-alias
-  'org-node-get-id-links 'org-node-get-id-links-to "2024-10-04")
+(org-node-changes--def-whiny-alias
+ 'org-node-get-id-links 'org-node-get-id-links-to "2024-10-04")
 
-(define-obsolete-function-alias
-  'org-node-get-reflinks 'org-node-get-reflinks-to "2024-10-04")
+(org-node-changes--def-whiny-alias
+ 'org-node-get-reflinks 'org-node-get-reflinks-to "2024-10-04")
 
 (define-obsolete-variable-alias
   'org-node--series 'org-node-built-series "2024-10-07")

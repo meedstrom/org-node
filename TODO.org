@@ -4,7 +4,7 @@
 
 - [ ] See comments at =org-node--call-at-nearest-node=, maybe remove these subroutines
 
-- [ ] Remove try-launch-scan
+- [X] Remove try-launch-scan
 
 - [ ] Spin out all series-related business into own file
 

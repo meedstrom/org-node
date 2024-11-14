@@ -24,7 +24,7 @@
 ;; `org-node-parser--collect-dangerously', then die.
 
 ;; NOTE: While developing, use `eval-buffer' instead of evalling specific
-;; defuns.  Why, because `org-node--ensure-compiled-lib' only looks up one
+;; defuns.  Why, because `org-node--ensure-compiled' only looks up one
 ;; of the defuns.
 
 ;;; Code:
@@ -118,7 +118,10 @@ What this means?  See test/org-node-test.el."
                                      (+ (not (any " ;]")))))
                           link?)
          ;; Replace & with @
-         collect (concat "@" (substring (match-string 1 link?) 1))
+         collect (let ((path (substring (match-string 1 link?) 1)))
+                   (push (cons path (substring link? 0 colon-pos))
+                         org-node-parser--paths-types)
+                   (concat "@" path))
          ;; Some sort of uri://path
          else when (setq colon-pos (string-search ":" link?))
          collect (let ((path (string-replace
@@ -216,348 +219,339 @@ a :PROPERTIES: and :END: string."
       (forward-line 1))
     result))
 
-
 
 ;;; Main
 
-(defun org-node-parser--collect-dangerously ()
-  "Dangerous - overwrites the current buffer!
+(defvar org-node-parser--buf nil
+  "Throwaway buffer.
+May be useful to look inside when debugging in main process rather than
+running el-job processes.")
 
-Taking info out of the temp files prepared by `org-node--scan',
-which includes info such as a list of Org files, visit all those
-files to look for ID-nodes and links, then finish by writing the
-findings to another temp file."
+(defun org-node-parser--init ()
+  "Setup a throwaway buffer in which to work.
+Also set some variables."
+  (switch-to-buffer (setq org-node-parser--buf
+                          (get-buffer-create " *org-node-parser*" t)))
+  (setq buffer-read-only t)
+  (setq case-fold-search t)
+  (setq file-name-handler-alist $file-name-handler-alist)
+  (setq coding-system-for-read $assume-coding-system)
   (when $inlinetask-min-level
     (setq org-node-parser--heading-re
           (rx-to-string
-           `(seq bol (repeat 1 ,(1- $inlinetask-min-level) "*") " "))))
-  (setq buffer-read-only t)
-  (let ((case-fold-search t)
-        result/missing-files
-        result/found-nodes
-        result/file-info
-        result/problems
-        ;; Perf
-        (file-name-handler-alist $file-name-handler-alist)
-        (coding-system-for-read $assume-coding-system)
-        (coding-system-for-write $assume-coding-system)
-        ;; Let-bind outside rather than inside the loop, even though they are
-        ;; only used inside the loop, to produce less garbage.  Not sure how
-        ;; Elisp works, but profiling shows a speedup... or it did once upon a
-        ;; time.  Suspect it makes no diff now that we nix GC, but I'm not
-        ;; gonna convert back to local `let' forms as it still matters if you
-        ;; wanna run this code synchronously.
+           `(seq bol (repeat 1 ,(1- $inlinetask-min-level) "*") " ")))))
+
+(defun org-node-parser--collect-dangerously (FILE)
+  "Dangerous - overwrites the current buffer!
+
+Scan FILE for ID-nodes and links, then return the list of findings."
+  (setq org-node-parser--paths-types nil)
+  (setq org-node-parser--found-links nil)
+  (let (missing-file
+        found-nodes
+        file-mtime
+        problem
         HEADING-POS HERE FAR END ID-HERE OLPATH
-        FILE-START-TIME
         DRAWER-BEG DRAWER-END
         TITLE FILE-TITLE
         TODO-STATE TODO-RE FILE-TODO-SETTINGS
         TAGS FILE-TAGS ID FILE-ID SCHED DEADLINE PRIORITY LEVEL PROPS)
+    (condition-case err
+        (catch 'file-done
+          (when (not (file-readable-p FILE))
+            ;; If FILE does not exist (not readable), user probably deleted
+            ;; or renamed a file.  If it was a rename, hopefully the new name
+            ;; is also in the file list.  Else, like if it was done outside
+            ;; Emacs by typing `mv' on the command line, it gets picked up on
+            ;; next scan.
+            (setq missing-file FILE)
+            (throw 'file-done t))
+          ;; Skip symlinks for two reasons:
+          ;; - Causes duplicates if the true file is also in the file list.
+          ;; - For performance, the codebase rarely uses `file-truename'.
+          ;; Note that symlinks should not count as missing files, since they
+          ;; get re-picked up every time by `org-node-list-files', leading to
+          ;; pointlessly repeating `org-node--forget-id-locations'.
+          (when (file-symlink-p FILE)
+            (throw 'file-done t))
+          ;; Transitional cleanup due to bug fixed in commit f900975
+          (unless (string-suffix-p ".org" FILE)
+            (setq missing-file FILE)
+            (throw 'file-done t))
+          (setq FILE-START-TIME (current-time))
+          ;; NOTE: Don't use `insert-file-contents-literally'!  It causes wrong
+          ;;       values for HEADING-POS when there is any Unicode in the file
+          ;;       (because it sets `coding-system-for-read' to
+          ;;       `no-conversion').
+          ;;       We get close to its performance just overriding
+          ;;       `coding-system-for-read' to some fixed value and
+          ;;       esp. minimizing `file-name-handler-alist'.
+          (let ((inhibit-read-only t))
+            (erase-buffer)
+            (insert-file-contents FILE))
+          ;; Verify there is at least one ID-node
+          (unless (re-search-forward "^[\t\s]*:id: " nil t)
+            (setq missing-file FILE) ;; Transitional cleanup
+            (throw 'file-done t))
+          (goto-char 1)
 
-    (dolist (FILE $files)
-      (condition-case err
-          (catch 'file-done
-            (when (not (file-readable-p FILE))
-              ;; If FILE does not exist (not readable), user probably deleted
-              ;; or renamed a file.  If it was a rename, hopefully the new name
-              ;; is also in the file list.  Else, like if it was done outside
-              ;; Emacs by typing `mv' on the command line, it gets picked up on
-              ;; next scan.
-              (push FILE result/missing-files)
-              (throw 'file-done t))
-            ;; Skip symlinks for two reasons:
-            ;; - Causes duplicates if the true file is also in the file list.
-            ;; - For performance, the codebase rarely uses `file-truename'.
-            ;; Note that symlinks should not count as missing files, since they
-            ;; get re-picked up every time by `org-node-list-files', leading to
-            ;; pointlessly repeating `org-node--forget-id-locations'.
-            (when (file-symlink-p FILE)
-              (throw 'file-done t))
-            ;; Transitional cleanup due to bug fixed in commit f900975
-            (unless (string-suffix-p ".org" FILE)
-              (push FILE result/missing-files)
-              (throw 'file-done t))
-            (setq FILE-START-TIME (current-time))
-            ;; NOTE: Don't use `insert-file-contents-literally'!  It causes
-            ;;       wrong values for HEADING-POS when there is any Unicode in
-            ;;       the file.  Just overriding `coding-system-for-read' and
-            ;;       esp. `file-name-handler-alist' grants similar performance.
-            (let ((inhibit-read-only t))
-              (erase-buffer)
-              (insert-file-contents FILE))
-            ;; Verify there is at least one ID-node
-            (unless (re-search-forward "^[\t\s]*:id: " nil t)
-              (push FILE result/missing-files) ;; Transitional cleanup
-              (throw 'file-done t))
+          ;; If the very first line of file is a heading (typical for people
+          ;; who set `org-node-prefer-with-heading'), don't try to scan any
+          ;; file-level front matter.  Our usage of
+          ;; `org-node-parser--next-heading' cannot handle that edge-case.
+          (if (looking-at-p "\\*")
+              (progn
+                (setq FILE-ID nil)
+                (setq FILE-TITLE nil)
+                (setq TODO-RE $global-todo-re))
+            ;; Narrow until first heading
+            (when (org-node-parser--next-heading)
+              (narrow-to-region 1 (point))
+              (goto-char 1))
+            ;; Rough equivalent of `org-end-of-meta-data' for the file
+            ;; level front matter, can jump somewhat too far but that's ok
+            (setq FAR (if (re-search-forward "^ *?[^#:\n]" nil t)
+                          (1- (point))
+                        ;; There's no content other than front matter
+                        (point-max)))
             (goto-char 1)
+            (setq PROPS
+                  (if (re-search-forward "^[\t\s]*:properties:" FAR t)
+                      (progn
+                        (forward-line 1)
+                        (org-node-parser--collect-properties
+                         (point)
+                         (if (re-search-forward "^[\t\s]*:end:" FAR t)
+                             (pos-bol)
+                           (error "Couldn't find :END: of drawer"))))
+                    nil))
+            (setq HERE (point))
+            (setq FILE-TAGS
+                  (if (re-search-forward "^#\\+filetags: " FAR t)
+                      (split-string
+                       (buffer-substring (point) (pos-eol))
+                       ":" t)
+                    nil))
+            (goto-char HERE)
+            (setq TODO-RE
+                  (if (re-search-forward $file-todo-option-re FAR t)
+                      (progn
+                        (setq FILE-TODO-SETTINGS nil)
+                        ;; Because you can have multiple #+todo: lines...
+                        (while (progn
+                                 (push (buffer-substring (point) (pos-eol))
+                                       FILE-TODO-SETTINGS)
+                                 (re-search-forward
+                                  $file-todo-option-re FAR t)))
+                        (org-node-parser--make-todo-regexp
+                         (string-join FILE-TODO-SETTINGS " ")))
+                    $global-todo-re))
+            (goto-char HERE)
+            (setq FILE-TITLE (when (re-search-forward "^#\\+title: " FAR t)
+                               (org-node-parser--org-link-display-format
+                                (buffer-substring (point) (pos-eol)))))
+            (setq FILE-ID (cdr (assoc "ID" PROPS)))
+            (when FILE-ID
+              (goto-char HERE)
+              ;; Don't count org-super-links backlinks as forward links
+              ;; TODO: Rewrite more readably
+              (if (re-search-forward $backlink-drawer-re nil t)
+                  (progn
+                    (setq END (point))
+                    (unless (search-forward ":end:" nil t)
+                      (error "Couldn't find :END: of drawer"))
+                    ;; Collect from end of backlinks drawer to first heading
+                    (org-node-parser--collect-links-until nil FILE-ID))
+                (setq END (point-max)))
+              (goto-char HERE)
+              (org-node-parser--collect-links-until END FILE-ID)
 
-            ;; If the very first line of file is a heading (typical for people
-            ;; who set `org-node-prefer-with-heading'), don't try to scan any
-            ;; file-level front matter.  Our usage of
-            ;; `org-node-parser--next-heading' cannot handle that edge-case.
-            (if (looking-at-p "\\*")
-                (progn
-                  (setq FILE-ID nil)
-                  (setq FILE-TITLE nil)
-                  (setq TODO-RE $global-todo-re))
-              ;; Narrow until first heading
-              (when (org-node-parser--next-heading)
-                (narrow-to-region 1 (point))
-                (goto-char 1))
-              ;; Rough equivalent of `org-end-of-meta-data' for the file
-              ;; level front matter, can jump somewhat too far but that's ok
-              (setq FAR (if (re-search-forward "^ *?[^#:\n]" nil t)
-                            (1- (point))
-                          ;; There's no content other than front matter
-                          (point-max)))
-              (goto-char 1)
+              ;; NOTE: A plist would be more readable than a record, but then
+              ;;       the mother Emacs has more work to do.  Profiled using:
+              ;; (benchmark-run 10 (setq org-node--done-ctr 6) (org-node--handle-finished-job 7 #'org-node--finalize-full))
+              ;;       Result when finalizer passes plists to `org-node--make-obj':
+              ;; (8.152532984 15 4.110698459000105)
+              ;;       Result when finalizer accepts these premade records:
+              ;; (5.928453786 10 2.7291036080000595)
+              (push (record 'org-node
+                            (split-string-and-unquote
+                             (or (cdr (assoc "ROAM_ALIASES" PROPS)) ""))
+                            nil
+                            FILE
+                            FILE-TITLE
+                            FILE-ID
+                            0
+                            nil
+                            1
+                            nil
+                            PROPS
+                            (org-node-parser--split-refs-field
+                             (cdr (assoc "ROAM_REFS" PROPS)))
+                            nil
+                            FILE-TAGS
+                            FILE-TAGS
+                            ;; Title mandatory
+                            (or FILE-TITLE (file-name-nondirectory FILE))
+                            nil)
+                    found-nodes))
+            (goto-char (point-max))
+            ;; We should now be at the first heading
+            (widen))
+
+          ;; Loop over the file's headings
+          (setq OLPATH nil)
+          (while (not (eobp))
+            (catch 'entry-done
+              ;; Narrow til next heading
+              (narrow-to-region (point)
+                                (save-excursion
+                                  (or (org-node-parser--next-heading)
+                                      (point-max))))
+              (setq HEADING-POS (point))
+              (setq LEVEL (skip-chars-forward "*"))
+              (skip-chars-forward " ")
+              (let ((case-fold-search nil))
+                (setq TODO-STATE
+                      (if (looking-at TODO-RE)
+                          (prog1 (buffer-substring (point) (match-end 0))
+                            (goto-char (match-end 0))
+                            (skip-chars-forward " "))
+                        nil))
+                ;; [#A] [#B] [#C]
+                (setq PRIORITY
+                      (if (looking-at "\\[#[A-Z0-9]+\\]")
+                          (prog1 (match-string 0)
+                            (goto-char (match-end 0))
+                            (skip-chars-forward " "))
+                        nil)))
+              ;; Skip statistics-cookie such as "[2/10]"
+              (when (looking-at "\\[[0-9]*/[0-9]*\\]")
+                (goto-char (match-end 0))
+                (skip-chars-forward " "))
+              (setq HERE (point))
+              ;; Any tags in heading?
+              (if (re-search-forward " +:.+: *$" (pos-eol) t)
+                  (progn
+                    (goto-char (match-beginning 0))
+                    (setq TAGS (split-string (match-string 0) ":" t " *"))
+                    (setq TITLE (org-node-parser--org-link-display-format
+                                 (buffer-substring HERE (point)))))
+                (setq TAGS nil)
+                (setq TITLE (org-node-parser--org-link-display-format
+                             (buffer-substring HERE (pos-eol)))))
+              ;; Gotta go forward 1 line, see if it is a planning-line, and
+              ;; if it is, then go forward 1 more line, and if that is a
+              ;; :PROPERTIES: line, then we're safe to collect properties
+              (forward-line 1)
+              (setq HERE (point))
+              (setq FAR (pos-eol))
+              (setq SCHED
+                    (if (re-search-forward "[\t\s]*SCHEDULED: +" FAR t)
+                        (prog1 (buffer-substring
+                                (point)
+                                (+ 1 (point) (skip-chars-forward "^]>\n")))
+                          (goto-char HERE))
+                      nil))
+              (setq DEADLINE
+                    (if (re-search-forward "[\t\s]*DEADLINE: +" FAR t)
+                        (prog1 (buffer-substring
+                                (point)
+                                (+ 1 (point) (skip-chars-forward "^]>\n")))
+                          (goto-char HERE))
+                      nil))
+              (when (or SCHED
+                        DEADLINE
+                        (re-search-forward "[\t\s]*CLOSED: +" FAR t))
+                ;; Alright, so there was a planning-line, meaning any
+                ;; :PROPERTIES: are not on this line but the next.
+                (forward-line 1)
+                (setq FAR (pos-eol)))
+              (skip-chars-forward "\t\s")
               (setq PROPS
-                    (if (re-search-forward "^[\t\s]*:properties:" FAR t)
+                    (if (looking-at-p ":properties:")
                         (progn
                           (forward-line 1)
                           (org-node-parser--collect-properties
                            (point)
-                           (if (re-search-forward "^[\t\s]*:end:" FAR t)
+                           (if (re-search-forward "^[\t\s]*:end:" nil t)
                                (pos-bol)
                              (error "Couldn't find :END: of drawer"))))
                       nil))
-              (setq HERE (point))
-              (setq FILE-TAGS
-                    (if (re-search-forward "^#\\+filetags: " FAR t)
-                        (split-string
-                         (buffer-substring (point) (pos-eol))
-                         ":" t)
-                      nil))
-              (goto-char HERE)
-              (setq TODO-RE
-                    (if (re-search-forward $file-todo-option-re FAR t)
-                        (progn
-                          (setq FILE-TODO-SETTINGS nil)
-                          ;; Because you can have multiple #+todo: lines...
-                          (while (progn
-                                   (push (buffer-substring (point) (pos-eol))
-                                         FILE-TODO-SETTINGS)
-                                   (re-search-forward
-                                    $file-todo-option-re FAR t)))
-                          (org-node-parser--make-todo-regexp
-                           (string-join FILE-TODO-SETTINGS " ")))
-                      $global-todo-re))
-              (goto-char HERE)
-              (setq FILE-TITLE (when (re-search-forward "^#\\+title: " FAR t)
-                                 (org-node-parser--org-link-display-format
-                                  (buffer-substring (point) (pos-eol)))))
-              (setq FILE-ID (cdr (assoc "ID" PROPS)))
-              (when FILE-ID
-                (goto-char HERE)
-                ;; Don't count org-super-links backlinks as forward links
-                ;; TODO: Rewrite more readably
-                (if (re-search-forward $backlink-drawer-re nil t)
-                    (progn
-                      (setq END (point))
-                      (unless (search-forward ":end:" nil t)
-                        (error "Couldn't find :END: of drawer"))
-                      ;; Collect from end of backlinks drawer to first heading
-                      (org-node-parser--collect-links-until nil FILE-ID))
-                  (setq END (point-max)))
-                (goto-char HERE)
-                (org-node-parser--collect-links-until END FILE-ID)
-
-                ;; NOTE: A plist would be more readable than a record, but then
-                ;;       the mother Emacs has more work to do.  Profiled using:
-                ;; (benchmark-run 10 (setq org-node--done-ctr 6) (org-node--handle-finished-job 7 #'org-node--finalize-full))
-                ;;       Result when finalizer passes plists to `org-node--make-obj':
-                ;; (8.152532984 15 4.110698459000105)
-                ;;       Result when finalizer accepts these premade records:
-                ;; (5.928453786 10 2.7291036080000595)
+              (setq ID (cdr (assoc "ID" PROPS)))
+              (cl-loop until (> LEVEL (or (caar OLPATH) 0))
+                       do (pop OLPATH)
+                       finally do (push (list LEVEL TITLE ID TAGS)
+                                        OLPATH))
+              (when ID
                 (push (record 'org-node
                               (split-string-and-unquote
                                (or (cdr (assoc "ROAM_ALIASES" PROPS)) ""))
-                              nil
+                              DEADLINE
                               FILE
                               FILE-TITLE
-                              FILE-ID
-                              0
-                              nil
-                              1
-                              nil
+                              ID
+                              LEVEL
+                              (nreverse (mapcar #'cadr (cdr OLPATH)))
+                              HEADING-POS
+                              PRIORITY
                               PROPS
                               (org-node-parser--split-refs-field
                                (cdr (assoc "ROAM_REFS" PROPS)))
-                              nil
-                              FILE-TAGS
-                              FILE-TAGS
-                              ;; Title mandatory
-                              (or FILE-TITLE (file-name-nondirectory FILE))
-                              nil)
-                      result/found-nodes))
-              (goto-char (point-max))
-              ;; We should now be at the first heading
-              (widen))
+                              SCHED
+                              TAGS
+                              (delete-dups
+                               (apply #'append FILE-TAGS
+                                      (mapcar #'cadddr OLPATH)))
+                              TITLE
+                              TODO-STATE)
+                      found-nodes))
 
-            ;; Loop over the file's headings
-            (setq OLPATH nil)
-            (while (not (eobp))
-              (catch 'entry-done
-                ;; Narrow til next heading
-                (narrow-to-region (point)
-                                  (save-excursion
-                                    (or (org-node-parser--next-heading)
-                                        (point-max))))
-                (setq HEADING-POS (point))
-                (setq LEVEL (skip-chars-forward "*"))
-                (skip-chars-forward " ")
-                (let ((case-fold-search nil))
-                  (setq TODO-STATE
-                        (if (looking-at TODO-RE)
-                            (prog1 (buffer-substring (point) (match-end 0))
-                              (goto-char (match-end 0))
-                              (skip-chars-forward " "))
-                          nil))
-                  ;; [#A] [#B] [#C]
-                  (setq PRIORITY
-                        (if (looking-at "\\[#[A-Z0-9]+\\]")
-                            (prog1 (match-string 0)
-                              (goto-char (match-end 0))
-                              (skip-chars-forward " "))
-                          nil)))
-                ;; Skip statistics-cookie such as "[2/10]"
-                (when (looking-at "\\[[0-9]*/[0-9]*\\]")
-                  (goto-char (match-end 0))
-                  (skip-chars-forward " "))
-                (setq HERE (point))
-                ;; Any tags in heading?
-                (if (re-search-forward " +:.+: *$" (pos-eol) t)
-                    (progn
-                      (goto-char (match-beginning 0))
-                      (setq TAGS (split-string (match-string 0) ":" t " *"))
-                      (setq TITLE (org-node-parser--org-link-display-format
-                                   (buffer-substring HERE (point)))))
-                  (setq TAGS nil)
-                  (setq TITLE (org-node-parser--org-link-display-format
-                               (buffer-substring HERE (pos-eol)))))
-                ;; Gotta go forward 1 line, see if it is a planning-line, and
-                ;; if it is, then go forward 1 more line, and if that is a
-                ;; :PROPERTIES: line, then we're safe to collect properties
-                (forward-line 1)
-                (setq HERE (point))
-                (setq FAR (pos-eol))
-                (setq SCHED
-                      (if (re-search-forward "[\t\s]*SCHEDULED: +" FAR t)
-                          (prog1 (buffer-substring
-                                  (point)
-                                  (+ 1 (point) (skip-chars-forward "^]>\n")))
-                            (goto-char HERE))
-                        nil))
-                (setq DEADLINE
-                      (if (re-search-forward "[\t\s]*DEADLINE: +" FAR t)
-                          (prog1 (buffer-substring
-                                  (point)
-                                  (+ 1 (point) (skip-chars-forward "^]>\n")))
-                            (goto-char HERE))
-                        nil))
-                (when (or SCHED
-                          DEADLINE
-                          (re-search-forward "[\t\s]*CLOSED: +" FAR t))
-                  ;; Alright, so there was a planning-line, meaning any
-                  ;; :PROPERTIES: are not on this line but the next.
-                  (forward-line 1)
-                  (setq FAR (pos-eol)))
-                (skip-chars-forward "\t\s")
-                (setq PROPS
-                      (if (looking-at-p ":properties:")
-                          (progn
-                            (forward-line 1)
-                            (org-node-parser--collect-properties
-                             (point)
-                             (if (re-search-forward "^[\t\s]*:end:" nil t)
-                                 (pos-bol)
-                               (error "Couldn't find :END: of drawer"))))
-                        nil))
-                (setq ID (cdr (assoc "ID" PROPS)))
-                (cl-loop until (> LEVEL (or (caar OLPATH) 0))
-                         do (pop OLPATH)
-                         finally do (push (list LEVEL TITLE ID TAGS)
-                                          OLPATH))
-                (when ID
-                  (push (record 'org-node
-                                (split-string-and-unquote
-                                 (or (cdr (assoc "ROAM_ALIASES" PROPS)) ""))
-                                DEADLINE
-                                FILE
-                                FILE-TITLE
-                                ID
-                                LEVEL
-                                (nreverse (mapcar #'cadr (cdr OLPATH)))
-                                HEADING-POS
-                                PRIORITY
-                                PROPS
-                                (org-node-parser--split-refs-field
-                                 (cdr (assoc "ROAM_REFS" PROPS)))
-                                SCHED
-                                TAGS
-                                (delete-dups
-                                 (apply #'append FILE-TAGS
-                                        (mapcar #'cadddr OLPATH)))
-                                TITLE
-                                TODO-STATE)
-                        result/found-nodes))
+              ;; Heading analyzed, now collect links in entry body!
+              (setq ID-HERE
+                    (or ID
+                        (cl-loop for crumb in OLPATH thereis (caddr crumb))
+                        FILE-ID
+                        (throw 'entry-done t)))
+              (setq HERE (point))
+              ;; Don't count org-super-links backlinks
+              ;; TODO: Generalize this mechanism to skip src blocks too
+              (setq DRAWER-BEG (re-search-forward $backlink-drawer-re nil t))
+              (setq DRAWER-END
+                    (and DRAWER-BEG
+                         (or (search-forward ":end:" nil t)
+                             (error "Couldn't find :END: of drawer"))))
 
-                ;; Heading analyzed, now collect links in entry body!
-                (setq ID-HERE
-                      (or ID
-                          (cl-loop for crumb in OLPATH thereis (caddr crumb))
-                          FILE-ID
-                          (throw 'entry-done t)))
-                (setq HERE (point))
-                ;; Don't count org-super-links backlinks
-                ;; TODO: Generalize this mechanism to skip src blocks too
-                (setq DRAWER-BEG (re-search-forward $backlink-drawer-re nil t))
-                (setq DRAWER-END
-                      (and DRAWER-BEG
-                           (or (search-forward ":end:" nil t)
-                               (error "Couldn't find :END: of drawer"))))
+              ;; Collect links inside the heading
+              (goto-char HEADING-POS)
+              (org-node-parser--collect-links-until (pos-eol) ID-HERE)
+              ;; Collect links between property drawer and backlinks drawer
+              (goto-char HERE)
+              (when DRAWER-BEG
+                (org-node-parser--collect-links-until DRAWER-BEG ID-HERE))
+              ;; Collect links until next heading
+              (goto-char (or DRAWER-END HERE))
+              (org-node-parser--collect-links-until (point-max) ID-HERE))
+            (goto-char (point-max))
+            (widen))
 
-                ;; Collect links inside the heading
-                (goto-char HEADING-POS)
-                (org-node-parser--collect-links-until (pos-eol) ID-HERE)
-                ;; Collect links between property drawer and backlinks drawer
-                (goto-char HERE)
-                (when DRAWER-BEG
-                  (org-node-parser--collect-links-until DRAWER-BEG ID-HERE))
-                ;; Collect links until next heading
-                (goto-char (or DRAWER-END HERE))
-                (org-node-parser--collect-links-until (point-max) ID-HERE))
-              (goto-char (point-max))
-              (widen))
+          (setq file-mtime
+                (cons FILE
+                      ;; Convert mtime into integer for `eq' operations
+                      (truncate (float-time
+                                 (file-attribute-modification-time
+                                  (file-attributes FILE)))))))
 
-            (push (cons FILE
-                        ;; Convert mtime into integer for `eq' operations
-                        (cons (truncate (float-time
-                                         (file-attribute-modification-time
-                                          (file-attributes FILE))))
-                              (float-time (time-since FILE-START-TIME))))
-                  result/file-info))
+      ;; Don't crash when there is an error signal, just report it
+      ;; Could have plural problems in future... but one per file is plenty
+      (( t error )
+       (setq problem (list FILE (point) err))))
 
-        ;; Don't crash the process when there is an error signal,
-        ;; report it and continue to the next file
-        (( t error )
-         (push (list FILE (point) err) result/problems))))
-
-    ;; All done
-
-    (let ((print-length nil)
-          (print-level nil)
-          (print-symbols-bare t)
-          ;; (print-circle t)
-          )
-      (prin1 (list (current-time)
-                   result/missing-files
-                   result/file-info
-                   result/found-nodes
-                   org-node-parser--paths-types
-                   org-node-parser--found-links
-                   result/problems
-                   )))))
+    (list (if missing-file (list missing-file))
+          (if file-mtime (list file-mtime))
+          found-nodes
+          org-node-parser--paths-types
+          org-node-parser--found-links
+          (if problem (list problem)))))
 
 (provide 'org-node-parser)
 

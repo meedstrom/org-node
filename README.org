@@ -17,7 +17,7 @@
 ** How to rollback
 Instructions to downgrade to [[https://github.com/meedstrom/org-node/tags][an older version]], let's say 1.6.2:
 
-With [[https://github.com/slotThe/vc-use-package][vc-use-package]] (built into Emacs from Emacs 30+):
+With [[https://github.com/slotThe/vc-use-package][vc-use-package]] (built into Emacs 30+):
 #+begin_src elisp
 (use-package org-node
   :vc (:fetcher github :repo "meedstrom/org-node"
