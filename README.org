@@ -8,9 +8,6 @@
 #+TEXINFO_DIR_DESC: Link org-id entries into a network.
 #+EXPORT_FILE_NAME: org-node
 #+HTML: <a href="https://melpa.org/#/org-node"><img alt="MELPA" src="https://melpa.org/packages/org-node-badge.svg"/></a> <a href="https://stable.melpa.org/#/org-node"><img alt="MELPA Stable" src="https://stable.melpa.org/packages/org-node-badge.svg"/></a>
-* News 1.8.0
-Some code was spun out into a new library [[https://github.com/meedstrom/el-job][el-job]], so that's a new dependency.  Update your package repositories.
-
 * Background
 ** What's all this
 

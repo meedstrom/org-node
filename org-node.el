@@ -1022,18 +1022,18 @@ JOB is the el-job object."
   (clrhash org-node--ref<>id)
   (clrhash org-node--file<>mtime)
   (setq org-node--collisions nil) ;; To be populated by `org-node--record-nodes'
-  (seq-let (missing-files file-info nodes path.type links problems) results
+  (seq-let (missing-files file-mtime nodes path.type links problems) results
     (org-node--forget-id-locations missing-files)
     (dolist (link links)
       (push link (gethash (org-node-link-dest link) org-node--dest<>links)))
     (cl-loop for (path . type) in path.type
              do (puthash path type org-node--ref-path<>ref-type))
-    (cl-loop for (file . mtime.elapsed) in file-info
-             do (puthash file mtime.elapsed org-node--file<>mtime))
+    (cl-loop for (file . mtime) in file-mtime
+             do (puthash file mtime org-node--file<>mtime))
     ;; HACK: Don't manage `org-id-files' at all.  Reduces GC, but could
     ;; affect downstream uses of org-id which assume the variable to be
     ;; correct.  Uncomment to improve.
-    ;; (setq org-id-files (mapcar #'car file-info))
+    ;; (setq org-id-files (mapcar #'car file-mtime))
     (org-node--record-nodes nodes)
     ;; (org-id-locations-save) ;; A nicety, but sometimes slow
     (setq org-node-built-series nil)
@@ -1071,8 +1071,8 @@ up-to-date set.")
 (defun org-node--finalize-modified (results job)
   "Use RESULTS to update tables."
   (run-hooks 'org-node-before-update-tables-hook)
-  (seq-let (missing-files file-info nodes path.type links problems) results
-    (let ((found-files (mapcar #'car file-info)))
+  (seq-let (missing-files file-mtime nodes path.type links problems) results
+    (let ((found-files (mapcar #'car file-mtime)))
       (org-node--forget-id-locations missing-files)
       (dolist (file missing-files)
         (remhash file org-node--file<>mtime))
@@ -1111,8 +1111,8 @@ up-to-date set.")
         (push link (gethash (org-node-link-dest link) org-node--dest<>links)))
       (cl-loop for (path . type) in path.type
                do (puthash path type org-node--ref-path<>ref-type))
-      (cl-loop for (file . mtime.elapsed) in file-info
-               do (puthash file mtime.elapsed org-node--file<>mtime))
+      (cl-loop for (file . mtime) in file-mtime
+               do (puthash file mtime org-node--file<>mtime))
       (org-node--record-nodes nodes)
       (while-let ((fn (pop org-node--temp-extra-fns)))
         (funcall fn job))
@@ -1190,7 +1190,7 @@ be misleading."
           (n-reflinks (cl-loop
                        for ref being the hash-keys of org-node--ref<>id
                        sum (length (gethash ref org-node--dest<>links)))))
-      (message "Saw %d file-nodes, %d subtree-nodes, %d ID-links, %d reflinks in %.2fs CPU-time (wall-time %.2fs)"
+      (message "Saw %d file-nodes, %d subtree-nodes, %d ID-links, %d reflinks in %.2fs CPU-time (%.2fs wall-time)"
                (- (hash-table-count org-node--id<>node) n-subtrees)
                n-subtrees
                n-backlinks
