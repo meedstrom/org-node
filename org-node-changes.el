@@ -80,7 +80,9 @@ value."
       (user-error "Update compat.el to use this version of org-node")))
   ;; 2024-10-18
   (unless org-node-changes--warned-roam-id
-    (when (eq (org-link-get-parameter "id" :follow) 'org-roam-id-open)
+    (when (and (eq (org-link-get-parameter "id" :follow) 'org-roam-id-open)
+               (bound-and-true-p org-roam-db-location)
+               (file-exists-p org-roam-db-location))
       (setq org-node-changes--warned-roam-id t)
       (message
        "%s" "Note: org-roam overrides ID-link behavior, you may want to
@@ -145,9 +147,6 @@ hardcoded strings."
 
 (org-node-changes--def-whiny-alias 'org-node-affix-with-olp
                                    'org-node-prefix-with-olp)
-
-(org-node-changes--def-whiny-alias 'org-node-complete-at-point-global-mode
-                                   'org-node-complete-at-point-mode)
 
 (org-node-changes--def-whiny-alias
  'org-node-parser--tmpfile 'org-node--tmpfile "2024-10-28")

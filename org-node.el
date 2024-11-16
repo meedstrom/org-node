@@ -149,7 +149,8 @@ Having fewer types results in a faster \\[org-node-reset].
 Tip: eval `(org-link-types)' to see all possible types.
 
 There is no need to add the \"cite\" type."
-  :type '(repeat string))
+  :type '(repeat string)
+  :package-version '(org-node . "0.7"))
 
 (defvar org-node-inject-variables (list)
   "Alist of variable-value pairs that child processes should set.
@@ -406,7 +407,7 @@ aliases."
           (function-item org-node-prefix-with-tags)
           (function-item org-node-affix-with-olp-and-tags)
           (function :tag "Custom function"))
-  :package-version "0.9"
+  :package-version '(org-node . "0.9")
   :set #'org-node--set-and-remind-reset)
 
 (defun org-node-affix-bare (_node title)
@@ -1598,7 +1599,7 @@ Behavior depends on the user option `org-node-ask-directory'."
 Example from Org-roam: %Y%m%d%H%M%S-
 Example from Denote: %Y%m%dT%H%M%S--
 
-For the filename itself, configure `org-node-slug-fn'."
+For the part after the datestamp, configure `org-node-slug-fn'."
   :type 'string)
 
 (defcustom org-node-slug-fn #'org-node-slugify-for-web
@@ -1627,7 +1628,7 @@ A title like \"Löb\\='s Theorem\" becomes \"lob_s_theorem\".
 
 Diacritical marks U+0300 to U+0331 are stripped \(mostly used with Latin
 alphabets).  Also stripped are all glyphs not categorized in Unicode as
-belonging to some alphabet or number system.
+belonging to an alphabet or number system.
 
 If you seek to emulate org-roam filenames, you may also want to
 configure `org-node-datestamp-format'."
@@ -1650,7 +1651,7 @@ A title like \"Löb\\='s Theorem\" becomes \"lobs-theorem\".
 
 Diacritical marks U+0300 to U+0331 are stripped \(mostly used with Latin
 alphabets).  Also stripped are all glyphs not categorized in Unicode as
-belonging to some alphabet or number system."
+belonging to an alphabet or number system."
   (thread-last title
                (ucs-normalize-NFD-string)
                (seq-remove (lambda (char) (<= #x300 char #x331)))
@@ -1665,7 +1666,7 @@ belonging to some alphabet or number system."
                (replace-regexp-in-string "^-" "")
                (replace-regexp-in-string "-$" "")))
 
-;; Useful test cases if you want to hack on this!
+;; Useful test cases if you want to hack on the above!
 
 ;; (org-node-slugify-for-web "A/B testing")
 ;; (org-node-slugify-for-web "\"But there's still a chance, right?\"")
@@ -3682,7 +3683,8 @@ Very presumptive!  Like `find-file-noselect' but intended as a
 subroutine for `org-node--in-files-do' or any program that has
 already ensured that ABBR-TRUENAME:
 
-- is an abbreviated file truename dissatisfying `backup-file-name-p'
+- is an abbreviated file truename
+- does not satisfy `backup-file-name-p'
 - is not being visited by any other buffer
 - is not a directory"
   (let ((attrs (file-attributes abbr-truename))
@@ -3967,8 +3969,8 @@ not exist."
       (funcall (plist-get series :creator) sortstr key))))
 
 ;; TODO
-(defun org-node-version ()
-  "Guess the installed version of org-node."
+(defun org-node--version ()
+  "Guess which version of org-node is in `load-path'."
   (let ((path (locate-library "org-node")))
     (cond
      ;; ... elpaca

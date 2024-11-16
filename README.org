@@ -170,7 +170,7 @@ Bad news: this is currently directed towards people who used [[https://github.co
 * Misc
 ** Manage org-id-locations
 
-I find unsatisfactory the config options in org-id (Why? See [[http://edstrom.dev/wjwrl/taking-ownership-of-org-id][Taking ownership of org-id]]), so org-node gives you an extra way to feed data to org-id.  That helps ensure that you never run into "ID not found" situations.
+Ever run into "ID not found" situations?  Org-node gives you an extra way to feed data to org-id, as [[http://edstrom.dev/wjwrl/taking-ownership-of-org-id][I find unsatisfactory the built-in options]].
 
 Example setting:
 
@@ -185,7 +185,7 @@ Do a =M-x org-node-reset= and see if it can find your notes now.
 
 *** Undoing a Roam hack
 
-If you have org-roam loaded, opening a link can sometimes send you to an outdated file path due to [[https://github.com/org-roam/org-roam/blob/2a630476b3d49d7106f582e7f62b515c62430714/org-roam-id.el#L91][a line in org-roam-id.el]] that causes org-id to /preferentially/ look up the org-roam DB instead of org-id's own table!
+If you have org-roam loaded, but no longer update the DB, opening a link can sometimes send you to an outdated file path due to [[https://github.com/org-roam/org-roam/blob/2a630476b3d49d7106f582e7f62b515c62430714/org-roam-id.el#L91][a line in org-roam-id.el]] that causes org-id to /preferentially/ look up the org-roam DB instead of org-id's own table!
 
 Either revert that with the following snippet, or if [[https://github.com/meedstrom/org-node-fakeroam][Fakeroam]] can cover your needs, simply delete the Roam DB (at "~/.emacs.d/org-roam.db").
 
@@ -202,7 +202,7 @@ Either revert that with the following snippet, or if [[https://github.com/meedst
 
 One user had over a thousand project-nodes, but only just began to do a knowledge base, and wished to avoid seeing the project nodes.
 
-This could work by, for example, excluding a "project" tag or any note that has a TODO state:
+This could work by, for example, excluding a "project" tag and excluding any note that has a TODO state:
 
 #+begin_src elisp
 (setq org-node-filter-fn
@@ -214,7 +214,7 @@ This could work by, for example, excluding a "project" tag or any note that has 
              (assoc "ROAM_EXCLUDE" (org-node-get-properties node))))))
 #+end_src
 
-You can also use a whitelist approach, allowing only nodes from a certain directory "my-wiki":
+You can also use a whitelist approach, to see only nodes from a certain directory "my-wiki":
 
 #+begin_src elisp
 (setq org-node-filter-fn
@@ -229,7 +229,7 @@ Let's say you have a big archive file, fulla IDs, and you want all the nodes wit
 
 However, nodes in isolation do still have inherited tags.  So you can use that, or the file name or outline path.
 
-Really, filename?  A big selling point of IDs is that you avoid depending on filenames, it's often pragmatic to let up on purism just a bit :-)  It works well for me to filter out any file or directory that happens to contain "archive" in the name:
+Really, filename!  A big selling point of IDs is that you avoid depending on filenames, it's often pragmatic to let up on purism just a bit :-)  It works well for me to filter out any file or directory that happens to contain "archive" in the name:
 
 #+begin_src elisp
 (setq org-node-filter-fn
