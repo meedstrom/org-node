@@ -1023,18 +1023,18 @@ JOB is the el-job object."
   (clrhash org-node--ref<>id)
   (clrhash org-node--file<>mtime)
   (setq org-node--collisions nil) ;; To be populated by `org-node--record-nodes'
-  (seq-let (missing-files file-mtime nodes path.type links problems) results
+  (seq-let (missing-files file.mtime nodes path.type links problems) results
     (org-node--forget-id-locations missing-files)
     (dolist (link links)
       (push link (gethash (org-node-link-dest link) org-node--dest<>links)))
     (cl-loop for (path . type) in path.type
              do (puthash path type org-node--ref-path<>ref-type))
-    (cl-loop for (file . mtime) in file-mtime
+    (cl-loop for (file . mtime) in file.mtime
              do (puthash file mtime org-node--file<>mtime))
     ;; HACK: Don't manage `org-id-files' at all.  Reduces GC, but could
     ;; affect downstream uses of org-id which assume the variable to be
     ;; correct.  Uncomment to improve.
-    ;; (setq org-id-files (mapcar #'car file-mtime))
+    ;; (setq org-id-files (mapcar #'car file.mtime))
     (org-node--record-nodes nodes)
     ;; (org-id-locations-save) ;; A nicety, but sometimes slow
     (setq org-node-built-series nil)
@@ -1072,8 +1072,8 @@ up-to-date set.")
 (defun org-node--finalize-modified (results job)
   "Use RESULTS to update tables."
   (run-hooks 'org-node-before-update-tables-hook)
-  (seq-let (missing-files file-mtime nodes path.type links problems) results
-    (let ((found-files (mapcar #'car file-mtime)))
+  (seq-let (missing-files file.mtime nodes path.type links problems) results
+    (let ((found-files (mapcar #'car file.mtime)))
       (org-node--forget-id-locations missing-files)
       (dolist (file missing-files)
         (remhash file org-node--file<>mtime))
@@ -1112,7 +1112,7 @@ up-to-date set.")
         (push link (gethash (org-node-link-dest link) org-node--dest<>links)))
       (cl-loop for (path . type) in path.type
                do (puthash path type org-node--ref-path<>ref-type))
-      (cl-loop for (file . mtime) in file-mtime
+      (cl-loop for (file . mtime) in file.mtime
                do (puthash file mtime org-node--file<>mtime))
       (org-node--record-nodes nodes)
       (while-let ((fn (pop org-node--temp-extra-fns)))
@@ -1339,10 +1339,6 @@ also necessary is `org-node--dirty-ensure-link-known' elsewhere."
                :todo (if heading (org-get-todo-state))
                :deadline (cdr (assoc "DEADLINE" props))
                :scheduled (cdr (assoc "SCHEDULED" props)))))))))))
-
-
-;;;; Scanning: Etc
-
 
 
 ;;;; Etc
@@ -1688,6 +1684,7 @@ belonging to an alphabet or number system."
 (defvar org-node-proposed-id nil
   "For use by `org-node-creation-fn'.")
 
+;; NOTE: This used to happen, don't think it does anymore. 2024-11-18
 (defun org-node--purge-backup-file-names ()
   "Clean backup names accidentally added to org-id database."
   (setq org-id-files (seq-remove #'backup-file-name-p org-id-files))
