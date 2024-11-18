@@ -2800,23 +2800,17 @@ need to compute once."
                                     "[[:alpha:]]+" "[[:alpha:]]+"
                                     example t)))))))))))
 
-;; This function can be removed if one day we drop support for file-level
-;; nodes, because then just (org-entry-get-with-inheritance "ID") will suffice.
-;; That demonstrates the maintenance burden of supporting file-level nodes:
-;; org-entry-get /can/ get the file-level ID but only sometimes.  Don't know
-;; where's the bug in that case, but it's not a bug to prioritize in Org IMHO;
-;; file-level property drawers were a mistake, they create the need for
-;; special-case code all over the place, which leads to new bugs, and bring
-;; very little to the table.  Even this workaround had a bug earlier, but we
-;; shouldn't need to write workarounds in the first place.  Thanks for
-;; listening.
+;; Going to try to see if `org-entry-get-with-inheritance' is always sufficient,
+;; so we can remove this function.  So, fail loudly if it turns out not to be.
 (defun org-node-id-at-point ()
   "Get ID for current entry or up the outline tree."
   (save-excursion
     (without-restriction
       (or (org-entry-get-with-inheritance "ID")
-          (progn (goto-char (point-min))
-                 (org-entry-get-with-inheritance "ID"))))))
+          (when-let ((alt-result (progn (goto-char (point-min))
+                                        (org-entry-get-with-inheritance "ID"))))
+            (message "org-node: `org-entry-get-with-inheritance' did not get file-level ID, report appreciated")
+            alt-result)))))
 
 (defcustom org-node-renames-allowed-dirs nil
   "Dirs in which files may be auto-renamed.
