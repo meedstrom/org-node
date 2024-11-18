@@ -18,7 +18,9 @@
 ;;; Commentary:
 
 ;; I rename things a lot.  That would break things for users unless I make
-;; aliases.  But `define-obsolete-variable-alias' does not warn users about
+;; aliases.
+
+;; But `define-obsolete-variable-alias' does not warn users about
 ;; user options, which means they can blissfully keep referring to a
 ;; thrice-deprecated variable name for years and not know.
 
@@ -28,28 +30,35 @@
 ;;; Code:
 
 (require 'seq)
+(require 'subr-x)
 (require 'cl-lib)
 (require 'ol)
 
 (unless (fboundp 'el-job-launch)
   (display-warning
-   'org-node (string-fill "Org-node has a new dependency el-job, update your package menus (e.g. by M-x package-refresh-contents)"
-                          70)))
+   'org-node (string-fill
+              "Org-node has a new dependency el-job, update your package menus (e.g. by M-x package-refresh-contents)"
+              70)))
 
 (defvar org-node-changes--new-names
-  '(
-    ;; (org-node-perf-eagerly-update-link-tables)
+  '((org-node--series org-node-seqs)
+    ;; Later (in Dec):
+    ;; (org-node-built-series org-node-seqs)
+    ;; (org-node-series-defs org-node-seq-defs)
     )
-  "Alist of deprecated symbol names and their new names.")
+  "Alist of deprecated symbol names and their new names.
+Names here will be loudly complained-about.")
 
 (defvar org-node-changes--warned-roam-id nil)
 (defvar org-node-changes--warned-once nil)
 (defun org-node-changes--warn-and-copy ()
   "Maybe print one-shot warnings, then become a no-op.
 
-Warn if any old name in `org-node-changes--new-names' is bound.  Then
-copy the value in the old name so that the new name gets the same
-value."
+First, warn if any old name in `org-node-changes--new-names' is bound.
+Then copy the value in the old name so that the new name gets the same
+value.
+
+Then do other one-shot warnings while we\\='re at it."
   (while-let ((row (pop org-node-changes--new-names)))
     (seq-let (old new removed-by) row
       (unless removed-by
@@ -69,35 +78,21 @@ value."
                  old)))))
   (unless org-node-changes--warned-once
     (setq org-node-changes--warned-once t)
-    ;; 2024-09-19 Clean up deprecated persist-defvars
-    (unless (memq system-type '(windows-nt ms-dos))
-      (cl-loop for sym in '(org-node--file<>mtime
-                            org-node--file<>previews
-                            org-node-fakeroam--saved-previews)
-               do (let ((file (org-node-changes--guess-persist-filename sym)))
-                    (when (file-exists-p file)
-                      (delete-file file)))))
     ;; 2024-10-25
     (unless (fboundp 'get-truename-buffer)
-      (user-error "Update compat.el to use this version of org-node")))
+      (display-warning
+       'org-node "Update compat.el to use this version of org-node")))
   ;; 2024-10-18
   (unless org-node-changes--warned-roam-id
-    (when (and (eq (org-link-get-parameter "id" :follow) 'org-roam-id-open)
-               (bound-and-true-p org-roam-db-location)
-               (file-exists-p org-roam-db-location))
+    (when (and (not (and (bound-and-true-p org-roam-autosync-mode)
+                         (bound-and-true-p org-roam-db-update-on-save)))
+               (eq (org-link-get-parameter "id" :follow) 'org-roam-id-open))
       (setq org-node-changes--warned-roam-id t)
       (message
        "%s" "Note: org-roam overrides ID-link behavior, you may want to
       revert to vanilla by evalling:
       (org-link-set-parameters
        \"id\" :follow #'org-id-open :store #'org-id-store-link-maybe)"))))
-
-;; Remove in Nov or so
-(defun org-node-changes--guess-persist-filename (sym)
-  (let ((dir (or (get sym 'persist-location)
-                 (bound-and-true-p persist--directory-location)
-                 (locate-user-emacs-file "persist"))))
-    (expand-file-name (symbol-name sym) dir)))
 
 (defmacro org-node-changes--def-whiny-alias (old new &optional when interactive removed-by)
   "Define OLD as effectively an alias for NEW.
@@ -118,17 +113,8 @@ hardcoded strings."
                 ,old ,(or removed-by "30 November 2024") ,new))
        (apply ,new args))))
 
-;; (define-obsolete-variable-alias
-;;   'org-node-creation-fn 'org-node-new-node-fn "2024-08-22")
-
-;; (define-obsolete-variable-alias
-;;   'org-node-creation-hook 'org-node-new-node-hook "2024-08-22")
-
-;; (org-node-changes--def-whiny-alias
-;;   'org-node-create #'org-node-new-node "2024-08-22")
-
 ;; 2024-09-17
-;; NOTE: Marking them as obsolete or whiny has to be done inside that library
+;; NOTE: Can't mark as obsolete here, it has be done inside that library
 (declare-function org-node-fakeroam-new-via-roam-capture "org-node-fakeroam")
 (declare-function org-node-fakeroam-slugify-via-roam "org-node-fakeroam")
 (defalias 'org-node-new-via-roam-capture #'org-node-fakeroam-new-via-roam-capture)
@@ -136,7 +122,7 @@ hardcoded strings."
 
 (defun org-node--write-eld (file object)
   (display-warning
-   'org-node "Please update org-node-fakeroam also when updating org-node")
+   'org-node "Looks like you updated org-node, please also update org-node-fakeroam")
   (if (stringp object)
       (let ((obj file))
         (setq file object)
@@ -148,17 +134,87 @@ hardcoded strings."
   (write-region (prin1-to-string object nil '((length . nil) (level . nil)))
                 nil file nil 'quiet))
 
-(org-node-changes--def-whiny-alias 'org-node-affix-with-olp
-                                   'org-node-prefix-with-olp)
+(org-node-changes--def-whiny-alias
+ 'org-node-get-id-links 'org-node-get-id-links-to "2024-10-04" nil "30 November")
 
 (org-node-changes--def-whiny-alias
- 'org-node-get-id-links 'org-node-get-id-links-to "2024-10-04")
+ 'org-node-get-reflinks 'org-node-get-reflinks-to "2024-10-04" nil "30 November")
 
-(org-node-changes--def-whiny-alias
- 'org-node-get-reflinks 'org-node-get-reflinks-to "2024-10-04")
+;; 2024-11-18 moved series-related code into own file, whereupon the namespace
+;; had to be made consistent.  Following names can be removed quite soon---
+(define-obsolete-function-alias 'org-node--build-series           'org-node-seq--build-from-def "2024-11-18")
+(define-obsolete-function-alias 'org-node--guess-daily-dir        'org-node-seq--guess-daily-dir "2024-11-18")
+(define-obsolete-function-alias 'org-node--add-series-to-dispatch 'org-node-seq--add-to-dispatch "2024-11-18")
+(define-obsolete-function-alias 'org-node--series-goto-previous*  'org-node-seq--goto-previous* "2024-11-18")
+(define-obsolete-function-alias 'org-node--series-goto-previous   'org-node-seq--goto-previous "2024-11-18")
+(define-obsolete-function-alias 'org-node--series-goto-next*      'org-node-seq--goto-next* "2024-11-18")
+(define-obsolete-function-alias 'org-node--series-goto-next       'org-node-seq--goto-next "2024-11-18")
+(define-obsolete-function-alias 'org-node--series-jump*           'org-node-seq--jump* "2024-11-18")
+(define-obsolete-function-alias 'org-node--series-jump            'org-node-seq--jump "2024-11-18")
+(define-obsolete-function-alias 'org-node--series-capture         'org-node-seq--capture "2024-11-18")
+(define-obsolete-function-alias 'org-node--mark-days              'org-node-seq--mark-days "2024-11-18")
+(define-obsolete-variable-alias 'org-node-current-series-key      'org-node-seq--current-key "2024-11-18")
 
-(define-obsolete-variable-alias
-  'org-node--series 'org-node-built-series "2024-10-07")
+;; ---but deprecate these more slowly
+(define-obsolete-variable-alias 'org-node-built-series          'org-node-seqs "2024-11-18")
+(define-obsolete-variable-alias 'org-node-series-defs           'org-node-seq-defs "2024-11-18")
+(define-obsolete-function-alias 'org-node-series-goto           'org-node-seq-goto "2024-11-18")
+(define-obsolete-function-alias 'org-node-series-dispatch       'org-node-seq-dispatch "2024-11-18")
+(define-obsolete-function-alias 'org-node-helper-try-goto-id    'org-node-seq-try-goto-id "2024-11-18")
+(define-obsolete-function-alias 'org-node-helper-try-visit-file 'org-node-seq-try-visit-file "2024-11-18")
+(define-obsolete-function-alias 'org-node-series-capture-target 'org-node-seq-capture-target "2024-11-18")
+(define-obsolete-function-alias 'org-node-helper-filename->ymd  'org-node-seq-filename->ymd "2024-11-18")
+(define-obsolete-function-alias 'org-node-extract-ymd           'org-node-seq-extract-ymd "2024-11-18")
+(define-obsolete-function-alias 'org-node-mk-series-sorted-by-property             'org-node-seq-def-on-any-sort-by-property "2024-11-18")
+(define-obsolete-function-alias 'org-node-mk-series-on-tags-sorted-by-property     'org-node-seq-def-on-tags-sort-by-property "2024-11-18")
+(define-obsolete-function-alias 'org-node-mk-series-on-filepath-sorted-by-basename 'org-node-seq-def-on-filepath-sort-by-basename "2024-11-18")
+
+;; Used by org-node-fakeroam until 1.8, so deprecate slowly as well.
+(define-obsolete-variable-alias 'org-node-proposed-series-key 'org-node-proposed-sequence  "2024-11-18")
+(define-obsolete-function-alias 'org-node--add-series-item    'org-node-seq--add-item "2024-11-18")
+
+;; TODO
+(defun org-node-changes--version ()
+  "Guess which version of org-node is in `load-path'."
+  (let ((path (locate-library "org-node")))
+    (cond
+     ;; ... elpaca
+     ((and (bound-and-true-p elpaca-directory)
+           (string-search elpaca-directory path)
+           (fboundp 'elpaca<-repo-dir)
+           (fboundp 'elpaca-get)
+           (fboundp 'elpaca--declared-version)
+           (fboundp 'elpaca-latest-tag)
+           (fboundp 'elpaca-process-output))
+      (when-let* ((e (elpaca-get 'org-node))
+                  (default-directory (elpaca<-repo-dir e))
+                  (version (ignore-errors (or (elpaca--declared-version e)
+                                              (elpaca-latest-tag e)))))
+        (concat (string-trim version) " "
+                (ignore-errors
+                  (string-trim (elpaca-process-output
+                                "git" "rev-parse" "--short" "HEAD"))))))
+
+     ;; ... package.el
+     ((and (bound-and-true-p package-user-dir)
+           (string-search package-user-dir path)
+           (fboundp 'package-get-descriptor)
+           (fboundp 'package-desc-version))
+      (mapconcat #'number-to-string
+                 (package-desc-version (package-get-descriptor 'org-node))
+                 "."))
+
+     ;; ... straight
+
+     ;; ... quelpa
+
+     ;; ... vc-use-package
+
+     ;; el-get, borg etc?
+
+     (t
+      (message "Sorry, couldn't figure out version, try checking the Git tag")
+      nil))))
 
 (provide 'org-node-changes)
 

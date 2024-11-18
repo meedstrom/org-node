@@ -72,7 +72,7 @@ Misc
 * Limitation Unique titles::
 * Limitation Org-ref::
 * Toolbox::
-* Experimental Node series::
+* Experimental Node sequences::
 
 Manage org-id-locations
 
@@ -82,9 +82,9 @@ Exclude uninteresting nodes
 
 * Limitation @samp{ROAM_EXCLUDE}::
 
-Experimental: Node series
+Experimental: Node sequences
 
-* What are series?::
+* What are node seqs?::
 * Future::
 
 Appendix
@@ -215,7 +215,7 @@ A comparison of three similar systems, which permit relying on org-id and don't 
 @tab yes
 @tab yes
 @tab --
-@item Node series
+@item Node sequences
 @tab --
 @tab yes
 @tab --
@@ -315,6 +315,8 @@ If you are an org-roam user, you'll want the following module as well.  Check it
 @subsection An update broke things?
 
 You can rollback to a version that used to work.  @uref{https://github.com/meedstrom/org-node#appendix-ii-how-to-rollback, How to rollback}.
+
+As of v1.8, part of the code was spun out to a new library (@uref{https://github.com/meedstrom/el-job/, el-job}) -- you may have to update your package repositories with @samp{M-x package-refresh-contents} or equivalent.
 
 @node Quick start
 @section Quick start
@@ -422,7 +424,7 @@ Bad news: this is currently directed towards people who used @uref{https://githu
 * Limitation Unique titles::
 * Limitation Org-ref::
 * Toolbox::
-* Experimental Node series::
+* Experimental Node sequences::
 @end menu
 
 @node Manage org-id-locations
@@ -671,7 +673,7 @@ Basic commands:
 @item
 @samp{org-node-refile}
 @item
-@samp{org-node-series-dispatch}
+@samp{org-node-seq-dispatch}
 @itemize
 @item
 Browse node series -- see README
@@ -783,41 +785,41 @@ Like if you have Org files under /mnt linking to assets in /home, those links wo
 @end itemize
 @end itemize
 
-@node Experimental Node series
-@section Experimental: Node series
+@node Experimental Node sequences
+@section Experimental: Node sequences
 
 Do you already know about "daily-notes"?  Then get started with a keybinding such as:
 
 @lisp
-(keymap-set global-map "M-s s" #'org-node-series-dispatch)
+(keymap-set global-map "M-s s" #'org-node-seq-dispatch)
 @end lisp
 
-and configure @samp{org-node-series-defs}.  See @uref{https://github.com/meedstrom/org-node/wiki/Configuring-series, wiki}.
+and configure @samp{org-node-seq-defs}.  See @uref{https://github.com/meedstrom/org-node/wiki/Configuring-series, wiki}.
 
 @menu
-* What are series?::
+* What are node seqs?::
 * Future::
 @end menu
 
-@node What are series?
-@subsection What are series?
+@node What are node seqs?
+@subsection What are node seqs?
 
-It's easiest to explain series if we use "daily-notes" (or "dailies") as an example of a series.
+It's easiest to explain node sequences if we use "daily-notes" (or "dailies") as an example.
 
 Roam's idea of a "daily-note" is the same as an @uref{https://github.com/bastibe/org-journal, org-journal} entry: a file/entry where the title is just today's date.
 
 You don't need software for that basic idea, only to make it extra convenient to navigate them and jump back and forth in the series.
 
-Thus, fundamentally, any "journal" or "dailies" software are just operating on a sorted series to navigate through.  You could have series about, let's say, historical events, Star Trek episodes, your school curriculum@dots{}
+Thus, fundamentally, any "journal" or "dailies" software are just operating on a sorted series to navigate through.  A node sequence.  You could have sequences for, let's say, historical events, Star Trek episodes, your school curriculum@dots{}
 
-You may be taken aback that defining a new series requires writing 5 lambdas, but once you get the hang of it, you can often reuse those lambdas.
+Currently, defining a new node seq requires writing 5 lambdas, but once you get the hang of it, you can often reuse those lambdas.
 
 @node Future
 @subsection Future
 
-A future version will likely bring convenient wrappers that let you define a series in 1-2 lines.
+A future version will likely bring convenient wrappers that let you define a node seq in 1-2 lines.
 
-It's also possible we just redesign this completely.  Input welcome.  How would you like to define a series?  Where should the information be stored?
+It's also possible we just redesign this completely.  Input welcome.  How would you like to define a node sequence?  Where should the information be stored?
 
 @node Appendix
 @chapter Appendix

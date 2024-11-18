@@ -2,8 +2,6 @@
 
 - [ ] Unify some subroutines for capture/refile/extract/insert/find
 
-- [ ] Spin out all series-related business into own file
-
 - [ ] In 2025: drop Emacs 28
 
   Seems that Debian stable will be stuck on Emacs 28 until mid-2025,
@@ -32,13 +30,13 @@
 
 - [ ] For even more perf (unnecessary): keep subprocesses alive, or track all data that came from each file so as to not re-scan if mtime has not changed, or both
 
-- [ ] org-node-series-dispatch: Free up keys "j" "n" "p", "c"
+- [ ] org-node-seq-dispatch: Free up keys "j" "n" "p", "c"
 
-- [ ] More org-node-series-defs wrappers:
+- [ ] More org-node-seq-defs wrappers:
 
-  - [ ] Define a series as simply the files in a subdirectory with a given name
+  - [ ] Define a seq from the links the body text of a single "master node" if that node has a tag such as :seq:
 
-  - [ ] Define a series from the links the body text of a single master node if that node has a tag such as :series:
+  - [ ] Define a seq from simply the files in a subdirectory with a given name
 
 - [ ] Accept more ref variants as the same ref
 
