@@ -33,7 +33,8 @@
 
 (unless (fboundp 'el-job-launch)
   (display-warning
-   'org-node "Org-node has a new dependency el-job, update your package repositories"))
+   'org-node (string-fill "Org-node has a new dependency el-job, update your package menus (e.g. by M-x package-refresh-contents)"
+                          70)))
 
 (defvar org-node-changes--new-names
   '(
@@ -114,7 +115,7 @@ hardcoded strings."
        (unless warned-once
          (setq warned-once t)
          (lwarn 'org-node :warning "Your initfiles use old function name: %S, which will be REMOVED by %s.  Please use new name: %S"
-                ,old ,(or removed-by "30 October 2024") ,new))
+                ,old ,(or removed-by "30 November 2024") ,new))
        (apply ,new args))))
 
 ;; (define-obsolete-variable-alias
@@ -149,9 +150,6 @@ hardcoded strings."
 
 (org-node-changes--def-whiny-alias 'org-node-affix-with-olp
                                    'org-node-prefix-with-olp)
-
-(org-node-changes--def-whiny-alias
- 'org-node-parser--tmpfile 'org-node--tmpfile "2024-10-28")
 
 (org-node-changes--def-whiny-alias
  'org-node-get-id-links 'org-node-get-id-links-to "2024-10-04")

@@ -99,6 +99,8 @@ If you are an org-roam user, you'll want the following module as well.  Check it
 *** An update broke things?
 You can rollback to a version that used to work.  [[https://github.com/meedstrom/org-node#appendix-ii-how-to-rollback][How to rollback]].
 
+As of v1.8, part of the code was spun out to a new library ([[https://github.com/meedstrom/el-job/][el-job]]) -- you may have to update your package repositories with =M-x package-refresh-contents= or equivalent.
+
 ** Quick start
 
 If you're new to these concepts, fear not.  The main things for day-to-day operation are two verbs: "find" and "insert".
