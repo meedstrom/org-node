@@ -32,7 +32,8 @@
 (require 'ol)
 
 (unless (fboundp 'el-job-launch)
-  (message "Org-node has a new dependency el-job, update your package repositories"))
+  (display-warning
+   'org-node "Org-node has a new dependency el-job, update your package repositories"))
 
 (defvar org-node-changes--new-names
   '(
@@ -133,7 +134,8 @@ hardcoded strings."
 (defalias 'org-node-slugify-like-roam-actual #'org-node-fakeroam-slugify-via-roam)
 
 (defun org-node--write-eld (file object)
-  (message "Please update org-node-fakeroam also when updating org-node")
+  (display-warning
+   'org-node "Please update org-node-fakeroam also when updating org-node")
   (if (stringp object)
       (let ((obj file))
         (setq file object)
