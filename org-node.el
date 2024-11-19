@@ -3208,6 +3208,7 @@ network to quality-control it.  Rationale:
   (unless (executable-find "Rscript")
     (user-error
      "This command requires GNU R, with R packages: stringr, readr, igraph"))
+  (mkdir (org-node--tmpfile) t)
   (let ((r-code "library(stringr)
 library(readr)
 library(igraph)
