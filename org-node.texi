@@ -64,7 +64,7 @@ Misc
 * Exclude uninteresting nodes::
 * Org-capture::
 * Completion-at-point::
-* Any analogue to @samp{org-roam-node-display-template}?::
+* FAQ Any analogue to @samp{org-roam-node-display-template}?::
 * Grep::
 * Let org-open-at-point detect refs::
 * Limitation TRAMP::
@@ -300,7 +300,7 @@ Assuming your package manager knows about @uref{https://melpa.org/#/getting-star
   :config (org-node-cache-mode))
 @end lisp
 
-If you are an org-roam user, you'll want the following module as well.  Check its README to @uref{https://github.com/meedstrom/org-node-fakeroam, make org-node work with org-roam side-by-side}.
+If you use org-roam, you probably want the following module as well.  Check its README to make org-node @uref{https://github.com/meedstrom/org-node-fakeroam, work with org-roam side-by-side}!
 
 @lisp
 (use-package org-node-fakeroam
@@ -389,13 +389,13 @@ Then enable the following global mode, which keeps these properties updated.
 
 NOTE 1: To be clear, this never generates new IDs.  That's your own business.  This only adds/edits :BACKLINKS: properties, and no backlink will appear that correspond to a link if the context for that link has no ID among any outline ancestor.
 
-NOTE 2: By default, the setting @samp{org-node-backlink-aggressive} is nil, so that stale backlinks are not cleaned until you carry out some edits under an affected heading and then save the file, which fixes that heading's :BACKLINKS: property.  Flip the setting if you'd like it to be more proactive:
+NOTE 2: By default, the setting @samp{org-node-backlink-aggressive} is nil, so that stale backlinks are not cleaned until you carry out some edits under an affected heading and then save the file, which fixes that heading's :BACKLINKS: property.  If you'd like it to be more proactive, set t:
 
 @lisp
 (setq org-node-backlink-aggressive t)
 @end lisp
 
-NOTE 3:  People who prefer to hard-wrap text instead of enabling @samp{visual-line-mode} or similar may not find this way of displaying backlinks very scalable, since Org places properties on a single logical line, which may run off the edge of the screen.
+NOTE 3:  People who prefer to hard-wrap text instead of enabling @samp{visual-line-mode} or similar may not find this way of displaying backlinks very scalable, since Org places properties on a single logical line, that may run off the edge of the screen.
 
 @node Option 2B Let org-super-links manage a @samp{BACKLINKSEND} drawer
 @subsection Option 2B: Let org-super-links manage a @samp{:BACKLINKS:...:END:} drawer
@@ -416,7 +416,7 @@ Bad news: this is currently directed towards people who used @uref{https://githu
 * Exclude uninteresting nodes::
 * Org-capture::
 * Completion-at-point::
-* Any analogue to @samp{org-roam-node-display-template}?::
+* FAQ Any analogue to @samp{org-roam-node-display-template}?::
 * Grep::
 * Let org-open-at-point detect refs::
 * Limitation TRAMP::
@@ -430,7 +430,7 @@ Bad news: this is currently directed towards people who used @uref{https://githu
 @node Manage org-id-locations
 @section Manage org-id-locations
 
-Ever run into "ID not found" situations?  Org-node gives you an extra way to feed data to org-id, as @uref{http://edstrom.dev/wjwrl/taking-ownership-of-org-id, I find unsatisfactory the built-in options}.
+Ever run into "ID not found" situations?  Org-node gives you an extra way to feed data to org-id, as @uref{http://edstrom.dev/wjwrl/taking-ownership-of-org-id, I find clumsy the built-in options}.
 
 Example setting:
 
@@ -457,7 +457,7 @@ Either revert that with the following snippet, or if @uref{https://github.com/me
 @lisp
 ;; Undo a Roam override
 (with-eval-after-load 'org-roam-id
-  ;; Default for Org 9.1 through 9.7+
+  ;; Restore default for Org 9.1 through 9.7+
   (org-link-set-parameters
    "id" :follow #'org-id-open :store #'org-id-store-link-maybe))
 @end lisp
@@ -479,7 +479,7 @@ This could work by, for example, excluding a "project" tag and excluding any not
              (assoc "ROAM_EXCLUDE" (org-node-get-properties node))))))
 @end lisp
 
-You can also use a whitelist approach, to see only nodes from a certain directory "my-wiki":
+Or you could go with a whitelist approach, to see only nodes from a certain directory we'll call "my-wiki":
 
 @lisp
 (setq org-node-filter-fn
@@ -487,6 +487,8 @@ You can also use a whitelist approach, to see only nodes from a certain director
         (and (string-search "/my-wiki/" (org-node-get-file-path node))
              (not (assoc "ROAM_EXCLUDE" (org-node-get-properties node))))))
 @end lisp
+
+(NB: if you don't know what is @samp{ROAM_EXCLUDE}, you can omit that clause)
 
 @menu
 * Limitation @samp{ROAM_EXCLUDE}::
@@ -497,9 +499,9 @@ You can also use a whitelist approach, to see only nodes from a certain director
 
 Let's say you have a big archive file, fulla IDs, and you want all the nodes within out of sight.  Putting a @samp{:ROAM_EXCLUDE: t} at the top won't do it, because unlike in org-roam, @strong{child ID nodes of an excluded node are not excluded!}  The @samp{org-node-filter-fn} applies its ruleset to each node in isolation.
 
-However, nodes in isolation do still have inherited tags.  So you can use that, or the file name or outline path.
+However, nodes in isolation do still have inherited tags.  So you can exploit that, or the file name or outline path.
 
-Really, filename!  A big selling point of IDs is that you avoid depending on filenames, it's often pragmatic to let up on purism just a bit :-)  It works well for me to filter out any file or directory that happens to contain "archive" in the name:
+Really, filename!  Even though a big selling point of IDs is that you avoid depending on filenames, it's often pragmatic to let up on principles a bit :-)  It works well for me to filter out any file or directory that happens to contain "archive" in the name:
 
 @lisp
 (setq org-node-filter-fn
@@ -507,19 +509,19 @@ Really, filename!  A big selling point of IDs is that you avoid depending on fil
         (not (string-search "archive" (org-node-get-file-path node)))))
 @end lisp
 
-Or put something like @samp{#+filetags: :wiki_exclude:} at the top of each file, and set:
+Or put something like @samp{#+filetags: :hide_node:} at the top of each file, and set:
 
 @lisp
 (setq org-node-filter-fn
       (lambda (node)
-        (not (member "wiki_exclude"
+        (not (member "hide_node"
                      (org-node-get-tags-with-inheritance node))))))
 @end lisp
 
 @node Org-capture
 @section Org-capture
 
-You may have heard that org-roam has its own special set of capture templates: the @samp{org-roam-capture-templates}.
+You may have heard that org-roam has a set of meta-capture templates: the @samp{org-roam-capture-templates}.
 
 People who understand the magic of capture templates, they may take this in stride.  Me, I never felt confident using a second-order abstraction over an already leaky abstraction I didn't fully understand.
 
@@ -552,6 +554,8 @@ With that done, you can optionally configure the everyday commands @samp{org-nod
 (setq org-node-creation-fn #'org-capture)
 @end lisp
 
+That last optional functionality may be a bit confusing if I explain it -- better you try it and see if you like.
+
 @node Completion-at-point
 @section Completion-at-point
 
@@ -562,10 +566,10 @@ To complete words at point into known node titles:
 (setq org-roam-completion-everywhere nil) ;; Prevent Roam's variant
 @end lisp
 
-@node Any analogue to @samp{org-roam-node-display-template}?
-@section Any analogue to @samp{org-roam-node-display-template}?
+@node FAQ Any analogue to @samp{org-roam-node-display-template}?
+@section FAQ: Any analogue to @samp{org-roam-node-display-template}?
 
-To customize how the nodes look in the minibuffer, configure @samp{org-node-affixation-fn}:
+You want to customize how the nodes look in the minibuffer?  It's down to @samp{org-node-affixation-fn}:
 
 @example
 M-x customize-variable RET org-node-affixation-fn RET
@@ -577,21 +581,21 @@ You may also want to set @samp{org-node-alter-candidates} to t.
 @node Grep
 @section Grep
 
-If you have Ripgrep installed on the computer and @uref{https://github.com/minad/consult, consult} installed on Emacs, you can use this command to grep across all your Org files at any time.
+If you have Ripgrep installed on the computer, and @uref{https://github.com/minad/consult, Consult} installed on Emacs, you can use this command to grep across all your Org files at any time.
 
 @lisp
-(keymap-set global-map "M-s M-g" #'org-node-grep) ;; Requires consult
+(keymap-set global-map "M-s M-g" #'org-node-grep)
 @end lisp
 
-This is can be a power tool for mass edits.  Say you want to rename some Org tag @samp{:math:} to @samp{:Math:} absolutely everywhere.  Then you could follow a procedure such as:
+This can be a power tool for mass edits.  Say you want to rename some Org tag @samp{:math:} to @samp{:Math:} absolutely everywhere.  Then you could follow a procedure such as:
 
 @enumerate
 @item
 Use @samp{org-node-grep} and type @samp{:math:}
 @item
-Use @samp{embark-export} (from @uref{https://github.com/oantolin/embark, embark})
+Use @samp{embark-export} (from package @uref{https://github.com/oantolin/embark, Embark})
 @item
-Use @samp{wgrep-change-to-wgrep-mode} (from @uref{https://github.com/mhayashi1120/Emacs-wgrep, wgrep})
+Use @samp{wgrep-change-to-wgrep-mode} (from package @uref{https://github.com/mhayashi1120/Emacs-wgrep, wgrep})
 @item
 Do a query-replace (@code{M-%}) to replace all @samp{:math:} with @samp{:Math:}
 @item
@@ -620,14 +624,14 @@ The best way to change this is to @uref{https://github.com/meedstrom/org-node/is
 @node Limitation Encryption
 @section Limitation: Encryption
 
-Encrypted nodes probably won't be found.  As above, file an issue.
+Encrypted nodes probably won't be found.  As with TRAMP, file an issue.
 
 @node Limitation Unique titles
 @section Limitation: Unique titles
 
 If two ID-nodes exist with the same title, one of them disappears from minibuffer completions.
 
-That's just the nature of completion.  Much can be said for embracing the uniqueness constraint, and org-node will print messages calling attention to any collisions.
+That's just the nature of completion.  Much can be said for embracing the uniqueness constraint, and org-node will print messages about collisions.
 
 Anyway@dots{} there's a workaround.  Assuming you leave @samp{org-node-affixation-fn} at its default setting, adding this to initfiles tends to do the trick:
 
@@ -637,19 +641,23 @@ Anyway@dots{} there's a workaround.  Assuming you leave @samp{org-node-affixatio
 
 This lets you match against the node outline path and not only the title, which resolves most conflicts given that the most likely source of conflict is subheadings in disparate files, that happen to be named the same.  @uref{https://fosstodon.org/@@nickanderson/112249581810196258, Some people} make this trick part of their workflow.
 
-NB: for users of @samp{org-node-complete-at-point-mode}, this workaround won't help those completions.  With some luck you'll rarely insert the wrong link, but it's worth being aware of. (@uref{https://github.com/meedstrom/org-node/issues/62, #62})
+NB: for users of @samp{org-node-complete-at-point-mode}, this workaround won't help those completions.  With some luck you'll rarely insert the wrong link, but it's worth being aware. (@uref{https://github.com/meedstrom/org-node/issues/62, #62})
 
 @node Limitation Org-ref
 @section Limitation: Org-ref
 
-Org-node supports the Org 9.5 @@citations, but not fully the aftermarket @uref{https://github.com/jkitchin/org-ref, org-ref} &citations that emulate @LaTeX{} look-and-feel, since it nearly doubles my scan time if I amend @samp{org-link-plain-re} to match all of @samp{org-ref-cite-types}.
+Org-node supports the Org 9.5 @@citations, but not fully the aftermarket @uref{https://github.com/jkitchin/org-ref, org-ref} &citations that emulate @LaTeX{} look-and-feel, because it would double the time taken by @samp{M-x org-node-reset}.
 
-What works is bracketed Org-ref v3 citations that start with "cite", e.g. @samp{[[citep:...]]}, @samp{[[citealt:...]]}, @samp{[[citeauthor:...]]}, since org-node-parser.el is able to pick them up for free.  What doesn't work is e.g. @samp{[[bibentry:...]]} since it doesn't start with "cite", nor plain @samp{citep:...} since it is not wrapped in brackets.
+What works is bracketed Org-ref v3 citations that start with "cite", e.g. @samp{[[citep:...]]}, @samp{[[citealt:...]]}, @samp{[[citeauthor:...]]}, since org-node-parser.el is able to pick them up for free.
+
+What doesn't work is e.g. @samp{[[bibentry:...]]} since it doesn't start with "cite", nor plain @samp{citep:...} since it is not wrapped in brackets.
 
 If you need more of Org-ref, you have at least two options:
+
 @itemize
 @item
 Use org-roam - see discussions on boosting its performance @uref{https://org-roam.discourse.group/t/rewriting-org-roam-node-list-for-speed-it-is-not-sqlite/3475/92, here} and @uref{https://org-roam.discourse.group/t/improving-performance-of-node-find-et-al/3326/33, here}
+
 @item
 Get your elbows dirty and try to revive the archived branch @uref{https://github.com/meedstrom/org-node/branches, "orgref"}, see @uref{https://github.com/meedstrom/org-node/commit/90b0e503ac75428a5d3ca6a4c8c51b5e075064d3, relevant commit}.
 @end itemize
@@ -703,14 +711,10 @@ A bizarro counterpart to @samp{org-roam-extract-subtree}.  Export the subtree at
 (Requires @uref{https://github.com/minad/consult, consult}) Grep across all known Org files.
 @end itemize
 @item
-@samp{org-node-fakeroam-show-roam-buffer}
+@samp{org-node-fakeroam-show-buffer}
 @itemize
 @item
 A different way to invoke the Roam buffer: display the buffer @emph{or} refresh it if it was already visible.  And a plot twist, if it was not visible, do not refresh until the second invocation.
-@itemize
-@item
-Useful if you have disabled the automatic redisplay, because the Roam command @samp{org-roam-buffer-toggle} is not meant for that.
-@end itemize
 @end itemize
 @end itemize
 
@@ -721,7 +725,9 @@ Rarer commands:
 @samp{org-node-lint-all}
 @itemize
 @item
-Can help you fix a broken setup: it runs org-lint on all known files and generates a report of syntax problems, for you to correct manually.  Org-node @uref{https://github.com/meedstrom/org-node/issues/8#issuecomment-2101316447, assumes all files have valid syntax}, though many of the problems reported by org-lint are survivable.
+Can help you fix a broken setup: it runs org-lint on all known files and generates a report of syntax problems, for you to correct manually.
+
+Org-node @uref{https://github.com/meedstrom/org-node/issues/8#issuecomment-2101316447, assumes all files have valid syntax}, though many of the problems reported by org-lint are survivable.
 @end itemize
 @item
 @samp{org-node-rewrite-links-ask}
@@ -733,12 +739,12 @@ Look for link descriptions that got out of sync with the corresponding node titl
 @samp{org-node-rename-file-by-title}
 @itemize
 @item
-Auto-rename the file based on the current @samp{#+title}
+Auto-rename the file based on the current @samp{#+title} or first heading
 @itemize
 @item
 Also works as an after-save-hook!  Does nothing as such until you configure @samp{org-node-renames-allowed-dirs}.
 @item
-Please note that if your filenames have datestamp prefixes, it is important to get @samp{org-node-datestamp-format} right or it may clobber a pre-existing datestamp.
+Please note that if your filenames have datestamp prefixes, it is important to get @samp{org-node-datestamp-format} right or it may clobber a pre-existing datestamp.  A message is printed about the rename, but it's easy to miss.
 @end itemize
 @end itemize
 @item
@@ -767,7 +773,7 @@ Update @samp{BACKLINKS} property in all nodes
 @samp{org-node-list-feedback-arcs}
 @itemize
 @item
-(Requires GNU R with R packages tidyverse and igraph)
+(Requires GNU R, with R packages stringr, readr and igraph)
 
 Explore @uref{https://en.wikipedia.org/wiki/Feedback_arc_set, feedback arcs} in your ID link network.  Can be a sort of @uref{https://edstrom.dev/zvjjm/slipbox-workflow#ttqyc, occasional QA routine}.
 @end itemize
@@ -834,13 +840,13 @@ It's also possible we just redesign this completely.  Input welcome.  How would 
 
 API cheatsheet between org-roam and org-node.
 
-@multitable {aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa} {aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa} {aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}
+@multitable {aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa} {aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa} {aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}
 @headitem Action
 @tab org-roam
 @tab org-node
 @item Get ID near point
 @tab @samp{(org-roam-id-at-point)}
-@tab @samp{(org-id-get nil nil nil t)}
+@tab @samp{(org-entry-get-with-inheritance "ID")}
 @item Get node at point
 @tab @samp{(org-roam-node-at-point)}
 @tab @samp{(org-node-at-point)}
@@ -912,7 +918,7 @@ API cheatsheet between org-roam and org-node.
 @tab @samp{(org-node-get-aliases NODE)}
 @item Get @samp{ROAM_EXCLUDE}
 @tab 
-@tab @samp{(assoc "ROAM_EXCLUDE" (org-node-get-properties NODE))}, no inheritance
+@tab @samp{(assoc "ROAM_EXCLUDE" (org-node-get-properties NODE))}
 @item Ensure fresh data
 @tab @samp{(org-roam-db-sync)}
 @tab @samp{(org-node-cache-ensure t t)}
@@ -923,18 +929,25 @@ API cheatsheet between org-roam and org-node.
 
 Instructions to downgrade to @uref{https://github.com/meedstrom/org-node/tags, an older version}, let's say 1.6.2:
 
-With @uref{https://github.com/slotThe/vc-use-package, vc-use-package} (built into Emacs 30+):
-@lisp
-(use-package org-node
-  :vc (:fetcher github :repo "meedstrom/org-node"
-       :rev "6ed833d1025d5163137904f2a1f6d80d930610b4"))
-@end lisp
-
 With @uref{https://github.com/quelpa/quelpa, Quelpa}:
 @lisp
 (use-package org-node
   :quelpa (org-node :fetcher github :repo "meedstrom/org-node"
-                    :commit "6ed833d1025d5163137904f2a1f6d80d930610b4"))
+                    :branch "v1.6"))
+@end lisp
+
+With @uref{https://github.com/slotThe/vc-use-package, vc-use-package} on Emacs 29:
+@lisp
+(use-package org-node
+  :vc (:fetcher github :repo "meedstrom/org-node"
+       :branch "v1.6"))
+@end lisp
+
+With built-in @samp{:vc} on Emacs 30+:
+@lisp
+(use-package org-node
+  :vc (:url "https://github.com/meedstrom/org-node"
+       :branch "v1.6"))
 @end lisp
 
 With @uref{https://github.com/progfolio/elpaca, Elpaca} as follows.  Note that recipe changes only take effect after you do @samp{M-x elpaca-delete} and it re-clones -- the idea is that Elpaca users will prefer to do it manually inside the cloned repo.
@@ -942,10 +955,18 @@ With @uref{https://github.com/progfolio/elpaca, Elpaca} as follows.  Note that r
 @lisp
 (use-package org-node
   :ensure (:fetcher github :repo "meedstrom/org-node"
+           :branch "v1.6"))
+@end lisp
+
+@dots{}Elpaca can also target an exact version tag.  Package manager of the future, it is:
+
+@lisp
+(use-package org-node
+  :ensure (:fetcher github :repo "meedstrom/org-node"
            :tag "1.6.2"))
 @end lisp
 
-With @uref{https://github.com/radian-software/straight.el, Straight}, either create a @uref{https://github.com/radian-software/straight.el?tab=readme-ov-file#lockfile-management, Straight lockfile} to pin a specific commit, or use the "v1.6" or "v1.5" branches:
+With @uref{https://github.com/radian-software/straight.el, Straight}:
 
 @lisp
 (use-package org-node

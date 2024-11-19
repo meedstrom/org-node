@@ -2582,6 +2582,7 @@ In case of unsolvable problems, how to wipe org-id-locations:
       (org-id-locations-save)
       (org-node-reset))))
 
+;; TODO: Optionally obey filter-fn
 ;;;###autoload
 (defun org-node-grep ()
   "Grep across all files known to org-node."
@@ -2600,8 +2601,8 @@ In case of unsolvable problems, how to wipe org-id-locations:
                          #'consult--ripgrep-make-builder
                          (org-node--root-dirs (org-node-list-files t))
                          nil)
-        ;; Much slower, no --type=org means must target thousands of files
-        ;; and not a handful of dirs
+        ;; Much slower!  Vanilla grep does not have Ripgrep's --type=org, so
+        ;; must target thousands of files and not a handful of dirs.
         (consult--grep "Grep in all known Org files: "
                        #'consult--grep-make-builder
                        (org-node-list-files)
