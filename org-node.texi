@@ -488,7 +488,7 @@ Or you could go with a whitelist approach, to see only nodes from a certain dire
              (not (assoc "ROAM_EXCLUDE" (org-node-get-properties node))))))
 @end lisp
 
-(NB: if you don't know what is @samp{ROAM_EXCLUDE}, you can omit that clause)
+(NB: if you don't know what @samp{ROAM_EXCLUDE} is, feel free to omit that clause)
 
 @menu
 * Limitation @samp{ROAM_EXCLUDE}::
@@ -497,11 +497,13 @@ Or you could go with a whitelist approach, to see only nodes from a certain dire
 @node Limitation @samp{ROAM_EXCLUDE}
 @subsection Limitation: @samp{ROAM_EXCLUDE}
 
-Let's say you have a big archive file, fulla IDs, and you want all the nodes within out of sight.  Putting a @samp{:ROAM_EXCLUDE: t} at the top won't do it, because unlike in org-roam, @strong{child ID nodes of an excluded node are not excluded!}  The @samp{org-node-filter-fn} applies its ruleset to each node in isolation.
+Let's say you have a big archive file, fulla IDs, and you want all the nodes within out of sight.
 
-However, nodes in isolation do still have inherited tags.  So you can exploit that, or the file name or outline path.
+Putting a @samp{:ROAM_EXCLUDE: t} at the top won't do it, because unlike in org-roam, @strong{child ID nodes of an excluded node are not excluded!}  The @samp{org-node-filter-fn} applies its ruleset to each node in isolation.
 
-Really, filename!  Even though a big selling point of IDs is that you avoid depending on filenames, it's often pragmatic to let up on principles a bit :-)  It works well for me to filter out any file or directory that happens to contain "archive" in the name:
+However, nodes in isolation do still have inherited tags.  So you can exploit that, or the outline path or file name.
+
+Really, filename!  Even though a big selling point of IDs is that you avoid depending on filenames, it's pragmatic to let up on principles sometimes :-)  It works well for me to filter out any file or directory that happens to contain "archive" in the name:
 
 @lisp
 (setq org-node-filter-fn
@@ -554,7 +556,7 @@ With that done, you can optionally configure the everyday commands @samp{org-nod
 (setq org-node-creation-fn #'org-capture)
 @end lisp
 
-That last optional functionality may be a bit confusing if I explain it -- better you try it and see if you like.
+That last optional functionality may be confusing if I describe it -- better you try and see if you like.
 
 @node Completion-at-point
 @section Completion-at-point
@@ -569,14 +571,16 @@ To complete words at point into known node titles:
 @node FAQ Any analogue to @samp{org-roam-node-display-template}?
 @section FAQ: Any analogue to @samp{org-roam-node-display-template}?
 
-You want to customize how the nodes look in the minibuffer?  It's down to @samp{org-node-affixation-fn}:
+Want to customize how the nodes look in the minibuffer?
+
+Configure @samp{org-node-affixation-fn}:
 
 @example
 M-x customize-variable RET org-node-affixation-fn RET
 @end example
 
 
-You may also want to set @samp{org-node-alter-candidates} to t.
+A related variable is @samp{org-node-alter-candidates}.  Read its docstring.
 
 @node Grep
 @section Grep

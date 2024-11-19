@@ -224,15 +224,17 @@ Or you could go with a whitelist approach, to see only nodes from a certain dire
              (not (assoc "ROAM_EXCLUDE" (org-node-get-properties node))))))
 #+end_src
 
-(NB: if you don't know what is =ROAM_EXCLUDE=, you can omit that clause)
+(NB: if you don't know what =ROAM_EXCLUDE= is, feel free to omit that clause)
 
 *** Limitation: =ROAM_EXCLUDE=
 
-Let's say you have a big archive file, fulla IDs, and you want all the nodes within out of sight.  Putting a =:ROAM_EXCLUDE: t= at the top won't do it, because unlike in org-roam, *child ID nodes of an excluded node are not excluded!*  The =org-node-filter-fn= applies its ruleset to each node in isolation.
+Let's say you have a big archive file, fulla IDs, and you want all the nodes within out of sight.
 
-However, nodes in isolation do still have inherited tags.  So you can exploit that, or the file name or outline path.
+Putting a =:ROAM_EXCLUDE: t= at the top won't do it, because unlike in org-roam, *child ID nodes of an excluded node are not excluded!*  The =org-node-filter-fn= applies its ruleset to each node in isolation.
 
-Really, filename!  Even though a big selling point of IDs is that you avoid depending on filenames, it's often pragmatic to let up on principles a bit :-)  It works well for me to filter out any file or directory that happens to contain "archive" in the name:
+However, nodes in isolation do still have inherited tags.  So you can exploit that, or the outline path or file name.
+
+Really, filename!  Even though a big selling point of IDs is that you avoid depending on filenames, it's pragmatic to let up on principles sometimes :-)  It works well for me to filter out any file or directory that happens to contain "archive" in the name:
 
 #+begin_src elisp
 (setq org-node-filter-fn
@@ -284,7 +286,7 @@ With that done, you can optionally configure the everyday commands =org-node-fin
 (setq org-node-creation-fn #'org-capture)
 #+end_src
 
-That last optional functionality may be a bit confusing if I explain it -- better you try it and see if you like.
+That last optional functionality may be confusing if I describe it -- better you try and see if you like.
 
 ** Completion-at-point
 To complete words at point into known node titles:
@@ -296,11 +298,13 @@ To complete words at point into known node titles:
 
 ** FAQ: Any analogue to =org-roam-node-display-template=?
 
-You want to customize how the nodes look in the minibuffer?  It's down to =org-node-affixation-fn=:
+Want to customize how the nodes look in the minibuffer?
+
+Configure =org-node-affixation-fn=:
 
     : M-x customize-variable RET org-node-affixation-fn RET
 
-You may also want to set =org-node-alter-candidates= to t.
+A related variable is =org-node-alter-candidates=.  Read its docstring.
 
 ** Grep
 
