@@ -23,8 +23,8 @@
 ;; The child processes are expected to load this file, execute
 ;; `org-node-parser--collect-dangerously', then die.
 
-;; NOTE: While developing, save and use `eval-buffer' instead of evalling
-;; specific defuns.  Why: so `el-job--find-lib' will find the right file!
+;; NOTE: While developing this file, do not eval only specific defuns;
+;; `el-job--find-lib' needs you to save the file and do `eval-buffer'.
 
 ;;; Code:
 

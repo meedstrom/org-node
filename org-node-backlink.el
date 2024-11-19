@@ -398,12 +398,12 @@ it in the nearby :BACKLINKS: property."
 ;;;; Aggressive visit-and-fix
 
 (defcustom org-node-backlink-aggressive nil
-  "On save, detect links added/deleted and fix backlinks.
+  "On save, detect added/deleted links and fix backlinks.
 
-Normally, links added via a link-insertion command will also insert a
-backlink in real time, but stale backlinks are not cleaned until you
-carry out some edits under the heading that has the stale backlink and
-save that buffer.
+Normally, links added via most commands will also insert a backlink in
+real time, but stale backlinks are not cleaned until you carry out some
+edits under the heading that has the stale backlink, and save that
+buffer.
 
 When t, all affected nodes will be visited silently to update the
 :BACKLINKS: properties.

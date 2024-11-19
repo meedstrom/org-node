@@ -197,9 +197,8 @@ need other changes to support TRAMP and encryption."
 Picking a specific coding system can speed up `org-node-reset'.
 Set nil to let Emacs figure it out anew on every file.
 
-For now, this setting is likely only noticeable if
-`el-job--cores' is 1 or very low.
-Otherwise overhead is a much larger component of the execute time.
+This setting is likely only noticeable if `el-job--cores' is low \(1-3\)
+or you have One Giant Org-File.
 
 On MS Windows this probably should be nil.  Same if you access
 your files from multiple platforms.
@@ -371,11 +370,11 @@ so long as `org-node-affixation-fn' is set to `org-node-prefix-with-olp'
 setting, they can match the prefix and suffix via
 `orderless-annotation', bound to the character \& by default.)
 
-Another consequence is it lifts the uniqueness constraint on note
-titles: you\\='ll be able to have two headings with the same name so
+Another consequence: this setting can lift the uniqueness constraint on
+note titles: you\\='ll be able to have two nodes with the same name, so
 long as their prefix or suffix differ.
 
-After changing this setting, please run \\[org-node-reset]."
+After changing this setting, run \\[org-node-reset]."
   :type 'boolean
   :set #'org-node--set-and-remind-reset)
 
@@ -579,10 +578,6 @@ documentation of `org-node-filter-fn' or Info node `(org-node)'."
 ;; (defalias 'org-node-get-sched #'org-node-get-scheduled)
 ;; (defalias 'org-node-get-file #'org-node-get-file-path)
 ;; (defalias 'org-node-get-lvl #'org-node-get-level)
-
-;; API transition underway: get-tags will include inherited tags in future
-(define-obsolete-function-alias 'org-node-get-tags #'org-node-get-tags-local
-  "2024-10-22")
 
 (cl-defstruct (org-node-link (:constructor org-node-link--make-obj)
                              (:copier nil))

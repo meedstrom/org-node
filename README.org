@@ -157,7 +157,7 @@ NOTE 2: By default, the setting =org-node-backlink-aggressive= is nil, so that s
 (setq org-node-backlink-aggressive t)
 #+end_src
 
-NOTE 3:  People who prefer to hard-wrap text instead of enabling =visual-line-mode= or similar may not find this way of displaying backlinks very scalable, since Org places properties on a single logical line.
+NOTE 3:  People who prefer to hard-wrap text instead of enabling =visual-line-mode= or similar may not find this way of displaying backlinks very scalable, since Org places properties on a single logical line, which may run off the edge of the screen.
 
 *** Option 2B: Let org-super-links manage a =:BACKLINKS:...:END:= drawer
 
@@ -506,7 +506,8 @@ The extension [[https://github.com/meedstrom/org-node-fakeroam][org-node-fakeroa
 Just in case---
 - For org-node v1.5, use fakeroam v1.3
 - For org-node v1.6, use fakeroam v1.4
-- For org-node v1.7+, use latest
+- For org-node v1.7 and v1.8, use fakeroam v1.5
+- For org-node v1.9+, use latest
 
 *** What version is installed?
 This info depends on your package manager.  I do not embed version in the source code.

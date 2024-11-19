@@ -36,21 +36,25 @@
 
 (unless (fboundp 'el-job-launch)
   (display-warning
-   'org-node (string-fill
-              "Org-node has a new dependency el-job, update your package menus (e.g. by M-x package-refresh-contents)"
-              70)))
+   'org-node "Org-node has new dependency el-job, update your
+    package menus (e.g. by M-x package-refresh-contents)"))
+
+(unless (fboundp 'get-truename-buffer)
+  (display-warning
+   'org-node "Update compat.el to use this version of org-node"))
 
 (defvar org-node-changes--new-names
-  '((org-node--series org-node-seqs)
-    ;; Later (in Dec):
+  '(;; Later (in Dec):
     ;; (org-node-built-series org-node-seqs)
     ;; (org-node-series-defs org-node-seq-defs)
-    )
+    (org-node-current-series-key org-node-seq--current-key)
+    (org-node--series org-node-seqs))
   "Alist of deprecated symbol names and their new names.
 Names here will be loudly complained-about.")
 
-(defvar org-node-changes--warned-roam-id nil)
-(defvar org-node-changes--warned-once nil)
+(defvar org-node-changes--warned-roam-id nil
+  "Non-nil if did warn about org-roam overriding a link parameter.")
+
 (defun org-node-changes--warn-and-copy ()
   "Maybe print one-shot warnings, then become a no-op.
 
@@ -62,7 +66,7 @@ Then do other one-shot warnings while we\\='re at it."
   (while-let ((row (pop org-node-changes--new-names)))
     (seq-let (old new removed-by) row
       (unless removed-by
-        (setq removed-by "15 December 2024"))
+        (setq removed-by "30 November 2024"))
       (when (boundp old)
         (if new
             (progn
@@ -76,12 +80,6 @@ Then do other one-shot warnings while we\\='re at it."
                    old new)
           (lwarn 'org-node :warning "Your initfiles key-bind a removed command: %S"
                  old)))))
-  (unless org-node-changes--warned-once
-    (setq org-node-changes--warned-once t)
-    ;; 2024-10-25
-    (unless (fboundp 'get-truename-buffer)
-      (display-warning
-       'org-node "Update compat.el to use this version of org-node")))
   ;; 2024-10-18
   (unless org-node-changes--warned-roam-id
     (when (and (not (and (bound-and-true-p org-roam-autosync-mode)
@@ -95,7 +93,7 @@ Then do other one-shot warnings while we\\='re at it."
        \"id\" :follow #'org-id-open :store #'org-id-store-link-maybe)"))))
 
 (defmacro org-node-changes--def-whiny-alias (old new &optional when interactive removed-by)
-  "Define OLD as effectively an alias for NEW.
+  "Define function OLD as effectively an alias for NEW.
 Also, running OLD will emit a deprecation warning the first time.
 
 If INTERACTIVE, define it as an interactive function.  Optional
@@ -112,6 +110,11 @@ hardcoded strings."
          (lwarn 'org-node :warning "Your initfiles use old function name: %S, which will be REMOVED by %s.  Please use new name: %S"
                 ,old ,(or removed-by "30 November 2024") ,new))
        (apply ,new args))))
+
+;; API transition underway: get-tags will include inherited tags in future
+;; ... Let's say Jan/Feb.
+(define-obsolete-function-alias 'org-node-get-tags #'org-node-get-tags-local
+  "2024-10-22")
 
 ;; 2024-09-17
 ;; NOTE: Can't mark as obsolete here, it has be done inside that library
@@ -140,24 +143,23 @@ hardcoded strings."
 (org-node-changes--def-whiny-alias
  'org-node-get-reflinks 'org-node-get-reflinks-to "2024-10-04" nil "30 November")
 
-;; 2024-11-18 moved series-related code into own file, whereupon the namespace
-;; had to be made consistent.  Following names can be removed quite soon---
-(define-obsolete-function-alias 'org-node--build-series           'org-node-seq--build-from-def "2024-11-18")
-(define-obsolete-function-alias 'org-node--guess-daily-dir        'org-node-seq--guess-daily-dir "2024-11-18")
-(define-obsolete-function-alias 'org-node--add-series-to-dispatch 'org-node-seq--add-to-dispatch "2024-11-18")
-(define-obsolete-function-alias 'org-node--series-goto-previous*  'org-node-seq--goto-previous* "2024-11-18")
-(define-obsolete-function-alias 'org-node--series-goto-previous   'org-node-seq--goto-previous "2024-11-18")
-(define-obsolete-function-alias 'org-node--series-goto-next*      'org-node-seq--goto-next* "2024-11-18")
-(define-obsolete-function-alias 'org-node--series-goto-next       'org-node-seq--goto-next "2024-11-18")
-(define-obsolete-function-alias 'org-node--series-jump*           'org-node-seq--jump* "2024-11-18")
-(define-obsolete-function-alias 'org-node--series-jump            'org-node-seq--jump "2024-11-18")
-(define-obsolete-function-alias 'org-node--series-capture         'org-node-seq--capture "2024-11-18")
-(define-obsolete-function-alias 'org-node--mark-days              'org-node-seq--mark-days "2024-11-18")
-(define-obsolete-variable-alias 'org-node-current-series-key      'org-node-seq--current-key "2024-11-18")
+;; 2024-11-18 (v1.9) moved series-related code into own file, whereupon the
+;; namespace had to be made consistent.  The following can be removed soon---
+(org-node-changes--def-whiny-alias 'org-node--build-series           'org-node-seq--build-from-def "2024-11-18")
+(org-node-changes--def-whiny-alias 'org-node--add-series-to-dispatch 'org-node-seq--add-to-dispatch "2024-11-18")
+(org-node-changes--def-whiny-alias 'org-node--series-goto-previous*  'org-node-seq--goto-previous* "2024-11-18")
+(org-node-changes--def-whiny-alias 'org-node--series-goto-next*      'org-node-seq--goto-next* "2024-11-18")
+(org-node-changes--def-whiny-alias 'org-node--series-jump*           'org-node-seq--jump* "2024-11-18")
+(org-node-changes--def-whiny-alias 'org-node--series-capture         'org-node-seq--capture "2024-11-18")
+(org-node-changes--def-whiny-alias 'org-node--mark-days              'org-node-seq--mark-days "2024-11-18")
 
 ;; ---but deprecate these more slowly
+(define-obsolete-function-alias 'org-node--guess-daily-dir        'org-node-seq--guess-daily-dir "2024-11-18")
 (define-obsolete-variable-alias 'org-node-built-series          'org-node-seqs "2024-11-18")
 (define-obsolete-variable-alias 'org-node-series-defs           'org-node-seq-defs "2024-11-18")
+(define-obsolete-function-alias 'org-node--series-jump          'org-node-seq--jump "2024-11-18")
+(define-obsolete-function-alias 'org-node--series-goto-next     'org-node-seq--goto-next "2024-11-18")
+(define-obsolete-function-alias 'org-node--series-goto-previous 'org-node-seq--goto-previous "2024-11-18")
 (define-obsolete-function-alias 'org-node-series-goto           'org-node-seq-goto "2024-11-18")
 (define-obsolete-function-alias 'org-node-series-dispatch       'org-node-seq-dispatch "2024-11-18")
 (define-obsolete-function-alias 'org-node-helper-try-goto-id    'org-node-seq-try-goto-id "2024-11-18")
@@ -169,7 +171,7 @@ hardcoded strings."
 (define-obsolete-function-alias 'org-node-mk-series-on-tags-sorted-by-property     'org-node-seq-def-on-tags-sort-by-property "2024-11-18")
 (define-obsolete-function-alias 'org-node-mk-series-on-filepath-sorted-by-basename 'org-node-seq-def-on-filepath-sort-by-basename "2024-11-18")
 
-;; Used by org-node-fakeroam until 1.8, so deprecate slowly as well.
+;; Used by org-node-fakeroam until 1.8, deprecate slowly as well.
 (define-obsolete-variable-alias 'org-node-proposed-series-key 'org-node-proposed-sequence  "2024-11-18")
 (define-obsolete-function-alias 'org-node--add-series-item    'org-node-seq--add-item "2024-11-18")
 
