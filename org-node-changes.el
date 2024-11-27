@@ -37,7 +37,8 @@
 (unless (fboundp 'el-job-launch)
   (display-warning
    'org-node "Org-node has new dependency el-job, update your
-    package menus (e.g. by M-x package-refresh-contents)"))
+    package menus (e.g. by M-x package-refresh-contents
+    or M-x elpaca-update-menus)"))
 
 (unless (fboundp 'get-truename-buffer)
   (display-warning
@@ -118,10 +119,15 @@ hardcoded strings."
                 ,old ,(or removed-by "30 November 2024") ,new))
        (apply ,new args))))
 
-;; API transition underway: get-tags will include inherited tags in future
-;; ... Let's say Jan/Feb.
-(define-obsolete-function-alias 'org-node-get-tags #'org-node-get-tags-local
-  "2024-10-22")
+(defun org-node-get-tags (node)
+  "Pass NODE to `org-node-get-tags-local' with a warning.
+Then re-define this function so it is just that function."
+  (when (fboundp 'org-node-get-tags-local)
+    (prog1 (org-node-get-tags-local node)
+      (display-warning
+       'org-node "Your initfiles use old function name `org-node-get-tags'. Use either `org-node-get-tags-local' or `org-node-get-tags-with-inheritance'.")
+      (define-obsolete-function-alias
+        'org-node-get-tags 'org-node-get-tags-local "2024-10-22"))))
 
 ;; 2024-09-17
 ;; NOTE: Can't mark as obsolete here, it has be done inside that library
@@ -161,7 +167,7 @@ hardcoded strings."
 (org-node-changes--def-whiny-alias 'org-node--mark-days              'org-node-seq--mark-days "2024-11-18")
 
 ;; ---but deprecate these more slowly
-(define-obsolete-function-alias 'org-node--guess-daily-dir        'org-node-seq--guess-daily-dir "2024-11-18")
+(define-obsolete-function-alias 'org-node--guess-daily-dir      'org-node-seq--guess-daily-dir "2024-11-18")
 (define-obsolete-variable-alias 'org-node-built-series          'org-node-seqs "2024-11-18")
 (define-obsolete-variable-alias 'org-node-series-defs           'org-node-seq-defs "2024-11-18")
 (define-obsolete-function-alias 'org-node--series-jump          'org-node-seq--jump "2024-11-18")

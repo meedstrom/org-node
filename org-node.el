@@ -155,7 +155,7 @@ There is no need to add the \"cite\" type."
   "Alist of variable-value pairs that child processes should set.
 
 May be useful for injecting your authinfo and EasyPG settings so
-that org-node can scan for ID nodes inside .org.gpg files.  Also,
+that org-node can scan for ID-nodes inside .org.gpg files.  Also,
 `org-node-perf-keep-file-name-handlers' should include the EPG
 handler.
 
@@ -167,7 +167,7 @@ or drop me a line on Mastodon: @meedstrom@hachyderm.io"
   )
 
 (defvar org-node-perf-keep-file-name-handlers nil
-  "Which file handlers to respect while scanning for ID nodes.
+  "Which file handlers to respect while scanning for ID-nodes.
 
 Normally, `file-name-handler-alist' changes the behavior of many Emacs
 functions when passed some file names: TRAMP paths, compressed files or
