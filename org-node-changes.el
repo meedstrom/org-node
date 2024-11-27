@@ -55,6 +55,7 @@ Names here will be loudly complained-about.")
 (defvar org-node-changes--warned-roam-id nil
   "Non-nil if did warn about org-roam overriding a link parameter.")
 
+(defvar org-node-changes--warned-once nil)
 (defun org-node-changes--warn-and-copy ()
   "Maybe print one-shot warnings, then become a no-op.
 
@@ -90,7 +91,13 @@ Then do other one-shot warnings while we\\='re at it."
        "%s" "Note: org-roam overrides ID-link behavior, you may want to
       revert to vanilla by evalling:
       (org-link-set-parameters
-       \"id\" :follow #'org-id-open :store #'org-id-store-link-maybe)"))))
+       \"id\" :follow #'org-id-open :store #'org-id-store-link-maybe)")))
+  (unless org-node-changes--warned-once
+    (setq org-node-changes--warned-once t)
+    ;; 2024-11-27: In case children are running old bytecode of
+    ;; org-node-parser, which expected this directory to exist.  The version
+    ;; mismatch will still break things, but with different messages.
+    (mkdir (file-name-concat temporary-file-directory "org-node") t)))
 
 (defmacro org-node-changes--def-whiny-alias (old new &optional when interactive removed-by)
   "Define function OLD as effectively an alias for NEW.

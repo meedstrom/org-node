@@ -1,7 +1,6 @@
 #+TITLE: org-node
 #+AUTHOR: Martin Edström
 #+EMAIL: meedstrom91@gmail.com
-#+LANGUAGE: en
 #+STARTUP: content
 #+TEXINFO_DIR_CATEGORY: Emacs
 #+TEXINFO_DIR_TITLE: Org-node: (org-node).
@@ -41,7 +40,7 @@ Once a subtree has an ID you can link to, it's a "node" because it has joined th
 
 ** Features
 
-A comparison of three similar systems, which permit relying on org-id and don't lock you into the all-too-seductive (for developers) concept of "one-note-per-file".
+A comparison of three similar systems, which permit relying on org-id and don't lock you into concept of "one-note-per-file".
 
 | Feature                        | org-roam | org-node           | [[https://github.com/toshism/org-super-links][org-super-links]]      |
 |--------------------------------+----------+--------------------+----------------------|
@@ -60,7 +59,7 @@ A comparison of three similar systems, which permit relying on org-id and don't 
 | Work thru org-roam-capture     | yes      | yes                | ?                    |
 | Work thru org-capture          | --       | yes                | ?                    |
 | Daily-nodes                    | yes      | yes                | --                   |
-| Node sequences           | --       | yes                | --                   |
+| Node sequences                 | --       | yes                | --                   |
 | Show backlinks in same window  | --       | yes                | yes                  |
 | Cooperate with org-super-links | --       | yes                | not applicable       |
 | Fix link descriptions          | --       | yes                | --                   |
@@ -482,7 +481,10 @@ API cheatsheet between org-roam and org-node.
 | Ensure fresh data                       | =(org-roam-db-sync)=               | =(org-node-cache-ensure t t)=                                       |
 
 ** Appendix II: How to rollback
-Instructions to downgrade to [[https://github.com/meedstrom/org-node/tags][an older version]], let's say 1.6.2:
+
+Instructions to downgrade to [[https://github.com/meedstrom/org-node/tags][an older version]], let's say 1.6.2.
+
+(You could read [[https://edstrom.dev/cdlxm/how-to-downgrade-rollback-an-emacs-package][How to Downgrade/Rollback an Emacs Package]], but org-node makes it simpler because it creates branches like v1.6 and v1.7, for each minor version series.)
 
 With [[https://github.com/quelpa/quelpa][Quelpa]]:
 #+begin_src elisp
@@ -529,15 +531,16 @@ With [[https://github.com/radian-software/straight.el][Straight]]:
                       :branch "v1.6"))
 #+end_src
 
-*** Match fakeroam version
-The extension [[https://github.com/meedstrom/org-node-fakeroam][org-node-fakeroam]] has been tightly coupled with specific versions of org-node, but hopefully I've made it warn about having the wrong version.  Then you can use a similar procedure as above.
 
-Just in case---
-- 2024-10-05 released org-node v1.5 and fakeroam v1.3
-- 2024-10-24 released org-node v1.6 and fakeroam v1.4
-- 2024-10-27 released org-node v1.7 and fakeroam v1.5
-- 2024-11-14 released org-node v1.8
-- 2024-11-18 released org-node v1.9+ and fakeroam v1.6+
+*** Match fakeroam version
+The extension [[https://github.com/meedstrom/org-node-fakeroam][org-node-fakeroam]] has been tightly coupled with contemporary versions of org-node, but hopefully I've made it warn at load time if it sees a version mismatch.  Then you can use a similar procedure as above.
+
+Just in case, the release history:
+- 2024-10-05: org-node v1.5 and org-node-fakeroam v1.3
+- 2024-10-24: org-node v1.6 and org-node-fakeroam v1.4
+- 2024-10-27: org-node v1.7 and org-node-fakeroam v1.5
+- 2024-11-14: org-node v1.8
+- 2024-11-18: org-node v1.9 and org-node-fakeroam v1.6
 
 *** What version is installed?
 This info depends on your package manager.  I do not embed version in the source code.
