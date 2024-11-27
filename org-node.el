@@ -1498,6 +1498,10 @@ Unlike `make-temp-file', do not add characters.
 On most systems, the resulting string will be
 /tmp/org-node/BASENAME, but it depends on
 OS and variable `temporary-file-directory'."
+  ;; Just in case anyone runs into issue #72.
+  ;; https://github.com/meedstrom/org-node/issues/72
+  (mkdir (file-name-concat temporary-file-directory "org-node")
+         t)
   (file-name-concat temporary-file-directory
                     "org-node"
                     (when basename (apply #'format basename args))))
