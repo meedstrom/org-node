@@ -1478,12 +1478,13 @@ You might consider committing the effect to disk afterwards by calling
 
 FILES are assumed to be abbreviated truenames."
   (when files
-    (if (listp org-id-locations)
-        (message "org-node--forget-id-locations: Surprised that `org-id-locations' is an alist at this time")
-      (maphash (lambda (id file)
-                 (when (member file files)
-                   (remhash id org-id-locations)))
-               org-id-locations))))
+    (when (listp org-id-locations)
+      (message "org-node--forget-id-locations: Surprised that `org-id-locations' is an alist at this time.  Converting to hash table.")
+      (setq org-id-locations (org-id-alist-to-hash org-id-locations)))
+    (maphash (lambda (id file)
+               (when (member file files)
+                 (remhash id org-id-locations)))
+             org-id-locations)))
 
 
 ;;;; Filename functions
@@ -2180,6 +2181,7 @@ creation-date as more \"truthful\" than today\\='s date.
                            (point)))))
       (if (file-exists-p path-to-write)
           (message "A file already exists named %s" path-to-write)
+        (if (org-at-heading-p) (org-show-entry) (org-show-context))
         (org-cut-subtree)
         ;; Try to leave a link at the end of parent entry, pointing to the
         ;; ID of subheading that was extracted.
@@ -2268,18 +2270,6 @@ to false positives, if you have been changing formats over time."
              name)
         (match-string 0 name)))))
 
-;; 2024-11-18 Let's see if we can deprecate; `org-entry-get-with-inheritance'
-;; may be sufficient.  Fail loudly if it turns out not to up to the job.
-(defun org-node-id-at-point ()
-  "Get ID for current entry or up the outline tree."
-  (save-excursion
-    (without-restriction
-      (or (org-entry-get-with-inheritance "ID")
-          (when-let ((alt-result (progn (goto-char (point-min))
-                                        (org-entry-get-with-inheritance "ID"))))
-            (message "org-node: `org-entry-get-with-inheritance' did not get file-level ID, report appreciated")
-            alt-result)))))
-
 (defcustom org-node-renames-allowed-dirs nil
   "Dirs in which files may be auto-renamed.
 Used if you have `org-node-rename-file-by-title' on a save-hook.
@@ -2344,14 +2334,17 @@ Argument INTERACTIVE automatically set."
                (date-prefix (or (org-node-extract-file-name-datestamp path)
                                 ;; Couldn't find date prefix, give a new one
                                 (format-time-string org-node-datestamp-format)))
-               (new-name
-                (concat date-prefix (funcall org-node-slug-fn title) ".org"))
+               (slug (funcall org-node-slug-fn title))
+               (new-name (concat date-prefix slug ".org"))
                (new-path
                 (file-name-concat (file-name-directory path) new-name)))
           (cond
            ((equal path new-path)
             (when interactive
               (message "Filename already correct: %s" path)))
+           ((string-empty-p slug)
+            (when interactive
+              (message "Filename would become blank: %s" path)))
            ((or (buffer-modified-p buf)
                 (buffer-modified-p (buffer-base-buffer buf)))
             (when interactive
@@ -3412,6 +3405,22 @@ heading, else the file-level node, whichever has an ID first."
   (gethash (completing-read "Node: " #'org-node-collection
                             () () () 'org-node-hist)
            org-node--candidate<>node))
+
+
+;;; Obsolete
+
+;; 2024-11-18 Let's see if `org-entry-get-with-inheritance' is sufficient.
+;; Fail loudly if it turns out not up to the job.
+(defun org-node-id-at-point ()
+  "Get ID for current entry or up the outline tree."
+  (declare (obsolete 'org-entry-get-with-inheritance "2024-11-18"))
+  (save-excursion
+    (without-restriction
+      (or (org-entry-get-with-inheritance "ID")
+          (when-let ((alt-result (progn (goto-char (point-min))
+                                        (org-entry-get-with-inheritance "ID"))))
+            (message "org-node: `org-entry-get-with-inheritance' did not get file-level ID, please report to let me know")
+            alt-result)))))
 
 (provide 'org-node)
 
