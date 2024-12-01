@@ -18,7 +18,7 @@
 ;; Author:           Martin Edström <meedstrom91@gmail.com>
 ;; Created:          2024-04-13
 ;; Keywords:         org, hypermedia
-;; Package-Requires: ((emacs "28.1") (compat "30") (el-job "0.3.11") (llama "0.4.0"))
+;; Package-Requires: ((emacs "28.1") (compat "30") (el-job "0.3.14") (llama "0.4.0"))
 ;; URL:              https://github.com/meedstrom/org-node
 
 ;; NOTE: Looking for Package-Version?
