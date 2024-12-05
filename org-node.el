@@ -1260,7 +1260,7 @@ If optional argument ID is non-nil, do not check the link at
 point but assume it is a link to ID."
   (when (derived-mode-p 'org-mode)
     (org-node--init-ids)
-    (when-let ((origin (org-node-id-at-point))
+    (when-let ((origin (org-entry-get-with-inheritance "ID"))
                (dest (if (gethash id org-id-locations)
                          id
                        (let ((elm (org-element-context)))
@@ -1284,7 +1284,7 @@ candidates right away, without having to save the buffer.
 2. ensure that `org-node-backlink-mode' won\\='t autoclean backlinks
 to this node on account of it \"not existing yet\".  Actually,
 also necessary is `org-node--dirty-ensure-link-known' elsewhere."
-  (let ((id (org-node-id-at-point))
+  (let ((id (org-entry-get-with-inheritance "ID"))
         (case-fold-search t))
     (unless (gethash id org-node--id<>node)
       (unless (gethash buffer-file-truename org-node--file<>mtime)
@@ -3196,7 +3196,7 @@ Afterwards, maybe restore point to where it had been previously,
 so long as the affected heading would still be visible in the
 window."
   (let* ((where-i-was (point-marker))
-         (id (org-node-id-at-point))
+         (id (org-entry-get-with-inheritance "ID"))
          (heading-pos
           (save-excursion
             (without-restriction
@@ -3384,7 +3384,7 @@ If already visiting that node, then follow the link normally."
                ;; Check that point is not already in said ref node (if so,
                ;; better to fallback to default `org-open-at-point' logic)
                (not (and (derived-mode-p 'org-mode)
-                         (equal (org-node-id-at-point)
+                         (equal (org-entry-get-with-inheritance "ID")
                                 (org-node-get-id found)))))
           (progn (org-node--goto found)
                  t)
@@ -3398,7 +3398,7 @@ If already visiting that node, then follow the link normally."
 
 This may refer to the current Org heading, else an ancestor
 heading, else the file-level node, whichever has an ID first."
-  (gethash (org-node-id-at-point) org-node--id<>node))
+  (gethash (org-entry-get-with-inheritance "ID") org-node--id<>node))
 
 (defun org-node-read ()
   "Prompt for a known ID-node."

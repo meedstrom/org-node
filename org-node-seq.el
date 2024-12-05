@@ -51,7 +51,7 @@ KEY, NAME and CAPTURE explained in `org-node-seq-defs'."
                             (org-node-get-id node)))))
     :whereami (lambda ()
                 (when-let* ((sortstr (org-entry-get nil ,prop t))
-                            (node (gethash (org-node-id-at-point) org-nodes)))
+                            (node (gethash (org-entry-get-with-inheritance "ID") org-nodes)))
                   (concat sortstr " " (org-node-get-title node))))
     :prompter (lambda (key)
                 (let ((seq (cdr (assoc key org-node-seqs))))
@@ -85,7 +85,7 @@ KEY, NAME and CAPTURE explained in `org-node-seq-defs'."
                 (when (seq-intersection (split-string ,tags ":" t)
                                         (org-get-tags))
                   (let ((sortstr (org-entry-get nil ,prop t))
-                        (node (gethash (org-node-id-at-point) org-nodes)))
+                        (node (gethash (org-entry-get-with-inheritance "ID") org-nodes)))
                     (when (and sortstr node)
                       (concat sortstr " " (org-node-get-title node))))))
     :prompter (lambda (key)
@@ -330,7 +330,7 @@ currently."
   (when (or key org-node-proposed-sequence)
     (let* ((seq (cdr (assoc (or key org-node-proposed-sequence)
                             org-node-seqs)))
-           (node-here (gethash (org-node-id-at-point) org-nodes))
+           (node-here (gethash (org-entry-get-with-inheritance "ID") org-nodes))
            (new-item (when node-here
                        (funcall (plist-get seq :classifier) node-here))))
       (when new-item

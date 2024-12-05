@@ -148,7 +148,7 @@ Once a subtree has an ID you can link to, it's a "node" because it has joined th
 @node Features
 @section Features
 
-A comparison of three similar systems, which permit relying on org-id and don't lock you into the all-too-seductive (for developers) concept of "one-note-per-file".
+A comparison of three similar systems, which permit relying on org-id and don't lock you into concept of "one-note-per-file".
 
 @multitable {aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa} {aaaaaaaa} {aaaaaaaaaaaaaaaaaa} {aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}
 @headitem Feature
@@ -931,7 +931,7 @@ API cheatsheet between org-roam and org-node.
 @node Appendix II How to rollback
 @section Appendix II: How to rollback
 
-Instructions to downgrade to @uref{https://github.com/meedstrom/org-node/tags, an older version}, let's say 1.6.2:
+Instructions to downgrade to @uref{https://github.com/meedstrom/org-node/tags, an older version}, let's say 1.6.2.
 
 With @uref{https://github.com/quelpa/quelpa, Quelpa}:
 @lisp
@@ -986,20 +986,20 @@ With @uref{https://github.com/radian-software/straight.el, Straight}:
 @node Match fakeroam version
 @subsection Match fakeroam version
 
-The extension @uref{https://github.com/meedstrom/org-node-fakeroam, org-node-fakeroam} has been tightly coupled with specific versions of org-node, but hopefully I've made it warn about having the wrong version.  Then you can use a similar procedure as above.
+The extension @uref{https://github.com/meedstrom/org-node-fakeroam, org-node-fakeroam} has been tightly coupled with contemporary versions of org-node, but hopefully I've made it warn about any version mismatch at load-time.
 
-Just in case---
+Just in case, the release history:
 @itemize
 @item
-2024-10-05 released org-node v1.5 and fakeroam v1.3
+2024-10-05: org-node v1.5 and org-node-fakeroam v1.3
 @item
-2024-10-24 released org-node v1.6 and fakeroam v1.4
+2024-10-24: org-node v1.6 and org-node-fakeroam v1.4
 @item
-2024-10-27 released org-node v1.7 and fakeroam v1.5
+2024-10-27: org-node v1.7 and org-node-fakeroam v1.5
 @item
-2024-11-14 released org-node v1.8
+2024-11-14: org-node v1.8
 @item
-2024-11-18 released org-node v1.9+ and fakeroam v1.6+
+2024-11-18: org-node v1.9 and org-node-fakeroam v1.6
 @end itemize
 
 @node What version is installed?
