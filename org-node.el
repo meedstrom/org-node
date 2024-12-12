@@ -1209,7 +1209,13 @@ be misleading."
              (byte-compile fn))
            ;; May actually use entirely uncompiled until native is available
            fn))
-        ((gethash fn org-node--compiled-lambdas))
+        ((condition-case err
+             (gethash fn org-node--compiled-lambdas)
+           ;; https://github.com/meedstrom/org-node/issues/76
+           (( cl-no-applicable-method )
+            (message "Caught signal, please report org-node bug if this happens a lot: %S"
+                     err)
+            nil)))
         ((prog1 (puthash fn (byte-compile fn) org-node--compiled-lambdas)
            (when (and (native-comp-available-p)
                       (not (eq 'closure (car-safe fn))))
