@@ -1207,7 +1207,7 @@ be misleading."
                        (run-with-idle-timer
                         (+ 5 (random 10)) nil #'native-compile fn)))
              (byte-compile fn))
-           ;; May actually use entirely uncompiled until native is available
+           ;; May be uncompiled until native comp is done
            fn))
         ((condition-case err
              (gethash fn org-node--compiled-lambdas)

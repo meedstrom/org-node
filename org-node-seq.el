@@ -397,7 +397,7 @@ With non-nil argument NEXT, visit the next entry, not previous."
                 t))
       ;; Usually this should return on the first try, but sometimes stale
       ;; items refer to something that has been erased from disk, so
-      ;; deregister each item that TRY-GOTO failed to visit and try again.
+      ;; deregister each item that TRY-GOTO failed to visit, and try again.
       (cl-loop for item in (if next head tail)
                if (funcall (plist-get seq :try-goto) item)
                return t
@@ -405,6 +405,10 @@ With non-nil argument NEXT, visit the next entry, not previous."
                finally do (message "No %s item in sequence \"%s\""
                                    (if next "next" "previous")
                                    (plist-get seq :name))))))
+
+(defvar org-node-seq--current-key nil
+  "Key identifying the node seq currently being browsed with the menu.
+Unlike `org-node-proposed-sequence', does not need to revert to nil.")
 
 (defun org-node-seq-capture-target ()
   "Experimental."
@@ -464,10 +468,6 @@ DEF is a seq-def from `org-node-seq-defs'."
                                      (compat-call sort items
                                                   :key #'car :lessp #'string<
                                                   :reverse t :in-place t))))))))
-
-(defvar org-node-seq--current-key nil
-  "Key identifying the node seq currently being browsed with the menu.
-Unlike `org-node-proposed-sequence', does not need to revert to nil.")
 
 (defun org-node-seq--add-to-dispatch (key name)
   "Use KEY and NAME to add a sequence to the Transient menu."
@@ -586,7 +586,7 @@ not exist."
       (funcall (plist-get seq :creator) sortstr key))))
 
 (defun org-node-seq--reset ()
-  "Wipe and re-build all sequence.
+  "Wipe and re-build all sequences.
 Must be done after the main org-node cache is up to date."
   (setq org-node-seqs nil)
   (dolist (def org-node-seq-defs)
