@@ -2019,32 +2019,32 @@ minibuffer before selecting some other node you had in mind, to
 which the region should be linkified, you\\='ll prefer
 `org-node-insert-link'.
 
-The commands are the same, it is just a difference in
-initial input."
+The commands are the same, just differing in initial input."
   (interactive nil org-mode)
   (org-node-insert-link t))
 
 ;;;###autoload
-(defun org-node-insert-transclusion ()
+(defun org-node-insert-transclusion (&optional node)
   "Insert a #+transclude: referring to a node."
   (interactive nil org-mode)
   (unless (derived-mode-p 'org-mode)
     (user-error "Only works in org-mode buffers"))
   (org-node-cache-ensure)
-  (let ((node (gethash (completing-read "Node: " #'org-node-collection
-                                        () () () 'org-node-hist)
-                       org-node--candidate<>node)))
-    (let ((id (org-node-get-id node))
-          (title (org-node-get-title node))
-          (level (or (org-current-level) 0)))
-      (insert (org-link-make-string (concat "id:" id) title))
-      (goto-char (pos-bol))
-      (insert "#+transclude: ")
-      (goto-char (pos-eol))
-      (insert " :level " (number-to-string (+ 1 level))))))
+  (unless node
+    (setq node (gethash (completing-read "Node: " #'org-node-collection
+                                         () () () 'org-node-hist)
+                        org-node--candidate<>node)))
+  (let ((id (org-node-get-id node))
+        (title (org-node-get-title node))
+        (level (or (org-current-level) 0)))
+    (insert (org-link-make-string (concat "id:" id) title))
+    (goto-char (pos-bol))
+    (insert "#+transclude: ")
+    (goto-char (pos-eol))
+    (insert " :level " (number-to-string (+ 1 level)))))
 
 ;;;###autoload
-(defun org-node-insert-transclusion-as-subtree ()
+(defun org-node-insert-transclusion-as-subtree (&optional node)
   "Insert a link and a transclusion.
 
 Result will basically look like:
@@ -2061,39 +2061,40 @@ adding keywords to the things to exclude:
   (unless (derived-mode-p 'org-mode)
     (error "Only works in org-mode buffers"))
   (org-node-cache-ensure)
-  (let ((node (gethash (completing-read "Node: " #'org-node-collection
-                                        () () () 'org-node-hist)
-                       org-node--candidate<>node)))
-    (let ((id (org-node-get-id node))
-          (title (org-node-get-title node))
-          (level (or (org-current-level) 0))
-          (m1 (make-marker)))
-      (insert (org-link-make-string (concat "id:" id) title))
-      (set-marker m1 (1- (point)))
-      (duplicate-line)
-      (goto-char (pos-bol))
-      (insert (make-string (+ 1 level) ?\*) " ")
-      (forward-line 1)
-      (insert "#+transclude: ")
-      (goto-char (pos-eol))
-      (insert " :level " (number-to-string (+ 2 level)))
-      ;; If the target is a subtree rather than file-level node, I'd like to
-      ;; cut out the initial heading because we already made an outer heading.
-      ;; (We made the outer heading so that this transclusion will count as a
-      ;; backlink, plus it makes more sense to me on export to HTML).
-      ;;
-      ;; Unfortunately cutting it out with the :lines trick would prevent
-      ;; `org-transclusion-exclude-elements' from having an effect, and the
-      ;; subtree's property drawer shows up!
-      ;; TODO: Patch `org-transclusion-content-range-of-lines' to respect
-      ;; `org-transclusion-exclude-elements', or (better) don't use :lines but
-      ;; make a different argument like ":no-initial-heading"
-      ;;
-      ;; For now, just let it nest an extra heading. Looks odd, but doesn't
-      ;; break things.
-      (goto-char (marker-position m1))
-      (set-marker m1 nil)
-      (run-hooks 'org-node-insert-link-hook))))
+  (unless node
+    (setq node (gethash (completing-read "Node: " #'org-node-collection
+                                         () () () 'org-node-hist)
+                        org-node--candidate<>node)))
+  (let ((id (org-node-get-id node))
+        (title (org-node-get-title node))
+        (level (or (org-current-level) 0))
+        (m1 (make-marker)))
+    (insert (org-link-make-string (concat "id:" id) title))
+    (set-marker m1 (1- (point)))
+    (duplicate-line)
+    (goto-char (pos-bol))
+    (insert (make-string (+ 1 level) ?\*) " ")
+    (forward-line 1)
+    (insert "#+transclude: ")
+    (goto-char (pos-eol))
+    (insert " :level " (number-to-string (+ 2 level)))
+    ;; If the target is a subtree rather than file-level node, I'd like to
+    ;; cut out the initial heading because we already made an outer heading.
+    ;; (We made the outer heading so that this transclusion will count as a
+    ;; backlink, plus it makes more sense to me on export to HTML).
+    ;;
+    ;; Unfortunately cutting it out with the :lines trick would prevent
+    ;; `org-transclusion-exclude-elements' from having an effect, and the
+    ;; subtree's property drawer shows up!
+    ;; TODO: Patch `org-transclusion-content-range-of-lines' to respect
+    ;; `org-transclusion-exclude-elements', or (better) don't use :lines but
+    ;; make a different argument like ":no-initial-heading"
+    ;;
+    ;; For now, just let it nest an extra heading. Looks odd, but doesn't
+    ;; break things.
+    (goto-char (marker-position m1))
+    (set-marker m1 nil)
+    (run-hooks 'org-node-insert-link-hook)))
 
 ;;;###autoload
 (defun org-node-refile ()
