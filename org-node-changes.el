@@ -136,20 +136,6 @@ Then re-define this function so it is just that function."
 (defalias 'org-node-new-via-roam-capture #'org-node-fakeroam-new-via-roam-capture)
 (defalias 'org-node-slugify-like-roam-actual #'org-node-fakeroam-slugify-via-roam)
 
-(defun org-node--write-eld (file object)
-  (display-warning
-   'org-node "Looks like you updated org-node, please also update org-node-fakeroam")
-  (if (stringp object)
-      (let ((obj file))
-        (setq file object)
-        (setq object obj)))
-  (when-let ((buf (if (fboundp 'get-truename-buffer) ;; Emacs 30
-                      (get-truename-buffer file)
-                    (get-file-buffer file))))
-    (kill-buffer buf))
-  (write-region (prin1-to-string object nil '((length . nil) (level . nil)))
-                nil file nil 'quiet))
-
 ;; 1.9.0 (2024-11-18) moved series-related code into its own file, whereupon
 ;; the namespace had to be made consistent.
 (org-node-changes--def-whiny-alias 'org-node--guess-daily-dir      'org-node-seq--guess-daily-dir "2024-11-18")
@@ -166,6 +152,7 @@ Then re-define this function so it is just that function."
 (org-node-changes--def-whiny-alias 'org-node-mk-series-sorted-by-property             'org-node-seq-def-on-any-sort-by-property "2024-11-18")
 (org-node-changes--def-whiny-alias 'org-node-mk-series-on-tags-sorted-by-property     'org-node-seq-def-on-tags-sort-by-property "2024-11-18")
 (org-node-changes--def-whiny-alias 'org-node-mk-series-on-filepath-sorted-by-basename 'org-node-seq-def-on-filepath-sort-by-basename "2024-11-18")
+(define-obsolete-variable-alias 'org-node-series-that-marks-calendar 'org-node-seq-that-marks-calendar "2024-12-13")
 
 ;; Used by org-node-fakeroam until 1.6.0 (co-released with org-node 1.9.0)
 (define-obsolete-variable-alias 'org-node-proposed-series-key 'org-node-proposed-sequence  "2024-11-18")

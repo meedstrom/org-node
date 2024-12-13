@@ -93,7 +93,7 @@
     (should (equal (car (org-node--root-dirs (org-node-list-files)))
                    "/tmp/org-node/test2/"))))
 
-(defun org-node-test-file (file)
+(defun org-node-test--file (file)
   "Look for FILE in test/ directory or in default directory."
   (let ((loaded-org-node (find-library-name "org-node")))
     (or (and loaded-org-node
@@ -105,7 +105,7 @@
 
 (ert-deftest org-node/test-goto-random ()
   (require 'seq)
-  (org-node--scan-targeted (list (org-node-test-file "testfile2.org")))
+  (org-node--scan-targeted (list (org-node-test--file "testfile2.org")))
   (org-node-cache-ensure t)
   (let ((node (seq-random-elt (hash-table-values org-node--id<>node))))
     (org-node--goto node)
@@ -125,7 +125,7 @@
 (ert-deftest org-node/test-file-naming ()
   (let ((org-node-datestamp-format "")
         (org-node-slug-fn #'org-node-slugify-for-web))
-    (should (equal (funcall org-node-slug-fn "19 Foo bar Baz 588")
+    (should (equal (funcall org-node-slug-fn "19 Foo bär Baz 588")
                    "19-foo-bar-baz-588")))
   (should (equal (org-node--make-regexp-for-time-format "%Y%M%d")
                  "^[[:digit:]]+"))
