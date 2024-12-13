@@ -1358,7 +1358,6 @@ operation."
            return nil
            finally return t))
 
-
 ;; (benchmark-call #'org-node-list-files)
 ;; => (0.009714744 0 0.0)
 ;; (benchmark-call #'org-roam-list-files)
@@ -1494,24 +1493,6 @@ FILES are assumed to be abbreviated truenames."
 
 
 ;;;; Filename functions
-
-;; TODO: Deprecate
-(defun org-node--tmpfile (&optional basename &rest args)
-  "Return a path that puts BASENAME in a temporary directory.
-As a nicety, `format' BASENAME with ARGS too.
-
-Unlike `make-temp-file', do not add characters.
-
-On most systems, the resulting string will be
-/tmp/org-node/BASENAME, but it depends on
-OS and variable `temporary-file-directory'."
-  ;; Just in case anyone runs into issue #72.
-  ;; https://github.com/meedstrom/org-node/issues/72
-  (mkdir (file-name-concat temporary-file-directory "org-node")
-         t)
-  (file-name-concat temporary-file-directory
-                    "org-node"
-                    (when basename (apply #'format basename args))))
 
 ;; (progn (byte-compile #'org-node--root-dirs) (benchmark-run 10 (org-node--root-dirs (hash-table-values org-id-locations))))
 (defun org-node--root-dirs (file-list)
@@ -2677,8 +2658,7 @@ network to quality-control it.  Rationale:
   (unless (executable-find "Rscript")
     (user-error
      "This command requires GNU R, with R packages: stringr, readr, igraph"))
-  (mkdir (org-node--tmpfile) t)
-  (let ((r-code "library(stringr)
+  (let* ((r-code "library(stringr)
 library(readr)
 library(igraph)
 
@@ -2694,16 +2674,18 @@ lisp_data <- str_c(\"(\\\"\", as_ids(fas1), \"\\\")\") |>
   })()
 
 write_file(lisp_data, file.path(dirname(tsv), \"feedback-arcs.eld\"))")
-        (script-file (org-node--tmpfile "analyze_feedback_arcs.R"))
-        (input-tsv (org-node--tmpfile "id_node_digraph.tsv")))
+         (tmpdir (file-name-concat temporary-file-directory "org-node"))
+         (script-file (file-name-concat tmpdir "analyze_feedback_arcs.R"))
+         (input-tsv (file-name-concat tmpdir "id_node_digraph.tsv"))
+         (output-eld (file-name-concat tmpdir "feedback-arcs.eld")))
+    (mkdir tmpdir t)
     (write-region r-code () script-file () 'quiet)
     (write-region (org-node--make-digraph-tsv-string) () input-tsv () 'quiet)
     (with-temp-buffer
       (unless (= 0 (call-process "Rscript" () t () script-file input-tsv))
         (error "%s" (buffer-string))))
     (let ((feedbacks (with-temp-buffer
-                       (insert-file-contents
-                        (org-node--tmpfile "feedback-arcs.eld"))
+                       (insert-file-contents output-eld)
                        (read (buffer-string)))))
       (when (listp feedbacks)
         (org-node--pop-to-tabulated-list
@@ -3428,6 +3410,24 @@ heading, else the file-level node, whichever has an ID first."
                                         (org-entry-get-with-inheritance "ID"))))
             (message "org-node: `org-entry-get-with-inheritance' did not get file-level ID, please report to let me know")
             alt-result)))))
+
+;; now only used by fakeroam
+(defun org-node--tmpfile (&optional basename &rest args)
+  "Return a path that puts BASENAME in a temporary directory.
+As a nicety, `format' BASENAME with ARGS too.
+
+Unlike `make-temp-file', do not add characters.
+
+On most systems, the resulting string will be
+/tmp/org-node/BASENAME, but it depends on
+OS and variable `temporary-file-directory'."
+  ;; Just in case anyone runs into issue #72.
+  ;; https://github.com/meedstrom/org-node/issues/72
+  (mkdir (file-name-concat temporary-file-directory "org-node")
+         t)
+  (file-name-concat temporary-file-directory
+                    "org-node"
+                    (when basename (apply #'format basename args))))
 
 (provide 'org-node)
 
