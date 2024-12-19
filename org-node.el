@@ -2303,7 +2303,7 @@ Argument INTERACTIVE automatically set."
           (cl-loop
            for dir in (mapcar #'file-truename org-node-renames-allowed-dirs)
            if (string-match-p org-node-renames-exclude dir)
-           do (user-error "Regexp `org-node-renames-exclude' would directly match a directory from `org-node-renames-allowed-dirs'")
+           do (error "Regexp `org-node-renames-exclude' would directly match a directory from `org-node-renames-allowed-dirs'")
            else if (and (string-prefix-p dir path)
                         (not (string-match-p org-node-renames-exclude path)))
            return t))
@@ -2323,7 +2323,7 @@ Argument INTERACTIVE automatically set."
                         (outline-next-heading)
                         (org-get-heading t t t t)))))))
       (if (not title)
-          (message "org-node-rename-file-by-title: No title in file")
+          (message "org-node-rename-file-by-title: No title in file %s" path)
 
         (let* ((name (file-name-nondirectory path))
                (date-prefix (or (org-node-extract-file-name-datestamp path)
@@ -2345,14 +2345,12 @@ Argument INTERACTIVE automatically set."
             (when interactive
               (message "Unsaved file, letting it be: %s" path)))
            ((find-buffer-visiting new-path)
-            (user-error "Wanted to rename, but a buffer already visits target: %s"
-                        new-path))
-           ((not (file-writable-p path))
-            (user-error "No permissions to rename file: %s"
-                        path))
-           ((not (file-writable-p new-path))
-            (user-error "No permissions to write a new file at: %s"
-                        new-path))
+            (error "Wanted to rename, but a buffer already visits target: %s"
+                   new-path))
+           ((or (not (file-writable-p path))
+                (not (file-writable-p new-path)))
+            (error "No permissions to rename file: %s"
+                   path))
            ((or (not interactive)
                 (y-or-n-p (format "Rename file %s to %s?" name new-name)))
             (rename-file path new-path)
