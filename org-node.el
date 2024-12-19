@@ -2307,16 +2307,23 @@ Argument INTERACTIVE automatically set."
            else if (and (string-prefix-p dir path)
                         (not (string-match-p org-node-renames-exclude path)))
            return t))
-      (if (not (setq title (or (cadar (org-collect-keywords '("TITLE")))
-                               ;; No #+title, so take first heading as title
-                               ;; for this purpose
-                               (save-excursion
-                                 (without-restriction
-                                   (goto-char 1)
-                                   (or (org-at-heading-p)
-                                       (outline-next-heading))
-                                   (org-get-heading t t t t))))))
-          (message "File has no title nor heading")
+      (setq title
+            (or (cadar (org-collect-keywords '("TITLE")))
+                ;; No #+TITLE keyword, so treat first heading as title
+                (save-excursion
+                  (without-restriction
+                    (goto-char 1)
+                    (if (org-at-heading-p)
+                        (org-get-heading t t t t)
+                      (if (org-entry-properties 1 "ID")
+                          ;; In the special case when content before the first
+                          ;; heading has a property drawer with :ID: (despite
+                          ;; absence of #+TITLE), do nothing.
+                          nil
+                        (outline-next-heading)
+                        (org-get-heading t t t t)))))))
+      (if (not title)
+          (message "org-node-rename-file-by-title: No title in file")
 
         (let* ((name (file-name-nondirectory path))
                (date-prefix (or (org-node-extract-file-name-datestamp path)
