@@ -2353,32 +2353,11 @@ Argument INTERACTIVE automatically set."
            ((not (file-writable-p new-path))
             (user-error "No permissions to write a new file at: %s"
                         new-path))
-           ;; A bit unnecessary bc `rename-file' would error too,
-           ;; but at least we didn't kill buffer yet
-           ((file-exists-p new-path)
-            (user-error "Canceled because a file exists at: %s"
-                        new-path))
            ((or (not interactive)
                 (y-or-n-p (format "Rename file %s to %s?" name new-name)))
-            (let* ((pt (point))
-                   (visible-window (get-buffer-window buf))
-                   (window-start (window-start visible-window)))
-              ;; Kill buffer before renaming, because it will not
-              ;; follow the rename
-              (kill-buffer buf)
-              (rename-file path new-path)
-              ;; REVIEW: Use `find-file'?
-              (let ((new-buf (find-file-noselect new-path)))
-                ;; Don't let remaining hooks operate on some random buffer
-                ;; (we are possibly being called in the middle of a hook)
-                (set-buffer new-buf)
-                ;; Helpfully go back to where point was
-                (when visible-window
-                  (set-window-buffer-start-and-point
-                   visible-window new-buf window-start pt))
-                (with-current-buffer new-buf
-                  (goto-char pt)
-                  (if (org-at-heading-p) (org-show-entry) (org-show-context)))))
+            (rename-file path new-path)
+            (with-current-buffer buf
+              (set-visited-file-name new-path t t))
             (message "File %s renamed to %s" name new-name)))))))))
 
 ;; FIXME: Kill opened buffers.  First make sure it can pick up where it left
