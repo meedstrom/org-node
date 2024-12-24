@@ -23,7 +23,7 @@
 ;; The child processes are expected to load this file, execute
 ;; `org-node-parser--collect-dangerously', then die.
 
-;; NOTE: While developing this file, do not eval only specific defuns;
+;; NOTE: While developing, do not eval only specific defuns;
 ;; `el-job--find-lib' needs you to save the file and do `eval-buffer'.
 
 ;;; Code:
@@ -243,7 +243,8 @@ Also set some variables."
 (defun org-node-parser--collect-dangerously (FILE)
   "Dangerous - overwrites the current buffer!
 
-Scan FILE for ID-nodes and links, then return the list of findings."
+Read FILE contents into current buffer, analyze it for ID-nodes, links
+and other data, then return the data."
   (setq org-node-parser--paths-types nil)
   (setq org-node-parser--found-links nil)
   (let (missing-file
@@ -267,7 +268,8 @@ Scan FILE for ID-nodes and links, then return the list of findings."
             (throw 'file-done t))
           ;; Skip symlinks for two reasons:
           ;; - Causes duplicates if the true file is also in the file list.
-          ;; - For performance, the codebase rarely uses `file-truename'.
+          ;; - For performance, the codebase rarely uses `file-truename' or
+          ;;   `file-equal-p'.
           ;; Note that symlinks should not count as missing files, since they
           ;; get re-picked up every time by `org-node-list-files', leading to
           ;; pointlessly repeating `org-node--forget-id-locations'.
@@ -277,14 +279,12 @@ Scan FILE for ID-nodes and links, then return the list of findings."
           (unless (string-suffix-p ".org" FILE)
             (setq missing-file FILE)
             (throw 'file-done t))
-          (setq FILE-START-TIME (current-time))
-          ;; NOTE: Don't use `insert-file-contents-literally'!  It causes wrong
-          ;;       values for HEADING-POS when there is any Unicode in the file
-          ;;       (because it sets `coding-system-for-read' to
-          ;;       `no-conversion').
-          ;;       We get close to its performance just overriding
-          ;;       `coding-system-for-read' to some fixed value and
-          ;;       esp. minimizing `file-name-handler-alist'.
+          ;; NOTE: Don't use `insert-file-contents-literally'!  It sets
+          ;;       `coding-system-for-read' to `no-conversion', which results in
+          ;;       wrong values for HEADING-POS when the file contains Unicode.
+          ;;       We get close to similar performance just overriding
+          ;;       `coding-system-for-read' to some fixed value, and
+          ;;       especially minimizing `file-name-handler-alist'.
           (let ((inhibit-read-only t))
             (erase-buffer)
             (insert-file-contents FILE))
@@ -366,9 +366,12 @@ Scan FILE for ID-nodes and links, then return the list of findings."
               (org-node-parser--collect-links-until END FILE-ID)
 
               ;; NOTE: A plist would be more readable than a record, but then
-              ;;       the mother Emacs has more work to do.  Profiled using:
+              ;;       the mother Emacs has more work to do.
+              ;;       Profiled using this snippet (won't work now):
               ;; (benchmark-run 10 (setq org-node--done-ctr 6) (org-node--handle-finished-job 7 #'org-node--finalize-full))
-              ;;       Result when finalizer passes plists to `org-node--make-obj':
+              ;;
+              ;;       Result when finalizer accepts plists and passes them
+              ;;       to `org-node--make-obj':
               ;; (8.152532984 15 4.110698459000105)
               ;;       Result when finalizer accepts these premade records:
               ;; (5.928453786 10 2.7291036080000595)
@@ -506,6 +509,7 @@ Scan FILE for ID-nodes and links, then return the list of findings."
                       found-nodes))
 
               ;; Heading analyzed, now collect links in entry body!
+
               (setq ID-HERE
                     (or ID
                         (cl-loop for crumb in OLPATH thereis (caddr crumb))
@@ -540,8 +544,8 @@ Scan FILE for ID-nodes and links, then return the list of findings."
                                  (file-attribute-modification-time
                                   (file-attributes FILE)))))))
 
-      ;; Don't crash when there is an error signal, just report it
-      ;; Could have plural problems in future... but one per file is plenty
+      ;; Don't crash when there is an error signal, just report it.
+      ;; Could allow for plural problems here, but one per file is plenty
       (( t error )
        (setq problem (list FILE (point) err))))
 
