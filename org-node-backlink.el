@@ -423,45 +423,49 @@ where backlinks are fixed."
 (defun org-node-backlink--maybe-fix-aggressively (_)
   "Designed for `org-node-rescan-functions'."
   (when org-node-backlink-aggressive
-    (if org-node-perf-eagerly-update-link-tables
-        (let (affected-dests)
-          (cl-loop
-           for (dest . old-links) in org-node--old-link-sets
-           when (cl-set-exclusive-or
-                 (mapcar #'org-node-link-origin old-links)
-                 (mapcar #'org-node-link-origin
-                         (gethash dest org-node--dest<>links))
-                 :test #'equal)
-           do (let* ((id dest)
-                     (node (or (gethash id org-node--id<>node)
-                               (and (setq id (gethash dest org-node--ref<>id))
-                                    (gethash id org-node--id<>node)))))
-                ;; (#59) This could be an empty link like [[id:]]
-                (when node
-                  (push id (alist-get (org-node-get-file-path node)
-                                      affected-dests nil nil #'equal)))))
-          (setq org-node--old-link-sets nil)
-          (cl-loop
-           for (file . ids) in affected-dests
-           when (and (file-readable-p file)
-                     (file-writable-p file))
-           do (org-node--with-quick-file-buffer file
-                :about-to-do "About to fix backlinks"
-                (let ((user-is-editing (buffer-modified-p))
-                      (case-fold-search t))
-                  (dolist (id (delete-dups ids))
-                    (goto-char (point-min))
-                    (when (re-search-forward
-                           (concat "^[\t\s]*:id: +" (regexp-quote id))
-                           nil t)
-                      (org-node-backlink--fix-entry-here)))
-                  (unless user-is-editing
-                    ;; Normally, `org-node--with-quick-file-buffer' only saves
-                    ;; buffers it had to open itself
-                    (let ((before-save-hook nil)
-                          (after-save-hook nil))
-                      (save-buffer)))))))
-      (message "Option `org-node-backlink-aggressive' has no effect when `org-node-perf-eagerly-update-link-tables' is nil"))))
+    (if (not org-node-perf-eagerly-update-link-tables)
+        (message "Option `org-node-backlink-aggressive' has no effect when `org-node-perf-eagerly-update-link-tables' is nil")
+      (let (affected-dests)
+        (cl-loop
+         for (dest . old-links) in org-node--old-link-sets
+         when (cl-set-exclusive-or
+               (mapcar #'org-node-link-origin
+                       old-links)
+               (mapcar #'org-node-link-origin
+                       (gethash dest org-node--dest<>links))
+               :test #'equal)
+         do (let* ((id dest)
+                   (node (or (gethash id org-node--id<>node)
+                             (and (setq id (gethash dest org-node--ref<>id))
+                                  (gethash id org-node--id<>node)))))
+              ;; (#59) Do nothing if this is empty link like [[id:]]
+              (when node
+                (push id (alist-get (org-node-get-file-path node)
+                                    affected-dests
+                                    nil
+                                    nil
+                                    #'equal)))))
+        (setq org-node--old-link-sets nil)
+        (cl-loop
+         for (file . ids) in affected-dests
+         when (and (file-readable-p file)
+                   (file-writable-p file))
+         do (org-node--with-quick-file-buffer file
+              :about-to-do "About to fix backlinks"
+              (let ((user-is-editing (buffer-modified-p))
+                    (case-fold-search t))
+                (dolist (id (delete-dups ids))
+                  (goto-char (point-min))
+                  (when (re-search-forward
+                         (concat "^[\t\s]*:id: +" (regexp-quote id))
+                         nil t)
+                    (org-node-backlink--fix-entry-here)))
+                (unless user-is-editing
+                  ;; Normally, `org-node--with-quick-file-buffer' only saves
+                  ;; buffers it had to open itself
+                  (let ((before-save-hook nil)
+                        (after-save-hook nil))
+                    (save-buffer))))))))))
 
 (provide 'org-node-backlink)
 
