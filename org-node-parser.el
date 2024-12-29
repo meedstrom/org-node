@@ -275,10 +275,6 @@ and other data, then return the data."
           ;; pointlessly repeating `org-node--forget-id-locations'.
           (when (file-symlink-p FILE)
             (throw 'file-done t))
-          ;; Transitional cleanup due to bug fixed in commit f900975
-          (unless (string-suffix-p ".org" FILE)
-            (setq missing-file FILE)
-            (throw 'file-done t))
           ;; NOTE: Don't use `insert-file-contents-literally'!  It sets
           ;;       `coding-system-for-read' to `no-conversion', which results in
           ;;       wrong values for HEADING-POS when the file contains Unicode.
@@ -290,7 +286,6 @@ and other data, then return the data."
             (insert-file-contents FILE))
           ;; Verify there is at least one ID-node
           (unless (re-search-forward "^[\t\s]*:id: " nil t)
-            (setq missing-file FILE) ;; Transitional cleanup
             (throw 'file-done t))
           (goto-char 1)
 
