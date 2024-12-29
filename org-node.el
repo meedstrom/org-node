@@ -198,7 +198,7 @@ Picking a specific coding system can speed up `org-node-reset'.
 Set nil to let Emacs figure it out anew on every file.
 
 This setting is likely only noticeable if `el-job--cores' is low \(1-3\)
-or you have One Giant Org-File.
+or you have one giant Org file.
 
 On MS Windows this probably should be nil.  Same if you access
 your files from multiple platforms.
@@ -218,7 +218,7 @@ Fortunately it is rarely needed, since the insert-link advices of
 `org-node-cache-mode' will already record links added during
 normal usage!
 
-Other issues are corrected when `org-node--idle-timer' fires.
+Other issues are corrected anyway when `org-node--idle-timer' fires.
 These temporary issues are:
 
 1. deleted links remain in the table, leading to undead backlinks
@@ -292,9 +292,12 @@ NOT applied by `org-node-fakeroam-new-via-roam-capture' -- see
 org-roam\\='s `org-roam-capture-new-node-hook' instead.
 
 A good function for this hook is `org-node-put-created', since
-the default `org-node-datestamp-format' is empty.  In the
-author\\='s experience, recording the creation-date somewhere may
-prove useful later on, e.g. when publishing to a blog."
+the default `org-node-datestamp-format' is empty.
+
+In the author\\='s experience, recording the creation-date somewhere may
+prove useful later on, e.g. when publishing to a blog.
+
+Filesystem creation-time cannot be relied on."
   :type 'hook)
 
 (defcustom org-node-extra-id-dirs nil
@@ -332,7 +335,7 @@ backups, causing org-id to complain about duplicate IDs, configure
 
 This option only influences which files under `org-node-extra-id-dirs'
 should be scanned.  It is meant as a way to avoid collecting IDs inside
-versioned backup files or other noise.
+versioned backup files and other noise.
 
 For all other \"excludey\" purposes, you probably mean to configure
 `org-node-filter-fn' instead.
@@ -2240,7 +2243,8 @@ to false positives, if you have been changing formats over time."
 
 (defcustom org-node-renames-allowed-dirs nil
   "Dirs in which files may be auto-renamed.
-Used if you have `org-node-rename-file-by-title' on a save-hook.
+Used if you have the function `org-node-rename-file-by-title' on
+`after-save-hook' or similar place.
 
 To add exceptions, see `org-node-renames-exclude'."
   :type '(repeat string))

@@ -324,9 +324,11 @@ your definitions."
   "Alist of data for each node sequence.")
 
 (defun org-node-seq--add-item (&optional key)
-  "Look at node near point to maybe add an item to a node seq.
-Only do something if `org-node-proposed-sequence' is non-nil
-currently."
+  "Analyze node near point to maybe grow a node seq.
+
+The sequence is identified either by KEY, or if that is nil, by the
+current value of `org-node-proposed-sequence'.  If that is also nil, do
+nothing."
   (when (or key org-node-proposed-sequence)
     (let* ((seq (cdr (assoc (or key org-node-proposed-sequence)
                             org-node-seqs)))

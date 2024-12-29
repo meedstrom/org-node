@@ -120,7 +120,7 @@ I like @uref{https://github.com/org-roam/org-roam, org-roam} but found it too sl
 
 With optional shims, you can even @strong{skip syncing the org-roam DB} and continue using its rich backlinks buffer!
 
-In pursuit of being "just org-id", this package has no equivalent setting to @samp{org-roam-directory} -- it just looks up @samp{org-id-locations}.
+In pursuit of being "just org-id", this package has no equivalent setting to @samp{org-roam-directory} -- it just looks up the @samp{org-id-locations} table.
 
 @item
 @strong{If you were not using org-roam}, maybe think of it as somewhat like @uref{https://github.com/alphapapa/org-recent-headings, org-recent-headings} tooled-up to the extent that you won't need other methods of browsing, as long as you give IDs to all objects of interest.

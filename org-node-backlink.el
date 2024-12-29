@@ -400,6 +400,8 @@ it in the nearby :BACKLINKS: property."
 (defcustom org-node-backlink-aggressive nil
   "On save, detect added/deleted links and fix backlinks.
 
+Only has an effect as long as `org-node-backlink-mode' is enabled.
+
 Normally, links added via most commands will also insert a backlink in
 real time, but stale backlinks are not cleaned until you carry out some
 edits under the heading that has the stale backlink, and save that
