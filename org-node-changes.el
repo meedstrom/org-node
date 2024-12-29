@@ -45,13 +45,11 @@
    'org-node "Update compat.el to use this version of org-node"))
 
 (defvar org-node-changes--new-names
-  '(;; Later (in Dec):
-    (org-node-built-series org-node-seqs)
+  '((org-node-built-series org-node-seqs)
     (org-node-series-defs org-node-seq-defs)
-    (org-node-current-series-key org-node-seq--current-key "30 November 2024")
-    (org-node--series org-node-seqs "30 November 2024"))
+    (org-node-current-series-key org-node-seq--current-key))
   "Alist of deprecated symbol names and their new names.
-Names here will be loudly complained-about.")
+Names here will cause complaints if bound.")
 
 (defvar org-node-changes--warned-roam-id nil
   "Non-nil if did warn about org-roam overriding a link parameter.")
@@ -64,23 +62,26 @@ Then copy the value in the old name so that the new name gets the same
 value.
 
 Then do other one-shot warnings while we\\='re at it."
-  (while-let ((row (pop org-node-changes--new-names)))
-    (seq-let (old new removed-by) row
-      (unless removed-by
-        (setq removed-by "30 January 2025"))
-      (when (boundp old)
-        (if new
-            (progn
-              (lwarn 'org-node :warning "Your initfiles set old variable: %S, will be REMOVED by %s.  Please use new name: %S"
-                     old removed-by new)
-              (set new (symbol-value old)))
-          (lwarn 'org-node :warning "Your initfiles set removed variable: %S" old)))
-      (when (and old (where-is-internal old))
-        (if new
-            (lwarn 'org-node :warning "Your initfiles key-bind an old command name: %S.  Please use new name: %S"
-                   old new)
-          (lwarn 'org-node :warning "Your initfiles key-bind a removed command: %S"
-                 old)))))
+  (let ((names org-node-changes--new-names))
+    (while-let ((row (pop names)))
+      (seq-let (old new removed-by) row
+        (unless removed-by
+          (setq removed-by "30 January 2025"))
+        (when (boundp old)
+          (if new
+              (progn
+                (lwarn 'org-node :warning "Your initfiles set old variable: %S, will be REMOVED by %s.  Please use new name: %S"
+                       old removed-by new)
+                (set new (symbol-value old)))
+            (lwarn 'org-node :warning "Your initfiles set removed variable: %S" old))
+          (set old nil)
+          (makunbound old))
+        (when (and old (where-is-internal old))
+          (if new
+              (lwarn 'org-node :warning "Your initfiles key-bind an old command name: %S.  Please use new name: %S"
+                     old new)
+            (lwarn 'org-node :warning "Your initfiles key-bind a removed command: %S"
+                   old))))))
   ;; 2024-10-18
   (unless org-node-changes--warned-roam-id
     (when (and (not (and (bound-and-true-p org-roam-autosync-mode)
