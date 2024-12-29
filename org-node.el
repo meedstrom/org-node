@@ -18,7 +18,7 @@
 ;; Author:           Martin Edström <meedstrom91@gmail.com>
 ;; Created:          2024-04-13
 ;; Keywords:         org, hypermedia
-;; Package-Requires: ((emacs "28.1") (compat "30") (el-job "0.3.14") (llama "0.4.0"))
+;; Package-Requires: ((emacs "28.1") (compat "30") (el-job "0.3.18") (llama "0.4.0"))
 ;; URL:              https://github.com/meedstrom/org-node
 
 ;; NOTE: Looking for Package-Version?
@@ -1669,59 +1669,39 @@ belonging to an alphabet or number system."
   "Key that identifies a node sequence about to be added-to.
 Automatically set, should be nil most of the time.")
 
-;; NOTE: This used to happen, don't think it does anymore. 2024-11-18
-(defun org-node--purge-backup-file-names ()
-  "Clean backup names accidentally added to org-id database."
-  (setq org-id-files (seq-remove #'backup-file-name-p org-id-files))
-  (setq org-id-locations
-        (org-id-alist-to-hash
-         (cl-loop for entry in (org-id-hash-to-alist org-id-locations)
-                  unless (backup-file-name-p (car entry))
-                  collect entry))))
-
 (defun org-node--goto (node)
   "Visit NODE."
   (if node
       (let ((file (org-node-get-file-path node)))
-        (if (backup-file-name-p file)
-            ;; Transitional; handle-save doesn't record backup files anymore
+        (if (file-exists-p file)
             (progn
-              (message "org-node: Somehow recorded backup file, resetting...")
-              (org-node--purge-backup-file-names)
-              (push (lambda ()
-                      (message "org-node: Somehow recorded backup file, resetting... done"))
-                    org-node--temp-extra-fns)
-              (org-node--scan-all))
-          (if (file-exists-p file)
-              (progn
-                (when (not (file-readable-p file))
-                  (error "org-node: Couldn't visit unreadable file %s" file))
-                (let ((pos (org-node-get-pos node)))
-                  (find-file file)
-                  (widen)
-                  ;; Now `save-place-find-file-hook' has potentially already
-                  ;; moved point, and that could be good enough.  So: move
-                  ;; point to node heading, unless heading is already inside
-                  ;; visible part of buffer and point is at or under it
-                  (if (org-node-get-is-subtree node)
-                      (progn
-                        (unless (and (pos-visible-in-window-p pos)
-                                     (not (org-invisible-p pos))
-                                     (equal (org-node-get-title node)
-                                            (org-get-heading t t t t)))
+              (when (not (file-readable-p file))
+                (error "org-node: Couldn't visit unreadable file %s" file))
+              (let ((pos (org-node-get-pos node)))
+                (find-file file)
+                (widen)
+                ;; Now `save-place-find-file-hook' has potentially already
+                ;; moved point, and that could be good enough.  So: move
+                ;; point to node heading, unless heading is already inside
+                ;; visible part of buffer and point is at or under it
+                (if (org-node-get-is-subtree node)
+                    (unless (and (pos-visible-in-window-p pos)
+                                 (not (org-invisible-p pos))
+                                 (equal (org-node-get-title node)
+                                        (org-get-heading t t t t)))
 
-                          (goto-char pos)
-                          (if (org-at-heading-p)
-                              (org-show-entry)
-                            (org-show-context))
-                          (recenter 0)))
-                    (unless (pos-visible-in-window-p pos)
-                      (goto-char pos)))))
-            (message "org-node: Didn't find file, resetting...")
-            (push (lambda ()
-                    (message "org-node: Didn't find file, resetting... done"))
-                  org-node--temp-extra-fns)
-            (org-node--scan-all))))
+                      (goto-char pos)
+                      (if (org-at-heading-p)
+                          (org-show-entry)
+                        (org-show-context))
+                      (recenter 0))
+                  (unless (pos-visible-in-window-p pos)
+                    (goto-char pos)))))
+          (message "org-node: Didn't find file, resetting...")
+          (push (lambda ()
+                  (message "org-node: Didn't find file, resetting... done"))
+                org-node--temp-extra-fns)
+          (org-node--scan-all)))
     (error "`org-node--goto' received a nil argument")))
 
 ;; TODO: "Create" sounds unspecific, rename to "New node"?
@@ -3366,6 +3346,11 @@ If already visiting that node, then follow the link normally."
 
 ;;;; API not used inside this package
 
+(defun org-node-id-at-point ()
+  "Get the ID property in entry at point or some ancestor."
+  (declare (obsolete org-entry-get-with-inheritance "2024-11-18"))
+  (org-entry-get-with-inheritance "ID"))
+
 (defun org-node-at-point ()
   "Return the ID-node near point.
 
@@ -3382,31 +3367,22 @@ heading, else the file-level node, whichever has an ID first."
 
 ;;; Obsolete
 
-;; 2024-11-18 Let's see if `org-entry-get-with-inheritance' is sufficient.
-;; Fail loudly if it turns out not up to the job.
-(defun org-node-id-at-point ()
-  "Get ID for current entry or up the outline tree."
-  (declare (obsolete 'org-entry-get-with-inheritance "2024-11-18"))
-  (save-excursion
-    (without-restriction
-      (or (org-entry-get-with-inheritance "ID")
-          (when-let ((alt-result (progn (goto-char (point-min))
-                                        (org-entry-get-with-inheritance "ID"))))
-            (message "org-node: `org-entry-get-with-inheritance' did not get file-level ID, please report to let me know")
-            alt-result)))))
+(defun org-node--purge-backup-file-names ()
+  "Clean backup names accidentally added to org-id database."
+  (setq org-id-files (seq-remove #'backup-file-name-p org-id-files))
+  (setq org-id-locations
+        (org-id-alist-to-hash
+         (cl-loop for entry in (org-id-hash-to-alist org-id-locations)
+                  unless (backup-file-name-p (car entry))
+                  collect entry))))
 
-;; now only used by fakeroam
 (defun org-node--tmpfile (&optional basename &rest args)
   "Return a path that puts BASENAME in a temporary directory.
 As a nicety, `format' BASENAME with ARGS too.
 
-Unlike `make-temp-file', do not add characters.
-
-On most systems, the resulting string will be
-/tmp/org-node/BASENAME, but it depends on
-OS and variable `temporary-file-directory'."
-  ;; Just in case anyone runs into issue #72.
-  ;; https://github.com/meedstrom/org-node/issues/72
+On most Unix systems, the resulting string will be
+/tmp/org-node/BASENAME."
+  (declare (obsolete org-node-fakeroam--tmpfile "2024-12-24"))
   (mkdir (file-name-concat temporary-file-directory "org-node")
          t)
   (file-name-concat temporary-file-directory

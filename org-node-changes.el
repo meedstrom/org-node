@@ -56,7 +56,6 @@ Names here will be loudly complained-about.")
 (defvar org-node-changes--warned-roam-id nil
   "Non-nil if did warn about org-roam overriding a link parameter.")
 
-(defvar org-node-changes--warned-once nil)
 (defun org-node-changes--warn-and-copy ()
   "Maybe print one-shot warnings, then become a no-op.
 
@@ -92,13 +91,7 @@ Then do other one-shot warnings while we\\='re at it."
        "%s" "Note: org-roam overrides ID-link behavior, you may want to
       revert to vanilla by evalling:
       (org-link-set-parameters
-       \"id\" :follow #'org-id-open :store #'org-id-store-link-maybe)")))
-  (unless org-node-changes--warned-once
-    (setq org-node-changes--warned-once t)
-    ;; 2024-11-27: In case children are running old bytecode of
-    ;; org-node-parser, which expected this directory to exist.  The version
-    ;; mismatch will still break things, but with different messages.
-    (mkdir (file-name-concat temporary-file-directory "org-node") t)))
+       \"id\" :follow #'org-id-open :store #'org-id-store-link-maybe)"))))
 
 (defmacro org-node-changes--def-whiny-alias (old new &optional when interactive removed-by)
   "Define function OLD as effectively an alias for NEW.
@@ -128,13 +121,6 @@ Then re-define this function so it is just that function."
        'org-node "Your initfiles use old function name `org-node-get-tags'. Use either `org-node-get-tags-local' or `org-node-get-tags-with-inheritance'.")
       (define-obsolete-function-alias
         'org-node-get-tags 'org-node-get-tags-local "2024-10-22"))))
-
-;; 2024-09-17
-;; NOTE: Can't mark as obsolete here, it has be done inside that library
-(declare-function org-node-fakeroam-new-via-roam-capture "org-node-fakeroam")
-(declare-function org-node-fakeroam-slugify-via-roam "org-node-fakeroam")
-(defalias 'org-node-new-via-roam-capture #'org-node-fakeroam-new-via-roam-capture)
-(defalias 'org-node-slugify-like-roam-actual #'org-node-fakeroam-slugify-via-roam)
 
 ;; 1.9.0 (2024-11-18) moved series-related code into its own file, whereupon
 ;; the namespace had to be made consistent.
