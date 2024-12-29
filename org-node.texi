@@ -986,7 +986,7 @@ With @uref{https://github.com/radian-software/straight.el, Straight}:
 @node Match fakeroam version
 @subsection Match fakeroam version
 
-The extension @uref{https://github.com/meedstrom/org-node-fakeroam, org-node-fakeroam} has been tightly coupled with contemporary versions of org-node, but hopefully I've made it warn about any version mismatch at load-time.
+The extension @uref{https://github.com/meedstrom/org-node-fakeroam, org-node-fakeroam} has been tightly coupled with contemporary versions of org-node, but hopefully it will warn about any version mismatch at load-time.
 
 Just in case, the release history:
 @itemize
@@ -1000,6 +1000,8 @@ Just in case, the release history:
 2024-11-14: org-node v1.8
 @item
 2024-11-18: org-node v1.9 and org-node-fakeroam v1.6
+@item
+2024-12-29: org-node-fakeroam v1.7
 @end itemize
 
 @node What version is installed?
