@@ -837,7 +837,7 @@ SYNCHRONOUS t, unless SYNCHRONOUS is the symbol `must-async'."
   (when (eq t synchronous)
     ;; Block until all processes finish
     (if org-node-cache-mode
-        (el-job--await 'org-node 9 "org-node first-time caching...")
+        (el-job--await 'org-node 9 "org-node caching...")
       (el-job--await 'org-node 9 "org-node caching... (Hint: Avoid this hang by enabling org-node-cache-mode early)"))))
 
 ;; BUG: A heisenbug lurks inside (or is revealed by) org-id.
@@ -3375,19 +3375,6 @@ heading, else the file-level node, whichever has an ID first."
          (cl-loop for entry in (org-id-hash-to-alist org-id-locations)
                   unless (backup-file-name-p (car entry))
                   collect entry))))
-
-(defun org-node--tmpfile (&optional basename &rest args)
-  "Return a path that puts BASENAME in a temporary directory.
-As a nicety, `format' BASENAME with ARGS too.
-
-On most Unix systems, the resulting string will be
-/tmp/org-node/BASENAME."
-  (declare (obsolete org-node-fakeroam--tmpfile "2024-12-24"))
-  (mkdir (file-name-concat temporary-file-directory "org-node")
-         t)
-  (file-name-concat temporary-file-directory
-                    "org-node"
-                    (when basename (apply #'format basename args))))
 
 (provide 'org-node)
 

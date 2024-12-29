@@ -145,6 +145,20 @@ Then re-define this function so it is just that function."
 (define-obsolete-variable-alias 'org-node-proposed-series-key 'org-node-proposed-sequence  "2024-11-18")
 (org-node-changes--def-whiny-alias 'org-node--add-series-item 'org-node-seq--add-item "2024-11-18")
 
+(defun org-node--tmpfile (&optional basename &rest args)
+  "Return a path that puts BASENAME in a temporary directory.
+As a nicety, `format' BASENAME with ARGS too.
+
+On most Unix systems, the resulting string will be
+/tmp/org-node/BASENAME."
+  (display-warning 'org-node
+                   "Old function `org-node--tmpfile' will be removed on 10 January 2025; please update org-node-fakeroam and call `org-node-fakeroam--tmpfile'")
+  (mkdir (file-name-concat temporary-file-directory "org-node")
+         t)
+  (file-name-concat temporary-file-directory
+                    "org-node"
+                    (when basename (apply #'format basename args))))
+
 (provide 'org-node-changes)
 
 ;;; org-node-changes.el ends here

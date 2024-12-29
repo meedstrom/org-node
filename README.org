@@ -16,7 +16,7 @@ I like [[https://github.com/org-roam/org-roam][org-roam]] but found it too slow,
 
   With optional shims, you can even *skip syncing the org-roam DB* and continue using its rich backlinks buffer!
 
-  In pursuit of being "just org-id", this package has no equivalent setting to =org-roam-directory= -- it just looks up =org-id-locations=.
+  In pursuit of being "just org-id", this package has no equivalent setting to =org-roam-directory= -- it just looks up the =org-id-locations= table.
 
 - *If you were not using org-roam*, maybe think of it as somewhat like [[https://github.com/alphapapa/org-recent-headings][org-recent-headings]] tooled-up to the extent that you won't need other methods of browsing, as long as you give IDs to all objects of interest.
 
