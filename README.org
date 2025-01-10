@@ -305,9 +305,11 @@ To customize how the nodes look in the minibuffer, configure =org-node-affixatio
 
     : M-x customize-variable RET org-node-affixation-fn RET
 
-A related variable is =org-node-alter-candidates=.  Read its docstring.
+A related option is =org-node-alter-candidates=, which lets you match against the annotations as well as the title:
 
-    : M-x customize-variable RET org-node-affixation-fn RET
+#+begin_src elisp
+(setq org-node-alter-candidates t)
+#+end_src
 
 ** Grep
 
