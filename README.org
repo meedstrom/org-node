@@ -40,7 +40,7 @@ Once a subtree has an ID you can link to, it's a "node" because it has joined th
 
 ** Features
 
-A comparison of three similar systems, which permit relying on org-id and don't lock you into concept of "one-note-per-file".
+A comparison of three systems that all permit relying on org-id and don't lock you into the concept of "one-note-per-file".
 
 | Feature                        | org-roam | org-node           | [[https://github.com/toshism/org-super-links][org-super-links]]      |
 |--------------------------------+----------+--------------------+----------------------|
@@ -148,9 +148,11 @@ Then enable the following global mode, which keeps these properties updated.
 (org-node-backlink-mode)
 #+end_src
 
-NOTE 1: To be clear, this never generates new IDs.  That's your own business.  This only adds/edits :BACKLINKS: properties, and no backlink will appear that correspond to a link if the context for that link has no ID among any outline ancestor.
+NOTE 1: To be clear, this never generates new IDs.  That's your own business.  This only adds/edits =:BACKLINKS:= properties.
 
-NOTE 2: By default, the setting =org-node-backlink-aggressive= is nil, so that stale backlinks are not cleaned until you carry out some edits under an affected heading and then save the file, which fixes that heading's :BACKLINKS: property.  If you'd like it to be more proactive, set t:
+That also means that *not every link causes a backlink to pop into existence,* only links located in an entry that has an ID.  After all, there must be something to link back to :)
+
+NOTE 2: By default, the setting =org-node-backlink-aggressive= is nil, so stale backlinks are not cleaned until you carry out some edits under an affected heading and then save the file, which fixes that heading's =:BACKLINKS:= property.  If you'd like it to be more proactive, set it to t:
 
 #+begin_src elisp
 (setq org-node-backlink-aggressive t)
@@ -188,13 +190,13 @@ Do a =M-x org-node-reset= and see if it can find your notes now.
 
 If you have org-roam loaded, but no longer update the DB, opening a link can sometimes send you to an outdated file path due to [[https://github.com/org-roam/org-roam/blob/2a630476b3d49d7106f582e7f62b515c62430714/org-roam-id.el#L91][a line in org-roam-id.el]] that causes org-id to /preferentially/ look up the org-roam DB instead of org-id's own table!
 
-Either revert that with the following snippet, or if [[https://github.com/meedstrom/org-node-fakeroam][Fakeroam]] can cover your needs, simply delete the Roam DB (at "~/.emacs.d/org-roam.db").
+Either revert that with the following snippet, or the extension [[https://github.com/meedstrom/org-node-fakeroam][org-node-fakeroam]] covers your needs, simply delete the DB (located at "~/.emacs.d/org-roam.db").
 
 #+begin_src elisp
 ;; Undo a Roam override
 (with-eval-after-load 'org-roam-id
-  ;; Restore default for Org 9.1 through 9.7+
   (org-link-set-parameters
+   ;; This was default value at least from Org 9.1 to 9.7+
    "id" :follow #'org-id-open :store #'org-id-store-link-maybe))
 #+end_src
 
@@ -202,7 +204,7 @@ Either revert that with the following snippet, or if [[https://github.com/meedst
 
 One user had over a thousand project-nodes, but only just began to do a knowledge base, and wished to avoid seeing the project nodes.
 
-This could work by, for example, excluding a "project" tag and excluding any note that has a TODO state:
+This could work by---for example---excluding anything tagged "project" or perhaps anything that has a TODO state.  This excludes both:
 
 #+begin_src elisp
 (setq org-node-filter-fn
@@ -214,12 +216,12 @@ This could work by, for example, excluding a "project" tag and excluding any not
              (assoc "ROAM_EXCLUDE" (org-node-get-properties node))))))
 #+end_src
 
-Or you could go with a whitelist approach, to see only nodes from a certain directory we'll call "my-wiki":
+Or you could go with a whitelist approach, to show only nodes from a certain directory we'll call "my-personal-wiki":
 
 #+begin_src elisp
 (setq org-node-filter-fn
       (lambda (node)
-        (and (string-search "/my-wiki/" (org-node-get-file-path node))
+        (and (string-search "/my-personal-wiki/" (org-node-get-file-path node))
              (not (assoc "ROAM_EXCLUDE" (org-node-get-properties node))))))
 #+end_src
 
@@ -229,11 +231,13 @@ Or you could go with a whitelist approach, to see only nodes from a certain dire
 
 Let's say you have a big archive file, fulla IDs, and you want all the nodes within out of sight.
 
+# (simply giving it the file name extension =.org_archive= would do it)
+
 Putting a =:ROAM_EXCLUDE: t= at the top won't do it, because unlike in org-roam, *child ID nodes of an excluded node are not excluded!*  The =org-node-filter-fn= applies its ruleset to each node in isolation.
 
 However, nodes in isolation do still have inherited tags.  So you can exploit that, or the outline path or file name.
 
-Really, filename!  Even though a big selling point of IDs is that you avoid depending on filenames, it's pragmatic to let up on principles sometimes :-)  It works well for me to filter out any file or directory that happens to contain "archive" in the name:
+It works well for me to filter out any file or directory that happens to contain "archive" in the name:
 
 #+begin_src elisp
 (setq org-node-filter-fn
@@ -285,7 +289,7 @@ With that done, you can optionally configure the everyday commands =org-node-fin
 (setq org-node-creation-fn #'org-capture)
 #+end_src
 
-That last optional functionality may be confusing if I describe it -- better you try and see if you like.
+That last optional functionality may be confusing if I describe it -- better you give it a spin and see if you like.
 
 ** Completion-at-point
 To complete words at point into known node titles:
@@ -297,13 +301,13 @@ To complete words at point into known node titles:
 
 ** FAQ: Any analogue to =org-roam-node-display-template=?
 
-Want to customize how the nodes look in the minibuffer?
-
-Configure =org-node-affixation-fn=:
+To customize how the nodes look in the minibuffer, configure =org-node-affixation-fn=:
 
     : M-x customize-variable RET org-node-affixation-fn RET
 
 A related variable is =org-node-alter-candidates=.  Read its docstring.
+
+    : M-x customize-variable RET org-node-affixation-fn RET
 
 ** Grep
 

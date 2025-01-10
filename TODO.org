@@ -2,15 +2,15 @@
 
 - [ ] Unify some subroutines for capture/refile/extract/insert/find
 
-- [ ] In 2025: drop Emacs 28
+- [ ] Mid-2025: drop Emacs 28
 
-  Seems that Debian stable will be stuck on Emacs 28 until mid-2025,
-  then likely leap to Emacs 30.
+  (Seems that Debian stable will be stuck on Emacs 28 until mid-2025,
+  then likely leap to Emacs 30.)
 
-  List of 28-isms and 29-isms to drop in future
+  List of 28-isms and 29-isms to drop
 
   - =(cadar (org-collect-keywords "TITLE"))= -> =(org-get-title)=
-  - =;;;###autoload (autoload 'org-node-series-dispatch "org-node" nil t)=
+  - =;;;###autoload (autoload 'org-node-seq-dispatch "org-node" nil t)=
     - In Emacs 30, replace with just =;;;###autoload=
   - any code gated on =emacs-major-version=
   - any usages of =compat-call=
@@ -20,21 +20,21 @@
 
 * Other
 
-- [ ] Manage org-super-links drawers
+- [ ] Absorb org-roam's backlink buffer https://github.com/meedstrom/org-node/issues/74
 
-- [ ] With the above fixed, it'll be close at hand to make a RELATED-drawer, another concept from org-super-links
+- [ ] Manage BACKLINKS drawers (like [[https://github.com/toshism/org-super-links][org-super-links]])
 
-- [ ] A workflow to allow untitled nodes (e.g. numeric-titled)
+- [ ] Manage RELATED drawers (just because it would be easy after the above is done)
 
-  Already =org-node-grep= can be considered an equivalent to =org-node-find= (except it does not create new nodes) so we "just" need an equivalent to =org-node-insert-link=.  Basically, capture, refile, and insert-link would probably all reuse a subroutine for *identifying a node by a grep result.*
+- [ ] =org-node-seq-dispatch=: Free up keys "j", "n", "p", "c"
 
-- [ ] For even more perf (unnecessary): keep subprocesses alive, or track all data that came from each file so as to not re-scan if mtime has not changed, or both
+- [ ] A workflow to allow untitled nodes (actually pseudo-untitled, the title would be an auto-assigned number)
 
-- [ ] org-node-seq-dispatch: Free up keys "j" "n" "p", "c"
+  Already =org-node-grep= can be considered an equivalent to =org-node-find= (except it does not create new nodes).  We "just" need an equivalent to =org-node-insert-link=.  Basically, capture, refile, and insert-link would probably all reuse a subroutine for *identifying a node by a grep result.*
 
 - [ ] More org-node-seq-defs wrappers:
 
-  - [ ] Define a seq from the links the body text of a single "master node" if that node has a tag such as :seq:
+  - [ ] Point at single "master node" that defines a seq: links in the body text are the seq.
 
   - [ ] Define a seq from simply the files in a subdirectory with a given name
 

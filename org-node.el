@@ -381,19 +381,29 @@ After changing this setting, run \\[org-node-reset]."
   :type 'boolean
   :set #'org-node--set-and-remind-reset)
 
+;; NOTE: For context see :affixation-function in `completion-extra-properties',
+;; however the following function is expected to operate on one candidate at a
+;; time, instead of a list.  The code flow is a bit roundabout, but the results
+;; are ultimately used by `org-node-collection'.
 (defcustom org-node-affixation-fn #'org-node-prefix-with-olp
   "Function to give prefix and suffix to completion candidates.
 
 The results will style the appearance of completions during
 \\[org-node-find], \\[org-node-insert-link] et al.
 
-To read more about affixations, see docstring of
-`completion-extra-properties', however this function operates on
-one candidate at a time, not the whole collection.
+Built-in choices:
 
-It receives two arguments: NODE and TITLE, and it must return a
-list of three strings: title, prefix and suffix.  The prefix and
-suffix can be nil.  Title should be TITLE unmodified.
+- `org-node-affix-bare'
+- `org-node-prefix-with-olp'
+- `org-node-prefix-with-tags'
+- `org-node-affix-with-olp-and-tags'
+
+------
+Info for writing a custom function
+
+The function receives two arguments: NODE and TITLE, and it must return
+a list of three strings: title, prefix and suffix.  The prefix and
+suffix can be nil.  The returned title should just be TITLE unmodified.
 
 NODE is an object which form you can observe in examples from
 \\[org-node-peek] and specified in type `org-node'
@@ -1579,7 +1589,7 @@ Behavior depends on the user option `org-node-ask-directory'."
 Example from Org-roam: %Y%m%d%H%M%S-
 Example from Denote: %Y%m%dT%H%M%S--
 
-For the part after the datestamp, configure `org-node-slug-fn'."
+For the rest of the filename, configure `org-node-slug-fn'."
   :type 'string)
 
 (defcustom org-node-slug-fn #'org-node-slugify-for-web
@@ -2336,11 +2346,11 @@ Argument INTERACTIVE automatically set."
             (error "No permissions to rename file: %s"
                    path))
            ((or (not interactive)
-                (y-or-n-p (format "Rename file %s to %s?" name new-name)))
+                (y-or-n-p (format "Rename file '%s' to '%s'?" name new-name)))
             (rename-file path new-path)
             (with-current-buffer buf
               (set-visited-file-name new-path t t))
-            (message "File %s renamed to %s" name new-name)))))))))
+            (message "File '%s' renamed to '%s'" name new-name)))))))))
 
 ;; FIXME: Kill opened buffers.  First make sure it can pick up where it left
 ;;        off.  Maybe use `org-node--in-files-do'.

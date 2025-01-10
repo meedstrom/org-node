@@ -39,7 +39,8 @@
     (key name prop &optional capture)
   "Define a sequence sorted by property PROP.
 If an ID-node does not have property PROP, it is excluded.
-KEY, NAME and CAPTURE explained in `org-node-seq-defs'."
+
+For KEY, NAME and CAPTURE, see `org-node-seq-defs'."
   `(,key
     :name ,name
     :version 2
@@ -68,8 +69,13 @@ KEY, NAME and CAPTURE explained in `org-node-seq-defs'."
 (defun org-node-seq-def-on-tags-sort-by-property
     (key name tags prop &optional capture)
   "Define a sequence filtered by TAGS sorted by property PROP.
+If a node does not have property PROP, it is excluded.
 TAGS is a string of tags separated by colons.
-KEY, NAME and CAPTURE explained in `org-node-seq-defs'."
+
+Tag inheritance does not apply; a node must have one or more of TAGS
+itself, even if a parent in the outline tree also has them.
+
+For KEY, NAME and CAPTURE, see `org-node-seq-defs'."
   `(,key
     :name ,name
     :version 2
@@ -109,14 +115,21 @@ KEY, NAME and CAPTURE explained in `org-node-seq-defs'."
 ;;;###autoload
 (defun org-node-seq-def-on-filepath-sort-by-basename
     (key name dir &optional capture date-picker)
-  "Define a sequence of files located under DIR.
-The files need not contain a top-level property drawer with an ID, but
+  "Define a sequence as all files under directory DIR.
+The files need not contain a top-level property drawer, but
 they do need to contain at least one ID-node.
 
-KEY, NAME and CAPTURE explained in `org-node-seq-defs'.
+For KEY, NAME and CAPTURE, see `org-node-seq-defs'.
 
 When optional argument DATE-PICKER is non-nil, let the prompter use the
-Org date picker.  This needs file basenames in YYYY-MM-DD format."
+interactive Org date picker.
+
+\(Tip: No idea how to use the Org date picker?  See `org-read-date'!)
+\(Tip: If you never make notes for the future, you might prefer setting
+       `org-read-date-prefer-future' to nil.)
+
+For the date-picker to work as expected, you need file names in
+YYYY-MM-DD format, e.g. \"2024-01-31.org\"."
   (setq dir (abbreviate-file-name (file-truename dir)))
   `(,key
     :name ,name
@@ -131,7 +144,6 @@ Org date picker.  This needs file basenames in YYYY-MM-DD format."
                 (when (string-prefix-p ,dir buffer-file-truename)
                   (file-name-base buffer-file-truename)))
     :prompter (lambda (key)
-                ;; Tip: Consider `org-read-date-prefer-future' nil
                 (if ,date-picker
                     (let ((org-node-seq-that-marks-calendar key))
                       (org-read-date))
@@ -220,6 +232,7 @@ format-constructs occur before these."
           (if (seq-some #'null (list pos-year pos-month pos-day))
               (progn (cl-assert pos-ymd)
                      (substring instance pos-ymd (+ pos-ymd 10)))
+            ;; TODO: Explanatory comment please
             (when (> pos-month pos-year) (cl-incf pos-month 2))
             (when (> pos-day pos-year) (cl-incf pos-day 2))
             (concat (substring instance pos-year (+ pos-year 4))
