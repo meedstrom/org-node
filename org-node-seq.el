@@ -196,15 +196,23 @@ On success, return non-nil; else nil.  Never create FILE anew."
       (when (file-readable-p file)
         (find-file file)))))
 
+;; REVIEW: Rename?
+;; (defalias 'org-node-seq-try-goto-file 'org-node-seq-try-visit-file)
+
 ;;;###autoload
 (defun org-node-seq-filename->ymd (path)
-  "Check the filename PATH for a date and return it.
-On failing to coerce a date, return nil."
+  "Check the filename PATH for a date, and return that date.
+On failing to coerce a date, return nil.
+
+Only works for names starting with either an YYYY-MM-DD date, or a
+datestamp matching the style of `org-node-datestamp-format'.
+
+The latter uses a sloppy algorithm so not all formats work, see
+`org-node-seq-extract-ymd'."
   (when path
     (let ((clipped-name (file-name-base path)))
-      (if (string-match
-           (rx bol (= 4 digit) "-" (= 2 digit) "-" (= 2 digit))
-           clipped-name)
+      (if (string-match (rx bol (= 4 digit) "-" (= 2 digit) "-" (= 2 digit))
+                        clipped-name)
           (match-string 0 clipped-name)
         ;; Even in a non-daily file, pretend it is a daily if possible,
         ;; to allow entering the sequence at a more relevant date

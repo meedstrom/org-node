@@ -2208,6 +2208,20 @@ creation-date as more \"truthful\" than today\\='s date.
         (when (bound-and-true-p org-node-backlink-mode)
           (org-node-backlink--fix-entry-here))))))
 
+(defun org-node-extract-file-name-datestamp (path)
+  "From filename PATH, get the datestamp prefix if it has one.
+Do so by comparing with `org-node-datestamp-format'.
+
+High risk of false positives if you have been changing formats over
+time without renaming existing files."
+  (when (and org-node-datestamp-format
+             (not (string-blank-p org-node-datestamp-format)))
+    (let ((name (file-name-nondirectory path)))
+      (when (string-match
+             (org-node--make-regexp-for-time-format org-node-datestamp-format)
+             name)
+        (match-string 0 name)))))
+
 ;; "Some people, when confronted with a problem, think
 ;; 'I know, I'll use regular expressions.'
 ;; Now they have two problems." —Jamie Zawinski
@@ -2238,18 +2252,6 @@ need to compute once."
                                    (replace-regexp-in-string
                                     "[[:alpha:]]+" "[[:alpha:]]+"
                                     example t)))))))))))
-
-(defun org-node-extract-file-name-datestamp (path)
-  "From filename PATH, get the datestamp prefix if it has one.
-Do so by comparing with `org-node-datestamp-format'.  Not immune
-to false positives, if you have been changing formats over time."
-  (when (and org-node-datestamp-format
-             (not (string-blank-p org-node-datestamp-format)))
-    (let ((name (file-name-nondirectory path)))
-      (when (string-match
-             (org-node--make-regexp-for-time-format org-node-datestamp-format)
-             name)
-        (match-string 0 name)))))
 
 (defcustom org-node-renames-allowed-dirs nil
   "Dirs in which files may be auto-renamed.
