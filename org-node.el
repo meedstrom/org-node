@@ -140,13 +140,37 @@ transition the files you already have with the Org-roam commands
 
 (defcustom org-node-link-types
   '("http" "https" "id")
-  "Link types that may count as backlinks.
-Types other than \"id\" only result in a backlink when there is
-some node with the same link in its ROAM_REFS property.
+  "Link types that may result in backlinks.
 
-Having fewer types results in a faster \\[org-node-reset].
-Tip: eval `(org-link-types)' to see all possible types.
+Of course, org-node is built around the \"id\" link type, which
+corresponds to a target node\\='s ID property.  The ID property is
+mandatory because it acts as a unique identifier.
 
+However, the concept can be generalized.  Org-node also looks at the
+ROAM_REFS property, which in another universe might have been called
+\"EXTRA_IDS\", because in many ways it is just a list of additional IDs
+for the same node.
+
+For performance reasons, not just any string of text is accepted in the
+ROAM_REFS property -- it must have valid links per Org syntax, such as
+\"[[https://gnu.org]]\" or \"https://gnu.org\".
+Use the command \\[org-node-ref-add] for convenience.
+
+Finally, this variable controls which link types are permitted.
+The fewer types, the faster your \\[org-node-reset].
+
+What\\='s it actually used for: if you insert \"https://gnu.org\" in the
+body text of another node, then that results in a new backlink, even
+though no reference was made to a proper ID!
+
+People often use this to write notes about a specific web-page or PDF
+file, and call it a ref-node for that web-page.  See also
+`org-node-try-visit-ref-node' and \\[org-node-list-reflinks].
+
+Tip: eval `(org-link-types)' to see all built-in link types.
+
+As a special case, citation keys such as \"@ioannidis2005\" also work in
+ROAM_REFS, and correspond to citations like \"[cite:@ioannidis2005]\".
 There is no need to add the \"cite\" type."
   :type '(repeat string)
   :package-version '(org-node . "0.7"))

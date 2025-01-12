@@ -329,6 +329,8 @@ This can be a power tool for mass edits.  Say you want to rename some Org tag =:
 
 ** Let org-open-at-point detect refs
 
+(For background, consult the docstring of =org-node-link-types=.)
+
 Say there's a link to a web URL, and you've forgotten you also have a node listing that exact URL in its =ROAM_REFS= property.
 
 Wouldn't it be nice if, clicking on that link, you automatically visit that node first instead of being sent to the web?  Here you go:
@@ -413,14 +415,15 @@ Rarer commands:
 - =org-node-list-dead-links=
   - List links where the destination ID could not be found
 - =org-node-list-reflinks=
-  - List citations and non-ID links
-    - Can be interesting for seeing which links have an associated node and which don't (usually, most don't)
+  - List all links and citations
+    - Can be interesting if you are an user of =ROAM_REFS=, for seeing which links have an associated node and which don't
+    - By default, only shows links of type =http= and =https=; to see more, customize =org-node-link-types=
 - =org-node-backlink-fix-all-files=
   - Update =BACKLINKS= property in all nodes
 - =org-node-list-feedback-arcs=
   - (Requires GNU R, with R packages stringr, readr and igraph)
 
-    Explore [[https://en.wikipedia.org/wiki/Feedback_arc_set][feedback arcs]] in your ID link network.  Can be a sort of [[https://edstrom.dev/zvjjm/slipbox-workflow#ttqyc][occasional QA routine]].
+    Explore [[https://en.wikipedia.org/wiki/Feedback_arc_set][feedback arcs]] in your ID link network.  Can work as a sort of [[https://edstrom.dev/zvjjm/slipbox-workflow#ttqyc][occasional QA routine]].
 - =org-node-rename-asset-and-rewrite-links=
   - Interactively rename an asset such as an image file and try to update all Org links to them.  Requires [[https://github.com/mhayashi1120/Emacs-wgrep][wgrep]].
     - NOTE: For now, it only looks for links inside the root directory that it prompts you for, and sub and sub-subdirectories and so on -- but won't find a link outside that root directory.
