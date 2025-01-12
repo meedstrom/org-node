@@ -3319,8 +3319,8 @@ non-nil, because it can cause noticeable latency."
                                 (when org-element-use-cache
                                   (org-get-buffer-tags)))
                         (mapcar #'car)
-                        (mapcar #'substring-no-properties)
-                        (cl-remove-if #'keywordp))
+                        (cl-remove-if #'keywordp)
+                        (mapcar #'substring-no-properties))
            (cl-loop for node being each hash-value of org-node--id<>node
                     append (org-node-get-tags-with-inheritance node))))))
 
