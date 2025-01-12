@@ -85,7 +85,6 @@ Exclude uninteresting nodes
 Experimental: Node sequences
 
 * What are "node seqs"?::
-* Future::
 
 Appendix
 
@@ -148,7 +147,7 @@ Once a subtree has an ID you can link to, it's a "node" because it has joined th
 @node Features
 @section Features
 
-A comparison of three similar systems, which permit relying on org-id and don't lock you into concept of "one-note-per-file".
+A comparison of three systems that all permit relying on org-id and don't lock you into the concept of "one-note-per-file".
 
 @multitable {aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa} {aaaaaaaa} {aaaaaaaaaaaaaaaaaa} {aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}
 @headitem Feature
@@ -387,9 +386,11 @@ Then enable the following global mode, which keeps these properties updated.
 (org-node-backlink-mode)
 @end lisp
 
-NOTE 1: To be clear, this never generates new IDs.  That's your own business.  This only adds/edits :BACKLINKS: properties, and no backlink will appear that correspond to a link if the context for that link has no ID among any outline ancestor.
+NOTE 1: To be clear, this never generates new IDs.  That's your own business.  This only adds/edits @samp{:BACKLINKS:} properties.
 
-NOTE 2: By default, the setting @samp{org-node-backlink-aggressive} is nil, so that stale backlinks are not cleaned until you carry out some edits under an affected heading and then save the file, which fixes that heading's :BACKLINKS: property.  If you'd like it to be more proactive, set t:
+That also means that @strong{not every link causes a backlink to pop into existence,} only links located in an entry that has an ID@.  After all, there must be something to link back to :)
+
+NOTE 2: By default, the setting @samp{org-node-backlink-aggressive} is nil, so stale backlinks are not cleaned until you carry out some edits under an affected heading and then save the file, which fixes that heading's @samp{:BACKLINKS:} property.  If you'd like it to be more proactive, set it to t:
 
 @lisp
 (setq org-node-backlink-aggressive t)
@@ -452,13 +453,13 @@ Do a @samp{M-x org-node-reset} and see if it can find your notes now.
 
 If you have org-roam loaded, but no longer update the DB, opening a link can sometimes send you to an outdated file path due to @uref{https://github.com/org-roam/org-roam/blob/2a630476b3d49d7106f582e7f62b515c62430714/org-roam-id.el#L91, a line in org-roam-id.el} that causes org-id to @emph{preferentially} look up the org-roam DB instead of org-id's own table!
 
-Either revert that with the following snippet, or if @uref{https://github.com/meedstrom/org-node-fakeroam, Fakeroam} can cover your needs, simply delete the Roam DB (at "~/.emacs.d/org-roam.db").
+Either revert that with the following snippet, or the extension @uref{https://github.com/meedstrom/org-node-fakeroam, org-node-fakeroam} covers your needs, simply delete the DB (located at "~/.emacs.d/org-roam.db").
 
 @lisp
 ;; Undo a Roam override
 (with-eval-after-load 'org-roam-id
-  ;; Restore default for Org 9.1 through 9.7+
   (org-link-set-parameters
+   ;; This was default value at least from Org 9.1 to 9.7+
    "id" :follow #'org-id-open :store #'org-id-store-link-maybe))
 @end lisp
 
@@ -467,7 +468,7 @@ Either revert that with the following snippet, or if @uref{https://github.com/me
 
 One user had over a thousand project-nodes, but only just began to do a knowledge base, and wished to avoid seeing the project nodes.
 
-This could work by, for example, excluding a "project" tag and excluding any note that has a TODO state:
+This could work by---for example---excluding anything tagged "project" or perhaps anything that has a TODO state.  This excludes both:
 
 @lisp
 (setq org-node-filter-fn
@@ -479,12 +480,12 @@ This could work by, for example, excluding a "project" tag and excluding any not
              (assoc "ROAM_EXCLUDE" (org-node-get-properties node))))))
 @end lisp
 
-Or you could go with a whitelist approach, to see only nodes from a certain directory we'll call "my-wiki":
+Or you could go with a whitelist approach, to show only nodes from a certain directory we'll call "my-personal-wiki":
 
 @lisp
 (setq org-node-filter-fn
       (lambda (node)
-        (and (string-search "/my-wiki/" (org-node-get-file-path node))
+        (and (string-search "/my-personal-wiki/" (org-node-get-file-path node))
              (not (assoc "ROAM_EXCLUDE" (org-node-get-properties node))))))
 @end lisp
 
@@ -503,7 +504,7 @@ Putting a @samp{:ROAM_EXCLUDE: t} at the top won't do it, because unlike in org-
 
 However, nodes in isolation do still have inherited tags.  So you can exploit that, or the outline path or file name.
 
-Really, filename!  Even though a big selling point of IDs is that you avoid depending on filenames, it's pragmatic to let up on principles sometimes :-)  It works well for me to filter out any file or directory that happens to contain "archive" in the name:
+It works well for me to filter out any file or directory that happens to contain "archive" in the name:
 
 @lisp
 (setq org-node-filter-fn
@@ -556,7 +557,7 @@ With that done, you can optionally configure the everyday commands @samp{org-nod
 (setq org-node-creation-fn #'org-capture)
 @end lisp
 
-That last optional functionality may be confusing if I describe it -- better you try and see if you like.
+That last optional functionality may be confusing if I describe it -- better you give it a spin and see if you like.
 
 @node Completion-at-point
 @section Completion-at-point
@@ -571,16 +572,18 @@ To complete words at point into known node titles:
 @node FAQ Any analogue to @samp{org-roam-node-display-template}?
 @section FAQ: Any analogue to @samp{org-roam-node-display-template}?
 
-Want to customize how the nodes look in the minibuffer?
-
-Configure @samp{org-node-affixation-fn}:
+To customize how the nodes look in the minibuffer, configure @samp{org-node-affixation-fn}:
 
 @example
 M-x customize-variable RET org-node-affixation-fn RET
 @end example
 
 
-A related variable is @samp{org-node-alter-candidates}.  Read its docstring.
+A related option is @samp{org-node-alter-candidates}, which lets you match against the annotations as well as the title:
+
+@lisp
+(setq org-node-alter-candidates t)
+@end lisp
 
 @node Grep
 @section Grep
@@ -608,6 +611,8 @@ Type @code{C-c C-c} to apply the changes
 
 @node Let org-open-at-point detect refs
 @section Let org-open-at-point detect refs
+
+(For background, consult the docstring of @samp{org-node-link-types}.)
 
 Say there's a link to a web URL, and you've forgotten you also have a node listing that exact URL in its @samp{ROAM_REFS} property.
 
@@ -761,10 +766,10 @@ List links where the destination ID could not be found
 @samp{org-node-list-reflinks}
 @itemize
 @item
-List citations and non-ID links
+List all links that aren't @samp{id:} links
 @itemize
 @item
-Can be interesting for seeing which links have an associated node and which don't (usually, most don't)
+Also list citations
 @end itemize
 @end itemize
 @item
@@ -779,7 +784,7 @@ Update @samp{BACKLINKS} property in all nodes
 @item
 (Requires GNU R, with R packages stringr, readr and igraph)
 
-Explore @uref{https://en.wikipedia.org/wiki/Feedback_arc_set, feedback arcs} in your ID link network.  Can be a sort of @uref{https://edstrom.dev/zvjjm/slipbox-workflow#ttqyc, occasional QA routine}.
+Explore @uref{https://en.wikipedia.org/wiki/Feedback_arc_set, feedback arcs} in your ID link network.  Can work as a sort of @uref{https://edstrom.dev/zvjjm/slipbox-workflow#ttqyc, occasional QA routine}.
 @end itemize
 @item
 @samp{org-node-rename-asset-and-rewrite-links}
@@ -790,7 +795,7 @@ Interactively rename an asset such as an image file and try to update all Org li
 @item
 NOTE: For now, it only looks for links inside the root directory that it prompts you for, and sub and sub-subdirectories and so on -- but won't find a link outside that root directory.
 
-Like if you have Org files under /mnt linking to assets in /home, those links won't be updated.  Neither if you choose ~/org/subdir as the root directory will links in ~/org/file.org be updated.
+Like if you have Org files under /mnt linking to assets in /home, those links won't be updated.  Neither if you choose ~/org/subdir as the root directory will links in ~/org/file.org be updated.  So choose ~/org even if you are renaming something in a subdir.
 @end itemize
 @end itemize
 @end itemize
@@ -804,32 +809,22 @@ Do you already know about "daily-notes"?  Then get started with a keybinding suc
 (keymap-set global-map "M-s s" #'org-node-seq-dispatch)
 @end lisp
 
-and configure @samp{org-node-seq-defs}.  See @uref{https://github.com/meedstrom/org-node/wiki/Configuring-series, wiki}.
+and configure @samp{org-node-seq-defs}.  See @uref{https://github.com/meedstrom/org-node/wiki/Configuring-node-sequences, wiki}.
 
 @menu
 * What are "node seqs"?::
-* Future::
 @end menu
 
 @node What are "node seqs"?
 @subsection What are "node seqs"?
 
-It's easiest to explain node sequences if we use "daily-notes" (or "dailies") as an example.
+It's easiest to explain node sequences if we use "daily-notes" (aka "dailies") as an example.
 
 Roam's idea of a "daily-note" is the same as an @uref{https://github.com/bastibe/org-journal, org-journal} entry: a file/entry where the title is just today's date.
 
 You don't need software for that basic idea, only to make it extra convenient to navigate them and jump back and forth in the series.
 
 Thus, fundamentally, any "journal" or "dailies" software are just operating on a sorted series to navigate through.  A node sequence.  You could have sequences for, let's say, historical events, Star Trek episodes, your school curriculum@dots{}
-
-Currently, defining a new node seq requires writing 5 lambdas, but once you get the hang of it, you can often reuse those lambdas.
-
-@node Future
-@subsection Future
-
-A future version will likely bring convenient wrappers that let you define a node seq in 1-2 lines.
-
-It's also possible we just redesign this completely.  Input welcome.  How would you like to define a node sequence?  Where should the information be stored?
 
 @node Appendix
 @chapter Appendix
