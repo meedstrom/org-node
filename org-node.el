@@ -966,9 +966,9 @@ https://lists.gnu.org/archive/html/emacs-orgmode/2024-09/msg00305.html"
                              (apply #'append (mapcar #'cdr default)))
                            " "))))
      (cons '$file-name-handler-alist
-           (cl-remove-if-not
-            (##memq % org-node-perf-keep-file-name-handlers)
-            file-name-handler-alist :key #'cdr))
+           (cl-remove-if-not (##memq % org-node-perf-keep-file-name-handlers)
+                             file-name-handler-alist
+                             :key #'cdr))
      (cons '$backlink-drawer-re
            (concat "^[\t\s]*:"
                    (or (and (require 'org-super-links nil t)
@@ -2800,42 +2800,43 @@ Useful to see how many times you\\='ve inserted a link that is very
 similar to another link, but not identical, so that likely only
 one of them is associated with a ROAM_REFS property."
   (interactive)
-  (let ((plain-links (cl-loop
-                      for list being the hash-values of org-node--dest<>links
-                      append (cl-loop
-                              for link in list
-                              unless (equal "id" (org-node-link-type link))
-                              collect link))))
-    ;; (cl-letf ((truncate-string-ellipsis " "))
-    (if plain-links
-        (org-node--pop-to-tabulated-list
-         :buffer "*org-node reflinks*"
-         :format [("Ref" 4 t) ("Inside node" 30 t) ("Link" 0 t)]
-         :reverter #'org-node-list-reflinks
-         :entries
-         (cl-loop
-          for link in plain-links
-          collect (let ((type (org-node-link-type link))
-                        (dest (org-node-link-dest link))
-                        (origin (org-node-link-origin link))
-                        (pos (org-node-link-pos link)))
-                    (let ((node (gethash origin org-node--id<>node)))
-                      (list link
-                            (vector
-                             (if (gethash dest org-node--ref<>id) "*" "")
-                             (if node
-                                 (list (org-node-get-title node)
-                                       'action `(lambda (_button)
-                                                  (org-id-goto ,origin)
-                                                  (goto-char ,pos)
-                                                  (if (org-at-heading-p)
-                                                      (org-show-entry)
-                                                    (org-show-context)))
-                                       'face 'link
-                                       'follow-link t)
-                               origin)
-                             (if type (concat type ":" dest) dest)))))))
-      (message "No links found"))))
+  (if-let* ((link-objects-excluding-id-type
+             (cl-loop
+              for list being the hash-values of org-node--dest<>links
+              append (cl-loop for LNK in list
+                              unless (equal "id" (org-node-link-type LNK))
+                              collect LNK)))
+            (entries
+             (cl-loop
+              for LNK in link-objects-excluding-id-type
+              collect (let ((type (org-node-link-type LNK))
+                            (dest (org-node-link-dest LNK))
+                            (origin (org-node-link-origin LNK))
+                            (pos (org-node-link-pos LNK)))
+                        (let ((node (gethash origin org-node--id<>node)))
+                          (list LNK
+                                (vector
+                                 (if (gethash dest org-node--ref<>id) "*" "")
+                                 (if node
+                                     (list (org-node-get-title node)
+                                           'action `(lambda (_button)
+                                                      (org-id-goto ,origin)
+                                                      (goto-char ,pos)
+                                                      (if (org-at-heading-p)
+                                                          (org-show-entry)
+                                                        (org-show-context)))
+                                           'face 'link
+                                           'follow-link t)
+                                   origin)
+                                 (if type (concat type ":" dest) dest))))))))
+      ;; TODO: Prevent ellipsis from breaking visual alignment?
+      ;; (cl-letf ((truncate-string-ellipsis " "))
+      (org-node--pop-to-tabulated-list
+       :buffer "*org-node reflinks*"
+       :format [("Ref" 4 t) ("Inside node" 30 t) ("Link" 0 t)]
+       :reverter #'org-node-list-reflinks
+       :entries entries)
+    (message "No links found")))
 
 (defcustom org-node-warn-title-collisions t
   "Whether to print messages on finding duplicate node titles."
@@ -2945,8 +2946,8 @@ Optional keyword argument ABOUT-TO-DO as in
        (org-element-with-disabled-cache
          (let* ((--was-open-- (find-buffer-visiting ,file))
                 (--file-- (org-node-abbrev-file-names (file-truename ,file)))
-                (_ (if (file-directory-p --file--)
-                       (error "Is a directory: %s" --file--)))
+                (_ (when (file-directory-p --file--)
+                     (error "Is a directory: %s" --file--)))
                 (--buf-- (or --was-open--
                              (delay-mode-hooks
                                (org-node--find-file-noselect --file-- ,why)))))
@@ -3247,7 +3248,7 @@ as the members of `org-tag-persistent-alist' and `org-tag-alist'.
 Also collect current buffer tags, but only if `org-element-use-cache' is
 non-nil, because it can cause noticeable latency."
   (completing-read-multiple
-   "Tag: "
+   "Tags: "
    (delete-dups
     (nconc (thread-last (append org-tag-persistent-alist
                                 org-tag-alist
@@ -3348,7 +3349,7 @@ Designed for `completion-at-point-functions', which see."
     (org-super-links-convert-link-to-super nil)))
 
 (defun org-node-try-visit-ref-node ()
-  "Designed for `org-open-at-point-functions'.
+  "Designed to be added to `org-open-at-point-functions'.
 
 For the link at point, if there exists an org-ID node that has
 the link in its ROAM_REFS property, visit that node rather than

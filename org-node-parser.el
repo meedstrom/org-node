@@ -146,7 +146,7 @@ the subheading potentially has an ID of its own."
     ;; - `$plain-re' will be set to basically `org-link-plain-re'
     ;; - `$merged-re' to a combination of that and `org-link-bracket-re'
     (while (re-search-forward $merged-re end t)
-      (setq link-pos (- (match-end 0) 1)) ;; Agree with `org-roam-db-map-links'
+      (setq link-pos (- (match-end 0) 1)) ;; Same as `org-roam-db-map-links'
       (if (setq path (match-string 1))
           ;; Link is the [[bracketed]] kind.  Is there an URI: style link
           ;; inside?  Here is the magic that allows links to have spaces, it is
@@ -176,10 +176,11 @@ the subheading potentially has an ID of its own."
     (while (search-forward "[cite" end t)
       (let ((closing-bracket (save-excursion (search-forward "]" end t))))
         (if closing-bracket
-            ;; The regexp is a modified `org-element-citation-key-re'
+            ;; Use a modified `org-element-citation-key-re'
             (while (re-search-forward "[&@][!#-+./:<>-@^-`{-~[:word:]-]+"
-                                      closing-bracket t)
-              ;; Agree with `org-roam-db-map-citations'
+                                      closing-bracket
+                                      t)
+              ;; Use same buffer position as `org-roam-db-map-citations'
               (setq link-pos (1+ (match-beginning 0)))
               (if (save-excursion
                     (goto-char (pos-bol))
