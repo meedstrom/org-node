@@ -75,7 +75,7 @@ Format string S for display - this means replace every link inside S
 with only their description if they have one, and in any case strip the
 brackets."
   (replace-regexp-in-string
-   ;; The regexp is `org-link-bracket-re'
+   ;; This regexp is `org-link-bracket-re'
    "\\[\\[\\(\\(?:[^][\\]\\|\\\\\\(?:\\\\\\\\\\)*[][]\\|\\\\+[^][]\\)+\\)]\\(?:\\[\\([^z-a]+?\\)]\\)?]"
    (lambda (m) (or (match-string 2 m) (match-string 1 m)))
    s nil t))

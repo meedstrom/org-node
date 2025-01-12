@@ -3248,7 +3248,8 @@ Wrap the value in double-brackets if necessary."
     (when (and (string-match-p " " ref)
                (string-match-p org-link-plain-re ref))
       ;; If it is a link, it should be enclosed in brackets
-      (setq ref (concat "[[" (string-trim ref (rx "[[") (rx "]]"))
+      (setq ref (concat "[["
+                        (string-trim ref (rx "[[") (rx "]]"))
                         "]]")))
     (org-node--add-to-property-keep-space "ROAM_REFS" ref)))
 
@@ -3263,6 +3264,45 @@ Wrap the value in double-brackets if necessary."
                                         ":"
                                         (org-node-link-dest link))))))
     (completing-read "Add ref: " links nil nil nil 'org-node-link-hist)))
+
+(defun org-node-tag-add (tag-or-tags)
+  "Add TAG-OR-TAGS to the node at point.
+To always operate on the local entry, try `org-node-tag-add*'."
+  (interactive (list (org-node--read-tag)) org-mode)
+  (org-node--call-at-nearest-node #'org-node-tag-add* tag-or-tags))
+
+(defun org-node-tag-add* (tag-or-tags)
+  "Add TAG-OR-TAGS to the entry at point."
+  (interactive (list (org-node--read-tag)) org-mode)
+  (if (= (org-outline-level) 0)
+      ;; There's no Org builtin to set filetags yet
+      ;; so we have to do it ourselves.
+      (let* ((tags (cl-loop
+                    for raw in (cdar (org-collect-keywords '("FILETAGS")))
+                    append (split-string raw ":" t)))
+             (new-tags (seq-uniq (append (ensure-list tag-or-tags) tags)))
+             (case-fold-search t))
+        (save-excursion
+          (without-restriction
+            (goto-char 1)
+            (if (search-forward "\n#+filetags:" nil t)
+                (progn
+                  (skip-chars-forward " ")
+                  (atomic-change-group
+                    (delete-region (point) (pos-eol))
+                    (insert ":" (string-join new-tags ":") ":")))
+              (if (re-search-forward "^[^:#]" nil t)
+                  (progn
+                    (backward-char 1)
+                    (skip-chars-backward "\n\t\s"))
+                (goto-char (point-max)))
+              (unless (looking-back "\n")
+                (newline))
+              (insert "#+filetags: :" (string-join new-tags ":") ":")))))
+    (save-excursion
+      (org-back-to-heading)
+      (org-set-tags (seq-uniq (append (ensure-list tag-or-tags)
+                                      (org-get-tags)))))))
 
 (defun org-node--read-tag ()
   "Prompt for an Org tag.
@@ -3283,43 +3323,6 @@ non-nil, because it can cause noticeable latency."
                         (cl-remove-if #'keywordp))
            (cl-loop for node being each hash-value of org-node--id<>node
                     append (org-node-get-tags-with-inheritance node))))))
-
-(defun org-node-tag-add (tag-or-tags)
-  "Add TAG-OR-TAGS to the node at point.
-To always operate on the local entry, try `org-node-tag-add*'."
-  (interactive (list (org-node--read-tag)) org-mode)
-  (org-node--call-at-nearest-node #'org-node-tag-add* tag-or-tags))
-
-(defun org-node-tag-add* (tag-or-tags)
-  "Add TAG-OR-TAGS to the entry at point."
-  (interactive (list (org-node--read-tag)) org-mode)
-  (if (= (org-outline-level) 0)
-      ;; There's no Org builtin to set filetags yet
-      (let* ((tags (cl-loop
-                    for raw in (cdar (org-collect-keywords '("FILETAGS")))
-                    append (split-string raw ":" t)))
-             (new-tags (seq-uniq (append (ensure-list tag-or-tags) tags)))
-             (case-fold-search t))
-        (save-excursion
-          (without-restriction
-            (goto-char 1)
-            (if (search-forward "\n#+filetags:" nil t)
-                (progn
-                  (skip-chars-forward " ")
-                  (atomic-change-group
-                    (delete-region (point) (pos-eol))
-                    (insert ":" (string-join new-tags ":") ":")))
-              (if (re-search-forward "^[^:#]" nil t)
-                  (progn
-                    (backward-char 1)
-                    (skip-chars-backward "\n\t\s"))
-                (goto-char (point-max)))
-              (newline)
-              (insert "#+filetags: :" (string-join new-tags ":") ":")))))
-    (save-excursion
-      (org-back-to-heading)
-      (org-set-tags (seq-uniq (append (ensure-list tag-or-tags)
-                                      (org-get-tags)))))))
 
 
 ;;;; CAPF (Completion-At-Point Function)
