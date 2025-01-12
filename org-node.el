@@ -3219,13 +3219,25 @@ as \"%20\", wrap the value in quotes if it has spaces."
   "Add to ROAM_REFS in nearest relevant property drawer.
 Wrap the value in double-brackets if necessary."
   (interactive nil org-mode)
-  (let ((ref (string-trim (read-string "Ref: "))))
+  (let ((ref (string-trim (org-node--read-potential-ref))))
     (when (and (string-match-p " " ref)
                (string-match-p org-link-plain-re ref))
       ;; If it is a link, it should be enclosed in brackets
       (setq ref (concat "[[" (string-trim ref (rx "[[") (rx "]]"))
                         "]]")))
     (org-node--add-to-property-keep-space "ROAM_REFS" ref)))
+
+(defun org-node--read-potential-ref ()
+  "Prompt for a link or citation that is known to exist."
+  (let ((links (cl-loop
+                for list being the hash-values of org-node--dest<>links
+                append (cl-loop
+                        for link in list
+                        unless (equal "id" (org-node-link-type link))
+                        collect (concat (org-node-link-type link)
+                                        ":"
+                                        (org-node-link-dest link))))))
+    (completing-read "Add ref: " links nil nil nil 'org-node-link-hist)))
 
 (defun org-node--read-tag ()
   "Prompt for an Org tag.
