@@ -155,7 +155,7 @@ the subheading potentially has an ID of its own."
               (setq link-type (match-string 1 path)
                     path (string-trim-left path ".*?:"))
             ;; Nothing of interest between the brackets
-            nil)
+            (setq link-type nil))
         ;; Link is the unbracketed kind
         (setq link-type (match-string 3)
               path (match-string 4)))
