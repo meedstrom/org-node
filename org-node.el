@@ -448,55 +448,66 @@ aliases."
 (defun org-node-affix-bare (_node title)
   "Use TITLE as-is.
 For use as `org-node-affixation-fn'."
-  (list title nil nil))
+  (list title "" ""))
 
 (defun org-node-prefix-with-tags (node title)
   "Prepend NODE's tags to TITLE.
 For use as `org-node-affixation-fn'."
   (list title
-        (when-let ((tags (if org-use-tag-inheritance
-                             (org-node-get-tags-with-inheritance node)
-                           (org-node-get-tags-local node))))
-          (propertize (concat "(" (string-join tags ", ") ") ")
-                      'face 'org-tag))
-        nil))
+        (let ((tags (if org-use-tag-inheritance
+                        (org-node-get-tags-with-inheritance node)
+                      (org-node-get-tags-local node))))
+          (if tags
+              (propertize (concat "(" (string-join tags ", ") ") ")
+                          'face 'org-tag)
+            ""))
+        ""))
 
 (defun org-node-prefix-with-olp (node title)
   "Prepend NODE's outline path to TITLE.
 For use as `org-node-affixation-fn'."
   (list title
-        (when (org-node-get-is-subtree node)
-          (let ((ancestors (cons (org-node-get-file-title-or-basename node)
-                                 (org-node-get-olp node)))
-                (result nil))
-            (dolist (anc ancestors)
-              (push (propertize anc 'face 'completions-annotations) result)
-              (push " > " result))
-            (apply #'concat (nreverse result))))
-        nil))
-
-(defun org-node-affix-with-olp-and-tags (node title)
-  "Prepend NODE's outline path to TITLE, and append NODE's tags.
-For use as `org-node-affixation-fn'."
-  (let ((prefix-len 0))
-    (list title
-          (when (org-node-get-is-subtree node)
+        (if (org-node-get-is-subtree node)
             (let ((ancestors (cons (org-node-get-file-title-or-basename node)
                                    (org-node-get-olp node)))
                   (result nil))
               (dolist (anc ancestors)
                 (push (propertize anc 'face 'completions-annotations) result)
                 (push " > " result))
-              (prog1 (setq result (apply #'concat (nreverse result)))
-                (setq prefix-len (length result)))))
-          (when-let ((tags (org-node-get-tags-local node)))
-            (setq tags (propertize (concat (string-join tags ":"))
-                                   'face 'org-tag))
-            (concat (make-string
-                     (max 2 (- (default-value 'fill-column)
-                               (+ prefix-len (length title) (length tags))))
-                     ?\s)
-                    tags)))))
+              (apply #'concat (nreverse result)))
+          "")
+        ""))
+
+(defun org-node-affix-with-olp-and-tags (node title)
+  "Prepend NODE's outline path to TITLE, and append NODE's tags.
+For use as `org-node-affixation-fn'."
+  (let ((prefix-len 0))
+    (list title
+          (if (org-node-get-is-subtree node)
+              (let ((ancestors (cons (org-node-get-file-title-or-basename node)
+                                     (org-node-get-olp node)))
+                    (result nil))
+                (dolist (anc ancestors)
+                  (push (propertize anc 'face 'completions-annotations) result)
+                  (push " > " result))
+                (progn
+                  (setq result (apply #'concat (nreverse result)))
+                  (setq prefix-len (length result))
+                  result))
+            "")
+          (let ((tags (if org-use-tag-inheritance
+                          (org-node-get-tags-with-inheritance node)
+                        (org-node-get-tags-local node))))
+            (if tags
+                (progn
+                  (setq tags (propertize (concat (string-join tags ":"))
+                                         'face 'org-tag))
+                  (concat (make-string
+                           (max 2 (- (default-value 'fill-column)
+                                     (+ prefix-len (length title) (length tags))))
+                           ?\s)
+                          tags))
+              "")))))
 
 (defvar org-node--title<>affixation-triplet (make-hash-table :test #'equal)
   "1:1 table mapping titles or aliases to affixation triplets.")
