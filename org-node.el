@@ -1186,8 +1186,8 @@ up-to-date set.")
 
 (defun org-node--record-nodes (nodes)
   "Add NODES to `org-nodes' and related info to other tables."
-  (let ((affixator (org-node--ensure-compiled org-node-affixation-fn))
-        (filterer (org-node--ensure-compiled org-node-filter-fn)))
+  (let ((affixator (org-node--try-ensure-compiled org-node-affixation-fn))
+        (filterer (org-node--try-ensure-compiled org-node-filter-fn)))
     (dolist (node nodes)
       (let* ((id (org-node-get-id node))
              (path (org-node-get-file-path node))
@@ -1263,7 +1263,7 @@ be misleading."
 (defvar org-node--compiled-lambdas (make-hash-table :test #'equal)
   "1:1 table mapping lambda expressions to compiled bytecode.")
 
-(defun org-node--ensure-compiled (fn)
+(defun org-node--try-ensure-compiled (fn)
   "Try to return FN as a compiled function.
 
 - If FN is a symbol with uncompiled function definition, return
@@ -3074,7 +3074,7 @@ Naturally, FUNDAMENTAL-MODE has no effect in that case.
 For explanation of TOO-MANY-FILES-HACK, see code comments."
   (declare (indent defun))
   (cl-assert (and msg files call about-to-do))
-  (setq call (org-node--ensure-compiled call))
+  (setq call (org-node--try-ensure-compiled call))
   (let ((enable-local-variables :safe)
         (org-inhibit-startup t) ;; Don't apply startup #+options
         (file-name-handler-alist nil)
