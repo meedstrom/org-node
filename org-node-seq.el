@@ -540,7 +540,7 @@ DEF is a seq-def from `org-node-seq-defs'."
                (setq org-node-seq--current-key nil)))
     (message "Choose sequence before navigating")))
 
-;;;###autoload (autoload 'org-node-seq-dispatch "org-node" nil t)
+;;;###autoload (autoload 'org-node-seq-dispatch "org-node-seq" nil t)
 (transient-define-prefix org-node-seq-dispatch ()
   ["Sequence"
    ("|" "Invisible" "Placeholder" :if-nil t)]

@@ -10,7 +10,7 @@
   List of 28-isms and 29-isms to drop
 
   - =(cadar (org-collect-keywords "TITLE"))= -> =(org-get-title)=
-  - =;;;###autoload (autoload 'org-node-seq-dispatch "org-node" nil t)=
+  - =;;;###autoload (autoload 'org-node-seq-dispatch "org-node-seq" nil t)=
     - In Emacs 30, replace with just =;;;###autoload=
   - any code gated on =emacs-major-version=
   - any usages of =compat-call=
