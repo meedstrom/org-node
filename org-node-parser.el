@@ -252,11 +252,12 @@ and other data, then return the data."
         found-nodes
         file-mtime
         problem
-        HEADING-POS HERE FAR END ID-HERE OLPATH
+        HEADING-POS HERE FAR END ID-HERE ID FILE-ID CRUMBS
         DRAWER-BEG DRAWER-END
         TITLE FILE-TITLE
         TODO-STATE TODO-RE FILE-TODO-SETTINGS
-        TAGS FILE-TAGS ID FILE-ID SCHED DEADLINE PRIORITY LEVEL PROPS)
+        TAGS FILE-TAGS HERITABLE-TAGS
+        SCHED DEADLINE PRIORITY LEVEL PROPS)
     (condition-case err
         (catch 'file-done
           (when (not (file-readable-p FILE))
@@ -397,7 +398,7 @@ and other data, then return the data."
             (widen))
 
           ;; Loop over the file's headings
-          (setq OLPATH nil)
+          (setq CRUMBS nil)
           (while (not (eobp))
             (catch 'entry-done
               ;; Narrow til next heading
@@ -476,10 +477,27 @@ and other data, then return the data."
                              (error "Couldn't find :END: of drawer"))))
                       nil))
               (setq ID (cdr (assoc "ID" PROPS)))
-              (cl-loop until (> LEVEL (or (caar OLPATH) 0))
-                       do (pop OLPATH)
-                       finally do (push (list LEVEL TITLE ID TAGS)
-                                        OLPATH))
+              (setq HERITABLE-TAGS
+                    (cl-loop for tag in TAGS
+                             unless (member tag $nonheritable-tags)
+                             collect tag))
+              ;; CRUMBS is a list that can look like
+              ;;    ((2 "Heading" "id1234" ("noexport" "work" "urgent"))
+              ;;     (... ... ... ...)
+              ;;     (... ... ... ...))
+              ;; if the previous heading looked like
+              ;;    ** Heading  :noexport:work:urgent:
+              ;;       :PROPERTIES:
+              ;;       :ID: id1234
+              ;;       :END:
+              ;; It lets us track context so we know the outline path to the
+              ;; current entry and what tags it should be able to inherit.
+              ;; Update.
+              (cl-loop until (> LEVEL (or (caar CRUMBS) 0))
+                       do (pop CRUMBS)
+                       finally do
+                       (push (list LEVEL TITLE ID HERITABLE-TAGS)
+                             CRUMBS))
               (when ID
                 (push (record 'org-node
                               (split-string-and-unquote
@@ -489,7 +507,7 @@ and other data, then return the data."
                               FILE-TITLE
                               ID
                               LEVEL
-                              (nreverse (mapcar #'cadr (cdr OLPATH)))
+                              (nreverse (mapcar #'cadr (cdr CRUMBS)))
                               HEADING-POS
                               PRIORITY
                               PROPS
@@ -498,8 +516,9 @@ and other data, then return the data."
                               SCHED
                               TAGS
                               (delete-dups
-                               (apply #'append FILE-TAGS
-                                      (mapcar #'cadddr OLPATH)))
+                               (apply #'append
+                                      FILE-TAGS
+                                      (mapcar #'cadddr (cdr CRUMBS))))
                               TITLE
                               TODO-STATE)
                       found-nodes))
@@ -508,7 +527,7 @@ and other data, then return the data."
 
               (setq ID-HERE
                     (or ID
-                        (cl-loop for crumb in OLPATH thereis (caddr crumb))
+                        (cl-loop for crumb in CRUMBS thereis (caddr crumb))
                         FILE-ID
                         (throw 'entry-done t)))
               (setq HERE (point))

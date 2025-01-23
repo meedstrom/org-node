@@ -113,16 +113,6 @@ hardcoded strings."
                 ,old ,(or removed-by "30 January 2024") ,new))
        (apply ,new args))))
 
-(defun org-node-get-tags (node)
-  "Pass NODE to `org-node-get-tags-local' with a warning.
-Then re-define this function so it is just that function."
-  (when (fboundp 'org-node-get-tags-local)
-    (prog1 (org-node-get-tags-local node)
-      (display-warning
-       'org-node "Your initfiles use old function name `org-node-get-tags'. Use either `org-node-get-tags-local' or `org-node-get-tags-with-inheritance'.")
-      (define-obsolete-function-alias
-        'org-node-get-tags 'org-node-get-tags-local "2024-10-22"))))
-
 ;; 1.9.0 (2024-11-18) moved series-related code into its own file, whereupon
 ;; the namespace had to be made consistent.
 (org-node-changes--def-whiny-alias 'org-node--guess-daily-dir      'org-node-seq--guess-daily-dir "2024-11-18")

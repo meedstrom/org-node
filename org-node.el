@@ -559,67 +559,90 @@ read more at Info node `(elisp)Programmed Completion'."
                         (:copier nil)
                         (:conc-name org-node-get-))
   "An org-node object holds information about an Org ID node.
-By the term \"Org ID node\", we mean either a subtree with
-an ID property, or a file with a file-level ID property.  The
-information is stored in slots listed below.
+By the term 'Org ID node', we mean either a subtree with
+an ID property, or a file with a file-level ID property.
+The information is stored in fields listed above.
 
-For each slot, there exists a getter function
-\"org-node-get-FIELD\".
+For each field, there exists a getter function \"org-node-get-FIELD\".
+For example, field \"deadline\" has a getter `org-node-get-deadline'.
+Given a NODE object, you would type this to get the deadline:
 
-For example, the field \"deadline\" has a getter
-`org-node-get-deadline'.  So you would type
-\"(org-node-get-deadline NODE)\", where NODE is one of the
-elements of \"(hash-table-values org-node--id<>node)\".
+   (org-node-get-deadline NODE)
 
-For real-world usage of these getters, see examples in the
-documentation of `org-node-filter-fn' or Info node `(org-node)'."
+To list all existing node objects, you can eval:
+
+   (hash-table-values org-nodes)
+
+For examples of real-world usage, see
+the documentation of `org-node-filter-fn'
+or the README available as Info node `(org-node)'."
   (aliases    nil :read-only t :type list :documentation
-              "Return list of ROAM_ALIASES registered on the node.")
+              "List of ROAM_ALIASES registered on the node.")
   (deadline   nil :read-only t :type string :documentation
-              "Return node's DEADLINE state.")
+              "Node's DEADLINE state.")
   (file-path  nil :read-only t :type string :documentation
-              "Return node's full file path.")
+              "Truename of file where the node is.
+Abbreviated per `abbreviate-file-name'.")
   (file-title nil :read-only t :type string :documentation
-              "Return the #+title of the file where this node is. May be nil.")
+              "The #+title of the file where this node is. May be nil.
+Rarely an useful value on its own, you may more often have use for
+either `org-node-get-file-title-or-basename' or `org-node-get-title'.")
   (id         nil :read-only t :type string :documentation
-              "Return node's ID property.")
+              "Node's ID property.")
   (level      nil :read-only t :type integer :documentation
-              "Return number of stars in the node heading. File-level node always 0.")
+              "Amount of stars in the node heading. A file-level node has 0.
+See also `org-node-get-is-subtree'.")
   (olp        nil :read-only t :type list :documentation
-              "Return list of ancestor headings to this node.")
+              "Outline path to this node, i.e. a list of ancestor headings.
+Excludes file title.")
   (pos        nil :read-only t :type integer :documentation
-              "Return char position of the node. File-level node always 1.")
+              "Char position of the node inside its file.
+For a file-level node, always 1.
+For a subtree node, the position of the first asterisk.")
   (priority   nil :read-only t :type string :documentation
-              "Return priority such as [#A], as a string.")
+              "Org priority state such as \"[#A]\".")
   (properties nil :read-only t :type alist :documentation
-              "Return alist of properties from the :PROPERTIES: drawer.")
+              "Alist of properties from the :PROPERTIES: drawer, verbatim.")
   (refs       nil :read-only t :type list :documentation
-              "Return list of ROAM_REFS registered on the node.")
+              "List of ROAM_REFS registered on the node.")
   (scheduled  nil :read-only t :type string :documentation
-              "Return node's SCHEDULED state.")
+              "Node's SCHEDULED state.")
   (tags-local nil :read-only t :type list :documentation
-              "Return list of tags local to the node.")
-  ;; REVIEW: Maybe this can be a function that combines tags with a new field
-  ;;         called inherited-tags.  That might cause slowdowns
-  ;;         though due to consing on every call.
-  (tags-with-inheritance nil :read-only t :type list :documentation
-                         "Return list of tags, including inherited tags.")
+              "List of tags local to the node.")
+  (tags-inherited nil :read-only t :type list :documentation
+                  "List of inherited tags.
+See also `org-node-get-tags-with-inheritance'.")
   (title      nil :read-only t :type string :documentation
-              "Return the node's heading, or #+title if it is not a subtree.")
+              "The node's heading, or #+title if it is a file-level node.
+In the latter case, there is no difference from `file-title'.")
   (todo       nil :read-only t :type string :documentation
-              "Return node's TODO state."))
+              "Node's TODO state."))
+
+(defun org-node-get-tags (node)
+  "Return NODE\\='s tags."
+  (if org-use-tag-inheritance
+      (org-node-get-tags-with-inheritance node)
+    (org-node-get-tags-local node)))
+
+;; Used to be part of the struct
+(defun org-node-get-tags-with-inheritance (node)
+  "Return all tags for NODE, local and inherited.
+Also respect `org-tags-exclude-from-inheritance'."
+  (delete-dups (append (org-node-get-tags-local node)
+                       (org-node-get-tags-inherited node))))
 
 ;; Used to be part of the struct
 (defun org-node-get-file-title-or-basename (node)
-  "Return either the #+title of file where NODE is, or bare file name."
+  "Return the #+title of file where NODE is, or file name if absent."
   (or (org-node-get-file-title node)
       (file-name-nondirectory (org-node-get-file-path node))))
 
+;; Used to be part of the struct
 (defun org-node-get-is-subtree (node)
   "Return t if NODE is a subtree instead of a file."
   (> (org-node-get-level node) 0))
 
-;; It's safe to alias an accessor, because they are all read only
+;; Should the names be shortened?
 (defalias 'org-node-get-props #'org-node-get-properties)
 ;; (defalias 'org-node-get-prio #'org-node-get-priority)
 ;; (defalias 'org-node-get-sched #'org-node-get-scheduled)
@@ -995,6 +1018,7 @@ https://lists.gnu.org/archive/html/emacs-orgmode/2024-09/msg00305.html"
      (cons '$merged-re (concat org-link-bracket-re "\\|" reduced-plain-re))
      (cons '$assume-coding-system org-node-perf-assume-coding-system)
      (cons '$inlinetask-min-level (bound-and-true-p org-inlinetask-min-level))
+     (cons '$nonheritable-tags org-tags-exclude-from-inheritance)
      (cons '$file-todo-option-re
            (rx bol (* space) (or "#+todo: " "#+seq_todo: " "#+typ_todo: ")))
      (cons '$global-todo-re
@@ -1377,13 +1401,25 @@ also necessary is `org-node--dirty-ensure-link-known' elsewhere."
                ;; Less important
                :properties props
                :tags-local (org-get-tags nil t)
-               :tags-with-inheritance (org-get-tags)
-               :todo (if heading (org-get-todo-state))
+               :tags-inherited (org-node--tags-at-point-inherited-only)
+               :todo (when heading (org-get-todo-state))
                :deadline (cdr (assoc "DEADLINE" props))
                :scheduled (cdr (assoc "SCHEDULED" props)))))))))))
 
 
 ;;;; Etc
+
+(defun org-node--tags-at-point-inherited-only ()
+  "Like `org-get-tags', but get only the inherited tags.
+Respects `org-tags-exclude-from-inheritance'."
+  (let ((all-tags (if (not org-use-tag-inheritance)
+                      (let ((org-use-tag-inheritance t)
+                            (org-trust-scanner-tags nil))
+                        (org-get-tags))
+                    (org-get-tags))))
+    (cl-loop for tag in all-tags
+             when (get-text-property 0 'inherited tag)
+             collect (substring-no-properties tag))))
 
 (defun org-node--die (format-string &rest args)
   "Like `error' but make sure the user sees it.

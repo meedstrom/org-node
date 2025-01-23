@@ -465,7 +465,7 @@ API cheatsheet between org-roam and org-node.
 | Get title /or/ name of file where NODE is |                                  | =(org-node-get-file-title-or-basename NODE)=                        |
 | Get name of file where NODE is          | =(org-roam-node-file NODE)=        | =(org-node-get-file-path NODE)=                                     |
 | Get ID                                  | =(org-roam-node-id NODE)=          | =(org-node-get-id NODE)=                                            |
-| Get tags                                | =(org-roam-node-tags NODE)=        | =(org-node-get-tags-with-inheritance NODE)=                         |
+| Get tags                                | =(org-roam-node-tags NODE)=        | =(org-node-get-tags NODE)=                                          |
 | Get local tags                          |                                  | =(org-node-get-tags-local NODE)=                                    |
 | Get outline level                       | =(org-roam-node-level NODE)=       | =(org-node-get-level NODE)=                                         |
 | Get whether this is a subtree           | =(=< 0 (org-roam-node-level NODE))= | =(org-node-get-is-subtree NODE)=                                    |
