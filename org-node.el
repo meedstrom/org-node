@@ -3291,10 +3291,10 @@ as \"%20\", wrap VALUE in quotes if it has spaces."
 
 ;; FIXME: What if user yanks a [cite:... ... ...]?
 (defun org-node-ref-add ()
-  "Add to ROAM_REFS in nearest relevant property drawer.
-Wrap the value in double-brackets if necessary."
+  "Add a link to ROAM_REFS in nearest relevant property drawer.
+Wrap the link in double-brackets if necessary."
   (interactive nil org-mode)
-  (let ((ref (string-trim (org-node--read-potential-ref))))
+  (dolist (ref (org-node--read-potential-refs "Add ref(s): "))
     (when (and (string-match-p " " ref)
                (string-match-p org-link-plain-re ref))
       ;; If it is a link, it should be enclosed in brackets
@@ -3303,8 +3303,9 @@ Wrap the value in double-brackets if necessary."
                         "]]")))
     (org-node--add-to-property-keep-space "ROAM_REFS" ref)))
 
-(defun org-node--read-potential-ref ()
-  "Prompt for a link or citation that is known to exist."
+(defun org-node--read-potential-refs (prompt)
+  "Prompt for a link or citation that is known to exist.
+Argument PROMPT as in `completing-read'."
   (let ((links (cl-loop
                 for list being the hash-values of org-node--dest<>links
                 append (cl-loop
@@ -3313,7 +3314,9 @@ Wrap the value in double-brackets if necessary."
                         collect (concat (org-node-link-type link)
                                         ":"
                                         (org-node-link-dest link))))))
-    (completing-read "Add ref: " links nil nil nil 'org-node-link-hist)))
+    (mapcar #'string-trim
+            (completing-read-multiple
+             prompt links () () () 'org-node-link-hist))))
 
 (defun org-node-tag-add (tag-or-tags)
   "Add TAG-OR-TAGS to the node at point.
