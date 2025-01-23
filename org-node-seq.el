@@ -467,12 +467,12 @@ Unlike `org-node-proposed-sequence', does not need to revert to nil.")
 (defun org-node-seq--build-from-def (def)
   "From DEF, make a plist for `org-node-seqs'.
 DEF is a seq-def from `org-node-seq-defs'."
-  (let ((classifier (org-node--ensure-compiled
+  (let ((classifier (org-node--try-ensure-compiled
                      (plist-get (cdr def) :classifier))))
     (nconc
      (cl-loop for elt in (cdr def)
               if (functionp elt)
-              collect (org-node--ensure-compiled elt)
+              collect (org-node--try-ensure-compiled elt)
               else collect elt)
      (cl-loop for node being the hash-values of org-node--id<>node
               as result = (funcall classifier node)
