@@ -610,7 +610,7 @@ not exist."
 
 (defun org-node-seq--reset ()
   "Wipe and re-build all sequences.
-Must be done after the main org-node cache is up to date."
+Must be done after the main org-node tables are up to date."
   (setq org-node-seqs nil)
   (dolist (def org-node-seq-defs)
     (setf (alist-get (car def) org-node-seqs nil nil #'equal)

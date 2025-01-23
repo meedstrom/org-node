@@ -1,4 +1,4 @@
-;;; org-node.el --- Link org-id entries into a network -*- lexical-binding: t; -*-
+;;; org-node.el --- Fast org-roam replacement -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2024 Martin Edström
 ;;
@@ -28,18 +28,17 @@
 
 ;; What is Org-node?
 
-;; If you were the sort of person to prefer "id:" links over "file:"
-;; links or any other type of link, you're in the right place!
+;; If you were the sort of person to prefer "id:" links over "file:" links
+;; or radio-targets or any other type of link, you're in the right place!
 
-;; Now you can rely on IDs and worry less about mentally tracking your
-;; subtree hierarchies and directory structures.  As long as you've
-;; assigned an ID to something, you can find it later.
+;; Now you can worry less about mentally tracking your subtree hierarchies and
+;; directory structures.  As long as you've assigned an ID to something, you
+;; can find it later.
 
 ;; The philosophy is the same as org-roam: if you assign an ID every
 ;; time you make an entry that you know you might want to link to from
 ;; elsewhere, then it tends to work out that the `org-node-find' command
 ;; can jump to more or less every entry you'd ever want to jump to.
-;; Pretty soon you've forgot that your files have names.
 
 ;; Anyway, that's just the core of it as described to someone not
 ;; familiar with zettelkasten-ish packages.  In fact, out of the
@@ -49,14 +48,14 @@
 ;; Compared to org-roam:
 
 ;;   - Same idea, compatible disk format
-;;   - Faster
+;;   - Fast
 ;;   - Does not need SQLite
 ;;   - Does not support "roam:" links
 ;;   - Lets you opt out of those file-level property drawers
-;;   - Ships extra commands to e.g. auto-rename files and links
 ;;   - Tries to rely in a bare-metal way on upstream org-id and org-capture
+;;   - Ships extra commands to e.g. auto-rename files and links
 
-;;   As a drawback of relying on org-id-locations, if a heading in some
+;;   As a drawback of relying on the org-id table, if a heading in some
 ;;   vendor README.org or whatever has an ID, it's considered part of
 ;;   your collection -- simply because if it's known to org-id, it's
 ;;   known to org-node.
@@ -426,12 +425,12 @@ Built-in choices:
 Info for writing a custom function
 
 The function receives two arguments: NODE and TITLE, and it must return
-a list of three strings: title, prefix and suffix.  The prefix and
-suffix can be nil.  The returned title should just be TITLE unmodified.
+a list of three strings: title, prefix and suffix.  Of those three, the
+title should be TITLE unmodified.
 
 NODE is an object which form you can observe in examples from
 \\[org-node-peek] and specified in type `org-node'
-\(type \\[describe-symbol] org-node RET).
+\(for docs, type \\[describe-symbol] org-node RET).
 
 If a node has aliases, the same node is passed to this function
 again for every alias, in which case TITLE is actually one of the
@@ -528,7 +527,7 @@ depending on the user option `org-node-alter-candidates' it
 either saves the affixed thing directly into
 `org-node--candidate<>node' or into a secondary table
 `org-node--title<>affixation-triplet'.  Finally, this function
-then either simply reads candidates off the candidates table or
+then either simply reads candidates off the candidates table, or
 attaches the affixations in realtime.
 
 Regardless of which, all completions are guaranteed to be keys of
@@ -652,7 +651,9 @@ can demonstrate the data format.  See also the type `org-node'.")
   "1:1 table mapping raw titles (and ROAM_ALIASES) to IDs.")
 
 (defvar org-node--ref<>id (make-hash-table :test #'equal)
-  "1:1 table mapping ROAM_REFS members to the ID property near.")
+  "1:1 table mapping ROAM_REFS members to the nearby ID property.
+The exact form of such a member is determined by
+`org-node-parser--split-refs-field'.")
 
 (defvar org-node--ref-path<>ref-type (make-hash-table :test #'equal)
   "1:1 table mapping //paths to types:.
@@ -665,30 +666,32 @@ This is a smaller table than you might think, since it only contains
 entries for links found in a :ROAM_REFS: field, instead of all links
 found anywhere.
 
-To see all links found, try \\[org-node-list-reflinks].")
+To see all links found anywhere, try \\[org-node-list-reflinks].")
 
 (defvar org-node--dest<>links (make-hash-table :test #'equal)
   "1:N table of links.
 
-The table keys are destinations (org-ids, URI paths or citekeys),
-and the corresponding table value is a list of `org-node-link'
-records describing each link to that destination, with info such
-as from which ID-node the link originates.  See
-`org-node-get-id-links-to' for more info.")
+The table keys are destinations, i.e. values from a node's ID or
+ROAM_REFS property.  In practice, that means a dest is an org-id, URI
+path or a citekey.
+
+For each table key, the corresponding table value is a list of
+`org-node-link' records describing each link to that destination, with
+info such as from which ID-node the link originates.
+
+For more info see `org-node-get-id-links-to'.")
 
 ;; As of 2024-10-06, the MTIME is not used for anything except supporting
 ;; `org-node-fakeroam-db-feed-mode'.  However, `org-node-list-files' needs a
 ;; hash table anyway for best perf, else we could have used `org-id-files'.
 (defvar org-node--file<>mtime (make-hash-table :test #'equal)
-  "1:1 table mapping file paths to values (MTIME . ELAPSED).
+  "1:1 table mapping file paths to last-modification times.
 
-MTIME is the file\\='s last-modification time \(as an integer Unix
-epoch) and ELAPSED how long it took to scan the file last time \(as a
-float, usually a tiny fraction of a second).")
+The mtimes are expressed as integer Unix time.")
 
 (defun org-node-get-id-links-to (node)
-  "Get list of ID-link objects pointing to NODE.
-Each object is of type `org-node-link' with these fields:
+  "List all `org-node-link' objects of type \"id\" that point to NODE.
+Each object has these fields:
 
 origin - ID of origin node (where the link was found)
 pos - buffer position where the link was found
@@ -697,13 +700,14 @@ type - link type, such as \"https\", \"ftp\", \"info\" or
        \"man\".  For ID-links this is always \"id\".  For a
        citation this is always nil.
 
-This function only returns ID-links, so you can expect the :dest
-to always equal the ID of NODE.  To see other link types, use
+This function only returns ID-links, so you can always expect the dest
+to equal the ID of the inputted NODE.  To return other link types, use
 `org-node-get-reflinks-to'."
   (gethash (org-node-get-id node) org-node--dest<>links))
 
 (defun org-node-get-reflinks-to (node)
   "Get list of reflink objects pointing to NODE.
+
 Typical reflinks are URLs or @citekeys occurring in any document,
 and they are considered to point to NODE when NODE has a
 :ROAM_REFS: property that includes that same string.
@@ -1091,7 +1095,7 @@ JOB is the el-job object."
     (setq org-node--first-init nil)))
 
 (defvar org-node--mid-scan-hook nil
-  "Hook run after most tables were updated.")
+  "Hook run after tables were updated but before the final timestamp.")
 
 (defvar org-node--old-link-sets nil
   "For use by `org-node-backlink-aggressive'.
@@ -1488,8 +1492,8 @@ sub-directories, sub-sub-directories and so on, with provisos:
 (defvar org-node--userhome nil)
 (defun org-node-abbrev-file-names (paths)
   "Abbreviate all file paths in PATHS.
-Faster than `abbreviate-file-name', especially if you have to run
-it for many paths.
+Faster than `abbreviate-file-name', especially if you would have to call
+it on many file paths at once.
 
 May in some corner-cases give different results.  For instance, it
 disregards file name handlers, affecting TRAMP.
@@ -3228,13 +3232,12 @@ window."
 (defun org-node--add-to-property-keep-space (property value)
   "Add VALUE to PROPERTY for node at point.
 
-If the current entry has no ID, operate on the closest ancestor
-with an ID.  If there\\='s no ID anywhere, operate on the current
-entry.
+If the current entry has no ID, but an ancestor entry has an ID, then
+operate on that entry instead.
 
 Then behave like `org-entry-add-to-multivalued-property' but
 preserve spaces: instead of percent-escaping each space character
-as \"%20\", wrap the value in quotes if it has spaces."
+as \"%20\", wrap VALUE in quotes if it has spaces."
   (org-node--call-at-nearest-node
    (lambda ()
      (let ((old (org-entry-get nil property)))

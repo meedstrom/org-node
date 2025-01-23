@@ -20,6 +20,8 @@
 
 * Other
 
+- [ ] Write a glossary, to clarify e.g. what is a "ref" vs "reflink"
+
 - [ ] Absorb org-roam's backlink buffer https://github.com/meedstrom/org-node/issues/74
 
 - [ ] Manage BACKLINKS drawers (like [[https://github.com/toshism/org-super-links][org-super-links]])
@@ -45,3 +47,7 @@
   Would prolly be a fairly expensive operation.  After building tables ref<>id and dest<>links, run thru every dest and check if an existing ref is a prefix of it, then simply nconc the value with the value for the corresponding dest.  But having to check for other dests that may also be a prefix is where it would get expensive... O(n^2) I guess.
 
   Hm... Sort all dests alphabetically.  All near-matches will be very close to each other, and indeed an alphabetic sort even results in a sort-by-length within each possible "group". So just run down progressively shorter prefixes until the length goes up again, then we know we're in another group.  Rough idea, but O(n^2) looks beatable.
+
+- [ ] ... Inspired by variable =org-id-link-consider-parent-id=, maybe scan all Org entries whether they have an ID or no, for the option to show some ID-less entries according to an user-defined rule.
+
+  But better instead expend our efforts on https://edstrom.dev/hnzgj/proposal-make-org-mode-fast-for-real

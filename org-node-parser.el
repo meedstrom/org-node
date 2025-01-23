@@ -362,8 +362,8 @@ and other data, then return the data."
               (org-node-parser--collect-links-until END FILE-ID)
 
               ;; NOTE: A plist would be more readable than a record, but then
-              ;;       the mother Emacs has more work to do.
-              ;;       Profiled using this snippet (won't work now):
+              ;;       the mother Emacs process gets more work to do.
+              ;;       Profiled long ago using this snippet (won't work now):
               ;; (benchmark-run 10 (setq org-node--done-ctr 6) (org-node--handle-finished-job 7 #'org-node--finalize-full))
               ;;
               ;;       Result when finalizer accepts plists and passes them
