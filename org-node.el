@@ -3310,11 +3310,13 @@ Argument PROMPT as in `completing-read'."
   (let ((links (cl-loop
                 for list being the hash-values of org-node--dest<>links
                 append (cl-loop
-                        for link in list
-                        unless (equal "id" (org-node-link-type link))
-                        collect (concat (org-node-link-type link)
-                                        ":"
-                                        (org-node-link-dest link))))))
+                        for LN in list
+                        unless (equal "id" (org-node-link-type LN))
+                        collect (if (org-node-link-type LN)
+                                    (concat (org-node-link-type LN)
+                                            ":"
+                                            (org-node-link-dest LN))
+                                  (org-node-link-dest LN))))))
     (mapcar #'string-trim
             (completing-read-multiple
              prompt links () () () 'org-node-link-hist))))
