@@ -2156,6 +2156,12 @@ adding keywords to the things to exclude:
     (set-marker m1 nil)
     (run-hooks 'org-node-insert-link-hook)))
 
+(defun org-node-insert-raw-link ()
+  (interactive)
+  (insert (completing-read "Insert raw link: "
+                           (org-node--list-known-raw-links)
+                           nil nil nil 'org-node-link-hist)))
+
 ;;;###autoload
 (defun org-node-refile ()
   "Experimental."
@@ -3306,31 +3312,35 @@ as \"%20\", wrap VALUE in quotes if it has spaces."
   "Add a link to ROAM_REFS in nearest relevant property drawer.
 Wrap the link in double-brackets if necessary."
   (interactive nil org-mode)
-  (dolist (ref (org-node--read-potential-refs "Add ref(s): "))
-    (when (and (string-match-p " " ref)
-               (string-match-p org-link-plain-re ref))
-      ;; If it is a link, it should be enclosed in brackets
-      (setq ref (concat "[["
-                        (string-trim ref (rx "[[") (rx "]]"))
-                        "]]")))
+  (dolist (ref (mapcar #'string-trim
+                       (completing-read-multiple
+                        "Add ref(s): "
+                        (org-node--list-known-raw-links)
+                        nil
+                        nil
+                        nil
+                        'org-node-link-hist)))
+    (when (string-search " " ref)
+      (if (string-match-p org-link-plain-re ref)
+          ;; If it is a link, it should be enclosed in brackets
+          (setq ref (concat "[["
+                            (string-trim ref (rx "[[") (rx "]]"))
+                            "]]"))
+        (message "Spaces in ref, not sure how to format correctly: %s" ref)))
     (org-node--add-to-property-keep-space "ROAM_REFS" ref)))
 
-(defun org-node--read-potential-refs (prompt)
-  "Prompt for a link or citation that is known to exist.
-Argument PROMPT as in `completing-read'."
-  (let ((links (cl-loop
-                for list being the hash-values of org-node--dest<>links
-                append (cl-loop
-                        for LN in list
-                        unless (equal "id" (org-node-link-type LN))
-                        collect (if (org-node-link-type LN)
-                                    (concat (org-node-link-type LN)
-                                            ":"
-                                            (org-node-link-dest LN))
-                                  (org-node-link-dest LN))))))
-    (mapcar #'string-trim
-            (completing-read-multiple
-             prompt links () () () 'org-node-link-hist))))
+;; TODO: Try to include all Firefox bookmarks and so on
+(defun org-node--list-known-raw-links ()
+  (cl-loop
+   for list being the hash-values of org-node--dest<>links
+   append (cl-loop
+           for LN in list
+           unless (equal "id" (org-node-link-type LN))
+           collect (if (org-node-link-type LN)
+                       (concat (org-node-link-type LN)
+                               ":"
+                               (org-node-link-dest LN))
+                     (org-node-link-dest LN)))))
 
 (defun org-node-tag-add (tag-or-tags)
   "Add TAG-OR-TAGS to the node at point.
