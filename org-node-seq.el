@@ -1,6 +1,6 @@
 ;;; org-node-seq.el --- Experimental way to define node sequences -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2024 Martin Edström
+;; Copyright (C) 2024-2025 Martin Edström
 ;;
 ;; This program is free software: you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
