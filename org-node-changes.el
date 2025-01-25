@@ -110,7 +110,7 @@ hardcoded strings."
        (unless warned-once
          (setq warned-once t)
          (lwarn 'org-node :warning "Your initfiles use old function name: %S, which will be REMOVED by %s.  Please use new name: %S"
-                ,old ,(or removed-by "30 January 2024") ,new))
+                ,old ,(or removed-by "30 January 2025") ,new))
        (apply ,new args))))
 
 ;; 1.9.0 (2024-11-18) moved series-related code into its own file, whereupon

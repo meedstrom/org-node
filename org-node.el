@@ -2878,18 +2878,19 @@ one of them is associated with a ROAM_REFS property."
   (if-let* ((link-objects-excluding-id-type
              (cl-loop
               for list being the hash-values of org-node--dest<>links
-              append (cl-loop for LNK in list
-                              unless (equal "id" (org-node-link-type LNK))
-                              collect LNK)))
+              append (cl-loop
+                      for LN in list
+                      unless (equal "id" (org-node-link-type LN))
+                      collect LN)))
             (entries
              (cl-loop
-              for LNK in link-objects-excluding-id-type
-              collect (let ((type (org-node-link-type LNK))
-                            (dest (org-node-link-dest LNK))
-                            (origin (org-node-link-origin LNK))
-                            (pos (org-node-link-pos LNK)))
+              for LN in link-objects-excluding-id-type
+              collect (let ((type (org-node-link-type LN))
+                            (dest (org-node-link-dest LN))
+                            (origin (org-node-link-origin LN))
+                            (pos (org-node-link-pos LN)))
                         (let ((node (gethash origin org-node--id<>node)))
-                          (list LNK
+                          (list LN
                                 (vector
                                  (if (gethash dest org-node--ref<>id) "*" "")
                                  (if node
@@ -3409,15 +3410,15 @@ Designed for `completion-at-point-functions', which see."
     (remove-hook 'completion-at-point-functions
                  #'org-node-complete-at-point t)))
 
-(defun org-node-complete-at-point--enable-if-org ()
-  "Enable `org-node-complete-at-point-local-mode' in Org file."
+(defun org-node-complete-at-point--try-enable ()
+  "Enable `org-node-complete-at-point-local-mode' if in Org file."
   (and (derived-mode-p 'org-mode)
        buffer-file-name
        (org-node-complete-at-point-local-mode)))
 
 (define-globalized-minor-mode org-node-complete-at-point-mode
   org-node-complete-at-point-local-mode
-  org-node-complete-at-point--enable-if-org)
+  org-node-complete-at-point--try-enable)
 
 
 ;;;; Misc
