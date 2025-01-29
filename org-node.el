@@ -1999,7 +1999,7 @@ To behave like `org-roam-node-find' when creating new nodes, set
                        (hash-table-values org-node--candidate<>node))))
 
 ;;;###autoload
-(defun org-node-insert-link (&optional region-as-initial-input)
+(defun org-node-insert-link (&optional region-as-initial-input immediate)
   "Insert a link to one of your ID nodes.
 
 To behave exactly like org-roam\\='s `org-roam-node-insert',
@@ -2028,8 +2028,10 @@ Optional argument REGION-AS-INITIAL-INPUT t means behave as
                             (try-completion region-text org-node--title<>id)))
                       region-text
                     nil))
-         (input (completing-read "Node: " #'org-node-collection
-                                 () () initial 'org-node-hist))
+         (input (if immediate
+                    initial
+                    (completing-read "Node: " #'org-node-collection
+                                () () initial 'org-node-hist)))
          (node (gethash input org-node--candidate<>node))
          (id (if node (org-node-get-id node) (org-id-new)))
          (link-desc (or region-text
@@ -2071,6 +2073,15 @@ which the region should be linkified, you\\='ll prefer
 The commands are the same, just differing in initial input."
   (interactive nil org-mode)
   (org-node-insert-link t))
+
+(defun org-node-insert-link*-immediate ()
+  "Insert a link to one of your ID nodes immediately,
+without opening a window or buffer for that node, even
+if it was not yet created. (Not-yet-created nodes are just
+created according to the defaults for `org-node-creation-fn'.)
+Behaves otherwise exactly like `org-node-insert-link*'."
+  (interactive nil org-mode)
+  (org-node-insert-link t t))
 
 ;;;###autoload
 (defun org-node-insert-transclusion (&optional node)
