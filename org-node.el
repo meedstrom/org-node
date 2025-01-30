@@ -3342,22 +3342,22 @@ Wrap the link in double-brackets if necessary."
                                (org-node-link-dest LN))
                      (org-node-link-dest LN)))))
 
-(defun org-node-tag-add (tag-or-tags)
-  "Add TAG-OR-TAGS to the node at point.
-To always operate on the local entry, try `org-node-tag-add*'."
-  (interactive (list (org-node--read-tag)) org-mode)
-  (org-node--call-at-nearest-node #'org-node-tag-add* tag-or-tags))
+(defun org-node-tag-add (tags)
+  "Add TAGS to the node at point or nearest ancestor.
+To always operate on the local entry, use `org-node-tag-add*'."
+  (interactive (list (org-node--read-tags)) org-mode)
+  (org-node--call-at-nearest-node #'org-node-tag-add* tags))
 
-(defun org-node-tag-add* (tag-or-tags)
-  "Add TAG-OR-TAGS to the entry at point."
-  (interactive (list (org-node--read-tag)) org-mode)
-  (if (= (org-outline-level) 0)
+(defun org-node-tag-add* (tags)
+  "Add TAGS to the entry at point."
+  (interactive (list (org-node--read-tags)) org-mode)
+  (if (org-before-first-heading-p)
       ;; There's no Org builtin to set filetags yet
       ;; so we have to do it ourselves.
-      (let* ((tags (cl-loop
-                    for raw in (cdar (org-collect-keywords '("FILETAGS")))
-                    append (split-string raw ":" t)))
-             (new-tags (seq-uniq (append (ensure-list tag-or-tags) tags)))
+      (let* ((filetags (cl-loop
+                        for raw in (cdar (org-collect-keywords '("FILETAGS")))
+                        append (split-string raw ":" t)))
+             (new-tags (seq-uniq (append tags filetags)))
              (case-fold-search t))
         (save-excursion
           (without-restriction
@@ -3378,16 +3378,15 @@ To always operate on the local entry, try `org-node-tag-add*'."
               (insert "#+filetags: :" (string-join new-tags ":") ":")))))
     (save-excursion
       (org-back-to-heading)
-      (org-set-tags (seq-uniq (append (ensure-list tag-or-tags)
-                                      (org-get-tags)))))))
+      (org-set-tags (seq-uniq (append tags (org-get-tags)))))))
 
-(defun org-node--read-tag ()
-  "Prompt for an Org tag.
+(defun org-node--read-tags ()
+  "Prompt for an Org tag or several.
 Pre-fill completions by collecting tags from all known ID-nodes, as well
 as the members of `org-tag-persistent-alist' and `org-tag-alist'.
 
 Also collect current buffer tags, but only if `org-element-use-cache' is
-non-nil, because it can cause noticeable latency."
+non-nil, because it may cause noticeable lag otherwise."
   (completing-read-multiple
    "Tags: "
    (delete-dups
