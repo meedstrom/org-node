@@ -2028,10 +2028,10 @@ Optional argument REGION-AS-INITIAL-INPUT t means behave as
                             (try-completion region-text org-node--title<>id)))
                       region-text
                     nil))
-         (input (if immediate
+         (input (if (and immediate initial)
                     initial
-                    (completing-read "Node: " #'org-node-collection
-                                () () initial 'org-node-hist)))
+                  (completing-read "Node: " #'org-node-collection
+                                   () () initial 'org-node-hist)))
          (node (gethash input org-node--candidate<>node))
          (id (if node (org-node-get-id node) (org-id-new)))
          (link-desc (or region-text
