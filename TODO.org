@@ -51,3 +51,7 @@
 - [ ] ... Inspired by variable =org-id-link-consider-parent-id=, maybe scan all Org entries whether they have an ID or no, for the option to show some ID-less entries according to an user-defined rule.
 
   But better instead expend our efforts on https://edstrom.dev/hnzgj/proposal-make-org-mode-fast-for-real
+
+  - In almost the same vein: [[https://github.com/nobiot/org-transclusion/issues/237][some Doom users]] combine ID and heading links like =[[id:4a3fc3b3-caef-47d7-8e2d-ee0d246b63de::*Some heading]]=.
+
+    But I feel this isn't the correct philosophy.  It should be fine to assign IDs to every grain of sand in the universe, and if that's too many IDs for some use-case, then you filter them /for that use-case/.

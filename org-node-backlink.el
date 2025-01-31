@@ -73,7 +73,17 @@ See Info node `(org-node)'.
 ;; local mode like this just to setup buffers locally.  Going by what I'd
 ;; prefer, which is to not see so many potential no-ops on hooks.
 (define-minor-mode org-node-backlink--local-mode
-  "Buffer-local part of `org-node-backlink-mode'."
+  "Buffer-local part of `org-node-backlink-mode'.
+
+NOT a local equivalent of aforementioned global mode, but adds a set of
+buffer-local hooks to the current buffer, in addition to the global
+hooks added by the global mode.  Enabling/disabling the global mode will
+also enable/disable this mode in relevant buffers.
+
+In short, this mode is not meant to be toggled on its own, because
+backlinks functionality cannot be purely buffer-local.
+
+-----"
   :interactive nil
   (if org-node-backlink--local-mode
       (progn
@@ -442,6 +452,10 @@ where backlinks are fixed."
                                   (gethash id org-node--id<>node)))))
               ;; (#59) Do nothing if this is empty link like [[id:]]
               (when node
+                ;; Add to the dataset `affected-dests' that looks like:
+                ;;   ((file1 . (origin1 origin2 origin3 ...))
+                ;;    (file2 . (...))
+                ;;    (file3 . (...)))
                 (push id (alist-get (org-node-get-file-path node)
                                     affected-dests
                                     nil
@@ -464,7 +478,8 @@ where backlinks are fixed."
                     (org-node-backlink--fix-entry-here)))
                 (unless user-is-editing
                   ;; Normally, `org-node--with-quick-file-buffer' only saves
-                  ;; buffers it had to open itself
+                  ;; buffers it had to open anew.  Let's save even if it was
+                  ;; open.
                   (let ((before-save-hook nil)
                         (after-save-hook nil))
                     (save-buffer))))))))))

@@ -3064,7 +3064,7 @@ Optional keyword argument ABOUT-TO-DO as in
 
 (define-error 'org-node-must-retry "Unexpected signal org-node-must-retry")
 
-;; TODO: Maybe have it prompt to kill all buffers prior to start
+;; REVIEW: Check out fileloop.el
 (cl-defun org-node--in-files-do
     (&key files fundamental-mode msg about-to-do call too-many-files-hack)
   "Temporarily visit each file in FILES and call function CALL.
@@ -3076,10 +3076,10 @@ the output of `org-node-list-files', but easily violated otherwise.
 While the loop runs, print a message every now and then, composed
 of MSG and a counter for the amount of files left to visit.
 
-On running across a problem such as the auto-save being newer
-than the original, prompt the user to recover it using
-ABOUT-TO-DO to clarify why the file is about to be accessed, and
-break the loop when the user declines.
+On running across a problem such as the auto-save being newer than the
+canonical file, prompt the user to recover it using string ABOUT-TO-DO
+to clarify why the file is about to be accessed, and break the loop if
+the user declines.
 
 If the user quits mid-way through the loop, or it is broken,
 return the remainder of FILES that have not yet been visited.
@@ -3142,7 +3142,7 @@ For explanation of TOO-MANY-FILES-HACK, see code comments."
               (setq was-open (find-buffer-visiting file))
               (setq buf (or was-open
                             (if fundamental-mode
-                                (let (auto-mode-alist)
+                                (let ((auto-mode-alist nil))
                                   (org-node--find-file-noselect
                                    file about-to-do))
                               (delay-mode-hooks
@@ -3168,8 +3168,10 @@ For explanation of TOO-MANY-FILES-HACK, see code comments."
                            :call call
                            :too-many-files-hack too-many-files-hack)
            ;; Because of the hack, the caller only receives `files*' once, and
-           ;; each timer run after that won't modify
+           ;; each timer run after that would not modify global variable like
            ;; `org-node-backlink--files-to-fix', so try to modify as a nicety.
+           ;; The consequence is that user can quit and resume without
+           ;; restarting nearly the entire file list.
            ;; This works until the last iteration, because a cons cell cannot
            ;; be destructively reassigned to nil.
            (setcar files (car files*))
