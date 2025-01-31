@@ -317,7 +317,7 @@ headings but you have only done work under one of them."
             ;; "Reflink"
             (setq id (gethash path org-node--ref<>id))
             (setq file (ignore-errors
-                         (org-node-get-file-path
+                         (org-node-get-file
                           (gethash id org-node--id<>node)))))
           (when (null file)
             (push id org-node-backlink--fails))
@@ -451,7 +451,7 @@ where backlinks are fixed."
                 ;;   ((file1 . (origin1 origin2 origin3 ...))
                 ;;    (file2 . (...))
                 ;;    (file3 . (...)))
-                (push id (alist-get (org-node-get-file-path node)
+                (push id (alist-get (org-node-get-file node)
                                     affected-dests
                                     nil
                                     nil

@@ -293,7 +293,7 @@ directory named \"archive\".
       (lambda (node)
         (not (or (assoc \"ROAM_EXCLUDE\" (org-node-get-properties node))
                  (org-node-get-todo node)
-                 (string-search \"/archive/\" (org-node-get-file-path node))
+                 (string-search \"/archive/\" (org-node-get-file node))
                  (member \"drill\" (org-node-get-tags-local node))))))"
   :type 'function
   :set #'org-node--set-and-remind-reset)
@@ -580,7 +580,7 @@ or the README available as Info node `(org-node)'."
               "List of ROAM_ALIASES registered on the node.")
   (deadline   nil :read-only t :type string :documentation
               "Node's DEADLINE state.")
-  (file-path  nil :read-only t :type string :documentation
+  (file       nil :read-only t :type string :documentation
               "Truename of file where the node is.
 Abbreviated per `abbreviate-file-name'.")
   (file-title nil :read-only t :type string :documentation
@@ -635,7 +635,7 @@ Also respect `org-tags-exclude-from-inheritance'."
 (defun org-node-get-file-title-or-basename (node)
   "Return the #+title of file where NODE is, or file name if absent."
   (or (org-node-get-file-title node)
-      (file-name-nondirectory (org-node-get-file-path node))))
+      (file-name-nondirectory (org-node-get-file node))))
 
 ;; Used to be part of the struct
 (defun org-node-get-is-subtree (node)
@@ -646,7 +646,6 @@ Also respect `org-tags-exclude-from-inheritance'."
 (defalias 'org-node-get-props #'org-node-get-properties)
 ;; (defalias 'org-node-get-prio #'org-node-get-priority)
 ;; (defalias 'org-node-get-sched #'org-node-get-scheduled)
-;; (defalias 'org-node-get-file #'org-node-get-file-path)
 ;; (defalias 'org-node-get-lvl #'org-node-get-level)
 
 (cl-defstruct (org-node-link (:constructor org-node-link--make-obj)
@@ -1190,7 +1189,7 @@ up-to-date set.")
         (filterer (org-node--try-ensure-compiled org-node-filter-fn)))
     (dolist (node nodes)
       (let* ((id (org-node-get-id node))
-             (path (org-node-get-file-path node))
+             (path (org-node-get-file node))
              (refs (org-node-get-refs node)))
         ;; Share location with org-id & do so with manual `puthash'
         ;; because `org-id-add-location' would run logic we've already run
@@ -1313,7 +1312,7 @@ thorough cleanup."
   (when files
     (cl-loop
      for node being each hash-value of org-node--id<>node
-     when (member (org-node-get-file-path node) files)
+     when (member (org-node-get-file node) files)
      collect (org-node-get-id node) into ids
      and append (org-node-get-refs node) into refs
      and append (cons (org-node-get-title node)
@@ -1333,7 +1332,7 @@ thorough cleanup."
     (cl-loop
      for candidate being each hash-key of org-node--candidate<>node
      using (hash-values node)
-     when (member (org-node-get-file-path node) files)
+     when (member (org-node-get-file node) files)
      do (remhash candidate org-node--candidate<>node))))
 
 (defun org-node--dirty-ensure-link-known (&optional id &rest _)
@@ -1761,7 +1760,7 @@ Automatically set, should be nil most of the time.")
 (defun org-node--goto (node)
   "Visit NODE."
   (if node
-      (let ((file (org-node-get-file-path node)))
+      (let ((file (org-node-get-file node)))
         (if (file-exists-p file)
             (progn
               (when (not (file-readable-p file))
@@ -1932,7 +1931,7 @@ type the name of a node that does not exist.  That enables this
     (if node
         ;; Node exists; capture into it
         (progn
-          (find-file (org-node-get-file-path node))
+          (find-file (org-node-get-file node))
           (widen)
           (goto-char (org-node-get-pos node))
           (org-reveal)

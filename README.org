@@ -218,7 +218,7 @@ Or you could go with a whitelist approach, to show only nodes from a certain dir
 #+begin_src elisp
 (setq org-node-filter-fn
       (lambda (node)
-        (and (string-search "/my-personal-wiki/" (org-node-get-file-path node))
+        (and (string-search "/my-personal-wiki/" (org-node-get-file node))
              (not (assoc "ROAM_EXCLUDE" (org-node-get-properties node))))))
 #+end_src
 
@@ -239,7 +239,7 @@ It works well for me to filter out any file or directory that happens to contain
 #+begin_src elisp
 (setq org-node-filter-fn
       (lambda (node)
-        (not (string-search "archive" (org-node-get-file-path node)))))
+        (not (string-search "archive" (org-node-get-file node)))))
 #+end_src
 
 Or put something like =#+filetags: :hide_node:= at the top of each file, and set:
@@ -459,7 +459,7 @@ API cheatsheet between org-roam and org-node.
 | Get title                               | =(org-roam-node-title NODE)=       | =(org-node-get-title NODE)=                                         |
 | Get title of file where NODE is         | =(org-roam-node-file-title NODE)=  | =(org-node-get-file-title NODE)=                                    |
 | Get title /or/ name of file where NODE is |                                  | =(org-node-get-file-title-or-basename NODE)=                        |
-| Get name of file where NODE is          | =(org-roam-node-file NODE)=        | =(org-node-get-file-path NODE)=                                     |
+| Get name of file where NODE is          | =(org-roam-node-file NODE)=        | =(org-node-get-file NODE)=                                     |
 | Get ID                                  | =(org-roam-node-id NODE)=          | =(org-node-get-id NODE)=                                            |
 | Get tags                                | =(org-roam-node-tags NODE)=        | =(org-node-get-tags NODE)=                                          |
 | Get local tags                          |                                  | =(org-node-get-tags-local NODE)=                                    |

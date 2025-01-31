@@ -116,6 +116,8 @@ hardcoded strings."
 (org-node-changes--def-whiny-alias 'org-node-tag-add* 'org-node-tag-add-here
                                    "2025-01-30" nil "30 February 2025")
 
+(defalias 'org-node-get-file-path 'org-node-get-file) ;; 2025-01-31
+
 ;; 1.9.0 (2024-11-18) moved series-related code into its own file, whereupon
 ;; the namespace had to be made consistent.
 (org-node-changes--def-whiny-alias 'org-node-series-goto           'org-node-seq-goto "2024-11-18")

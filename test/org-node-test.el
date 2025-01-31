@@ -111,7 +111,7 @@
     (org-node--goto node)
     (should (equal (point) (org-node-get-pos node)))
     (should (equal (abbreviate-file-name (buffer-file-name))
-                   (org-node-get-file-path node)))))
+                   (org-node-get-file node)))))
 
 (ert-deftest org-node/test-split-into-n-sublists ()
   (should (equal 4 (length (org-node--split-into-n-sublists

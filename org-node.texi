@@ -313,9 +313,7 @@ If you use org-roam, you probably want the following module as well.  Check its 
 @node An update broke things?
 @subsection An update broke things?
 
-You can rollback to a version that used to work.  See @uref{https://github.com/meedstrom/org-node#appendix-ii-how-to-rollback, How to rollback} at the end of this readme.
-
-As of v1.8, part of the code was spun out to a new library (@uref{https://github.com/meedstrom/el-job/, el-job}) -- you may have to update your package repositories via commands @samp{package-refresh-contents}, @samp{elpaca-update-menus} or equivalent.
+See @uref{https://github.com/meedstrom/org-node#appendix-ii-how-to-rollback, How to rollback} at the end of this readme.
 
 @node Quick start
 @section Quick start
@@ -453,7 +451,7 @@ Do a @samp{M-x org-node-reset} and see if it can find your notes now.
 
 If you have org-roam loaded, but no longer update the DB, opening a link can sometimes send you to an outdated file path due to @uref{https://github.com/org-roam/org-roam/blob/2a630476b3d49d7106f582e7f62b515c62430714/org-roam-id.el#L91, a line in org-roam-id.el} that causes org-id to @emph{preferentially} look up the org-roam DB instead of org-id's own table!
 
-Either revert that with the following snippet, or the extension @uref{https://github.com/meedstrom/org-node-fakeroam, org-node-fakeroam} covers your needs, simply delete the DB (located at "~/.emacs.d/org-roam.db").
+Either revert that with the following snippet, or if the extension @uref{https://github.com/meedstrom/org-node-fakeroam, org-node-fakeroam} covers your needs, simply delete the DB (normally located at "~/.emacs.d/org-roam.db").
 
 @lisp
 ;; Undo a Roam override
@@ -475,8 +473,7 @@ This could work by---for example---excluding anything tagged "project" or perhap
       (lambda (node)
         (not
          (or (org-node-get-todo node)
-             (member "project"
-                     (org-node-get-tags-with-inheritance node))
+             (member "project" (org-node-get-tags node))
              (assoc "ROAM_EXCLUDE" (org-node-get-properties node))))))
 @end lisp
 
@@ -485,7 +482,7 @@ Or you could go with a whitelist approach, to show only nodes from a certain dir
 @lisp
 (setq org-node-filter-fn
       (lambda (node)
-        (and (string-search "/my-personal-wiki/" (org-node-get-file-path node))
+        (and (string-search "/my-personal-wiki/" (org-node-get-file node))
              (not (assoc "ROAM_EXCLUDE" (org-node-get-properties node))))))
 @end lisp
 
@@ -509,7 +506,7 @@ It works well for me to filter out any file or directory that happens to contain
 @lisp
 (setq org-node-filter-fn
       (lambda (node)
-        (not (string-search "archive" (org-node-get-file-path node)))))
+        (not (string-search "archive" (org-node-get-file node)))))
 @end lisp
 
 Or put something like @samp{#+filetags: :hide_node:} at the top of each file, and set:
@@ -517,8 +514,7 @@ Or put something like @samp{#+filetags: :hide_node:} at the top of each file, an
 @lisp
 (setq org-node-filter-fn
       (lambda (node)
-        (not (member "hide_node"
-                     (org-node-get-tags-with-inheritance node))))))
+        (not (member "hide_node" (org-node-get-tags node))))))
 @end lisp
 
 @node Org-capture
@@ -872,13 +868,13 @@ API cheatsheet between org-roam and org-node.
 @tab @samp{(org-node-get-file-title-or-basename NODE)}
 @item Get name of file where NODE is
 @tab @samp{(org-roam-node-file NODE)}
-@tab @samp{(org-node-get-file-path NODE)}
+@tab @samp{(org-node-get-file NODE)}
 @item Get ID
 @tab @samp{(org-roam-node-id NODE)}
 @tab @samp{(org-node-get-id NODE)}
 @item Get tags
 @tab @samp{(org-roam-node-tags NODE)}
-@tab @samp{(org-node-get-tags-with-inheritance NODE)}
+@tab @samp{(org-node-get-tags NODE)}
 @item Get local tags
 @tab 
 @tab @samp{(org-node-get-tags-local NODE)}

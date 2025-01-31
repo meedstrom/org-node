@@ -136,8 +136,8 @@ YYYY-MM-DD format, e.g. \"2024-01-31.org\"."
     :version 2
     :capture ,capture
     :classifier (lambda (node)
-                  (when (string-prefix-p ,dir (org-node-get-file-path node))
-                    (let* ((path (org-node-get-file-path node))
+                  (when (string-prefix-p ,dir (org-node-get-file node))
+                    (let* ((path (org-node-get-file node))
                            (sortstr (file-name-base path)))
                       (cons sortstr path))))
     :whereami (lambda ()
