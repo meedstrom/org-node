@@ -1490,6 +1490,7 @@ list the files in a new buffer."
                                               org-node-extra-id-dirs-exclude)))
                  do (or (gethash file org-node--file<>mtime)
                         (puthash file 0 org-node--file<>mtime))))
+      (org-node--init-ids)
       (cl-loop for file being each hash-value of org-id-locations
                do (or (gethash file org-node--file<>mtime)
                       (puthash file 0 org-node--file<>mtime))))
