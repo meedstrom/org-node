@@ -3188,8 +3188,7 @@ For explanation of TOO-MANY-FILES-HACK, see code comments."
              (kill-buffer buf))
            files*)
           (:success
-           (when too-many-files-hack
-             (message "%s... done" msg))
+           (message "%s... done" msg)
            nil))))))
 
 ;; Somewhat faster than `find-file-noselect', not benchmarked.
@@ -3339,16 +3338,18 @@ Wrap the link in double-brackets if necessary."
 
 ;; TODO: Try to include all Firefox bookmarks and so on
 (defun org-node--list-known-raw-links ()
-  (cl-loop
-   for list being the hash-values of org-node--dest<>links
-   append (cl-loop
-           for LN in list
-           unless (equal "id" (org-node-link-type LN))
-           collect (if (org-node-link-type LN)
-                       (concat (org-node-link-type LN)
-                               ":"
-                               (org-node-link-dest LN))
-                     (org-node-link-dest LN)))))
+  (let (result)
+    (maphash
+     (lambda (dest links)
+       (let ((types (mapcar #'org-node-link-type links)))
+         (when (memq nil types)
+           ;; Type nil is a @citation
+           (push dest result)
+           (setq types (delq nil types)))
+         (dolist (type (delete-dups (delete "id" types)))
+           (push (concat type ":" dest) result))))
+     org-node--dest<>links)
+    result))
 
 (defun org-node-tag-add (tags)
   "Add TAGS to the node at point or nearest ancestor.
