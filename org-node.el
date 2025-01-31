@@ -619,19 +619,24 @@ In the latter case, there is no difference from `file-title'.")
               "Node's TODO state."))
 
 (defun org-node-get-tags (node)
-  "Return NODE\\='s tags."
+  "Return NODE\\='s tags.
+
+See also:
+- `org-node-get-tags-local'
+- `org-node-get-tags-with-inheritance'
+
+This uses either of those two,
+depending on the current value of `org-use-tag-inheritance'."
   (if org-use-tag-inheritance
       (org-node-get-tags-with-inheritance node)
     (org-node-get-tags-local node)))
 
-;; Used to be part of the struct
 (defun org-node-get-tags-with-inheritance (node)
   "Return all tags for NODE, local and inherited.
 Also respect `org-tags-exclude-from-inheritance'."
   (delete-dups (append (org-node-get-tags-local node)
                        (org-node-get-tags-inherited node))))
 
-;; Used to be part of the struct
 (defun org-node-get-file-title-or-basename (node)
   "Return the #+title of file where NODE is, or file name if absent."
   (or (org-node-get-file-title node)
