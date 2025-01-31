@@ -3376,14 +3376,8 @@ To always operate on the local entry, use `org-node-tag-add-here'."
                   (atomic-change-group
                     (delete-region (point) (pos-eol))
                     (insert ":" (string-join new-tags ":") ":")))
-              (if (re-search-forward "^[^:#]" nil t)
-                  (progn
-                    (backward-char 1)
-                    (skip-chars-backward "\n\t\s"))
-                (goto-char (point-max)))
-              (unless (looking-back "\n")
-                (newline))
-              (insert "#+filetags: :" (string-join new-tags ":") ":")))))
+              (org-node--end-of-meta-data)
+              (insert "#+filetags: :" (string-join new-tags ":") ":\n")))))
     (save-excursion
       (org-back-to-heading)
       (org-set-tags (seq-uniq (append tags (org-get-tags)))))))
@@ -3407,6 +3401,50 @@ non-nil, because it may cause noticeable lag otherwise."
                         (mapcar #'substring-no-properties))
            (cl-loop for node being each hash-value of org-node--id<>node
                     append (org-node-get-tags-with-inheritance node))))))
+
+(defun org-node--end-of-meta-data (&optional full)
+  "Like `org-end-of-meta-data', but supports file-level metadata.
+
+Argument FULL same as in that function when point is in a subtree,
+ignored otherwise.  When point is before the first heading, always jump
+to a position after any file-level properties and keywords.
+
+As in `org-end-of-meta-data', point always lands on a newline.  Since
+that may be the beginning of the next heading, you should probably check
+`org-at-heading-p' and do `open-line' prior to inserting any text."
+  (if (org-before-first-heading-p)
+      (progn
+        (goto-char (point-min))
+        ;; Jump past top-level PROPERTIES drawer.
+        (let ((case-fold-search t))
+          (when (looking-at-p "[\t\s]*?:properties: *?$")
+            (forward-line)
+            (while (looking-at-p "[\t\s]*?:")
+              (forward-line))))
+        ;; Jump past #+keywords, comment lines and blank lines.
+        (while (looking-at-p (rx (*? (any "\t\s")) (or "#+" "# " "\n")))
+          (forward-line)))
+    ;; PERF: Override a bottleneck in `org-end-of-meta-data'.
+    (cl-letf (((symbol-function 'org-back-to-heading)
+               #'org-node--back-to-heading-or-point-min))
+      (org-end-of-meta-data full))))
+
+(defun org-node--back-to-heading-or-point-min (&optional invisible-ok)
+  "Alternative to `org-back-to-heading-or-point-min'.
+Argument INVISIBLE-OK as in that function.
+
+Like `org-back-to-heading-or-point-min' but should be faster in the case
+that an org-element cache has not been built for the buffer.  This can
+be the case in a buffer spawned by `org-roam-with-temp-buffer'.
+
+As bonus, do not land on an inlinetask, seek a real heading."
+  (let ((inlinetask-re (when (fboundp 'org-inlinetask-outline-regexp)
+                         (org-inlinetask-outline-regexp))))
+    (cl-loop until (and (org-at-heading-p (not invisible-ok))
+                        (not (and inlinetask-re (looking-at-p inlinetask-re))))
+             unless (re-search-backward org-outline-regexp-bol nil t)
+             return (goto-char (point-min)))
+    (point)))
 
 
 ;;;; CAPF (Completion-At-Point Function)
