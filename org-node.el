@@ -1289,7 +1289,7 @@ be misleading."
              (gethash fn org-node--compiled-lambdas)
            ;; https://github.com/meedstrom/org-node/issues/76
            (( cl-no-applicable-method )
-            (message "Caught signal, please report org-node bug if this happens a lot: %S"
+            (message "Caught unexpected signal. If this happens a lot, please file an issue at https://github.com/meedstrom/org-node:  %S"
                      err)
             nil)))
         ((prog1 (puthash fn (byte-compile fn) org-node--compiled-lambdas)
@@ -3208,8 +3208,10 @@ subroutine for `org-node--in-files-do' or any program that has
 already ensured that ABBR-TRUENAME:
 
 - is an abbreviated file truename
+  - \(i.e. the equivalent of passing a wild filename through
+     `file-truename' and then `abbreviate-file-name')
 - does not satisfy `backup-file-name-p'
-- is not being visited by any other buffer
+- is not already being visited in another buffer
 - is not a directory"
   (let ((attrs (file-attributes abbr-truename))
         (buf (create-file-buffer abbr-truename)))
@@ -3468,7 +3470,7 @@ If already visiting that node, then follow the link normally."
   (when-let ((url (thing-at-point 'url)))
     ;; Rarely more than one car
     (let* ((dest (car (org-node-parser--split-refs-field url)))
-           (found (cl-loop for node being the hash-values of org-nodes
+           (found (cl-loop for node being each hash-value of org-nodes
                            when (member dest (org-node-get-refs node))
                            return node)))
       (if (and found
