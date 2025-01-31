@@ -2081,7 +2081,10 @@ if it was not yet created. (Not-yet-created nodes are just
 created according to the defaults for `org-node-creation-fn'.)
 Behaves otherwise exactly like `org-node-insert-link*'."
   (interactive nil org-mode)
-  (org-node-insert-link t t))
+  (let ((org-roam-capture-templates
+         (list (append (car org-roam-capture-templates)
+                       '(:immediate-finish t)))))
+    (org-node-insert-link t t)))
 
 ;;;###autoload
 (defun org-node-insert-transclusion (&optional node)
