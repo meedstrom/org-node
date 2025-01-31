@@ -1243,13 +1243,13 @@ be misleading."
   (if (not org-node-cache-mode)
       (message "Scan complete (Hint: Turn on org-node-cache-mode)")
     (let ((n-subtrees (cl-loop
-                       for node being the hash-values of org-node--id<>node
+                       for node being each hash-value of org-node--id<>node
                        count (org-node-get-is-subtree node)))
           (n-backlinks (cl-loop
-                        for id being the hash-keys of org-node--id<>node
+                        for id being each hash-key of org-node--id<>node
                         sum (length (gethash id org-node--dest<>links))))
           (n-reflinks (cl-loop
-                       for ref being the hash-keys of org-node--ref<>id
+                       for ref being each hash-key of org-node--ref<>id
                        sum (length (gethash ref org-node--dest<>links)))))
       (message "Saw %d file-nodes, %d subtree-nodes, %d ID-links, %d reflinks in %.2fs CPU-time (%.2fs wall-time)"
                (- (hash-table-count org-node--id<>node) n-subtrees)
@@ -2793,7 +2793,7 @@ from ID links found in `org-node--dest<>links'."
    "src\tdest\n"
    (string-join
     (seq-uniq (cl-loop
-               for dest being the hash-keys of org-node--dest<>links
+               for dest being each hash-key of org-node--dest<>links
                using (hash-values links)
                append (cl-loop
                        for link in links
@@ -2857,7 +2857,7 @@ with \\[universal-argument] prefix."
   "List links that lead to no known ID."
   (interactive)
   (let ((dead-links
-         (cl-loop for dest being the hash-keys of org-node--dest<>links
+         (cl-loop for dest being each hash-key of org-node--dest<>links
                   using (hash-values links)
                   unless (gethash dest org-node--id<>node)
                   append (cl-loop for link in links
@@ -2898,20 +2898,20 @@ one of them is associated with a ROAM_REFS property."
   (interactive)
   (if-let* ((link-objects-excluding-id-type
              (cl-loop
-              for list being the hash-values of org-node--dest<>links
+              for list being each hash-value of org-node--dest<>links
               append (cl-loop
-                      for LN in list
-                      unless (equal "id" (org-node-link-type LN))
-                      collect LN)))
+                      for LINK in list
+                      unless (equal "id" (org-node-link-type LINK))
+                      collect LINK)))
             (entries
              (cl-loop
-              for LN in link-objects-excluding-id-type
-              collect (let ((type (org-node-link-type LN))
-                            (dest (org-node-link-dest LN))
-                            (origin (org-node-link-origin LN))
-                            (pos (org-node-link-pos LN)))
+              for LINK in link-objects-excluding-id-type
+              collect (let ((type (org-node-link-type LINK))
+                            (dest (org-node-link-dest LINK))
+                            (origin (org-node-link-origin LINK))
+                            (pos (org-node-link-pos LINK)))
                         (let ((node (gethash origin org-node--id<>node)))
-                          (list LN
+                          (list LINK
                                 (vector
                                  (if (gethash dest org-node--ref<>id) "*" "")
                                  (if node

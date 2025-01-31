@@ -474,7 +474,7 @@ DEF is a seq-def from `org-node-seq-defs'."
               if (functionp elt)
               collect (org-node--try-ensure-compiled elt)
               else collect elt)
-     (cl-loop for node being the hash-values of org-node--id<>node
+     (cl-loop for node being each hash-value of org-node--id<>node
               as result = (funcall classifier node)
               if (listp (car result))
               nconc result into items
