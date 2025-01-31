@@ -3347,11 +3347,11 @@ Wrap the link in double-brackets if necessary."
 
 (defun org-node-tag-add (tags)
   "Add TAGS to the node at point or nearest ancestor.
-To always operate on the local entry, use `org-node-tag-add*'."
+To always operate on the local entry, use `org-node-tag-add-here'."
   (interactive (list (org-node--read-tags)) org-mode)
-  (org-node--call-at-nearest-node #'org-node-tag-add* tags))
+  (org-node--call-at-nearest-node #'org-node-tag-add-here tags))
 
-(defun org-node-tag-add* (tags)
+(defun org-node-tag-add-here (tags)
   "Add TAGS to the entry at point."
   (interactive (list (org-node--read-tags)) org-mode)
   (if (org-before-first-heading-p)
