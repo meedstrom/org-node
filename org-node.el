@@ -3502,18 +3502,6 @@ heading, else the file-level node, whichever has an ID first."
                             () () () 'org-node-hist)
            org-node--candidate<>node))
 
-
-;;; Obsolete
-
-(defun org-node--purge-backup-file-names ()
-  "Clean backup names accidentally added to org-id database."
-  (setq org-id-files (seq-remove #'backup-file-name-p org-id-files))
-  (setq org-id-locations
-        (org-id-alist-to-hash
-         (cl-loop for entry in (org-id-hash-to-alist org-id-locations)
-                  unless (backup-file-name-p (car entry))
-                  collect entry))))
-
 (provide 'org-node)
 
 ;;; org-node.el ends here

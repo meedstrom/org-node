@@ -50,8 +50,8 @@ See Info node `(org-node)'.
   :global t
   :group 'org-node
   (when (member #'org-node-backlink-mode org-mode-hook)
-    ;; 2024-10-22
-    (message "Now a global mode: `org-node-backlink-mode'")
+    (display-warning
+     'org-node "Since 2024-10-22, `org-node-backlink-mode' is a global mode, but your initfiles still add it to `org-mode-hook'")
     (remove-hook 'org-mode-hook #'org-node-backlink-mode))
   (if org-node-backlink-mode
       (progn
@@ -96,11 +96,6 @@ backlinks functionality cannot be purely buffer-local.
     (remove-hook 'org-node-insert-link-hook       #'org-node-backlink--add-in-target t)
     (remove-hook 'after-change-functions          #'org-node-backlink--flag-buffer-modification t)
     (remove-hook 'before-save-hook                #'org-node-backlink--fix-flagged-parts-of-buffer t)))
-
-;;;###autoload (autoload 'org-node-backlink-global-mode "org-node-backlink" nil t)
-(org-node-changes--def-whiny-alias 'org-node-backlink-global-mode
-                                   #'org-node-backlink-mode
-                                   "2024-10-22" nil "15 December 2024")
 
 
 ;;;; Buffer validation

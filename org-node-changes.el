@@ -118,10 +118,6 @@ hardcoded strings."
 
 ;; 1.9.0 (2024-11-18) moved series-related code into its own file, whereupon
 ;; the namespace had to be made consistent.
-(org-node-changes--def-whiny-alias 'org-node--guess-daily-dir      'org-node-seq--guess-daily-dir "2024-11-18")
-(org-node-changes--def-whiny-alias 'org-node--series-jump          'org-node-seq--jump "2024-11-18")
-(org-node-changes--def-whiny-alias 'org-node--series-goto-next     'org-node-seq--goto-next "2024-11-18")
-(org-node-changes--def-whiny-alias 'org-node--series-goto-previous 'org-node-seq--goto-previous "2024-11-18")
 (org-node-changes--def-whiny-alias 'org-node-series-goto           'org-node-seq-goto "2024-11-18")
 (org-node-changes--def-whiny-alias 'org-node-series-dispatch       'org-node-seq-dispatch "2024-11-18")
 (org-node-changes--def-whiny-alias 'org-node-helper-try-goto-id    'org-node-seq-try-goto-id "2024-11-18")
@@ -137,20 +133,6 @@ hardcoded strings."
 ;; Used by org-node-fakeroam until 1.6.0 (co-released with org-node 1.9.0)
 (define-obsolete-variable-alias 'org-node-proposed-series-key 'org-node-proposed-sequence  "2024-11-18")
 (org-node-changes--def-whiny-alias 'org-node--add-series-item 'org-node-seq--add-item "2024-11-18")
-
-(defun org-node--tmpfile (&optional basename &rest args)
-  "Return a path that puts BASENAME in a temporary directory.
-As a nicety, `format' BASENAME with ARGS too.
-
-On most Unix systems, the resulting string will be
-/tmp/org-node/BASENAME."
-  (display-warning 'org-node
-                   "Old function `org-node--tmpfile' will be removed on 10 January 2025; please update org-node-fakeroam and call `org-node-fakeroam--tmpfile'")
-  (mkdir (file-name-concat temporary-file-directory "org-node")
-         t)
-  (file-name-concat temporary-file-directory
-                    "org-node"
-                    (when basename (apply #'format basename args))))
 
 (provide 'org-node-changes)
 
