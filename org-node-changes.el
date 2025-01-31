@@ -113,6 +113,9 @@ hardcoded strings."
                 ,old ,(or removed-by "30 January 2025") ,new))
        (apply ,new args))))
 
+(org-node-changes--def-whiny-alias 'org-node-tag-add* 'org-node-tag-add-here
+                                   "2025-01-30" nil "30 February 2025")
+
 ;; 1.9.0 (2024-11-18) moved series-related code into its own file, whereupon
 ;; the namespace had to be made consistent.
 (org-node-changes--def-whiny-alias 'org-node--guess-daily-dir      'org-node-seq--guess-daily-dir "2024-11-18")
