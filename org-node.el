@@ -18,7 +18,7 @@
 ;; Author:           Martin Edström <meedstrom91@gmail.com>
 ;; Created:          2024-04-13
 ;; Keywords:         org, hypermedia
-;; Package-Requires: ((emacs "28.1") (compat "30") (el-job "0.3.18") (llama "0.4.0"))
+;; Package-Requires: ((emacs "28.1") (compat "30") (el-job "0.3.22") (llama "0.4.0"))
 ;; URL:              https://github.com/meedstrom/org-node
 
 ;; NOTE: Looking for Package-Version?
@@ -916,8 +916,8 @@ SYNCHRONOUS t, unless SYNCHRONOUS is the symbol `must-async'."
   (when (eq t synchronous)
     ;; Block until all processes finish
     (if org-node-cache-mode
-        (el-job--await 'org-node 9 "org-node caching...")
-      (el-job--await 'org-node 9 "org-node caching... (Hint: Avoid this hang by enabling org-node-cache-mode early)"))))
+        (el-job-await 'org-node 9 "org-node caching...")
+      (el-job-await 'org-node 9 "org-node caching... (Hint: Avoid this hang by enabling org-node-cache-mode early)"))))
 
 ;; BUG: A heisenbug lurks inside (or is revealed by) org-id.
 ;; https://emacs.stackexchange.com/questions/81794/

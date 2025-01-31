@@ -24,7 +24,8 @@
 ;; `org-node-parser--collect-dangerously', then die.
 
 ;; NOTE: While developing, do not eval only specific defuns;
-;; `el-job--find-lib' needs you to save the file and do `eval-buffer'.
+;; `el-job--ensure-compiled-lib' needs you to save the file and do
+;; `eval-buffer'.
 
 ;;; Code:
 
