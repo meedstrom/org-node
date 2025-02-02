@@ -1266,6 +1266,7 @@ be misleading."
 (defvar org-node--compile-timers nil)
 (defvar org-node--compiled-lambdas (make-hash-table :test #'equal)
   "1:1 table mapping lambda expressions to compiled bytecode.")
+(defvar org-node--old-compiled-lambdas nil)
 
 (defun org-node--try-ensure-compiled (fn)
   "Try to return FN as a compiled function.
@@ -1289,19 +1290,18 @@ be misleading."
              (byte-compile fn))
            ;; May be uncompiled until native comp is done
            fn))
-        ((condition-case err
-             (gethash fn org-node--compiled-lambdas)
-           ;; https://github.com/meedstrom/org-node/issues/76
-           (( cl-no-applicable-method )
-            (message "Caught unexpected signal. If this happens a lot, please file an issue at https://github.com/meedstrom/org-node:  %S"
-                     err)
-            nil)))
+        ((gethash fn org-node--compiled-lambdas))
         ((prog1 (puthash fn (byte-compile fn) org-node--compiled-lambdas)
            (when (and (native-comp-available-p)
                       (not (eq 'closure (car-safe fn))))
              (run-with-idle-timer (+ 5 (random 10))
                                   nil
                                   `(lambda ()
+                                     ;; Attempt to workaround #76 by saving the
+                                     ;; old byte-compiled version somewhere so
+                                     ;; it does not get garbage-collected
+                                     (push (gethash ,fn org-node--compiled-lambdas)
+                                           org-node--old-compiled-lambdas)
                                      (puthash ,fn (native-compile ,fn)
                                               org-node--compiled-lambdas))))))))
 
