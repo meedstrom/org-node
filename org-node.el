@@ -1391,7 +1391,7 @@ also necessary is `org-node--dirty-ensure-link-known' elsewhere."
               (org-node--make-obj
                :title (or heading ftitle)
                :id id
-               :file-path fpath
+               :file fpath
                :file-title ftitle
                :aliases (split-string-and-unquote
                          (or (cdr (assoc "ROAM_ALIASES" props)) ""))
