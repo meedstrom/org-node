@@ -1274,9 +1274,11 @@ be misleading."
   the same symbol and arrange to natively compile it after some
   idle time.
 
+  If this Emacs does not support native compilation, byte-compile the
+  symbol right away.
+
 - If FN is an anonymous lambda, compile it, cache the resulting
-  bytecode, and return that bytecode.  Then arrange to replace
-  the cached value with native bytecode after some idle time."
+  bytecode, and return that bytecode."
   (cond ((compiled-function-p fn) fn)
         ((symbolp fn)
          (if (compiled-function-p (symbol-function fn))
@@ -1285,25 +1287,12 @@ be misleading."
                (unless (alist-get fn org-node--compile-timers)
                  (setf (alist-get fn org-node--compile-timers)
                        (run-with-idle-timer
-                        (+ 5 (random 10)) nil #'native-compile fn)))
+                        (+ 5 (random 5)) nil #'native-compile fn)))
              (byte-compile fn))
-           ;; May be uncompiled until native comp is done
+           ;; May remain uncompiled until native comp is done
            fn))
-        ((condition-case err
-             (gethash fn org-node--compiled-lambdas)
-           ;; https://github.com/meedstrom/org-node/issues/76
-           (( cl-no-applicable-method )
-            (message "Caught unexpected signal. If this happens a lot, please file an issue at https://github.com/meedstrom/org-node:  %S"
-                     err)
-            nil)))
-        ((prog1 (puthash fn (byte-compile fn) org-node--compiled-lambdas)
-           (when (and (native-comp-available-p)
-                      (not (eq 'closure (car-safe fn))))
-             (run-with-idle-timer (+ 5 (random 10))
-                                  nil
-                                  `(lambda ()
-                                     (puthash ,fn (native-compile ,fn)
-                                              org-node--compiled-lambdas))))))))
+        ((gethash fn org-node--compiled-lambdas))
+        ((puthash fn (byte-compile fn) org-node--compiled-lambdas))))
 
 
 ;;;; "Dirty" functions
