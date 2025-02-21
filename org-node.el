@@ -3369,6 +3369,7 @@ entry, use `org-node-tags-add-here'."
 (defun org-node-tags-add-here (tags)
   "Add TAGS to the entry at point."
   (interactive (list (org-node--read-tags)) org-mode)
+  (setq tags (ensure-list tags))
   (if (org-before-first-heading-p)
       ;; There's no Org builtin to set filetags yet
       ;; so we have to do it ourselves.
