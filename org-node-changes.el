@@ -115,11 +115,11 @@ hardcoded strings."
 
 ;; To slow deprecate
 (defalias 'org-node-get-file-path 'org-node-get-file) ;; 2025-01-31
-(define-obsolete-function-alias 'org-node-ref-add 'org-node-refs-add "2025-02-21")
-(define-obsolete-function-alias 'org-node-tag-add 'org-node-tags-add "2025-02-21")
-(define-obsolete-function-alias 'org-node-tag-add-here 'org-node-tags-add-here "2025-02-21")
+(define-obsolete-function-alias 'org-node-ref-add 'org-node-add-refs "2025-02-21")
+(define-obsolete-function-alias 'org-node-tag-add 'org-node-add-tags "2025-02-21")
+(define-obsolete-function-alias 'org-node-tag-add-here 'org-node-add-tags-here "2025-02-21")
 
-(org-node-changes--def-whiny-alias 'org-node-tag-add* 'org-node-tags-add-here
+(org-node-changes--def-whiny-alias 'org-node-tag-add* 'org-node-add-tags-here
                                    "30 January 2025" nil "30 February 2025")
 
 ;; 1.9.0 (2024-11-18) moved series-related code into its own file, whereupon

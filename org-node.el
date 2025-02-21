@@ -153,7 +153,7 @@ for the same node.
 For performance reasons, not just any string of text is accepted in the
 ROAM_REFS property -- it must have valid links per Org syntax, such as
 \"[[https://gnu.org]]\" or \"https://gnu.org\".
-Use the command \\[org-node-refs-add] for convenience.
+Use the command \\[org-node-add-refs] for convenience.
 
 Finally, this variable controls which link types are permitted.
 The fewer types, the faster your \\[org-node-reset].
@@ -3315,14 +3315,14 @@ as \"%20\", wrap VALUE in quotes if it has spaces."
          (org-entry-put nil property (combine-and-quote-strings
                                       (cons value old))))))))
 
-(defun org-node-alias-add ()
+(defun org-node-add-alias ()
   "Add to ROAM_ALIASES in nearest relevant property drawer."
   (interactive nil org-mode)
   (org-node--add-to-property-keep-space
    "ROAM_ALIASES" (string-trim (read-string "Alias: "))))
 
 ;; FIXME: What if user yanks a [cite:... ... ...]?
-(defun org-node-refs-add ()
+(defun org-node-add-refs ()
   "Add a link to ROAM_REFS in nearest relevant property drawer.
 Wrap the link in double-brackets if necessary."
   (interactive nil org-mode)
@@ -3358,15 +3358,15 @@ Wrap the link in double-brackets if necessary."
      org-node--dest<>links)
     result))
 
-(defun org-node-tags-add (tags)
+(defun org-node-add-tags (tags)
   "Add TAGS to the node at point or nearest ancestor that is a node.
 
 Uses `org-node--call-at-nearest-node'.  To always operate on the current
-entry, use `org-node-tags-add-here'."
+entry, use `org-node-add-tags-here'."
   (interactive (list (org-node--read-tags)) org-mode)
-  (org-node--call-at-nearest-node #'org-node-tags-add-here tags))
+  (org-node--call-at-nearest-node #'org-node-add-tags-here tags))
 
-(defun org-node-tags-add-here (tags)
+(defun org-node-add-tags-here (tags)
   "Add TAGS to the entry at point."
   (interactive (list (org-node--read-tags)) org-mode)
   (setq tags (ensure-list tags))
