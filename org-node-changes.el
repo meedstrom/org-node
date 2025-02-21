@@ -118,6 +118,7 @@ hardcoded strings."
 (define-obsolete-function-alias 'org-node-ref-add 'org-node-add-refs "2025-02-21")
 (define-obsolete-function-alias 'org-node-tag-add 'org-node-add-tags "2025-02-21")
 (define-obsolete-function-alias 'org-node-tag-add-here 'org-node-add-tags-here "2025-02-21")
+(define-obsolete-function-alias 'org-node-alias-add 'org-node-add-alias "2025-02-21")
 
 (org-node-changes--def-whiny-alias 'org-node-tag-add* 'org-node-add-tags-here
                                    "30 January 2025" nil "30 February 2025")
