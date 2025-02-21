@@ -859,26 +859,37 @@ If not running, start it."
 ;;     (org-node--scan-targeted))
 ;;   )
 
-(defvar org-node--not-yet-saved nil
+(defvar org-node--new-unsaved-buffers nil
   "List of buffers created to hold a new node.")
 
 (defun org-node--kill-blank-unsaved-buffers (&rest _)
   "Kill buffers created by org-node that have become blank.
+Only applicable if the buffer\\='s file had not yet been written to
+disk, and the buffer is unmodified.
 
 This exists to allow you to create a node, especially a journal note for
-today, change your mind, do an undo to empty the buffer, then browse to
-the previous day\\='s note.  When later you want to create today\\='s
+today, change your mind, do an `undo' to empty the buffer, then browse
+to the previous day\\='s note.  When later you want to create today\\='s
 note after all, the sequence\\='s :creator function should be made to
 run again, but will only do so if the buffer has been properly deleted
 since, thus this hook."
   (unless (minibufferp)
-    (dolist (buf org-node--not-yet-saved)
+    (dolist (buf org-node--new-unsaved-buffers)
       (if (or (not (buffer-live-p buf))
               (file-exists-p (buffer-file-name buf)))
-          (setq org-node--not-yet-saved (delq buf org-node--not-yet-saved))
-        (and (not (get-buffer-window buf t)) ;; buffer not visible
-             (string-blank-p (with-current-buffer buf (buffer-string)))
-             (kill-buffer buf))))))
+          ;; Stop checking the buffer
+          (setq org-node--new-unsaved-buffers
+                (delq buf org-node--new-unsaved-buffers))
+        (with-current-buffer buf
+          (when (and (not (get-buffer-window buf t)) ;; Buffer is not visible
+                     (string-blank-p (buffer-string))
+                     (not (buffer-modified-p)))
+            (when buffer-auto-save-file-name
+              ;; Hopefully throw away a stale autosave
+              (do-auto-save nil t))
+            (org-node--dirty-forget-completions-in (list buffer-file-truename))
+            (org-node--dirty-forget-files (list buffer-file-truename))
+            (kill-buffer buf)))))))
 
 (defun org-node-cache-ensure (&optional synchronous force)
   "Ensure that org-node is ready for use.
@@ -1405,11 +1416,11 @@ also necessary is `org-node--dirty-ensure-link-known' elsewhere."
 (defun org-node--tags-at-point-inherited-only ()
   "Like `org-get-tags', but get only the inherited tags.
 Respects `org-tags-exclude-from-inheritance'."
-  (let ((all-tags (if (not org-use-tag-inheritance)
-                      (let ((org-use-tag-inheritance t)
-                            (org-trust-scanner-tags nil))
-                        (org-get-tags))
-                    (org-get-tags))))
+  (let ((all-tags (if org-use-tag-inheritance
+                      (org-get-tags)
+                    (let ((org-use-tag-inheritance t)
+                          (org-trust-scanner-tags nil))
+                      (org-get-tags)))))
     (cl-loop for tag in all-tags
              when (get-text-property 0 'inherited tag)
              collect (substring-no-properties tag))))
@@ -1756,29 +1767,30 @@ Automatically set, should be nil most of the time.")
   (if node
       (let ((file (org-node-get-file node)))
         (if (file-exists-p file)
-            (progn
+            (let ((pos (org-node-get-pos node)))
               (when (not (file-readable-p file))
                 (error "org-node: Couldn't visit unreadable file %s" file))
-              (let ((pos (org-node-get-pos node)))
-                (find-file file)
-                (widen)
-                ;; Now `save-place-find-file-hook' has potentially already
-                ;; moved point, and that could be good enough.  So: move
-                ;; point to node heading, unless heading is already inside
-                ;; visible part of buffer and point is at or under it
-                (if (org-node-get-is-subtree node)
-                    (unless (and (pos-visible-in-window-p pos)
-                                 (not (org-invisible-p pos))
-                                 (equal (org-node-get-title node)
-                                        (org-get-heading t t t t)))
+              (find-file file)
+              (widen)
+              ;; TODO: Be friendly in this special case, but what's appropriate?
+              ;; (when (string-blank-p (buffer-string)))
 
-                      (goto-char pos)
-                      (if (org-at-heading-p)
-                          (org-show-entry)
-                        (org-show-context))
-                      (recenter 0))
-                  (unless (pos-visible-in-window-p pos)
-                    (goto-char pos)))))
+              ;; Now `save-place-find-file-hook' has potentially already
+              ;; moved point, and that could be good enough.  So: move
+              ;; point to node heading, unless heading is already inside
+              ;; visible part of buffer and point is at or under it
+              (if (org-node-get-is-subtree node)
+                  (unless (and (pos-visible-in-window-p pos)
+                               (not (org-invisible-p pos))
+                               (equal (org-node-get-title node)
+                                      (org-get-heading t t t t)))
+                    (goto-char pos)
+                    (if (org-at-heading-p)
+                        (org-show-entry)
+                      (org-show-context))
+                    (recenter 0))
+                (unless (pos-visible-in-window-p pos)
+                  (goto-char pos))))
           (message "org-node: Didn't find file, resetting...")
           (push (lambda ()
                   (message "org-node: Didn't find file, resetting... done"))
@@ -1873,7 +1885,7 @@ necessary variables are set."
                 "\n#+title: " org-node-proposed-title
                 "\n"))
       (goto-char (point-max))
-      (push (current-buffer) org-node--not-yet-saved)
+      (push (current-buffer) org-node--new-unsaved-buffers)
       (run-hooks 'org-node-creation-hook))))
 
 (defun org-node-capture-target ()
@@ -1961,7 +1973,7 @@ type the name of a node that does not exist.  That enables this
                   "\n:END:"
                   "\n#+title: " title
                   "\n"))
-        (push (current-buffer) org-node--not-yet-saved)
+        (push (current-buffer) org-node--new-unsaved-buffers)
         (run-hooks 'org-node-creation-hook)))))
 
 
@@ -2076,10 +2088,11 @@ if it was not yet created. (Not-yet-created nodes are just
 created according to the defaults for `org-node-creation-fn'.)
 Behaves otherwise exactly like `org-node-insert-link*'."
   (interactive nil org-mode)
-  (let ((org-roam-capture-templates
-         (list (append (car org-roam-capture-templates)
-                       '(:immediate-finish t)))))
-    (org-node-insert-link t t)))
+  (if (boundp 'org-roam-capture-templates)
+      (let ((org-roam-capture-templates
+             (list (append (car org-roam-capture-templates)
+                           '(:immediate-finish t)))))
+        (org-node-insert-link t t))))
 
 ;;;###autoload
 (defun org-node-insert-transclusion (&optional node)
@@ -2293,7 +2306,7 @@ creation-date as more \"truthful\" than today\\='s date.
            "\n#+title: " title
            "\n"))
         (org-node--dirty-ensure-node-known)
-        (push (current-buffer) org-node--not-yet-saved)
+        (push (current-buffer) org-node--new-unsaved-buffers)
         (run-hooks 'org-node-creation-hook)
         (when (bound-and-true-p org-node-backlink-mode)
           (org-node-backlink--fix-entry-here))))))
@@ -3532,6 +3545,9 @@ If already visiting that node, then follow the link normally."
 This may refer to the current Org heading, else an ancestor
 heading, else the file-level node, whichever has an ID first."
   (gethash (org-entry-get-with-inheritance "ID") org-node--id<>node))
+
+(defun org-node-by-id (id)
+  (gethash id org-node--id<>node))
 
 (defun org-node-read ()
   "Prompt for a known ID-node."

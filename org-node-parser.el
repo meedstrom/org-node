@@ -48,8 +48,8 @@
 (defvar $file-todo-option-re)
 (defvar $global-todo-re)
 (defvar $backlink-drawer-re)
+(defvar $nonheritable-tags)
 (defvar $inlinetask-min-level)
-(defvar $files)
 
 (defvar org-node-parser--paths-types nil)
 (defvar org-node-parser--found-links nil)
@@ -145,9 +145,10 @@ the subheading potentially has an ID of its own."
         link-type path link-pos)
     ;; Here it may help to know that:
     ;; - `$plain-re' will be set to basically `org-link-plain-re'
-    ;; - `$merged-re' to a combination of that and `org-link-bracket-re'
+    ;; - `$merged-re' merges the above with `org-link-bracket-re'
     (while (re-search-forward $merged-re end t)
-      (setq link-pos (- (match-end 0) 1)) ;; Same as `org-roam-db-map-links'
+      ;; Record same position that `org-roam-db-map-links' would
+      (setq link-pos (- (match-end 0) 1))
       (if (setq path (match-string 1))
           ;; Link is the [[bracketed]] kind.  Is there an URI: style link
           ;; inside?  Here is the magic that allows links to have spaces, it is
@@ -181,7 +182,7 @@ the subheading potentially has an ID of its own."
             (while (re-search-forward "[&@][!#-+./:<>-@^-`{-~[:word:]-]+"
                                       closing-bracket
                                       t)
-              ;; Use same buffer position as `org-roam-db-map-citations'
+              ;; Record same position that `org-roam-db-map-citations' would
               (setq link-pos (1+ (match-beginning 0)))
               (if (save-excursion
                     (goto-char (pos-bol))
@@ -223,16 +224,10 @@ between buffer substrings \":PROPERTIES:\" and \":END:\"."
 
 ;;; Main
 
-(defvar org-node-parser--buf nil
-  "Throwaway buffer.
-May be useful to look inside when debugging in main process rather than
-running el-job processes.")
-
 (defun org-node-parser--init ()
-  "Setup a throwaway buffer in which to work.
+  "Setup a throwaway buffer in which to work and make it current.
 Also set some variables."
-  (switch-to-buffer (setq org-node-parser--buf
-                          (get-buffer-create " *org-node-parser*" t)))
+  (switch-to-buffer (get-buffer-create " *org-node-parser*" t))
   (setq buffer-read-only t)
   (setq case-fold-search t)
   (setq file-name-handler-alist $file-name-handler-alist)
@@ -389,7 +384,7 @@ and other data, then return the data."
                              (cdr (assoc "ROAM_REFS" PROPS)))
                             nil
                             FILE-TAGS
-                            FILE-TAGS
+                            nil
                             ;; Title mandatory
                             (or FILE-TITLE (file-name-nondirectory FILE))
                             nil)
@@ -398,8 +393,13 @@ and other data, then return the data."
             ;; We should now be at the first heading
             (widen))
 
-          ;; Loop over the file's headings
+          ;; Prep
           (setq CRUMBS nil)
+          (setq FILE-TAGS (cl-loop for tag in FILE-TAGS
+                                   unless (member tag $nonheritable-tags)
+                                   collect tag))
+
+          ;; Loop over the file's headings
           (while (not (eobp))
             (catch 'entry-done
               ;; Narrow til next heading
