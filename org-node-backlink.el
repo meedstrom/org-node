@@ -148,7 +148,7 @@ Can be quit midway through and resumed later.  With
       (message "Done editing :BACKLINKS: properties!"))))
 
 (defun org-node-backlink-fix-buffer (&optional remove)
-  "Update :BACKLINKS: property for all nodes in buffer.
+  "Update :BACKLINKS: property on all nodes in buffer.
 If REMOVE is non-nil, remove the property."
   (interactive)
   (goto-char (point-min))
@@ -445,9 +445,9 @@ where backlinks are fixed."
                    (node (or (gethash id org-node--id<>node)
                              (and (setq id (gethash dest org-node--ref<>id))
                                   (gethash id org-node--id<>node)))))
-              ;; (#59) Do nothing if this is empty link like [[id:]]
+              ;; (#59) Do nothing if this is an empty link like [[id:]]
               (when node
-                ;; Add to the dataset `affected-dests' that looks like:
+                ;; Add to the dataset `affected-dests', which looks like:
                 ;;   ((file1 . (origin1 origin2 origin3 ...))
                 ;;    (file2 . (...))
                 ;;    (file3 . (...)))

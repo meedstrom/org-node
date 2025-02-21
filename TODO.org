@@ -17,6 +17,8 @@
   - =org-element-with-disabled-cache=, it may be safe to remove in 30
   - =cl-sort=
   - what the compiler tells you is obsolete
+  - =ucs-normalize-NFD-string= -> =string-glyph-decompose=
+  - =ucs-normalize-NFC-string= -> =string-glyph-compose=
 
 * Other
 

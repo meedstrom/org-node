@@ -200,8 +200,8 @@ the subheading potentially has an ID of its own."
 
 (defun org-node-parser--collect-properties (beg end)
   "Collect Org properties between BEG and END into an alist.
-Assumes BEG and END delimit the region in between
-a :PROPERTIES: and :END: string."
+Assumes BEG and END are buffer positions delimiting a region in
+between buffer substrings \":PROPERTIES:\" and \":END:\"."
   (let (result pos-start pos-eol)
     (goto-char beg)
     (while (< (point) end)
@@ -279,10 +279,10 @@ and other data, then return the data."
           (when (file-symlink-p FILE)
             (throw 'file-done t))
           ;; NOTE: Don't use `insert-file-contents-literally'!  It sets
-          ;;       `coding-system-for-read' to `no-conversion', which results in
-          ;;       wrong values for HEADING-POS when the file contains Unicode.
-          ;;       We get close to similar performance just overriding
-          ;;       `coding-system-for-read' to some fixed value, and
+          ;;       `coding-system-for-read' to `no-conversion', which results
+          ;;       in wrong values for HEADING-POS when the file contains
+          ;;       Unicode.  We get close to similar performance just
+          ;;       overriding `coding-system-for-read' to some fixed value, and
           ;;       especially minimizing `file-name-handler-alist'.
           (let ((inhibit-read-only t))
             (erase-buffer)
@@ -493,7 +493,7 @@ and other data, then return the data."
               ;;       :END:
               ;; It lets us track context so we know the outline path to the
               ;; current entry and what tags it should be able to inherit.
-              ;; Update.
+              ;; Update the list.
               (cl-loop until (> LEVEL (or (caar CRUMBS) 0))
                        do (pop CRUMBS)
                        finally do

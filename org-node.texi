@@ -84,7 +84,7 @@ Exclude uninteresting nodes
 
 Experimental: Node sequences
 
-* What are "node seqs"?::
+* What are node seqs?::
 
 Appendix
 
@@ -473,7 +473,7 @@ This could work by---for example---excluding anything tagged "project" or perhap
       (lambda (node)
         (not
          (or (org-node-get-todo node)
-             (member "project" (org-node-get-tags node))
+             (member "project" (org-node-get-tags-with-inheritance node))
              (assoc "ROAM_EXCLUDE" (org-node-get-properties node))))))
 @end lisp
 
@@ -514,7 +514,8 @@ Or put something like @samp{#+filetags: :hide_node:} at the top of each file, an
 @lisp
 (setq org-node-filter-fn
       (lambda (node)
-        (not (member "hide_node" (org-node-get-tags node))))))
+        (not (member "hide_node"
+                     (org-node-get-tags-with-inheritance node)))))
 @end lisp
 
 @node Org-capture
@@ -808,11 +809,11 @@ Do you already know about "daily-notes"?  Then get started with a keybinding suc
 and configure @samp{org-node-seq-defs}.  See @uref{https://github.com/meedstrom/org-node/wiki/Configuring-node-sequences, wiki}.
 
 @menu
-* What are "node seqs"?::
+* What are node seqs?::
 @end menu
 
-@node What are "node seqs"?
-@subsection What are "node seqs"?
+@node What are node seqs?
+@subsection What are node seqs?
 
 It's easiest to explain node sequences if we use "daily-notes" (aka "dailies") as an example.
 

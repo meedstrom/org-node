@@ -209,7 +209,7 @@ This could work by---for example---excluding anything tagged "project" or perhap
       (lambda (node)
         (not
          (or (org-node-get-todo node)
-             (member "project" (org-node-get-tags node))
+             (member "project" (org-node-get-tags-with-inheritance node))
              (assoc "ROAM_EXCLUDE" (org-node-get-properties node))))))
 #+end_src
 
@@ -247,7 +247,8 @@ Or put something like =#+filetags: :hide_node:= at the top of each file, and set
 #+begin_src elisp
 (setq org-node-filter-fn
       (lambda (node)
-        (not (member "hide_node" (org-node-get-tags node))))))
+        (not (member "hide_node"
+                     (org-node-get-tags-with-inheritance node)))))
 #+end_src
 
 ** Org-capture
@@ -434,7 +435,7 @@ Do you already know about "daily-notes"?  Then get started with a keybinding suc
 
 and configure =org-node-seq-defs=.  See [[https://github.com/meedstrom/org-node/wiki/Configuring-node-sequences][wiki]].
 
-*** What are "node seqs"?
+*** What are node seqs?
 It's easiest to explain node sequences if we use "daily-notes" (aka "dailies") as an example.
 
 Roam's idea of a "daily-note" is the same as an [[https://github.com/bastibe/org-journal][org-journal]] entry: a file/entry where the title is just today's date.

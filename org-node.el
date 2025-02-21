@@ -2068,6 +2068,7 @@ The commands are the same, just differing in initial input."
   (interactive nil org-mode)
   (org-node-insert-link t))
 
+;; TODO
 (defun org-node-insert-link*-immediate ()
   "Insert a link to one of your ID nodes immediately,
 without opening a window or buffer for that node, even
@@ -3399,13 +3400,15 @@ non-nil, because it may cause noticeable lag otherwise."
 (defun org-node--end-of-meta-data (&optional full)
   "Like `org-end-of-meta-data', but supports file-level metadata.
 
-Argument FULL same as in that function when point is in a subtree,
-ignored otherwise.  When point is before the first heading, always jump
-to a position after any file-level properties and keywords.
+As in `org-end-of-meta-data', point always lands on a newline \(or the
+end of buffer).  Since that newline may be the beginning of the next
+heading, you should probably verify that `org-at-heading-p' is nil and
+`point' has changed, else do `backward-char' or `open-line' prior to
+inserting any text.
 
-As in `org-end-of-meta-data', point always lands on a newline.  Since
-that may be the beginning of the next heading, you should probably check
-`org-at-heading-p' and do `open-line' prior to inserting any text."
+Argument FULL same as in `org-end-of-meta-data' when point is in a subtree,
+meaningless otherwise.  When point is before the first heading, always jump
+to a position after any file-level properties and keywords."
   (if (org-before-first-heading-p)
       (progn
         (goto-char (point-min))
