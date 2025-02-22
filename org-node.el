@@ -328,11 +328,11 @@ Filesystem creation-time cannot be relied on."
 
 Essentially like variable `org-id-extra-files', but take directories.
 
-You could already do this by adding directories to `org-agenda-files',
-but that only checks the directories once.  This variable causes the
-directories to be checked again over time in order to find new files
-that have appeared, e.g. files moved by terminal commands or created by
-other instances of Emacs.
+You could already do this by adding directories to variable
+`org-agenda-files', but that only checks the directories once.  This
+variable causes the directories to be checked again over time in order
+to find new files that have appeared, e.g. files moved by terminal
+commands or created by other instances of Emacs.
 
 These directories are only checked as long as `org-node-cache-mode' is
 active.  They are checked recursively (looking in subdirectories,
@@ -388,17 +388,17 @@ This means that org-node will concatenate the results of
 the minibuffer can match against the prefix and suffix as well as
 against the node title.
 
-In other words: you can match against the node's outline path, at least
-so long as `org-node-affixation-fn' is set to `org-node-prefix-with-olp'
+In other words: you can match against the node's outline path, if
+as `org-node-affixation-fn' is set to `org-node-prefix-with-olp'
 \(default).
 
 \(Tip: users of the orderless library from July 2024 do not need this
-setting, they can match the prefix and suffix via
+setting, they can match against the prefix and suffix in any command via
 `orderless-annotation', bound to the character \& by default.)
 
 Another consequence: this setting can lift the uniqueness constraint on
 note titles: you\\='ll be able to have two nodes with the same name, so
-long as their prefix or suffix differ.
+long as their prefix or suffix differ in some way.
 
 After changing this setting, run \\[org-node-reset]."
   :type 'boolean
@@ -420,6 +420,8 @@ Built-in choices:
 - `org-node-prefix-with-olp'
 - `org-node-prefix-with-tags'
 - `org-node-affix-with-olp-and-tags'
+
+After changing this setting, run \\[org-node-reset].
 
 ------
 Info for writing a custom function
@@ -453,9 +455,7 @@ For use as `org-node-affixation-fn'."
   "Prepend NODE's tags to TITLE.
 For use as `org-node-affixation-fn'."
   (list title
-        (let ((tags (if org-use-tag-inheritance
-                        (org-node-get-tags-with-inheritance node)
-                      (org-node-get-tags-local node))))
+        (let ((tags (org-node-get-tags node)))
           (if tags
               (propertize (concat "(" (string-join tags ", ") ") ")
                           'face 'org-tag)
@@ -494,9 +494,7 @@ For use as `org-node-affixation-fn'."
                   (setq prefix-len (length result))
                   result))
             "")
-          (let ((tags (if org-use-tag-inheritance
-                          (org-node-get-tags-with-inheritance node)
-                        (org-node-get-tags-local node))))
+          (let ((tags (org-node-get-tags node)))
             (if tags
                 (progn
                   (setq tags (propertize (concat (string-join tags ":"))
@@ -668,6 +666,7 @@ Also respect `org-tags-exclude-from-inheritance'."
 
 (defvar org-node--id<>node (make-hash-table :test #'equal)
   "1:1 table mapping IDs to nodes.
+
 To peek on the contents, try \\[org-node-peek] a few times, which
 can demonstrate the data format.  See also the type `org-node'.")
 
@@ -709,8 +708,10 @@ info such as from which ID-node the link originates.
 For more info see `org-node-get-id-links-to'.")
 
 ;; As of 2024-10-06, the MTIME is not used for anything except supporting
-;; `org-node-fakeroam-db-feed-mode'.  However, `org-node-list-files' needs a
-;; hash table anyway for best perf, else we could have used `org-id-files'.
+;; `org-node-fakeroam-db-feed-mode'.
+;; However, `org-node-list-files' needs a hash table anyway for best perf,
+;; else it could simply have reused `org-id-files'.
+;; Additionally, the MTIME is often useful downstream.
 (defvar org-node--file<>mtime (make-hash-table :test #'equal)
   "1:1 table mapping file paths to last-modification times.
 
@@ -752,7 +753,7 @@ distinguish citations from other links this way."
            append (gethash ref org-node--dest<>links)))
 
 (defun org-node-peek (&optional ht)
-  "Print some random rows of table `org-nodes'.
+  "Print some random values of table `org-nodes'.
 For reference, see type `org-node'.
 When called from Lisp, peek on any hash table HT."
   (interactive)
@@ -813,7 +814,8 @@ When called from Lisp, peek on any hash table HT."
   "Arrange to forget nodes and links in FILE."
   (when (string-suffix-p ".org" file)
     (unless (org-node--tramp-file-p file)
-      (org-node--scan-targeted file))))
+      (org-node--scan-targeted
+       (org-node-abbrev-file-names (file-truename file))))))
 
 (defun org-node--handle-save ()
   "Arrange to re-scan nodes and links in current buffer."
@@ -838,7 +840,7 @@ Override that function to configure timer behavior.")
 If not running, start it."
   (let ((new-delay (* 25 (1+ org-node--time-elapsed))))
     (when (or (not (member org-node--idle-timer timer-idle-list))
-              ;; Don't enter an infinite loop (idle timers are footguns)
+              ;; Don't enter an infinite loop -- idle timers can be a footgun.
               (not (> (float-time (or (current-idle-time) 0))
                       new-delay)))
       (cancel-timer org-node--idle-timer)
@@ -1001,8 +1003,8 @@ https://lists.gnu.org/archive/html/emacs-orgmode/2024-09/msg00305.html"
     (el-job-launch
      :id 'org-node
      :if-busy 'noop
-     :load 'org-node-parser
      :inject-vars (append org-node-inject-variables (org-node--mk-work-vars))
+     :load 'org-node-parser
      :eval-once "(org-node-parser--init)"
      :funcall #'org-node-parser--collect-dangerously
      :inputs #'org-node-list-files
@@ -1016,8 +1018,8 @@ https://lists.gnu.org/archive/html/emacs-orgmode/2024-09/msg00305.html"
      :method 'reap
      :if-busy 'wait
      :skip-benchmark t
-     :load 'org-node-parser
      :inject-vars (append org-node-inject-variables (org-node--mk-work-vars))
+     :load 'org-node-parser
      :eval-once "(org-node-parser--init)"
      :funcall #'org-node-parser--collect-dangerously
      :inputs (ensure-list files)
@@ -1108,12 +1110,10 @@ JOB is the el-job object."
              do (puthash path type org-node--ref-path<>ref-type))
     (cl-loop for (file . mtime) in file.mtime
              do (puthash file mtime org-node--file<>mtime))
-    ;; HACK: Don't manage `org-id-files' at all.  Reduces GC, but could
-    ;; affect downstream uses of org-id which assume the variable to be
-    ;; correct.  Uncomment to improve.
-    ;; (setq org-id-files (mapcar #'car file.mtime))
+    ;; Update `org-id-files' even though it makes no difference for org-id,
+    ;; because downstream uses may assume that the variable reflects reality.
+    (setq org-id-files (mapcar #'car file.mtime))
     (org-node--record-nodes nodes)
-    ;; (org-id-locations-save) ;; A nicety, but sometimes slow
     (run-hooks 'org-node--mid-scan-hook)
     (setq org-node--time-elapsed
           ;; For more reproducible profiling: don't count time spent on
@@ -1145,7 +1145,8 @@ links with destination DEST.  These reflect a past state of
 up-to-date set.")
 
 (defun org-node--finalize-modified (results job)
-  "Use RESULTS to update tables."
+  "Use RESULTS to update tables.
+Argument JOB is the el-job object."
   (run-hooks 'org-node-before-update-tables-hook)
   (seq-let (missing-files file.mtime nodes path.type links problems) results
     (let ((found-files (mapcar #'car file.mtime)))
@@ -1417,6 +1418,7 @@ also necessary is `org-node--dirty-ensure-link-known' elsewhere."
   "Like `org-get-tags', but get only the inherited tags.
 Respects `org-tags-exclude-from-inheritance'."
   (let ((all-tags (if org-use-tag-inheritance
+                      ;; NOTE: Above variable can have complex rules
                       (org-get-tags)
                     (let ((org-use-tag-inheritance t)
                           (org-trust-scanner-tags nil))
@@ -1455,16 +1457,16 @@ operation."
 ;; (benchmark-call #'org-roam-list-files)
 ;; => (1.488666741 1 0.23508516499999388)
 (defun org-node-list-files (&optional instant interactive)
-  "List files in `org-id-locations' or `org-node-extra-id-dirs'.
+  "List Org files in `org-id-locations' and `org-node-extra-id-dirs'.
 
-With optional argument INSTANT t, return already known files
+With optional argument INSTANT t, return already-known files
 instead of checking the filesystem again.
 
 When called interactively \(automatically making INTERACTIVE non-nil),
-list the files in a new buffer."
+display the list of files in a new buffer."
   (interactive "i\np")
   (if interactive
-      ;; TODO: Make something like a find-dired buffer
+      ;; TODO: Make something like a find-dired buffer instead, handy!
       (org-node--pop-to-tabulated-list
        :buffer "*org-node files*"
        :format [("File" 0 t)]
@@ -1476,11 +1478,11 @@ list the files in a new buffer."
                                                       (find-file ,file))
                                            'face 'link
                                            'follow-link t)))))
-
     (when (stringp org-node-extra-id-dirs)
       (setq org-node-extra-id-dirs (list org-node-extra-id-dirs))
       (message
        "Option `org-node-extra-id-dirs' must be a list, changed it for you"))
+
     (when (or (not instant)
               (hash-table-empty-p org-node--file<>mtime))
       (let* ((file-name-handler-alist nil)
@@ -1587,55 +1589,62 @@ FILES are assumed to be abbreviated truenames."
 
 ;;;; Filename functions
 
+;; To benchmark:
 ;; (progn (byte-compile #'org-node--root-dirs) (benchmark-run 10 (org-node--root-dirs (hash-table-values org-id-locations))))
+;; REVIEW: 75% of compute is in `file-name-directory', can that be improved?
 (defun org-node--root-dirs (file-list)
   "Infer root directories of FILE-LIST.
 
-If FILE-LIST is the `hash-table-values' of `org-id-locations',
-this function will in many cases spit out a list of one item
-because many people keep their Org files in one root
-directory \(with various subdirectories).
-
-By \"root\", we mean the longest directory path common to a set
-of files.
-
-If it finds more than one root, it sorts by count of files they
-contain recursively, so that the most populous root directory
-will be the first element.
-
-Note also that the only directories that may qualify are those
-that directly contain some member of FILE-LIST, so that if you
-have the 3 members
+By 'root', we mean the longest directory path common to a set of files,
+as long as that directory contains at least one member of
+FILE-LIST itself.  For example, if you have the 3 members
 
 - \"/home/me/Syncthing/foo.org\"
-- \"/home/kept/bar.org\"
-- \"/home/kept/archive/baz.org\"
+- \"/home/kept/archive/bar.org\"
+- \"/home/kept/baz.org\"
 
-the return value will not be \(\"/home/\"), but
-\(\"/home/kept/\" \"/home/me/Syncthing/\"), because \"/home\"
-itself contains no direct members of FILE-LIST.
+the return value will not be \(\"/home/\"), even though
+the substring \"/home/\" is common to all of them,
+but \(\"/home/kept/\" \"/home/me/Syncthing/\").
 
-FILE-LIST must be a list of full paths; this function does not
-consult the filesystem, just compares substrings to each other."
+
+On finding more than one root, sort by count of files they contain
+recursively, so that the most populous root directory will be the first
+element.
+
+This function does not consult the filesystem,
+so FILE-LIST must be a list of full paths that can be compared.
+
+
+For Org users, it is pragmatic to know that if FILE-LIST was the
+output of something like
+
+   \(hash-table-values org-id-locations)
+
+this function will in many cases spit out a list of exactly one item
+because many people keep their Org files in one root directory \(with
+various subdirectories)."
   (let* ((files (seq-uniq file-list))
          (dirs (sort (delete-consecutive-dups
                       (sort (mapcar #'file-name-directory files) #'string<))
                      (##length< %1 (length %2))))
-         roots)
+         root-dirs)
     ;; Example: if there is /home/roam/courses/Math1A/, but ancestor dir
-    ;; /home/roam/ is also a member of the set, throw out the child
+    ;; /home/roam/ is also a member of the set, throw out the child.
     (while-let ((dir (car (last dirs))))
-      (cl-loop for other-dir in (setq dirs (nbutlast dirs))
+      ;; REVIEW: Maybe more elegant to use `nreverse' twice
+      (setq dirs (nbutlast dirs))
+      (cl-loop for other-dir in dirs
                when (string-prefix-p other-dir dir)
                return (delete dir dirs)
-               finally return (push dir roots)))
-    ;; Now sort by count of items inside if we found 2 or more roots
-    (if (= (length roots) 1)
-        roots
+               finally return (push dir root-dirs)))
+    (if (= (length root-dirs) 1)
+        root-dirs
+      ;; Found more than 1 root, sort them by count of files inside.
       (cl-loop
-       with dir-counters = (cl-loop for dir in roots collect (cons dir 0))
+       with dir-counters = (cl-loop for dir in root-dirs collect (cons dir 0))
        for file in files
-       do (cl-loop for dir in roots
+       do (cl-loop for dir in root-dirs
                    when (string-prefix-p dir file)
                    return (cl-incf (cdr (assoc dir dir-counters))))
        finally return (mapcar #'car (cl-sort dir-counters #'> :key #'cdr))))))
@@ -2013,7 +2022,7 @@ see `org-node-insert-link*' and its docstring.
 
 Optional argument REGION-AS-INITIAL-INPUT t means behave as
 `org-node-insert-link*'."
-  (interactive nil org-mode)
+  (interactive "*" org-mode)
   (unless (derived-mode-p 'org-mode)
     (user-error "Only works in org-mode buffers"))
   (org-node-cache-ensure)
@@ -2041,7 +2050,7 @@ Optional argument REGION-AS-INITIAL-INPUT t means behave as
          (node (gethash input org-node--candidate<>node))
          (id (if node (org-node-get-id node) (org-id-new)))
          (link-desc (or region-text
-                        (when (not org-node-alter-candidates) input)
+                        (and (not org-node-alter-candidates) input)
                         (and node (seq-find (##string-search % input)
                                             (org-node-get-aliases node)))
                         (and node (org-node-get-title node))
@@ -2077,7 +2086,7 @@ which the region should be linkified, you\\='ll prefer
 `org-node-insert-link'.
 
 The commands are the same, just differing in initial input."
-  (interactive nil org-mode)
+  (interactive "*" org-mode)
   (org-node-insert-link t))
 
 ;; TODO
@@ -2087,7 +2096,7 @@ without opening a window or buffer for that node, even
 if it was not yet created. (Not-yet-created nodes are just
 created according to the defaults for `org-node-creation-fn'.)
 Behaves otherwise exactly like `org-node-insert-link*'."
-  (interactive nil org-mode)
+  (interactive "*" org-mode)
   (if (boundp 'org-roam-capture-templates)
       (let ((org-roam-capture-templates
              (list (append (car org-roam-capture-templates)
@@ -2227,7 +2236,7 @@ creation-date as more \"truthful\" than today\\='s date.
                                     (or parent-creation
                                         (format-time-string
                                          (org-time-stamp-format t t)))))))"
-  (interactive nil org-mode)
+  (interactive "*" org-mode)
   (unless (derived-mode-p 'org-mode)
     (user-error "This command expects an org-mode buffer"))
   (org-node-cache-ensure)
@@ -2584,14 +2593,14 @@ user quits, do not apply any modifications."
 ;;;###autoload
 (defun org-node-insert-heading ()
   "Insert a heading with ID and run `org-node-creation-hook'."
-  (interactive nil org-mode)
+  (interactive "*" org-mode)
   (org-insert-heading)
   (org-node-nodeify-entry))
 
 ;;;###autoload
 (defun org-node-nodeify-entry ()
   "Add an ID to entry at point and run `org-node-creation-hook'."
-  (interactive nil org-mode)
+  (interactive "*" org-mode)
   (org-node-cache-ensure)
   (org-id-get-create)
   (run-hooks 'org-node-creation-hook))
@@ -2599,7 +2608,7 @@ user quits, do not apply any modifications."
 ;;;###autoload
 (defun org-node-put-created ()
   "Add a CREATED property to entry at point, if none already."
-  (interactive nil org-mode)
+  (interactive "*" org-mode)
   (unless (org-entry-get nil "CREATED")
     (org-entry-put nil "CREATED"
                    (format-time-string (org-time-stamp-format t t)))))
@@ -2770,26 +2779,25 @@ write_file(lisp_data, file.path(dirname(tsv), \"feedback-arcs.eld\"))")
     (let ((feedbacks (with-temp-buffer
                        (insert-file-contents output-eld)
                        (read (buffer-string)))))
-      (when (listp feedbacks)
-        (org-node--pop-to-tabulated-list
-         :buffer "*org-node feedback arcs*"
-         :format [("Node containing link" 39 t) ("Target of link" 0 t)]
-         :entries (cl-loop
-                   for (origin . dest) in feedbacks
-                   as origin-node = (gethash origin org-node--id<>node)
-                   as dest-node = (gethash dest org-node--id<>node)
-                   collect
-                   (list (cons origin dest)
-                         (vector (list (org-node-get-title origin-node)
-                                       'face 'link
-                                       'action `(lambda (_button)
-                                                  (org-node--goto ,origin-node))
-                                       'follow-link t)
-                                 (list (org-node-get-title dest-node)
-                                       'face 'link
-                                       'action `(lambda (_button)
-                                                  (org-node--goto ,dest-node))
-                                       'follow-link t)))))))))
+      (org-node--pop-to-tabulated-list
+       :buffer "*org-node feedback arcs*"
+       :format [("Node containing link" 39 t) ("Target of link" 0 t)]
+       :entries (cl-loop
+                 for (origin . dest) in feedbacks
+                 as origin-node = (gethash origin org-node--id<>node)
+                 as dest-node = (gethash dest org-node--id<>node)
+                 collect
+                 (list (cons origin dest)
+                       (vector (list (org-node-get-title origin-node)
+                                     'face 'link
+                                     'action `(lambda (_button)
+                                                (org-node--goto ,origin-node))
+                                     'follow-link t)
+                               (list (org-node-get-title dest-node)
+                                     'face 'link
+                                     'action `(lambda (_button)
+                                                (org-node--goto ,dest-node))
+                                     'follow-link t))))))))
 
 ;; TODO: Temp merge all refs into corresponding ID
 (defun org-node--make-digraph-tsv-string ()
@@ -3049,12 +3057,14 @@ Optional keyword argument ABOUT-TO-DO as in
        ;; The cache is buggy, disable to be safe
        (org-element-with-disabled-cache
          (let* ((--was-open-- (find-buffer-visiting ,file))
-                (--file-- (org-node-abbrev-file-names (file-truename ,file)))
-                (_ (when (file-directory-p --file--)
-                     (error "Is a directory: %s" --file--)))
+                (_ (when (file-directory-p ,file)
+                     (error "Is a directory: %s" ,file)))
                 (--buf-- (or --was-open--
                              (delay-mode-hooks
-                               (org-node--find-file-noselect --file-- ,why)))))
+                               (org-node--find-file-noselect
+                                (org-node-abbrev-file-names
+                                 (file-truename ,file))
+                                ,why)))))
            (when (bufferp --buf--)
              (with-current-buffer --buf--
                (save-excursion

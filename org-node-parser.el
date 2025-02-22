@@ -483,11 +483,11 @@ and other data, then return the data."
                              unless (member tag $nonheritable-tags)
                              collect tag))
               ;; CRUMBS is a list that can look like
-              ;;    ((2 "Heading" "id1234" ("noexport" "work" "urgent"))
-              ;;     (... ... ... ...)
+              ;;    ((3 "Heading" "id1234" ("noexport" "work" "urgent"))
+              ;;     (2 "Another heading" "id6532" ("work"))
               ;;     (... ... ... ...))
               ;; if the previous heading looked like
-              ;;    ** Heading  :noexport:work:urgent:
+              ;;    *** Heading  :noexport:work:urgent:
               ;;       :PROPERTIES:
               ;;       :ID: id1234
               ;;       :END:

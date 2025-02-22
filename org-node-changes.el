@@ -55,7 +55,7 @@
   "Alist of deprecated symbol names and their new names.
 Names here will cause complaints if bound.")
 
-(defvar org-node-changes--warned-roam-id nil
+(defvar org-node-changes--warned-about-roam-id nil
   "Non-nil if did warn about org-roam overriding a link parameter.")
 
 (defun org-node-changes--warn-and-copy ()
@@ -87,11 +87,11 @@ Then do other one-shot warnings while we\\='re at it."
             (lwarn 'org-node :warning "Your initfiles key-bind a removed command: %S"
                    old))))))
   ;; 2024-10-18
-  (unless org-node-changes--warned-roam-id
+  (unless org-node-changes--warned-about-roam-id
     (when (and (not (and (bound-and-true-p org-roam-autosync-mode)
                          (bound-and-true-p org-roam-db-update-on-save)))
                (eq (org-link-get-parameter "id" :follow) 'org-roam-id-open))
-      (setq org-node-changes--warned-roam-id t)
+      (setq org-node-changes--warned-about-roam-id t)
       (message
        "%s" "Note: org-roam overrides ID-link behavior, you may want to
       revert to vanilla by evalling:
