@@ -40,6 +40,10 @@
     package menus (e.g. by M-x package-refresh-contents
     or M-x elpaca-update-menus)"))
 
+(unless (fboundp 'el-job-await)
+  (display-warning
+   'org-node "Update el-job to use this version of org-node"))
+
 (unless (fboundp 'get-truename-buffer)
   (display-warning
    'org-node "Update compat.el to use this version of org-node"))
