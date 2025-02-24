@@ -40,13 +40,11 @@
     package menus (e.g. by M-x package-refresh-contents
     or M-x elpaca-update-menus)"))
 
-(unless (fboundp 'el-job-await)
+(unless (and (boundp 'el-job--major-version)
+             (< el-job--major-version 1))
   (display-warning
-   'org-node "Update el-job to use this version of org-node"))
+   'org-node "Version of el-job too high for this version of org-node"))
 
-(unless (fboundp 'get-truename-buffer)
-  (display-warning
-   'org-node "Update compat.el to use this version of org-node"))
 
 (defvar org-node-changes--new-names
   '((org-node-built-series org-node-seqs)
