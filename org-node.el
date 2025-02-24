@@ -466,14 +466,11 @@ For use as `org-node-affixation-fn'."
   "Prepend NODE's outline path to TITLE.
 For use as `org-node-affixation-fn'."
   (list title
-        (if (org-node-get-is-subtree node)
-            (let ((ancestors (cons (org-node-get-file-title-or-basename node)
-                                   (org-node-get-olp node)))
-                  (result nil))
-              (dolist (anc ancestors)
-                (push (propertize anc 'face 'completions-annotations) result)
-                (push " > " result))
-              (apply #'concat (nreverse result)))
+        (if-let ((fontified-ancestors
+                  (cl-loop
+                   for anc in (org-node-get-olp-full node t)
+                   collect (propertize anc 'face 'completions-annotations))))
+            (concat (string-join fontified-ancestors " > ") " > ")
           "")
         ""))
 
@@ -483,16 +480,14 @@ For use as `org-node-affixation-fn'."
   (let ((prefix-len 0))
     (list title
           (if (org-node-get-is-subtree node)
-              (let ((ancestors (cons (org-node-get-file-title-or-basename node)
-                                     (org-node-get-olp node)))
+              (let ((ancestors (org-node-get-olp-full node t))
                     (result nil))
                 (dolist (anc ancestors)
                   (push (propertize anc 'face 'completions-annotations) result)
                   (push " > " result))
-                (progn
-                  (setq result (apply #'concat (nreverse result)))
-                  (setq prefix-len (length result))
-                  result))
+                (setq result (apply #'concat (nreverse result)))
+                (setq prefix-len (length result))
+                result)
             "")
           (let ((tags (org-node-get-tags node)))
             (if tags
@@ -592,7 +587,7 @@ either `org-node-get-file-title-or-basename' or `org-node-get-title'.")
 See also `org-node-get-is-subtree'.")
   (olp        nil :read-only t :type list :documentation
               "Outline path to this node, i.e. a list of ancestor headings.
-Excludes file title.")
+Excludes file title.  To include it, try `org-node-get-olp-full'.")
   (pos        nil :read-only t :type integer :documentation
               "Char position of the node inside its file.
 For a file-level node, always 1.
@@ -640,10 +635,21 @@ Also respect `org-tags-exclude-from-inheritance'."
   (or (org-node-get-file-title node)
       (file-name-nondirectory (org-node-get-file node))))
 
-;; Used to be part of the struct
 (defun org-node-get-is-subtree (node)
   "Return t if NODE is a subtree instead of a file."
   (> (org-node-get-level node) 0))
+
+(defun org-node-get-olp-full (node &optional filename-fallback)
+  "Get outline path to NODE, and include the file title if present.
+If FILENAME-FALLBACK is t, use the filename if title absent."
+  (if (org-node-get-is-subtree node)
+      (let ((top (if filename-fallback
+                     (org-node-get-file-title-or-basename node)
+                   (org-node-get-file-title node))))
+        (if top
+            (cons top (org-node-get-olp node))
+          (org-node-get-olp node)))
+    nil))
 
 ;; Should the names be shortened?
 (defalias 'org-node-get-props #'org-node-get-properties)
