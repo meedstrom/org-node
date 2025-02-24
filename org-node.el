@@ -997,7 +997,6 @@ https://lists.gnu.org/archive/html/emacs-orgmode/2024-09/msg00305.html"
      :if-busy 'noop
      :inject-vars (append org-node-inject-variables (org-node--mk-work-vars))
      :load 'org-node-parser
-     :eval-once "(org-node-parser--init)"
      :funcall #'org-node-parser--collect-dangerously
      :inputs #'org-node-list-files
      :wrapup #'org-node--finalize-full)))
@@ -1012,7 +1011,6 @@ https://lists.gnu.org/archive/html/emacs-orgmode/2024-09/msg00305.html"
      :skip-benchmark t
      :inject-vars (append org-node-inject-variables (org-node--mk-work-vars))
      :load 'org-node-parser
-     :eval-once "(org-node-parser--init)"
      :funcall #'org-node-parser--collect-dangerously
      :inputs (ensure-list files)
      :wrapup #'org-node--finalize-modified)))

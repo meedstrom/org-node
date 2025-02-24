@@ -222,10 +222,12 @@ between buffer substrings \":PROPERTIES:\" and \":END:\"."
 
 ;;; Main
 
-(defun org-node-parser--init ()
+(defvar org-node-parser--buf nil)
+(defun org-node-parser--init-dangerously ()
   "Setup a throwaway buffer in which to work and make it current.
-Also set some variables."
+Also set some variables, including global variables."
   (switch-to-buffer (get-buffer-create " *org-node-parser*" t))
+  (setq org-node-parser--buf (current-buffer))
   (setq buffer-read-only t)
   (setq case-fold-search t)
   (setq file-name-handler-alist $file-name-handler-alist)
@@ -240,6 +242,8 @@ Also set some variables."
 
 Read FILE contents into current buffer, analyze it for ID-nodes, links
 and other data, then return the data."
+  (unless (equal org-node-parser--buf (current-buffer))
+    (org-node-parser--init-dangerously))
   (setq org-node-parser--paths-types nil)
   (setq org-node-parser--found-links nil)
   (let (missing-file
