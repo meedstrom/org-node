@@ -1014,7 +1014,6 @@ https://lists.gnu.org/archive/html/emacs-orgmode/2024-09/msg00305.html"
      :id 'org-node-targeted
      :method 'reap
      :if-busy 'wait
-     :skip-benchmark t
      :inject-vars (append org-node-inject-variables (org-node--mk-work-vars))
      :load 'org-node-parser
      :funcall #'org-node-parser--collect-dangerously

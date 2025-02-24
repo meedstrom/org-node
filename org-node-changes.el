@@ -115,16 +115,6 @@ hardcoded strings."
                 ,old ,(or removed-by "30 January 2025") ,new))
        (apply ,new args))))
 
-;; To slow deprecate
-(defalias 'org-node-get-file-path 'org-node-get-file) ;; 2025-01-31
-(define-obsolete-function-alias 'org-node-ref-add 'org-node-add-refs "2025-02-21")
-(define-obsolete-function-alias 'org-node-tag-add 'org-node-add-tags "2025-02-21")
-(define-obsolete-function-alias 'org-node-tag-add-here 'org-node-add-tags-here "2025-02-21")
-(define-obsolete-function-alias 'org-node-alias-add 'org-node-add-alias "2025-02-21")
-
-(org-node-changes--def-whiny-alias 'org-node-tag-add* 'org-node-add-tags-here
-                                   "30 January 2025" nil "30 February 2025")
-
 ;; 1.9.0 (2024-11-18) moved series-related code into its own file, whereupon
 ;; the namespace had to be made consistent.
 (org-node-changes--def-whiny-alias 'org-node-series-goto           'org-node-seq-goto "2024-11-18")
@@ -143,6 +133,22 @@ hardcoded strings."
 (define-obsolete-variable-alias 'org-node-proposed-series-key 'org-node-proposed-sequence  "2024-11-18")
 (org-node-changes--def-whiny-alias 'org-node--add-series-item 'org-node-seq--add-item "2024-11-18")
 
+(org-node-changes--def-whiny-alias 'org-node-tag-add* 'org-node-add-tags-here
+                                   "30 January 2025" nil "30 February 2025")
+
+;;; To slow-deprecate (introduced in v1.9)
+
+(defalias 'org-node-get-file-path 'org-node-get-file) ;; 2025-01-31
+(define-obsolete-function-alias 'org-node-ref-add 'org-node-add-refs "2025-02-21")
+(define-obsolete-function-alias 'org-node-tag-add 'org-node-add-tags "2025-02-21")
+(define-obsolete-function-alias 'org-node-tag-add-here 'org-node-add-tags-here "2025-02-21")
+(define-obsolete-function-alias 'org-node-alias-add 'org-node-add-alias "2025-02-21")
+
+;;; To slow-deprecate (introduced in v1.10)
+
+;; Removed the org-node-link struct.  Easier to read code that has
+;; e.g. (plist-get LINK :origin) instead of (org-node-link-origin LINK) all
+;; over the place, imho, and you can use `map-let'.
 (defun org-node-link-origin (link)
   (plist-get link :origin))
 (defun org-node-link-pos (link)

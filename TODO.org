@@ -32,7 +32,7 @@
 
 - [ ] =org-node-seq-dispatch=: Free up keys "j", "n", "p", "c"
 
-- [ ] A workflow to allow untitled nodes (actually pseudo-untitled, the title would be an auto-assigned number)
+- [ ] A workflow to allow untitled nodes (actually pseudo-untitled; the title would be an auto-assigned number)
 
   Already =org-node-grep= can be considered an equivalent to =org-node-find= (except it does not create new nodes).  We "just" need an equivalent to =org-node-insert-link=.  Basically, capture, refile, and insert-link would probably all reuse a subroutine for *identifying a node by a grep result.*
 
