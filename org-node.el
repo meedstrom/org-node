@@ -2901,44 +2901,40 @@ Useful to see how many times you\\='ve inserted a link that is very
 similar to another link, but not identical, so that likely only
 one of them is associated with a ROAM_REFS property."
   (interactive)
-  (if-let* ((link-objects-excluding-id-type
-             (cl-loop
-              for list being each hash-value of org-node--dest<>links
-              append (cl-loop
-                      for LINK in list
-                      unless (equal "id" (plist-get LINK :type))
-                      collect LINK)))
-            (entries
-             (cl-loop
-              for LINK in link-objects-excluding-id-type
-              collect (let ((type (plist-get LINK :type))
-                            (dest (plist-get LINK :dest))
-                            (origin (plist-get LINK :origin))
-                            (pos (plist-get LINK :pos)))
-                        (let ((node (gethash origin org-node--id<>node)))
-                          (list LINK
-                                (vector
-                                 (if (gethash dest org-node--ref<>id) "*" "")
-                                 (if node
-                                     (list (org-node-get-title node)
-                                           'action `(lambda (_button)
-                                                      (org-id-goto ,origin)
-                                                      (goto-char ,pos)
-                                                      (if (org-at-heading-p)
-                                                          (org-show-entry)
-                                                        (org-show-context)))
-                                           'face 'link
-                                           'follow-link t)
-                                   origin)
-                                 (if type (concat type ":" dest) dest))))))))
-      ;; TODO: Prevent ellipsis from breaking visual alignment?
-      ;; (cl-letf ((truncate-string-ellipsis " "))
-      (org-node--pop-to-tabulated-list
-       :buffer "*org-node reflinks*"
-       :format [("Ref" 4 t) ("Inside node" 30 t) ("Link" 0 t)]
-       :reverter #'org-node-list-reflinks
-       :entries entries)
-    (message "No links found")))
+  (let* ((link-objects-excluding-id-type
+          (cl-loop
+           for list being each hash-value of org-node--dest<>links
+           append (cl-loop
+                   for LINK in list
+                   unless (equal "id" (plist-get LINK :type))
+                   collect LINK)))
+         (entries
+          (cl-loop
+           for LINK in link-objects-excluding-id-type
+           collect (pcase-let (((map :origin :pos :type :dest)) LINK)
+                     (let ((node (gethash origin org-node--id<>node)))
+                       (list LINK
+                             (vector
+                              (if (gethash dest org-node--ref<>id) "*" "")
+                              (if node
+                                  (list (org-node-get-title node)
+                                        'action `(lambda (_button)
+                                                   (org-id-goto ,origin)
+                                                   (goto-char ,pos)
+                                                   (if (org-at-heading-p)
+                                                       (org-show-entry)
+                                                     (org-show-context)))
+                                        'face 'link
+                                        'follow-link t)
+                                origin)
+                              (if type (concat type ":" dest) dest))))))))
+    (if entries
+        (org-node--pop-to-tabulated-list
+         :buffer "*org-node reflinks*"
+         :format [("Ref" 4 t) ("Inside node" 30 t) ("Link" 0 t)]
+         :reverter #'org-node-list-reflinks
+         :entries entries)
+      (message "No links found"))))
 
 (defcustom org-node-warn-title-collisions t
   "Whether to print messages on finding duplicate node titles."
