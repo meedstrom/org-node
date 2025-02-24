@@ -180,7 +180,7 @@ instead of calling this function."
 ;;;###autoload
 (defun org-node-seq-try-goto-id (id)
   "Try to visit org-id ID and return non-nil, else nil on fail."
-  (let ((node (gethash id org-node--id<>node)))
+  (let ((node (gethash id org-nodes)))
     (when node
       (org-node--goto node)
       t)))
@@ -473,7 +473,7 @@ DEF is a seq-def from `org-node-seq-defs'."
               if (functionp elt)
               collect (org-node--try-ensure-compiled elt)
               else collect elt)
-     (cl-loop for node being each hash-value of org-node--id<>node
+     (cl-loop for node being each hash-value of org-nodes
               as result = (funcall classifier node)
               if (listp (car result))
               nconc result into items

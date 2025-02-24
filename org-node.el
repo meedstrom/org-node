@@ -1818,7 +1818,7 @@ To operate on a node after creating it, either let-bind
 
     (org-node-create TITLE ID)
     (org-node-cache-ensure t)
-    (let ((node (gethash ID org-node--id<>node)))
+    (let ((node (gethash ID org-nodes)))
       (if node (org-node--goto node)))"
   (setq org-node-proposed-title title)
   (setq org-node-proposed-id id)
@@ -2497,7 +2497,7 @@ so it matches the destination\\='s current title."
                                (substring (cadr parts) 0 -2)))
                        (id (when (string-prefix-p "id:" target)
                              (substring target 3)))
-                       (node (gethash id org-node--id<>node))
+                       (node (gethash id org-nodes))
                        (true-title (when node
                                      (org-node-get-title node)))
                        (answered-yes nil))
@@ -2774,8 +2774,8 @@ write_file(lisp_data, file.path(dirname(tsv), \"feedback-arcs.eld\"))")
        :format [("Node containing link" 39 t) ("Target of link" 0 t)]
        :entries (cl-loop
                  for (origin . dest) in feedbacks
-                 as origin-node = (gethash origin org-node--id<>node)
-                 as dest-node = (gethash dest org-node--id<>node)
+                 as origin-node = (gethash origin org-nodes)
+                 as dest-node = (gethash dest org-nodes)
                  collect
                  (list (cons origin dest)
                        (vector (list (org-node-get-title origin-node)
@@ -2864,7 +2864,7 @@ with \\[universal-argument] prefix."
   (let ((dead-links
          (cl-loop for dest being each hash-key of org-node--dest<>links
                   using (hash-values links)
-                  unless (gethash dest org-node--id<>node)
+                  unless (gethash dest org-nodes)
                   append (cl-loop for link in links
                                   when (equal "id" (plist-get link :type))
                                   collect (cons dest link)))))
@@ -2878,7 +2878,7 @@ with \\[universal-argument] prefix."
        (cl-loop
         for (dest . link) in dead-links
         as origin-node = (gethash (plist-get link :origin)
-                                  org-node--id<>node)
+                                  org-nodes)
         if (not (equal dest (plist-get link :dest)))
         do (error "IDs not equal: %s, %s" dest (plist-get link :dest))
         else if (not origin-node)
@@ -2912,7 +2912,7 @@ one of them is associated with a ROAM_REFS property."
           (cl-loop
            for LINK in link-objects-excluding-id-type
            collect (pcase-let (((map :origin :pos :type :dest)) LINK)
-                     (let ((node (gethash origin org-node--id<>node)))
+                     (let ((node (gethash origin org-nodes)))
                        (list LINK
                              (vector
                               (if (gethash dest org-node--ref<>id) "*" "")
@@ -2995,7 +2995,7 @@ one of them is associated with a ROAM_REFS property."
                                           'follow-link t)
                                          (format "%s" signal))))))
     (message "Congratulations, no problems scanning %d nodes!"
-             (hash-table-count org-node--id<>node))))
+             (hash-table-count org-nodes))))
 
 ;; Very important macro for the backlink mode, because backlink insertion opens
 ;; the target Org file in the background, and if doing that is laggy, then
@@ -3406,7 +3406,7 @@ non-nil, because it may cause noticeable lag otherwise."
                         (mapcar #'car)
                         (cl-remove-if #'keywordp)
                         (mapcar #'substring-no-properties))
-           (cl-loop for node being each hash-value of org-node--id<>node
+           (cl-loop for node being each hash-value of org-nodes
                     append (org-node-get-tags-with-inheritance node))))))
 
 (defun org-node--end-of-meta-data (&optional full)
@@ -3543,10 +3543,10 @@ If already visiting that node, then follow the link normally."
 
 This may refer to the current Org heading, else an ancestor
 heading, else the file-level node, whichever has an ID first."
-  (gethash (org-entry-get-with-inheritance "ID") org-node--id<>node))
+  (gethash (org-entry-get-with-inheritance "ID") org-nodes))
 
 (defun org-node-by-id (id)
-  (gethash id org-node--id<>node))
+  (gethash id org-nodes))
 
 (defun org-node-read ()
   "Prompt for a known ID-node."

@@ -162,7 +162,7 @@ If REMOVE is non-nil, remove it instead."
   (if remove
       (org-entry-delete nil "BACKLINKS")
     (when-let* ((id (org-entry-get nil "ID"))
-                (node (gethash id org-node--id<>node)))
+                (node (gethash id org-nodes)))
       (catch 'break
         (let* ((sorted-uuids (thread-last
                                (append (org-node-get-id-links-to node)
@@ -172,7 +172,7 @@ If REMOVE is non-nil, remove it instead."
                                (compat-call sort)))
                (links (cl-loop
                        for origin in sorted-uuids
-                       as origin-node = (gethash origin org-node--id<>node)
+                       as origin-node = (gethash origin org-nodes)
                        if origin-node
                        collect (org-link-make-string
                                 (concat "id:" origin)
@@ -318,7 +318,7 @@ headings but you have only done work under one of them."
             (setq id (gethash path org-node--ref<>id))
             (setq file (ignore-errors
                          (org-node-get-file
-                          (gethash id org-node--id<>node)))))
+                          (gethash id org-nodes)))))
           (when (null file)
             (push id org-node-backlink--fails))
           (when (and id file)
@@ -442,9 +442,9 @@ where backlinks are fixed."
                        (gethash dest org-node--dest<>links))
                :test #'equal)
          do (let* ((id dest)
-                   (node (or (gethash id org-node--id<>node)
+                   (node (or (gethash id org-nodes)
                              (and (setq id (gethash dest org-node--ref<>id))
-                                  (gethash id org-node--id<>node)))))
+                                  (gethash id org-nodes)))))
               ;; (#59) Do nothing if this is an empty link like [[id:]]
               (when node
                 ;; Add to the dataset `affected-dests', which looks like:
