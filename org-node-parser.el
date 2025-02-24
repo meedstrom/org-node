@@ -166,11 +166,10 @@ the subheading potentially has an ID of its own."
                   ;; If point is on a # comment line, skip
                   (goto-char (pos-bol))
                   (looking-at-p "[\t\s]*# "))
-          (push (record 'org-node-link
-                        id-here
-                        link-pos
-                        link-type
-                        (string-replace "%20" " " path))
+          (push (list :origin id-here
+                      :pos link-pos
+                      :type link-type
+                      :dest (string-replace "%20" " " path))
                 org-node-parser--found-links))))
 
     ;; Start over and look for @citekeys
@@ -189,12 +188,11 @@ the subheading potentially has an ID of its own."
                     (looking-at-p "[\t\s]*# "))
                   ;; On a # comment, skip citation
                   (goto-char closing-bracket)
-                (push (record 'org-node-link
-                              id-here
-                              link-pos
-                              nil
-                              ;; Replace & with @
-                              (concat "@" (substring (match-string 0) 1)))
+                (push (list :origin id-here
+                            :pos link-pos
+                            :type nil
+                            ;; Replace & with @
+                            :dest (concat "@" (substring (match-string 0) 1)))
                       org-node-parser--found-links)))
           (error "No closing bracket to [cite:")))))
   (goto-char (or end (point-max))))

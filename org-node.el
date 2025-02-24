@@ -651,14 +651,6 @@ Also respect `org-tags-exclude-from-inheritance'."
 ;; (defalias 'org-node-get-sched #'org-node-get-scheduled)
 ;; (defalias 'org-node-get-lvl #'org-node-get-level)
 
-(cl-defstruct (org-node-link (:constructor org-node-link--make-obj)
-                             (:copier nil))
-  "Please see docstring of `org-node-get-id-links-to'."
-  origin
-  pos
-  type
-  dest)
-
 
 ;;;; Tables
 
@@ -1105,7 +1097,7 @@ JOB is the el-job object."
   (seq-let (missing-files file.mtime nodes path.type links problems) results
     (org-node--forget-id-locations missing-files)
     (dolist (link links)
-      (push link (gethash (org-node-link-dest link) org-node--dest<>links)))
+      (push link (gethash (plist-get link :dest) org-node--dest<>links)))
     (cl-loop for (path . type) in path.type
              do (puthash path type org-node--ref-path<>ref-type))
     (cl-loop for (file . mtime) in file.mtime
@@ -1168,7 +1160,7 @@ Argument JOB is the el-job object."
                  do (cl-loop
                      with update-this-dest = nil
                      for link in link-set
-                     if (member (org-node-link-origin link)
+                     if (member (plist-get link :origin)
                                 ids-of-nodes-scanned)
                      do (setq update-this-dest t)
                      else collect link into reduced-link-set
@@ -1185,7 +1177,7 @@ Argument JOB is the el-job object."
       ;; Having discarded the links that were known to originate in the
       ;; re-scanned nodes, it's safe to record them (again).
       (dolist (link links)
-        (push link (gethash (org-node-link-dest link) org-node--dest<>links)))
+        (push link (gethash (plist-get link :dest) org-node--dest<>links)))
       (cl-loop for (path . type) in path.type
                do (puthash path type org-node--ref-path<>ref-type))
       (cl-loop for (file . mtime) in file.mtime
@@ -1353,11 +1345,10 @@ point but assume it is a link to ID."
                        (let ((elm (org-element-context)))
                          (when (equal "id" (org-element-property :type elm))
                            (org-element-property :path elm))))))
-      (push (org-node-link--make-obj
-             :origin origin
-             :pos (point)
-             :type "id"
-             :dest dest)
+      (push (list :origin origin
+                  :pos (point)
+                  :type "id"
+                  :dest dest)
             (gethash dest org-node--dest<>links)))))
 
 (defun org-node--dirty-ensure-node-known ()
@@ -2811,8 +2802,8 @@ from ID links found in `org-node--dest<>links'."
                using (hash-values links)
                append (cl-loop
                        for link in links
-                       when (equal "id" (org-node-link-type link))
-                       collect (concat dest "\t" (org-node-link-origin link)))))
+                       when (equal "id" (plist-get link :type))
+                       collect (concat dest "\t" (plist-get link :origin)))))
     "\n")))
 
 (cl-defun org-node--pop-to-tabulated-list (&key buffer format entries reverter)
@@ -2875,7 +2866,7 @@ with \\[universal-argument] prefix."
                   using (hash-values links)
                   unless (gethash dest org-node--id<>node)
                   append (cl-loop for link in links
-                                  when (equal "id" (org-node-link-type link))
+                                  when (equal "id" (plist-get link :type))
                                   collect (cons dest link)))))
     (message "%d dead links found" (length dead-links))
     (when dead-links
@@ -2886,12 +2877,12 @@ with \\[universal-argument] prefix."
        :entries
        (cl-loop
         for (dest . link) in dead-links
-        as origin-node = (gethash (org-node-link-origin link)
+        as origin-node = (gethash (plist-get link :origin)
                                   org-node--id<>node)
-        if (not (equal dest (org-node-link-dest link)))
-        do (error "IDs not equal: %s, %s" dest (org-node-link-dest link))
+        if (not (equal dest (plist-get link :dest)))
+        do (error "IDs not equal: %s, %s" dest (plist-get link :dest))
         else if (not origin-node)
-        do (error "Node not found for ID: %s" (org-node-link-origin link))
+        do (error "Node not found for ID: %s" (plist-get link :origin))
         else collect
         (list link
               (vector
@@ -2899,7 +2890,7 @@ with \\[universal-argument] prefix."
                      'face 'link
                      'action `(lambda (_button)
                                 (org-node--goto ,origin-node)
-                                (goto-char ,(org-node-link-pos link)))
+                                (goto-char ,(plist-get link :pos)))
                      'follow-link t)
                dest)))))))
 
@@ -2915,15 +2906,15 @@ one of them is associated with a ROAM_REFS property."
               for list being each hash-value of org-node--dest<>links
               append (cl-loop
                       for LINK in list
-                      unless (equal "id" (org-node-link-type LINK))
+                      unless (equal "id" (plist-get LINK :type))
                       collect LINK)))
             (entries
              (cl-loop
               for LINK in link-objects-excluding-id-type
-              collect (let ((type (org-node-link-type LINK))
-                            (dest (org-node-link-dest LINK))
-                            (origin (org-node-link-origin LINK))
-                            (pos (org-node-link-pos LINK)))
+              collect (let ((type (plist-get LINK :type))
+                            (dest (plist-get LINK :dest))
+                            (origin (plist-get LINK :origin))
+                            (pos (plist-get LINK :pos)))
                         (let ((node (gethash origin org-node--id<>node)))
                           (list LINK
                                 (vector

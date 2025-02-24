@@ -145,6 +145,15 @@ hardcoded strings."
 (define-obsolete-variable-alias 'org-node-proposed-series-key 'org-node-proposed-sequence  "2024-11-18")
 (org-node-changes--def-whiny-alias 'org-node--add-series-item 'org-node-seq--add-item "2024-11-18")
 
+(defun org-node-link-origin (link)
+  (plist-get link :origin))
+(defun org-node-link-pos (link)
+  (plist-get link :pos))
+(defun org-node-link-type (link)
+  (plist-get link :type))
+(defun org-node-link-dest (link)
+  (plist-get link :dest))
+
 (provide 'org-node-changes)
 
 ;;; org-node-changes.el ends here
