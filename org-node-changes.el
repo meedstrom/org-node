@@ -40,11 +40,9 @@
     package menus (e.g. by M-x package-refresh-contents
     or M-x elpaca-update-menus)"))
 
-(unless (and (boundp 'el-job--major-version)
-             (< el-job--major-version 1))
+(when (boundp 'el-job--major-version)
   (display-warning
    'org-node "Version of el-job too high for this version of org-node"))
-
 
 (defvar org-node-changes--new-names
   '((org-node-built-series org-node-seqs)
