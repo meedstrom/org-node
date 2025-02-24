@@ -2911,7 +2911,7 @@ one of them is associated with a ROAM_REFS property."
          (entries
           (cl-loop
            for LINK in link-objects-excluding-id-type
-           collect (pcase-let (((map :origin :pos :type :dest)) LINK)
+           collect (pcase-let (((map :origin :pos :type :dest) LINK))
                      (let ((node (gethash origin org-nodes)))
                        (list LINK
                              (vector
