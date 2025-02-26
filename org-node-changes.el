@@ -94,7 +94,7 @@ Then do other one-shot warnings while we\\='re at it."
       (org-link-set-parameters
        \"id\" :follow #'org-id-open :store #'org-id-store-link-maybe)"))))
 
-(defmacro org-node-changes--def-whiny-alias (old new &optional when interactive removed-by)
+(defmacro org-node-changes--def-whiny-alias (old new &optional when removed-by interactive)
   "Define function OLD as effectively an alias for NEW.
 Also, running OLD will emit a deprecation warning the first time.
 
