@@ -2670,13 +2670,14 @@ In case of unsolvable problems, how to wipe org-id-locations:
              (lambda (name &optional _dir) name)))
     (let ((consult-ripgrep-args (concat consult-ripgrep-args " --type=org")))
       (if (executable-find "rg")
-          (consult--grep "Grep in all known Org files: "
+          (consult--grep "Grep in files known to org-node: "
                          #'consult--ripgrep-make-builder
-                         (org-node--root-dirs (org-node-list-files t))
+                         (org-node--root-dirs (org-node-list-files))
                          nil)
         ;; Much slower!  Vanilla grep does not have Ripgrep's --type=org, so
-        ;; must target thousands of files and not a handful of dirs.
-        (consult--grep "Grep in all known Org files: "
+        ;; must target thousands of files and not a handful of dirs, a calling
+        ;; pattern that would also slow Ripgrep down.
+        (consult--grep "Grep in files known to org-node: "
                        #'consult--grep-make-builder
                        (org-node-list-files)
                        nil)))))
