@@ -185,7 +185,8 @@ handler.
 I do not use EPG, so that is probably not enough to make it work.
 Report an issue on https://github.com/meedstrom/org-node/issues
 or drop me a line on Mastodon: @meedstrom@hachyderm.io"
-  ;; Reverted to defvar for now
+  ;; Reverted to defvar for now.
+  ;; Make it a defcustom if ever we finish support for .org.gpg files.
   ;; :type 'alist
   )
 
@@ -202,13 +203,14 @@ list, the faster `org-node-reset'.
 
 There is probably no point adding items for now, as org-node will
 need other changes to support TRAMP and encryption."
-  ;; Reverted to defvar for now
+  ;; Reverted to defvar for now.
+  ;; Make it a defcustom if ever we finish support for .org.gpg files.
   ;; :type '(set
   ;;         (function-item jka-compr-handler)
   ;;         (function-item epa-file-handler)
   ;;         ;; REVIEW: Chesterton's Fence.  I don't understand why
   ;;         ;; `tramp-archive-autoload-file-name-handler' exists
-  ;;         ;; (check emacs -Q), when these two already have autoloads?
+  ;;         ;; (look in emacs -Q), when these two already have autoloads?
   ;;         (function-item tramp-file-name-handler)
   ;;         (function-item tramp-archive-file-name-handler)
   ;;         (function-item file-name-non-special))
@@ -252,7 +254,8 @@ well as `org-node-backlink-aggressive'."
   :type 'boolean)
 
 (defun org-node--set-and-remind-reset (sym val)
-  "Set SYM to VAL."
+  "Set SYM to VAL.
+Then remind the user to run \\[org-node-reset]."
   (let ((caller (cadr (backtrace-frame 5))))
     (when (and (boundp 'org-node--first-init)
                (not org-node--first-init)
@@ -3534,7 +3537,50 @@ If already visiting that node, then follow the link normally."
         nil))))
 
 
-;;;; API not used inside this package
+;;;; API used by some subpackage(s)
+
+(defun org-node--re-search-forward-skip-special-regions (regexp &optional bound)
+  "Like `re-search-forward', but do not search inside certain regions.
+These regions are delimited by lines that start with \"#+BEGIN\" or
+\"#+END\".  Upon finding such regions, jump to the end of that region,
+then continue the search.
+
+Argument BOUND as in `re-search-forward'.
+Always behave as if NOERROR argument to `re-search-forward' is t.
+
+Each invocation has overhead, so to search for the same REGEXP
+repeatedly, it performs better not to copy the standard pattern
+\"(while (re-search-forward REGEXP nil t) ...)\",
+but to use `org-node--map-matches-skip-special-regions' instead."
+  (let ((starting-pos (point))
+        (skips (org-node--find-regions-to-skip bound)))
+    (catch 'found
+      (cl-loop for (beg . end) in skips
+               if (re-search-forward regexp beg t)
+               do (throw 'found (point))
+               else do (goto-char end))
+      (if (re-search-forward regexp bound t)
+          (throw 'found (point))
+        (goto-char starting-pos)
+        nil))))
+
+(defun org-node--find-regions-to-skip (&optional bound)
+  (let ((starting-pos (point))
+        (case-fold-search t)
+        skips)
+    (while (re-search-forward "^[\t\s]*#\\+BEGIN" bound t)
+      (forward-line 0)
+      (let ((beg (point)))
+        (unless (re-search-forward "^[\t\s]*#\\+END" bound t)
+          (error "org-node: Could not find #+end%s"
+                 (if bound (format " before search boundary %d" bound) "")))
+        (forward-line 1)
+        (push (cons beg (point)) skips)))
+    (goto-char starting-pos)
+    (nreverse skips)))
+
+
+;;;; API not used in this package at all
 
 (defun org-node-id-at-point ()
   "Get the ID property in entry at point or some ancestor."

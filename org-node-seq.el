@@ -156,7 +156,7 @@ YYYY-MM-DD format, e.g. \"2024-01-31.org\"."
                  (org-node-create sortstr (org-id-new) key)))))
 
 
-;;; Helpers to use in a sequence definition
+;;; Helpers to use in a seq definition
 
 (defvar org-node-seq--guess-daily-dir nil
   "Last result of function `org-node-seq--guess-daily-dir'.")
@@ -164,7 +164,7 @@ YYYY-MM-DD format, e.g. \"2024-01-31.org\"."
 ;;;###autoload
 (defun org-node-seq--guess-daily-dir ()
   "Do not rely on this.
-Better insert a hardcoded string in your seq def
+Better insert a hardcoded string in your seq def,
 instead of calling this function."
   (with-memoization org-node-seq--guess-daily-dir
     (or (bound-and-true-p org-node-fakeroam-daily-dir)
@@ -249,7 +249,7 @@ format-constructs occur before these."
                     (substring instance pos-day (+ pos-day 2)))))))))
 
 
-;;;; Sequence plumbing
+;;;; Plumbing
 
 (defcustom org-node-seq-defs nil
   "Alist defining each node sequence.
@@ -336,7 +336,7 @@ message to remind you to check out the wiki on GitHub and port
 your definitions."
   :type 'alist
   :group 'org-node
-  :package-version '(org-node . "1.0.10")
+  :package-version '(org-node . "1.9.0")
   :set #'org-node--set-and-remind-reset)
 
 ;;;###autoload
@@ -479,8 +479,8 @@ DEF is a seq-def from `org-node-seq-defs'."
               nconc result into items
               else collect result into items
               finally return
-              ;; Sort `string>' due to most recent dailies probably being most
-              ;; relevant, thus cycling recent dailies will be best perf.
+              ;; Sort by `string>' due to most recent dailies probably being
+              ;; most relevant, thus cycling recent dailies will be best perf.
               (list :key (car def)
                     :sorted-items (delete-consecutive-dups
                                    (if (< emacs-major-version 30)
@@ -504,8 +504,8 @@ DEF is a seq-def from `org-node-seq-defs'."
                       'incompatible)
           (list (seq-uniq (cons key old))))))
 
-;; These suffixes just exist due to a linter complaint, could
-;; have been lambdas
+;; These suffixes just exist due to a linter complaint, could have been
+;; lambdas inlined in the `org-node-seq-dispatch' definition.
 
 (transient-define-suffix org-node-seq--goto-previous* (args)
   (interactive (list (transient-args 'org-node-seq-dispatch)))
@@ -539,6 +539,7 @@ DEF is a seq-def from `org-node-seq-defs'."
                (setq org-node-seq--current-key nil)))
     (message "Choose sequence before navigating")))
 
+;; TODO: In Emacs 30, simplify to just ###autoload
 ;;;###autoload (autoload 'org-node-seq-dispatch "org-node-seq" nil t)
 (transient-define-prefix org-node-seq-dispatch ()
   ["Sequence"
@@ -567,6 +568,7 @@ indicated, any time Org pops up a calendar for you.
 The sort-strings in the sequence that corresponds to this key
 should be correctly parseable by `parse-time-string'."
   :group 'org-node
+  :package-version '(org-node . "1.9.0")
   :type '(choice key (const nil)))
 
 ;; TODO: How to cooperate with preexisting marks?
@@ -608,8 +610,9 @@ not exist."
       (funcall (plist-get seq :creator) sortstr key))))
 
 (defun org-node-seq--reset ()
-  "Wipe and re-build all sequences.
-Must be done after the main org-node tables are up to date."
+  "Wipe and re-build all seqs.
+Must be done after the main org-node tables are up to date,
+not before."
   (setq org-node-seqs nil)
   (dolist (def org-node-seq-defs)
     (setf (alist-get (car def) org-node-seqs nil nil #'equal)
@@ -619,7 +622,10 @@ Must be done after the main org-node tables are up to date."
                                    (plist-get (cdr def) :name))))
 
 (defun org-node-seq--enable-or-disable ()
-  "If `org-node-cache-mode' is enabled, enable node sequences as well."
+  "If `org-node-cache-mode' is enabled, enable node sequences as well.
+
+The reason this function is separated from `org-node-cache-mode' itself
+is purely to let you avoid loading org-node-seq.el if you do not use it."
   (if org-node-cache-mode
       (progn
         ;; FIXME: A dirty-added node eventually disappears if its buffer is
