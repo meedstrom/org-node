@@ -52,13 +52,14 @@
 
 ;; Compared to org-roam:
 
-;;   - Same idea, compatible disk format
-;;   - Fast
-;;   - Does not need SQLite
+;;   + Same idea, compatible disk format
+;;   + Fast
+;;   + Does not need SQLite
+;;   + Lets you opt out of those file-level property drawers
+;;   + Tries to rely in a bare-metal way on upstream org-id and org-capture
+;;   + Ships extra commands to e.g. auto-rename files and links
+
 ;;   - Does not support "roam:" links
-;;   - Lets you opt out of those file-level property drawers
-;;   - Tries to rely in a bare-metal way on upstream org-id and org-capture
-;;   - Ships extra commands to e.g. auto-rename files and links
 
 ;;   As a drawback of relying on the org-id table, if a heading in some
 ;;   vendor README.org or whatever has an ID, it's considered part of
@@ -68,17 +69,19 @@
 
 ;; Compared to denote:
 
-;;   - Org only, no Markdown nor other file types
-;;   - Does not support "denote:" links
-;;   - Filenames have no meaning (can match the Denote format if you like)
-;;   - You can have as many "notes" as you want inside one file.  You
+;;   + Filenames have no meaning (can match the Denote format if you like)
+;;   + You can have as many "notes" as you want inside one file.  You
 ;;     could possibly use Denote to search files and org-node
 ;;     as a more granular search.
+
+;;   - Org only, no Markdown nor other file types
+;;   - Does not support "denote:" links
 
 ;;; Code:
 
 ;; Built-in
 (require 'seq)
+(require 'map)
 (require 'cl-lib)
 (require 'subr-x)
 (require 'bytecomp)
@@ -96,11 +99,10 @@
 (require 'el-job)
 
 ;; Satisfy compiler
-(defvar org-roam-directory)
-(defvar org-roam-dailies-directory)
 (defvar consult-ripgrep-args)
+(defvar org-roam-capture-templates)
 (defvar org-node-backlink-mode)
-(declare-function org-node-backlink--fix-entry-here "org-node-backlink")
+(declare-function org-node-backlink--fix-nearby-property "org-node-backlink")
 (declare-function profiler-report "profiler")
 (declare-function profiler-stop "profiler")
 (declare-function tramp-tramp-file-p "tramp")
@@ -899,6 +901,35 @@ since, thus this hook."
             (org-node--dirty-forget-files (list buffer-file-truename))
             (kill-buffer buf)))))))
 
+(define-advice org-id-locations-load
+    (:after () org-node--abbrev-org-id-locations)
+  "Maybe abbreviate all filenames in `org-id-locations'.
+
+Due to an oversight, org-id does not abbreviate after reconstructing
+filenames if `org-id-locations-file-relative' is t.
+
+https://lists.gnu.org/archive/html/emacs-orgmode/2024-09/msg00305.html"
+  (when org-id-locations-file-relative
+    (maphash (lambda (id file)
+               (puthash id (org-node-abbrev-file-names file) org-id-locations))
+             org-id-locations)))
+
+
+;;;; Scanning files to cache info about them
+
+(defvar org-node--temp-extra-fns nil
+  "Extra functions to run at the end of a full scan.
+The list is emptied on each use.  Primarily exists to give the
+interactive command `org-node-reset' a way to print the time
+elapsed.")
+
+;;;###autoload
+(defun org-node-reset ()
+  "Wipe and rebuild the cache."
+  (interactive)
+  (cl-pushnew #'org-node--print-elapsed org-node--temp-extra-fns)
+  (org-node-cache-ensure nil t))
+
 (defun org-node-cache-ensure (&optional synchronous force)
   "Ensure that org-node is ready for use.
 Specifically, do the following:
@@ -985,27 +1016,11 @@ In broad strokes:
 \trandom heading with M-x `org-id-get-create', so that at least one exists
 \ton disk, then do M-x `org-node-reset' and it should work from then on."))))))
 
-(define-advice org-id-locations-load
-    (:after () org-node--abbrev-org-id-locations)
-  "Maybe abbreviate all filenames in `org-id-locations'.
-
-Due to an oversight, org-id does not abbreviate after reconstructing
-filenames if `org-id-locations-file-relative' is t.
-
-https://lists.gnu.org/archive/html/emacs-orgmode/2024-09/msg00305.html"
-  (when org-id-locations-file-relative
-    (maphash (lambda (id file)
-               (puthash id (org-node-abbrev-file-names file) org-id-locations))
-             org-id-locations)))
-
-
-;;;; Scanning
-
 (defvar org-node--time-at-begin-full-scan nil)
 (defun org-node--scan-all ()
   "Arrange a full scan."
   (unless (el-job-is-busy 'org-node)
-    (setq org-node--time-at-begin-full-scan (time-convert nil t))
+    (setq org-node--time-at-begin-full-scan (current-time))
     (el-job-launch
      :id 'org-node
      :if-busy 'noop
@@ -1122,7 +1137,7 @@ JOB is the el-job object."
           ;; other sentinels, timers or I/O in between these periods
           (float-time
            (time-add
-            (time-subtract (time-convert nil t)
+            (time-subtract (current-time)
                            (plist-get (el-job:timestamps job) :got-all-results))
             (time-subtract (plist-get (el-job:timestamps job) :children-done)
                            org-node--time-at-begin-full-scan))))
@@ -1596,7 +1611,7 @@ FILES are assumed to be abbreviated truenames."
 (defun org-node--root-dirs (file-list)
   "Infer root directories of FILE-LIST.
 
-By 'root', we mean the longest directory path common to a set of files,
+By root, we mean the longest directory path common to a set of files,
 as long as that directory contains at least one member of
 FILE-LIST itself.  For example, if you have the 3 members
 
@@ -1605,7 +1620,7 @@ FILE-LIST itself.  For example, if you have the 3 members
 - \"/home/kept/baz.org\"
 
 the return value will not be \(\"/home/\"), even though
-the substring \"/home/\" is common to all of them,
+the substring \"/home/\" is common to all three,
 but \(\"/home/kept/\" \"/home/me/Syncthing/\").
 
 
@@ -2318,7 +2333,7 @@ creation-date as more \"truthful\" than today\\='s date.
         (push (current-buffer) org-node--new-unsaved-buffers)
         (run-hooks 'org-node-creation-hook)
         (when (bound-and-true-p org-node-backlink-mode)
-          (org-node-backlink--fix-entry-here))))))
+          (org-node-backlink--fix-nearby-property))))))
 
 (defun org-node-extract-file-name-datestamp (path)
   "From filename PATH, get the datestamp prefix if it has one.
@@ -2612,19 +2627,6 @@ user quits, do not apply any modifications."
   (unless (org-entry-get nil "CREATED")
     (org-entry-put nil "CREATED"
                    (format-time-string (org-time-stamp-format t t)))))
-
-(defvar org-node--temp-extra-fns nil
-  "Extra functions to run at the end of a full scan.
-The list is emptied on each use.  Primarily exists to give the
-interactive command `org-node-reset' a way to print the time
-elapsed.")
-
-;;;###autoload
-(defun org-node-reset ()
-  "Wipe and rebuild the cache."
-  (interactive)
-  (cl-pushnew #'org-node--print-elapsed org-node--temp-extra-fns)
-  (org-node-cache-ensure nil t))
 
 ;;;###autoload
 (defun org-node-forget-dir (dir)
@@ -2922,7 +2924,7 @@ one of them is associated with a ROAM_REFS property."
          (entries
           (cl-loop
            for LINK in link-objects-excluding-id-type
-           collect (pcase-let (((map :origin :pos :type :dest) LINK))
+           collect (seq-let (_ origin _ pos _ type _ dest) LINK
                      (let ((node (gethash origin org-nodes)))
                        (list LINK
                              (vector
@@ -2948,7 +2950,7 @@ one of them is associated with a ROAM_REFS property."
       (message "No links found"))))
 
 (defcustom org-node-warn-title-collisions t
-  "Whether to print messages on finding duplicate node titles."
+  "Whether to print messages on vvfinding duplicate node titles."
   :group 'org-node
   :type 'boolean)
 
@@ -3355,7 +3357,7 @@ Wrap the link in double-brackets if necessary."
   (let (result)
     (maphash
      (lambda (dest links)
-       (let ((types (mapcar #'org-node-link-type links)))
+       (let ((types (mapcar (##plist-get % :type) links)))
          (when (memq nil types)
            ;; Type nil is a @citation
            (push dest result)
@@ -3437,7 +3439,7 @@ to a position after any file-level properties and keywords."
         (goto-char (point-min))
         ;; Jump past top-level PROPERTIES drawer.
         (let ((case-fold-search t))
-          (when (looking-at-p "[\t\s]*?:properties: *?$")
+          (when (looking-at-p "[\t\s]*?:PROPERTIES: *?$")
             (forward-line)
             (while (looking-at-p "[\t\s]*?:")
               (forward-line))))
@@ -3447,7 +3449,8 @@ to a position after any file-level properties and keywords."
     ;; PERF: Override a bottleneck in `org-end-of-meta-data'.
     (cl-letf (((symbol-function 'org-back-to-heading)
                #'org-node--back-to-heading-or-point-min))
-      (org-end-of-meta-data full))))
+      (org-end-of-meta-data full)))
+  (point))
 
 (defun org-node--back-to-heading-or-point-min (&optional invisible-ok)
   "Alternative to `org-back-to-heading-or-point-min'.
@@ -3468,6 +3471,7 @@ As bonus, do not land on an inlinetask, seek a real heading."
 
 
 ;;;; CAPF (Completion-At-Point Function)
+;; Also known as in-buffer completion.
 
 (defun org-node-complete-at-point ()
   "Complete word at point to a known node title, and linkify.
@@ -3568,6 +3572,20 @@ but to use `org-node--map-matches-skip-special-regions' instead."
           (throw 'found (point))
         (goto-char starting-pos)
         nil))))
+
+;; unused for now; likely something like this will go in org-node-parser.el
+(defun org-node--map-matches-skip-special-regions (regexp fn &optional bound)
+  (let ((last-search-hit (point))
+        (skips (org-node--find-regions-to-skip bound)))
+    (cl-loop for (beg . end) in skips do
+             (while (re-search-forward regexp beg t)
+               (setq last-search-hit (point))
+               (funcall fn))
+             (goto-char end))
+    (while (re-search-forward regexp bound t)
+      (setq last-search-hit (point))
+      (funcall fn))
+    (goto-char last-search-hit)))
 
 (defun org-node--find-regions-to-skip (&optional bound)
   (let ((starting-pos (point))
