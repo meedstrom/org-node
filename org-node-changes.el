@@ -47,9 +47,7 @@
    'org-node "Update el-job to use this version of org-node"))
 
 (defvar org-node-changes--new-names
-  '((org-node-built-series org-node-seqs)
-    (org-node-series-defs org-node-seq-defs)
-    (org-node-current-series-key org-node-seq--current-key))
+  '((org-node-built-series org-node-seqs))
   "Alist of deprecated symbol names and their new names.
 Names here will cause complaints if bound.")
 
@@ -126,26 +124,30 @@ hardcoded strings."
 (define-obsolete-variable-alias 'org-node-series-that-marks-calendar 'org-node-seq-that-marks-calendar "2024-12-13")
 (define-obsolete-variable-alias 'org-node-proposed-series-key 'org-node-proposed-sequence  "2024-11-18")
 
-;;; To slow-deprecate (introduced in v1.9)
+;;; v1.9
 
-(defalias 'org-node-get-file-path 'org-node-get-file) ;; 2025-01-31
+(define-obsolete-function-alias 'org-node-get-file-path 'org-node-get-file "2025-01-31")
 (define-obsolete-function-alias 'org-node-ref-add 'org-node-add-refs "2025-02-21")
 (define-obsolete-function-alias 'org-node-tag-add 'org-node-add-tags "2025-02-21")
 (define-obsolete-function-alias 'org-node-tag-add-here 'org-node-add-tags-here "2025-02-21")
 (define-obsolete-function-alias 'org-node-alias-add 'org-node-add-alias "2025-02-21")
 
-;;; To slow-deprecate (introduced in v1.10)
+;;; v2.0
 
-;; Removed the org-node-link struct.  Easier to read code that has
-;; e.g. (plist-get LINK :origin) instead of (org-node-link-origin LINK) all
-;; over the place, imho, and you can use `map-let'.
+;; Removed the org-node-link struct.  Less cognitive work to read code that has
+;; the familiar (plist-get LINK :origin) instead of (org-node-link-origin LINK)
+;; all over the place, and you can use `map-let' syntactic sugar.
 (defun org-node-link-origin (link)
+  (declare (obsolete "use (plist-get LINK :origin) instead" "2025-02-26"))
   (plist-get link :origin))
 (defun org-node-link-pos (link)
+  (declare (obsolete "use (plist-get LINK :pos) instead" "2025-02-26"))
   (plist-get link :pos))
 (defun org-node-link-type (link)
+  (declare (obsolete "use (plist-get LINK :type) instead" "2025-02-26"))
   (plist-get link :type))
 (defun org-node-link-dest (link)
+  (declare (obsolete "use (plist-get LINK :dest) instead" "2025-02-26"))
   (plist-get link :dest))
 
 (org-node-changes--def-whiny-alias 'org-node-insert-link*-immediate
