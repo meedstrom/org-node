@@ -33,6 +33,7 @@
 (require 'subr-x)
 (require 'cl-lib)
 (require 'ol)
+(require 'el-job)
 
 (unless (fboundp 'el-job-launch)
   (display-warning

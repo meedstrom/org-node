@@ -20,11 +20,11 @@ You can configure =org-node-backlink-mode= to use multiline drawers instead of a
 
 #+begin_src org
 ,* My problems in life
-,:PROPERTIES:
-,:CREATED: [2023-12-25 Mon 17:20]
-,:ID: 432324523
-,:BACKLINKS: [[id:123456][Relationships]] [[id:235611][Feelings]]
-,:END:
+:PROPERTIES:
+:CREATED: [2023-12-25 Mon 17:20]
+:ID: 432324523
+:BACKLINKS: [[id:123456][Relationships]] [[id:235611][Feelings]]
+:END:
 
 Blah blah blah
 #+end_src
@@ -33,17 +33,17 @@ you can now have this:
 
 #+begin_src org
 ,* My problems in life
-,:PROPERTIES:
-,:CREATED: [2023-12-25 Mon 17:20]
-,:ID: 432324523
-,:END:
+:PROPERTIES:
+:CREATED: [2023-12-25 Mon 17:20]
+:ID: 432324523
+:END:
 
 Blah blah blah
 
-,:BACKLINKS:
+:BACKLINKS:
 - [2025-01-05 Sun 16:16] [[id:123456][Relationships]]
 - [2025-02-26 Wed 01:55] [[id:235611][Feelings]]
-,:END:
+:END:
 #+end_src
 
 It will be the new default, because you never know when you might want to look at timestamps or other extra info that is now trivial to store.

@@ -94,9 +94,9 @@
 ;; External
 (require 'llama)
 (require 'compat)
+(require 'el-job)
 (require 'org-node-parser)
 (require 'org-node-changes)
-(require 'el-job)
 
 ;; Satisfy compiler
 (defvar consult-ripgrep-args)
