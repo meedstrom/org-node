@@ -1010,23 +1010,22 @@ https://lists.gnu.org/archive/html/emacs-orgmode/2024-09/msg00305.html"
      :id 'org-node
      :if-busy 'noop
      :inject-vars (append org-node-inject-variables (org-node--mk-work-vars))
-     :load 'org-node-parser
-     :funcall #'org-node-parser--collect-dangerously
+     :load-features '(org-node-parser)
+     :funcall-per-input #'org-node-parser--collect-dangerously
      :inputs #'org-node-list-files
-     :wrapup #'org-node--finalize-full)))
+     :callback #'org-node--finalize-full)))
 
 (defun org-node--scan-targeted (files)
   "Arrange to scan FILES."
   (when files
     (el-job-launch
      :id 'org-node-targeted
-     :method 'reap
      :if-busy 'wait
      :inject-vars (append org-node-inject-variables (org-node--mk-work-vars))
-     :load 'org-node-parser
-     :funcall #'org-node-parser--collect-dangerously
+     :load-features '(org-node-parser)
+     :funcall-per-input #'org-node-parser--collect-dangerously
      :inputs (ensure-list files)
-     :wrapup #'org-node--finalize-modified)))
+     :callback #'org-node--finalize-modified)))
 
 (defun org-node--mk-work-vars ()
   "Return an alist of symbols and values to set in subprocesses."
