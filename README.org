@@ -7,6 +7,57 @@
 #+TEXINFO_DIR_DESC: Link org-id entries into a network.
 #+EXPORT_FILE_NAME: org-node
 #+HTML: <a href="https://melpa.org/#/org-node"><img alt="MELPA" src="https://melpa.org/packages/org-node-badge.svg"/></a> <a href="https://stable.melpa.org/#/org-node"><img alt="MELPA Stable" src="https://stable.melpa.org/packages/org-node-badge.svg"/></a>
+* News [2025-02-25 Tue]
+
+2.0.0 is out, with two new features: backlink drawers, and context buffers!
+
+*If you were using version 1.8.7 or older (November 2024), you'll have a smoother ride if you first upgrade to the latest in [[https://github.com/meedstrom/org-node/tree/v1.9][v1.9 branch]],* deal with any transitional warnings, /then/ upgrade to the latest version.
+
+It is partly for this reason I bumped the version number to 2.0: so I could cull the crop of aliases left behind after renames.
+
+** Backlinks drawer
+You can configure =org-node-backlink-mode= to use multiline drawers instead of a single property line.  Same idea as [[https://github.com/toshism/org-super-links][org-super-links]].  I.e. instead of this:
+
+#+begin_src org
+,* My problems in life
+,:PROPERTIES:
+,:CREATED: [2023-12-25 Mon 17:20]
+,:ID: 432324523
+,:BACKLINKS: [[id:123456][Relationships]] [[id:235611][Feelings]]
+,:END:
+
+Blah blah blah
+#+end_src
+
+you can now have this:
+
+#+begin_src org
+,* My problems in life
+,:PROPERTIES:
+,:CREATED: [2023-12-25 Mon 17:20]
+,:ID: 432324523
+,:END:
+
+Blah blah blah
+
+,:BACKLINKS:
+- [2025-01-05 Sun 16:16] [[id:123456][Relationships]]
+- [2025-02-26 Wed 01:55] [[id:235611][Feelings]]
+,:END:
+#+end_src
+
+It will be the new default, because you never know when you might want to look at timestamps or other extra info that is now trivial to store.
+
+The format is customizable.
+
+** Context buffers
+Try one of these ways to invoke a backlinks buffer:
+
+- =org-node-context-raise=
+- =org-node-context-toggle=
+
+Info TBD.
+
 * Background
 ** What's all this
 
@@ -42,40 +93,40 @@ Once a subtree has an ID you can link to, it's a "node" because it has joined th
 
 A comparison of three systems that all permit relying on org-id and don't lock you into the concept of "one-note-per-file".
 
-| Feature                        | org-roam | org-node           | [[https://github.com/toshism/org-super-links][org-super-links]]      |
-|--------------------------------+----------+--------------------+----------------------|
-| Backlinks                      | yes      | yes                | yes                  |
-| Node search and insert         | yes      | yes                | -- (suggests [[https://github.com/alphapapa/org-ql][org-ql]]) |
-| Node aliases                   | yes      | yes                | --                   |
-| Node exclusion                 | yes      | limited            | not applicable       |
-| Refile                         | yes      | yes                | --                   |
-| Rich backlinks buffer          | yes      | yes (org-roam's)   | --                   |
-| Customize how backlinks shown  | yes      | yes (org-roam's)   | yes                  |
-| Reflinks                       | yes      | yes (as backlinks) | --                   |
-| Ref search                     | yes      | yes (as aliases)   | not applicable       |
-| Org 9.5 @citations as refs     | yes      | yes                | not applicable       |
-| Support org-ref v3             | yes      | limited            | not applicable       |
-| Support org-ref v2             | yes      | --                 | not applicable       |
-| Work thru org-roam-capture     | yes      | yes                | ?                    |
-| Work thru org-capture          | --       | yes                | ?                    |
-| Daily-nodes                    | yes      | yes                | --                   |
-| Node sequences                 | --       | yes                | --                   |
-| Show backlinks in same window  | --       | yes                | yes                  |
-| Cooperate with org-super-links | --       | yes                | not applicable       |
-| Fix link descriptions          | --       | yes                | --                   |
-| List dead links                | --       | yes                | --                   |
-| Rename file when title changes | --       | yes                | --                   |
-| Warn about duplicate titles    | --       | yes                | --                   |
-| Principled "related-section"   | --       | --                 | yes                  |
-| Untitled notes                 | --       | --                 | --                   |
-| Support =roam:= links            | yes      | -- (WONTFIX)       | not applicable       |
-| Can have separate note piles   | yes      | -- (WONTFIX)       | not applicable       |
-|--------------------------------+----------+--------------------+----------------------|
-| Some query-able cache          | EmacSQL  | hash tables        | --                   |
-| Async cache rebuild            | --       | yes                | not applicable       |
-| *Time to cache my 3000 nodes*    | *2m 48s*   | *0m 01s*             | not applicable       |
-| *Time to save file w/ 400 nodes* | *5--10s*   | *instant*            | ?                    |
-| *Time to open minibuffer*        | *1--3s*    | *instant*            | not applicable       |
+| Feature                        | org-roam       | org-node           | [[https://github.com/toshism/org-super-links][org-super-links]]      |
+|--------------------------------+----------------+--------------------+----------------------|
+| Backlinks                      | yes            | yes                | yes                  |
+| Node search and insert         | yes            | yes                | -- (suggests [[https://github.com/alphapapa/org-ql][org-ql]]) |
+| Node aliases                   | yes            | yes                | --                   |
+| Node exclusion                 | yes            | limited            | not applicable       |
+| Refile                         | yes            | yes                | --                   |
+| Rich backlinks buffer          | yes            | yes (org-roam's)   | --                   |
+| Customize how backlinks shown  | yes            | yes (org-roam's)   | yes                  |
+| Reflinks                       | yes            | yes (as backlinks) | --                   |
+| Ref search                     | yes            | yes (as aliases)   | not applicable       |
+| Org 9.5 @citations as refs     | yes            | yes                | not applicable       |
+| Support org-ref v3             | yes            | limited            | not applicable       |
+| Support org-ref v2             | yes            | --                 | not applicable       |
+| Work thru org-roam-capture     | yes            | yes                | ?                    |
+| Work thru org-capture          | --             | yes                | ?                    |
+| Daily-nodes                    | yes            | yes                | --                   |
+| Node sequences                 | --             | yes                | --                   |
+| Show backlinks in same window  | --             | yes                | yes                  |
+| Cooperate with org-super-links | --             | yes                | not applicable       |
+| Fix link descriptions          | --             | yes                | --                   |
+| List dead links                | --             | yes                | --                   |
+| Rename file when title changes | --             | yes                | --                   |
+| Warn about duplicate titles    | --             | yes                | --                   |
+| Principled "related-section"   | --             | --                 | yes                  |
+| Untitled notes                 | --             | --                 | --                   |
+| Support =roam:= links            | yes            | -- (WONTFIX)       | --                   |
+| Can have separate note piles   | yes (via hack) | -- (WONTFIX)       | not applicable       |
+|--------------------------------+----------------+--------------------+----------------------|
+| Some query-able cache          | EmacSQL        | hash tables        | --                   |
+| Async cache rebuild            | --             | yes                | not applicable       |
+| *Time to cache my 3000 nodes*    | *2m 48s*         | *0m 01s*             | not applicable       |
+| *Time to save file w/ 400 nodes* | *5--10s*         | *instant*            | ?                    |
+| *Time to open minibuffer*        | *1--3s*          | *instant*            | not applicable       |
 
 * Setup
 ** Install
@@ -111,7 +162,7 @@ Pick some short keys and try them out.
 
 To browse config options, type =M-x customize-group RET org-node RET=.
 
-Final tip: there's *no separate command* for creating a new node!  Reuse one of the commands above, and type the name of a node that doesn't exist.  Try it and see what happens!
+Final tip: there's *no separate command* for creating a new node!  Reuse one of the commands above, and type the name of a node that doesn't exist, such as "My problems in life".  Try it and see what happens!
 
 * Backlinks
 ** What are backlinks?
