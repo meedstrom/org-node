@@ -103,37 +103,27 @@ If INTERACTIVE, define it as an interactive function.  Optional
 string WHEN says when it was deprecated and REMOVED-BY when it
 may be removed.  When these strings are omitted, fall back on
 hardcoded strings."
+  (when (or (eq t removed-by) (stringp interactive))
+    (warn "org-node-changes--def-whiny-alias: Argument order has changed")
+    (let ((date interactive))
+      (when (eq t removed-by)
+        (setq interactive t))
+      (if (stringp date)
+          (setq removed-by date)
+        (setq removed-by nil))))
   `(let (warned-once)
      (add-to-list 'org-node-changes--new-names '(,(cadr old) ,(cadr new) ,removed-by))
      (defun ,(cadr old) (&rest args)
-       (declare (obsolete ,new ,(or when "2024")))
+       (declare (obsolete ,new ,(or when "2025")))
        ,@(if interactive '((interactive)))
        (unless warned-once
          (setq warned-once t)
          (lwarn 'org-node :warning "Your initfiles use old function name: %S, which will be REMOVED by %s.  Please use new name: %S"
-                ,old ,(or removed-by "30 January 2025") ,new))
+                ,old ,(or removed-by "30 February 2025") ,new))
        (apply ,new args))))
 
-;; 1.9.0 (2024-11-18) moved series-related code into its own file, whereupon
-;; the namespace had to be made consistent.
-(org-node-changes--def-whiny-alias 'org-node-series-goto           'org-node-seq-goto "2024-11-18")
-(org-node-changes--def-whiny-alias 'org-node-series-dispatch       'org-node-seq-dispatch "2024-11-18")
-(org-node-changes--def-whiny-alias 'org-node-helper-try-goto-id    'org-node-seq-try-goto-id "2024-11-18")
-(org-node-changes--def-whiny-alias 'org-node-helper-try-visit-file 'org-node-seq-try-visit-file "2024-11-18")
-(org-node-changes--def-whiny-alias 'org-node-series-capture-target 'org-node-seq-capture-target "2024-11-18")
-(org-node-changes--def-whiny-alias 'org-node-helper-filename->ymd  'org-node-seq-filename->ymd "2024-11-18")
-(org-node-changes--def-whiny-alias 'org-node-extract-ymd           'org-node-seq-extract-ymd "2024-11-18")
-(org-node-changes--def-whiny-alias 'org-node-mk-series-sorted-by-property             'org-node-seq-def-on-any-sort-by-property "2024-11-18")
-(org-node-changes--def-whiny-alias 'org-node-mk-series-on-tags-sorted-by-property     'org-node-seq-def-on-tags-sort-by-property "2024-11-18")
-(org-node-changes--def-whiny-alias 'org-node-mk-series-on-filepath-sorted-by-basename 'org-node-seq-def-on-filepath-sort-by-basename "2024-11-18")
 (define-obsolete-variable-alias 'org-node-series-that-marks-calendar 'org-node-seq-that-marks-calendar "2024-12-13")
-
-;; Used by org-node-fakeroam until 1.6.0 (co-released with org-node 1.9.0)
 (define-obsolete-variable-alias 'org-node-proposed-series-key 'org-node-proposed-sequence  "2024-11-18")
-(org-node-changes--def-whiny-alias 'org-node--add-series-item 'org-node-seq--add-item "2024-11-18")
-
-(org-node-changes--def-whiny-alias 'org-node-tag-add* 'org-node-add-tags-here
-                                   "30 January 2025" nil "30 February 2025")
 
 ;;; To slow-deprecate (introduced in v1.9)
 
@@ -156,6 +146,10 @@ hardcoded strings."
   (plist-get link :type))
 (defun org-node-link-dest (link)
   (plist-get link :dest))
+
+(org-node-changes--def-whiny-alias 'org-node-insert-link*-immediate
+                                   'org-node-insert-link-novisit*
+                                   "2025-02-26" "2025-03-30" t)
 
 (provide 'org-node-changes)
 

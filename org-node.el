@@ -2104,19 +2104,29 @@ The commands are the same, just differing in initial input."
   (interactive "*" org-mode)
   (org-node-insert-link t))
 
-;; TODO
-(defun org-node-insert-link*-immediate ()
-  "Insert a link to one of your ID nodes immediately,
-without opening a window or buffer for that node, even
-if it was not yet created. (Not-yet-created nodes are just
-created according to the defaults for `org-node-creation-fn'.)
-Behaves otherwise exactly like `org-node-insert-link*'."
+;;;###autoload
+(defun org-node-insert-link-novisit ()
+  "Insert a link to one of your ID nodes without ever visiting it.
+
+Normally, if the node does not exist, `org-node-insert-link' would
+create it and then visit it.  This will not visit it."
   (interactive "*" org-mode)
-  (if (boundp 'org-roam-capture-templates)
-      (let ((org-roam-capture-templates
-             (list (append (car org-roam-capture-templates)
-                           '(:immediate-finish t)))))
-        (org-node-insert-link t t))))
+  (let ((org-roam-capture-templates
+         (list (append (car (bound-and-true-p org-roam-capture-templates))
+                       '(:immediate-finish t)))))
+    (org-node-insert-link t t)))
+
+;;;###autoload
+(defun org-node-insert-link-novisit* ()
+  "Insert a link to one of your ID nodes without ever visiting it.
+
+Normally, if the node does not exist, `org-node-insert-link*' would
+create it and then visit it.  This will not visit it."
+  (interactive "*" org-mode)
+  (let ((org-roam-capture-templates
+         (list (append (car (bound-and-true-p org-roam-capture-templates))
+                       '(:immediate-finish t)))))
+    (org-node-insert-link t t)))
 
 ;;;###autoload
 (defun org-node-insert-transclusion (&optional node)
