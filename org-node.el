@@ -16,10 +16,15 @@
 ;; see <http://www.gnu.org/licenses/>.
 
 ;; Author:           Martin Edström <meedstrom91@gmail.com>
+;; URL:              https://github.com/meedstrom/org-node
 ;; Created:          2024-04-13
 ;; Keywords:         org, hypermedia
-;; Package-Requires: ((emacs "28.1") (compat "30") (el-job "0.3.22") (llama "0.4.0"))
-;; URL:              https://github.com/meedstrom/org-node
+;; Package-Requires: (
+;; 	(emacs "28.1")
+;; 	(compat "30.0.0.0")
+;; 	(el-job "0.3.22")
+;; 	(llama "0.4.0")
+;; 	(magit-section "4.3.0"))
 
 ;; NOTE: Looking for Package-Version?
 ;;       Consult your package manager, or the Git tag.
