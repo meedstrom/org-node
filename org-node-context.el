@@ -141,8 +141,9 @@ time that context was shown in a visible window.  Including:
 - The array of backlinks shown, and which sections were collapsed")
 
 (defvar-local org-node-context--current nil)
-(defvar-local org-node-context--future nil)
-(defvar-local org-node-context--past nil)
+;; FIXME: either all three local or none local
+(defvar org-node-context--future nil)
+(defvar org-node-context--past nil)
 
 (defun org-node-context-history-go-back ()
   (interactive () org-node-context-mode)
@@ -213,7 +214,7 @@ contains `org-node-context--truncate-buffer'."
 
 (defun org-node-context--restore-context-state ()
   "Should run near the end of `org-node-context-refresh-hook'."
-  (when-let* ((id (oref (magit-current-section) id))
+  (when-let* ((id (oref (magit-current-section) dest-id))
               (state (gethash id org-node-context--remembered-state)))
     (seq-let ( num-sections pt win-pt ) state
       (when (= num-sections (org-node-context--count-sections))
@@ -255,7 +256,6 @@ properties."
      :extend t
      :height 1.5))
   "Face for backlink node titles in the context buffer."
-  ;; :group 'org-node
   :package-version '(org-node . "2.0.0"))
 
 (defcustom org-node-context-main-buffer "*Org-Node Context*"
@@ -299,7 +299,7 @@ properties."
     (visual-line-mode)))
 
 (defclass org-node-context-section (magit-section)
-  ((id :initform nil)
+  ((dest-id :initform nil)
    (file :initform nil)
    (link-pos :initform nil)))
 
@@ -335,11 +335,13 @@ properties."
                (inhibit-same-window . t))))
         (display-buffer buf)))
 
+     ((derived-mode-p 'org-mode)
+      (org-node-context--refresh (get-buffer-create buf)
+                                 (org-entry-get-with-inheritance "ID"))
+      (display-buffer buf))
+
      (t
-      (when (derived-mode-p 'org-mode)
-        (org-node-context--refresh (get-buffer-create buf)
-                                   (org-entry-get-with-inheritance "ID"))
-        (display-buffer buf))))))
+      (message "Found no context buffer, visit an org-mode buffer first")))))
 
 ;;;###autoload
 (defun org-node-context-toggle ()
@@ -362,6 +364,8 @@ properties."
          (not (org-node-context--displaying-p nil id))
          (org-node-context--refresh org-node-context-main-buffer id))))
 
+;; TODO REVIEW is it important to hypothetically be able to show multiple
+;;             contexts in one buffer?
 (defun org-node-context--displaying-p (buf id)
   (when-let ((buf (get-buffer (or buf org-node-context-main-buffer))))
     (equal id (buffer-local-value 'org-node-context--current buf))))
@@ -374,7 +378,6 @@ properties."
 
 ;;; Plumbing
 
-(defvar org-node-context--scroll-positions (make-hash-table :test #'equal))
 (defun org-node-context--refresh (&optional buf id)
   "Refresh buffer BUF to show context for node known by ID.
 
@@ -384,14 +387,17 @@ that buffer."
   (org-node-context--maybe-init-persistence)
   (with-current-buffer (get-buffer-create (or buf org-node-context-main-buffer))
     (let ((inhibit-read-only t))
-      (when (and org-node-context--current (not id))
+      (when (not id)
+        ;; NOTE: Can still be nil initially.
         (setq id org-node-context--current))
-      (when (and id (eq (selected-window) (get-buffer-window)))
+      (when (and id (get-buffer-window))
         (puthash id
                  (list (point)
                        (window-point)
                        (org-node-context--count-sections))
-                 org-node-context--remembered-state))
+                 org-node-context--remembered-state)
+        (when org-node-context--current
+          (push org-node-context--current org-node-context--past)))
       (erase-buffer)
       (org-node-context-mode)
       (setq-local org-node-context--current id)
