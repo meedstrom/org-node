@@ -3746,6 +3746,22 @@ heading, else the file-level node, whichever has an ID first."
                             () () () 'org-node-hist)
            org-node--candidate<>node))
 
+(defun org-node-insert-link-into-drawer ()
+  "Experimental; insert a link into a RELATED drawer."
+  (interactive "*" org-mode)
+  (save-excursion
+    (save-restriction
+      (org-node--narrow-to-drawer-create "RELATED" t)
+      ;; Here is something to ponder in the design of
+      ;; `org-node--narrow-to-drawer-create'. Should it ensure a blank line?
+      (let ((already-blank-line (eolp)))
+        (atomic-change-group
+          (org-node-insert-link nil t)
+          (back-to-indentation)
+          (insert (format-time-string (org-time-stamp-format t t)) " <- ")
+          (unless already-blank-line
+            (newline-and-indent)))))))
+
 (provide 'org-node)
 
 ;;; org-node.el ends here
