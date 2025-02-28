@@ -161,7 +161,6 @@ time that context was shown in a visible window.  Including:
 
 ;;; Porcelain
 
-
 (defcustom org-node-context-collapse-more-than 5
   "How many backlinks before they should all start collapsed."
   :type '(choice natnum (const :value nil))
@@ -259,7 +258,7 @@ properties."
   ;; :group 'org-node
   :package-version '(org-node . "2.0.0"))
 
-(defcustom org-node-context-main-buffer "*Context*"
+(defcustom org-node-context-main-buffer "*Org-Node Context*"
   "Name of the context buffer."
   :type 'string
   :package-version '(org-node . "2.0.0"))
@@ -286,32 +285,28 @@ properties."
 
 (defvar-keymap org-node-context-mode-map
   :parent magit-section-mode-map
-  "<return>"                #'org-node-context-foo
-  "C-m"                     #'org-node-context-foo
+  "<return>"                #'org-node-context-visit-thing
+  "C-m"                     #'org-node-context-visit-thing
   "l"                       #'org-node-context-history-go-back
   "r"                       #'org-node-context-history-go-forward
   "<remap> <revert-buffer>" #'org-node-context-refresh-this-buffer)
 
 (define-derived-mode org-node-context-mode magit-section-mode
-  "Org-node context"
+  "org-node context"
   "Major mode for the context buffer."
   (when (or (member #'visual-line-mode org-mode-hook)
             (member #'visual-line-mode text-mode-hook))
     (visual-line-mode)))
 
-(defclass org-node-context-generic-section (magit-section)
+(defclass org-node-context-section (magit-section)
   ((id :initform nil)
    (file :initform nil)
    (link-pos :initform nil)))
 
-;; XXX
-(defclass org-node-context-test-child-section (org-node-context-generic-section)
-  ((foo :initform 'bar)))
-
-(defun org-node-context-foo ()
+(defun org-node-context-visit-thing ()
   (interactive nil org-node-context-mode)
   (unless (derived-mode-p 'org-node-context-mode)
-    (user-error "`org-node-context-foo' called outside org-node-context-mode"))
+    (user-error "`org-node-context-visit-thing' called in non org-node-context-mode buffer"))
   (let ((file     (oref (magit-current-section) file))
         (link-pos (oref (magit-current-section) link-pos)))
     (find-file file)
@@ -403,18 +398,23 @@ that buffer."
       (let ((node (gethash id org-nodes)))
         (unless node
           (error "org-node-context: ID not known: %s" id))
-        (magit-insert-section ( org-node-context-generic-section )
-          (oset (magit-current-section) file (org-node-get-file node))
+        (magit-insert-section this
+          ( org-node-context-section )
+          (oset this file (org-node-get-file node))
           (magit-insert-heading
             (concat "Context for " (org-node-get-title node)))
           (when-let ((links (org-node-get-id-links-to node)))
-            (magit-insert-section ( org-node-context-generic-section )
+            (magit-insert-section this
+              ( org-node-context-section )
+              (oset this file (org-node-get-file node))
               (magit-insert-heading "ID backlinks:")
               (dolist (link (sort links #'org-node-context--origin-title-lessp))
                 (org-node-context--insert-backlink link))
               (insert "\n")))
           (when-let ((links (org-node-get-reflinks-to node)))
-            (magit-insert-section ( org-node-context-test-child-section )
+            (magit-insert-section this
+              ( org-node-context-section )
+              (oset this file (org-node-get-file node))
               (magit-insert-heading "Ref backlinks:")
               (dolist (link (sort links #'org-node-context--origin-title-lessp))
                 (org-node-context--insert-backlink link))
@@ -429,9 +429,10 @@ that buffer."
          (breadcrumbs (if-let ((olp (org-node-get-olp-full node)))
                           (string-join olp " > ")
                         "Top")))
-    (magit-insert-section ( org-node-context-generic-section )
-      (oset (magit-current-section) file (org-node-get-file node))
-      (oset (magit-current-section) link-pos (plist-get link :pos))
+    (magit-insert-section this
+      ( org-node-context-section )
+      (oset this file (org-node-get-file node))
+      (oset this link-pos (plist-get link :pos))
       (magit-insert-heading
         (format "%s (%s)"
                 (propertize (org-node-get-title node)
