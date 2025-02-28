@@ -1410,7 +1410,11 @@ also necessary is `org-node--dirty-ensure-link-known' elsewhere."
                 (fpath buffer-file-truename) ;; Abbreviated
                 (ftitle (cadar (org-collect-keywords '("TITLE")))))
             (when heading
-              (setq heading (substring-no-properties heading)))
+              (setq heading (org-link-display-format
+                             (substring-no-properties heading))))
+            (when ftitle
+              (setq ftitle (org-link-display-format
+                            (substring-no-properties ftitle))))
             (org-node--record-nodes
              (list
               (org-node--make-obj
