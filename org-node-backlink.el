@@ -348,7 +348,11 @@ headings but you have only done work under one of them."
             (let ((origin-title
                    (save-excursion
                      (without-restriction
-                       (re-search-backward (concat "^[ \t]*:id: +" origin-id))
+                       ;; This search can fail when point is on the heading
+                       ;; with the id-property below, but then point is in the
+                       ;; right place anyway.
+                       (re-search-backward (concat "^[ \t]*:id: +" origin-id)
+                                           nil t)
                        (or (org-get-heading t t t t)
                            (cadar (org-collect-keywords '("TITLE")))
                            (file-name-nondirectory buffer-file-name))))))
