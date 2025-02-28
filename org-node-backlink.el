@@ -539,7 +539,7 @@ where backlinks are fixed."
   :package-version '(org-node . "2.0.0"))
 
 (defcustom org-node-backlink-drawer-sort-in-reverse nil
-  "."
+  "Whether to reverse how lines are sorted in the backlinks drawer."
   :type 'boolean
   :package-version '(org-node . "2.0.0"))
 
@@ -664,6 +664,8 @@ The result can look like:
         (let ((sorted-lines
                (sort (split-string (buffer-string) "\n" t)
                      org-node-backlink-drawer-sorter)))
+          (when org-node-backlink-drawer-sort-in-reverse
+            (setq sorted-lines (nreverse sorted-lines)))
           (atomic-change-group
             (delete-region (point-min) (point-max))
             (insert (string-join sorted-lines "\n"))))))))
@@ -713,6 +715,8 @@ The result can look like:
           (let ((sorted-lines
                  (sort (split-string (buffer-string) "\n" t)
                        org-node-backlink-drawer-sorter)))
+            (when org-node-backlink-drawer-sort-in-reverse
+              (setq sorted-lines (nreverse sorted-lines)))
             (atomic-change-group
               (delete-region (point-min) (point-max))
               (insert (string-join sorted-lines "\n")))))))))
