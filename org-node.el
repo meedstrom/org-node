@@ -1074,6 +1074,16 @@ In broad strokes:
            (cl-remove-if-not (##memq % org-node-perf-keep-file-name-handlers)
                              file-name-handler-alist
                              :key #'cdr))
+     (cons '$structures-to-ignore
+           (list "src" "comment" "example"))
+     (cons '$drawers-to-ignore
+           (delete-dups
+            (list (or (and (boundp 'org-super-links-backlink-into-drawer)
+                           (stringp org-super-links-backlink-into-drawer)
+                           org-super-links-backlink-into-drawer)
+                      "BACKLINKS")
+                  (or (bound-and-true-p org-node-backlink-drawer-name)
+                      "BACKLINKS"))))
      (cons '$backlink-drawer-re
            (concat "^[\t\s]*:"
                    (or (and (require 'org-super-links nil t)
@@ -3713,6 +3723,8 @@ heading, else the file-level node, whichever has an ID first."
 (defun org-node-by-id (id)
   (gethash id org-nodes))
 
+;; TODO: Add an extended variant that checks active region like
+;;       `org-node-insert-link' does.
 (defun org-node-read ()
   "Prompt for a known ID-node."
   (gethash (completing-read "Node: " #'org-node-collection

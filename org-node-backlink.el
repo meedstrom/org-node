@@ -1,4 +1,4 @@
-;;; org-node-backlink.el --- Manage :BACKLINKS: properties -*- lexical-binding: t; -*-
+;;; org-node-backlink.el --- Manage :BACKLINKS: properties or drawers -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2024-2025 Martin Edström
 ;;
@@ -17,12 +17,10 @@
 
 ;;; Commentary:
 
-;; Advices and hooks that efficiently make sure that the Org property drawers
-;; that should have :BACKLINKS: properties have them and are up to date.
+;; A mode for ensuring that the Org nodes that should have
+;; :BACKLINKS: properties (or :BACKLINKS: drawers) have them and are up to date.
 
 ;;; Code:
-
-;; TODO: Reuse much of this logic to make org-super-links drawers
 
 (require 'org-node)
 (require 'org-node-changes)
@@ -43,7 +41,6 @@
 (defcustom org-node-backlink-do-drawers nil
   "Experimental setting."
   :type 'boolean
-  :group 'org-node
   :package-version '(org-node . "2.0.0"))
 
 
@@ -57,7 +54,6 @@ See Info node `(org-node)'.
 
 -----"
   :global t
-  :group 'org-node
   (when (member #'org-node-backlink-mode org-mode-hook)
     (display-warning
      'org-node "Since 2024-10-22, `org-node-backlink-mode' is a global mode, but your initfiles still add it to `org-mode-hook'")
@@ -460,7 +456,6 @@ If t, `org-node-perf-eagerly-update-link-tables' must be t as well
 
 Minor side effect: `org-element-cache-reset' is called in the buffers
 where backlinks are fixed."
-  :group 'org-node
   :type 'boolean
   :package-version '(org-node . "1.1.0"))
 
@@ -529,7 +524,7 @@ where backlinks are fixed."
 
 (defcustom org-node-backlink-drawer-sorter
   #'org-node-backlink-timestamp-lessp
-  "Function to use for sorting lines in the backlinks drawer."
+  "Function for sorting lines in the backlinks drawer."
   :type '(radio
           (function-item org-node-backlink-timestamp-lessp)
           (function-item org-node-backlink-link-description-lessp)
@@ -684,9 +679,6 @@ The result can look like:
                            (mapcar (##plist-get % :origin))
                            (delete-dups))))
       (save-restriction
-        ;; TODO: Should prolly ensure that point is indented same as the
-        ;;       :DRAWER: line that we now cannot see, esp. because there may
-        ;;       be no next line for `indent-according-to-mode' to base on
         (org-node--narrow-to-drawer "BACKLINKS" t)
         (let* ((lines (split-string (buffer-string) "\n" t))
                (already-present-ids

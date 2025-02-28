@@ -41,8 +41,8 @@ you can now have this:
 Blah blah blah
 
 :BACKLINKS:
-- [2025-01-05 Sun 16:16] [[id:123456][Relationships]]
-- [2025-02-26 Wed 01:55] [[id:235611][Feelings]]
+[2025-01-05 Sun 16:16] <- [[id:123456][Relationships]]
+[2025-02-26 Wed 01:55] <- [[id:235611][Feelings]]
 :END:
 #+end_src
 

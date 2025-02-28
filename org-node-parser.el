@@ -47,9 +47,12 @@
 (defvar $file-name-handler-alist)
 (defvar $file-todo-option-re)
 (defvar $global-todo-re)
-(defvar $backlink-drawer-re)
 (defvar $nonheritable-tags)
 (defvar $inlinetask-min-level)
+
+(defvar $backlink-drawer-re) ;; TODO: deprecate in favor of next two
+(defvar $structures-to-ignore)
+(defvar $drawers-to-ignore)
 
 (defvar org-node-parser--paths-types nil)
 (defvar org-node-parser--found-links nil)
