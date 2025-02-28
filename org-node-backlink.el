@@ -544,8 +544,10 @@ where backlinks are fixed."
   :package-version '(org-node . "2.0.0"))
 
 (defcustom org-node-backlink-drawer-line-formatter
-  #'org-node-backlink-format-as-bullet-with-time
-  ".
+  #'org-node-backlink-format-like-org-super-links-default
+  "Function to format a new line for the backlinks drawer.
+
+It takes three arguments ID, TITLE, and optionally TIME.
 
 The function should beware not to add:
 - Initial whitespace.
