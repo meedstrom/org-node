@@ -388,8 +388,7 @@ that buffer."
     (let ((inhibit-read-only t))
       (when (and org-node-context--current (not id))
         (setq id org-node-context--current))
-      (when id
-        (cl-assert (eq (selected-window) (get-buffer-window)))
+      (when (and id (eq (selected-window) (get-buffer-window)))
         (puthash id
                  (list (point)
                        (window-point)
