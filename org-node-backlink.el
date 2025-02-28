@@ -554,8 +554,8 @@ The function should beware not to add:
           (function :tag "Custom function"))
   :package-version '(org-node . "2.0.0"))
 
-(defcustom org-node-backlink-put-drawer-near-end-of-entry nil
-  "."
+(defcustom org-node-backlink-put-drawer-near-bottom nil
+  "When creating a BACKLINKS drawer, put it below all text in the entry."
   :type 'boolean
   :package-version '(org-node . "2.0.0"))
 
@@ -638,10 +638,8 @@ The result can look like:
 ;; For link-insertion advice
 (defun org-node-backlink--add-link-to-drawer (id title)
   (save-restriction
-    (org-node--narrow-to-drawer
-     "BACKLINKS"
-     t
-     org-node-backlink-put-drawer-near-end-of-entry)
+    (org-node--narrow-to-drawer-create
+     "BACKLINKS" org-node-backlink-put-drawer-near-bottom)
     (catch 'break
       (let (lines)
         (while (search-forward "[[id:" (pos-eol) t)
@@ -679,7 +677,8 @@ The result can look like:
                            (mapcar (##plist-get % :origin))
                            (delete-dups))))
       (save-restriction
-        (org-node--narrow-to-drawer "BACKLINKS" t)
+        (org-node--narrow-to-drawer-create
+         "BACKLINKS" org-node-backlink-put-drawer-near-bottom)
         (let* ((lines (split-string (buffer-string) "\n" t))
                (already-present-ids
                 (seq-keep #'org-node-backlink--extract-id lines))

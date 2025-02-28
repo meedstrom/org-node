@@ -3640,22 +3640,37 @@ but to use `org-node--map-matches-skip-special-regions' instead."
 ;; That only works under an Org entry though, not before the first heading.
 ;; Plus, this subroutine has many uses.
 
-(defun org-node--narrow-to-drawer
-    (name &optional create-missing create-near-bottom)
-  "Seek a drawer named NAME in the current entry, then narrow to it.
-This also works before the first entry in the file.
+(defun org-node--narrow-to-drawer-create (name &optional create-near-bottom)
+  "Narrow to pre-existing drawer named NAME, creating it if necessary.
 
-If a drawer was found, return t.
-Otherwise, do not narrow, and return nil.
-With CREATE-MISSING t, create a new drawer if one was not found.
+Uses `org-node--narrow-to-drawer-p' as subroutine.
 
 When drawer is created, insert it near the beginning of the Org entry
 \(after any properties and logbook drawers\), unless CREATE-NEAR-BOTTOM
-is t, in which case insert it near the end of the entry \(just before
-the next heading\).
+is t, in which case insert it near the end of the entry \(right before
+the next heading\)."
+  (org-node--narrow-to-drawer-p name t create-near-bottom))
 
-Narrow to the region between :NAME: and :END:, exclusive.
-Place point at the beginning of that region, after any indentation."
+;; REVIEW: We should test how it respects indentation.  It seems functions like
+;;         `back-to-indentation' and `indent-according-to-mode' would have no
+;;         effect after calling `org-insert-drawer', because that never inserts
+;;         indentation.  I guess users are fine with that?
+(defun org-node--narrow-to-drawer-p
+    (name &optional create-missing create-near-bottom)
+  "Seek a drawer named NAME in the current entry, then narrow to it.
+This also works at the file top level, before the first entry.
+
+If a drawer was found, return t.
+Otherwise do not narrow, and return nil.
+
+When found, narrow to the region between :NAME: and :END:, exclusive.
+Place point at the beginning of that region, after any indentation.
+If the drawer was empty, ensure there is one blank line.
+
+With CREATE-MISSING t, create a new drawer if one was not found.
+However, instead of passing this argument, it is recommended for clarity
+to call `org-node--narrow-to-drawer-create' instead.
+Also see that function for meaning of CREATE-NEAR-BOTTOM."
   (let ((entry-end (org-entry-end-position))
         (case-fold-search t))
     (org-node--end-of-meta-data)
@@ -3673,13 +3688,13 @@ Place point at the beginning of that region, after any indentation."
        (concat "^[\t\s]*:" (regexp-quote name) ":[\t\s]*$")
        entry-end)
       (if (get-text-property (point) 'org-transclusion-id)
-          (error "Was about to operate on backlink drawer inside an org-transclusion, probably not intended")
+          (error "Was about to operate on a drawer inside an org-transclusion, probably not intended")
         (let ((drawbeg (progn (forward-line 1) (point))))
           (re-search-forward org-clock-drawer-end-re entry-end)
           (forward-line 0)
           (if (= drawbeg (point))
               ;; Empty drawer with no newlines in-between; add one newline
-              ;; so the result is identical to after `org-insert-drawer'.
+              ;; so the result looks similar to after `org-insert-drawer'.
               (open-line 1)
             ;; Not an empty drawer, so it is safe to back up from the :END: line
             (backward-char))
@@ -3697,7 +3712,7 @@ Place point at the beginning of that region, after any indentation."
 
 (defun org-node--delete-drawer (name)
   (save-restriction
-    (when (org-node--narrow-to-drawer name)
+    (when (org-node--narrow-to-drawer-p name)
       (delete-region (point-min) (point-max))
       (widen)
       (delete-blank-lines)
