@@ -294,7 +294,10 @@ properties."
 
 (define-derived-mode org-node-context-mode magit-section-mode
   "Org-node context"
-  "Major mode for the context buffer.")
+  "Major mode for the context buffer."
+  (when (or (member #'visual-line-mode org-mode-hook)
+            (member #'visual-line-mode text-mode-hook))
+    (visual-line-mode)))
 
 (defclass org-node-context-generic-section (magit-section)
   ((id :initform nil)
