@@ -22,7 +22,7 @@
 (require 'org-node)
 (require 'magit-section)
 
-;; Assuage compiler
+;; Reassure compiler
 (defvar org-node-context-mode)
 
 (defgroup org-node-context nil "Preview backlink contexts in separate buffer."
@@ -30,15 +30,6 @@
 
 
 ;;; Persistence
-
-;; TODO Make a PR to no-littering.el
-;; TODO Deprecate org-node-fakeroam's equivalent variable
-(defcustom org-node-data-dir user-emacs-directory
-  "Directory in which to persist data between sessions."
-  :type `(choice (const :value ,user-emacs-directory)
-                 directory)
-  ;; :group 'org-node
-  :package-version '(org-node . "2.0.0"))
 
 (defcustom org-node-context-persist-on-disk nil
   "Whether to sync cached backlink previews to disk.

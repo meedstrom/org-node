@@ -529,7 +529,7 @@ where backlinks are fixed."
 
 (defcustom org-node-backlink-drawer-sorter
   #'org-node-backlink-timestamp-lessp
-  ""
+  "Function to use for sorting lines in the backlinks drawer."
   :type '(radio
           (function-item org-node-backlink-timestamp-lessp)
           (function-item org-node-backlink-link-description-lessp)
@@ -638,7 +638,7 @@ The result can look like:
            (org-node-backlink--extract-link-desc line)
            (org-node-backlink--extract-timestamp line)))
 
-;; for advice
+;; For link-insertion advice
 (defun org-node-backlink--add-link-to-drawer (id title)
   (save-restriction
     (org-node--narrow-to-drawer
@@ -668,10 +668,10 @@ The result can look like:
             (delete-region (point-min) (point-max))
             (insert (string-join sorted-lines "\n"))))))))
 
-;; for on-save
+;; For save-hook
 (defun org-node-backlink--fix-nearby-drawer (&optional remove)
   (if remove
-      (org-node-backlink--delete-drawer "BACKLINKS")
+      (org-node--delete-drawer "BACKLINKS")
     (when-let* ((id (org-entry-get nil "ID"))
                 (node (gethash id org-nodes))
                 (origins (thread-last
@@ -716,77 +716,6 @@ The result can look like:
             (atomic-change-group
               (delete-region (point-min) (point-max))
               (insert (string-join sorted-lines "\n")))))))))
-
-(defun org-node-backlink--delete-drawer (name)
-  (save-restriction
-    (when (org-node--narrow-to-drawer name)
-      (delete-region (point-min) (point-max))
-      (widen)
-      (delete-blank-lines)
-      (forward-line -1)
-      (delete-line)
-      (delete-line))))
-
-;; Home-made subroutine to find/create a drawer.  There's a trick used by
-;; org-super-links to let upstream code do the work: temporarily set
-;; `org-log-into-drawer' to "BACKLINKS", and then call `org-log-beginning'.
-;; That only works under an Org entry though, not before the first heading.
-;; Plus, this subroutine has many uses.
-
-(defun org-node--narrow-to-drawer
-    (name &optional create-missing create-near-bottom)
-  "Seek a drawer named NAME in the current entry, then narrow to it.
-This also works before the first entry in the file.
-
-If a drawer was found, return t.
-Otherwise, do not narrow, and return nil.
-With CREATE-MISSING t, create a new drawer if one was not found.
-
-When drawer is created, insert it near the beginning of the Org entry
-\(after any properties and logbook drawers\), unless CREATE-NEAR-BOTTOM
-is t, in which case insert it near the end of the entry \(just before
-the next heading\).
-
-Narrow to the region between :NAME: and :END:, exclusive.
-Place point at the beginning of that region, after any indentation."
-  (let ((entry-end (org-entry-end-position))
-        (case-fold-search t))
-    (org-node--end-of-meta-data)
-    (cond
-     ;; Empty entry (next line after heading was another heading)
-     ((org-at-heading-p)
-      (if create-missing
-          (progn
-            (org-insert-drawer nil name)
-            (narrow-to-region (point) (point))
-            t)
-        nil))
-     ;; Pre-existing drawer
-     ((org-node--re-search-forward-skip-special-regions
-       (concat "^[\t\s]*:" (regexp-quote name) ":[\t\s]*$")
-       entry-end)
-      (if (get-text-property (point) 'org-transclusion-id)
-          (error "Was about to operate on backlink drawer inside an org-transclusion, probably not intended")
-        (let ((drawbeg (progn (forward-line 1) (point))))
-          (re-search-forward org-clock-drawer-end-re entry-end)
-          (forward-line 0)
-          (if (= drawbeg (point))
-              ;; Empty drawer with no newlines in-between; add one newline
-              ;; so the result is identical to after `org-insert-drawer'.
-              (open-line 1)
-            ;; Not an empty drawer, so it is safe to back up from the :END: line
-            (backward-char))
-          (let ((drawend (point)))
-            (goto-char drawbeg)
-            (back-to-indentation)
-            (narrow-to-region drawbeg drawend))
-          t)))
-     (create-missing
-      (when create-near-bottom
-        (goto-char entry-end))
-      (org-insert-drawer nil name)
-      (narrow-to-region (point) (point))
-      t))))
 
 (provide 'org-node-backlink)
 

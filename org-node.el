@@ -118,6 +118,14 @@
   "Support a zettelkasten of org-id files and subtrees."
   :group 'org)
 
+;; TODO Make a PR to no-littering.el
+;; TODO Deprecate org-node-fakeroam's equivalent variable
+(defcustom org-node-data-dir user-emacs-directory
+  "Directory in which to persist data between sessions."
+  :type `(choice (const :value ,user-emacs-directory)
+                 directory)
+  :package-version '(org-node . "2.0.0"))
+
 (defcustom org-node-rescan-functions nil
   "Hook run after scanning specific files.
 Not run after a full cache reset, only after e.g. a file is
@@ -181,6 +189,8 @@ There is no need to add the \"cite\" type."
   :type '(repeat string)
   :package-version '(org-node . "0.7"))
 
+;; Reverted to defvar for now.
+;; Make it a defcustom if ever we finish support for .org.gpg files.
 (defvar org-node-inject-variables (list)
   "Alist of variable-value pairs that child processes should set.
 
@@ -192,11 +202,11 @@ handler.
 I do not use EPG, so that is probably not enough to make it work.
 Report an issue on https://github.com/meedstrom/org-node/issues
 or drop me a line on Mastodon: @meedstrom@hachyderm.io"
-  ;; Reverted to defvar for now.
-  ;; Make it a defcustom if ever we finish support for .org.gpg files.
   ;; :type 'alist
   )
 
+;; Reverted to defvar for now.
+;; Make it a defcustom if ever we finish support for .org.gpg files.
 (defvar org-node-perf-keep-file-name-handlers nil
   "Which file handlers to respect while scanning for ID-nodes.
 
@@ -210,8 +220,6 @@ list, the faster `org-node-reset'.
 
 There is probably no point adding items for now, as org-node will
 need other changes to support TRAMP and encryption."
-  ;; Reverted to defvar for now.
-  ;; Make it a defcustom if ever we finish support for .org.gpg files.
   ;; :type '(set
   ;;         (function-item jka-compr-handler)
   ;;         (function-item epa-file-handler)
@@ -304,7 +312,7 @@ directory named \"archive\".
         (not (or (assoc \"ROAM_EXCLUDE\" (org-node-get-properties node))
                  (org-node-get-todo node)
                  (string-search \"/archive/\" (org-node-get-file node))
-                 (member \"drill\" (org-node-get-tags-local node))))))"
+                 (member \"drill\" (org-node-get-tags node))))))"
   :type 'function
   :set #'org-node--set-and-remind-reset)
 
@@ -855,13 +863,13 @@ If not running, start it."
       (setq org-node--idle-timer
             (run-with-idle-timer new-delay t #'org-node--scan-all)))))
 
-;; FIXME: The idle timer will detect new files appearing, created by other
-;;        emacsen, but won't run the hook `org-node-rescan-functions' on them,
-;;        which would be good to do.  So check for new files and then try to
-;;        use `org-node--scan-targeted', since that runs the hook, but it is
-;;        easy to imagine a pitfall where the list of new files is just all
-;;        files, and then we do NOT want to run the hook.  So use a heuristic
-;;        cutoff like 10 files.
+;; TODO: The idle timer will detect new files appearing, created by other
+;;       emacsen, but won't run the hook `org-node-rescan-functions' on them,
+;;       which would be good to do.  So check for new files and then try to
+;;       use `org-node--scan-targeted', since that runs the hook, but it is
+;;       easy to imagine a pitfall where the list of new files is just all
+;;       files, and then we do NOT want to run the hook.  So use a heuristic
+;;       cutoff like 10 files.
 ;; (defun org-node--catch-unknown-modifications ()
 ;;   (let ((new (-difference (org-node-list-files) (org-node-list-files t)))))
 ;;   (if (> 10 )
@@ -1072,7 +1080,7 @@ In broad strokes:
                             (boundp 'org-super-links-backlink-into-drawer)
                             (stringp org-super-links-backlink-into-drawer)
                             org-super-links-backlink-into-drawer)
-                       "backlinks")
+                       "BACKLINKS")
                    ":")))))
 
 ;; Copied from part of `org-link-make-regexps'
@@ -3556,7 +3564,7 @@ If already visiting that node, then follow the link normally."
         nil))))
 
 
-;;;; API used by some subpackage(s)
+;;;; API used by some submodule(s)
 
 (defun org-node--re-search-forward-skip-special-regions (regexp &optional bound)
   "Like `re-search-forward', but do not search inside certain regions.
@@ -3611,6 +3619,77 @@ but to use `org-node--map-matches-skip-special-regions' instead."
         (push (cons beg (point)) skips)))
     (goto-char starting-pos)
     (nreverse skips)))
+
+;; Home-made subroutine to find/create a drawer.  There's a trick used by
+;; org-super-links to let upstream code do the work: temporarily set
+;; `org-log-into-drawer' to "BACKLINKS", and then call `org-log-beginning'.
+;; That only works under an Org entry though, not before the first heading.
+;; Plus, this subroutine has many uses.
+
+(defun org-node--narrow-to-drawer
+    (name &optional create-missing create-near-bottom)
+  "Seek a drawer named NAME in the current entry, then narrow to it.
+This also works before the first entry in the file.
+
+If a drawer was found, return t.
+Otherwise, do not narrow, and return nil.
+With CREATE-MISSING t, create a new drawer if one was not found.
+
+When drawer is created, insert it near the beginning of the Org entry
+\(after any properties and logbook drawers\), unless CREATE-NEAR-BOTTOM
+is t, in which case insert it near the end of the entry \(just before
+the next heading\).
+
+Narrow to the region between :NAME: and :END:, exclusive.
+Place point at the beginning of that region, after any indentation."
+  (let ((entry-end (org-entry-end-position))
+        (case-fold-search t))
+    (org-node--end-of-meta-data)
+    (cond
+     ;; Empty entry (next line after heading was another heading)
+     ((org-at-heading-p)
+      (if create-missing
+          (progn
+            (org-insert-drawer nil name)
+            (narrow-to-region (point) (point))
+            t)
+        nil))
+     ;; Pre-existing drawer
+     ((org-node--re-search-forward-skip-special-regions
+       (concat "^[\t\s]*:" (regexp-quote name) ":[\t\s]*$")
+       entry-end)
+      (if (get-text-property (point) 'org-transclusion-id)
+          (error "Was about to operate on backlink drawer inside an org-transclusion, probably not intended")
+        (let ((drawbeg (progn (forward-line 1) (point))))
+          (re-search-forward org-clock-drawer-end-re entry-end)
+          (forward-line 0)
+          (if (= drawbeg (point))
+              ;; Empty drawer with no newlines in-between; add one newline
+              ;; so the result is identical to after `org-insert-drawer'.
+              (open-line 1)
+            ;; Not an empty drawer, so it is safe to back up from the :END: line
+            (backward-char))
+          (let ((drawend (point)))
+            (goto-char drawbeg)
+            (back-to-indentation)
+            (narrow-to-region (pos-bol) drawend))
+          t)))
+     (create-missing
+      (when create-near-bottom
+        (goto-char entry-end))
+      (org-insert-drawer nil name)
+      (narrow-to-region (point) (point))
+      t))))
+
+(defun org-node--delete-drawer (name)
+  (save-restriction
+    (when (org-node--narrow-to-drawer name)
+      (delete-region (point-min) (point-max))
+      (widen)
+      (delete-blank-lines)
+      (forward-line -1)
+      (delete-line)
+      (delete-line))))
 
 
 ;;;; API not used in this package at all
