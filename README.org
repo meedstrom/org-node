@@ -9,11 +9,13 @@
 #+HTML: <a href="https://melpa.org/#/org-node"><img alt="MELPA" src="https://melpa.org/packages/org-node-badge.svg"/></a> <a href="https://stable.melpa.org/#/org-node"><img alt="MELPA Stable" src="https://stable.melpa.org/packages/org-node-badge.svg"/></a>
 * News [2025-02-25 Tue]
 
-2.0.0 is out, with two new features: backlink drawers, and context buffers!
+Version 2.0 is out, with two new features:
+- backlink drawers (providing an alternative to org-super-links)
+- context buffers (providing an alternative to org-roam's buffers)
 
-*If you were using version 1.8.7 or older (November 2024), you'll have a smoother ride if you first upgrade to the latest in [[https://github.com/meedstrom/org-node/tree/v1.9][v1.9 branch]],* deal with any transitional warnings, /then/ upgrade to the latest version.
+*If you were using version 1.8.7 or older (November 2024), you'll have a smoother ride if you first upgrade to the latest in [[https://github.com/meedstrom/org-node/tree/v1.9][v1.9 branch]],* deal with any transitional warnings, /then/ upgrade to the latest version on [[https://github.com/meedstrom/org-node/branches][main]].
 
-It is partly for this reason I bumped the version number to 2.0: so I could cull the crop of aliases left behind after renames.
+The main reason for bumping to 2.0 is culling the crop of aliases that have built up after renames, as they clutter ~C-h f~ output.
 
 ** Backlinks drawer
 You can configure =org-node-backlink-mode= to use multiline drawers instead of a single property line.  Same idea as [[https://github.com/toshism/org-super-links][org-super-links]].  I.e. instead of this:

@@ -35,19 +35,13 @@
 (require 'ol)
 (require 'el-job)
 
-(unless (fboundp 'el-job-launch)
-  (display-warning
-   'org-node "Org-node has new dependency el-job, update your
-    package menus (e.g. by M-x package-refresh-contents
-    or M-x elpaca-update-menus)"))
-
 (unless (and (boundp 'el-job-major-version)
              (>= el-job-major-version 1))
   (display-warning
    'org-node "Update el-job to use this version of org-node"))
 
 (defvar org-node-changes--new-names
-  '((org-node-built-series org-node-seqs))
+  '()
   "Alist of deprecated symbol names and their new names.
 Names here will cause complaints if bound.")
 
@@ -120,9 +114,6 @@ hardcoded strings."
          (lwarn 'org-node :warning "Your initfiles use old function name: %S, which will be REMOVED by %s.  Please use new name: %S"
                 ,old ,(or removed-by "30 February 2025") ,new))
        (apply ,new args))))
-
-(define-obsolete-variable-alias 'org-node-series-that-marks-calendar 'org-node-seq-that-marks-calendar "2024-12-13")
-(define-obsolete-variable-alias 'org-node-proposed-series-key 'org-node-proposed-sequence  "2024-11-18")
 
 ;;; v1.9
 
