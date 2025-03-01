@@ -996,34 +996,55 @@ https://lists.gnu.org/archive/html/emacs-orgmode/2024-09/msg00305.html"
 ;;;; Scanning
 
 (defvar org-node--time-at-begin-full-scan nil)
-(defun org-node--scan-all ()
-  "Arrange a full scan."
-  (unless (el-job-is-busy 'org-node)
-    (setq org-node--time-at-begin-full-scan (time-convert nil t))
-    (el-job-launch
-     :id 'org-node
-     :if-busy 'noop
-     :inject-vars (append org-node-inject-variables (org-node--mk-work-vars))
-     :load 'org-node-parser
-     :eval-once "(org-node-parser--init)"
-     :funcall #'org-node-parser--collect-dangerously
-     :inputs #'org-node-list-files
-     :wrapup #'org-node--finalize-full)))
+(if (and (boundp 'el-job-major-version) (>= el-job-major-version 1))
+    (defun org-node--scan-all ()
+      "Arrange a full scan."
+      (unless (el-job-is-busy 'org-node)
+        (setq org-node--time-at-begin-full-scan (time-convert nil t))
+        (el-job-launch
+         :id 'org-node
+         :inject-vars (append org-node-inject-variables (org-node--mk-work-vars))
+         :load-features '(org-node-parser)
+         :funcall-per-input #'org-node-parser--collect-dangerously
+         :inputs #'org-node-list-files
+         :callback #'org-node--finalize-full)))
+  (defun org-node--scan-all ()
+    "Arrange a full scan."
+    (unless (el-job-is-busy 'org-node)
+      (setq org-node--time-at-begin-full-scan (time-convert nil t))
+      (el-job-launch
+       :id 'org-node
+       :if-busy 'noop
+       :inject-vars (append org-node-inject-variables (org-node--mk-work-vars))
+       :load 'org-node-parser
+       :funcall #'org-node-parser--collect-dangerously
+       :inputs #'org-node-list-files
+       :wrapup #'org-node--finalize-full))))
 
-(defun org-node--scan-targeted (files)
-  "Arrange to scan FILES."
-  (when files
-    (el-job-launch
-     :id 'org-node-targeted
-     :method 'reap
-     :if-busy 'wait
-     :skip-benchmark t
-     :inject-vars (append org-node-inject-variables (org-node--mk-work-vars))
-     :load 'org-node-parser
-     :eval-once "(org-node-parser--init)"
-     :funcall #'org-node-parser--collect-dangerously
-     :inputs (ensure-list files)
-     :wrapup #'org-node--finalize-modified)))
+(if (and (boundp 'el-job-major-version) (>= el-job-major-version 1))
+    (defun org-node--scan-targeted (files)
+      "Arrange to scan FILES."
+      (when files
+        (el-job-launch
+         :id 'org-node-targeted
+         :inject-vars (append org-node-inject-variables (org-node--mk-work-vars))
+         :load-features '(org-node-parser)
+         :funcall-per-input #'org-node-parser--collect-dangerously
+         :inputs (ensure-list files)
+         :callback #'org-node--finalize-modified)))
+  (defun org-node--scan-targeted (files)
+    "Arrange to scan FILES."
+    (when files
+      (el-job-launch
+       :id 'org-node-targeted
+       :method 'reap
+       :if-busy 'wait
+       :skip-benchmark t
+       :inject-vars (append org-node-inject-variables (org-node--mk-work-vars))
+       :load 'org-node-parser
+       :funcall #'org-node-parser--collect-dangerously
+       :inputs (ensure-list files)
+       :wrapup #'org-node--finalize-modified))))
 
 (defun org-node--mk-work-vars ()
   "Return an alist of symbols and values to set in subprocesses."

@@ -237,11 +237,15 @@ Also set some variables."
           (rx-to-string
            `(seq bol (repeat 1 ,(1- $inlinetask-min-level) "*") " ")))))
 
+(defvar org-node-parser--ready nil)
 (defun org-node-parser--collect-dangerously (FILE)
   "Dangerous - overwrites the current buffer!
 
 Read FILE contents into current buffer, analyze it for ID-nodes, links
 and other data, then return the data."
+  (unless org-node-parser--ready
+    (setq org-node-parser--ready t)
+    (org-node-parser--init))
   (setq org-node-parser--paths-types nil)
   (setq org-node-parser--found-links nil)
   (let (missing-file
