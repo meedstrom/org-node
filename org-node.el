@@ -81,7 +81,6 @@
 
 ;; Built-in
 (require 'seq)
-(require 'map)
 (require 'cl-lib)
 (require 'subr-x)
 (require 'bytecomp)
@@ -611,19 +610,6 @@ In the latter case, there is no difference from `file-title'.")
               "Node's TODO state."))
 
 (defun org-node-get-tags (node)
-  "Return NODE\\='s tags.
-
-See also:
-- `org-node-get-tags-local'
-- `org-node-get-tags-with-inheritance'
-
-This uses either of those two,
-depending on the current value of `org-use-tag-inheritance'."
-  (if org-use-tag-inheritance
-      (org-node-get-tags-with-inheritance node)
-    (org-node-get-tags-local node)))
-
-(defun org-node-get-tags-with-inheritance (node)
   "Return all tags for NODE, local and inherited.
 Also respect `org-tags-exclude-from-inheritance'."
   (delete-dups (append (org-node-get-tags-local node)
@@ -634,7 +620,8 @@ Also respect `org-tags-exclude-from-inheritance'."
   (or (org-node-get-file-title node)
       (file-name-nondirectory (org-node-get-file node))))
 
-(defun org-node-get-is-subtree (node)
+(defalias 'org-node-get-is-subtree 'org-node-is-subtree)
+(defun org-node-is-subtree (node)
   "Return t if NODE is a subtree instead of a file."
   (> (org-node-get-level node) 0))
 
@@ -1012,10 +999,9 @@ In broad strokes:
     (setq org-node--time-at-begin-full-scan (current-time))
     (el-job-launch
      :id 'org-node
-     :if-busy 'noop
      :inject-vars (append org-node-inject-variables (org-node--mk-work-vars))
      :load-features '(org-node-parser)
-     :funcall-per-input #'org-node-parser--collect-dangerously
+     :funcall-per-input #'org-node-parser--scan-file
      :inputs #'org-node-list-files
      :callback #'org-node--finalize-full)))
 
@@ -1024,10 +1010,9 @@ In broad strokes:
   (when files
     (el-job-launch
      :id 'org-node-targeted
-     :if-busy 'wait
      :inject-vars (append org-node-inject-variables (org-node--mk-work-vars))
      :load-features '(org-node-parser)
-     :funcall-per-input #'org-node-parser--collect-dangerously
+     :funcall-per-input #'org-node-parser--scan-file
      :inputs (ensure-list files)
      :callback #'org-node--finalize-modified)))
 
@@ -1138,9 +1123,9 @@ JOB is the el-job object."
           (float-time
            (time-add
             (time-subtract (current-time)
-                           (plist-get (el-job:timestamps job) :got-all-results))
-            (time-subtract (plist-get (el-job:timestamps job) :children-done)
-                           org-node--time-at-begin-full-scan))))
+                           (plist-get (el-job:timestamps job) :callback-begun))
+            (time-subtract (plist-get (el-job:timestamps job) :work-done)
+                           (plist-get (el-job:timestamps job) :launched)))))
     (org-node--maybe-adjust-idle-timer)
     (while-let ((fn (pop org-node--temp-extra-fns)))
       (funcall fn))
@@ -2165,7 +2150,7 @@ adding keywords to the things to exclude:
 
 \(setq org-transclusion-exclude-elements
       \\='(property-drawer comment keyword))"
-  (interactive nil org-mode)
+  (interactive () org-mode)
   (unless (derived-mode-p 'org-mode)
     (error "Only works in org-mode buffers"))
   (org-node-cache-ensure)
@@ -2213,7 +2198,7 @@ adding keywords to the things to exclude:
 ;;;###autoload
 (defun org-node-refile ()
   "Experimental."
-  (interactive nil org-mode)
+  (interactive () org-mode)
   (unless (derived-mode-p 'org-mode)
     (user-error "This command expects an org-mode buffer"))
   (org-node-cache-ensure)
@@ -2703,7 +2688,7 @@ In case of unsolvable problems, how to wipe org-id-locations:
 
 (defvar org-node--unlinted nil)
 (defvar org-node--lint-warnings nil)
-(defun org-node-lint-all ()
+(defun org-node-lint-all-files ()
   "Run `org-lint' on all known Org files, and report results.
 
 If last run was interrupted, resume working through the file list
@@ -2731,7 +2716,7 @@ from the beginning."
     (org-node--pop-to-tabulated-list
      :buffer "*org lint results*"
      :format [("File" 30 t) ("Line" 5 t) ("Trust" 5 t) ("Explanation" 0 t)]
-     :reverter #'org-node-lint-all
+     :reverter #'org-node-lint-all-files
      :entries (cl-loop
                for (file . warning) in org-node--lint-warnings
                collect (let ((array (cadr warning)))
@@ -2903,22 +2888,14 @@ with \\[universal-argument] prefix."
        :entries
        (cl-loop
         for (dest . link) in dead-links
-        as origin-node = (gethash (plist-get link :origin)
-                                  org-nodes)
-        if (not (equal dest (plist-get link :dest)))
-        do (error "IDs not equal: %s, %s" dest (plist-get link :dest))
-        else if (not origin-node)
-        do (error "Node not found for ID: %s" (plist-get link :origin))
-        else collect
-        (list link
-              (vector
-               (list (org-node-get-title origin-node)
-                     'face 'link
-                     'action `(lambda (_button)
-                                (org-node--goto ,origin-node)
-                                (goto-char ,(plist-get link :pos)))
-                     'follow-link t)
-               dest)))))))
+        as origin-node = (gethash (plist-get link :origin) org-nodes)
+        collect
+        (list (sxhash link)
+              (vector (buttonize (org-node-get-title origin-node)
+                                 `(lambda (_)
+                                    (org-node--goto ,origin-node)
+                                    (goto-char ,(plist-get link :pos))))
+                      dest)))))))
 
 (defun org-node-list-reflinks ()
   "List all reflinks and their locations.
@@ -2939,19 +2916,17 @@ one of them is associated with a ROAM_REFS property."
            for LINK in link-objects-excluding-id-type
            collect (seq-let (_ origin _ pos _ type _ dest) LINK
                      (let ((node (gethash origin org-nodes)))
-                       (list LINK
+                       (list (sxhash LINK)
                              (vector
                               (if (gethash dest org-node--ref<>id) "*" "")
                               (if node
-                                  (list (org-node-get-title node)
-                                        'action `(lambda (_button)
-                                                   (org-id-goto ,origin)
-                                                   (goto-char ,pos)
-                                                   (if (org-at-heading-p)
-                                                       (org-show-entry)
-                                                     (org-show-context)))
-                                        'face 'link
-                                        'follow-link t)
+                                  (buttonize (org-node-get-title node)
+                                             `(lambda (_button)
+                                                (org-id-goto ,origin)
+                                                (goto-char ,pos)
+                                                (if (org-at-heading-p)
+                                                    (org-show-entry)
+                                                  (org-show-context))))
                                 origin)
                               (if type (concat type ":" dest) dest))))))))
     (if entries
@@ -3157,7 +3132,7 @@ For explanation of TOO-MANY-FILES-HACK, see code comments."
                 (when too-many-files-hack
                   ;; Sometimes necessary to drop the call stack to actually
                   ;; reap file handles, sometimes not.  Don't understand it.
-                  ;; E.g. `org-node-lint-all' does not seem to need this hack,
+                  ;; E.g. `org-node-lint-all-files' does not seem to need this hack,
                   ;; but `org-node-backlink-fix-all-files' does.
                   (signal 'org-node-must-retry nil)))
               (if interval
@@ -3339,7 +3314,7 @@ as \"%20\", wrap VALUE in quotes if it has spaces."
 
 (defun org-node-add-alias ()
   "Add to ROAM_ALIASES in nearest relevant property drawer."
-  (interactive nil org-mode)
+  (interactive () org-mode)
   (org-node--add-to-property-keep-space
    "ROAM_ALIASES" (string-trim (read-string "Alias: "))))
 
@@ -3347,7 +3322,7 @@ as \"%20\", wrap VALUE in quotes if it has spaces."
 (defun org-node-add-refs ()
   "Add a link to ROAM_REFS in nearest relevant property drawer.
 Wrap the link in double-brackets if necessary."
-  (interactive nil org-mode)
+  (interactive () org-mode)
   (dolist (ref (mapcar #'string-trim
                        (completing-read-multiple
                         "Add ref(s): "
@@ -3433,7 +3408,7 @@ non-nil, because it may cause noticeable lag otherwise."
                         (cl-remove-if #'keywordp)
                         (mapcar #'substring-no-properties))
            (cl-loop for node being each hash-value of org-nodes
-                    append (org-node-get-tags-with-inheritance node))))))
+                    append (org-node-get-tags node))))))
 
 (defun org-node--end-of-meta-data (&optional full)
   "Like `org-end-of-meta-data', but supports file-level metadata.
@@ -3671,14 +3646,14 @@ Also see that function for meaning of CREATE-NEAR-BOTTOM."
             (narrow-to-region (point) (point))
             t)
         nil))
-     ;; Pre-existing drawer
+     ;; Pre-existing drawer?
      ((org-node--re-search-forward-skip-special-regions
-       (concat "^[\t\s]*:" (regexp-quote name) ":[\t\s]*$")
+       (concat "^[ \t]*:" (regexp-quote name) ":[ \t]*$")
        entry-end)
       (if (get-text-property (point) 'org-transclusion-id)
           (error "Was about to operate on a drawer inside an org-transclusion, probably not intended")
         (let ((drawbeg (progn (forward-line 1) (point))))
-          (re-search-forward org-clock-drawer-end-re entry-end)
+          (re-search-forward "^[ \t]*:END:[ \t]*$" entry-end)
           (forward-line 0)
           (if (= drawbeg (point))
               ;; Empty drawer with no newlines in-between; add one newline

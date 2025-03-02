@@ -22,11 +22,15 @@
 (require 'org-node)
 (require 'magit-section)
 
-;; Reassure compiler
-(defvar org-node-context-mode)
-
 (defgroup org-node-context nil "Preview backlink contexts in separate buffer."
   :group 'org-node)
+
+(defun org-node-context--goto-section-with-value (sought-value)
+  (let (sections)
+    (magit-map-sections (lambda (section)
+                          (push (cons (oref section value) section)
+                                sections)))
+    (magit-section-goto (alist-get sought-value sections () () #'equal))))
 
 
 ;;; Persistence
@@ -124,6 +128,18 @@ but when this finds one of them stale, it removes that whole entry."
      org-node-context--previews)))
 
 
+;;; Early defs
+
+(define-derived-mode org-node-context-mode magit-section-mode "Org-Node-Context"
+  "Major mode for the context buffer."
+  (when (or (member #'visual-line-mode org-mode-hook)
+            (member #'visual-line-mode text-mode-hook))
+    (visual-line-mode)))
+
+(defclass org-node-context (magit-section)
+  ((value :initform nil)))
+
+
 ;;; History navigation
 
 ;; TODO
@@ -140,9 +156,8 @@ time that context was shown in a visible window.  Including:
 - The array of backlinks shown, and which sections were collapsed")
 
 (defvar-local org-node-context--current nil)
-;; FIXME: either all three local or none local
-(defvar org-node-context--future nil)
-(defvar org-node-context--past nil)
+(defvar-local org-node-context--future nil)
+(defvar-local org-node-context--past nil)
 
 (defun org-node-context-history-go-back ()
   (interactive () org-node-context-mode)
@@ -168,13 +183,13 @@ time that context was shown in a visible window.  Including:
   :type '(choice natnum (const :value nil))
   :package-version '(org-node . "2.0.0"))
 
-;; FIXME: Problem if truncating away a :END: or #+END_... but not begin.
-(defcustom org-node-context-truncate-to-lines 18
-  "Experimental.
-Applies when the hook `org-node-context-postprocess-hook'
-contains `org-node-context--truncate-buffer'."
-  :type '(choice natnum (const :value nil))
-  :package-version '(org-node . "2.0.0"))
+;; ;; FIXME: Problem if truncating away a :END: or #+END_... but not begin.
+;; (defcustom org-node-context-truncate-to-lines 18
+;;   "Experimental.
+;; Applies when the hook `org-node-context-postprocess-hook'
+;; contains `org-node-context--truncate-buffer'."
+;;   :type '(choice natnum (const :value nil))
+;;   :package-version '(org-node . "2.0.0"))
 
 (defun org-node-context--strip-meta-data ()
   "Delete any heading and properties drawers."
@@ -203,19 +218,19 @@ contains `org-node-context--truncate-buffer'."
     (magit-map-sections (lambda (_) (cl-incf n-sections)))
     n-sections))
 
-(defun org-node-context--truncate-buffer ()
-  (when-let ((cutoff org-node-context-truncate-to-lines))
-    (when (> (line-number-at-pos) cutoff)
-      (forward-line (- cutoff))
-      (delete-region (point-min) (point)))
-    (when (> (line-number-at-pos (point-max)) cutoff)
-      (goto-char (point-min))
-      (forward-line cutoff)
-      (delete-region (point) (point-max)))))
+;; (defun org-node-context--truncate-buffer ()
+;;   (when-let ((cutoff org-node-context-truncate-to-lines))
+;;     (when (> (line-number-at-pos) cutoff)
+;;       (forward-line (- cutoff))
+;;       (delete-region (point-min) (point)))
+;;     (when (> (line-number-at-pos (point-max)) cutoff)
+;;       (goto-char (point-min))
+;;       (forward-line cutoff)
+;;       (delete-region (point) (point-max)))))
 
 (defun org-node-context--restore-context-state ()
   "Should run near the end of `org-node-context-refresh-hook'."
-  (when-let* ((id (oref (magit-current-section) dest-id))
+  (when-let* ((id org-node-context--current)
               (state (gethash id org-node-context--remembered-state)))
     (seq-let ( num-sections pt win-pt ) state
       (when (= num-sections (org-node-context--count-sections))
@@ -272,8 +287,7 @@ properties.  Org-mode is enabled, but the org-element cache is not."
   (cond
    ((not org-node-context-follow-mode)
     (remove-hook 'post-command-hook #'org-node-context--try-refresh t))
-   ((not (and (derived-mode-p 'org-mode)
-              buffer-file-name))
+   ((not (and (derived-mode-p 'org-mode) buffer-file-name))
     (org-node-context-follow-mode 0))
    (t
     (add-hook 'post-command-hook #'org-node-context--try-refresh nil t))))
@@ -283,33 +297,17 @@ properties.  Org-mode is enabled, but the org-element cache is not."
   org-node-context-follow-mode
   org-node-context-follow-mode)
 
-(defvar-keymap org-node-context-mode-map
-  :parent magit-section-mode-map
-  "<return>"                #'org-node-context-visit-thing
-  "C-m"                     #'org-node-context-visit-thing
-  "l"                       #'org-node-context-history-go-back
-  "r"                       #'org-node-context-history-go-forward
-  "<remap> <revert-buffer>" #'org-node-context-refresh-this-buffer)
-
-(define-derived-mode org-node-context-mode magit-section-mode
-  "org-node context"
-  "Major mode for the context buffer."
-  (when (or (member #'visual-line-mode org-mode-hook)
-            (member #'visual-line-mode text-mode-hook))
-    (visual-line-mode)))
-
-(defclass org-node-context-section (magit-section)
-  ((dest-id :initform nil)
-   (file :initform nil)
-   (link-pos :initform nil)))
-
 (defun org-node-context-visit-thing ()
-  (interactive nil org-node-context-mode)
+  (interactive () org-node-context-mode)
   (unless (derived-mode-p 'org-node-context-mode)
-    (user-error "`org-node-context-visit-thing' called in non org-node-context-mode buffer"))
-  (let ((file     (oref (magit-current-section) file))
-        (link-pos (oref (magit-current-section) link-pos)))
-    (find-file file)
+    (error "`org-node-context-visit-thing' called outside context buffer"))
+  (let* ((value (oref (magit-current-section) value))
+         link-pos
+         (node (if (org-node-p value)
+                   value
+                 (setq link-pos (plist-get value :pos))
+                 (gethash (plist-get value :origin) org-nodes))))
+    (find-file (org-node-get-file node))
     (when link-pos
       (goto-char link-pos)
       (recenter))))
@@ -331,7 +329,7 @@ the user invokes the command."
      ((get-buffer-window buf 'visible)
       (if (derived-mode-p 'org-mode)
           (org-node-context--ensure-context-is-for-here)
-        (org-node-context--refresh)))
+        (org-node-context--refresh buf)))
 
      ((get-buffer buf)
       (let ((display-buffer-overriding-action
@@ -374,9 +372,17 @@ the user invokes the command."
     (equal id (buffer-local-value 'org-node-context--current buf))))
 
 (defun org-node-context-refresh-this-buffer ()
-  (interactive nil org-node-context-mode)
-  (cl-assert org-node-context-mode)
+  (interactive () org-node-context-mode)
+  (cl-assert (derived-mode-p 'org-node-context-mode))
   (org-node-context--refresh (current-buffer)))
+
+(defvar-keymap org-node-context-mode-map
+  :parent magit-section-mode-map
+  "<return>"                #'org-node-context-visit-thing
+  "C-m"                     #'org-node-context-visit-thing
+  "l"                       #'org-node-context-history-go-back
+  "r"                       #'org-node-context-history-go-forward
+  "<remap> <revert-buffer>" #'org-node-context-refresh-this-buffer)
 
 
 ;;; Plumbing
@@ -389,9 +395,10 @@ If argument ID not supplied, just refresh the context already shown in
 that buffer."
   (org-node-context--maybe-init-persistence)
   (with-current-buffer (get-buffer-create (or buf org-node-context-main-buffer))
+    (unless (derived-mode-p 'org-node-context-mode)
+      (org-node-context-mode))
     (let ((inhibit-read-only t))
-      (when (not id)
-        ;; NOTE: Can still be nil initially.
+      (when (and org-node-context--current (null id))
         (setq id org-node-context--current))
       (when (and id (get-buffer-window))
         (puthash id
@@ -401,29 +408,22 @@ that buffer."
                  org-node-context--remembered-state)
         (when org-node-context--current
           (push org-node-context--current org-node-context--past)))
-      (erase-buffer)
-      (org-node-context-mode)
-      (setq-local org-node-context--current id)
+      (setq org-node-context--current id)
       (let ((node (gethash id org-nodes)))
         (unless node
           (error "org-node-context: ID not known: %s" id))
-        (magit-insert-section this
-          ( org-node-context-section )
-          (oset this file (org-node-get-file node))
-          (magit-insert-heading
-            (concat "Context for " (org-node-get-title node)))
+        (erase-buffer)
+        (setq header-line-format
+              (concat "Context for " (org-node-get-title node)))
+        (magit-insert-section (org-node-context node)
           (when-let ((links (org-node-get-id-links-to node)))
-            (magit-insert-section this
-              ( org-node-context-section )
-              (oset this file (org-node-get-file node))
+            (magit-insert-section (org-node-context 'id-links)
               (magit-insert-heading "ID backlinks:")
               (dolist (link (sort links #'org-node-context--origin-title-lessp))
                 (org-node-context--insert-backlink link))
               (insert "\n")))
           (when-let ((links (org-node-get-reflinks-to node)))
-            (magit-insert-section this
-              ( org-node-context-section )
-              (oset this file (org-node-get-file node))
+            (magit-insert-section (org-node-context 'reflinks)
               (magit-insert-heading "Ref backlinks:")
               (dolist (link (sort links #'org-node-context--origin-title-lessp))
                 (org-node-context--insert-backlink link))
@@ -438,21 +438,18 @@ that buffer."
          (breadcrumbs (if-let ((olp (org-node-get-olp-full node)))
                           (string-join olp " > ")
                         "Top")))
-    (magit-insert-section this
-      ( org-node-context-section )
-      (oset this file (org-node-get-file node))
-      (oset this link-pos (plist-get link :pos))
+    (magit-insert-section (org-node-context link)
       (magit-insert-heading
         (format "%s (%s)"
                 (propertize (org-node-get-title node)
                             'face
                             'org-node-context-origin-title)
                 (propertize breadcrumbs 'face 'completions-annotations)))
-      (insert (org-node--get-preview-snippet node link))
+      (insert (org-node--get-preview node link))
       (insert "\n"))))
 
 (defvar org-node-context--snippet-link)
-(defun org-node--get-preview-snippet (node link)
+(defun org-node--get-preview (node link)
   "Get a preview snippet out of NODE file, where LINK is.
 
 Actually, if a snippet was previously cached, return the cached version,

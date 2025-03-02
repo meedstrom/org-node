@@ -18,7 +18,8 @@ Version 2.0 is out, with two major features:
 Or else just check out that you're not using any of [[https://github.com/meedstrom/org-node/blob/v1.9/org-node-changes.el][these aliases]].
 
 ** Backlinks drawer
-You can configure =org-node-backlink-mode= to use multiline drawers instead of a single property line.  Same idea as [[https://github.com/toshism/org-super-links][org-super-links]].  I.e. instead of this:
+
+You can choose whether =org-node-backlink-mode= should use multiline drawers or a single property line.  The drawers are the same idea as [[https://github.com/toshism/org-super-links][org-super-links]].  I.e. instead of this:
 
 #+begin_src org
 ,* My problems in life
@@ -47,14 +48,18 @@ you can now have this:
 Blah blah blah
 #+end_src
 
-It will be the new default behavior, because:
-
-1. You never know when you might want to reference timestamps or other extra info, that is now trivial to store but hard to reconstruct later.
-2. It's more scalable for people who do not enable =visual-line-mode=
+This is controlled by variable =org-node-backlink-do-drawers=, which defaults to t.
 
 To check out the config options, type:
 
 : M-x customize-group RET org-node-backlink RET
+
+The two old commands =org-node-backlink-fix-all-files=  and =org-node-backlink-regret= are replaced by four, hopefully self-explanatory:
+
+- Command =org-node-backlink-mass-update-drawers=
+- Command =org-node-backlink-mass-update-props=
+- Command =org-node-backlink-mass-delete-drawers=
+- Command =org-node-backlink-mass-delete-props=
 
 ** Context buffers
 
