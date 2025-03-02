@@ -250,26 +250,6 @@ as `utf-8-unix'.  Verify this is true of your existing files with the
 helper command \\[org-node-list-file-coding-systems]."
   :type '(choice coding-system (const nil)))
 
-(defcustom org-node-perf-eagerly-update-link-tables t
-  "Update backlink tables on every save.
-
-A setting of t MAY slow down saving a big file containing
-thousands of links on constrained devices.
-
-Fortunately it is rarely needed, since the insert-link advices of
-`org-node-cache-mode' will already record links added during
-normal usage!
-
-Other issues are corrected anyway when `org-node--idle-timer' fires.
-These temporary issues are:
-
-1. deleted links remain in the table, leading to undead backlinks
-2. link positions can desync, which can affect the org-roam buffer
-
-A user of `org-node-backlink-mode' is recommended to enable this as
-well as `org-node-backlink-aggressive'."
-  :type 'boolean)
-
 (defun org-node--set-and-remind-reset (sym val)
   "Set SYM to VAL.
 Then remind the user to run \\[org-node-reset]."
@@ -1195,30 +1175,29 @@ Argument JOB is the el-job object."
       ;; In case a title was edited: don't persist old revisions of the title
       (org-node--dirty-forget-completions-in found-files)
       (setq org-node--old-link-sets nil)
-      (when org-node-perf-eagerly-update-link-tables
-        (cl-loop with ids-of-nodes-scanned = (cl-loop
-                                              for node in nodes
-                                              collect (org-node-get-id node))
-                 with reduced-link-sets = nil
-                 for dest being each hash-key of org-node--dest<>links
-                 using (hash-values link-set)
-                 do (cl-loop
-                     with update-this-dest = nil
-                     for link in link-set
-                     if (member (plist-get link :origin)
-                                ids-of-nodes-scanned)
-                     do (setq update-this-dest t)
-                     else collect link into reduced-link-set
-                     finally do
-                     (when update-this-dest
-                       (push (cons dest reduced-link-set) reduced-link-sets)))
-                 finally do
-                 (cl-loop
-                  for (dest . links) in reduced-link-sets do
-                  (when (bound-and-true-p org-node-backlink-aggressive)
-                    (push (cons dest (gethash dest org-node--dest<>links))
-                          org-node--old-link-sets))
-                  (puthash dest links org-node--dest<>links))))
+      ;; This loop used to be gated on an user option
+      ;; `org-node-perf-eagerly-update-link-tables' (default t), but it
+      ;; performs surprisingly well, so v2.0 removed the option.
+      (cl-loop with ids-of-nodes-scanned = (mapcar #'org-node-get-id nodes)
+               with reduced-link-sets = nil
+               for dest being each hash-key of org-node--dest<>links
+               using (hash-values link-set)
+               do (cl-loop
+                   with update-this-dest = nil
+                   for link in link-set
+                   if (member (plist-get link :origin) ids-of-nodes-scanned)
+                   do (setq update-this-dest t)
+                   else collect link into reduced-link-set
+                   finally do
+                   (when update-this-dest
+                     (push (cons dest reduced-link-set) reduced-link-sets)))
+               finally do
+               (cl-loop
+                for (dest . links) in reduced-link-sets do
+                (unless (bound-and-true-p org-node-backlink-lazy)
+                  (push (cons dest (gethash dest org-node--dest<>links))
+                        org-node--old-link-sets))
+                (puthash dest links org-node--dest<>links)))
       ;; Having discarded the links that were known to originate in the
       ;; re-scanned nodes, it's safe to record them (again).
       (dolist (link links)

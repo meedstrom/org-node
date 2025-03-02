@@ -55,21 +55,17 @@ See Info node `(org-node)'.
 
 -----"
   :global t
-  (when (member #'org-node-backlink-mode org-mode-hook)
-    (display-warning
-     'org-node "Since 2024-10-22, `org-node-backlink-mode' is a global mode, but your initfiles still add it to `org-mode-hook'")
-    (remove-hook 'org-mode-hook #'org-node-backlink-mode))
   (if org-node-backlink-mode
       (progn
         (advice-add 'org-insert-link :after  #'org-node-backlink--add-in-target)
-        (add-hook 'org-node-rescan-functions #'org-node-backlink--maybe-fix-aggressively)
+        (add-hook 'org-node-rescan-functions #'org-node-backlink--maybe-fix-proactively)
         (add-hook 'org-mode-hook             #'org-node-backlink--local-mode)
         (dolist (buf (buffer-list))
           (with-current-buffer buf
             (when (derived-mode-p 'org-mode)
               (org-node-backlink--local-mode)))))
     (advice-remove 'org-insert-link          #'org-node-backlink--add-in-target)
-    (remove-hook 'org-node-rescan-functions  #'org-node-backlink--maybe-fix-aggressively)
+    (remove-hook 'org-node-rescan-functions  #'org-node-backlink--maybe-fix-proactively)
     (remove-hook 'org-mode-hook              #'org-node-backlink--local-mode)
     (dolist (buf (buffer-list))
       (with-current-buffer buf
@@ -432,84 +428,86 @@ it in the nearby :BACKLINKS: property."
             (save-buffer)))))))
 
 
-;;;; Aggressive visit-and-fix
+;;; Proactive fixing
 
-(defcustom org-node-backlink-aggressive nil
-  "On save, detect added/deleted links and fix backlinks.
+(defcustom org-node-backlink-lazy nil
+  "Defer updating backlinks until user edits the affected entry.
 
-Only has an effect as long as `org-node-backlink-mode' is enabled.
+Background: Regardless of this value, links inserted via most commands
+will also insert a backlink in real time, so long as
+`org-node-backlink-mode' is enabled.
 
-Normally, links added via most commands will also insert a backlink in
-real time, but stale backlinks are not cleaned until you carry out some
-edits under the heading that has the stale backlink, and save that
-buffer.
+This value is instead about how eagerly to clean backlinks that have
+become stale.
 
-When t, all affected nodes will be visited silently to update the
-:BACKLINKS: properties.
+When t, they are not cleaned until you carry out some edits under the
+heading that holds the stale backlinks, and save that buffer.
+That can be desirable for e.g. quieter git diffs.
 
-To clarify, this is about the textual contents of :BACKLINKS: properties;
-the underlying link tables are up to date anyway.  This defaults to
-nil to avoid unnecessary file visitations.
+When nil, all affected nodes are visited silently to update the
+:BACKLINKS: properties or drawers, to reflect reality at all times.
 
-If t, `org-node-perf-eagerly-update-link-tables' must be t as well
-\(default).
+To clarify, this is solely about the textual contents of :BACKLINKS:
+properties or drawers; the underlying link tables are up to date anyway.
 
 Minor side effect: `org-element-cache-reset' is called in the buffers
-where backlinks are fixed."
-  :type 'boolean
-  :package-version '(org-node . "1.1.0"))
+where backlinks are fixed.
 
-(defun org-node-backlink--maybe-fix-aggressively (_)
+To force an update at any time, use one of these commands:
+- \\[org-node-backlink-fix-buffer]
+- \\[org-node-backlink-fix-all-files]"
+  :type 'boolean
+  :package-version '(org-node . "2.0.0"))
+
+(defun org-node-backlink--maybe-fix-proactively (_)
   "Designed for `org-node-rescan-functions'."
-  (when org-node-backlink-aggressive
-    (if (not org-node-perf-eagerly-update-link-tables)
-        (message "Option `org-node-backlink-aggressive' has no effect when `org-node-perf-eagerly-update-link-tables' is nil")
-      (let (affected-dests)
-        (cl-loop
-         for (dest . old-links) in org-node--old-link-sets
-         when (cl-set-exclusive-or
-               (mapcar (##plist-get % :origin)
-                       old-links)
-               (mapcar (##plist-get % :origin)
-                       (gethash dest org-node--dest<>links))
-               :test #'equal)
-         do (let* ((id dest)
-                   (node (or (gethash id org-nodes)
-                             (and (setq id (gethash dest org-node--ref<>id))
-                                  (gethash id org-nodes)))))
-              ;; (#59) Do nothing if this is an empty link like [[id:]]
-              (when node
-                ;; Add to the dataset `affected-dests', which looks like:
-                ;;   ((file1 . (origin1 origin2 origin3 ...))
-                ;;    (file2 . (...))
-                ;;    (file3 . (...)))
-                (push id (alist-get (org-node-get-file node)
-                                    affected-dests
-                                    nil
-                                    nil
-                                    #'equal)))))
-        (setq org-node--old-link-sets nil)
-        (cl-loop
-         for (file . ids) in affected-dests
-         when (and (file-readable-p file)
-                   (file-writable-p file))
-         do (org-node--with-quick-file-buffer file
-              :about-to-do "About to fix backlinks"
-              (let ((user-is-editing (buffer-modified-p))
-                    (case-fold-search t))
-                (dolist (id (delete-dups ids))
-                  (goto-char (point-min))
-                  (when (re-search-forward
-                         (concat "^[\t\s]*:id: +" (regexp-quote id))
-                         nil t)
-                    (org-node-backlink--fix-nearby-property)))
-                (unless user-is-editing
-                  ;; Normally, `org-node--with-quick-file-buffer' only saves
-                  ;; buffers it had to open anew.  Let's save even if it was
-                  ;; open.
-                  (let ((before-save-hook nil)
-                        (after-save-hook nil))
-                    (save-buffer))))))))))
+  (unless org-node-backlink-lazy
+    (let (affected-dests)
+      (cl-loop
+       for (dest . old-links) in org-node--old-link-sets
+       when (cl-set-exclusive-or
+             (mapcar (##plist-get % :origin)
+                     old-links)
+             (mapcar (##plist-get % :origin)
+                     (gethash dest org-node--dest<>links))
+             :test #'equal)
+       do (let* ((id dest)
+                 (node (or (gethash id org-nodes)
+                           (and (setq id (gethash dest org-node--ref<>id))
+                                (gethash id org-nodes)))))
+            ;; (#59) Do nothing if this is an empty link like [[id:]]
+            (when node
+              ;; Add to the dataset `affected-dests', which looks like:
+              ;;   ((file1 . (origin1 origin2 origin3 ...))
+              ;;    (file2 . (...))
+              ;;    (file3 . (...)))
+              (push id (alist-get (org-node-get-file node)
+                                  affected-dests
+                                  nil
+                                  nil
+                                  #'equal)))))
+      (setq org-node--old-link-sets nil)
+      (cl-loop
+       for (file . ids) in affected-dests
+       when (and (file-readable-p file)
+                 (file-writable-p file))
+       do (org-node--with-quick-file-buffer file
+            :about-to-do "About to fix backlinks"
+            (let ((user-is-editing (buffer-modified-p))
+                  (case-fold-search t))
+              (dolist (id (delete-dups ids))
+                (goto-char (point-min))
+                (when (re-search-forward
+                       (concat "^[\t\s]*:id: +" (regexp-quote id))
+                       nil t)
+                  (org-node-backlink--fix-nearby-property)))
+              (unless user-is-editing
+                ;; Normally, `org-node--with-quick-file-buffer' only saves
+                ;; buffers it had to open anew.  Let's save even if it was
+                ;; open.
+                (let ((before-save-hook nil)
+                      (after-save-hook nil))
+                  (save-buffer)))))))))
 
 
 ;;; Drawers
