@@ -55,8 +55,9 @@ Backlinks
 
 Backlink solution 2: Print inside the file
 
-* Option 2A Let org-node manage a @samp{BACKLINKS} property::
-* Option 2B Let org-super-links manage a @samp{BACKLINKS...END} drawer: Option 2B Let org-super-links manage a @samp{BACKLINKSEND} drawer. 
+* Option 2A Automatic @samp{BACKLINKS} property::
+* Option 2B Automatic @samp{BACKLINKS...END} drawer: Option 2B Automatic @samp{BACKLINKSEND} drawer. 
+* Option 2C Semi-automatic @samp{BACKLINKS...END} drawer: Option 2C Semi-automatic @samp{BACKLINKSEND} drawer. 
 
 Misc
 
@@ -149,7 +150,7 @@ Once a subtree has an ID you can link to, it's a "node" because it has joined th
 
 A comparison of three systems that all permit relying on org-id and don't lock you into the concept of "one-note-per-file".
 
-@multitable {aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa} {aaaaaaaa} {aaaaaaaaaaaaaaaaaa} {aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}
+@multitable {aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa} {aaaaaaaaaaaaaa} {aaaaaaaaaaaaaaaaaa} {aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}
 @headitem Feature
 @tab org-roam
 @tab org-node
@@ -253,9 +254,9 @@ A comparison of three systems that all permit relying on org-id and don't lock y
 @item Support @samp{roam:} links
 @tab yes
 @tab -- (WONTFIX)
-@tab not applicable
+@tab --
 @item Can have separate note piles
-@tab yes
+@tab yes (via hack)
 @tab -- (WONTFIX)
 @tab not applicable
 @item Some query-able cache
@@ -329,7 +330,7 @@ Pick some short keys and try them out.
 
 To browse config options, type @samp{M-x customize-group RET org-node RET}.
 
-Final tip: there's @strong{no separate command} for creating a new node!  Reuse one of the commands above, and type the name of a node that doesn't exist.  Try it and see what happens!
+Final tip: there's @strong{no separate command} for creating a new node!  Reuse one of the commands above, and type the name of a node that doesn't exist, such as "My problems in life".  Try it and see what happens!
 
 @node Backlinks
 @chapter Backlinks
@@ -366,46 +367,74 @@ TIP: If you have not done so yet, I recommend binding some short key sequences. 
 @node Backlink solution 2 Print inside the file
 @section Backlink solution 2: Print inside the file
 
-I rarely have the screen space to display a backlink buffer.  Because it needs my active involvement to keep visible, I go long periods seeing no backlinks.  This solution can be a great complement (or even stand alone).
+I rarely have the screen space to display a backlink buffer.  Because it needs my active involvement to keep visible, I go long periods seeing no backlinks.
+
+A complementary solution, which can also stand alone, is to have the backlinks @emph{written into} the file, on an Org property line or in a drawer.
 
 @menu
-* Option 2A Let org-node manage a @samp{BACKLINKS} property::
-* Option 2B Let org-super-links manage a @samp{BACKLINKS...END} drawer: Option 2B Let org-super-links manage a @samp{BACKLINKSEND} drawer. 
+* Option 2A Automatic @samp{BACKLINKS} property::
+* Option 2B Automatic @samp{BACKLINKS...END} drawer: Option 2B Automatic @samp{BACKLINKSEND} drawer. 
+* Option 2C Semi-automatic @samp{BACKLINKS...END} drawer: Option 2C Semi-automatic @samp{BACKLINKSEND} drawer. 
 @end menu
 
-@node Option 2A Let org-node manage a @samp{BACKLINKS} property
-@subsection Option 2A: Let org-node manage a @samp{:BACKLINKS:} property
+@node Option 2A Automatic @samp{BACKLINKS} property
+@subsection Option 2A: Automatic @samp{:BACKLINKS:} property
 
 For a first-time run, type @samp{M-x org-node-backlink-fix-all-files}.  (Don't worry if you change your mind; undo with @samp{M-x org-node-backlink-regret}.)
 
-Then enable the following global mode, which keeps these properties updated.
+Then add to initfiles:
 
 @lisp
+(setq org-node-backlink-do-drawers nil)
 (org-node-backlink-mode)
 @end lisp
 
 NOTE 1: To be clear, this never generates new IDs.  That's your own business.  This only adds/edits @samp{:BACKLINKS:} properties.
 
-That also means that @strong{not every link causes a backlink to pop into existence,} only links located in an entry that has an ID@.  After all, there must be something to link back to :)
+That also means that @strong{not all links create a backlink,} only links located in an entry that has an ID@.  After all, there must be something to link back to.
 
-NOTE 2: By default, the setting @samp{org-node-backlink-aggressive} is nil, so stale backlinks are not cleaned until you carry out some edits under an affected heading and then save the file, which fixes that heading's @samp{:BACKLINKS:} property.  If you'd like it to be more proactive, set it to t:
+NOTE 2:  People who prefer to hard-wrap text, instead of enabling @samp{visual-line-mode} or similar, may prefer Option 2B@.
 
-@lisp
-(setq org-node-backlink-aggressive t)
-@end lisp
+@node Option 2B Automatic @samp{BACKLINKSEND} drawer
+@subsection Option 2B: Automatic @samp{:BACKLINKS:...:END:} drawer
 
-NOTE 3:  People who prefer to hard-wrap text instead of enabling @samp{visual-line-mode} or similar may not find this way of displaying backlinks very scalable, since Org places properties on a single logical line, that may run off the edge of the screen.
+Same as Option 2A, but uses a multiline drawer.
 
-@node Option 2B Let org-super-links manage a @samp{BACKLINKSEND} drawer
-@subsection Option 2B: Let org-super-links manage a @samp{:BACKLINKS:...:END:} drawer
+For a first-time run, type @samp{M-x org-node-backlink-fix-all-files}.  (Don't worry if you change your mind; undo with @samp{M-x org-node-backlink-regret}.)
 
-I @emph{think} the following should work. Totally untested, let me know!
+Then add to initfiles:
 
 @lisp
-(add-hook 'org-node-insert-link-hook #'org-node-convert-link-to-super)
+(setq org-node-backlink-do-drawers t)
+(org-node-backlink-mode)
 @end lisp
 
-Bad news: this is currently directed towards people who used @uref{https://github.com/toshism/org-super-links, org-super-links} from the beginning, or people who are just now starting to assign IDs, as there is not yet a command to add new BACKLINKS drawers in bulk to preexisting nodes. (@uref{https://github.com/toshism/org-super-links/issues/93, org-super-links#93})
+@node Option 2C Semi-automatic @samp{BACKLINKSEND} drawer
+@subsection Option 2C: Semi-automatic @samp{:BACKLINKS:...:END:} drawer
+
+If you were previously using org-super-links, you can continue with it.
+
+I @emph{think} the following should integrate well.  Untested, let me know!
+
+@lisp
+(add-hook 'org-node-insert-link-hook
+          #'org-super-links-convert-link-to-super)
+@end lisp
+
+Bonus: you can still use a command @samp{M-x org-node-backlink-fix-all-files} to add missing backlinks in bulk.  That may be useful to start you off on your life with org-super-links.
+
+However, when you have pre-existing drawers -- @strong{MAKE A FULL BACKUP@!}
+
+Org-node has a different usage in mind than org-super-links, and you may be accustomed to having old manually formatted and sorted drawers.  Running @samp{org-node-backlink-fix-all-files} @strong{may re-sort your backlinks and re-format their appearance into something you don't want}; double-check the following options!
+
+@itemize
+@item
+@samp{org-node-backlink-drawer-sorter}
+@item
+@samp{org-node-backlink-drawer-formatter}
+@end itemize
+
+Additionally, any lines that don't contain a valid link are simply @strong{deleted}.
 
 @node Misc
 @chapter Misc
@@ -473,7 +502,7 @@ This could work by---for example---excluding anything tagged "project" or perhap
       (lambda (node)
         (not
          (or (org-node-get-todo node)
-             (member "project" (org-node-get-tags-with-inheritance node))
+             (member "project" (org-node-get-tags node))
              (assoc "ROAM_EXCLUDE" (org-node-get-properties node))))))
 @end lisp
 
@@ -515,7 +544,7 @@ Or put something like @samp{#+filetags: :hide_node:} at the top of each file, an
 (setq org-node-filter-fn
       (lambda (node)
         (not (member "hide_node"
-                     (org-node-get-tags-with-inheritance node)))))
+                     (org-node-get-tags node)))))
 @end lisp
 
 @node Org-capture
@@ -728,7 +757,7 @@ Rarer commands:
 
 @itemize
 @item
-@samp{org-node-lint-all}
+@samp{org-node-lint-all-files}
 @itemize
 @item
 Can help you fix a broken setup: it runs org-lint on all known files and generates a report of syntax problems, for you to correct manually.

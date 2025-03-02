@@ -7,15 +7,15 @@
 #+TEXINFO_DIR_DESC: Link org-id entries into a network.
 #+EXPORT_FILE_NAME: org-node
 #+HTML: <a href="https://melpa.org/#/org-node"><img alt="MELPA" src="https://melpa.org/packages/org-node-badge.svg"/></a> <a href="https://stable.melpa.org/#/org-node"><img alt="MELPA Stable" src="https://stable.melpa.org/packages/org-node-badge.svg"/></a>
-* News [2025-02-25 Tue]
+* News [2025-03-03 Mon] :noexport:
 
-Version 2.0 is out, with two new features:
+Version 2.0 is out, with two major features:
 - backlink drawers (providing an alternative to org-super-links)
 - context buffers (providing an alternative to org-roam's buffers)
 
 *If you were using version 1.8.7 or older (November 2024), you'll have a smoother ride if you first upgrade to the latest in [[https://github.com/meedstrom/org-node/tree/v1.9][v1.9 branch]],* deal with any transitional warnings, /then/ upgrade to the latest version on [[https://github.com/meedstrom/org-node/branches][main]].
 
-The main reason for bumping to 2.0 is culling the crop of aliases that have built up after renames, as they clutter ~C-h f~ output.
+Or else just check out that you're not using any of [[https://github.com/meedstrom/org-node/blob/v1.9/org-node-changes.el][these aliases]].
 
 ** Backlinks drawer
 You can configure =org-node-backlink-mode= to use multiline drawers instead of a single property line.  Same idea as [[https://github.com/toshism/org-super-links][org-super-links]].  I.e. instead of this:
@@ -24,7 +24,7 @@ You can configure =org-node-backlink-mode= to use multiline drawers instead of a
 ,* My problems in life
 :PROPERTIES:
 :CREATED: [2023-12-25 Mon 17:20]
-:ID: 432324523
+:ID: 4323245
 :BACKLINKS: [[id:123456][Relationships]] [[id:235611][Feelings]]
 :END:
 
@@ -37,28 +37,70 @@ you can now have this:
 ,* My problems in life
 :PROPERTIES:
 :CREATED: [2023-12-25 Mon 17:20]
-:ID: 432324523
+:ID: 4323245
 :END:
-
-Blah blah blah
-
 :BACKLINKS:
 [2025-01-05 Sun 16:16] <- [[id:123456][Relationships]]
 [2025-02-26 Wed 01:55] <- [[id:235611][Feelings]]
 :END:
+
+Blah blah blah
 #+end_src
 
-It will be the new default, because you never know when you might want to look at timestamps or other extra info that is now trivial to store.
+It will be the new default behavior, because:
 
-The format is customizable.
+1. You never know when you might want to reference timestamps or other extra info, that is now trivial to store but hard to reconstruct later.
+2. It's more scalable for people who do not enable =visual-line-mode=
+
+To check out the config options, type:
+
+: M-x customize-group RET org-node-backlink RET
 
 ** Context buffers
-Try one of these ways to invoke a backlinks buffer:
 
-- =org-node-context-raise=
-- =org-node-context-toggle=
+The new context buffer replaces much of [[https://github.com/meedstrom/org-node-fakeroam][org-node-fakeroam]]'s hacks, and with them, org-roam itself.
 
-Info TBD.
+Some direct substitutes:
+- Command =org-node-context-raise=
+  - replaces =org-node-fakeroam-show-buffer=
+- Command =org-node-context-toggle=
+  - replaces =org-roam-buffer-toggle=
+- Minor mode =org-node-context-follow-global-mode=
+  - replaces =org-node-fakeroam-redisplay-mode=
+- Variable =org-node-context-persist-on-disk=
+  - replaces =org-node-fakeroam-fast-render-persist=
+- Variable =org-node-context-refresh-hook=
+  - replaces =org-roam-preview-postrender-functions=
+
+You no longer need these:
+- Minor mode =org-node-fakeroam-jit-backlinks-mode=
+- Minor mode =org-node-fakeroam-fast-render-mode=
+
+Some technical differences from org-roam's buffer:
+- Variable =org-node-context-postprocess-hook= -- like =org-roam-buffer-postprocess-functions=, but runs in a buffer instead of passing a string
+- No grep section (yet?)
+
+To check out the config options, type:
+
+: M-x customize-group RET org-node-context RET
+
+And because someone will ask, the remaining utility in org-node-fakeroam boils down to:
+
+- Using org-roam-capture
+  : (setq org-node-creation-fn 'org-node-fakeroam-new-via-roam-capture)
+
+- Keeping org-roam's DB updated, so that extensions that rely on it can continue to work
+  : (org-node-fakeroam-db-feed-mode)
+
+  - Note that the performance leaves something to be desired.
+
+** Incompatible changes
+
+1. Removed a number of [[https://github.com/meedstrom/org-node/blob/v1.9/org-node-changes.el][deprecated aliases]].
+2. Struct type =org-node-link= removed.
+   - A link is now a plist, so use e.g. =(plist-get LINK :pos)= instead.
+3. Bumped dependency [[https://github.com/meedstrom/el-job][el-job]] to the just-released v1.0.
+5. Removed user option =org-node-backlink-aggressive=, in favor of =org-node-backlink-lazy=, with inverted meaning.
 
 * Background
 ** What's all this
@@ -187,39 +229,61 @@ TIP: If you have not done so yet, I recommend binding some short key sequences. 
 #+end_src
 
 ** Backlink solution 2: Print inside the file
-I rarely have the screen space to display a backlink buffer.  Because it needs my active involvement to keep visible, I go long periods seeing no backlinks.  This solution can be a great complement (or even stand alone).
+I rarely have the screen space to display a backlink buffer.  Because it needs my active involvement to keep visible, I go long periods seeing no backlinks.
 
-*** Option 2A: Let org-node manage a =:BACKLINKS:= property
+A complementary solution, which can also stand alone, is to have the backlinks /written into/ the file, on an Org property line or in a drawer.
+
+*** Option 2A: Automatic =:BACKLINKS:= property
 
 For a first-time run, type =M-x org-node-backlink-fix-all-files=.  (Don't worry if you change your mind; undo with =M-x org-node-backlink-regret=.)
 
-Then enable the following global mode, which keeps these properties updated.
+Then add to initfiles:
 
 #+begin_src elisp
+(setq org-node-backlink-do-drawers nil)
 (org-node-backlink-mode)
 #+end_src
 
 NOTE 1: To be clear, this never generates new IDs.  That's your own business.  This only adds/edits =:BACKLINKS:= properties.
 
-That also means that *not every link causes a backlink to pop into existence,* only links located in an entry that has an ID.  After all, there must be something to link back to :)
+That also means that *not all links create a backlink,* only links located in an entry that has an ID.  After all, there must be something to link back to.
 
-NOTE 2: By default, the setting =org-node-backlink-aggressive= is nil, so stale backlinks are not cleaned until you carry out some edits under an affected heading and then save the file, which fixes that heading's =:BACKLINKS:= property.  If you'd like it to be more proactive, set it to t:
+NOTE 2:  People who prefer to hard-wrap text, instead of enabling =visual-line-mode= or similar, may prefer Option 2B.
 
-#+begin_src elisp
-(setq org-node-backlink-aggressive t)
-#+end_src
+*** Option 2B: Automatic =:BACKLINKS:...:END:= drawer
 
-NOTE 3:  People who prefer to hard-wrap text instead of enabling =visual-line-mode= or similar may not find this way of displaying backlinks very scalable, since Org places properties on a single logical line, that may run off the edge of the screen.
+Same as Option 2A, but uses a multiline drawer.
 
-*** Option 2B: Let org-super-links manage a =:BACKLINKS:...:END:= drawer
+For a first-time run, type =M-x org-node-backlink-fix-all-files=.  (Don't worry if you change your mind; undo with =M-x org-node-backlink-regret=.)
 
-I /think/ the following should work. Totally untested, let me know!
+Then add to initfiles:
 
 #+begin_src elisp
-(add-hook 'org-node-insert-link-hook #'org-node-convert-link-to-super)
+(setq org-node-backlink-do-drawers t)
+(org-node-backlink-mode)
 #+end_src
 
-Bad news: this is currently directed towards people who used [[https://github.com/toshism/org-super-links][org-super-links]] from the beginning, or people who are just now starting to assign IDs, as there is not yet a command to add new BACKLINKS drawers in bulk to preexisting nodes. ([[https://github.com/toshism/org-super-links/issues/93][org-super-links#93]])
+*** Option 2C: Semi-automatic =:BACKLINKS:...:END:= drawer
+
+If you were previously using org-super-links, you can continue with it.
+
+I /think/ the following should integrate well.  Untested, let me know!
+
+#+begin_src elisp
+(add-hook 'org-node-insert-link-hook
+          #'org-super-links-convert-link-to-super)
+#+end_src
+
+Bonus: you can still use a command =M-x org-node-backlink-fix-all-files= to add missing backlinks in bulk.  That may be useful to start you off on your life with org-super-links.
+
+However, when you have pre-existing drawers -- *MAKE A FULL BACKUP!*
+
+Org-node has a different usage in mind than org-super-links, and you may be accustomed to having old manually formatted and sorted drawers.  Running =org-node-backlink-fix-all-files= *may re-sort your backlinks and re-format their appearance into something you don't want*; double-check the following options!
+
+- =org-node-backlink-drawer-sorter=
+- =org-node-backlink-drawer-formatter=
+
+Additionally, any lines that don't contain a valid link are simply *deleted*.
 
 * Misc
 ** Manage org-id-locations
@@ -262,7 +326,7 @@ This could work by---for example---excluding anything tagged "project" or perhap
       (lambda (node)
         (not
          (or (org-node-get-todo node)
-             (member "project" (org-node-get-tags-with-inheritance node))
+             (member "project" (org-node-get-tags node))
              (assoc "ROAM_EXCLUDE" (org-node-get-properties node))))))
 #+end_src
 
@@ -301,7 +365,7 @@ Or put something like =#+filetags: :hide_node:= at the top of each file, and set
 (setq org-node-filter-fn
       (lambda (node)
         (not (member "hide_node"
-                     (org-node-get-tags-with-inheritance node)))))
+                     (org-node-get-tags node)))))
 #+end_src
 
 ** Org-capture
@@ -452,7 +516,7 @@ Basic commands:
 
 Rarer commands:
 
-- =org-node-lint-all=
+- =org-node-lint-all-files=
   - Can help you fix a broken setup: it runs org-lint on all known files and generates a report of syntax problems, for you to correct manually.
 
     Org-node [[https://github.com/meedstrom/org-node/issues/8#issuecomment-2101316447][assumes all files have valid syntax]], though many of the problems reported by org-lint are survivable.
