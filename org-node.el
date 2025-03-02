@@ -231,21 +231,23 @@ need other changes to support TRAMP and encryption."
   ;;         (function-item file-name-non-special))
   )
 
+;; TODO: Probably deprecate.  This was more important back when we scanned
+;;       synchronously (ever so long ago, April 2024).
 (defcustom org-node-perf-assume-coding-system nil
-  "Coding system to assume while scanning ID nodes.
+  "Presumed coding system of all Org files while scanning.
 
-Picking a specific coding system can speed up `org-node-reset'.
+Picking a specific system can speed up `org-node-reset' somewhat.
 Set nil to let Emacs figure it out anew on every file.
 
-This setting is likely only noticeable if `el-job--cores' is low \(1-3\)
-or you have one giant Org file.
+This setting is likely only noticeable with a low
+`el-job--machine-cores' \(1-3) or you have a gigantic Org file.
 
 On MS Windows this probably should be nil.  Same if you access
 your files from multiple platforms.
 
-Modern GNU/Linux, BSD and MacOS systems almost always encode new
-files as `utf-8-unix'.  You can verify with a helper command
-\\[org-node-list-file-coding-systems]."
+Modern GNU/Linux, BSD and MacOS systems almost always encode new files
+as `utf-8-unix'.  Verify this is true of your existing files with the
+helper command \\[org-node-list-file-coding-systems]."
   :type '(choice coding-system (const nil)))
 
 (defcustom org-node-perf-eagerly-update-link-tables t
@@ -592,12 +594,11 @@ or the README available as Info node `(org-node)'."
   (deadline   nil :read-only t :type string :documentation
               "Node's DEADLINE state.")
   (file       nil :read-only t :type string :documentation
-              "Truename of file where the node is.
-Abbreviated per `abbreviate-file-name'.")
+              "Abbreviated truename of file that contains this node.")
   (file-title nil :read-only t :type string :documentation
-              "The #+title of the file where this node is. May be nil.
-Rarely an useful value on its own, you may more often have use for
-either `org-node-get-file-title-or-basename' or `org-node-get-title'.")
+              "The #+title of the file that contains this node. May be nil.
+See also `org-node-get-file-title-or-basename', which is always a string
+and never nil.")
   (id         nil :read-only t :type string :documentation
               "Node's ID property.")
   (level      nil :read-only t :type integer :documentation
@@ -622,7 +623,7 @@ For a subtree node, the position of the first asterisk.")
               "List of tags local to the node.")
   (tags-inherited nil :read-only t :type list :documentation
                   "List of inherited tags.
-See also `org-node-get-tags-with-inheritance'.")
+See also `org-node-get-tags'.")
   (title      nil :read-only t :type string :documentation
               "The node's heading, or #+title if it is a file-level node.
 In the latter case, there is no difference from `file-title'.")
@@ -1145,8 +1146,9 @@ JOB is the el-job object."
              do (puthash path type org-node--ref-path<>ref-type))
     (cl-loop for (file . mtime) in file.mtime
              do (puthash file mtime org-node--file<>mtime))
-    ;; Update `org-id-files' even though it makes no difference for org-id,
-    ;; because downstream uses may assume that the variable reflects reality.
+    ;; Update `org-id-files' even though it is not needed to keep org-id
+    ;; functional, because downstream uses may assume that this variable
+    ;; reflects reality.
     (setq org-id-files (mapcar #'car file.mtime))
     (org-node--record-nodes nodes)
     (run-hooks 'org-node--mid-scan-hook)
@@ -2153,7 +2155,7 @@ create it and then visit it.  This will not visit it."
 ;;;###autoload
 (defun org-node-insert-transclusion (&optional node)
   "Insert a #+transclude: referring to a node."
-  (interactive nil org-mode)
+  (interactive () org-mode)
   (unless (derived-mode-p 'org-mode)
     (user-error "Only works in org-mode buffers"))
   (org-node-cache-ensure)
@@ -2740,7 +2742,7 @@ from the beginning."
   (setq org-node--unlinted
         (org-node--in-files-do
           :files org-node--unlinted
-          :msg "Running org-lint (you may quit and resume anytime)"
+          :msg "Running org-lint (you can quit and resume)"
           :about-to-do "About to visit a file to run org-lint"
           :call (lambda ()
                   (when-let ((warning (org-lint)))
@@ -2891,7 +2893,7 @@ with \\[universal-argument] prefix."
         (org-node--in-files-do
           :files org-node--list-file-coding-systems-files
           :fundamental-mode t
-          :msg "Checking file coding systems (quit and resume anytime)"
+          :msg "Checking file coding systems (you can quit and resume)"
           :about-to-do "About to check file coding system"
           :call (lambda ()
                   (push (cons buffer-file-name buffer-file-coding-system)
@@ -3643,7 +3645,7 @@ but to use `org-node--map-matches-skip-special-regions' instead."
 (defun org-node--narrow-to-drawer-create (name &optional create-near-bottom)
   "Narrow to pre-existing drawer named NAME, creating it if necessary.
 
-Uses `org-node--narrow-to-drawer-p' as subroutine.
+See subroutine `org-node--narrow-to-drawer-p' for some details.
 
 When drawer is created, insert it near the beginning of the Org entry
 \(after any properties and logbook drawers\), unless CREATE-NEAR-BOTTOM
@@ -3667,6 +3669,13 @@ When found, narrow to the region between :NAME: and :END:, exclusive.
 Place point at the beginning of that region, after any indentation.
 If the drawer was empty, ensure there is one blank line.
 
+A typical way to use this function:
+
+    \(save-restriction
+      \(if \(org-node--narrow-to-drawer-p \"MY_DRAWER\")
+          ...
+        ...))
+
 With CREATE-MISSING t, create a new drawer if one was not found.
 However, instead of passing this argument, it is recommended for clarity
 to call `org-node--narrow-to-drawer-create' instead.
@@ -3675,7 +3684,7 @@ Also see that function for meaning of CREATE-NEAR-BOTTOM."
         (case-fold-search t))
     (org-node--end-of-meta-data)
     (cond
-     ;; Empty entry (next line after heading was another heading)
+     ;; Empty entry? (next line after heading was another heading)
      ((org-at-heading-p)
       (if create-missing
           (progn
@@ -3703,6 +3712,7 @@ Also see that function for meaning of CREATE-NEAR-BOTTOM."
             (back-to-indentation)
             (narrow-to-region (pos-bol) drawend))
           t)))
+     ;; No dice; create new.
      (create-missing
       (when create-near-bottom
         (goto-char entry-end))

@@ -20,12 +20,9 @@
 ;; This file is worker code meant for child processes.  It should load no
 ;; libraries at runtime.
 
-;; The child processes are expected to load this file, execute
-;; `org-node-parser--collect-dangerously', then die.
-
-;; NOTE: While developing, do not eval only specific defuns;
-;; `el-job--ensure-compiled-lib' needs you to save the file and do
-;; `eval-buffer'.
+;; NOTE: While developing, do not eval specific defuns;
+;;       `el-job--locate-lib-in-load-history' needs you to save the file and do
+;;       M-x eval-buffer.
 
 ;;; Code:
 

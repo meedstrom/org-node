@@ -18,7 +18,8 @@
 ;;; Commentary:
 
 ;; A mode for ensuring that the Org nodes that should have
-;; :BACKLINKS: properties (or :BACKLINKS: drawers) have them and are up to date.
+;; :BACKLINKS: properties (or :BACKLINKS: drawers) have them,
+;; and are up to date.
 
 ;;; Code:
 
@@ -44,7 +45,7 @@
   :package-version '(org-node . "2.0.0"))
 
 
-;;;; Global minor mode
+;;; Global minor mode
 
 ;;;###autoload
 (define-minor-mode org-node-backlink-mode
@@ -85,8 +86,7 @@ buffer-local hooks to the current buffer, in addition to the global
 hooks added by the global mode.  Enabling/disabling the global mode will
 also enable/disable this mode in relevant buffers.
 
-In short, this mode is not meant to be toggled on its own, because
-backlinks functionality cannot be purely buffer-local.
+In short, this mode is not meant to be toggled on its own.
 
 -----"
   :interactive nil
@@ -103,7 +103,7 @@ backlinks functionality cannot be purely buffer-local.
     (remove-hook 'before-save-hook                #'org-node-backlink--fix-flagged-parts-of-buffer t)))
 
 
-;;;; Buffer validation
+;;; Buffer validation
 
 (defvar org-node-backlink--fix-ctr 0)
 (defvar org-node-backlink--files-to-fix nil)
@@ -286,7 +286,7 @@ headings but you have only done work under one of them."
          (backtrace))))))
 
 
-;;;; Link-insertion advice
+;;; Link-insertion advice
 
 ;; This logic is independent from the per-buffer validation, because that
 ;; operates on the file being saved -- in other words, making the file
@@ -667,6 +667,9 @@ The result can look like:
 
 ;; For save-hook
 (defun org-node-backlink--fix-nearby-drawer (&optional remove)
+  "Update nearby backlinks drawer so it reflects current reality.
+Designed for use by `org-node-backlink-fix-buffer', which see
+for argument REMOVE."
   (if remove
       (org-node--delete-drawer "BACKLINKS")
     (when-let* ((id (org-entry-get nil "ID"))

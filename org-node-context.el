@@ -38,21 +38,20 @@ This allows the context buffer created by \\[org-node-context-raise] to
 show up more instantly, even the first time it renders a given set of
 backlinks.
 
-The backlinks are lumped into a single file in `org-node-data-dir'.
+Noticeable mainly if you are a connoisseur of low input latency,
+have a bad computer, and often re-start Emacs.
 
-Benefit noticeable mainly if you are a connoisseur of low input
-latency, have a bad computer, and often re-start Emacs."
+For the cache location, see `org-node-data-dir'."
   :type 'boolean
   :package-version '(org-node . "2.0.0"))
 
 (defvar org-node-context--previews (make-hash-table :test #'equal)
   "1:N table mapping IDs to seen previews of backlink contexts.
-For use by `org-node-fakeroam-fast-render-mode'.
 
 Each preview is a cons cell \(POS-DIFF . TEXT) where POS-DIFF
 corresponds to a link\\='s buffer position relative to that of
 the heading that has said ID, and TEXT is an output of
-`org-roam-preview-get-contents'.")
+`org-node--get-preview'.")
 
 (defvar org-node-context--persist-timer (timer-create))
 (defvar org-node-context--last-tbl-state 0)
@@ -162,6 +161,8 @@ time that context was shown in a visible window.  Including:
 
 ;;; Porcelain
 
+;; TODO: Simply check if the expanded sections would push 1 or more sections
+;; below the visible window, and decide based on that.
 (defcustom org-node-context-collapse-more-than 5
   "How many backlinks before they should all start collapsed."
   :type '(choice natnum (const :value nil))
@@ -230,13 +231,12 @@ contains `org-node-context--truncate-buffer'."
         ;; #'org-node-context--truncate-buffer
         )
   "Hook run in a temp buffer containing a backlink preview snippet.
-This can be used to transform the snippet to a desired appearance.
+This can be used to transform the snippet into a desired appearance.
 
-Point is inside the link for which the preview snippet is being
-generated.
+Point is inside the link for which the preview is being generated.
 
 Font-locking is NOT in effect at this time, so there are no text
-properties."
+properties.  Org-mode is enabled, but the org-element cache is not."
   :type 'hook
   :package-version '(org-node . "2.0.0"))
 
@@ -259,13 +259,13 @@ properties."
   :package-version '(org-node . "2.0.0"))
 
 (defcustom org-node-context-main-buffer "*Org-Node Context*"
-  "Name of the context buffer."
+  "Name of the main context buffer."
   :type 'string
   :package-version '(org-node . "2.0.0"))
 
 ;;;###autoload
 (define-minor-mode org-node-context-follow-mode
-  "Make the context buffer update when point moves to a different entry.
+  "Update the context buffer when point moves in an Org buffer.
 
 -----"
   :require 'org-node
@@ -316,6 +316,11 @@ properties."
 
 ;;;###autoload
 (defun org-node-context-raise ()
+  "Either display a context buffer or refresh an already visible one.
+
+To reiterate: if it was not visible, only bring it up for
+display, do NOT also refresh it.  Leave that for the second time
+the user invokes the command."
   (interactive)
   (let ((buf org-node-context-main-buffer))
     (cond
@@ -364,8 +369,6 @@ properties."
          (not (org-node-context--displaying-p nil id))
          (org-node-context--refresh org-node-context-main-buffer id))))
 
-;; TODO REVIEW is it important to hypothetically be able to show multiple
-;;             contexts in one buffer?
 (defun org-node-context--displaying-p (buf id)
   (when-let ((buf (get-buffer (or buf org-node-context-main-buffer))))
     (equal id (buffer-local-value 'org-node-context--current buf))))
@@ -484,11 +487,9 @@ else briefly visit the file at LINK-POS and call
              ;; contains only the snippet that needs to be font-locked, not the
              ;; entire source file.
              ;;
-             ;; It would be nice to do this before to the postprocess hook
-             ;; instead of after, to offer the possibility for users to
-             ;; override colors or something, but we'd have to run
-             ;; `font-lock-ensure' again on principle (as the hook could be
-             ;; used to add text), and then IIUC all text properties get reset.
+             ;; It would be nice to do this before the postprocess hook instead
+             ;; of after, to offer the possibility for users to override colors
+             ;; or something, but the hook also could be used to add text,
              (font-lock-ensure)
              (buffer-string)))))))
 
