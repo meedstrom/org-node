@@ -123,6 +123,14 @@ but when this finds one of them stale, it removes that whole entry."
 
 ;;; Early defs
 
+(defvar-keymap org-node-context-mode-map
+  :parent magit-section-mode-map
+  "<return>"                'org-node-context-visit-thing
+  "C-m"                     'org-node-context-visit-thing
+  "l"                       'org-node-context-history-go-back
+  "r"                       'org-node-context-history-go-forward
+  "<remap> <revert-buffer>" 'org-node-context-refresh-this-buffer)
+
 (define-derived-mode org-node-context-mode magit-section-mode "Org-Node-Context"
   "Major mode for the context buffer."
   (when (or (member #'visual-line-mode org-mode-hook)
@@ -369,14 +377,6 @@ the user invokes the command."
   (interactive () org-node-context-mode)
   (cl-assert (derived-mode-p 'org-node-context-mode))
   (org-node-context--refresh (current-buffer)))
-
-(defvar-keymap org-node-context-mode-map
-  :parent magit-section-mode-map
-  "<return>"                #'org-node-context-visit-thing
-  "C-m"                     #'org-node-context-visit-thing
-  "l"                       #'org-node-context-history-go-back
-  "r"                       #'org-node-context-history-go-forward
-  "<remap> <revert-buffer>" #'org-node-context-refresh-this-buffer)
 
 
 ;;; Plumbing
