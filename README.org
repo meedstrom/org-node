@@ -14,17 +14,17 @@ Version 2.0 is out, with two major features:
 - backlink drawers!
 - context buffers!
 
-Upgrade note: *if you were using version 1.8.7 or older (November 2024), you'll have a smoother ride if you:*
+Upgrade note: *if you were using version 1.8.7 or older (November 2024)*, you'll have a smoother ride if you:
 
 1. first upgrade to the latest in [[https://github.com/meedstrom/org-node/tree/v1.9][v1.9 branch]],
 2. deal with any transitional warnings,
-3. /then/ upgrade to the latest version on [[https://github.com/meedstrom/org-node/branches][main]].
+3. /then/ upgrade to the latest version (on [[https://github.com/meedstrom/org-node/branches][main]]).
 
-Or just check that you're not using any of [[https://github.com/meedstrom/org-node/blob/v1.9/org-node-changes.el][these aliases]].
+Or skip all that, and just check that you're not using any of [[https://github.com/meedstrom/org-node/blob/v1.9/org-node-changes.el#L140][these aliases]].
 
 ** Backlinks drawer
 
-You can choose whether =org-node-backlink-mode= should use multiline drawers or a single property line.  The drawers are the same idea as [[https://github.com/toshism/org-super-links][org-super-links]].  I.e. instead of this:
+You can now choose whether =org-node-backlink-mode= should use multiline drawers or a single property line.  The drawers are the same idea as [[https://github.com/toshism/org-super-links][org-super-links]].  I.e. instead of this:
 
 #+begin_src org
 ,* My problems in life
@@ -61,14 +61,14 @@ To check out the config options, type:
 
 ** Context buffers
 
-The new context buffer replaces much of [[https://github.com/meedstrom/org-node-fakeroam][org-node-fakeroam]]'s hacks... and with them, org-roam itself.
+The new context buffer replaces much of [[https://github.com/meedstrom/org-node-fakeroam][org-node-fakeroam]]'s hacks.
 
 For previous users, some direct substitutes:
 - Command =org-node-context-raise=
   - replaces =org-node-fakeroam-show-buffer=
 - Command =org-node-context-toggle=
   - replaces =org-roam-buffer-toggle=
-- Minor mode =org-node-context-follow-global-mode=
+- Minor mode =org-node-context-follow-mode=
   - replaces =org-node-fakeroam-redisplay-mode=
 - Variable =org-node-context-persist-on-disk=
   - replaces =org-node-fakeroam-fast-render-persist=
@@ -77,23 +77,21 @@ You no longer need these:
 - Minor mode =org-node-fakeroam-jit-backlinks-mode=
 - Minor mode =org-node-fakeroam-fast-render-mode=
 
-To check out the config options, type:
+MISSING features for now:
+- org-roam's "node-dedicated" buffers
+- grep sections
+
+To check out some config options, type:
 
 : M-x customize-group RET org-node-context RET
 
-And because someone will ask, the remaining utility in org-node-fakeroam boils down to:
-
-- Using org-roam-capture
-- Keeping org-roam's DB updated, so that extensions that rely on it can continue to work
-
 ** Incompatible changes
 
-1. Removed a number of [[https://github.com/meedstrom/org-node/blob/v1.9/org-node-changes.el][deprecated aliases]].
+1. Removed a number of [[https://github.com/meedstrom/org-node/blob/v1.9/org-node-changes.el#L140][deprecated aliases]].
 2. Struct type =org-node-link= removed.
    - A link is now a plist, so use e.g. =(plist-get LINK :pos)= instead.
 3. Bumped dependency [[https://github.com/meedstrom/el-job][el-job]] to the just-released v1.0.
 4. New option =org-node-backlink-do-drawers= implies a different default behavior from before, but a message will be printed to help you out.
-# 4. User option =org-node-backlink-aggressive= now has the inverted meaning, and named =org-node-backlink-lazy=.  It is now aggressive by default.
 
 * Background
 ** What's all this
@@ -176,7 +174,7 @@ Assuming your package manager knows about [[https://melpa.org/#/getting-started]
   :config (org-node-cache-mode))
 #+end_src
 
-If you use org-roam, you probably want the following module as well.  Check its README to make org-node [[https://github.com/meedstrom/org-node-fakeroam][work with org-roam side-by-side]]!
+If you use org-roam, you /may/ want the following module as well, at least during a transition period.  Check its README to make org-node [[https://github.com/meedstrom/org-node-fakeroam][work smoothly with org-roam]]!
 
 #+begin_src elisp
 (use-package org-node-fakeroam
@@ -205,20 +203,34 @@ Final tip: there's *no separate command* for creating a new node!  Reuse one of 
 ** What are backlinks?
 Backlinks are the butter on the bread of your notes.  If you've ever seen a "What links here" section on some webpage, that's exactly what it is.  Imagine seeing that, all the time.  The following sections outline two general ways to do so.
 
-** Backlink solution 1: Borrow org-roam's backlink buffer
-As a Roam user, you can keep using =M-x org-roam-buffer-toggle=.
+** Backlink solution 1: displayed in a separate window
+*** Option 1A: Reuse the org-roam buffer
+Believe it or not, it Just Works.
 
-TIP: If it has been slow, or saving files has been slow, [[https://github.com/meedstrom/org-node-fakeroam][org-node-fakeroam]] gives you ways to speed it up.
+If you install [[org-node-fakeroam]] -- which will pull in org-roam too -- add to initfiles:
 
-TIP: If you have not done so yet, I recommend binding some short key sequences.  I spent many months waffling on where to bind them, so here's an example:
+# It's a shim with the effect that the org-roam buffer does not need to ask the SQLite DB for backlinks, indeed SQLite need not even be installed.
 
 #+begin_src elisp
-;; Either this...
-(keymap-set org-mode-map "M-s M-r" #'org-roam-buffer-toggle)
-(keymap-set global-map "M-s M-d" #'org-roam-buffer-display-dedicated)
-
-;; ...or just this for a different behavior
+(org-node-fakeroam-redisplay-mode)
+(org-node-fakeroam-jit-backlinks-mode) ;; shim so no SQLite needed
+(org-node-fakeroam-fast-render-mode) ;; perf fixes
+(keymap-set org-mode-map "M-s M-t M-t" #'org-roam-buffer-toggle)
+(keymap-set org-mode-map "M-s M-t M-d" #'org-roam-buffer-display-dedicated)
+;; if your window mgmt style is constantly losing all windows
 (keymap-set global-map "M-s M-r" #'org-node-fakeroam-show-buffer)
+#+end_src
+
+*** Option 2A: Use the new org-node-context buffer
+
+Org-node ships a complete rewrite of the org-roam buffer.
+
+Add to initfiles:
+
+#+begin_src elisp
+(org-node-context-follow-mode)
+(keymap-set global-map "M-s M-r" #'org-node-context-raise)
+(keymap-set org-mode-map "M-s M-t" #'org-node-context-toggle)
 #+end_src
 
 ** Backlink solution 2: Print inside the file
@@ -228,16 +240,16 @@ A complementary solution, which can also stand alone, is to have the backlinks /
 
 *** Option 2A: Automatic =:BACKLINKS:= property
 
-For a first-time run, type =M-x org-node-backlink-mass-update-props=.  (Don't worry if you change your mind; undo with =M-x org-node-backlink-mass-delete-props=.)
-
-Then add to initfiles:
+Add to initfiles:
 
 #+begin_src elisp
 (setq org-node-backlink-do-drawers nil)
 (org-node-backlink-mode)
 #+end_src
 
-NOTE 1: To be clear, this never generates new IDs.  That's your own business.  This only adds/edits =:BACKLINKS:= properties.
+For a first-time run, type =M-x org-node-backlink-mass-update-props=.  (Don't worry if you change your mind; undo with =M-x org-node-backlink-mass-delete-props=.)
+
+NOTE 1: To be clear, this mode never generates new IDs.  That's your own business.  This only adds/edits =:BACKLINKS:= properties.
 
 That also means that *not all links create a backlink,* only links located in an entry that has an ID.  After all, there must be something to link back to.
 
@@ -538,10 +550,10 @@ Rarer commands:
 Do you already know about "daily-notes"?  Then get started with a keybinding such as:
 
 #+begin_src elisp
-(keymap-set global-map "M-s s" #'org-node-seq-dispatch)
+(keymap-set global-map "M-s M-s" #'org-node-seq-dispatch)
 #+end_src
 
-and configure =org-node-seq-defs=.  See [[https://github.com/meedstrom/org-node/wiki/Configuring-node-sequences][wiki]].
+and configure =org-node-seq-defs=.  See [[https://github.com/meedstrom/org-node/wiki/Configuring-node-sequences][wiki]] for premade examples.
 
 *** What are node seqs?
 It's easiest to explain node sequences if we use "daily-notes" (aka "dailies") as an example.
@@ -634,26 +646,3 @@ With [[https://github.com/radian-software/straight.el][Straight]]:
   :straight (org-node :type git :host github :repo "meedstrom/org-node"
                       :branch "v1.6"))
 #+end_src
-
-
-*** Match fakeroam version
-The extension [[https://github.com/meedstrom/org-node-fakeroam][org-node-fakeroam]] has been tightly coupled with contemporary versions of org-node, but hopefully it will warn about any version mismatch at load-time.
-
-Just in case, the release history:
-- 2024-10-05: org-node v1.5 and org-node-fakeroam v1.3
-- 2024-10-24: org-node v1.6 and org-node-fakeroam v1.4
-- 2024-10-27: org-node v1.7 and org-node-fakeroam v1.5
-- 2024-11-14: org-node v1.8
-- 2024-11-18: org-node v1.9 and org-node-fakeroam v1.6
-- 2024-12-29: org-node-fakeroam v1.7
-
-*** What version is installed?
-This info depends on your package manager.  I do not embed version in the source code.
-
-- With Elpaca
-  - =M-x elpaca-info RET org-node RET=
-- With Straight and Borg:
-  - go to =M-x find-library RET org-node RET=
-  - then run the Git command ~git log --tags --pretty="%ci %d"~
-- With the built-in package.el
-  - unfortunately... MELPA does not make it easy (their version numbering is [[https://github.com/melpa/melpa/issues/2955#issuecomment-1874169295][planned to improve]]).  For now, cross-correlate with the date.
