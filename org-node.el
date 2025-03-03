@@ -1510,7 +1510,7 @@ Return a list of all files under directory DIR, its
 sub-directories, sub-sub-directories and so on, with provisos:
 
 - Don\\='t follow symlinks to other directories.
-- Don\\='t enter directories whose name start with a dot.
+- Don\\='t enter directories whose name start with dot or underscore.
 - Don\\='t enter directories where some substring of the path
   matches one of strings EXCLUDES literally.
 - Don\\='t collect any file where some substring of the name
@@ -1520,7 +1520,8 @@ sub-directories, sub-sub-directories and so on, with provisos:
   (let (result)
     (dolist (file (file-name-all-completions "" dir))
       (if (directory-name-p file)
-          (unless (string-prefix-p "." file)
+          (unless (or (string-prefix-p "." file)
+                      (string-prefix-p "_" file))
             (setq file (file-name-concat dir file))
             (unless (or (cl-loop for substr in excludes
                                  thereis (string-search substr file))
