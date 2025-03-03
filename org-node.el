@@ -619,7 +619,6 @@ Also respect `org-tags-exclude-from-inheritance'."
   (or (org-node-get-file-title node)
       (file-name-nondirectory (org-node-get-file node))))
 
-(defalias 'org-node-get-is-subtree 'org-node-is-subtree)
 (defun org-node-is-subtree (node)
   "Return t if NODE is a subtree instead of a file."
   (> (org-node-get-level node) 0))
@@ -3670,6 +3669,8 @@ but to use `org-node--map-matches-skip-some-regions' instead."
 
 ;; unused for now; likely something like this will go in org-node-parser.el
 (defun org-node--map-matches-skip-some-regions (regexp fn &optional bound)
+  "Go to each match for REGEXP and call FN.
+BOUND as in `re-search-forward'."
   (let ((last-search-hit (point))
         (skips (org-node--find-regions-to-skip bound)))
     (cl-loop for (beg . end) in skips do
@@ -3683,7 +3684,8 @@ but to use `org-node--map-matches-skip-some-regions' instead."
     (goto-char last-search-hit)))
 
 (defun org-node--find-regions-to-skip (&optional bound)
-  "Subroutine for `org-node--re-search-forward-skip-some-regions'."
+  "Subroutine for `org-node--re-search-forward-skip-some-regions'.
+BOUND as in `re-search-forward'."
   (let ((starting-pos (point))
         (case-fold-search t)
         skips)

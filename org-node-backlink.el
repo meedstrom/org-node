@@ -33,15 +33,6 @@
 (defgroup org-node-backlink nil "In-file backlinks."
   :group 'org-node)
 
-(let (warned-once)
-  (defun org-node-backlinks-mode (&rest args)
-    (unless warned-once
-      (setq warned-once t)
-      (run-with-timer
-       .1 nil #'display-warning 'org-node
-       "Your initfiles may have misspelled `org-node-backlink-mode' as `org-node-backlinks-mode'"))
-    (apply 'org-node-backlink-mode args)))
-
 (defcustom org-node-backlink-do-drawers t
   "Manage drawers instead of properties."
   :type 'boolean
@@ -135,6 +126,15 @@ In short, this mode is not meant to be toggled on its own.
     (remove-hook 'after-change-functions          #'org-node-backlink--flag-buffer-modification t)
     (remove-hook 'before-save-hook                #'org-node-backlink--fix-flagged-parts-of-buffer t)))
 
+(let (warned-once)
+  (defun org-node-backlinks-mode (&rest args)
+    (unless warned-once
+      (setq warned-once t)
+      (run-with-timer
+       .1 nil #'display-warning 'org-node
+       "Your initfiles may have misspelled `org-node-backlink-mode' as `org-node-backlinks-mode'"))
+    (apply #'org-node-backlink-mode args)))
+
 
 ;;; Mass operations
 
@@ -222,8 +222,8 @@ Can be quit midway through and resumed later.  With
   "Update :BACKLINKS: properties or drawers in all nodes in buffer.
 Let `org-node-backlink-do-drawers' determine which.
 
-Or if REMOVE-KIND is symbol `drawers', remove the drawer in all nodes.
-Or if REMOVE-KIND is symbol `props', remove the property in all nodes."
+Or if KIND is symbol `add-drawers', `del-drawers', `add-props', or
+`del-props', do the corresponding thing."
   (interactive)
   (unless (or (and (memq kind '(add-drawers add-props))
                    (org-node-backlink--check-v2-misaligned-setting-p))
@@ -676,7 +676,9 @@ If REMOVE non-nil, remove it instead."
           "BACKLINKS" org-node-backlink-drawer-positioner)
         (let* ((lines (split-string (buffer-string) "\n" t))
                (already-present-ids
-                (seq-keep #'org-node-backlink--extract-id lines))
+                ;; `seq-keep' depends on 29.1
+                ;; (seq-keep #'org-node-backlink--extract-id lines)
+                (delq 'nil (mapcar #'org-node-backlink--extract-id lines)))
                (to-add      (seq-difference   origins already-present-ids))
                (to-remove   (seq-difference   already-present-ids origins))
                (to-reformat (seq-intersection already-present-ids origins)))

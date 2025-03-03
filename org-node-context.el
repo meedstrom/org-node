@@ -184,7 +184,6 @@ time that context was shown in a visible window.  Including:
   :type '(choice natnum (const :value nil))
   :package-version '(org-node . "2.0.0"))
 
-;; ;; FIXME: Problem if truncating away a :END: or #+END_... but not begin.
 ;; (defcustom org-node-context-truncate-to-lines 18
 ;;   "Experimental.
 ;; Applies when the hook `org-node-context-postprocess-hook'
@@ -192,33 +191,8 @@ time that context was shown in a visible window.  Including:
 ;;   :type '(choice natnum (const :value nil))
 ;;   :package-version '(org-node . "2.0.0"))
 
-(defun org-node-context--strip-meta-data ()
-  "Delete any heading and properties drawers."
-  (save-excursion
-    (delete-region (point-min) (org-node--end-of-meta-data t))))
-
-(defun org-node-context--strip-comments ()
-  (save-excursion
-    (goto-char (point-min))
-    (while (not (eobp))
-      (if (org-at-comment-p)
-          (delete-line)
-        (forward-line)))))
-
-(defun org-node-context--expand-or-collapse ()
-  "Expand or collapse sections depending on count of sections."
-  ;;  Don't collapse if user has been browsing the buffer
-  (unless (= (point) (point-min))
-    (if (> (org-node-context--count-sections)
-           org-node-context-collapse-more-than)
-        (magit-section-show-level-2-all)
-      (magit-section-show-level-3-all))))
-
-(defun org-node-context--count-sections ()
-  (let ((n-sections 0))
-    (magit-map-sections (lambda (_) (cl-incf n-sections)))
-    n-sections))
-
+;; TODO: Solve problem if truncating away a :END: or #+END_... but not #+BEGIN,
+;; or vice versa.
 ;; (defun org-node-context--truncate-buffer ()
 ;;   (when-let ((cutoff org-node-context-truncate-to-lines))
 ;;     (when (> (line-number-at-pos) cutoff)
@@ -229,6 +203,39 @@ time that context was shown in a visible window.  Including:
 ;;       (forward-line cutoff)
 ;;       (delete-region (point) (point-max)))))
 
+(defun org-node-context--strip-meta-data ()
+  "Delete any heading and properties/logbook drawers."
+  (save-excursion
+    (delete-region (point-min) (org-node--end-of-meta-data t))))
+
+(defun org-node-context--strip-backlinks ()
+  "Delete any backlinks drawer."
+  (org-node--delete-drawer "BACKLINKS"))
+
+(defun org-node-context--strip-comments ()
+  "Delete any Org comments."
+  (save-excursion
+    (goto-char (point-min))
+    (while (not (eobp))
+      (if (org-at-comment-p)
+          (delete-line)
+        (forward-line)))))
+
+(defun org-node-context--expand-or-collapse ()
+  "Expand or collapse sections depending on count of sections."
+  ;;  Don't collapse if user has been browsing the buffer
+  (unless (bobp)
+    (if (> (org-node-context--count-sections)
+           org-node-context-collapse-more-than)
+        (magit-section-show-level-2-all)
+      (magit-section-show-level-3-all))))
+
+(defun org-node-context--count-sections ()
+  (let ((n-sections 0))
+    (magit-map-sections (lambda (_) (cl-incf n-sections)))
+    n-sections))
+
+;; TODO
 (defun org-node-context--restore-context-state ()
   "Should run near the end of `org-node-context-refresh-hook'."
   (when-let* ((id org-node-context--current)
@@ -238,11 +245,11 @@ time that context was shown in a visible window.  Including:
         ;; FIXME: first restore collapse states
         (goto-char pt)
         (cl-assert (eq (selected-window) (get-buffer-window)))
-        (set-window-point (selected-window) win-pt)
-        ))))
+        (set-window-point (selected-window) win-pt)))))
 
 (defcustom org-node-context-postprocess-hook
   (list #'org-node-context--strip-meta-data
+        #'org-node-context--strip-backlinks
         #'org-node-context--strip-comments
         ;; #'org-node-context--truncate-buffer
         )
@@ -426,7 +433,7 @@ that buffer."
         (run-hooks 'org-node-context-refresh-hook)))))
 
 (defun org-node-context--insert-backlink (link)
-  "Insert a magit-section displaying a preview of LINK."
+  "Insert a section displaying a preview of LINK."
   (let* ((node (or (gethash (plist-get link :origin) org-nodes)
                    (error "Origin not found for link: %S" link)))
          (breadcrumbs (if-let ((olp (org-node-get-olp-full node)))
