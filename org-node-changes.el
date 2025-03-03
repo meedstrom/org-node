@@ -189,6 +189,9 @@ NAME, ARGLIST and BODY as in `defun'."
 (define-obsolete-function-alias
   'org-node-get-tags-with-inheritance 'org-node-get-tags "March 2025")
 
+(define-obsolete-function-alias
+  'org-node-proposed-sequence 'org-node-proposed-seq "2025-03-03")
+
 (org-node-changes--def-whiny-alias 'org-node-insert-link*-immediate
                                    'org-node-insert-link-novisit*
                                    "2.0.0 (March 2025)" "April" t)

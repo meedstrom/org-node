@@ -1768,7 +1768,7 @@ belonging to an alphabet or number system."
 (defvar org-node-proposed-id nil
   "For use by `org-node-creation-fn'.")
 
-(defvar org-node-proposed-sequence nil
+(defvar org-node-proposed-seq nil
   "Key that identifies a node sequence about to be added-to.
 Automatically set, should be nil most of the time.")
 
@@ -1832,12 +1832,12 @@ To operate on a node after creating it, either let-bind
       (if node (org-node--goto node)))"
   (setq org-node-proposed-title title)
   (setq org-node-proposed-id id)
-  (setq org-node-proposed-sequence seq-key)
+  (setq org-node-proposed-seq seq-key)
   (unwind-protect
       (funcall org-node-creation-fn)
     (setq org-node-proposed-title nil)
     (setq org-node-proposed-id nil)
-    (setq org-node-proposed-sequence nil)))
+    (setq org-node-proposed-seq nil)))
 
 (defcustom org-node-creation-fn #'org-node-new-file
   "Function called to create a node that does not yet exist.
@@ -3629,21 +3629,69 @@ Also see that function for meaning of CREATE-WHERE."
           t)))
      ;; No dice; create new.
      (create-missing
-      (when create-near-bottom
-        (goto-char entry-end))
+      (when create-where
+        (let ((res (funcall create-where)))
+          (when (number-or-marker-p res)
+            (goto-char res))))
       (org-insert-drawer nil name)
       (narrow-to-region (point) (point))
       t))))
 
-(defun org-node--delete-drawer (name)
-  (save-restriction
-    (when (org-node--narrow-to-drawer-p name)
-      (delete-region (point-min) (point-max))
-      (widen)
-      (delete-blank-lines)
-      (forward-line -1)
-      (delete-line)
-      (delete-line))))
+(defun org-node--re-search-forward-skip-some-regions
+    (regexp &optional bound)
+  "Like `re-search-forward', but do not search inside certain regions.
+These regions are delimited by lines that start with \"#+BEGIN\" or
+\"#+END\".  Upon finding such regions, jump to the end of that region,
+then continue the search.
+
+Argument BOUND as in `re-search-forward'.
+Always behave as if passing NOERROR=t to `re-search-forward'.
+
+Each invocation has overhead, so to search for the same REGEXP
+repeatedly, it performs better not to iterate as in
+\"(while (re-search-forward REGEXP nil t) ...)\",
+but to use `org-node--map-matches-skip-some-regions' instead."
+  (let ((starting-pos (point))
+        (skips (org-node--find-regions-to-skip bound)))
+    (catch 'found
+      (cl-loop for (beg . end) in skips
+               if (re-search-forward regexp beg t)
+               do (throw 'found (point))
+               else do (goto-char end))
+      (if (re-search-forward regexp bound t)
+          (throw 'found (point))
+        (goto-char starting-pos)
+        nil))))
+
+;; unused for now; likely something like this will go in org-node-parser.el
+(defun org-node--map-matches-skip-some-regions (regexp fn &optional bound)
+  (let ((last-search-hit (point))
+        (skips (org-node--find-regions-to-skip bound)))
+    (cl-loop for (beg . end) in skips do
+             (while (re-search-forward regexp beg t)
+               (setq last-search-hit (point))
+               (funcall fn))
+             (goto-char end))
+    (while (re-search-forward regexp bound t)
+      (setq last-search-hit (point))
+      (funcall fn))
+    (goto-char last-search-hit)))
+
+(defun org-node--find-regions-to-skip (&optional bound)
+  "Subroutine for `org-node--re-search-forward-skip-some-regions'."
+  (let ((starting-pos (point))
+        (case-fold-search t)
+        skips)
+    (while (re-search-forward "^[ \t]*#\\+BEGIN" bound t)
+      (forward-line 0)
+      (let ((beg (point)))
+        (unless (re-search-forward "^[ \t]*#\\+END" bound t)
+          (error "org-node: Could not find #+end%s"
+                 (if bound (format " before search boundary %d" bound) "")))
+        (forward-line 1)
+        (push (cons beg (point)) skips)))
+    (goto-char starting-pos)
+    (nreverse skips)))
 
 
 ;;;; API not used in this package at all
@@ -3676,9 +3724,9 @@ heading, else the file-level node, whichever has an ID first."
   (interactive "*" org-mode)
   (save-excursion
     (save-restriction
-      (org-node--narrow-to-drawer-create "RELATED" t)
+      (org-node-narrow-to-drawer-create "RELATED" t)
       ;; Here is something to ponder in the design of
-      ;; `org-node--narrow-to-drawer-create'. Should it ensure a blank line?
+      ;; `org-node-narrow-to-drawer-create'. Should it ensure a blank line?
       (let ((already-blank-line (eolp)))
         (atomic-change-group
           (org-node-insert-link nil t)

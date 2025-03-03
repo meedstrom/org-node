@@ -347,10 +347,10 @@ your definitions."
   "Analyze node near point to maybe grow a node seq.
 
 The sequence is identified either by KEY, or if that is nil, by the
-current value of `org-node-proposed-sequence'.  If that is also nil, do
+current value of `org-node-proposed-seq'.  If that is also nil, do
 nothing."
-  (when (or key org-node-proposed-sequence)
-    (let* ((seq (cdr (assoc (or key org-node-proposed-sequence)
+  (when (or key org-node-proposed-seq)
+    (let* ((seq (cdr (assoc (or key org-node-proposed-seq)
                             org-node-seqs)))
            (node-here (gethash (org-entry-get-with-inheritance "ID") org-nodes))
            (new-item (when node-here
@@ -430,7 +430,7 @@ With non-nil argument NEXT, visit the next entry, not previous."
 
 (defvar org-node-seq--current-key nil
   "Key identifying the node seq currently being browsed with the menu.
-Unlike `org-node-proposed-sequence', does not need to revert to nil.")
+Unlike `org-node-proposed-seq', does not need to revert to nil.")
 
 (defun org-node-seq-capture-target ()
   "Experimental."

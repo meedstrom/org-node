@@ -531,7 +531,7 @@ it in the nearby :BACKLINKS: property."
   :type 'boolean
   :package-version '(org-node . "2.0.0"))
 
-(defcustom org-node-backlink-drawer-line-formatter
+(defcustom org-node-backlink-drawer-formatter
   #'org-node-backlink-format-like-org-super-links-default
   "Function to format a new line for the backlinks drawer.
 
@@ -550,9 +550,15 @@ It should return a string, with constraints:
           (function :tag "Custom function"))
   :package-version '(org-node . "2.0.0"))
 
-(defcustom org-node-backlink-put-drawer-near-bottom nil
+(defcustom org-node-backlink-drawer-positioner nil
   "When creating a BACKLINKS drawer, put it below all text in the entry."
   :type 'boolean
+  :package-version '(org-node . "2.0.0"))
+
+(defcustom org-node-backlink-drawer-positioner nil
+  :type '(radio (function-item org-node--end-of-meta-data)
+                (function-item org-entry-end-position)
+                (function :tag "Custom function"))
   :package-version '(org-node . "2.0.0"))
 
 (defun org-node-backlink--extract-timestamp (text)
@@ -623,8 +629,8 @@ Designed for use by `org-node-backlink--add-in-target'."
           (org-node-backlink--check-osl-user-p))
       (org-node-backlink-mode 0)
     (save-restriction
-      (org-node--narrow-to-drawer-create
-       "BACKLINKS" org-node-backlink-put-drawer-near-bottom)
+      (org-node-narrow-to-drawer-create
+        "BACKLINKS" org-node-backlink-drawer-positioner)
       (catch 'break
         (let (lines)
           (while (search-forward "[[id:" (pos-eol) t)
@@ -638,7 +644,7 @@ Designed for use by `org-node-backlink--add-in-target'."
                       lines)
                 (forward-line 1))))
           (insert "\n"
-                  (funcall org-node-backlink-drawer-line-formatter id title)
+                  (funcall org-node-backlink-drawer-formatter id title)
                   "\n")
           ;; Re-sort so the just-inserted link ends up in the correct place
           (let ((sorted-lines
@@ -664,8 +670,8 @@ If REMOVE non-nil, remove it instead."
                            (mapcar (##plist-get % :origin))
                            (delete-dups))))
       (save-restriction
-        (org-node--narrow-to-drawer-create
-         "BACKLINKS" org-node-backlink-put-drawer-near-bottom)
+        (org-node-narrow-to-drawer-create
+          "BACKLINKS" org-node-backlink-drawer-positioner)
         (let* ((lines (split-string (buffer-string) "\n" t))
                (already-present-ids
                 (seq-keep #'org-node-backlink--extract-id lines))
@@ -688,9 +694,9 @@ If REMOVE non-nil, remove it instead."
           (dolist (id to-add)
             (when-let ((known-node (gethash id org-nodes)))
               (let ((title (org-node-get-title known-node)))
-                (open-line 1)
                 (indent-according-to-mode)
-                (insert (funcall org-node-backlink-drawer-line-formatter id title)))))
+                (insert (funcall org-node-backlink-drawer-formatter id title)
+                        "\n"))))
 
           (let ((sorted-lines
                  (sort (split-string (buffer-string) "\n" t)
@@ -702,7 +708,7 @@ If REMOVE non-nil, remove it instead."
               (insert (string-join sorted-lines "\n")))))))))
 
 (defun org-node-backlink--reformat-line (line)
-  (funcall org-node-backlink-drawer-line-formatter
+  (funcall org-node-backlink-drawer-formatter
            (org-node-backlink--extract-id line)
            (org-node-backlink--extract-link-desc line)
            (encode-time (parse-time-string

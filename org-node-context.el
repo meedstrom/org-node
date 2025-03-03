@@ -273,23 +273,23 @@ properties.  Org-mode is enabled, but the org-element cache is not."
   :package-version '(org-node . "2.0.0"))
 
 ;;;###autoload
-(define-minor-mode org-node-context-follow-mode
+(define-minor-mode org-node-context-follow-local-mode
   "Update the context buffer when point moves in an Org buffer.
 
 -----"
   :require 'org-node
   (cond
-   ((not org-node-context-follow-mode)
+   ((not org-node-context-follow-local-mode)
     (remove-hook 'post-command-hook #'org-node-context--try-refresh t))
    ((not (and (derived-mode-p 'org-mode) buffer-file-name))
-    (org-node-context-follow-mode 0))
+    (org-node-context-follow-local-mode 0))
    (t
     (add-hook 'post-command-hook #'org-node-context--try-refresh nil t))))
 
 ;;;###autoload
-(define-globalized-minor-mode org-node-context-follow-global-mode
-  org-node-context-follow-mode
-  org-node-context-follow-mode)
+(define-globalized-minor-mode org-node-context-follow-mode
+  org-node-context-follow-local-mode
+  org-node-context-follow-local-mode)
 
 (defun org-node-context-visit-thing ()
   (interactive () org-node-context-mode)
