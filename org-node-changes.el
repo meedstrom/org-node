@@ -86,10 +86,14 @@ Then do other one-shot warnings while we\\='re at it."
                (eq (org-link-get-parameter "id" :follow) 'org-roam-id-open))
       (setq org-node-changes--warned-about-roam-id t)
       (message
-       "%s" "Note: org-roam overrides ID-link behavior to prefer its DB.
-      You may want to revert to vanilla:
-      (org-link-set-parameters
-       \"id\" :follow #'org-id-open :store #'org-id-store-link-maybe)"))))
+       "%s" "Note: org-roam overrides ID-link behavior to prefer its own DB!
+This becomes a problem if the DB goes outdated: clicking a link can
+send you to an empty file due to an uncaught rename, for example.
+Org-node always keeps `org-id-locations' up to date for you.
+So you can revert ID-link behavior to its default,
+by adding to initfiles AFTER org-roam loads:
+(org-link-set-parameters
+ \"id\" :follow #'org-id-open :store #'org-id-store-link-maybe)"))))
 
 (defmacro org-node-changes--def-whiny-alias
     (old new when removed-by &optional interactive)

@@ -25,13 +25,6 @@
 (defgroup org-node-context nil "Preview backlink contexts in separate buffer."
   :group 'org-node)
 
-(defun org-node-context--goto-section-with-value (sought-value)
-  (let (sections)
-    (magit-map-sections (lambda (section)
-                          (push (cons (oref section value) section)
-                                sections)))
-    (magit-section-goto (alist-get sought-value sections () () #'equal))))
-
 
 ;;; Persistence
 
@@ -269,11 +262,12 @@ properties.  Org-mode is enabled, but the org-element cache is not."
      :inherit org-document-title)
     (t ;; On GUI.
      :extend t
-     :height 1.5))
+     :height 1.5
+     :inherit variable-pitch))
   "Face for backlink node titles in the context buffer."
   :package-version '(org-node . "2.0.0"))
 
-(defcustom org-node-context-main-buffer "*Org-Node Context*"
+(defcustom org-node-context-main-buffer "*Backlinks*"
   "Name of the main context buffer."
   :type 'string
   :package-version '(org-node . "2.0.0"))
@@ -537,7 +531,7 @@ overhead of creation.  To clean up, call
           (delay-mode-hooks (org-mode))
           (insert-file-contents file)
           ;; Ensure that attempted edits trip an error, since the buffer may be
-          ;; reused any numbmer of times, and should always reflect FILE.
+          ;; reused any number of times, and should always reflect FILE.
           (setq-local buffer-read-only t)
           (current-buffer)))))
 

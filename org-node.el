@@ -102,8 +102,6 @@
 (defvar org-roam-capture-templates)
 (defvar org-node-backlink-mode)
 (declare-function org-node-backlink--fix-nearby-property "org-node-backlink")
-(declare-function profiler-report "profiler")
-(declare-function profiler-stop "profiler")
 (declare-function tramp-tramp-file-p "tramp")
 (declare-function org-lint "org-lint")
 (declare-function consult--grep "consult")
@@ -1476,12 +1474,11 @@ display the list of files in a new buffer."
        :format [("File" 0 t)]
        :entries (cl-loop
                  for file in (org-node-list-files)
-                 collect (list file (vector
-                                     (list file
-                                           'action `(lambda (_button)
-                                                      (find-file ,file))
-                                           'face 'link
-                                           'follow-link t)))))
+                 collect (list (sxhash file)
+                               (vector
+                                (buttonize file
+                                           `(lambda (_button)
+                                              (find-file ,file)))))))
     (when (stringp org-node-extra-id-dirs)
       (setq org-node-extra-id-dirs (list org-node-extra-id-dirs))
       (message
@@ -3544,83 +3541,39 @@ If already visiting that node, then follow the link normally."
 
 ;;;; API used by some submodule(s)
 
-(defun org-node--re-search-forward-skip-special-regions (regexp &optional bound)
-  "Like `re-search-forward', but do not search inside certain regions.
-These regions are delimited by lines that start with \"#+BEGIN\" or
-\"#+END\".  Upon finding such regions, jump to the end of that region,
-then continue the search.
-
-Argument BOUND as in `re-search-forward'.
-Always behave as if NOERROR argument to `re-search-forward' is t.
-
-Each invocation has overhead, so to search for the same REGEXP
-repeatedly, it performs better not to copy the standard pattern
-\"(while (re-search-forward REGEXP nil t) ...)\",
-but to use `org-node--map-matches-skip-special-regions' instead."
-  (let ((starting-pos (point))
-        (skips (org-node--find-regions-to-skip bound)))
-    (catch 'found
-      (cl-loop for (beg . end) in skips
-               if (re-search-forward regexp beg t)
-               do (throw 'found (point))
-               else do (goto-char end))
-      (if (re-search-forward regexp bound t)
-          (throw 'found (point))
-        (goto-char starting-pos)
-        nil))))
-
-;; unused for now; likely something like this will go in org-node-parser.el
-(defun org-node--map-matches-skip-special-regions (regexp fn &optional bound)
-  (let ((last-search-hit (point))
-        (skips (org-node--find-regions-to-skip bound)))
-    (cl-loop for (beg . end) in skips do
-             (while (re-search-forward regexp beg t)
-               (setq last-search-hit (point))
-               (funcall fn))
-             (goto-char end))
-    (while (re-search-forward regexp bound t)
-      (setq last-search-hit (point))
-      (funcall fn))
-    (goto-char last-search-hit)))
-
-(defun org-node--find-regions-to-skip (&optional bound)
-  (let ((starting-pos (point))
-        (case-fold-search t)
-        skips)
-    (while (re-search-forward "^[\t\s]*#\\+BEGIN" bound t)
-      (forward-line 0)
-      (let ((beg (point)))
-        (unless (re-search-forward "^[\t\s]*#\\+END" bound t)
-          (error "org-node: Could not find #+end%s"
-                 (if bound (format " before search boundary %d" bound) "")))
-        (forward-line 1)
-        (push (cons beg (point)) skips)))
-    (goto-char starting-pos)
-    (nreverse skips)))
+(defun org-node--delete-drawer (name)
+  (save-restriction
+    (when (org-node-narrow-to-drawer-p name)
+      (delete-region (point-min) (point-max))
+      (widen)
+      (delete-blank-lines)
+      (forward-line -1)
+      (delete-line)
+      (delete-line))))
 
 ;; Home-made subroutine to find/create a drawer.  There's a trick used by
 ;; org-super-links to let upstream code do the work: temporarily set
 ;; `org-log-into-drawer' to "BACKLINKS", and then call `org-log-beginning'.
 ;; That only works under an Org entry though, not before the first heading.
-;; Plus, this subroutine has many uses.
+;; Plus, our version is flexible.
 
-(defun org-node--narrow-to-drawer-create (name &optional create-near-bottom)
+(defun org-node-narrow-to-drawer-create (name &optional create-where)
   "Narrow to pre-existing drawer named NAME, creating it if necessary.
 
-See subroutine `org-node--narrow-to-drawer-p' for some details.
+Search current entry only, via subroutine `org-node-narrow-to-drawer-p'.
 
-When drawer is created, insert it near the beginning of the Org entry
-\(after any properties and logbook drawers\), unless CREATE-NEAR-BOTTOM
-is t, in which case insert it near the end of the entry \(right before
-the next heading\)."
-  (org-node--narrow-to-drawer-p name t create-near-bottom))
+When drawer is created, insert it near the beginning of the entry
+\(after any properties and logbook drawers\), unless CREATE-WHERE is a
+function, in which case call it to reposition point prior to calling
+`org-insert-drawer'.
 
-;; REVIEW: We should test how it respects indentation.  It seems functions like
-;;         `back-to-indentation' and `indent-according-to-mode' would have no
-;;         effect after calling `org-insert-drawer', because that never inserts
-;;         indentation.  I guess users are fine with that?
-(defun org-node--narrow-to-drawer-p
-    (name &optional create-missing create-near-bottom)
+If CREATE-WHERE returns an integer or marker, go to that position, else
+trust it to have done the appropriate buffer movements."
+  (declare (indent defun))
+  (org-node-narrow-to-drawer-p name t create-where))
+
+(defun org-node-narrow-to-drawer-p
+    (name &optional create-missing create-where)
   "Seek a drawer named NAME in the current entry, then narrow to it.
 This also works at the file top level, before the first entry.
 
@@ -3631,17 +3584,17 @@ When found, narrow to the region between :NAME: and :END:, exclusive.
 Place point at the beginning of that region, after any indentation.
 If the drawer was empty, ensure there is one blank line.
 
-A typical way to use this function:
+A way you might invoke this function:
 
     \(save-restriction
-      \(if \(org-node--narrow-to-drawer-p \"MY_DRAWER\")
-          ...
-        ...))
+      \(if \(org-node-narrow-to-drawer-p \"MY_DRAWER\")
+          ...edit the narrowed buffer...
+        \(message \"No such drawer in this entry\")))
 
 With CREATE-MISSING t, create a new drawer if one was not found.
-However, instead of passing this argument, it is recommended for clarity
-to call `org-node--narrow-to-drawer-create' instead.
-Also see that function for meaning of CREATE-NEAR-BOTTOM."
+However, instead of passing that argument, it is recommended for clarity
+to call `org-node-narrow-to-drawer-create' instead.
+Also see that function for meaning of CREATE-WHERE."
   (let ((entry-end (org-entry-end-position))
         (case-fold-search t))
     (org-node--end-of-meta-data)
@@ -3655,7 +3608,7 @@ Also see that function for meaning of CREATE-NEAR-BOTTOM."
             t)
         nil))
      ;; Pre-existing drawer?
-     ((org-node--re-search-forward-skip-special-regions
+     ((org-node--re-search-forward-skip-some-regions
        (concat "^[ \t]*:" (regexp-quote name) ":[ \t]*$")
        entry-end)
       (if (get-text-property (point) 'org-transclusion-id)

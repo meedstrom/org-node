@@ -522,6 +522,7 @@ it in the nearby :BACKLINKS: property."
           (function-item org-node-backlink-id-lessp)
           (function-item org-node-backlink-id-blind-simple-lessp)
           (function-item string-lessp)
+          (function-item string-collate-lessp)
           (function :tag "Custom function"))
   :package-version '(org-node . "2.0.0"))
 
