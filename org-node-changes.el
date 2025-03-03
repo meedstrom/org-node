@@ -87,12 +87,9 @@ Then do other one-shot warnings while we\\='re at it."
       (setq org-node-changes--warned-about-roam-id t)
       (message
        "%s" "Note: org-roam overrides ID-link behavior to prefer its DB.
-      If you disable org-roam-autosync-mode, you may want to
-      revert to vanilla behavior by evalling:
+      You may want to revert to vanilla:
       (org-link-set-parameters
-       \"id\" :follow #'org-id-open :store #'org-id-store-link-maybe)")))
-  (when (bound-and-true-p org-node-backlink-aggressive)
-    (display-warning 'org-node "Your initfiles set old variable `org-node-backlink-aggressive', now controlled by `org-node-backlink-lazy'")))
+       \"id\" :follow #'org-id-open :store #'org-id-store-link-maybe)"))))
 
 (defmacro org-node-changes--def-whiny-alias
     (old new when removed-by &optional interactive)

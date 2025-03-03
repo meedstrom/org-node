@@ -161,7 +161,6 @@ In short, this mode is not meant to be toggled on its own.
   (interactive)
   (org-node-backlink--fix-all-files 'del-props))
 
-;;;###autoload
 (defun org-node-backlink--fix-all-files (kind)
   "Update :BACKLINKS: in all known nodes.
 Argument KIND controls how to update them.
@@ -170,8 +169,10 @@ Can be quit midway through and resumed later.  With
 \\[universal-argument], start over instead of resuming."
   (interactive)
   (org-node-cache-ensure t)
-  (unless (or (org-node-backlink--check-v2-misaligned-setting-p)
-              (org-node-backlink--check-osl-user-p))
+  (unless (or (and (memq kind '(add-drawers add-props))
+                   (org-node-backlink--check-v2-misaligned-setting-p))
+              (and (eq kind 'add-drawers)
+                   (org-node-backlink--check-osl-user-p)))
     ;; Maybe reset file list
     (unless (eq org-node-backlink--work-kind kind)
       (setq org-node-backlink--work-kind kind)
@@ -186,6 +187,7 @@ Can be quit midway through and resumed later.  With
           (setq org-node-backlink--work-files files))))
     ;; Resume working thru the file list
     (when org-node-backlink--work-files
+      (org-node-backlink-mode 0)
       (if (memq kind '(del-drawers del-props))
           (setq org-node-backlink--work-files
                 (org-node--in-files-do
@@ -193,14 +195,20 @@ Can be quit midway through and resumed later.  With
                   :msg "Removing :BACKLINKS: (you can quit and resume)"
                   :about-to-do "About to remove backlinks"
                   :call (##org-node-backlink-fix-buffer kind)
-                  :too-many-files-hack t))
+                  :too-many-files-hack t
+                  :cleanup (when org-node-backlink-mode
+                             (org-node-backlink-mode 0)
+                             #'org-node-backlink-mode)))
         (setq org-node-backlink--work-files
               (org-node--in-files-do
                 :files org-node-backlink--work-files
                 :msg "Adding/updating :BACKLINKS: (you can quit and resume)"
                 :about-to-do "About to edit backlinks"
-                :call (lambda () (org-node-backlink-fix-buffer kind))
-                :too-many-files-hack t)))
+                :call (##org-node-backlink-fix-buffer kind)
+                :too-many-files-hack t
+                :cleanup (when org-node-backlink-mode
+                           (org-node-backlink-mode 0)
+                           #'org-node-backlink-mode))))
       (when (null org-node-backlink--work-files)
         (if (memq kind '(del-drawers del-props))
             (message "Done removing :BACKLINKS:!")
@@ -217,8 +225,11 @@ Let `org-node-backlink-do-drawers' determine which.
 Or if REMOVE-KIND is symbol `drawers', remove the drawer in all nodes.
 Or if REMOVE-KIND is symbol `props', remove the property in all nodes."
   (interactive)
-  (unless (or (org-node-backlink--check-v2-misaligned-setting-p)
-              (org-node-backlink--check-osl-user-p))
+  (unless (or (and (memq kind '(add-drawers add-props))
+                   (org-node-backlink--check-v2-misaligned-setting-p))
+              (and (eq kind 'add-drawers)
+                   (org-node-backlink--check-osl-user-p)))
+    (message "Fixing file %s" buffer-file-name)
     (goto-char (point-min))
     (let ((case-fold-search t))
       ;; NOTE: If there is an entry that has :BACKLINKS:, but no :ID:, it will
@@ -693,7 +704,8 @@ If REMOVE non-nil, remove it instead."
   (funcall org-node-backlink-drawer-line-formatter
            (org-node-backlink--extract-id line)
            (org-node-backlink--extract-link-desc line)
-           (org-node-backlink--extract-timestamp line)))
+           (encode-time (parse-time-string
+                         (org-node-backlink--extract-timestamp line)))))
 
 
 ;;; Proactive fixing

@@ -240,7 +240,7 @@ A complementary solution, which can also stand alone, is to have the backlinks /
 
 *** Option 2A: Automatic =:BACKLINKS:= property
 
-For a first-time run, type =M-x org-node-backlink-fix-all-files=.  (Don't worry if you change your mind; undo with =M-x org-node-backlink-regret=.)
+For a first-time run, type =M-x org-node-backlink-mass-update-props=.  (Don't worry if you change your mind; undo with =M-x org-node-backlink-mass-delete-props=.)
 
 Then add to initfiles:
 
@@ -259,12 +259,11 @@ NOTE 2:  People who prefer to hard-wrap text, instead of enabling =visual-line-m
 
 Same as Option 2A, but uses a multiline drawer.
 
-For a first-time run, type =M-x org-node-backlink-fix-all-files=.  (Don't worry if you change your mind; undo with =M-x org-node-backlink-regret=.)
+For a first-time run, type =M-x org-node-backlink-mass-update-drawers=.  (Don't worry if you change your mind; undo with =M-x org-node-mass-delete-drawers=.)
 
 Then add to initfiles:
 
 #+begin_src elisp
-(setq org-node-backlink-do-drawers t)
 (org-node-backlink-mode)
 #+end_src
 
@@ -279,16 +278,16 @@ I /think/ the following should integrate well.  Untested, let me know!
           #'org-super-links-convert-link-to-super)
 #+end_src
 
-Bonus: you can still use a command =M-x org-node-backlink-fix-all-files= to add missing backlinks in bulk.  That may be useful to start you off on your life with org-super-links.
+Bonus: you can still use the command =M-x org-node-backlink-mass-update-drawers= to add missing backlinks in bulk.  That may be useful to start you off on your life with org-super-links.
 
 However, when you have pre-existing drawers -- *MAKE A FULL BACKUP!*
 
-Org-node has a different usage in mind than org-super-links, and you may be accustomed to having old manually formatted and sorted drawers.  Running =org-node-backlink-fix-all-files= *may re-sort your backlinks and re-format their appearance into something you don't want*; double-check the following options!
+Org-node has a different usage in mind than org-super-links.  You may be accustomed to having old manually formatted and sorted drawers.  Running aforementioned command *may re-sort your backlinks and re-format their appearance into something you don't want*; double-check the following options.
 
 - =org-node-backlink-drawer-sorter=
 - =org-node-backlink-drawer-formatter=
 
-Additionally, any lines that don't contain a valid link are simply *deleted*.
+Additionally, lines that don't contain a valid and current link are *deleted*.
 
 * Misc
 ** Manage org-id-locations

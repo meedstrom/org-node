@@ -3070,7 +3070,8 @@ Optional keyword argument ABOUT-TO-DO as in
 
 ;; REVIEW: Check out fileloop.el
 (cl-defun org-node--in-files-do
-    (&key files fundamental-mode msg about-to-do call too-many-files-hack)
+    (&key files fundamental-mode msg about-to-do call
+          too-many-files-hack cleanup)
   "Temporarily visit each file in FILES and call function CALL.
 
 Take care!  This function presumes that FILES satisfy the assumptions
@@ -3097,7 +3098,8 @@ FUNDAMENTAL-MODE is t, do not activate any major mode.
 If a buffer had already been visiting FILE, reuse that buffer.
 Naturally, FUNDAMENTAL-MODE has no effect in that case.
 
-For explanation of TOO-MANY-FILES-HACK, see code comments."
+For explanation of TOO-MANY-FILES-HACK, see code comments.
+CLEANUP is a kludge related to that."
   (declare (indent defun))
   (cl-assert (and msg files call about-to-do))
   (setq call (org-node--try-ensure-compiled call))
@@ -3112,7 +3114,8 @@ For explanation of TOO-MANY-FILES-HACK, see code comments."
         (kill-buffer-hook nil) ;; Inhibit save-place etc
         (kill-buffer-query-functions nil)
         (write-file-functions nil) ;; recentf-track-opened-file
-        (buffer-list-update-hook nil))
+        (buffer-list-update-hook nil)
+        (org-node-renames-allowed-dirs nil))
     (let ((files* files)
           interval
           file
@@ -3184,6 +3187,7 @@ For explanation of TOO-MANY-FILES-HACK, see code comments."
           (( quit )
            (unless (or was-open (not buf) (buffer-modified-p buf))
              (kill-buffer buf))
+           (when (functionp cleanup) (funcall cleanup))
            (cons file files*))
           (( error )
            (lwarn 'org-node :warning "%s: Loop interrupted by signal %S\n\tBuffer: %s\n\tFile: %s\n\tNext file: %s\n\tValue of ctr: %d"
@@ -3192,6 +3196,7 @@ For explanation of TOO-MANY-FILES-HACK, see code comments."
              (kill-buffer buf))
            files*)
           (:success
+           (when (functionp cleanup) (funcall cleanup))
            (message "%s... done" msg)
            nil))))))
 
@@ -3427,13 +3432,16 @@ to a position after any file-level properties and keywords."
         (goto-char (point-min))
         ;; Jump past top-level PROPERTIES drawer.
         (let ((case-fold-search t))
-          (when (looking-at-p "[\t\s]*?:PROPERTIES: *?$")
+          (when (looking-at-p "[ \t]*?:PROPERTIES: *?$")
             (forward-line)
-            (while (looking-at-p "[\t\s]*?:")
+            (while (looking-at-p "[ \t]*?:")
               (forward-line))))
         ;; Jump past #+keywords, comment lines and blank lines.
         (while (looking-at-p (rx (*? (any "\t\s")) (or "#+" "# " "\n")))
-          (forward-line)))
+          (forward-line))
+        ;; Don't go past a "final stretch" of blanklines
+        (unless (zerop (skip-chars-backward "\n"))
+          (forward-char 1)))
     ;; PERF: Override a bottleneck in `org-end-of-meta-data'.
     (cl-letf (((symbol-function 'org-back-to-heading)
                #'org-node--back-to-heading-or-point-min))
