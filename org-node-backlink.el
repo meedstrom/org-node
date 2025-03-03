@@ -544,9 +544,9 @@ It should return a string, with constraints:
 - No newlines.
 - Not more than one [[id:...]] construct."
   :type '(radio
+          (function-item org-node-backlink-format-like-org-super-links-default)
           (function-item org-node-backlink-format-as-bullet-with-time)
           (function-item org-node-backlink-format-as-bullet-no-time)
-          (function-item org-node-backlink-format-like-org-super-links-default)
           (function :tag "Custom function"))
   :package-version '(org-node . "2.0.0"))
 
@@ -558,7 +558,7 @@ headings.  Point is at the beginning of the body text as determined by
 
 The function may return anything, but if it returns an integer or
 marker, point will move to that position."
-  :type '(radio (const nil :tag "Leave at beginning of body")
+  :type '(radio (const :tag "Leave at beginning of body" nil)
                 (function-item org-entry-end-position)
                 (function :tag "Custom function"))
   :package-version '(org-node . "2.0.0"))
