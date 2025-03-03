@@ -20,12 +20,9 @@
 ;; This file is worker code meant for child processes.  It should load no
 ;; libraries at runtime.
 
-;; The child processes are expected to load this file, execute
-;; `org-node-parser--collect-dangerously', then die.
-
-;; NOTE: While developing, do not eval only specific defuns;
-;; `el-job--ensure-compiled-lib' needs you to save the file and do
-;; `eval-buffer'.
+;; NOTE: While developing, do not eval specific defuns;
+;;       `el-job--locate-lib-in-load-history' needs you to save the file and do
+;;       M-x eval-buffer.
 
 ;;; Code:
 
@@ -47,9 +44,12 @@
 (defvar $file-name-handler-alist)
 (defvar $file-todo-option-re)
 (defvar $global-todo-re)
-(defvar $backlink-drawer-re)
 (defvar $nonheritable-tags)
 (defvar $inlinetask-min-level)
+
+(defvar $backlink-drawer-re) ;; TODO: deprecate in favor of next two
+(defvar $structures-to-ignore)
+(defvar $drawers-to-ignore)
 
 (defvar org-node-parser--paths-types nil)
 (defvar org-node-parser--found-links nil)
@@ -166,11 +166,10 @@ the subheading potentially has an ID of its own."
                   ;; If point is on a # comment line, skip
                   (goto-char (pos-bol))
                   (looking-at-p "[\t\s]*# "))
-          (push (record 'org-node-link
-                        id-here
-                        link-pos
-                        link-type
-                        (string-replace "%20" " " path))
+          (push (list :origin id-here
+                      :pos link-pos
+                      :type link-type
+                      :dest (string-replace "%20" " " path))
                 org-node-parser--found-links))))
 
     ;; Start over and look for @citekeys
@@ -189,12 +188,11 @@ the subheading potentially has an ID of its own."
                     (looking-at-p "[\t\s]*# "))
                   ;; On a # comment, skip citation
                   (goto-char closing-bracket)
-                (push (record 'org-node-link
-                              id-here
-                              link-pos
-                              nil
-                              ;; Replace & with @
-                              (concat "@" (substring (match-string 0) 1)))
+                (push (list :origin id-here
+                            :pos link-pos
+                            :type nil
+                            ;; Replace & with @
+                            :dest (concat "@" (substring (match-string 0) 1)))
                       org-node-parser--found-links)))
           (error "No closing bracket to [cite:")))))
   (goto-char (or end (point-max))))
@@ -224,10 +222,12 @@ between buffer substrings \":PROPERTIES:\" and \":END:\"."
 
 ;;; Main
 
-(defun org-node-parser--init ()
+(defvar org-node-parser--buf nil)
+(defun org-node-parser--init-buf-and-switch ()
   "Setup a throwaway buffer in which to work and make it current.
-Also set some variables."
+Also set some variables, including global variables."
   (switch-to-buffer (get-buffer-create " *org-node-parser*" t))
+  (setq org-node-parser--buf (current-buffer))
   (setq buffer-read-only t)
   (setq case-fold-search t)
   (setq file-name-handler-alist $file-name-handler-alist)
@@ -237,15 +237,10 @@ Also set some variables."
           (rx-to-string
            `(seq bol (repeat 1 ,(1- $inlinetask-min-level) "*") " ")))))
 
-(defvar org-node-parser--ready nil)
-(defun org-node-parser--collect-dangerously (FILE)
-  "Dangerous - overwrites the current buffer!
-
-Read FILE contents into current buffer, analyze it for ID-nodes, links
-and other data, then return the data."
-  (unless org-node-parser--ready
-    (setq org-node-parser--ready t)
-    (org-node-parser--init))
+(defun org-node-parser--scan-file (FILE)
+  "Gather ID-nodes, links and other data in FILE."
+  (unless (equal org-node-parser--buf (current-buffer))
+    (org-node-parser--init-buf-and-switch))
   (setq org-node-parser--paths-types nil)
   (setq org-node-parser--found-links nil)
   (let (missing-file

@@ -7,6 +7,92 @@
 #+TEXINFO_DIR_DESC: Link org-id entries into a network.
 #+EXPORT_FILE_NAME: org-node
 #+HTML: <a href="https://melpa.org/#/org-node"><img alt="MELPA" src="https://melpa.org/packages/org-node-badge.svg"/></a> <a href="https://stable.melpa.org/#/org-node"><img alt="MELPA Stable" src="https://stable.melpa.org/packages/org-node-badge.svg"/></a>
+* News for v2.0 :noexport:
+
+Version 2.0 is out, with two major features:
+
+- backlink drawers!
+- context buffers!
+
+Upgrade note: *if you were using version 1.8.7 or older (November 2024)*, you'll have a smoother ride if you:
+
+1. first upgrade to the latest in [[https://github.com/meedstrom/org-node/tree/v1.9][v1.9 branch]],
+2. deal with any transitional warnings,
+3. /then/ upgrade to the latest version (on [[https://github.com/meedstrom/org-node/branches][main]]).
+
+Or skip all that, and just check that you're not using any of [[https://github.com/meedstrom/org-node/blob/v1.9/org-node-changes.el#L140][these aliases]].
+
+** Backlinks drawer
+
+You can now choose whether =org-node-backlink-mode= should use multiline drawers or a single property line.  The drawers are the same idea as [[https://github.com/toshism/org-super-links][org-super-links]].  I.e. instead of this:
+
+#+begin_src org
+,* My problems in life
+:PROPERTIES:
+:CREATED: [2023-12-25 Mon 17:20]
+:ID: 4323245
+:BACKLINKS: [[id:123456][Relationships]] [[id:235611][Feelings]]
+:END:
+
+Blah blah blah
+#+end_src
+
+you can now have this:
+
+#+begin_src org
+,* My problems in life
+:PROPERTIES:
+:CREATED: [2023-12-25 Mon 17:20]
+:ID: 4323245
+:END:
+:BACKLINKS:
+[2025-01-05 Sun 16:16] <- [[id:123456][Relationships]]
+[2025-02-26 Wed 01:55] <- [[id:235611][Feelings]]
+:END:
+
+Blah blah blah
+#+end_src
+
+This is controlled by variable =org-node-backlink-do-drawers=, which defaults to t.
+
+To check out the config options, type:
+
+: M-x customize-group RET org-node-backlink RET
+
+** Context buffers
+
+The new context buffer replaces much of [[https://github.com/meedstrom/org-node-fakeroam][org-node-fakeroam]]'s hacks.
+
+For previous users, some direct substitutes:
+- Command =org-node-context-raise=
+  - replaces =org-node-fakeroam-show-buffer=
+- Command =org-node-context-toggle=
+  - replaces =org-roam-buffer-toggle=
+- Minor mode =org-node-context-follow-mode=
+  - replaces =org-node-fakeroam-redisplay-mode=
+- Variable =org-node-context-persist-on-disk=
+  - replaces =org-node-fakeroam-fast-render-persist=
+
+You no longer need these:
+- Minor mode =org-node-fakeroam-jit-backlinks-mode=
+- Minor mode =org-node-fakeroam-fast-render-mode=
+
+MISSING features for now:
+- org-roam's "node-dedicated" buffers
+- grep sections
+
+To check out some config options, type:
+
+: M-x customize-group RET org-node-context RET
+
+** Incompatible changes
+
+1. Removed a number of [[https://github.com/meedstrom/org-node/blob/v1.9/org-node-changes.el#L140][deprecated aliases]].
+2. Struct type =org-node-link= removed.
+   - A link is now a plist, so use e.g. =(plist-get LINK :pos)= instead.
+3. Bumped dependency [[https://github.com/meedstrom/el-job][el-job]] to the just-released v1.0.
+4. New option =org-node-backlink-do-drawers= implies a different default behavior from before, but a message will be printed to help you out.
+
 * Background
 ** What's all this
 
@@ -42,40 +128,40 @@ Once a subtree has an ID you can link to, it's a "node" because it has joined th
 
 A comparison of three systems that all permit relying on org-id and don't lock you into the concept of "one-note-per-file".
 
-| Feature                        | org-roam | org-node           | [[https://github.com/toshism/org-super-links][org-super-links]]      |
-|--------------------------------+----------+--------------------+----------------------|
-| Backlinks                      | yes      | yes                | yes                  |
-| Node search and insert         | yes      | yes                | -- (suggests [[https://github.com/alphapapa/org-ql][org-ql]]) |
-| Node aliases                   | yes      | yes                | --                   |
-| Node exclusion                 | yes      | limited            | not applicable       |
-| Refile                         | yes      | yes                | --                   |
-| Rich backlinks buffer          | yes      | yes (org-roam's)   | --                   |
-| Customize how backlinks shown  | yes      | yes (org-roam's)   | yes                  |
-| Reflinks                       | yes      | yes (as backlinks) | --                   |
-| Ref search                     | yes      | yes (as aliases)   | not applicable       |
-| Org 9.5 @citations as refs     | yes      | yes                | not applicable       |
-| Support org-ref v3             | yes      | limited            | not applicable       |
-| Support org-ref v2             | yes      | --                 | not applicable       |
-| Work thru org-roam-capture     | yes      | yes                | ?                    |
-| Work thru org-capture          | --       | yes                | ?                    |
-| Daily-nodes                    | yes      | yes                | --                   |
-| Node sequences                 | --       | yes                | --                   |
-| Show backlinks in same window  | --       | yes                | yes                  |
-| Cooperate with org-super-links | --       | yes                | not applicable       |
-| Fix link descriptions          | --       | yes                | --                   |
-| List dead links                | --       | yes                | --                   |
-| Rename file when title changes | --       | yes                | --                   |
-| Warn about duplicate titles    | --       | yes                | --                   |
-| Principled "related-section"   | --       | --                 | yes                  |
-| Untitled notes                 | --       | --                 | --                   |
-| Support =roam:= links            | yes      | -- (WONTFIX)       | not applicable       |
-| Can have separate note piles   | yes      | -- (WONTFIX)       | not applicable       |
-|--------------------------------+----------+--------------------+----------------------|
-| Some query-able cache          | EmacSQL  | hash tables        | --                   |
-| Async cache rebuild            | --       | yes                | not applicable       |
-| *Time to cache my 3000 nodes*    | *2m 48s*   | *0m 01s*             | not applicable       |
-| *Time to save file w/ 400 nodes* | *5--10s*   | *instant*            | ?                    |
-| *Time to open minibuffer*        | *1--3s*    | *instant*            | not applicable       |
+| Feature                        | org-roam       | org-node           | [[https://github.com/toshism/org-super-links][org-super-links]]      |
+|--------------------------------+----------------+--------------------+----------------------|
+| Backlinks                      | yes            | yes                | yes                  |
+| Node search and insert         | yes            | yes                | -- (suggests [[https://github.com/alphapapa/org-ql][org-ql]]) |
+| Node aliases                   | yes            | yes                | --                   |
+| Node exclusion                 | yes            | limited            | not applicable       |
+| Refile                         | yes            | yes                | --                   |
+| Rich backlinks buffer          | yes            | yes (org-roam's)   | --                   |
+| Customize how backlinks shown  | yes            | yes (org-roam's)   | yes                  |
+| Reflinks                       | yes            | yes (as backlinks) | --                   |
+| Ref search                     | yes            | yes (as aliases)   | not applicable       |
+| Org 9.5 @citations as refs     | yes            | yes                | not applicable       |
+| Support org-ref v3             | yes            | limited            | not applicable       |
+| Support org-ref v2             | yes            | --                 | not applicable       |
+| Work thru org-roam-capture     | yes            | yes                | ?                    |
+| Work thru org-capture          | --             | yes                | ?                    |
+| Daily-nodes                    | yes            | yes                | --                   |
+| Node sequences                 | --             | yes                | --                   |
+| Show backlinks in same window  | --             | yes                | yes                  |
+| Cooperate with org-super-links | --             | yes                | not applicable       |
+| Fix link descriptions          | --             | yes                | --                   |
+| List dead links                | --             | yes                | --                   |
+| Rename file when title changes | --             | yes                | --                   |
+| Warn about duplicate titles    | --             | yes                | --                   |
+| Principled "related-section"   | --             | --                 | yes                  |
+| Untitled notes                 | --             | --                 | --                   |
+| Support =roam:= links            | yes            | -- (WONTFIX)       | --                   |
+| Can have separate note piles   | yes (via hack) | -- (WONTFIX)       | not applicable       |
+|--------------------------------+----------------+--------------------+----------------------|
+| Some query-able cache          | EmacSQL        | hash tables        | --                   |
+| Async cache rebuild            | --             | yes                | not applicable       |
+| *Time to cache my 3000 nodes*    | *2m 48s*         | *0m 01s*             | not applicable       |
+| *Time to save file w/ 400 nodes* | *5--10s*         | *instant*            | ?                    |
+| *Time to open minibuffer*        | *1--3s*          | *instant*            | not applicable       |
 
 * Setup
 ** Install
@@ -88,7 +174,7 @@ Assuming your package manager knows about [[https://melpa.org/#/getting-started]
   :config (org-node-cache-mode))
 #+end_src
 
-If you use org-roam, you probably want the following module as well.  Check its README to make org-node [[https://github.com/meedstrom/org-node-fakeroam][work with org-roam side-by-side]]!
+If you use org-roam, you /may/ want the following module as well, at least during a transition period.  Check its README to make org-node [[https://github.com/meedstrom/org-node-fakeroam][work smoothly with org-roam]]!
 
 #+begin_src elisp
 (use-package org-node-fakeroam
@@ -111,62 +197,97 @@ Pick some short keys and try them out.
 
 To browse config options, type =M-x customize-group RET org-node RET=.
 
-Final tip: there's *no separate command* for creating a new node!  Reuse one of the commands above, and type the name of a node that doesn't exist.  Try it and see what happens!
+Final tip: there's *no separate command* for creating a new node!  Reuse one of the commands above, and type the name of a node that doesn't exist, such as "My problems in life".  Try it and see what happens!
 
 * Backlinks
 ** What are backlinks?
 Backlinks are the butter on the bread of your notes.  If you've ever seen a "What links here" section on some webpage, that's exactly what it is.  Imagine seeing that, all the time.  The following sections outline two general ways to do so.
 
-** Backlink solution 1: Borrow org-roam's backlink buffer
-As a Roam user, you can keep using =M-x org-roam-buffer-toggle=.
+** Backlink solution 1: displayed in a separate window
+*** Option 1A: Reuse the org-roam buffer
+Believe it or not, it Just Works.
 
-TIP: If it has been slow, or saving files has been slow, [[https://github.com/meedstrom/org-node-fakeroam][org-node-fakeroam]] gives you ways to speed it up.
+If you install [[org-node-fakeroam]] -- which will pull in org-roam too -- add to initfiles:
 
-TIP: If you have not done so yet, I recommend binding some short key sequences.  I spent many months waffling on where to bind them, so here's an example:
+# It's a shim with the effect that the org-roam buffer does not need to ask the SQLite DB for backlinks, indeed SQLite need not even be installed.
 
 #+begin_src elisp
-;; Either this...
-(keymap-set org-mode-map "M-s M-r" #'org-roam-buffer-toggle)
-(keymap-set global-map "M-s M-d" #'org-roam-buffer-display-dedicated)
-
-;; ...or just this for a different behavior
+(org-node-fakeroam-redisplay-mode)
+(org-node-fakeroam-jit-backlinks-mode) ;; shim so no SQLite needed
+(org-node-fakeroam-fast-render-mode) ;; perf fixes
+(keymap-set org-mode-map "M-s M-t M-t" #'org-roam-buffer-toggle)
+(keymap-set org-mode-map "M-s M-t M-d" #'org-roam-buffer-display-dedicated)
+;; if your window mgmt style is constantly losing all windows
 (keymap-set global-map "M-s M-r" #'org-node-fakeroam-show-buffer)
 #+end_src
 
+*** Option 2A: Use the new org-node-context buffer
+
+Org-node ships a complete rewrite of the org-roam buffer.
+
+Add to initfiles:
+
+#+begin_src elisp
+(org-node-context-follow-mode)
+(keymap-set global-map "M-s M-r" #'org-node-context-raise)
+(keymap-set org-mode-map "M-s M-t" #'org-node-context-toggle)
+#+end_src
+
 ** Backlink solution 2: Print inside the file
-I rarely have the screen space to display a backlink buffer.  Because it needs my active involvement to keep visible, I go long periods seeing no backlinks.  This solution can be a great complement (or even stand alone).
+I rarely have the screen space to display a backlink buffer.  Because it needs my active involvement to keep visible, I go long periods seeing no backlinks.
 
-*** Option 2A: Let org-node manage a =:BACKLINKS:= property
+A complementary solution, which can also stand alone, is to have the backlinks /written into/ the file, on an Org property line or in a drawer.
 
-For a first-time run, type =M-x org-node-backlink-fix-all-files=.  (Don't worry if you change your mind; undo with =M-x org-node-backlink-regret=.)
+*** Option 2A: Automatic =:BACKLINKS:= property
 
-Then enable the following global mode, which keeps these properties updated.
+Add to initfiles:
+
+#+begin_src elisp
+(setq org-node-backlink-do-drawers nil)
+(org-node-backlink-mode)
+#+end_src
+
+For a first-time run, type =M-x org-node-backlink-mass-update-props=.  (Don't worry if you change your mind; undo with =M-x org-node-backlink-mass-delete-props=.)
+
+NOTE 1: To be clear, this mode never generates new IDs.  That's your own business.  This only adds/edits =:BACKLINKS:= properties.
+
+That also means that *not all links create a backlink,* only links located in an entry that has an ID.  After all, there must be something to link back to.
+
+NOTE 2:  People who prefer to hard-wrap text, instead of enabling =visual-line-mode= or similar, may prefer Option 2B.
+
+*** Option 2B: Automatic =:BACKLINKS:...:END:= drawer
+
+Same as Option 2A, but uses a multiline drawer.
+
+For a first-time run, type =M-x org-node-backlink-mass-update-drawers=.  (Don't worry if you change your mind; undo with =M-x org-node-mass-delete-drawers=.)
+
+Then add to initfiles:
 
 #+begin_src elisp
 (org-node-backlink-mode)
 #+end_src
 
-NOTE 1: To be clear, this never generates new IDs.  That's your own business.  This only adds/edits =:BACKLINKS:= properties.
+*** Option 2C: Semi-automatic =:BACKLINKS:...:END:= drawer
 
-That also means that *not every link causes a backlink to pop into existence,* only links located in an entry that has an ID.  After all, there must be something to link back to :)
+If you were previously using org-super-links, you can continue with it.
 
-NOTE 2: By default, the setting =org-node-backlink-aggressive= is nil, so stale backlinks are not cleaned until you carry out some edits under an affected heading and then save the file, which fixes that heading's =:BACKLINKS:= property.  If you'd like it to be more proactive, set it to t:
-
-#+begin_src elisp
-(setq org-node-backlink-aggressive t)
-#+end_src
-
-NOTE 3:  People who prefer to hard-wrap text instead of enabling =visual-line-mode= or similar may not find this way of displaying backlinks very scalable, since Org places properties on a single logical line, that may run off the edge of the screen.
-
-*** Option 2B: Let org-super-links manage a =:BACKLINKS:...:END:= drawer
-
-I /think/ the following should work. Totally untested, let me know!
+I /think/ the following should integrate well.  Untested, let me know!
 
 #+begin_src elisp
-(add-hook 'org-node-insert-link-hook #'org-node-convert-link-to-super)
+(add-hook 'org-node-insert-link-hook
+          #'org-super-links-convert-link-to-super)
 #+end_src
 
-Bad news: this is currently directed towards people who used [[https://github.com/toshism/org-super-links][org-super-links]] from the beginning, or people who are just now starting to assign IDs, as there is not yet a command to add new BACKLINKS drawers in bulk to preexisting nodes. ([[https://github.com/toshism/org-super-links/issues/93][org-super-links#93]])
+Bonus: you can still use the command =M-x org-node-backlink-mass-update-drawers= to add missing backlinks in bulk.  That may be useful to start you off on your life with org-super-links.
+
+However, when you have pre-existing drawers -- *MAKE A FULL BACKUP!*
+
+Org-node has a different usage in mind than org-super-links.  You may be accustomed to having old manually formatted and sorted drawers.  Running aforementioned command *may re-sort your backlinks and re-format their appearance into something you don't want*; double-check the following options.
+
+- =org-node-backlink-drawer-sorter=
+- =org-node-backlink-drawer-formatter=
+
+Additionally, lines that don't contain a valid and current link are *deleted*.
 
 * Misc
 ** Manage org-id-locations
@@ -209,7 +330,7 @@ This could work by---for example---excluding anything tagged "project" or perhap
       (lambda (node)
         (not
          (or (org-node-get-todo node)
-             (member "project" (org-node-get-tags-with-inheritance node))
+             (member "project" (org-node-get-tags node))
              (assoc "ROAM_EXCLUDE" (org-node-get-properties node))))))
 #+end_src
 
@@ -247,8 +368,7 @@ Or put something like =#+filetags: :hide_node:= at the top of each file, and set
 #+begin_src elisp
 (setq org-node-filter-fn
       (lambda (node)
-        (not (member "hide_node"
-                     (org-node-get-tags-with-inheritance node)))))
+        (not (member "hide_node" (org-node-get-tags node)))))
 #+end_src
 
 ** Org-capture
@@ -399,7 +519,7 @@ Basic commands:
 
 Rarer commands:
 
-- =org-node-lint-all=
+- =org-node-lint-all-files=
   - Can help you fix a broken setup: it runs org-lint on all known files and generates a report of syntax problems, for you to correct manually.
 
     Org-node [[https://github.com/meedstrom/org-node/issues/8#issuecomment-2101316447][assumes all files have valid syntax]], though many of the problems reported by org-lint are survivable.
@@ -430,10 +550,10 @@ Rarer commands:
 Do you already know about "daily-notes"?  Then get started with a keybinding such as:
 
 #+begin_src elisp
-(keymap-set global-map "M-s s" #'org-node-seq-dispatch)
+(keymap-set global-map "M-s M-s" #'org-node-seq-dispatch)
 #+end_src
 
-and configure =org-node-seq-defs=.  See [[https://github.com/meedstrom/org-node/wiki/Configuring-node-sequences][wiki]].
+and configure =org-node-seq-defs=.  See [[https://github.com/meedstrom/org-node/wiki/Configuring-node-sequences][wiki]] for premade examples.
 
 *** What are node seqs?
 It's easiest to explain node sequences if we use "daily-notes" (aka "dailies") as an example.
@@ -526,26 +646,3 @@ With [[https://github.com/radian-software/straight.el][Straight]]:
   :straight (org-node :type git :host github :repo "meedstrom/org-node"
                       :branch "v1.6"))
 #+end_src
-
-
-*** Match fakeroam version
-The extension [[https://github.com/meedstrom/org-node-fakeroam][org-node-fakeroam]] has been tightly coupled with contemporary versions of org-node, but hopefully it will warn about any version mismatch at load-time.
-
-Just in case, the release history:
-- 2024-10-05: org-node v1.5 and org-node-fakeroam v1.3
-- 2024-10-24: org-node v1.6 and org-node-fakeroam v1.4
-- 2024-10-27: org-node v1.7 and org-node-fakeroam v1.5
-- 2024-11-14: org-node v1.8
-- 2024-11-18: org-node v1.9 and org-node-fakeroam v1.6
-- 2024-12-29: org-node-fakeroam v1.7
-
-*** What version is installed?
-This info depends on your package manager.  I do not embed version in the source code.
-
-- With Elpaca
-  - =M-x elpaca-info RET org-node RET=
-- With Straight and Borg:
-  - go to =M-x find-library RET org-node RET=
-  - then run the Git command ~git log --tags --pretty="%ci %d"~
-- With the built-in package.el
-  - unfortunately... MELPA does not make it easy (their version numbering is [[https://github.com/melpa/melpa/issues/2955#issuecomment-1874169295][planned to improve]]).  For now, cross-correlate with the date.
