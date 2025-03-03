@@ -7,15 +7,20 @@
 #+TEXINFO_DIR_DESC: Link org-id entries into a network.
 #+EXPORT_FILE_NAME: org-node
 #+HTML: <a href="https://melpa.org/#/org-node"><img alt="MELPA" src="https://melpa.org/packages/org-node-badge.svg"/></a> <a href="https://stable.melpa.org/#/org-node"><img alt="MELPA Stable" src="https://stable.melpa.org/packages/org-node-badge.svg"/></a>
-* News [2025-03-03 Mon] :noexport:
+* News for v2.0 :noexport:
 
 Version 2.0 is out, with two major features:
-- backlink drawers (providing an alternative to org-super-links)
-- context buffers (providing an alternative to org-roam's buffers)
 
-*If you were using version 1.8.7 or older (November 2024), you'll have a smoother ride if you first upgrade to the latest in [[https://github.com/meedstrom/org-node/tree/v1.9][v1.9 branch]],* deal with any transitional warnings, /then/ upgrade to the latest version on [[https://github.com/meedstrom/org-node/branches][main]].
+- backlink drawers!
+- context buffers!
 
-Or else just check out that you're not using any of [[https://github.com/meedstrom/org-node/blob/v1.9/org-node-changes.el][these aliases]].
+Upgrade note: *if you were using version 1.8.7 or older (November 2024), you'll have a smoother ride if you:*
+
+1. first upgrade to the latest in [[https://github.com/meedstrom/org-node/tree/v1.9][v1.9 branch]],
+2. deal with any transitional warnings,
+3. /then/ upgrade to the latest version on [[https://github.com/meedstrom/org-node/branches][main]].
+
+Or just check that you're not using any of [[https://github.com/meedstrom/org-node/blob/v1.9/org-node-changes.el][these aliases]].
 
 ** Backlinks drawer
 
@@ -54,18 +59,11 @@ To check out the config options, type:
 
 : M-x customize-group RET org-node-backlink RET
 
-The two old commands =org-node-backlink-fix-all-files=  and =org-node-backlink-regret= are replaced by four, hopefully self-explanatory:
-
-- Command =org-node-backlink-mass-update-drawers=
-- Command =org-node-backlink-mass-update-props=
-- Command =org-node-backlink-mass-delete-drawers=
-- Command =org-node-backlink-mass-delete-props=
-
 ** Context buffers
 
-The new context buffer replaces much of [[https://github.com/meedstrom/org-node-fakeroam][org-node-fakeroam]]'s hacks, and with them, org-roam itself.
+The new context buffer replaces much of [[https://github.com/meedstrom/org-node-fakeroam][org-node-fakeroam]]'s hacks... and with them, org-roam itself.
 
-Some direct substitutes:
+For previous users, some direct substitutes:
 - Command =org-node-context-raise=
   - replaces =org-node-fakeroam-show-buffer=
 - Command =org-node-context-toggle=
@@ -74,16 +72,10 @@ Some direct substitutes:
   - replaces =org-node-fakeroam-redisplay-mode=
 - Variable =org-node-context-persist-on-disk=
   - replaces =org-node-fakeroam-fast-render-persist=
-- Variable =org-node-context-refresh-hook=
-  - replaces =org-roam-preview-postrender-functions=
 
 You no longer need these:
 - Minor mode =org-node-fakeroam-jit-backlinks-mode=
 - Minor mode =org-node-fakeroam-fast-render-mode=
-
-Some technical differences from org-roam's buffer:
-- Variable =org-node-context-postprocess-hook= -- like =org-roam-buffer-postprocess-functions=, but runs in a buffer instead of passing a string
-- No grep section (yet?)
 
 To check out the config options, type:
 
@@ -92,12 +84,7 @@ To check out the config options, type:
 And because someone will ask, the remaining utility in org-node-fakeroam boils down to:
 
 - Using org-roam-capture
-  : (setq org-node-creation-fn 'org-node-fakeroam-new-via-roam-capture)
-
 - Keeping org-roam's DB updated, so that extensions that rely on it can continue to work
-  : (org-node-fakeroam-db-feed-mode)
-
-  - Note that the performance leaves something to be desired.
 
 ** Incompatible changes
 
@@ -105,7 +92,8 @@ And because someone will ask, the remaining utility in org-node-fakeroam boils d
 2. Struct type =org-node-link= removed.
    - A link is now a plist, so use e.g. =(plist-get LINK :pos)= instead.
 3. Bumped dependency [[https://github.com/meedstrom/el-job][el-job]] to the just-released v1.0.
-5. Removed user option =org-node-backlink-aggressive=, in favor of =org-node-backlink-lazy=, with inverted meaning.
+4. New option =org-node-backlink-do-drawers= implies a different default behavior from before, but a message will be printed to help you out.
+# 4. User option =org-node-backlink-aggressive= now has the inverted meaning, and named =org-node-backlink-lazy=.  It is now aggressive by default.
 
 * Background
 ** What's all this
@@ -368,8 +356,7 @@ Or put something like =#+filetags: :hide_node:= at the top of each file, and set
 #+begin_src elisp
 (setq org-node-filter-fn
       (lambda (node)
-        (not (member "hide_node"
-                     (org-node-get-tags node)))))
+        (not (member "hide_node" (org-node-get-tags node)))))
 #+end_src
 
 ** Org-capture
