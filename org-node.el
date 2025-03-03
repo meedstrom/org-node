@@ -28,6 +28,7 @@
 
 ;; NOTE: Looking for Package-Version?
 ;;       Consult your package manager, or the Git tag.
+;;       For reference, 2.0.0 was released on 20250303, i.e. March 3.
 
 ;;; Commentary:
 

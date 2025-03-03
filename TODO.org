@@ -4,8 +4,8 @@
 
 - Mid-2025: drop Emacs 28
 
-  (Seems that Debian stable will be stuck on Emacs 28 until mid-2025,
-  then likely leap to Emacs 30.)
+  (Seems that Debian stable will be stuck on Emacs 28 until [[https://release.debian.org/trixie/freeze_policy.html][mid-2025]],
+  then leap to [[https://packages.debian.org/trixie/emacs-gtk][Emacs 30]].)
 
   List of 28-isms and 29-isms to drop
 
