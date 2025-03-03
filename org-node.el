@@ -22,8 +22,8 @@
 ;; Package-Requires: (
 ;; 	(emacs "28.1")
 ;; 	(compat "30.0.0.0")
-;; 	(el-job "0.3.22")
-;; 	(llama "0.4.0")
+;; 	(el-job "1.0.2")
+;; 	(llama "0.5.0")
 ;; 	(magit-section "4.3.0"))
 
 ;; NOTE: Looking for Package-Version?
