@@ -94,15 +94,7 @@ Then do other one-shot warnings while we\\='re at it."
                (eq (org-link-get-parameter "id" :follow) 'org-roam-id-open))
       (setq org-node-changes--warned-about-roam-id t)
       (message
-       <<<<<<< HEAD
-       "%s" "Note: org-roam overrides ID-link behavior, you may want to
-      revert to vanilla by evalling:
-      (org-link-set-parameters
-       \"id\" :follow #'org-id-open :store #'org-id-store-link-maybe)")))
-
-  )
-=======
-"%s" "Note: org-roam overrides ID-link behavior to prefer its own DB!
+       "%s" "Note: org-roam overrides ID-link behavior to prefer its own DB!
 This becomes a problem if the DB goes outdated: clicking a link can
 send you to an empty file due to an uncaught rename, for example.
 Org-node always keeps `org-id-locations' up to date for you.
@@ -110,7 +102,6 @@ So you can revert ID-link behavior to its default,
 by adding to initfiles AFTER org-roam loads:
 (org-link-set-parameters
  \"id\" :follow #'org-id-open :store #'org-id-store-link-maybe)"))))
->>>>>>> volatile
 
 (defmacro org-node-changes--def-whiny-alias
     (old new when removed-by &optional interactive)
@@ -129,137 +120,9 @@ hardcoded strings."
        ,@(if interactive '((interactive)))
        (unless warned-once
          (setq warned-once t)
-         <<<<<<< HEAD
-         (lwarn 'org-node :warning "Your initfiles use old function name: %S, which will be REMOVED by %s.  Please use new name: %S"
-                ,old ,(or removed-by "v2.0") ,new))
+         (lwarn ,old :warning "Obsolete as of %s, will be removed by %s; use `%s' instead. (Check your initfiles)"
+                ,when ,removed-by ,new))
        (apply ,new args))))
-
-;; Nov 2024 or older
-
-(declare-function org-node-fakeroam-new-via-roam-capture "org-node-fakeroam")
-(declare-function org-node-fakeroam-slugify-via-roam "org-node-fakeroam")
-(defalias 'org-node-new-via-roam-capture #'org-node-fakeroam-new-via-roam-capture)
-(defalias 'org-node-slugify-like-roam-actual #'org-node-fakeroam-slugify-via-roam)
-
-(org-node-changes--def-whiny-alias 'org-node-affix-with-olp
-                                   'org-node-prefix-with-olp "2024-09-19")
-
-(org-node-changes--def-whiny-alias 'org-node-complete-at-point-global-mode
-                                   'org-node-complete-at-point-mode "2024-09-29")
-
-(org-node-changes--def-whiny-alias 'org-node-get-id-links
-                                   'org-node-get-id-links-to "2024-10-04")
-
-(org-node-changes--def-whiny-alias 'org-node-get-reflinks
-                                   'org-node-get-reflinks-to "2024-10-04")
-
-(org-node-changes--def-whiny-alias 'org-node-parser--tmpfile
-                                   'org-node--tmpfile "2024-10-28")
-
-;; 1.9.0 (2024-11-18) moved series-related code into its own file, whereupon
-;; the namespace had to be made consistent.
-(org-node-changes--def-whiny-alias 'org-node--series-jump
-                                   'org-node-seq--jump
-                                   "2024-11-18" "v1.9")
-(org-node-changes--def-whiny-alias 'org-node--series-goto-next
-                                   'org-node-seq--goto-next
-                                   "2024-11-18" "v1.9.")
-(org-node-changes--def-whiny-alias 'org-node--series-goto-previous
-                                   'org-node-seq--goto-previous
-                                   "2024-11-18" "v1.9")
-(org-node-changes--def-whiny-alias 'org-node--add-series-item
-                                   'org-node-seq--add-item
-                                   "2024-11-18" "v1.9")
-(org-node-changes--def-whiny-alias 'org-node-series-goto
-                                   'org-node-seq-goto
-                                   "2024-11-18")
-(org-node-changes--def-whiny-alias 'org-node-series-dispatch
-                                   'org-node-seq-dispatch
-                                   "2024-11-18")
-(org-node-changes--def-whiny-alias 'org-node-helper-try-goto-id
-                                   'org-node-seq-try-goto-id
-                                   "2024-11-18")
-(org-node-changes--def-whiny-alias 'org-node-helper-try-visit-file
-                                   'org-node-seq-try-visit-file
-                                   "2024-11-18")
-(org-node-changes--def-whiny-alias 'org-node-series-capture-target
-                                   'org-node-seq-capture-target
-                                   "2024-11-18")
-(org-node-changes--def-whiny-alias 'org-node-helper-filename->ymd
-                                   'org-node-seq-filename->ymd
-                                   "2024-11-18")
-(org-node-changes--def-whiny-alias 'org-node-extract-ymd
-                                   'org-node-seq-extract-ymd
-                                   "2024-11-18")
-(org-node-changes--def-whiny-alias 'org-node-mk-series-sorted-by-property
-                                   'org-node-seq-def-on-any-sort-by-property
-                                   "2024-11-18")
-(org-node-changes--def-whiny-alias 'org-node-mk-series-on-tags-sorted-by-property
-                                   'org-node-seq-def-on-tags-sort-by-property
-                                   "2024-11-18")
-(org-node-changes--def-whiny-alias 'org-node-mk-series-on-filepath-sorted-by-basename
-                                   'org-node-seq-def-on-filepath-sort-by-basename
-                                   "2024-11-18")
-(org-node-changes--def-whiny-alias 'org-node--build-series
-                                   'org-node-seq--build-from-def
-                                   "2024-11-18")
-(org-node-changes--def-whiny-alias 'org-node--add-series-to-dispatch
-                                   'org-node-seq--add-to-dispatch
-                                   "2024-11-18")
-(org-node-changes--def-whiny-alias 'org-node--series-goto-previous*
-                                   'org-node-seq--goto-previous*
-                                   "2024-11-18")
-(org-node-changes--def-whiny-alias 'org-node--series-goto-next*
-                                   'org-node-seq--goto-next*
-                                   "2024-11-18")
-(org-node-changes--def-whiny-alias 'org-node--series-jump*
-                                   'org-node-seq--jump*
-                                   "2024-11-18")
-(org-node-changes--def-whiny-alias 'org-node--series-capture
-                                   'org-node-seq--capture
-                                   "2024-11-18")
-(org-node-changes--def-whiny-alias 'org-node--mark-days
-                                   'org-node-seq--mark-days
-                                   "2024-11-18")
-(define-obsolete-variable-alias
-  'org-node-series-that-marks-calendar 'org-node-seq-that-marks-calendar "2024-12-13")
-(define-obsolete-variable-alias
-  'org-node-proposed-series-key 'org-node-proposed-sequence  "2024-11-18")
-
-;; 2025
-
-(defalias 'org-node-get-file-path 'org-node-get-file) ;; 2025-01-31
-(org-node-changes--def-whiny-alias 'org-node-ref-add 'org-node-add-refs "2025-02-21")
-(org-node-changes--def-whiny-alias 'org-node-tag-add 'org-node-add-tags "2025-02-21")
-(org-node-changes--def-whiny-alias 'org-node-tag-add-here 'org-node-add-tags-here "2025-02-21")
-(org-node-changes--def-whiny-alias 'org-node-tag-add* 'org-node-add-tags-here "2025-01-30" nil)
-(org-node-changes--def-whiny-alias 'org-node-alias-add 'org-node-add-alias "2025-02-21")
-
-;; Some names that may be missing
-
-(defun org-node--write-eld (file object)
-  (display-warning
-   'org-node "Looks like you updated org-node, please also update org-node-fakeroam")
-  (if (stringp object)
-      (let ((obj file))
-        (setq file object)
-        (setq object obj)))
-  (when-let ((buf (if (fboundp 'get-truename-buffer) ;; Emacs 30
-                      (get-truename-buffer file)
-                    (get-file-buffer file))))
-    (kill-buffer buf))
-  (write-region (prin1-to-string object nil '((length . nil) (level . nil)))
-                nil file nil 'quiet))
-
-(defun org-node-changes--guess-persist-filename (sym)
-  (let ((dir (or (get sym 'persist-location)
-                 (bound-and-true-p persist--directory-location)
-                 (locate-user-emacs-file "persist"))))
-    (expand-file-name (symbol-name sym) dir)))
-=======
-(lwarn ,old :warning "Obsolete as of %s, will be removed by %s; use `%s' instead. (Check your initfiles)"
-       ,when ,removed-by ,new))
-(apply ,new args))))
 
 (defmacro org-node-changes--def-whiny-fn
     (name arglist when removed-by newname-or-expl &rest body)
@@ -340,7 +203,6 @@ NAME, ARGLIST and BODY as in `defun'."
 (org-node-changes--def-whiny-alias 'org-node-insert-link*-immediate
                                    'org-node-insert-link-novisit*
                                    "2.0.0 (March 2025)" "April" t)
->>>>>>> volatile
 
 (provide 'org-node-changes)
 
