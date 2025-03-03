@@ -551,12 +551,14 @@ It should return a string, with constraints:
   :package-version '(org-node . "2.0.0"))
 
 (defcustom org-node-backlink-drawer-positioner nil
-  "When creating a BACKLINKS drawer, put it below all text in the entry."
-  :type 'boolean
-  :package-version '(org-node . "2.0.0"))
+  "Function for moving point before placing a new drawer.
+Called in a buffer narrowed to one Org entry, excluding any other
+headings.  Point is at the beginning of the body text as determined by
+`org-node--end-of-meta-data'.
 
-(defcustom org-node-backlink-drawer-positioner nil
-  :type '(radio (function-item org-node--end-of-meta-data)
+The function may return anything, but if it returns an integer or
+marker, point will move to that position."
+  :type '(radio (const nil :tag "Leave at beginning of body")
                 (function-item org-entry-end-position)
                 (function :tag "Custom function"))
   :package-version '(org-node . "2.0.0"))
