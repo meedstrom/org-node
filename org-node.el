@@ -101,7 +101,7 @@
 (defvar consult-ripgrep-args)
 (defvar org-roam-capture-templates)
 (defvar org-node-backlink-mode)
-(declare-function org-node-backlink--fix-nearby-property "org-node-backlink")
+(declare-function org-node-backlink--fix-nearby "org-node-backlink")
 (declare-function tramp-tramp-file-p "tramp")
 (declare-function org-lint "org-lint")
 (declare-function consult--grep "consult")
@@ -2328,7 +2328,7 @@ creation-date as more \"truthful\" than today\\='s date.
         (push (current-buffer) org-node--new-unsaved-buffers)
         (run-hooks 'org-node-creation-hook)
         (when (bound-and-true-p org-node-backlink-mode)
-          (org-node-backlink--fix-nearby-property))))))
+          (org-node-backlink--fix-nearby))))))
 
 (defun org-node-extract-file-name-datestamp (path)
   "From filename PATH, get the datestamp prefix if it has one.
