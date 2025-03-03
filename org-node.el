@@ -3428,16 +3428,19 @@ to a position after any file-level properties and keywords."
   (if (org-before-first-heading-p)
       (progn
         (goto-char (point-min))
-        ;; Jump past top-level PROPERTIES drawer.
+        ;; Jump past comment lines and blank lines.
+        (while (looking-at-p (rx (*? space) (or "# " "\n")))
+          (forward-line))
         (let ((case-fold-search t))
+          ;; Jump past top-level PROPERTIES drawer.
           (when (looking-at-p "[ \t]*?:PROPERTIES: *?$")
             (forward-line)
             (while (looking-at-p "[ \t]*?:")
               (forward-line))))
         ;; Jump past #+keywords, comment lines and blank lines.
-        (while (looking-at-p (rx (*? (any "\t\s")) (or "#+" "# " "\n")))
+        (while (looking-at-p (rx (*? (any "\s\t")) (or "#+" "# " "\n")))
           (forward-line))
-        ;; Don't go past a "final stretch" of blanklines
+        ;; Don't go past a "final stretch" of blanklines.
         (unless (zerop (skip-chars-backward "\n"))
           (forward-char 1)))
     ;; PERF: Override a bottleneck in `org-end-of-meta-data'.
