@@ -2,17 +2,21 @@
 #+AUTHOR: Martin Edström
 #+EMAIL: meedstrom91@gmail.com
 #+STARTUP: content
+#+EXPORT_FILE_NAME: org-node
 #+TEXINFO_DIR_CATEGORY: Emacs
 #+TEXINFO_DIR_TITLE: Org-node: (org-node).
 #+TEXINFO_DIR_DESC: Link org-id entries into a network.
-#+EXPORT_FILE_NAME: org-node
-#+HTML: <a href="https://melpa.org/#/org-node"><img alt="MELPA" src="https://melpa.org/packages/org-node-badge.svg"/></a> <a href="https://stable.melpa.org/#/org-node"><img alt="MELPA Stable" src="https://stable.melpa.org/packages/org-node-badge.svg"/></a>
 * News for v2.0 :noexport:
+# Oneliner because ox-texinfo does not understand #+BEGIN_HTML,
+# and GitHub's org parser does not understand #+BEGIN_EXPORT HTML.
+#+HTML: <a href="https://repology.org/project/emacs%3Aorg-node/versions"> <img src="https://repology.org/badge/vertical-allrepos/emacs%3Aorg-node.svg" alt="Packaging status" align="right"> </a>
 
 Version 2.0 is out, with two major features:
 
 - backlink drawers!
 - context buffers!
+
+Feedback welcome.
 
 Upgrade note: *if you were using version 1.8.7 or older (November 2024)*, you'll have a smoother ride if you:
 
@@ -24,7 +28,9 @@ Or skip all that, and just check that you're not using any of [[https://github.c
 
 ** Backlinks drawer
 
-You can now choose whether =org-node-backlink-mode= should use multiline drawers or a single property line.  The drawers are the same idea as [[https://github.com/toshism/org-super-links][org-super-links]].  I.e. instead of this:
+Users of =org-node-backlink-mode= can now choose whether it should generate multiline drawers or the old default, a single property line.
+
+These drawers are inspired by [[https://github.com/toshism/org-super-links][org-super-links]].  To demonstrate, instead of this (a property line):
 
 #+begin_src org
 ,* My problems in life
@@ -37,7 +43,7 @@ You can now choose whether =org-node-backlink-mode= should use multiline drawers
 Blah blah blah
 #+end_src
 
-you can now have this:
+you can now have this (a drawer):
 
 #+begin_src org
 ,* My problems in life
@@ -53,9 +59,14 @@ you can now have this:
 Blah blah blah
 #+end_src
 
-This is controlled by variable =org-node-backlink-do-drawers=, which defaults to t.
+The choice is controlled by variable =org-node-backlink-do-drawers=, which defaults to t.
 
-To check out the config options, type:
+To transition all files, you can run these two commands:
+
+: M-x org-node-backlink-mass-delete-props RET
+: M-x org-node-backlink-mass-update-drawers RET
+
+To check out config options, type:
 
 : M-x customize-group RET org-node-backlink RET
 
@@ -207,7 +218,7 @@ Backlinks are the butter on the bread of your notes.  If you've ever seen a "Wha
 *** Option 1A: Reuse the org-roam buffer
 Believe it or not, it Just Works.
 
-If you install [[org-node-fakeroam]] -- which will pull in org-roam too -- add to initfiles:
+If you install [[https://github.com/meedstrom/org-node-fakeroam][org-node-fakeroam]] -- which pulls in org-roam with it -- add to initfiles:
 
 # It's a shim with the effect that the org-roam buffer does not need to ask the SQLite DB for backlinks, indeed SQLite need not even be installed.
 
@@ -215,9 +226,12 @@ If you install [[org-node-fakeroam]] -- which will pull in org-roam too -- add t
 (org-node-fakeroam-redisplay-mode)
 (org-node-fakeroam-jit-backlinks-mode) ;; shim so no SQLite needed
 (org-node-fakeroam-fast-render-mode) ;; perf fixes
+
+;; Example keybindings
 (keymap-set org-mode-map "M-s M-t M-t" #'org-roam-buffer-toggle)
 (keymap-set org-mode-map "M-s M-t M-d" #'org-roam-buffer-display-dedicated)
-;; if your window mgmt style is constantly losing all windows
+;; if your window mgmt style is constantly lose all windows.
+;; motivates a shorter key seq.
 (keymap-set global-map "M-s M-r" #'org-node-fakeroam-show-buffer)
 #+end_src
 
@@ -229,8 +243,11 @@ Add to initfiles:
 
 #+begin_src elisp
 (org-node-context-follow-mode)
-(keymap-set global-map "M-s M-r" #'org-node-context-raise)
+
+;; Example keybindings
 (keymap-set org-mode-map "M-s M-t" #'org-node-context-toggle)
+;; if your window mgmt style is constantly lose all windows
+(keymap-set global-map "M-s M-r" #'org-node-context-raise)
 #+end_src
 
 ** Backlink solution 2: Print inside the file
