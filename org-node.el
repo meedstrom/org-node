@@ -477,7 +477,7 @@ For use as `org-node-affixation-fn'."
 For use as `org-node-affixation-fn'."
   (let ((prefix-len 0))
     (list title
-          (if (org-node-get-is-subtree node)
+          (if (org-node-is-subtree node)
               (let ((ancestors (org-node-get-olp-full node t))
                     (result nil))
                 (dolist (anc ancestors)
@@ -581,7 +581,7 @@ and never nil.")
               "Node's ID property.")
   (level      nil :read-only t :type integer :documentation
               "Amount of stars in the node heading. A file-level node has 0.
-See also `org-node-get-is-subtree'.")
+See also `org-node-is-subtree'.")
   (olp        nil :read-only t :type list :documentation
               "Outline path to this node, i.e. a list of ancestor headings.
 Excludes file title.  To include it, try `org-node-get-olp-full'.")
@@ -626,7 +626,7 @@ Also respect `org-tags-exclude-from-inheritance'."
 (defun org-node-get-olp-full (node &optional filename-fallback)
   "Get outline path to NODE, and include the file title if present.
 If FILENAME-FALLBACK is t, use the filename if title absent."
-  (if (org-node-get-is-subtree node)
+  (if (org-node-is-subtree node)
       (let ((top (if filename-fallback
                      (org-node-get-file-title-or-basename node)
                    (org-node-get-file-title node))))
@@ -1259,7 +1259,7 @@ be misleading."
       (message "Scan complete (Hint: Turn on org-node-cache-mode)")
     (let ((n-subtrees (cl-loop
                        for node being each hash-value of org-node--id<>node
-                       count (org-node-get-is-subtree node)))
+                       count (org-node-is-subtree node)))
           (n-backlinks (cl-loop
                         for id being each hash-key of org-node--id<>node
                         sum (length (gethash id org-node--dest<>links))))
@@ -1790,7 +1790,7 @@ Automatically set, should be nil most of the time.")
               ;; moved point, and that could be good enough.  So: move
               ;; point to node heading, unless heading is already inside
               ;; visible part of buffer and point is at or under it
-              (if (org-node-get-is-subtree node)
+              (if (org-node-is-subtree node)
                   (unless (and (pos-visible-in-window-p pos)
                                (not (org-invisible-p pos))
                                (equal (org-node-get-title node)

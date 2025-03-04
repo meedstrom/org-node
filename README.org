@@ -585,7 +585,7 @@ API cheatsheet between org-roam and org-node.
 | Get tags                                | =(org-roam-node-tags NODE)=        | =(org-node-get-tags NODE)=                                          |
 | Get local tags                          |                                  | =(org-node-get-tags-local NODE)=                                    |
 | Get outline level                       | =(org-roam-node-level NODE)=       | =(org-node-get-level NODE)=                                         |
-| Get whether this is a subtree           | =(=< 0 (org-roam-node-level NODE))= | =(org-node-get-is-subtree NODE)=                                    |
+| Get whether this is a subtree           | =(=< 0 (org-roam-node-level NODE))= | =(org-node-is-subtree NODE)=                                    |
 | Get char position                       | =(org-roam-node-point NODE)=       | =(org-node-get-pos NODE)=                                           |
 | Get properties                          | =(org-roam-node-properties NODE)=  | =(org-node-get-properties NODE)=, only includes explicit properties |
 | Get subtree TODO state                  | =(org-roam-node-todo NODE)=        | =(org-node-get-todo NODE)=                                          |
