@@ -885,18 +885,28 @@ since, thus this hook."
             (org-node--dirty-forget-files (list buffer-file-truename))
             (kill-buffer buf)))))))
 
+;; Fixed in 036e8dcf0463517749f8b32ca828b923e584625f
+;; which unfortunately did NOT make it into Emacs 30.1's Org 9.7.11.
 (define-advice org-id-locations-load
     (:after () org-node--abbrev-org-id-locations)
   "Maybe abbreviate all filenames in `org-id-locations'.
 
-Due to an oversight, org-id does not abbreviate after reconstructing
+Due to an oversight, org-id does not re-abbreviate after reconstructing
 filenames if `org-id-locations-file-relative' is t.
 
-https://lists.gnu.org/archive/html/emacs-orgmode/2024-09/msg00305.html"
+E.g. a path ~/org/file.org becomes /home/me/org/file.org after loading
+back from disk.
+
+Org-node does not do `file-equal-p', so this would be a problem."
   (when org-id-locations-file-relative
     (maphash (lambda (id file)
                (puthash id (org-node-abbrev-file-names file) org-id-locations))
              org-id-locations)))
+
+(when (and (bound-and-true-p org-version) (version< "9.7.17" org-version))
+  (advice-remove 'org-id-locations-load
+                 'org-id-locations-load@org-node--abbrev-org-id-locations))
+
 
 
 ;;;; Scanning files to cache info about them
