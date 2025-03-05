@@ -32,13 +32,11 @@
 
 ;;; Commentary:
 
-;; What is Org-node?
-
-;; If you were the sort of person to prefer "id:" links over "file:" links
-;; or radio-targets or any other type of link, you're in the right place!
+;; If you were the sort of person to prefer "id:" links, over "file:" links,
+;; radio-targets or any other type of link, you're in the right place!
 
 ;; Now you can worry less about mentally tracking your subtree hierarchies and
-;; directory structures.  As long as you've assigned an ID to something, you
+;; directory structures.  Once you've assigned an ID to something, you
 ;; can find it later.
 
 ;; The philosophy is the same as org-roam: if you assign an ID every
@@ -116,8 +114,6 @@
   "Support a zettelkasten of org-id files and subtrees."
   :group 'org)
 
-;; TODO Make a PR to no-littering.el
-;; TODO Deprecate org-node-fakeroam's equivalent variable
 (defcustom org-node-data-dir user-emacs-directory
   "Directory in which to persist data between sessions."
   :type `(choice (const :value ,user-emacs-directory)
@@ -440,7 +436,8 @@ aliases."
           (function-item org-node-prefix-with-olp)
           (function-item org-node-prefix-with-tags)
           (function-item org-node-affix-with-olp-and-tags)
-          (function :tag "Custom function"))
+          (function :tag "Custom function"
+                    :value (lambda (node title) (list title "" ""))))
   :package-version '(org-node . "0.9")
   :set #'org-node--set-and-remind-reset)
 
@@ -697,39 +694,42 @@ For more info see `org-node-get-id-links-to'.")
 (defvar org-node--file<>mtime (make-hash-table :test #'equal)
   "1:1 table mapping file paths to last-modification times.
 
-The mtimes are expressed as integer Unix time.")
+The mtimes are expressed as integer Unix time.
+New files are initialized with value 0, until scanned.
+So do not assume that 0 means 1970-01-01T00:00:00.")
 
 (defun org-node-get-id-links-to (node)
-  "List all `org-node-link' objects of type \"id\" that point to NODE.
-Each object has these fields:
+  "List all links with :type \"id\" that point to NODE.
+Each link is a plist with these fields:
 
-origin - ID of origin node (where the link was found)
-pos - buffer position where the link was found
-dest - ID of destination node, or a ref that belongs to it
-type - link type, such as \"https\", \"ftp\", \"info\" or
+:origin - ID of origin node (where the link was found)
+:pos - buffer position where the link was found
+:dest - ID of destination node, or a ref that belongs to it
+:type - link type, such as \"https\", \"ftp\", \"info\" or
        \"man\".  For ID-links this is always \"id\".  For a
        citation this is always nil.
 
-This function only returns ID-links, so you can always expect the dest
-to equal the ID of the inputted NODE.  To return other link types, use
+This function only returns the ID-links, so you can always expect :dest
+to equal the ID of NODE.  To return other link types, use
 `org-node-get-reflinks-to'."
   (gethash (org-node-get-id node) org-node--dest<>links))
 
 (defun org-node-get-reflinks-to (node)
-  "Get list of reflink objects pointing to NODE.
+  "List all reflinks pointing to NODE.
 
 Typical reflinks are URLs or @citekeys occurring in any document,
 and they are considered to point to NODE when NODE has a
 :ROAM_REFS: property that includes that same string.
 
-The reflink object has the same shape as an ID-link object (see
-`org-node-get-id-links-to'), but instead of an ID in the DEST field,
-you have a ref string such an URL.  Common gotcha: for a web
-address such as \"http://gnu.org\", the DEST field holds only
-\"//gnu.org\", and the \"http\" part goes into the TYPE
-field.  Colon is not stored anywhere.
+The reflink plist has the same shape as an ID-link plist
+(see `org-node-get-id-links-to'), but instead of an org-id in :dest,
+you have a \"ref\" such as a web address.
 
-Citations such as \"@gelman2001\" have TYPE nil, so you can
+Small gotcha: for a web address such as \"http://gnu.org\",
+the :dest field holds only \"//gnu.org\",
+while the :type field holds \"http\".
+
+Citations such as \"@gelman2001\" have :type nil, so you can
 distinguish citations from other links this way."
   (cl-loop for ref in (org-node-get-refs node)
            append (gethash ref org-node--dest<>links)))
@@ -1699,7 +1699,7 @@ that, configure `org-node-datestamp-format'."
           (function-item org-node-slugify-for-web)
           (function-item org-node-slugify-like-roam-default)
           (function-item org-node-fakeroam-slugify-via-roam)
-          (function :tag "Custom function")))
+          (function :tag "Custom function" :value (lambda (title) title))))
 
 (defun org-node-slugify-like-roam-default (title)
   "From TITLE, make a filename slug in default org-roam style.
@@ -1862,7 +1862,7 @@ the function is called: `org-node-proposed-title' and
           (function-item org-node-new-file)
           (function-item org-node-fakeroam-new-via-roam-capture)
           (function-item org-capture)
-          (function :tag "Custom function")))
+          (function :tag "Custom function" :value (lambda ()))))
 
 (defun org-node-new-file ()
   "Create a file-level node.

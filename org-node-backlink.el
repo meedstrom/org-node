@@ -523,7 +523,7 @@ it in the nearby :BACKLINKS: property."
           (function-item org-node-backlink-id-blind-simple-lessp)
           (function-item string-lessp)
           (function-item string-collate-lessp)
-          (function :tag "Custom function"))
+          (function :tag "Custom function" :value (lambda (s1 s2))))
   :package-version '(org-node . "2.0.0"))
 
 (defcustom org-node-backlink-drawer-sort-in-reverse nil
@@ -547,7 +547,7 @@ It should return a string, with constraints:
           (function-item org-node-backlink-format-like-org-super-links-default)
           (function-item org-node-backlink-format-as-bullet-with-time)
           (function-item org-node-backlink-format-as-bullet-no-time)
-          (function :tag "Custom function"))
+          (function :tag "Custom function" :value (lambda (id title time))))
   :package-version '(org-node . "2.0.0"))
 
 (defcustom org-node-backlink-drawer-positioner nil
@@ -560,7 +560,7 @@ The function may return anything, but if it returns an integer or
 marker, point will move to that position."
   :type '(radio (const :tag "Leave at beginning of body" nil)
                 (function-item org-entry-end-position)
-                (function :tag "Custom function"))
+                (function :tag "Custom function" :value (lambda ())))
   :package-version '(org-node . "2.0.0"))
 
 (defun org-node-backlink--extract-timestamp (text)

@@ -50,4 +50,6 @@
 
   - In almost the same vein: [[https://github.com/nobiot/org-transclusion/issues/237][some Doom users]] combine ID and heading links like =[[id:4a3fc3b3-caef-47d7-8e2d-ee0d246b63de::*Some heading]]=.
 
-    But I feel this isn't the correct philosophy.  It should be fine to assign IDs to every grain of sand in the universe, and if that's too many IDs for some use-case, then you filter them /for that use-case/.
+    Not a fan.  Better if it is fine to assign IDs to every grain of sand in the universe, and if that's too many IDs for some use-case, then filter them for that use-case.
+
+    A sweet middle ground might be to set up a variety of local overrides for =org-id-prefix= and =org-id-method=, and then figure out some brainless way to make that work for you.
