@@ -15,19 +15,17 @@
 ;; For a full copy of the GNU General Public License
 ;; see <http://www.gnu.org/licenses/>.
 
-;; Author:           Martin Edström <meedstrom91@gmail.com>
-;; URL:              https://github.com/meedstrom/org-node
-;; Created:          2024-04-13
-;; Keywords:         org, hypermedia
-;; Package-Requires: (
-;; 	(emacs "28.1")
-;; 	(compat "30.0.0.0")
-;; 	(el-job "1.0.2")
-;; 	(llama "0.5.0")
-;; 	(magit-section "4.3.0"))
+;; Author:   Martin Edström <meedstrom91@gmail.com>
+;; URL:      https://github.com/meedstrom/org-node
+;; Created:  2024-04-13
+;; Keywords: org, hypermedia
+;; Package-Requires: ((emacs "28.1")
+;;                    (compat "30")
+;;                    (llama "0.5.0")
+;;                    (el-job "1.0.5")
+;;                    (magit-section "4.3.0"))
 
-;; NOTE: Looking for Package-Version?
-;;       Consult your package manager, or the Git tag.
+;; NOTE: Looking for Package-Version?  Consult the Git tag.
 ;;       For reference, 2.0.0 was released on 20250303, i.e. March 3.
 
 ;;; Commentary:

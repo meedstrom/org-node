@@ -564,7 +564,7 @@ Also set some variables, including global variables."
       (( t error )
        (setq problem (list FILE (point) err))))
 
-    (list (if missing-file (list missing-file))
+    (list (ensure-list missing-file)
           (if file-mtime (list file-mtime))
           found-nodes
           org-node-parser--paths-types
