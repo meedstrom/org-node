@@ -780,6 +780,13 @@ When called from Lisp, peek on any hash table HT."
   (when (featurep 'tramp)
     (tramp-tramp-file-p file)))
 
+(defun org-node--handle-save ()
+  "Arrange to re-scan nodes and links in current buffer."
+  (when (and (string-suffix-p ".org" buffer-file-truename)
+             (not (backup-file-name-p buffer-file-truename))
+             (not (org-node--tramp-file-p buffer-file-truename)))
+    (org-node--scan-targeted buffer-file-truename)))
+
 (defun org-node--handle-rename (file newname &rest _)
   "Arrange to scan NEWNAME for nodes and links, and forget FILE."
   (org-node--scan-targeted
@@ -790,19 +797,24 @@ When called from Lisp, peek on any hash table HT."
                 (mapcar #'file-truename)
                 (org-node-abbrev-file-names))))
 
-(defun org-node--handle-delete (file &rest _)
+(defun org-node--handle-delete (file &optional _trash)
   "Arrange to forget nodes and links in FILE."
   (when (string-suffix-p ".org" file)
     (unless (org-node--tramp-file-p file)
-      (org-node--scan-targeted
-       (org-node-abbrev-file-names (file-truename file))))))
+      (setq file (org-node-abbrev-file-names (file-truename file)))
+      ;; Used to just hand the file to `org-node--scan-targeted' which will
+      ;; have the same effect if the file is gone, but sometimes it is not
+      ;; gone, thanks to `delete-by-moving-to-trash'.
+      (org-node--forget-id-locations (list file))
+      (org-node--dirty-forget-files (list file))
+      (org-node--dirty-forget-completions-in (list file))
+      (org-node--dirty-forget-links-from
+       (mapcar #'org-node-get-id (org-nodes-in-file file))))))
 
-(defun org-node--handle-save ()
-  "Arrange to re-scan nodes and links in current buffer."
-  (when (and (string-suffix-p ".org" buffer-file-truename)
-             (not (backup-file-name-p buffer-file-truename))
-             (not (org-node--tramp-file-p buffer-file-truename)))
-    (org-node--scan-targeted buffer-file-truename)))
+(defun org-nodes-in-file (file)
+  (cl-loop for node being the hash-values of org-nodes
+           when (string= file (org-node-get-file node))
+           collect node))
 
 (defvar org-node--idle-timer (timer-create)
   "Timer for intermittently checking `org-node-extra-id-dirs'.
@@ -1142,6 +1154,25 @@ links with destination DEST.  These reflect a past state of
 `org-node--dest<>links', allowing for a diff operation against the
 up-to-date set.")
 
+(defun org-node--dirty-forget-links-from (dead-ids)
+  (cl-loop with reduced-link-sets = nil
+           for dest being each hash-key of org-node--dest<>links
+           using (hash-values link-set) do
+           (cl-loop with update-this-dest = nil
+                    for link in link-set
+                    if (member (plist-get link :origin) dead-ids)
+                    do (setq update-this-dest t)
+                    else collect link into reduced-link-set
+                    finally do
+                    (when update-this-dest
+                      (push (cons dest reduced-link-set) reduced-link-sets)))
+           finally do
+           (cl-loop for (dest . links) in reduced-link-sets do
+                    (unless (bound-and-true-p org-node-backlink-lazy)
+                      (push (cons dest (gethash dest org-node--dest<>links))
+                            org-node--old-link-sets))
+                    (puthash dest links org-node--dest<>links))))
+
 (defun org-node--finalize-modified (results job)
   "Use RESULTS to update tables.
 Argument JOB is the el-job object."
@@ -1149,38 +1180,14 @@ Argument JOB is the el-job object."
   (seq-let (missing-files file.mtime nodes path.type links problems) results
     (let ((found-files (mapcar #'car file.mtime)))
       (org-node--forget-id-locations missing-files)
-      (dolist (file missing-files)
-        (remhash file org-node--file<>mtime))
       (org-node--dirty-forget-files missing-files)
       (org-node--dirty-forget-completions-in missing-files)
-      ;; In case a title was edited: don't persist old revisions of the title
       (org-node--dirty-forget-completions-in found-files)
       (setq org-node--old-link-sets nil)
       ;; This loop used to be gated on an user option
       ;; `org-node-perf-eagerly-update-link-tables' (default t), but it
       ;; performs surprisingly well, so v2.0 removed the option.
-      (cl-loop with ids-of-nodes-scanned = (mapcar #'org-node-get-id nodes)
-               with reduced-link-sets = nil
-               for dest being each hash-key of org-node--dest<>links
-               using (hash-values link-set)
-               do (cl-loop
-                   with update-this-dest = nil
-                   for link in link-set
-                   if (member (plist-get link :origin) ids-of-nodes-scanned)
-                   do (setq update-this-dest t)
-                   else collect link into reduced-link-set
-                   finally do
-                   (when update-this-dest
-                     (push (cons dest reduced-link-set) reduced-link-sets)))
-               finally do
-               (cl-loop
-                for (dest . links) in reduced-link-sets do
-                (unless (bound-and-true-p org-node-backlink-lazy)
-                  (push (cons dest (gethash dest org-node--dest<>links))
-                        org-node--old-link-sets))
-                (puthash dest links org-node--dest<>links)))
-      ;; Having discarded the links that were known to originate in the
-      ;; re-scanned nodes, it's safe to record them (again).
+      (org-node--dirty-forget-links-from (mapcar #'org-node-get-id nodes))
       (dolist (link links)
         (push link (gethash (plist-get link :dest) org-node--dest<>links)))
       (cl-loop for (path . type) in path.type
@@ -1307,11 +1314,13 @@ be misleading."
 ;;;; "Dirty" functions
 ;; Help keep the cache reasonably in sync without having to do a full reset
 
-;; See `org-node--finalize-modified' for forgetting links
 (defun org-node--dirty-forget-files (files)
-  "Remove from cache info about nodes/refs in FILES.
-You should also run `org-node--dirty-forget-completions-in' for a
-thorough cleanup."
+  "Remove from cache, info about nodes/refs in FILES.
+
+For a thorough cleanup, you should also run
+- `org-node--dirty-forget-completions-in'
+- `org-node--dirty-forget-links-from'
+- `org-node--forget-id-locations'"
   (when files
     (cl-loop
      for node being each hash-value of org-node--id<>node
@@ -1581,6 +1590,8 @@ FILES are assumed to be abbreviated truenames."
     (when (listp org-id-locations)
       (message "org-node--forget-id-locations: Surprised that `org-id-locations' is an alist at this time.  Converting to hash table.")
       (setq org-id-locations (org-id-alist-to-hash org-id-locations)))
+    (dolist (file files)
+      (remhash file org-node--file<>mtime))
     (maphash (lambda (id file)
                (when (member file files)
                  (remhash id org-id-locations)))
