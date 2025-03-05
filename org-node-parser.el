@@ -166,6 +166,10 @@ the subheading potentially has an ID of its own."
                   ;; If point is on a # comment line, skip
                   (goto-char (pos-bol))
                   (looking-at-p "[\t\s]*# "))
+          ;; Special case: Org 9.7 `org-id-link-use-context'...
+          (when (and (equal link-type "id"))
+            (let ((chop (string-search "::" path)))
+              (when chop (setq path (substring path 0 chop)))))
           (push (list :origin id-here
                       :pos link-pos
                       :type link-type
