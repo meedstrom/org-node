@@ -29,7 +29,6 @@
 (require 'cl-lib)
 (require 'calendar)
 (require 'transient)
-(require 'compat)
 (require 'org-node)
 
 ;;; Easy wrappers to define a sequence
@@ -483,13 +482,7 @@ DEF is a seq-def from `org-node-seq-defs'."
               ;; most relevant, thus cycling recent dailies will be best perf.
               (list :key (car def)
                     :sorted-items (delete-consecutive-dups
-                                   (if (< emacs-major-version 30)
-                                       ;; Faster than compat's sort on 29
-                                       (cl-sort items #'string> :key #'car)
-                                     ;; Will run new builtin sort on 30
-                                     (compat-call sort items
-                                                  :key #'car :lessp #'string<
-                                                  :reverse t :in-place t))))))))
+                                   (cl-sort items #'string> :key #'car)))))))
 
 (defun org-node-seq--add-to-dispatch (key name)
   "Use KEY and NAME to add a sequence to the Transient menu."

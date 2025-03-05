@@ -19,11 +19,7 @@
 ;; URL:      https://github.com/meedstrom/org-node
 ;; Created:  2024-04-13
 ;; Keywords: org, hypermedia
-;; Package-Requires: ((emacs "28.1")
-;;                    (compat "30")
-;;                    (llama "0.5.0")
-;;                    (el-job "1.0.5")
-;;                    (magit-section "4.3.0"))
+;; Package-Requires: ((emacs "29.1") (llama "0.5.0") (el-job "1.0.5") (magit-section "4.3.0"))
 
 ;; NOTE: Looking for Package-Version?  Consult the Git tag.
 ;;       For reference, 2.0.0 was released on 20250303, i.e. March 3.
@@ -80,8 +76,6 @@
 (require 'seq)
 (require 'cl-lib)
 (require 'subr-x)
-(require 'bytecomp)
-(require 'ucs-normalize)
 (require 'org)
 (require 'org-id)
 (require 'org-macs)
@@ -89,7 +83,6 @@
 
 ;; External
 (require 'llama)
-(require 'compat)
 (require 'el-job)
 (require 'org-node-parser)
 (require 'org-node-changes)
@@ -1398,7 +1391,7 @@ also necessary is `org-node--dirty-ensure-link-known' elsewhere."
           (let ((props (org-entry-properties))
                 (heading (org-get-heading t t t t))
                 (fpath buffer-file-truename) ;; Abbreviated
-                (ftitle (cadar (org-collect-keywords '("TITLE")))))
+                (ftitle (org-get-title)))
             (when heading
               (setq heading (org-link-display-format
                              (substring-no-properties heading))))
@@ -1732,10 +1725,10 @@ belonging to an alphabet or number system.
 If you seek to emulate org-roam filenames, you may also want to
 configure `org-node-datestamp-format'."
   (thread-last title
-               (ucs-normalize-NFD-string)
+               (string-glyph-decompose)
                (seq-remove (lambda (char) (<= #x300 char #x331)))
                (concat)
-               (ucs-normalize-NFC-string)
+               (string-glyph-compose)
                (downcase)
                (string-trim)
                (replace-regexp-in-string "[^[:alnum:]]" "_")
@@ -1752,10 +1745,10 @@ Diacritical marks U+0300 to U+0331 are stripped \(mostly used with Latin
 alphabets).  Also stripped are all glyphs not categorized in Unicode as
 belonging to an alphabet or number system."
   (thread-last title
-               (ucs-normalize-NFD-string)
+               (string-glyph-decompose)
                (seq-remove (lambda (char) (<= #x300 char #x331)))
                (concat)
-               (ucs-normalize-NFC-string)
+               (string-glyph-compose)
                (downcase)
                (string-trim)
                (replace-regexp-in-string "[[:space:]]+" "-")
@@ -1814,8 +1807,8 @@ Automatically set, should be nil most of the time.")
                                (equal (org-node-get-title node)
                                       (org-get-heading t t t t)))
                     (goto-char pos)
-                    (org-show-entry)
-                    (org-show-children)
+                    (org-fold-show-entry)
+                    (org-fold-show-children)
                     (recenter 0))
                 (unless (pos-visible-in-window-p pos)
                   (goto-char pos))))
@@ -2303,7 +2296,7 @@ creation-date as more \"truthful\" than today\\='s date.
                            (point)))))
       (if (file-exists-p path-to-write)
           (message "A file already exists named %s" path-to-write)
-        (if (org-at-heading-p) (org-show-entry) (org-show-context))
+        (if (org-at-heading-p) (org-fold-show-entry) (org-fold-show-context))
         (org-cut-subtree)
         ;; Try to leave a link at the end of parent entry, pointing to the
         ;; ID of subheading that was extracted.
@@ -2445,7 +2438,7 @@ Argument INTERACTIVE automatically set."
                         (not (string-match-p org-node-renames-exclude path)))
            return t))
       (setq title
-            (or (cadar (org-collect-keywords '("TITLE")))
+            (or (org-get-title)
                 ;; No #+TITLE keyword, so treat first heading as title
                 (save-excursion
                   (without-restriction
@@ -2547,8 +2540,8 @@ so it matches the destination\\='s current title."
                     (switch-to-buffer (current-buffer))
                     (goto-char end)
                     (if (org-at-heading-p)
-                        (org-show-entry)
-                      (org-show-context))
+                        (org-fold-show-entry)
+                      (org-fold-show-context))
                     (recenter)
                     (highlight-regexp exact-link 'org-node--rewrite-face)
                     (unwind-protect
@@ -2941,8 +2934,8 @@ one of them is associated with a ROAM_REFS property."
                                                 (org-id-goto ,origin)
                                                 (goto-char ,pos)
                                                 (if (org-at-heading-p)
-                                                    (org-show-entry)
-                                                  (org-show-context))))
+                                                    (org-fold-show-entry)
+                                                  (org-fold-show-context))))
                                 origin)
                               (if type (concat type ":" dest) dest))))))))
     (if entries

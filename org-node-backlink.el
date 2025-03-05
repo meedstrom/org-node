@@ -24,7 +24,7 @@
 ;;; Code:
 
 (require 'cl-lib)
-(require 'compat)
+(require 'seq)
 (require 'llama)
 (require 'org)
 (require 'org-node-changes)
@@ -477,7 +477,7 @@ it in the nearby :BACKLINKS: property."
                        (re-search-backward (concat "^[ \t]*:id: +" origin-id)
                                            nil t)
                        (or (org-get-heading t t t t)
-                           (cadar (org-collect-keywords '("TITLE")))
+                           (org-get-title)
                            (file-name-nondirectory buffer-file-name))))))
               ;; Ensure that
               ;; `org-node-backlink--fix-flagged-parts-of-buffer' will not
@@ -677,9 +677,7 @@ If REMOVE non-nil, remove it instead."
           "BACKLINKS" org-node-backlink-drawer-positioner)
         (let* ((lines (split-string (buffer-string) "\n" t))
                (already-present-ids
-                ;; `seq-keep' depends on 29.1
-                ;; (seq-keep #'org-node-backlink--extract-id lines)
-                (delq 'nil (mapcar #'org-node-backlink--extract-id lines)))
+                (seq-keep #'org-node-backlink--extract-id lines))
                (to-add      (seq-difference   origins already-present-ids))
                (to-remove   (seq-difference   already-present-ids origins))
                (to-reformat (seq-intersection already-present-ids origins)))

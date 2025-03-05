@@ -18,7 +18,7 @@ Version 2.0 is out, with two major features:
 
 Feedback welcome.
 
-Upgrade note: *if you were using version 1.8.7 or older (November 2024)*, you'll have a smoother ride if you:
+Upgrade note: Emacs 29+ required.  And if you were using *org-node 1.8.7 or older (November 2024)*, you'll have a smoother ride if you:
 
 1. first upgrade to the latest in [[https://github.com/meedstrom/org-node/tree/v1.9][v1.9 branch]],
 2. deal with any transitional warnings,
@@ -98,6 +98,7 @@ To check out some config options, type:
 
 ** Incompatible changes
 
+1. Dropped support for Emacs 28.  It likely has not worked for a while anyway.
 1. Removed a number of [[https://github.com/meedstrom/org-node/blob/v1.9/org-node-changes.el#L140][deprecated aliases]].
 2. Struct type =org-node-link= removed.
    - A link is now a plist, so use e.g. =(plist-get LINK :pos)= instead.
