@@ -40,7 +40,8 @@
 
 (defcustom org-node-backlink-protect-org-super-links t
   "Do not try to manage drawers if user has org-super-links installed.
-Print a message instead."
+Print a message instead, ensuring the user knows what they are doing
+and can invert this setting."
   :type 'boolean
   :package-version '(org-node . "2.0.0"))
 
@@ -51,11 +52,11 @@ If a warning was not needed, return nil."
        org-node-backlink-protect-org-super-links
        (fboundp 'org-super-links-convert-link-to-super)
        (message "%s" "
-  A notice to users of org-super-links:
-  To protect your pre-existing drawers,
-  `org-node-backlink-mode' will do nothing.
-  If you're OK with how it would reformat your backlinks drawers,
-  set `org-node-backlink-protect-org-super-links' to nil.")))
+A notice to users of org-super-links:
+To protect your pre-existing drawers,
+`org-node-backlink-mode' will do nothing.
+If you're OK with how it would reformat your backlinks drawers,
+set `org-node-backlink-protect-org-super-links' to nil.")))
 
 (defun org-node-backlink--check-v2-misaligned-setting-p ()
   "Warn if `org-node-backlink-do-drawers' is t but properties exist.
@@ -63,11 +64,11 @@ If a warning was not needed, return nil."
   (and org-node-backlink-do-drawers
        (org-node-backlink--props-exist-p)
        (message "%s" "
-  User option `org-node-backlink-do-drawers' is t,
-  but found :BACKLINKS: lines in some Org entry properties,
-  so doing nothing.
-  This is a new default in v2, you probably just need to toggle it.
-  Or use `org-node-backlink-mass-delete-props'.")))
+User option `org-node-backlink-do-drawers' is t,
+but found :BACKLINKS: lines in some Org entry properties,
+so doing nothing.
+This is a new default in v2, you probably just need to toggle it.
+Or use `org-node-backlink-mass-delete-props'.")))
 
 (defun org-node-backlink--props-exist-p ()
   "Return t if property lines called :BACKLINKS: exist in some file."
@@ -682,7 +683,7 @@ If REMOVE non-nil, remove it instead."
                (to-add      (seq-difference   origins already-present-ids))
                (to-remove   (seq-difference   already-present-ids origins))
                (to-reformat (seq-intersection already-present-ids origins)))
-
+          ;; Add new, remove stale, reformat the rest
           (dolist (id to-remove)
             (save-excursion
               (search-forward id)
@@ -701,7 +702,7 @@ If REMOVE non-nil, remove it instead."
                 (indent-according-to-mode)
                 (insert (funcall org-node-backlink-drawer-formatter id title)
                         "\n"))))
-
+          ;; Members are correct, now re-sort so the order is correct
           (let ((sorted-lines
                  (sort (split-string (buffer-string) "\n" t)
                        org-node-backlink-drawer-sorter)))

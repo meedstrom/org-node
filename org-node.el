@@ -3159,7 +3159,7 @@ CLEANUP is a kludge related to that."
                     (message "%s... %d files to go" msg (length files*)))
                 ;; Set a reasonable interval between `message' calls, since they
                 ;; can be surprisingly expensive.
-                (when (> (float-time (time-since start-time)) 0.3)
+                (when (> (float-time (time-since start-time)) 0.2)
                   (setq interval ctr)))
               (setq file (pop files*))
               (setq was-open (find-buffer-visiting file))
