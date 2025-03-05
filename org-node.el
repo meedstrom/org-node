@@ -148,14 +148,13 @@ transition the files you already have with the Org-roam commands
   '("http" "https" "id")
   "Link types that may result in backlinks.
 
-Of course, org-node is built around the \"id\" link type, which
-corresponds to a target node\\='s ID property.  The ID property is
-mandatory because it acts as a unique identifier.
+While org-node is built around the \"id\" link type, and the ID property
+is mandatory because it acts as a singular identifier, the
+concept can be generalized.
 
-However, the concept can be generalized.  Org-node also looks at the
-ROAM_REFS property, which in another universe might have been called
-\"EXTRA_IDS\", because in many ways it is just a list of additional IDs
-for the same node.
+Org-node also looks at the ROAM_REFS property, which in another universe
+might have been called \"EXTRA_IDS\", because in many ways it is just a
+list of additional IDs for the same node.
 
 For performance reasons, not just any string of text is accepted in the
 ROAM_REFS property -- it must have valid links per Org syntax, such as
@@ -165,6 +164,8 @@ Use the command \\[org-node-add-refs] for convenience.
 Finally, this variable controls which link types are permitted.
 The fewer types, the faster your \\[org-node-reset].
 
+Tip: eval `(org-link-types)' to see all built-in link types.
+
 What\\='s it actually used for: if you insert \"https://gnu.org\" in the
 body text of another node, then that results in a new backlink, even
 though no reference was made to a proper ID!
@@ -172,8 +173,6 @@ though no reference was made to a proper ID!
 People often use this to write notes about a specific web-page or PDF
 file, and call it a ref-node for that web-page.  See also
 `org-node-try-visit-ref-node' and \\[org-node-list-reflinks].
-
-Tip: eval `(org-link-types)' to see all built-in link types.
 
 As a special case, citation keys such as \"@ioannidis2005\" also work in
 ROAM_REFS, and correspond to citations like \"[cite:@ioannidis2005]\".
@@ -225,7 +224,7 @@ need other changes to support TRAMP and encryption."
 
 ;; TODO: Probably deprecate.  This was more important back when we scanned
 ;;       synchronously (ever so long ago, April 2024).
-(defcustom org-node-perf-assume-coding-system nil
+(defvar org-node-perf-assume-coding-system nil
   "Presumed coding system of all Org files while scanning.
 
 Picking a specific system can speed up `org-node-reset' somewhat.
@@ -240,7 +239,8 @@ your files from multiple platforms.
 Modern GNU/Linux, BSD and MacOS systems almost always encode new files
 as `utf-8-unix'.  Verify this is true of your existing files with the
 helper command \\[org-node-list-file-coding-systems]."
-  :type '(choice coding-system (const nil)))
+  ;; :type '(choice coding-system (const nil))
+  )
 
 (defun org-node--set-and-remind-reset (sym val)
   "Set SYM to VAL.
@@ -903,10 +903,9 @@ Org-node does not do `file-equal-p', so this would be a problem."
                (puthash id (org-node-abbrev-file-names file) org-id-locations))
              org-id-locations)))
 
-(when (and (bound-and-true-p org-version) (version< "9.7.17" org-version))
+(when (and (bound-and-true-p org-version) (version<= "9.7.17" org-version))
   (advice-remove 'org-id-locations-load
                  'org-id-locations-load@org-node--abbrev-org-id-locations))
-
 
 
 ;;;; Scanning files to cache info about them
@@ -3737,7 +3736,7 @@ heading, else the file-level node, whichever has an ID first."
 (defun org-node-by-id (id)
   (gethash id org-nodes))
 
-;; TODO: Add an extended variant that checks active region like
+;; TODO: Add an extended variant that checks active region, like
 ;;       `org-node-insert-link' does.
 (defun org-node-read ()
   "Prompt for a known ID-node."

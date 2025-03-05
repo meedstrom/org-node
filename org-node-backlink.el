@@ -229,7 +229,7 @@ Or if KIND is symbol `add-drawers', `del-drawers', `add-props', or
                    (org-node-backlink--check-v2-misaligned-setting-p))
               (and (eq kind 'add-drawers)
                    (org-node-backlink--check-osl-user-p)))
-    (message "Fixing file %s" buffer-file-name)
+    ;; (message "Fixing file %s" buffer-file-name)
     (goto-char (point-min))
     (let ((case-fold-search t))
       ;; NOTE: If there is an entry that has :BACKLINKS:, but no :ID:, it will
@@ -349,7 +349,7 @@ If REMOVE is non-nil, remove it instead."
                           (mapcar (##plist-get % :origin))
                           (delete-dups)
                           ;; Sort for deterministic order for less noisy diffs.
-                          (compat-call sort)))
+                          (seq-sort #'string<)))
                (links (cl-loop
                        for origin in origins
                        as origin-node = (gethash origin org-nodes)

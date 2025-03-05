@@ -32,32 +32,32 @@ Users of =org-node-backlink-mode= can now choose whether it should generate mult
 
 These drawers are inspired by [[https://github.com/toshism/org-super-links][org-super-links]].  To demonstrate, instead of this (a property line):
 
-#+begin_src org
+#+begin_example
 ,* My problems in life
 :PROPERTIES:
-:CREATED: [2023-12-25 Mon 17:20]
+:CREATED: [2023-Dec-25 17:20]
 :ID: 4323245
 :BACKLINKS: [[id:123456][Relationships]] [[id:235611][Feelings]]
 :END:
 
 Blah blah blah
-#+end_src
+#+end_example
 
 you can now have this (a drawer):
 
-#+begin_src org
+#+begin_example
 ,* My problems in life
 :PROPERTIES:
-:CREATED: [2023-12-25 Mon 17:20]
+:CREATED: [2023-Dec-25 17:20]
 :ID: 4323245
 :END:
 :BACKLINKS:
-[2025-01-05 Sun 16:16] <- [[id:123456][Relationships]]
-[2025-02-26 Wed 01:55] <- [[id:235611][Feelings]]
+[2025-Jan-05 01:57] <- [[id:123456][Relationships]]
+[2025-Feb-26 10:29] <- [[id:235611][Feelings]]
 :END:
 
 Blah blah blah
-#+end_src
+#+end_example
 
 The choice is controlled by variable =org-node-backlink-do-drawers=, which defaults to t.
 
