@@ -3617,7 +3617,8 @@ With CREATE-MISSING t, create a new drawer if one was not found.
 However, instead of passing that argument, it is recommended for clarity
 to call `org-node-narrow-to-drawer-create' instead.
 Also see that function for meaning of CREATE-WHERE."
-  (let ((entry-end (org-entry-end-position))
+  (let ((start (point))
+        (entry-end (org-entry-end-position))
         (case-fold-search t))
     (org-node--end-of-meta-data)
     (cond
@@ -3628,6 +3629,7 @@ Also see that function for meaning of CREATE-WHERE."
             (org-insert-drawer nil name)
             (narrow-to-region (point) (point))
             t)
+        (goto-char start)
         nil))
      ;; Pre-existing drawer?
      ((org-node--re-search-forward-skip-some-regions
@@ -3657,7 +3659,9 @@ Also see that function for meaning of CREATE-WHERE."
             (goto-char res))))
       (org-insert-drawer nil name)
       (narrow-to-region (point) (point))
-      t))))
+      t)
+     (t (goto-char start)
+        nil))))
 
 (defun org-node--re-search-forward-skip-some-regions
     (regexp &optional bound)
