@@ -740,6 +740,10 @@ Basic commands:
 @item
 @samp{org-node-refile}
 @item
+@samp{org-node-context-raise}
+@item
+@samp{org-node-context-toggle}
+@item
 @samp{org-node-seq-dispatch}
 @itemize
 @item
@@ -769,25 +773,11 @@ A bizarro counterpart to @samp{org-roam-extract-subtree}.  Export the subtree at
 @item
 (Requires @uref{https://github.com/minad/consult, consult}) Grep across all known Org files.
 @end itemize
-@item
-@samp{org-node-fakeroam-show-buffer}
-@itemize
-@item
-A different way to invoke the Roam buffer: display the buffer @emph{or} refresh it if it was already visible.  And a plot twist, if it was not visible, do not refresh until the second invocation.
-@end itemize
 @end itemize
 
 Rarer commands:
 
 @itemize
-@item
-@samp{org-node-lint-all-files}
-@itemize
-@item
-Can help you fix a broken setup: it runs org-lint on all known files and generates a report of syntax problems, for you to correct manually.
-
-Org-node @uref{https://github.com/meedstrom/org-node/issues/8#issuecomment-2101316447, assumes all files have valid syntax}, though many of the problems reported by org-lint are survivable.
-@end itemize
 @item
 @samp{org-node-rewrite-links-ask}
 @itemize
@@ -801,9 +791,9 @@ Look for link descriptions that got out of sync with the corresponding node titl
 Auto-rename the file based on the current @samp{#+title} or first heading
 @itemize
 @item
-Also works as an after-save-hook!  Does nothing as such until you configure @samp{org-node-renames-allowed-dirs}.
+Can be run manually or placed on @samp{after-save-hook}!  When run as a hook, it is conservative, doing nothing until you configure @samp{org-node-renames-allowed-dirs}.
 @item
-Please note that if your filenames have datestamp prefixes, it is important to get @samp{org-node-datestamp-format} right or it may clobber a pre-existing datestamp.  A message is printed about the rename, but it's easy to miss.
+@strong{Please note} that if your filenames have datestamp prefixes, like org-roam's default behavior of making filenames such as @samp{20240831143302-node_title.org}, it is important to get @samp{org-node-datestamp-format} right or it @strong{may clobber a pre-existing datestamp}.  A message is printed about the rename, but it's easy to miss.
 @end itemize
 @end itemize
 @item
@@ -811,6 +801,14 @@ Please note that if your filenames have datestamp prefixes, it is important to g
 @itemize
 @item
 List links where the destination ID could not be found
+@end itemize
+@item
+@samp{org-node-lint-all-files}
+@itemize
+@item
+Can help you fix a broken setup: it runs org-lint on all known files and generates a report of Org syntax problems, for you to correct manually.
+
+Org-node @uref{https://github.com/meedstrom/org-node/issues/8#issuecomment-2101316447, assumes all files have valid syntax}, but many of the reported problems are survivable.
 @end itemize
 @item
 @samp{org-node-list-reflinks}
@@ -821,12 +819,6 @@ List all links that aren't @samp{id:} links
 @item
 Also list citations
 @end itemize
-@end itemize
-@item
-@samp{org-node-backlink-fix-all-files}
-@itemize
-@item
-Update @samp{BACKLINKS} property in all nodes
 @end itemize
 @item
 @samp{org-node-list-feedback-arcs}
@@ -843,11 +835,26 @@ Explore @uref{https://en.wikipedia.org/wiki/Feedback_arc_set, feedback arcs} in 
 Interactively rename an asset such as an image file and try to update all Org links to them.  Requires @uref{https://github.com/mhayashi1120/Emacs-wgrep, wgrep}.
 @itemize
 @item
-NOTE: For now, it only looks for links inside the root directory that it prompts you for, and sub and sub-subdirectories and so on -- but won't find a link outside that root directory.
+NOTE: It prompts you for a certain root directory, and then only looks for links in there, and in sub and sub-subdirectories and so on -- but won't find a link elsewhere.
 
-Like if you have Org files under /mnt linking to assets in /home, those links won't be updated.  Neither if you choose ~/org/subdir as the root directory will links in ~/org/file.org be updated.  So choose ~/org even if you are renaming something in a subdir.
+Like if you have Org files under /mnt linking to assets in /home, then those links won't be updated.  Or if you choose ~/org/some-subdir as the root directory, then links in ~/org/file.org will not update.  So choose ~/org as the root even if you are renaming something in a subdir.
 @end itemize
 @end itemize
+@end itemize
+
+Rarer commands for org-node-backlink-mode:
+
+@itemize
+@item
+@samp{org-node-backlink-mass-update-drawers}
+@item
+@samp{org-node-backlink-mass-update-props}
+@item
+@samp{org-node-backlink-mass-delete-drawers}
+@item
+@samp{org-node-backlink-mass-delete-props}
+@item
+@samp{org-node-backlink-fix-buffer}
 @end itemize
 
 @node Experimental Node sequences

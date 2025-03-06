@@ -526,6 +526,8 @@ Basic commands:
 - =org-node-insert-transclusion-as-subtree=
 - =org-node-visit-random=
 - =org-node-refile=
+- =org-node-context-raise=
+- =org-node-context-toggle=
 - =org-node-seq-dispatch=
   - Browse node series -- see README
 - =org-node-extract-subtree=
@@ -536,37 +538,41 @@ Basic commands:
   - (Trivial) Shortcut for =org-insert-heading= + =org-node-nodeify-entry=
 - =org-node-grep=
   - (Requires [[https://github.com/minad/consult][consult]]) Grep across all known Org files.
-- =org-node-fakeroam-show-buffer=
-  - A different way to invoke the Roam buffer: display the buffer /or/ refresh it if it was already visible.  And a plot twist, if it was not visible, do not refresh until the second invocation.
 
 Rarer commands:
 
-- =org-node-lint-all-files=
-  - Can help you fix a broken setup: it runs org-lint on all known files and generates a report of syntax problems, for you to correct manually.
-
-    Org-node [[https://github.com/meedstrom/org-node/issues/8#issuecomment-2101316447][assumes all files have valid syntax]], though many of the problems reported by org-lint are survivable.
 - =org-node-rewrite-links-ask=
   - Look for link descriptions that got out of sync with the corresponding node title, then prompt at each link to update it
 - =org-node-rename-file-by-title=
   - Auto-rename the file based on the current =#+title= or first heading
-    - Also works as an after-save-hook!  Does nothing as such until you configure =org-node-renames-allowed-dirs=.
-    - Please note that if your filenames have datestamp prefixes, it is important to get =org-node-datestamp-format= right or it may clobber a pre-existing datestamp.  A message is printed about the rename, but it's easy to miss.
+    - Can be run manually or placed on =after-save-hook=!  When run as a hook, it is conservative, doing nothing until you configure =org-node-renames-allowed-dirs=.
+    - *Please note* that if your filenames have datestamp prefixes, like org-roam's default behavior of making filenames such as =20240831143302-node_title.org=, it is important to get =org-node-datestamp-format= right or it *may clobber a pre-existing datestamp*.  A message is printed about the rename, but it's easy to miss.
 - =org-node-list-dead-links=
   - List links where the destination ID could not be found
+- =org-node-lint-all-files=
+  - Can help you fix a broken setup: it runs org-lint on all known files and generates a report of Org syntax problems, for you to correct manually.
+
+    Org-node [[https://github.com/meedstrom/org-node/issues/8#issuecomment-2101316447][assumes all files have valid syntax]], but many of the reported problems are survivable.
 - =org-node-list-reflinks=
   - List all links that aren't =id:= links
     - Also list citations
-- =org-node-backlink-fix-all-files=
-  - Update =BACKLINKS= property in all nodes
 - =org-node-list-feedback-arcs=
   - (Requires GNU R, with R packages stringr, readr and igraph)
 
     Explore [[https://en.wikipedia.org/wiki/Feedback_arc_set][feedback arcs]] in your ID link network.  Can work as a sort of [[https://edstrom.dev/zvjjm/slipbox-workflow#ttqyc][occasional QA routine]].
 - =org-node-rename-asset-and-rewrite-links=
   - Interactively rename an asset such as an image file and try to update all Org links to them.  Requires [[https://github.com/mhayashi1120/Emacs-wgrep][wgrep]].
-    - NOTE: For now, it only looks for links inside the root directory that it prompts you for, and sub and sub-subdirectories and so on -- but won't find a link outside that root directory.
+    - NOTE: It prompts you for a certain root directory, and then only looks for links in there, and in sub and sub-subdirectories and so on -- but won't find a link elsewhere.
 
-      Like if you have Org files under /mnt linking to assets in /home, those links won't be updated.  Neither if you choose ~/org/subdir as the root directory will links in ~/org/file.org be updated.  So choose ~/org even if you are renaming something in a subdir.
+      Like if you have Org files under /mnt linking to assets in /home, then those links won't be updated.  Or if you choose ~/org/some-subdir as the root directory, then links in ~/org/file.org will not update.  So choose ~/org as the root even if you are renaming something in a subdir.
+
+Rarer commands for org-node-backlink-mode:
+
+- =org-node-backlink-mass-update-drawers=
+- =org-node-backlink-mass-update-props=
+- =org-node-backlink-mass-delete-drawers=
+- =org-node-backlink-mass-delete-props=
+- =org-node-backlink-fix-buffer=
 
 ** Experimental: Node sequences
 Do you already know about "daily-notes"?  Then get started with a keybinding such as:
