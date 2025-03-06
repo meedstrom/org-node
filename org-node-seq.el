@@ -214,7 +214,7 @@ The latter uses a sloppy algorithm so not all formats work, see
           (match-string 0 clipped-name)
         ;; Even in a non-daily file, pretend it is a daily if possible,
         ;; to allow entering the sequence at a more relevant date
-        (when-let ((stamp (org-node-extract-file-name-datestamp path)))
+        (when-let* ((stamp (org-node-extract-file-name-datestamp path)))
           (org-node-seq-extract-ymd stamp org-node-datestamp-format))))))
 
 ;; TODO: Handle %s, %V, %y...  is there a library?

@@ -164,7 +164,7 @@ time that context was shown in a visible window.  Including:
 (defun org-node-context-history-go-back ()
   "Show the last context."
   (interactive () org-node-context-mode)
-  (when-let ((last (pop org-node-context--past)))
+  (when-let* ((last (pop org-node-context--past)))
     (push org-node-context--current
           org-node-context--future)
     (org-node-context--refresh nil last)))
@@ -172,7 +172,7 @@ time that context was shown in a visible window.  Including:
 (defun org-node-context-history-go-forward ()
   "Show the next context."
   (interactive () org-node-context-mode)
-  (when-let ((next (pop org-node-context--future)))
+  (when-let* ((next (pop org-node-context--future)))
     (push org-node-context--current
           org-node-context--past)
     (org-node-context--refresh nil next)))
@@ -197,7 +197,7 @@ time that context was shown in a visible window.  Including:
 ;; TODO: Solve problem if truncating away a :END: or #+END_... but not #+BEGIN,
 ;; or vice versa.
 ;; (defun org-node-context--truncate-buffer ()
-;;   (when-let ((cutoff org-node-context-truncate-to-lines))
+;;   (when-let* ((cutoff org-node-context-truncate-to-lines))
 ;;     (when (> (line-number-at-pos) cutoff)
 ;;       (forward-line (- cutoff))
 ;;       (delete-region (point-min) (point)))
@@ -364,7 +364,7 @@ the user invokes the command."
 (defun org-node-context-toggle ()
   "Show the main context buffer, or hide it if already showing."
   (interactive)
-  (if-let ((win (get-buffer-window org-node-context-main-buffer 'visible)))
+  (if-let* ((win (get-buffer-window org-node-context-main-buffer 'visible)))
       (quit-window nil win)
     (let ((buf (get-buffer-create org-node-context-main-buffer)))
       (org-node-context--refresh buf (org-entry-get-with-inheritance "ID"))
@@ -383,7 +383,8 @@ the user invokes the command."
          (org-node-context--refresh org-node-context-main-buffer id))))
 
 (defun org-node-context--displaying-p (buf id)
-  (when-let ((buf (get-buffer (or buf org-node-context-main-buffer))))
+  "Is BUF displaying context for ID?"
+  (when-let* ((buf (get-buffer (or buf org-node-context-main-buffer))))
     (equal id (buffer-local-value 'org-node-context--current buf))))
 
 (defun org-node-context-refresh-this-buffer (&rest _)
@@ -424,13 +425,13 @@ that buffer."
         (setq header-line-format
               (concat "Context for " (org-node-get-title node)))
         (magit-insert-section (org-node-context node)
-          (when-let ((links (org-node-get-id-links-to node)))
+          (when-let* ((links (org-node-get-id-links-to node)))
             (magit-insert-section (org-node-context 'id-links)
               (magit-insert-heading "ID backlinks:")
               (dolist (link (sort links #'org-node-context--origin-title-lessp))
                 (org-node-context--insert-backlink link))
               (insert "\n")))
-          (when-let ((links (org-node-get-reflinks-to node)))
+          (when-let* ((links (org-node-get-reflinks-to node)))
             (magit-insert-section (org-node-context 'reflinks)
               (magit-insert-heading "Ref backlinks:")
               (dolist (link (sort links #'org-node-context--origin-title-lessp))
@@ -443,7 +444,7 @@ that buffer."
   "Insert a section displaying a preview of LINK."
   (let* ((node (or (gethash (plist-get link :origin) org-nodes)
                    (error "Origin not found for link: %S" link)))
-         (breadcrumbs (if-let ((olp (org-node-get-olp-full node)))
+         (breadcrumbs (if-let* ((olp (org-node-get-olp-full node)))
                           (string-join olp " > ")
                         "Top")))
     (magit-insert-section (org-node-context link)

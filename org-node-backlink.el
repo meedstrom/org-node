@@ -717,7 +717,7 @@ If REMOVE non-nil, remove it instead."
                   (delete-region (point) (pos-eol))
                   (insert (org-node-backlink--reformat-line line))))))
           (dolist (id to-add)
-            (when-let ((known-node (gethash id org-nodes)))
+            (when-let* ((known-node (gethash id org-nodes)))
               (let ((title (org-node-get-title known-node)))
                 (indent-according-to-mode)
                 (insert (funcall org-node-backlink-drawer-formatter id title)

@@ -463,10 +463,10 @@ For use as `org-node-affixation-fn'."
   "Prepend NODE's outline path to TITLE.
 For use as `org-node-affixation-fn'."
   (list title
-        (if-let ((fontified-ancestors
-                  (cl-loop
-                   for anc in (org-node-get-olp-full node t)
-                   collect (propertize anc 'face 'completions-annotations))))
+        (if-let* ((fontified-ancestors
+                   (cl-loop
+                    for anc in (org-node-get-olp-full node t)
+                    collect (propertize anc 'face 'completions-annotations))))
             (concat (string-join fontified-ancestors " > ") " > ")
           "")
         ""))
@@ -1368,12 +1368,12 @@ If optional argument ID is non-nil, do not check the link at
 point but assume it is a link to ID."
   (when (derived-mode-p 'org-mode)
     (org-node--init-ids)
-    (when-let ((origin (org-entry-get-with-inheritance "ID"))
-               (dest (if (gethash id org-id-locations)
-                         id
-                       (let ((elm (org-element-context)))
-                         (when (equal "id" (org-element-property :type elm))
-                           (org-element-property :path elm))))))
+    (when-let* ((origin (org-entry-get-with-inheritance "ID"))
+                (dest (if (gethash id org-id-locations)
+                          id
+                        (let ((elm (org-element-context)))
+                          (when (equal "id" (org-element-property :type elm))
+                            (org-element-property :path elm))))))
       (push (list :origin origin
                   :pos (point)
                   :type "id"
@@ -2608,8 +2608,8 @@ user quits, do not apply any modifications."
             (setq default-directory
                   (read-directory-name
                    "Directory with Org notes to operate on: "))))
-      (when-let ((bufs (seq-filter (##string-search "*grep*" (buffer-name %))
-                                   (buffer-list))))
+      (when-let* ((bufs (seq-filter (##string-search "*grep*" (buffer-name %))
+                                    (buffer-list))))
         (when (yes-or-no-p "Kill other *grep* buffers to be sure this works?")
           (mapc #'kill-buffer bufs)))
       (let* ((filename (file-relative-name (read-file-name "File to rename: ")))
@@ -2742,7 +2742,7 @@ from the beginning."
           :msg "Running org-lint (you can quit and resume)"
           :about-to-do "About to visit a file to run org-lint"
           :call (lambda ()
-                  (when-let ((warning (org-lint)))
+                  (when-let* ((warning (org-lint)))
                     (push (cons buffer-file-name (car warning))
                           org-node--lint-warnings)))))
   (when org-node--lint-warnings
@@ -3509,7 +3509,7 @@ As bonus, do not land on an inlinetask, seek a real heading."
 (defun org-node-complete-at-point ()
   "Complete word at point to a known node title, and linkify.
 Designed for `completion-at-point-functions', which see."
-  (when-let ((bounds (bounds-of-thing-at-point 'word)))
+  (when-let* ((bounds (bounds-of-thing-at-point 'word)))
     (and (not (org-in-src-block-p))
          (not (save-match-data (org-in-regexp org-link-any-re)))
          (list (car bounds)
@@ -3518,7 +3518,7 @@ Designed for `completion-at-point-functions', which see."
                :exclusive 'no
                :exit-function
                (lambda (text _)
-                 (when-let ((id (gethash text org-node--title<>id)))
+                 (when-let* ((id (gethash text org-node--title<>id)))
                    (atomic-change-group
                      (delete-char (- (length text)))
                      (insert (org-link-make-string (concat "id:" id) text)))
@@ -3557,7 +3557,7 @@ the link in its ROAM_REFS property, visit that node rather than
 following the link normally.
 
 If already visiting that node, then follow the link normally."
-  (when-let ((url (thing-at-point 'url)))
+  (when-let* ((url (thing-at-point 'url)))
     ;; Rarely more than one car
     (let* ((dest (car (org-node-parser--split-refs-field url)))
            (found (cl-loop for node being each hash-value of org-nodes
