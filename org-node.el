@@ -713,7 +713,7 @@ and they are considered to point to NODE when NODE has a
 :ROAM_REFS: property that includes that same string.
 
 The reflink plist has the same shape as an ID-link plist
-(see `org-node-get-id-links-to'), but instead of an org-id in :dest,
+\(see `org-node-get-id-links-to'), but instead of an org-id in :dest,
 you have a \"ref\" such as a web address.
 
 Small gotcha: for a web address such as \"http://gnu.org\",
@@ -3516,6 +3516,7 @@ Designed for `completion-at-point-functions', which see."
        buffer-file-name
        (org-node-complete-at-point-local-mode)))
 
+;;;###autoload
 (define-globalized-minor-mode org-node-complete-at-point-mode
   org-node-complete-at-point-local-mode
   org-node-complete-at-point--try-enable)

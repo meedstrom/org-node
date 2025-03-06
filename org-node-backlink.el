@@ -143,22 +143,26 @@ In short, this mode is not meant to be toggled on its own.
 (defvar org-node-backlink--work-files nil)
 
 (defun org-node-backlink-mass-update-drawers ()
+  "Add or update backlinks drawers in all files."
   (interactive)
   (unless org-node-backlink-do-drawers
     (user-error "Asked to update :BACKLINKS: drawers, but `org-node-backlink-do-drawers' is nil"))
   (org-node-backlink--fix-all-files 'add-drawers))
 
 (defun org-node-backlink-mass-update-props ()
+  "Add or update backlinks properties in all files."
   (interactive)
   (when org-node-backlink-do-drawers
     (user-error "Asked to update :BACKLINKS: properties, but `org-node-backlink-do-drawers' is t"))
   (org-node-backlink--fix-all-files 'add-props))
 
 (defun org-node-backlink-mass-delete-drawers ()
+  "Delete all backlinks drawers in all files."
   (interactive)
   (org-node-backlink--fix-all-files 'del-drawers))
 
 (defun org-node-backlink-mass-delete-props ()
+  "Delete all backlinks properties in all files."
   (interactive)
   (org-node-backlink--fix-all-files 'del-props))
 
@@ -565,10 +569,13 @@ marker, point will move to that position."
   :package-version '(org-node . "2.0.0"))
 
 (defun org-node-backlink--extract-timestamp (text)
+  "Get Org timestamp out of TEXT."
   (when (string-match org-ts-regexp-both text)
     (match-string 0 text)))
 
 (defun org-node-backlink--extract-id (text)
+  "Get first link description out of TEXT.
+That means the first part of a [[id][description]]."
   (with-temp-buffer
     (insert text)
     (goto-char 1)
@@ -576,6 +583,8 @@ marker, point will move to that position."
       (buffer-substring (point) (- (search-forward "]") 1)))))
 
 (defun org-node-backlink--extract-link-desc (text)
+  "Get first link description out of TEXT.
+That means the second part of a [[id][description]]."
   (with-temp-buffer
     (insert text)
     (goto-char 1)
@@ -583,31 +592,37 @@ marker, point will move to that position."
                (search-forward "][" nil t))
       (buffer-substring (point) (- (search-forward "]]") 2)))))
 
-(defun org-node-backlink-timestamp-lessp (line-1 line-2)
-  "Sort on first Org timestamp in the line."
-  (let ((ts-1 (org-node-backlink--extract-timestamp line-1))
-        (ts-2 (org-node-backlink--extract-timestamp line-2)))
+(defun org-node-backlink-timestamp-lessp (s1 s2)
+  "Sort on first Org timestamp in the line.
+S1 before S2 if timestamp in S1 is earlier in time."
+  (let ((ts-1 (org-node-backlink--extract-timestamp s1))
+        (ts-2 (org-node-backlink--extract-timestamp s2)))
     (or (and ts-1 (not ts-2))
         (and ts-1 ts-2 (org-time< ts-1 ts-2)))))
 
-(defun org-node-backlink-link-description-lessp (line-1 line-2)
-  "Sort on first link description in the line."
-  (string (org-node-backlink--extract-link-desc line-1)
-          (org-node-backlink--extract-link-desc line-2)))
+(defun org-node-backlink-link-description-lessp (s1 s2)
+  "Sort on first link description in the line.
+S1 before S2 if link descriptions inside satisfy `string<'."
+  (string< (org-node-backlink--extract-link-desc s1)
+           (org-node-backlink--extract-link-desc s2)))
 
-(defun org-node-backlink-id-blind-simple-lessp (line-1 line-2)
-  "Sort lexicographically, but ignoring nonsense inside [[id:...]]."
-  (string< (replace-regexp-in-string "\\[\\[id:.*?]" "" line-1)
-           (replace-regexp-in-string "\\[\\[id:.*?]" "" line-2)))
+(defun org-node-backlink-id-blind-simple-lessp (s1 s2)
+  "Sort lexicographically, but ignoring nonsense inside [[id:...]].
+S1 before S2 if the strings sans org-ids satisfy `string<'."
+  (string< (replace-regexp-in-string "\\[\\[id:.*?]" "" s1)
+           (replace-regexp-in-string "\\[\\[id:.*?]" "" s2)))
 
-(defun org-node-backlink-id-lessp (line-1 line-2)
+(defun org-node-backlink-id-lessp (s1 s2)
   "Sort on first [[id:...]] in the line.
+S1 before S2 if the IDs inside satisfy `string<'.
+
 May be useful with a non-default `org-id-method'."
-  (string< (replace-regexp-in-string "\\[\\[id:.*?]" "" line-1)
-           (replace-regexp-in-string "\\[\\[id:.*?]" "" line-2)))
+  (string< (replace-regexp-in-string "\\[\\[id:.*?]" "" s1)
+           (replace-regexp-in-string "\\[\\[id:.*?]" "" s2)))
 
 (defun org-node-backlink-format-like-org-super-links-default (id desc &optional time)
-  "Example: \"[2025-02-21 Fri 14:39] <- [[id:ID][Node title]]\"."
+  "Example: \"[2025-02-21 Fri 14:39] <- [[id:ID][Node title]]\".
+"
   (concat (format-time-string (org-time-stamp-format t t)
                               (or time (current-time)))
           " <- "
@@ -711,6 +726,7 @@ If REMOVE non-nil, remove it instead."
               (insert (string-join sorted-lines "\n")))))))))
 
 (defun org-node-backlink--reformat-line (line)
+  "Pass LINE back through `org-node-backlink-drawer-formatter'."
   (funcall org-node-backlink-drawer-formatter
            (org-node-backlink--extract-id line)
            (org-node-backlink--extract-link-desc line)

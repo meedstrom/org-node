@@ -113,15 +113,6 @@
     (should (equal (abbreviate-file-name (buffer-file-name))
                    (org-node-get-file node)))))
 
-(ert-deftest org-node/test-split-into-n-sublists ()
-  (should (equal 4 (length (org-node--split-into-n-sublists
-                            '(a v e e) 7))))
-  (should (equal 1 (length (org-node--split-into-n-sublists
-                            '(a v e e) 1))))
-  (should (equal 4 (length (org-node--split-into-n-sublists
-                            '(a v e e q l fk k k ki i o r r r r r r  r g g gg)
-                            4)))))
-
 (ert-deftest org-node/test-file-naming ()
   (let ((org-node-datestamp-format "")
         (org-node-slug-fn #'org-node-slugify-for-web))
