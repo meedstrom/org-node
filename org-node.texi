@@ -437,20 +437,34 @@ Then add to initfiles:
 @node Option 2C Semi-automatic @samp{BACKLINKSEND} drawer
 @subsection Option 2C: Semi-automatic @samp{:BACKLINKS:...:END:} drawer
 
-If you were previously using org-super-links, you can continue with it.
+If you were previously using org-super-links, you can continue letting it manage them, and leave org-node out of the matter.
 
-I @emph{think} the following should integrate well.  Untested, let me know!
+Just add to initfiles:
 
 @lisp
 (add-hook 'org-node-insert-link-hook
           #'org-super-links-convert-link-to-super)
 @end lisp
 
-Bonus: you can still use the command @samp{M-x org-node-backlink-mass-update-drawers} to add missing backlinks in bulk.  That may be useful to start you off on your life with org-super-links.
+Bonus 1: You can list any dead forward-links to fix them manually:
 
-However, when you have pre-existing drawers -- @strong{MAKE A FULL BACKUP@!}
+@example
+M-x org-node-list-dead-links
+@end example
 
-Org-node has a different usage in mind than org-super-links.  You may be accustomed to having old manually formatted and sorted drawers.  Running aforementioned command @strong{may re-sort your backlinks and re-format their appearance into something you don't want}; double-check the following options.
+
+Bonus 2: You can add all missing backlinks in bulk:
+
+@example
+M-x org-node-backlink-mass-update-drawers
+@end example
+
+
+That may be useful as a starting point if you're new to org-super-links.
+
+However, when you have pre-existing drawers@dots{} @strong{MAKE A FULL BACKUP} before trying it!
+
+Org-node has a different usage in mind than org-super-links.  You may be accustomed to having old manually formatted and sorted drawers.  Running aforementioned command @strong{may re-sort your backlinks and re-format their appearance into something you don't want}; double-check the following options:
 
 @itemize
 @item
@@ -459,7 +473,7 @@ Org-node has a different usage in mind than org-super-links.  You may be accusto
 @samp{org-node-backlink-drawer-formatter}
 @end itemize
 
-Additionally, lines that don't contain a valid and current link are @strong{deleted}.
+Finally, lines without a proper bracketed Org link are @strong{deleted}, which would mean @strong{destroying the timestamps.}
 
 @node Misc
 @chapter Misc
