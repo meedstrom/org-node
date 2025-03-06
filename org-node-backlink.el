@@ -761,7 +761,8 @@ where backlinks are fixed.
 
 To force an update at any time, use one of these commands:
 - \\[org-node-backlink-fix-buffer]
-- \\[org-node-backlink-fix-all-files]"
+- \\[org-node-backlink-mass-update-drawers]
+- \\[org-node-backlink-mass-update-props]"
   :type 'boolean
   :package-version '(org-node . "2.0.0"))
 

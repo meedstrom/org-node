@@ -94,7 +94,7 @@ You no longer need these:
 
 MISSING features for now:
 - org-roam's "node-dedicated" buffers
-- grep sections
+- grep sections (but see command =org-node-grep=)
 
 To see what can be customized:
 
@@ -216,19 +216,16 @@ Pick some short keys and try them out.
 
 To browse config options, type =M-x customize-group RET org-node=.
 
-Final tip: there's *no separate command* for creating a new node!  Reuse one of the commands above, and type the name of a node that doesn't exist, such as "My problems in life".  Try it and see what happens!
+Final tip: there's *no separate command* for creating a new node!  Reuse one of the commands above, and type the name of a node that doesn't exist.
+
+Try it and see what happens!
 
 * Backlinks
-** What are backlinks?
-Backlinks are the butter on the bread of your notes.  If you've ever seen a "What links here" section on some webpage, that's exactly what it is.  Imagine seeing that, all the time.  The following sections outline two general ways to do so.
+Backlinks are the butter on the bread that is your notes.  If you've ever seen a "What links here" section on some webpage, that's exactly what it is.  Imagine seeing that, all the time.  The following sections outline two general ways to do so.
 
 ** Backlink solution 1: displayed in a separate window
 *** Option 1A: Reuse the org-roam buffer
-Believe it or not, it Just Works.
-
-If you install [[https://github.com/meedstrom/org-node-fakeroam][org-node-fakeroam]] -- which pulls in org-roam with it -- add to initfiles:
-
-# It's a shim with the effect that the org-roam buffer does not need to ask the SQLite DB for backlinks, indeed SQLite need not even be installed.
+Believe it or not, it Just Works.  So long as you install [[https://github.com/meedstrom/org-node-fakeroam][org-node-fakeroam]] -- which pulls in org-roam with it -- and add to initfiles:
 
 #+begin_src elisp
 (org-node-fakeroam-redisplay-mode)
@@ -238,8 +235,7 @@ If you install [[https://github.com/meedstrom/org-node-fakeroam][org-node-fakero
 ;; Example keybindings
 (keymap-set org-mode-map "M-s M-t M-t" #'org-roam-buffer-toggle)
 (keymap-set org-mode-map "M-s M-t M-d" #'org-roam-buffer-display-dedicated)
-;; if your window mgmt style is constantly lose all windows.
-;; motivates a shorter key seq.
+;; if your window mgmt style is constantly lose all windows
 (keymap-set global-map "M-s M-r" #'org-node-fakeroam-show-buffer)
 #+end_src
 
@@ -294,7 +290,7 @@ Then add to initfiles:
 
 *** Option 2C: Semi-automatic =:BACKLINKS:...:END:= drawer
 
-If you were previously using org-super-links, you can continue letting it manage them, and leave org-node out of the matter.
+If you were previously using [[https://github.com/toshism/org-super-links][org-super-links]], you can continue letting it manage them, and leave org-node out of the matter.
 
 Just add to initfiles:
 
@@ -303,24 +299,28 @@ Just add to initfiles:
           #'org-super-links-convert-link-to-super)
 #+end_src
 
-Bonus 1: You can list any dead forward-links to fix them manually:
+Now, you have some bonus tools:
 
-: M-x org-node-list-dead-links
+- 1. You can list any dead forward-links to fix them manually:
 
-Bonus 2: You can add all missing backlinks in bulk:
+  =M-x org-node-list-dead-links=
 
-: M-x org-node-backlink-mass-update-drawers
+- 2. You can add all missing backlinks in bulk:
 
-That may be useful as a starting point if you're new to org-super-links.
+  =M-x org-node-backlink-mass-update-drawers=
+
+The second command may be useful as a starting point if you're new to org-super-links, pre-populating the notes you already have.
 
 However, when you have pre-existing drawers... *MAKE A FULL BACKUP* before trying it!
 
-Org-node has a different usage in mind than org-super-links.  You may be accustomed to having old manually formatted and sorted drawers.  Running aforementioned command *may re-sort your backlinks and re-format their appearance into something you don't want*; double-check the following options:
+Org-node has a different usage in mind than org-super-links.  You may be accustomed to having old manually formatted and sorted drawers.
+
+Running aforementioned command *may re-sort your backlinks and re-format their appearance into something you don't want*; double-check the following options:
 
 - =org-node-backlink-drawer-sorter=
 - =org-node-backlink-drawer-formatter=
 
-Finally, lines without a proper bracketed Org link are *deleted*, which would mean *destroying the timestamps.*
+Finally, lines without a proper Org link like =[[id:foo][bar]]= are *deleted*, which would mean *destroying any timestamp within.*
 
 * Misc
 ** Manage org-id-locations
@@ -408,7 +408,7 @@ Or put something like =#+filetags: :hide_node:= at the top of each file, and set
 
 You may have heard that org-roam has a set of meta-capture templates: the =org-roam-capture-templates=.
 
-People who understand the magic of capture templates, they may take this in stride.  Me, I never felt confident using a second-order abstraction over an already leaky abstraction I didn't fully understand.
+People who understand the magic of capture templates, they may take this in stride.  Me, I never felt confident using a second-order abstraction over an already leaky abstraction.
 
 Can we just use vanilla org-capture?  That'd be less scary.  The answer is yes!
 
@@ -554,23 +554,30 @@ Rarer commands:
 
 - =org-node-rewrite-links-ask=
   - Look for link descriptions that got out of sync with the corresponding node title, then prompt at each link to update it
+
 - =org-node-rename-file-by-title=
   - Auto-rename the file based on the current =#+title= or first heading
     - Can be run manually or placed on =after-save-hook=!  When run as a hook, it is conservative, doing nothing until you configure =org-node-renames-allowed-dirs=.
-    - *Please note* that if your filenames have datestamp prefixes, like org-roam's default behavior of making filenames such as =20240831143302-node_title.org=, it is important to get =org-node-datestamp-format= right or it *may clobber a pre-existing datestamp*.  A message is printed about the rename, but it's easy to miss.
+    - *Please note* that if your filenames have datestamp prefixes, like org-roam's default behavior of making filenames such as =20240831143302-node_title.org=, it is important to get =org-node-datestamp-format= right or it *may clobber a pre-existing datestamp*.
+
+      A message is printed about the rename, but it's easy to miss.
+
 - =org-node-list-dead-links=
   - List links where the destination ID could not be found
+
 - =org-node-lint-all-files=
   - Can help you fix a broken setup: it runs org-lint on all known files and generates a report of Org syntax problems, for you to correct manually.
 
     Org-node [[https://github.com/meedstrom/org-node/issues/8#issuecomment-2101316447][assumes all files have valid syntax]], but many of the reported problems are survivable.
+
 - =org-node-list-reflinks=
-  - List all links that aren't =id:= links
-    - Also list citations
+  - List all links that aren't =id:= links.  Also includes citations, even though they are technically not links.
+
 - =org-node-list-feedback-arcs=
   - (Requires GNU R, with R packages stringr, readr and igraph)
 
     Explore [[https://en.wikipedia.org/wiki/Feedback_arc_set][feedback arcs]] in your ID link network.  Can work as a sort of [[https://edstrom.dev/zvjjm/slipbox-workflow#ttqyc][occasional QA routine]].
+
 - =org-node-rename-asset-and-rewrite-links=
   - Interactively rename an asset such as an image file and try to update all Org links to them.  Requires [[https://github.com/mhayashi1120/Emacs-wgrep][wgrep]].
     - NOTE: It prompts you for a certain root directory, and then only looks for links in there, and in sub and sub-subdirectories and so on -- but won't find a link elsewhere.
@@ -597,7 +604,7 @@ and configure =org-node-seq-defs=.  See [[https://github.com/meedstrom/org-node/
 *** What are node seqs?
 It's easiest to explain node sequences if we use "daily-notes" (aka "dailies") as an example.
 
-Roam's idea of a "daily-note" is the same as an [[https://github.com/bastibe/org-journal][org-journal]] entry: a file/entry where the title is just today's date.
+Org-roam's idea of a "daily-note" is the same as an [[https://github.com/bastibe/org-journal][org-journal]] entry: a file/entry where the title is just today's date.
 
 You don't need software for that basic idea, only to make it extra convenient to navigate them and jump back and forth in the series.
 
@@ -608,34 +615,37 @@ Thus, fundamentally, any "journal" or "dailies" software are just operating on a
 
 API cheatsheet between org-roam and org-node.
 
-| Action                                  | org-roam                         | org-node                                                          |
-|-----------------------------------------+----------------------------------+-------------------------------------------------------------------|
-| Get ID near point                       | =(org-roam-id-at-point)=           | =(org-entry-get-with-inheritance "ID")=                             |
-| Get node at point                       | =(org-roam-node-at-point)=         | =(org-node-at-point)=                                               |
-| Get list of files                       | =(org-roam-list-files)=            | =(org-node-list-files)=                                             |
-| Prompt user to pick a node              | =(org-roam-node-read)=             | =(org-node-read)=                                                   |
-| Get backlink objects                    | =(org-roam-backlinks-get NODE)=    | =(org-node-get-id-links-to NODE)=                                   |
-| Get reflink objects                     | =(org-roam-reflinks-get NODE)=     | =(org-node-get-reflinks-to NODE)=                                   |
-| Get title                               | =(org-roam-node-title NODE)=       | =(org-node-get-title NODE)=                                         |
-| Get title of file where NODE is         | =(org-roam-node-file-title NODE)=  | =(org-node-get-file-title NODE)=                                    |
-| Get title /or/ name of file where NODE is |                                  | =(org-node-get-file-title-or-basename NODE)=                        |
-| Get name of file where NODE is          | =(org-roam-node-file NODE)=        | =(org-node-get-file NODE)=                                     |
-| Get ID                                  | =(org-roam-node-id NODE)=          | =(org-node-get-id NODE)=                                            |
-| Get tags                                | =(org-roam-node-tags NODE)=        | =(org-node-get-tags NODE)=                                          |
-| Get local tags                          |                                  | =(org-node-get-tags-local NODE)=                                    |
-| Get outline level                       | =(org-roam-node-level NODE)=       | =(org-node-get-level NODE)=                                         |
-| Get whether this is a subtree           | =(=< 0 (org-roam-node-level NODE))= | =(org-node-is-subtree NODE)=                                    |
-| Get char position                       | =(org-roam-node-point NODE)=       | =(org-node-get-pos NODE)=                                           |
-| Get properties                          | =(org-roam-node-properties NODE)=  | =(org-node-get-properties NODE)=, only includes explicit properties |
-| Get subtree TODO state                  | =(org-roam-node-todo NODE)=        | =(org-node-get-todo NODE)=                                          |
-| Get subtree SCHEDULED                   | =(org-roam-node-scheduled NODE)=   | =(org-node-get-scheduled NODE)=                                     |
-| Get subtree DEADLINE                    | =(org-roam-node-deadline NODE)=    | =(org-node-get-deadline NODE)=                                      |
-| Get subtree priority                    | =(org-roam-node-priority NODE)=    | =(org-node-get-priority NODE)=                                      |
-| Get outline-path                        | =(org-roam-node-olp NODE)=         | =(org-node-get-olp NODE)=                                           |
-| Get =ROAM_REFS=                           | =(org-roam-node-refs NODE)=        | =(org-node-get-refs NODE)=                                          |
-| Get =ROAM_ALIASES=                        | =(org-roam-node-aliases NODE)=     | =(org-node-get-aliases NODE)=                                       |
-| Get =ROAM_EXCLUDE=                        |                                  | =(assoc "ROAM_EXCLUDE" (org-node-get-properties NODE))=             |
-| Ensure fresh data                       | =(org-roam-db-sync)=               | =(org-node-cache-ensure t t)=                                       |
+| Action                                  | org-roam                         | org-node                                              |
+|-----------------------------------------+----------------------------------+-------------------------------------------------------|
+| Get ID near point                       | =(org-roam-id-at-point)=           | =(org-entry-get-with-inheritance "ID")=                 |
+| Get node at point                       | =(org-roam-node-at-point)=         | =(org-node-at-point)=                                   |
+| Prompt user to pick a node              | =(org-roam-node-read)=             | =(org-node-read)=                                       |
+| Get node by ID                          |                                  | =(org-node-by-id ID)=                                   |
+| Get nodes in a file                     |                                  | =(org-nodes-in-file FILE)=                              |
+| Get list of files                       | =(org-roam-list-files)=            | =(org-node-list-files)=                                 |
+| Get backlink objects                    | =(org-roam-backlinks-get NODE)=    | =(org-node-get-id-links-to NODE)=                       |
+| Get reflink objects                     | =(org-roam-reflinks-get NODE)=     | =(org-node-get-reflinks-to NODE)=                       |
+| Get title                               | =(org-roam-node-title NODE)=       | =(org-node-get-title NODE)=                             |
+| Get title of file where NODE is         | =(org-roam-node-file-title NODE)=  | =(org-node-get-file-title NODE)=                        |
+| Get title /or/ name of file where NODE is |                                  | =(org-node-get-file-title-or-basename NODE)=            |
+| Get full path to file where NODE is     | =(org-roam-node-file NODE)=        | =(org-node-get-file NODE)=                              |
+| Get ID                                  | =(org-roam-node-id NODE)=          | =(org-node-get-id NODE)=                                |
+| Get tags                                | =(org-roam-node-tags NODE)=        | =(org-node-get-tags NODE)=                              |
+| Get tags (local only)                   |                                  | =(org-node-get-tags-local NODE)=                        |
+| Get tags (inherited only)               |                                  | =(org-node-get-tags-inherited NODE)=                    |
+| Get outline level                       | =(org-roam-node-level NODE)=       | =(org-node-get-level NODE)=                             |
+| Get whether this is a subtree           | =(=< 0 (org-roam-node-level NODE))= | =(org-node-is-subtree NODE)=                            |
+| Get char position                       | =(org-roam-node-point NODE)=       | =(org-node-get-pos NODE)=                               |
+| Get properties                          | =(org-roam-node-properties NODE)=  | =(org-node-get-properties NODE)=                        |
+| Get subtree TODO state                  | =(org-roam-node-todo NODE)=        | =(org-node-get-todo NODE)=                              |
+| Get subtree SCHEDULED                   | =(org-roam-node-scheduled NODE)=   | =(org-node-get-scheduled NODE)=                         |
+| Get subtree DEADLINE                    | =(org-roam-node-deadline NODE)=    | =(org-node-get-deadline NODE)=                          |
+| Get subtree priority                    | =(org-roam-node-priority NODE)=    | =(org-node-get-priority NODE)=                          |
+| Get outline-path                        | =(org-roam-node-olp NODE)=         | =(org-node-get-olp NODE)=                               |
+| Get =ROAM_REFS=                           | =(org-roam-node-refs NODE)=        | =(org-node-get-refs NODE)=                              |
+| Get =ROAM_ALIASES=                        | =(org-roam-node-aliases NODE)=     | =(org-node-get-aliases NODE)=                           |
+| Get =ROAM_EXCLUDE=                        |                                  | =(assoc "ROAM_EXCLUDE" (org-node-get-properties NODE))= |
+| Ensure fresh data                       | =(org-roam-db-sync)=               | =(org-node-cache-ensure t t)=                           |
 
 ** Appendix II: How to rollback
 
@@ -655,14 +665,14 @@ With [[https://github.com/slotThe/vc-use-package][vc-use-package]] on Emacs 29:
        :branch "v1.6"))
 #+end_src
 
-With built-in =:vc= on Emacs 30+:
+With built-in =:vc= on Emacs 30+ (but note default value of =use-package-vc-prefer-newest= means you never update, since it is not aware of Git tags):
 #+begin_src elisp
 (use-package org-node
   :vc (:url "https://github.com/meedstrom/org-node"
        :branch "v1.6"))
 #+end_src
 
-With [[https://github.com/progfolio/elpaca][Elpaca]] as follows.  Note that recipe changes only take effect after you do =M-x elpaca-delete= and it re-clones -- the idea is that Elpaca users will prefer to do it manually inside the cloned repo.
+With [[https://github.com/progfolio/elpaca][Elpaca]] as follows.  Note that recipe changes only take effect after you do =M-x elpaca-delete= and it re-clones -- the idea is that Elpaca users will prefer to do it manually.
 
 #+begin_src elisp
 (use-package org-node

@@ -274,38 +274,38 @@ Jump/Next/Previous/Capture actions.
 
 NAME describes the sequence, in one or a few words.
 
-CLASSIFIER is a single-argument function taking an `org-node'
-object and should return a cons cell or list if a sequence-item was
-found, otherwise nil.
+CLASSIFIER is a single-argument function taking an `org-node' object
+and should return a list or cons cell if a sequence-item was found,
+otherwise nil.
 
-The list may contain anything, but the first element must be a
-sort-string, i.e. a string suitable for sorting on.  An example
-is a date in the format YYYY-MM-DD, but not in the format MM/DD/YY.
+The list or cons cell may contain anything, but the first element must
+be a sort-string, i.e. a string suitable for sorting on.  An example is
+a date in the format YYYY-MM-DD, but not in the format MM/DD/YY.
 
 This is what determines the order of items in the sequence: after
-all nodes have been processed by CLASSIFIER, the non-nil return
-values are sorted by the sort-string, using `string>'.
+all nodes have been processed by CLASSIFIER, the items found
+are sorted by the sort-string, using `string>'.
 
 Aside from returning a single item, CLASSIFIER may also return a list of
-such items.  This can be useful if e.g. you have a special type of node
-that \"defines\" a sequence by simply containing links to each item that
-should go into it.
+multiple such items.  This can be useful if e.g. you have a special type
+of node that \"defines\" a sequence by simply containing links to each
+item that should go into it.
 
 Function PROMPTER may be used during jump/capture/refile to
 interactively prompt for a sort-string.  This highlights the
 other use of the sort-string: finding our way back from scant
 context.
 
-For example, in a sequence of daily-notes sorted on YYYY-MM-DD, a
-prompter could use `org-read-date'.
+For example, in a sequence of daily-notes sorted on YYYY-MM-DD,
+a prompter could use `org-read-date'.
 
-PROMPTER receives one argument, the sequence plist, which has the
-same form as one of the values in `org-node-seq-defs' but
+PROMPTER receives one argument: the whole node-seq object, which is a
+plist with the same form as one of the values in `org-node-seq-defs' but
 includes two extra members :key, corresponding to KEY, and
 :sorted-items, which may be useful for interactive completion.
 
 Function WHEREAMI is like PROMPTER in that it should return a
-sort-string.  However, it should do this without user
+sort-string or nil.  However, it should do this without user
 interaction, and may return nil.  For example, if the user is not
 currently in a daily-note, the daily-notes\\=' WHEREAMI should
 return nil.  It receives no arguments.
@@ -327,12 +327,12 @@ Optional string CAPTURE indicates the keys to a capture template
 to autoselect, when you choose the capture option in the
 `org-node-seq-dispatch' menu.
 
-Integer VERSION indicates the sequence definition language.  New
-sequence should use version 2, as of 2024-09-05.  When org-node
-updates the sequence definition language, old versions may still
-work, but this is not heavily tested, so it will start printing a
-message to remind you to check out the wiki on GitHub and port
-your definitions."
+Integer VERSION indicates the definition language used for this
+variable.  New sequences should use version 2, as of 2024-09-05.  When
+org-node updates the seq definition language, old versions may
+still work, but this is not heavily tested, so it will start printing a
+message to remind you to check out the wiki on GitHub and port your
+definitions."
   :type 'alist
   :group 'org-node
   :package-version '(org-node . "1.9.0")
@@ -343,7 +343,7 @@ your definitions."
   "Alist of data for each node sequence.")
 
 (defun org-node-seq--add-item (&optional key)
-  "Analyze node near point to maybe grow a node seq.
+  "Analyze node near point to maybe grow a node sequence.
 
 The sequence is identified either by KEY, or if that is nil, by the
 current value of `org-node-proposed-seq'.  If that is also nil, do
@@ -557,10 +557,10 @@ This need usually not be customized!  When you use
 other date-based sequence, that sequence may be designed to
 temporarily set this variable.
 
-Customize this mainly if you want a given sequence to always be
+Customize this mainly if you want a given node seq to always be
 indicated, any time Org pops up a calendar for you.
 
-The sort-strings in the sequence that corresponds to this key
+The sort-strings in the node seq for this key
 should be correctly parseable by `parse-time-string'."
   :group 'org-node
   :package-version '(org-node . "1.9.0")

@@ -168,7 +168,8 @@ Use the command \\[org-node-add-refs] for convenience.
 Finally, this variable controls which link types are permitted.
 The fewer types, the faster your \\[org-node-reset].
 
-Tip: eval `(org-link-types)' to see all built-in link types.
+Tip: eval `(org-link-types)' to see all built-in link types.  But you
+can add your own types.
 
 What\\='s it actually used for: if you insert \"https://gnu.org\" in the
 body text of another node, then that results in a new backlink, even
@@ -315,7 +316,6 @@ the default `org-node-datestamp-format' is empty.
 
 In the author\\='s experience, recording the creation-date somewhere may
 prove useful later on, e.g. when publishing to a blog.
-
 Filesystem creation-time cannot be relied on."
   :type 'hook)
 
@@ -2959,7 +2959,7 @@ one of them is associated with a ROAM_REFS property."
       (message "No links found"))))
 
 (defcustom org-node-warn-title-collisions t
-  "Whether to print messages on vvfinding duplicate node titles."
+  "Whether to print messages on finding duplicate node titles."
   :group 'org-node
   :type 'boolean)
 
