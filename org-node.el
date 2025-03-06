@@ -58,7 +58,7 @@
 ;;   vendor README.org or whatever has an ID, it's considered part of
 ;;   your collection -- simply because if it's known to org-id, it's
 ;;   known to org-node.
-;;   These headings can be filtered after-the-fact.
+;;   These headings can be filtered after-the-fact by `org-node-filter-fn'.
 
 ;; Compared to denote:
 
@@ -67,7 +67,7 @@
 ;;     could possibly use Denote to search files and org-node
 ;;     as a more granular search.
 
-;;   - Org only, no Markdown nor other file types
+;;   - Supports Org only, no Markdown nor other file types
 ;;   - Does not support "denote:" links
 
 ;;; Code:
@@ -87,7 +87,7 @@
 (require 'org-node-parser)
 (require 'org-node-changes)
 
-;; Satisfy compiler
+;; Yes officer, I know what these names are.
 (defvar consult-ripgrep-args)
 (defvar org-roam-capture-templates)
 (defvar org-node-backlink-mode)

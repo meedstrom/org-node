@@ -532,7 +532,9 @@ DEF is a seq-def from `org-node-seq-defs'."
                (setq org-node-seq--current-key nil)))
     (message "Choose sequence before navigating")))
 
-;; TODO: In Emacs 30, simplify to just ###autoload
+;; TODO: Don't use the invisible placeholder.
+;;       https://github.com/magit/transient/issues/49#issuecomment-2289762426
+;; TODO: In Emacs 30, simplify to just ###autoload.
 ;;;###autoload (autoload 'org-node-seq-dispatch "org-node-seq" nil t)
 (transient-define-prefix org-node-seq-dispatch ()
   ["Sequence"

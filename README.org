@@ -18,13 +18,17 @@ Version 2.0 is out, with two major features:
 
 Feedback welcome.
 
-Upgrade note: Emacs 29+ required.  And if you were using *org-node 1.8.7 or older (November 2024)*, you'll have a smoother ride if you:
+** Upgrade notice
 
-1. first upgrade to the latest in [[https://github.com/meedstrom/org-node/tree/v1.9][v1.9 branch]],
-2. deal with any transitional warnings,
-3. /then/ upgrade to the latest version (which is the [[https://github.com/meedstrom/org-node/branches][main branch]]).
+- Emacs 29+ required
 
-Or skip all that, and just check that you're not using any of [[https://github.com/meedstrom/org-node/blob/v1.9/org-node-changes.el#L140][these aliases]].
+- If you were using *org-node 1.8.7 or older (November 2024)*, you'll have a smoother ride if you:
+
+  1. first upgrade to the latest in [[https://github.com/meedstrom/org-node/tree/v1.9][v1.9 branch]],
+  2. deal with any transitional warnings,
+  3. /then/ upgrade to the latest version (which is the [[https://github.com/meedstrom/org-node/branches][main branch]]).
+
+  Or skip all that, and just check that you're not using any of [[https://github.com/meedstrom/org-node/blob/v1.9/org-node-changes.el#L140][these aliases]].
 
 ** Backlinks drawer
 

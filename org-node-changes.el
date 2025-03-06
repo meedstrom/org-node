@@ -35,11 +35,6 @@
 (require 'ol)
 (require 'el-job)
 
-(unless (and (boundp 'el-job-major-version)
-             (>= el-job-major-version 1))
-  (display-warning
-   'org-node "Update el-job to use this version of org-node"))
-
 (defvar org-node-changes--new-names
   '()
   "Alist of deprecated symbol names and their new names.
@@ -146,6 +141,7 @@ NAME, ARGLIST and BODY as in `defun'."
                     ,when ,removed-by ,newname-or-expl)))
        ,@body)))
 
+
 ;;; v1.9
 
 (org-node-changes--def-whiny-alias 'org-node-get-file-path
@@ -164,11 +160,12 @@ NAME, ARGLIST and BODY as in `defun'."
                                    'org-node-add-alias
                                    "February 2025" "April")
 
+
 ;;; v2.0
 
 ;; Removed the `org-node-link' struct.  Less cognitive work to read the
 ;; familiar (plist-get LINK :origin) instead of (org-node-link-origin LINK) all
-;; over the place, and you can use `seq-let' syntactic sugar.
+;; over the place, and you can use `seq-let' / `map-let' syntactic sugar.
 (org-node-changes--def-whiny-fn org-node-link-origin (link)
   "2.0.0 (March 2025)" "May" "use (plist-get LINK :origin) instead"
   (plist-get link :origin))
@@ -198,9 +195,13 @@ NAME, ARGLIST and BODY as in `defun'."
 (define-obsolete-function-alias
   'org-node-get-is-subtree 'org-node-is-subtree "2025-03-03")
 
-(org-node-changes--def-whiny-alias 'org-node-insert-link*-immediate
-                                   'org-node-insert-link-novisit*
-                                   "2.0.0 (March 2025)" "April" t)
+
+;;; Change in dependencies
+
+(unless (and (boundp 'el-job-major-version)
+             (>= el-job-major-version 1))
+  (display-warning
+   'org-node "Update el-job to use this version of org-node"))
 
 ;; https://github.com/toshism/org-super-links/pull/104
 (org-node-changes--def-whiny-fn org-node-convert-link-to-super (&rest _)
