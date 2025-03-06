@@ -3524,12 +3524,6 @@ Designed for `completion-at-point-functions', which see."
 
 ;;;; Misc
 
-(defun org-node-convert-link-to-super (&rest _)
-  "Drop input and call `org-super-links-convert-link-to-super'."
-  (require 'org-super-links)
-  (when (fboundp 'org-super-links-convert-link-to-super)
-    (org-super-links-convert-link-to-super nil)))
-
 (defun org-node-try-visit-ref-node ()
   "Designed to be added to `org-open-at-point-functions'.
 

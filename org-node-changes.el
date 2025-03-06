@@ -202,6 +202,14 @@ NAME, ARGLIST and BODY as in `defun'."
                                    'org-node-insert-link-novisit*
                                    "2.0.0 (March 2025)" "April" t)
 
+;; https://github.com/toshism/org-super-links/pull/104
+(org-node-changes--def-whiny-fn org-node-convert-link-to-super (&rest _)
+  "March 2025" "May"
+  "upgrade org-super-links and use their `org-super-links-convert-link-to-super' instead."
+  (require 'org-super-links)
+  (when (fboundp 'org-super-links-convert-link-to-super)
+    (org-super-links-convert-link-to-super nil)))
+
 (provide 'org-node-changes)
 
 ;;; org-node-changes.el ends here
