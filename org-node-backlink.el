@@ -51,7 +51,7 @@ If a warning was not needed, return nil."
   (and org-node-backlink-do-drawers
        org-node-backlink-protect-org-super-links
        (fboundp 'org-super-links-convert-link-to-super)
-       (message "%s" "
+       (display-warning 'org-node-backlink "
 A notice to users of org-super-links:
 To protect your pre-existing drawers,
 `org-node-backlink-mode' will do nothing.
@@ -63,9 +63,9 @@ set `org-node-backlink-protect-org-super-links' to nil.")))
 If a warning was not needed, return nil."
   (and org-node-backlink-do-drawers
        (org-node-backlink--props-exist-p)
-       (message "%s" "
+       (display-warning 'org-node-backlink "
 User option `org-node-backlink-do-drawers' is t,
-but found :BACKLINKS: lines in some Org entry properties,
+but found :BACKLINKS: lines in some property drawers,
 so doing nothing.
 This is a new default in v2, you probably just need to toggle it.
 Or use `org-node-backlink-mass-delete-props'.")))
