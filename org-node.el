@@ -805,6 +805,7 @@ When called from Lisp, peek on any hash table HT."
        (mapcar #'org-node-get-id (org-nodes-in-file file))))))
 
 (defun org-nodes-in-file (file)
+  "List all nodes in FILE."
   (cl-loop for node being the hash-values of org-nodes
            when (string= file (org-node-get-file node))
            collect node))
