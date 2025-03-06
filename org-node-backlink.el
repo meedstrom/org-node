@@ -243,6 +243,11 @@ Or if KIND is symbol `add-drawers', `del-drawers', `add-props', or
         (org-node-backlink--fix-nearby kind)))))
 
 (defun org-node-backlink--fix-nearby (&optional kind)
+  "In current entry, fix the backlinks drawer or property.
+Let `org-node-backlink-do-drawers' determine which.
+
+Or if KIND is symbol `add-drawers', `del-drawers', `add-props', or
+`del-props', do the corresponding thing."
   (if kind
       (pcase kind
         ('del-props   (org-node-backlink--fix-nearby-property t))
@@ -369,8 +374,7 @@ If REMOVE is non-nil, remove it instead."
             (org-entry-delete nil "BACKLINKS")))))))
 
 (defun org-node-backlink--add-to-property (id title)
-  "Compose a link string out of ID and TITLE and insert
-it in the nearby :BACKLINKS: property."
+  "Insert a link with ID and TITLE into nearby :BACKLINKS: property."
   (let ((current-backlinks-value (org-entry-get nil "BACKLINKS"))
         (new-link (org-link-make-string (concat "id:" id) title))
         new-value)
@@ -511,6 +515,7 @@ it in the nearby :BACKLINKS: property."
                     (push dest-id org-node-backlink--fails)))))))))))
 
 (defun org-node-backlink--add (id title)
+  "Add link with ID and TITLE into local backlink drawer or property."
   (if org-node-backlink-do-drawers
       (org-node-backlink--add-to-drawer id title)
     (org-node-backlink--add-to-property id title)))
@@ -622,14 +627,15 @@ May be useful with a non-default `org-id-method'."
 
 (defun org-node-backlink-format-like-org-super-links-default (id desc &optional time)
   "Example: \"[2025-02-21 Fri 14:39] <- [[id:ID][Node title]]\".
-"
+ID and DESC are link id: and description, TIME a Lisp time value."
   (concat (format-time-string (org-time-stamp-format t t)
                               (or time (current-time)))
           " <- "
           (org-link-make-string (concat "id:" id) desc)))
 
 (defun org-node-backlink-format-as-bullet-with-time (id desc &optional time)
-  "Example: \"- [2025-02-21 Fri 14:39] [[id:ID][Node title]]\"."
+  "Example: \"- [2025-02-21 Fri 14:39] [[id:ID][Node title]]\".
+ID and DESC are link id: and description, TIME a Lisp time value."
   (concat "- "
           (format-time-string (org-time-stamp-format t t)
                               (or time (current-time)))
@@ -637,7 +643,8 @@ May be useful with a non-default `org-id-method'."
           (org-link-make-string (concat "id:" id) desc)))
 
 (defun org-node-backlink-format-as-bullet-no-time (id desc &optional _time)
-  "Example: \"- [[id:ID][Node title]]\"."
+  "Example: \"- [[id:ID][Node title]]\".
+ID and DESC are link id: and description, TIME a Lisp time value."
   (concat "- " (org-link-make-string (concat "id:" id) desc)))
 
 (defun org-node-backlink--add-to-drawer (id title)

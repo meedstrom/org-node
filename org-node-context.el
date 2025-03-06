@@ -162,6 +162,7 @@ time that context was shown in a visible window.  Including:
 (defvar-local org-node-context--past nil)
 
 (defun org-node-context-history-go-back ()
+  "Show the last context."
   (interactive () org-node-context-mode)
   (when-let ((last (pop org-node-context--past)))
     (push org-node-context--current
@@ -169,6 +170,7 @@ time that context was shown in a visible window.  Including:
     (org-node-context--refresh nil last)))
 
 (defun org-node-context-history-go-forward ()
+  "Show the next context."
   (interactive () org-node-context-mode)
   (when-let ((next (pop org-node-context--future)))
     (push org-node-context--current
@@ -232,6 +234,7 @@ time that context was shown in a visible window.  Including:
       (magit-section-show-level-3-all))))
 
 (defun org-node-context--count-sections ()
+  "Return the number of Magit sections in current buffer."
   (let ((n-sections 0))
     (magit-map-sections (lambda (_) (cl-incf n-sections)))
     n-sections))
@@ -308,6 +311,7 @@ properties.  Org-mode is enabled, but the org-element cache is not."
   org-node-context-follow-local-mode)
 
 (defun org-node-context-visit-thing ()
+  "Visit the thing under point."
   (interactive () org-node-context-mode)
   (unless (derived-mode-p 'org-node-context-mode)
     (error "`org-node-context-visit-thing' called outside context buffer"))
@@ -358,6 +362,7 @@ the user invokes the command."
 
 ;;;###autoload
 (defun org-node-context-toggle ()
+  "Show the main context buffer, or hide it if already showing."
   (interactive)
   (if-let ((win (get-buffer-window org-node-context-main-buffer 'visible)))
       (quit-window nil win)
@@ -381,7 +386,8 @@ the user invokes the command."
   (when-let ((buf (get-buffer (or buf org-node-context-main-buffer))))
     (equal id (buffer-local-value 'org-node-context--current buf))))
 
-(defun org-node-context-refresh-this-buffer ()
+(defun org-node-context-refresh-this-buffer (&rest _)
+  "Designed for `revert-buffer-function'."
   (interactive () org-node-context-mode)
   (cl-assert (derived-mode-p 'org-node-context-mode))
   (org-node-context--refresh (current-buffer)))
@@ -493,6 +499,7 @@ else briefly visit the file at LINK-POS and call
              (buffer-string)))))))
 
 (defun org-node-context--extract-entry-at-point ()
+  "Return whole entry at point as a string."
   (save-excursion
     (string-trim (buffer-substring-no-properties
                   (org-back-to-heading-or-point-min)

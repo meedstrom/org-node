@@ -902,7 +902,7 @@ filenames if `org-id-locations-file-relative' is t.
 E.g. a path ~/org/file.org becomes /home/me/org/file.org after loading
 back from disk.
 
-Org-node does not do `file-equal-p', so this would be a problem."
+Org-node never checks `file-equal-p', so this would be a problem."
   (when org-id-locations-file-relative
     (maphash (lambda (id file)
                (puthash id (org-node-abbrev-file-names file) org-id-locations))
@@ -1169,6 +1169,7 @@ links with destination DEST.  These reflect a past state of
 up-to-date set.")
 
 (defun org-node--dirty-forget-links-from (dead-ids)
+  "Forget links with :origin matching any of DEAD-IDS."
   (cl-loop with reduced-link-sets = nil
            for dest being each hash-key of org-node--dest<>links
            using (hash-values link-set) do
@@ -1704,7 +1705,11 @@ Example from Org-roam: %Y%m%d%H%M%S-
 Example from Denote: %Y%m%dT%H%M%S--
 
 For the rest of the filename, configure `org-node-slug-fn'."
-  :type 'string)
+  :type '(radio
+          (const :tag "None" :value "")
+          (const :tag "Like Org-roam: %Y%m%d%H%M%S-" :value "%Y%m%d%H%M%S-")
+          (const :tag "Like Denote: %Y%m%dT%H%M%S--" :value "%Y%m%dT%H%M%S--")
+          (string :tag "Custom")))
 
 (defcustom org-node-slug-fn #'org-node-slugify-for-web
   "Function taking a node title and returning a filename component.
@@ -1787,10 +1792,12 @@ belonging to an alphabet or number system."
 ;;;; How to create new nodes
 
 (defvar org-node-proposed-title nil
-  "For use by `org-node-creation-fn'.")
+  "For use by `org-node-creation-fn'.
+Automatically set, should be nil most of the time.")
 
 (defvar org-node-proposed-id nil
-  "For use by `org-node-creation-fn'.")
+  "For use by `org-node-creation-fn'.
+Automatically set, should be nil most of the time.")
 
 (defvar org-node-proposed-seq nil
   "Key that identifies a node sequence about to be added-to.
@@ -2045,7 +2052,10 @@ To behave exactly like org-roam\\='s `org-roam-node-insert',
 see `org-node-insert-link*' and its docstring.
 
 Optional argument REGION-AS-INITIAL-INPUT t means behave as
-`org-node-insert-link*'."
+`org-node-insert-link*'.
+
+Argument IMMEDIATE means behave as
+`org-node-insert-link-novisit'."
   (interactive "*" org-mode)
   (unless (derived-mode-p 'org-mode)
     (user-error "Only works in org-mode buffers"))
@@ -2139,7 +2149,7 @@ create it and then visit it.  This will not visit it."
 
 ;;;###autoload
 (defun org-node-insert-transclusion (&optional node)
-  "Insert a #+transclude: referring to a node."
+  "Insert a #+transclude: referring to NODE, prompting if needed."
   (interactive () org-mode)
   (unless (derived-mode-p 'org-mode)
     (user-error "Only works in org-mode buffers"))
@@ -2160,6 +2170,7 @@ create it and then visit it.  This will not visit it."
 ;;;###autoload
 (defun org-node-insert-transclusion-as-subtree (&optional node)
   "Insert a link and a transclusion.
+Prompt for NODE if needed.
 
 Result will basically look like:
 
@@ -2211,6 +2222,7 @@ adding keywords to the things to exclude:
     (run-hooks 'org-node-insert-link-hook)))
 
 (defun org-node-insert-raw-link ()
+  "Complete to a link that already exists in some file, and insert it."
   (interactive)
   (insert (completing-read "Insert raw link: "
                            (org-node--list-known-raw-links)
@@ -3368,6 +3380,7 @@ Wrap the link in double-brackets if necessary."
 
 ;; TODO: Try to include all Firefox bookmarks and so on
 (defun org-node--list-known-raw-links ()
+  "Return list of all links seen in all known files."
   (let (result)
     (maphash
      (lambda (dest links)
@@ -3564,6 +3577,7 @@ If already visiting that node, then follow the link normally."
 ;;;; API used by some submodule(s)
 
 (defun org-node--delete-drawer (name)
+  "In current entry, seek and delete drawer named NAME."
   (save-restriction
     (when (org-node-narrow-to-drawer-p name)
       (delete-region (point-min) (point-max))
@@ -3738,6 +3752,7 @@ heading, else the file-level node, whichever has an ID first."
   (gethash (org-entry-get-with-inheritance "ID") org-nodes))
 
 (defun org-node-by-id (id)
+  "Return the node object known by ID."
   (gethash id org-nodes))
 
 ;; TODO: Add an extended variant that checks active region, like
