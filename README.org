@@ -67,18 +67,18 @@ The choice is controlled by variable =org-node-backlink-do-drawers=, which defau
 
 To transition all files, you can run these two commands:
 
-: M-x org-node-backlink-mass-delete-props RET
-: M-x org-node-backlink-mass-update-drawers RET
+: M-x org-node-backlink-mass-delete-props
+: M-x org-node-backlink-mass-update-drawers
 
 To see what can be customized:
 
-: M-x customize-group RET org-node-backlink RET
+: M-x customize-group RET org-node-backlink
 
 ** Context buffers
 
 The new context buffer replaces much of [[https://github.com/meedstrom/org-node-fakeroam][org-node-fakeroam]]'s hacks.
 
-For previous users, some direct substitutes:
+Some direct substitutes:
 - Command =org-node-context-raise=
   - Replaces =org-node-fakeroam-show-buffer=
 - Command =org-node-context-toggle=
@@ -98,16 +98,18 @@ MISSING features for now:
 
 To see what can be customized:
 
-: M-x customize-group RET org-node-context RET
+: M-x customize-group RET org-node-context
 
 ** Incompatible changes
 
-1. Dropped support for Emacs 28.  It likely has not worked for a while anyway.
-1. Removed a number of [[https://github.com/meedstrom/org-node/blob/v1.9/org-node-changes.el#L140][deprecated aliases]].
-2. Struct type =org-node-link= removed.
-   - A link is now a plist, so use e.g. =(plist-get LINK :pos)= instead.
+1. Dropped support for Emacs 28.
+   - Discovered that it likely has not worked for a while anyway.
+   - If you're on Emacs 28, you could try [[https://github.com/meedstrom/org-node/tree/v1.9][org-node v1.9]] (with dependency [[https://github.com/meedstrom/el-job/tree/v0.3][el-job v0.3]]), but no guarantees.  Or---since you're probably a Debian user---get Emacs 30 which recently landed in Debian trixie.
+2. Removed a number of [[https://github.com/meedstrom/org-node/blob/v1.9/org-node-changes.el#L140][deprecated aliases]].
 3. Bumped dependency [[https://github.com/meedstrom/el-job][el-job]] to the just-released v1.0.
-4. New option =org-node-backlink-do-drawers= implies a different default behavior from before, but a message will be printed to help you out.
+4. Struct type =org-node-link= removed.
+   - A link is now a plist, so use e.g. =(plist-get LINK :pos)= instead.
+5. New option =org-node-backlink-do-drawers= implies a different default behavior from before, but a message will be printed to help you out.
    - Default was changed because timestamps are hard to reconstruct later -- so it's better that they are opt-out than opt-in.
 
 * Background
@@ -212,7 +214,7 @@ Pick some short keys and try them out.
 (keymap-set org-mode-map "M-s M-i" #'org-node-insert-link)
 #+end_src
 
-To browse config options, type =M-x customize-group RET org-node RET=.
+To browse config options, type =M-x customize-group RET org-node=.
 
 Final tip: there's *no separate command* for creating a new node!  Reuse one of the commands above, and type the name of a node that doesn't exist, such as "My problems in life".  Try it and see what happens!
 
@@ -451,7 +453,7 @@ To complete words at point into known node titles:
 
 To customize how the nodes look in the minibuffer, configure =org-node-affixation-fn=:
 
-    : M-x customize-variable RET org-node-affixation-fn RET
+    : M-x customize-variable RET org-node-affixation-fn
 
 A related option is =org-node-alter-candidates=, which lets you match against the annotations as well as the title:
 
