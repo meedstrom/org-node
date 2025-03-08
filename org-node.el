@@ -1353,8 +1353,8 @@ be misleading."
                       (push (cons dest reduced-link-set) reduced-link-sets)))
            finally do
            (cl-loop for (dest . links) in reduced-link-sets do
-                    (when (or (not (boundp 'org-node-backlink-lazy))
-                              (bound-and-true-p org-node-backlink-lazy))
+                    (when (and (boundp 'org-node-backlink-lazy)
+                               (not (bound-and-true-p org-node-backlink-lazy)))
                       (push (cons dest (gethash dest org-node--dest<>links))
                             org-node--old-link-sets))
                     (puthash dest links org-node--dest<>links))))
