@@ -24,7 +24,7 @@ Feedback welcome.
 
 - If you were using *org-node 1.8.7 or older (November 2024)*, you'll have a smoother ride if you:
 
-  1. first upgrade to the latest in [[https://github.com/meedstrom/org-node/tree/v1.9][v1.9 branch]],
+  1. first upgrade to the latest in [[https://github.com/meedstrom/org-node/tree/v1.9][v1.9 branch]] (with dependency [[https://github.com/meedstrom/el-job/tree/v0.3][el-job v0.3]]),
   2. deal with any transitional warnings,
   3. /then/ upgrade to the latest version (which is the [[https://github.com/meedstrom/org-node/branches][main branch]]).
 
@@ -636,6 +636,7 @@ API cheatsheet between org-roam and org-node.
 | Get outline level                       | =(org-roam-node-level NODE)=       | =(org-node-get-level NODE)=                             |
 | Get whether this is a subtree           | =(=< 0 (org-roam-node-level NODE))= | =(org-node-is-subtree NODE)=                            |
 | Get char position                       | =(org-roam-node-point NODE)=       | =(org-node-get-pos NODE)=                               |
+| Get line number                         |                                  | =(org-node-get-lnum NODE)=                              |
 | Get properties                          | =(org-roam-node-properties NODE)=  | =(org-node-get-properties NODE)=                        |
 | Get subtree TODO state                  | =(org-roam-node-todo NODE)=        | =(org-node-get-todo NODE)=                              |
 | Get subtree SCHEDULED                   | =(org-roam-node-scheduled NODE)=   | =(org-node-get-scheduled NODE)=                         |
