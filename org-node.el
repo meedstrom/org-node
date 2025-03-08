@@ -1062,8 +1062,6 @@ In broad strokes:
      (cons '$inlinetask-min-level (bound-and-true-p org-inlinetask-min-level))
      (cons '$nonheritable-tags org-tags-exclude-from-inheritance)
      (cons '$cache-everything org-node-cache-everything)
-     (cons '$file-todo-option-re
-           (rx bol (* space) (or "#+todo: " "#+seq_todo: " "#+typ_todo: ")))
      (cons '$global-todo-re
            (let ((default (default-value 'org-todo-keywords)))
              (org-node-parser--make-todo-regexp
@@ -3624,7 +3622,6 @@ function, in which case call it to reposition point prior to calling
 
 If CREATE-WHERE returns an integer or marker, go to that position, else
 trust it to have done the appropriate buffer movements."
-  (declare (indent defun))
   (org-node-narrow-to-drawer-p name t create-where))
 
 (defun org-node-narrow-to-drawer-p

@@ -41,15 +41,14 @@
 (defvar $merged-re)
 (defvar $assume-coding-system)
 (defvar $file-name-handler-alist)
-(defvar $file-todo-option-re)
 (defvar $global-todo-re)
 (defvar $nonheritable-tags)
 (defvar $inlinetask-min-level)
+(defvar $cache-everything)
 
 (defvar $backlink-drawer-re) ;; TODO: deprecate in favor of next two
 (defvar $structures-to-ignore)
 (defvar $drawers-to-ignore)
-(defvar $cache-everything)
 
 (defvar org-node-parser--paths-types nil)
 (defvar org-node-parser--found-links nil)
@@ -57,10 +56,10 @@
 (defun org-node-parser--make-todo-regexp (keywords-string)
   "Build a regexp from KEYWORDS-STRING.
 KEYWORDS-STRING is expected to be the sort of thing you see after
-a #+todo: or #+seq_todo: or #+typ_todo: keyword in an Org file.
+a #+todo: or #+seq_todo: or #+typ_todo: setting in an Org file.
 
-The resulting regexp should be able to match any of the TODO
-keywords within."
+The resulting regexp should be able to match any of
+the custom TODO words thus defined."
   (thread-last keywords-string
                (replace-regexp-in-string "(.*?)" "")
                (string-replace "|" "")
@@ -76,7 +75,7 @@ Format string S for display - this means replace every link inside S
 with only their description if they have one, and in any case strip the
 brackets."
   (replace-regexp-in-string
-   ;; This regexp is `org-link-bracket-re'
+   ;; Copy-pasted value of `org-link-bracket-re'
    "\\[\\[\\(\\(?:[^][\\]\\|\\\\\\(?:\\\\\\\\\\)*[][]\\|\\\\+[^][]\\)+\\)]\\(?:\\[\\([^z-a]+?\\)]\\)?]"
    (lambda (m) (or (match-string 2 m) (match-string 1 m)))
    s nil t))
@@ -247,7 +246,9 @@ Also set some variables, including global variables."
     (org-node-parser--init-buf-and-switch))
   (setq org-node-parser--paths-types nil)
   (setq org-node-parser--found-links nil)
-  (let (missing-file
+  (let ((file-todo-option-re
+         (rx bol (* space) (or "#+todo: " "#+seq_todo: " "#+typ_todo: ")))
+        missing-file
         found-nodes
         unidentified-nodes
         file-mtime
@@ -333,7 +334,7 @@ Also set some variables, including global variables."
                     nil))
             (goto-char HERE)
             (setq TODO-RE
-                  (if (re-search-forward $file-todo-option-re FAR t)
+                  (if (re-search-forward file-todo-option-re FAR t)
                       (progn
                         (setq FILE-TODO-SETTINGS nil)
                         ;; Because you can have multiple #+todo: lines...
@@ -341,7 +342,7 @@ Also set some variables, including global variables."
                                  (push (buffer-substring (point) (pos-eol))
                                        FILE-TODO-SETTINGS)
                                  (re-search-forward
-                                  $file-todo-option-re FAR t)))
+                                  file-todo-option-re FAR t)))
                         (org-node-parser--make-todo-regexp
                          (string-join FILE-TODO-SETTINGS " ")))
                     $global-todo-re))
