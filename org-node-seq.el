@@ -20,9 +20,13 @@
 ;; Support programmatically defining node sequences based on such
 ;; things as tags and date-stamps.
 
-;; To Be Done: manually defining sequences
-
 ;;; Code:
+
+;; TODO: More API
+;;  - goto latest in a seq
+;;  - goto earliest
+;;  - list files in a seq
+;;  - get a seq w/o needing (alist-get "d" org-node-seqs () () #'equal)
 
 (require 'seq)
 (require 'subr-x)

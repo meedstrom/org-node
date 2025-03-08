@@ -513,12 +513,12 @@ For use as `org-node-affixation-fn'."
 
 Ahead of time, org-node takes titles and aliases from
 `org-node--title<>id', runs `org-node-affixation-fn' on each, and
-depending on the user option `org-node-alter-candidates' it
-either saves the affixed thing directly into
-`org-node--candidate<>node' or into a secondary table
+depending on the user option `org-node-alter-candidates', it
+either saves the affixated thing directly into
+`org-node--candidate<>node', or into a secondary table
 `org-node--title<>affixation-triplet'.  Finally, this function
 then either simply reads candidates off the candidates table, or
-attaches the affixations in realtime.
+attaches the affixes in realtime.
 
 Regardless of which, all completions are guaranteed to be keys of
 `org-node--candidate<>node', but remember that it is possible for
@@ -526,7 +526,7 @@ Regardless of which, all completions are guaranteed to be keys of
 match anything.
 
 Arguments STR, PRED and ACTION are handled behind the scenes,
-read more at Info node `(elisp)Programmed Completion'."
+see Info node `(elisp)Programmed Completion'."
   (if (eq action 'metadata)
       (cons 'metadata (unless org-node-alter-candidates
                         (list (cons 'affixation-function
@@ -538,6 +538,8 @@ read more at Info node `(elisp)Programmed Completion'."
 
 ;; Boost this completion hist to at least 1000 elements, unless user has nerfed
 ;; the global `history-length'.
+;; Because you often narrow down the completions majorly, and still want to
+;; sort among what's left.
 (and (>= history-length (car (get 'history-length 'standard-value)))
      (< history-length 1000)
      (put 'org-node-hist 'history-length 1000))
@@ -1225,11 +1227,11 @@ Argument JOB is the el-job object."
         (filterer (org-node--try-ensure-compiled org-node-filter-fn)))
     (dolist (node nodes)
       (let* ((id (org-node-get-id node))
-             (path (org-node-get-file node))
+             (file (org-node-get-file node))
              (refs (org-node-get-refs node)))
         ;; Share location with org-id & do so with manual `puthash'
         ;; because `org-id-add-location' would run logic we've already run
-        (puthash id path org-id-locations)
+        (puthash id file org-id-locations)
         ;; Register the node
         (puthash id node org-node--id<>node)
         (dolist (ref refs)
@@ -3139,7 +3141,6 @@ CLEANUP is a kludge related to that."
   (let ((enable-local-variables :safe)
         (org-inhibit-startup t) ;; Don't apply startup #+options
         (file-name-handler-alist nil)
-        ;; (coding-system-for-read org-node-perf-assume-coding-system)
         (find-file-hook nil)
         (after-save-hook nil)
         (before-save-hook nil)
