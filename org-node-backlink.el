@@ -141,6 +141,7 @@ In short, this mode is not meant to be toggled on its own.
 
 (defvar org-node-backlink--work-kind nil)
 (defvar org-node-backlink--work-files nil)
+(defvar org-node-backlink--work-reenable-on-done nil)
 
 (defun org-node-backlink-mass-update-drawers ()
   "Add or update backlinks drawers in all files."
@@ -192,28 +193,23 @@ Can be quit midway through and resumed later.  With
           (setq org-node-backlink--work-files files))))
     ;; Resume working thru the file list
     (when org-node-backlink--work-files
-      (org-node-backlink-mode 0)
-      (if (memq kind '(del-drawers del-props))
-          (setq org-node-backlink--work-files
-                (org-node--in-files-do
-                  :files org-node-backlink--work-files
-                  :msg "Removing :BACKLINKS: (you can quit and resume)"
-                  :about-to-do "About to remove backlinks"
-                  :call (##org-node-backlink-fix-buffer kind)
-                  :too-many-files-hack t
-                  :cleanup (when org-node-backlink-mode
-                             (org-node-backlink-mode 0)
-                             #'org-node-backlink-mode)))
-        (setq org-node-backlink--work-files
-              (org-node--in-files-do
-                :files org-node-backlink--work-files
-                :msg "Adding/updating :BACKLINKS: (you can quit and resume)"
-                :about-to-do "About to edit backlinks"
-                :call (##org-node-backlink-fix-buffer kind)
-                :too-many-files-hack t
-                :cleanup (when org-node-backlink-mode
-                           (org-node-backlink-mode 0)
-                           #'org-node-backlink-mode))))
+      (setq org-node-backlink--work-files
+            (org-node--in-files-do
+              :files org-node-backlink--work-files
+              :msg (if (memq kind '(del-drawers del-props))
+                       "Removing :BACKLINKS: (you can quit and resume)"
+                     "Adding/updating :BACKLINKS: (you can quit and resume)")
+              :about-to-do "About to edit :BACKLINKS:"
+              :call (##org-node-backlink-fix-buffer kind)
+              :too-many-files-hack t
+              :cleanup
+              (when org-node-backlink-mode
+                (setq org-node-backlink--work-reenable-on-done t)
+                (org-node-backlink-mode 0)
+                (lambda ()
+                  (when org-node-backlink--work-reenable-on-done
+                    (setq org-node-backlink--work-reenable-on-done nil)
+                    (org-node-backlink-mode))))))
       (when (null org-node-backlink--work-files)
         (if (memq kind '(del-drawers del-props))
             (message "Done removing :BACKLINKS:!")
