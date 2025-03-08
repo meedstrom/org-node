@@ -24,6 +24,7 @@
 (require 'org-node)
 (require 'org-node-parser)
 (require 'org-node-backlink)
+(require 'org-node-seq)
 
 (ert-deftest org-node/test-various ()
   ;; (should (-all-p #'plistp
@@ -88,7 +89,7 @@
 
 (ert-deftest org-node/test-time-format-hacks ()
   (let ((fmt "Wild%Y--%m%dexample%H%M%S-"))
-    (should (equal (org-node-extract-ymd
+    (should (equal (org-node-seq-extract-ymd
                     (format-time-string fmt '(26300 36406 109008 201000))
                     fmt)
                    "2024-08-14"))))

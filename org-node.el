@@ -754,6 +754,46 @@ When called from Lisp, peek on any hash table HT."
 
 ;;;; The mode
 
+(defvar org-node--time-elapsed 1.0
+  "Duration of the last cache reset.")
+
+(defvar org-node--idle-timer (timer-create)
+  "Timer for intermittently checking `org-node-extra-id-dirs'.
+for new, changed or deleted files, then resetting the cache.
+
+This redundant behavior helps detect changes made by something
+other than the current instance of Emacs, such as an user typing
+rm on the command line instead of using \\[delete-file].
+
+This timer is set by `org-node--maybe-adjust-idle-timer'.
+Override that function to configure timer behavior.")
+
+(defun org-node--maybe-adjust-idle-timer ()
+  "Adjust `org-node--idle-timer' based on duration of last scan.
+If not running, start it."
+  (let ((new-delay (* 25 (1+ org-node--time-elapsed))))
+    (when (or (not (member org-node--idle-timer timer-idle-list))
+              ;; Don't enter an infinite loop -- idle timers can be a footgun.
+              (not (> (float-time (or (current-idle-time) 0))
+                      new-delay)))
+      (cancel-timer org-node--idle-timer)
+      (setq org-node--idle-timer
+            (run-with-idle-timer new-delay t #'org-node--scan-all)))))
+
+;; TODO: The idle timer will detect new files appearing, created by other
+;;       emacsen, but won't run the hook `org-node-rescan-functions' on them,
+;;       which would be good to do.  So check for new files and then try to
+;;       use `org-node--scan-targeted', since that runs the hook, but it is
+;;       easy to imagine a pitfall where the list of new files is just all
+;;       files, and then we do NOT want to run the hook.  So use a heuristic
+;;       cutoff like 10 files.
+;; (defun org-node--catch-unknown-modifications ()
+;;   (let ((new (-difference (org-node-list-files) (org-node-list-files t)))))
+;;   (if (> 10 )
+;;       (org-node--scan-all)
+;;     (org-node--scan-targeted))
+;;   )
+
 ;;;###autoload
 (define-minor-mode org-node-cache-mode
   "Instruct various hooks to keep the cache updated.
@@ -824,43 +864,6 @@ When called from Lisp, peek on any hash table HT."
   (cl-loop for node being the hash-values of org-nodes
            when (string= file (org-node-get-file node))
            collect node))
-
-(defvar org-node--idle-timer (timer-create)
-  "Timer for intermittently checking `org-node-extra-id-dirs'.
-for new, changed or deleted files, then resetting the cache.
-
-This redundant behavior helps detect changes made by something
-other than the current instance of Emacs, such as an user typing
-rm on the command line instead of using \\[delete-file].
-
-This timer is set by `org-node--maybe-adjust-idle-timer'.
-Override that function to configure timer behavior.")
-
-(defun org-node--maybe-adjust-idle-timer ()
-  "Adjust `org-node--idle-timer' based on duration of last scan.
-If not running, start it."
-  (let ((new-delay (* 25 (1+ org-node--time-elapsed))))
-    (when (or (not (member org-node--idle-timer timer-idle-list))
-              ;; Don't enter an infinite loop -- idle timers can be a footgun.
-              (not (> (float-time (or (current-idle-time) 0))
-                      new-delay)))
-      (cancel-timer org-node--idle-timer)
-      (setq org-node--idle-timer
-            (run-with-idle-timer new-delay t #'org-node--scan-all)))))
-
-;; TODO: The idle timer will detect new files appearing, created by other
-;;       emacsen, but won't run the hook `org-node-rescan-functions' on them,
-;;       which would be good to do.  So check for new files and then try to
-;;       use `org-node--scan-targeted', since that runs the hook, but it is
-;;       easy to imagine a pitfall where the list of new files is just all
-;;       files, and then we do NOT want to run the hook.  So use a heuristic
-;;       cutoff like 10 files.
-;; (defun org-node--catch-unknown-modifications ()
-;;   (let ((new (-difference (org-node-list-files) (org-node-list-files t)))))
-;;   (if (> 10 )
-;;       (org-node--scan-all)
-;;     (org-node--scan-targeted))
-;;   )
 
 (defvar org-node--new-unsaved-buffers nil
   "List of buffers created to hold a new node.")
@@ -1042,6 +1045,11 @@ In broad strokes:
      :inputs (ensure-list files)
      :callback #'org-node--finalize-modified)))
 
+;; New 2025-03-08
+;; https://github.com/BurntSushi/ripgrep/discussions/3013
+(defvar org-node-cache-everything nil)
+(defvar org-node--file<>lnum.node (make-hash-table :test #'equal))
+
 (defun org-node--mk-work-vars ()
   "Return an alist of symbols and values to set in subprocesses."
   (let ((reduced-plain-re (org-node--mk-plain-re org-node-link-types)))
@@ -1112,6 +1120,11 @@ Make it target only LINK-TYPES instead of all the cars of
 
 ;;;; Scan-finalizers
 
+(defcustom org-node-warn-title-collisions t
+  "Whether to print messages on finding duplicate node titles."
+  :group 'org-node
+  :type 'boolean)
+
 (defvar org-node--first-init t
   "Non-nil until org-node has been initialized, then nil.
 Mainly for muffling some messages.")
@@ -1119,10 +1132,19 @@ Mainly for muffling some messages.")
 (defvar org-node-before-update-tables-hook nil
   "Hook run just before processing results from scan.")
 
-;; New 2025-03-08
-;; https://github.com/BurntSushi/ripgrep/discussions/3013
-(defvar org-node-cache-everything nil)
-(defvar org-node--file<>lnum.node (make-hash-table :test #'equal))
+(defvar org-node--collisions nil
+  "Alist of node title collisions.")
+
+(defvar org-node--problems nil
+  "Alist of errors encountered by org-node-parser.")
+
+(defvar org-node--old-link-sets nil
+  "For use by `org-node-backlink-lazy'.
+
+Alist of ((DEST . LINKS) (DEST . LINKS) ...), where LINKS is are sets of
+links with destination DEST.  These reflect a past state of
+`org-node--dest<>links', allowing for a diff operation against the
+up-to-date set.")
 
 (defun org-node--finalize-full (results job)
   "Wipe tables and repopulate from data in RESULTS.
@@ -1254,9 +1276,6 @@ Argument JOB is the el-job object."
                 (puthash title affx org-node--title<>affixation-triplet)
                 (puthash title node org-node--candidate<>node)))))))))
 
-(defvar org-node--time-elapsed 1.0
-  "Duration of the last cache reset.")
-
 (defun org-node--print-elapsed (&rest _)
   "Print time elapsed since start of `org-node--scan-all'.
 Also report statistics about the nodes and links found.
@@ -1318,14 +1337,6 @@ be misleading."
 
 ;;;; "Dirty" functions
 ;; Help keep the cache reasonably in sync without having to do a full reset
-
-(defvar org-node--old-link-sets nil
-  "For use by `org-node-backlink-aggressive'.
-
-Alist of ((DEST . LINKS) (DEST . LINKS) ...), where LINKS is are sets of
-links with destination DEST.  These reflect a past state of
-`org-node--dest<>links', allowing for a diff operation against the
-up-to-date set.")
 
 (defun org-node--dirty-forget-links-from (dead-ids)
   "Forget links with :origin matching any of DEAD-IDS."
@@ -1858,6 +1869,30 @@ Automatically set, should be nil most of the time.")
           (org-node--scan-all)))
     (error "`org-node--goto' received a nil argument")))
 
+(defcustom org-node-creation-fn #'org-node-new-file
+  "Function called to create a node that does not yet exist.
+Used by commands such as `org-node-find'.
+
+Some choices:
+- `org-node-new-file'
+- `org-node-fakeroam-new-via-roam-capture'
+- `org-capture'
+
+It is pointless to choose `org-capture' here unless you configure
+`org-capture-templates' such that some capture templates use
+`org-node-capture-target' as their target.
+
+If you wish to write a custom function instead of any of the
+above three choices, know that two variables are set at the time
+the function is called: `org-node-proposed-title' and
+`org-node-proposed-id', which it is expected to obey."
+  :group 'org-node
+  :type '(radio
+          (function-item org-node-new-file)
+          (function-item org-node-fakeroam-new-via-roam-capture)
+          (function-item org-capture)
+          (function :tag "Custom function" :value (lambda ()))))
+
 ;; TODO: "Create" sounds unspecific, rename to "New node"?
 (defun org-node-create (title id &optional seq-key)
   "Call `org-node-creation-fn' with necessary variables set.
@@ -1889,30 +1924,6 @@ To operate on a node after creating it, either let-bind
     (setq org-node-proposed-title nil)
     (setq org-node-proposed-id nil)
     (setq org-node-proposed-seq nil)))
-
-(defcustom org-node-creation-fn #'org-node-new-file
-  "Function called to create a node that does not yet exist.
-Used by commands such as `org-node-find'.
-
-Some choices:
-- `org-node-new-file'
-- `org-node-fakeroam-new-via-roam-capture'
-- `org-capture'
-
-It is pointless to choose `org-capture' here unless you configure
-`org-capture-templates' such that some capture templates use
-`org-node-capture-target' as their target.
-
-If you wish to write a custom function instead of any of the
-above three choices, know that two variables are set at the time
-the function is called: `org-node-proposed-title' and
-`org-node-proposed-id', which it is expected to obey."
-  :group 'org-node
-  :type '(radio
-          (function-item org-node-new-file)
-          (function-item org-node-fakeroam-new-via-roam-capture)
-          (function-item org-capture)
-          (function :tag "Custom function" :value (lambda ()))))
 
 (defun org-node-new-file ()
   "Create a file-level node.
@@ -2990,14 +3001,6 @@ one of them is associated with a ROAM_REFS property."
          :entries entries)
       (message "No links found"))))
 
-(defcustom org-node-warn-title-collisions t
-  "Whether to print messages on finding duplicate node titles."
-  :group 'org-node
-  :type 'boolean)
-
-(defvar org-node--collisions nil
-  "Alist of node title collisions.")
-
 (defun org-node-list-collisions ()
   "Pop up a buffer listing node title collisions."
   (interactive)
@@ -3023,9 +3026,6 @@ one of them is associated with a ROAM_REFS property."
                                                'follow-link t))))))
     (message "Congratulations, no title collisions! (in %d filtered nodes)"
              (hash-table-count org-node--title<>id))))
-
-(defvar org-node--problems nil
-  "Alist of errors encountered by org-node-parser.")
 
 (defun org-node-list-scan-problems ()
   "Pop up a buffer listing errors found by org-node-parser."
