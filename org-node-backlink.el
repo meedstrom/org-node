@@ -620,8 +620,8 @@ S1 before S2 if the strings sans org-ids satisfy `string<'."
 S1 before S2 if the IDs inside satisfy `string<'.
 
 May be useful with a non-default `org-id-method'."
-  (string< (replace-regexp-in-string "\\[\\[id:.*?]" "" s1)
-           (replace-regexp-in-string "\\[\\[id:.*?]" "" s2)))
+  (string< (org-node-backlink--extract-id s1)
+           (org-node-backlink--extract-id s2)))
 
 (defun org-node-backlink-format-like-org-super-links-default
     (id desc &optional time)
