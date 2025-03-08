@@ -583,6 +583,8 @@ and never nil.")
   (level      nil :read-only t :type integer :documentation
               "Amount of stars in the node heading. A file-level node has 0.
 See also `org-node-is-subtree'.")
+  (lnum       nil :read-only t :type integer :documentation
+              "Line number.")
   (olp        nil :read-only t :type list :documentation
               "Outline path to this node, i.e. a list of ancestor headings.
 Excludes file title.  To include it, try `org-node-get-olp-full'.")
@@ -1051,6 +1053,7 @@ In broad strokes:
      (cons '$assume-coding-system org-node-perf-assume-coding-system)
      (cons '$inlinetask-min-level (bound-and-true-p org-inlinetask-min-level))
      (cons '$nonheritable-tags org-tags-exclude-from-inheritance)
+     (cons '$cache-everything org-node-cache-everything)
      (cons '$file-todo-option-re
            (rx bol (* space) (or "#+todo: " "#+seq_todo: " "#+typ_todo: ")))
      (cons '$global-todo-re
@@ -1116,6 +1119,11 @@ Mainly for muffling some messages.")
 (defvar org-node-before-update-tables-hook nil
   "Hook run just before processing results from scan.")
 
+;; New 2025-03-08
+;; https://github.com/BurntSushi/ripgrep/discussions/3013
+(defvar org-node-cache-everything nil)
+(defvar org-node--file<>lnum.node (make-hash-table :test #'equal))
+
 (defun org-node--finalize-full (results job)
   "Wipe tables and repopulate from data in RESULTS.
 JOB is the el-job object."
@@ -1126,8 +1134,9 @@ JOB is the el-job object."
   (clrhash org-node--title<>id)
   (clrhash org-node--ref<>id)
   (clrhash org-node--file<>mtime)
+  (clrhash org-node--file<>lnum.node)
   (setq org-node--collisions nil) ;; To be populated by `org-node--record-nodes'
-  (seq-let (missing-files file.mtime nodes path.type links problems) results
+  (seq-let (missing-files file.mtime nodes path.type links problems unidentified) results
     (org-node--forget-id-locations missing-files)
     (dolist (link links)
       (push link (gethash (plist-get link :dest) org-node--dest<>links)))
@@ -1140,6 +1149,13 @@ JOB is the el-job object."
     ;; reflects reality.
     (setq org-id-files (mapcar #'car file.mtime))
     (org-node--record-nodes nodes)
+    (when org-node-cache-everything
+      (dolist (node unidentified)
+        (let ((file (org-node-get-file node))
+              (lnum (org-node-get-lnum node)))
+          ;; already ordered by line number
+          ;; because any given file was scanned sequentially by a single process
+          (push (cons lnum node) (gethash file org-node--file<>lnum.node)))))
     (run-hooks 'org-node--mid-scan-hook)
     (setq org-node--time-elapsed
           ;; For more reproducible profiling: don't count time spent on
@@ -1430,6 +1446,7 @@ also necessary is `org-node--dirty-ensure-link-known' elsewhere."
                :level (or (org-current-level) 0)
                :olp (org-get-outline-path)
                ;; Less important
+               :lnum (line-number-at-pos (org-entry-beginning-position) t)
                :properties props
                :tags-local (org-get-tags nil t)
                :tags-inherited (org-node--tags-at-point-inherited-only)

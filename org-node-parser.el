@@ -49,6 +49,7 @@
 (defvar $backlink-drawer-re) ;; TODO: deprecate in favor of next two
 (defvar $structures-to-ignore)
 (defvar $drawers-to-ignore)
+(defvar $cache-everything)
 
 (defvar org-node-parser--paths-types nil)
 (defvar org-node-parser--found-links nil)
@@ -248,11 +249,12 @@ Also set some variables, including global variables."
   (setq org-node-parser--found-links nil)
   (let (missing-file
         found-nodes
+        unidentified-nodes
         file-mtime
         problem
         HEADING-POS HERE FAR END ID-HERE ID FILE-ID CRUMBS
         DRAWER-BEG DRAWER-END
-        TITLE FILE-TITLE
+        TITLE FILE-TITLE LNUM
         TODO-STATE TODO-RE FILE-TODO-SETTINGS
         TAGS FILE-TAGS HERITABLE-TAGS
         SCHED DEADLINE PRIORITY LEVEL PROPS)
@@ -285,7 +287,8 @@ Also set some variables, including global variables."
             (erase-buffer)
             (insert-file-contents FILE))
           ;; Verify there is at least one ID-node
-          (unless (re-search-forward "^[\t\s]*:id: " nil t)
+          (unless (or $cache-everything
+                      (re-search-forward "^[\t\s]*:id: " nil t))
             (throw 'file-done t))
           (goto-char 1)
 
@@ -378,6 +381,7 @@ Also set some variables, including global variables."
                             FILE-TITLE
                             FILE-ID
                             0
+                            1
                             nil
                             1
                             nil
@@ -404,6 +408,7 @@ Also set some variables, including global variables."
           ;; Loop over the file's headings
           (while (not (eobp))
             (catch 'entry-done
+              (setq LNUM (line-number-at-pos)) ;; slow-ish
               ;; Narrow til next heading
               (narrow-to-region (point)
                                 (save-excursion
@@ -501,30 +506,34 @@ Also set some variables, including global variables."
                        finally do
                        (push (list LEVEL TITLE ID HERITABLE-TAGS)
                              CRUMBS))
-              (when ID
-                (push (record 'org-node
-                              (split-string-and-unquote
-                               (or (cdr (assoc "ROAM_ALIASES" PROPS)) ""))
-                              DEADLINE
-                              FILE
-                              FILE-TITLE
-                              ID
-                              LEVEL
-                              (nreverse (mapcar #'cadr (cdr CRUMBS)))
-                              HEADING-POS
-                              PRIORITY
-                              PROPS
-                              (org-node-parser--split-refs-field
-                               (cdr (assoc "ROAM_REFS" PROPS)))
-                              SCHED
-                              TAGS
-                              (delete-dups
-                               (apply #'append
-                                      FILE-TAGS
-                                      (mapcar #'cadddr (cdr CRUMBS))))
-                              TITLE
-                              TODO-STATE)
-                      found-nodes))
+              (let ((record
+                     (record 'org-node
+                             (split-string-and-unquote
+                              (or (cdr (assoc "ROAM_ALIASES" PROPS)) ""))
+                             DEADLINE
+                             FILE
+                             FILE-TITLE
+                             ID
+                             LEVEL
+                             LNUM
+                             (nreverse (mapcar #'cadr (cdr CRUMBS)))
+                             HEADING-POS
+                             PRIORITY
+                             PROPS
+                             (org-node-parser--split-refs-field
+                              (cdr (assoc "ROAM_REFS" PROPS)))
+                             SCHED
+                             TAGS
+                             (delete-dups
+                              (apply #'append
+                                     FILE-TAGS
+                                     (mapcar #'cadddr (cdr CRUMBS))))
+                             TITLE
+                             TODO-STATE)))
+                (if ID
+                    (push record found-nodes)
+                  (when $cache-everything
+                    (push record unidentified-nodes))))
 
               ;; Heading analyzed, now collect links in entry body!
 
@@ -572,7 +581,8 @@ Also set some variables, including global variables."
           found-nodes
           org-node-parser--paths-types
           org-node-parser--found-links
-          (if problem (list problem)))))
+          (if problem (list problem))
+          unidentified-nodes)))
 
 (provide 'org-node-parser)
 
