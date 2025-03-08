@@ -254,18 +254,20 @@ Or if KIND is symbol `add-drawers', `del-drawers', `add-props', or
         (org-node-backlink--fix-nearby-drawer)
       (org-node-backlink--fix-nearby-property))))
 
+(defvar org-node-backlink--inhibit-flagging nil)
 (defun org-node-backlink--flag-buffer-modification (beg end _n-deleted-chars)
   "Add text property `org-node-flag' to region between BEG and END.
 
 Designed for `after-change-functions', where this effectively flags
 all areas where text is added/changed/deleted.  Where text was
 purely deleted, this flags the preceding and succeeding char."
-  (with-silent-modifications
-    (if (= beg end)
-        (put-text-property (max (1- beg) (point-min))
-                           (min (1+ end) (point-max))
-                           'org-node-flag t)
-      (put-text-property beg end 'org-node-flag t))))
+  (unless org-node-backlink--inhibit-flagging
+    (with-silent-modifications
+      (if (= beg end)
+          (put-text-property (max (1- beg) (point-min))
+                             (min (1+ end) (point-max))
+                             'org-node-flag t)
+        (put-text-property beg end 'org-node-flag t)))))
 
 (defun org-node-backlink--fix-flagged-parts-of-buffer ()
   "Fix backlinks around parts of buffer that have been modified.
@@ -304,34 +306,31 @@ headings but you have only done work under one of them."
                   (set-marker end (or (text-property-not-all
                                        start (point-max) 'org-node-flag prop)
                                       (point-max)))
+                  (cl-assert (not (= start end)))
                   (when prop
                     (goto-char start)
                     ;; START and END delineate an area where changes were
                     ;; detected, but the area rarely envelops the current
-                    ;; subtree's property drawer, likely placed long before
+                    ;; tree's property drawer, likely placed long before
                     ;; START, so search back for it
                     (save-excursion
-                      (let ((id-here (org-entry-get-with-inheritance "ID")))
-                        (and id-here
-                             (re-search-backward
-                              (concat "^[\t\s]*:id: +"
-                                      (regexp-quote id-here))
-                              nil t)
-                             (org-node-backlink--fix-nearby))))
+                      (and (org-entry-get-with-inheritance "ID")
+                           (goto-char org-entry-property-inherited-from)
+                           (org-node-backlink--fix-nearby)))
                     ;; ...and if the change-area is massive, spanning multiple
                     ;; subtrees (like after a big yank), update each subtree
                     ;; within
                     (while (and (< (point) end)
-                                (re-search-forward
-                                 "^[\t\s]*:id: +" end t))
+                                (re-search-forward "^[\t\s]*:id: +" end t))
                       (org-node-backlink--fix-nearby))
                     (remove-text-properties start end 'org-node-flag))
                   ;; This change-area dealt with, move on
                   (set-marker start (marker-position end)))
                 (set-marker start nil)
                 (set-marker end nil))))
-        (( t error debug )
-         (remove-text-properties (point-min) (point-max) 'org-node-flag)
+        (( error )
+         (unless (remove-text-properties 1 (point-max) 'org-node-flag)
+           (message "org-node: Did not remove org-node-flag text property"))
          ;; Provide backtrace even tho we don't signal an error
          (when debug-on-error
            (backtrace))
@@ -404,10 +403,8 @@ If REMOVE is non-nil, remove it instead."
       (setq new-value new-link))
     (unless (equal new-value current-backlinks-value)
       (let ((user-is-editing (buffer-modified-p))
-            ;; Prevent reacting to this edit (redundant)
-            (after-change-functions
-             (remq 'org-node-backlink--flag-buffer-modification
-                   after-change-functions)))
+            ;; Prevent reacting to this edit (would be redundant at best)
+            (org-node-backlink--inhibit-flagging t))
         (org-entry-put nil "BACKLINKS" new-value)
         (unless user-is-editing
           (let ((before-save-hook nil)
@@ -579,19 +576,23 @@ marker, point will move to that position."
 That means the first part of a [[id][description]]."
   (with-temp-buffer
     (insert text)
-    (goto-char 1)
+    (goto-char (point-min))
     (when (search-forward "[[id:" nil t)
-      (buffer-substring (point) (- (search-forward "]") 1)))))
+      (buffer-substring-no-properties (point)
+                                      (- (re-search-forward "].\\|::")
+                                         2)))))
 
 (defun org-node-backlink--extract-link-desc (text)
   "Get first link description out of TEXT.
 That means the second part of a [[id][description]]."
   (with-temp-buffer
     (insert text)
-    (goto-char 1)
+    (goto-char (point-min))
     (when (and (search-forward "[[id:" nil t)
                (search-forward "][" nil t))
-      (buffer-substring (point) (- (search-forward "]]") 2)))))
+      (buffer-substring-no-properties (point)
+                                      (- (search-forward "]]")
+                                         2)))))
 
 (defun org-node-backlink-timestamp-lessp (s1 s2)
   "Sort on first Org timestamp in the line.
@@ -649,33 +650,35 @@ Designed for use by `org-node-backlink--add-in-target'."
   (if (or (org-node-backlink--check-v2-misaligned-setting-p)
           (org-node-backlink--check-osl-user-p))
       (org-node-backlink-mode 0)
-    (save-restriction
-      (org-node-narrow-to-drawer-create
-        "BACKLINKS" org-node-backlink-drawer-positioner)
-      (catch 'break
-        (let (lines)
-          (while (search-forward "[[id:" (pos-eol) t)
-            (let ((id-found (buffer-substring-no-properties
-                             (point)
-                             (1- (search-forward "]")))))
-              (if (equal id-found id)
-                  ;; No need to do anything
-                  (throw 'break nil)
-                (push (buffer-substring-no-properties (pos-bol) (pos-eol))
-                      lines)
-                (forward-line 1))))
-          (insert "\n"
-                  (funcall org-node-backlink-drawer-formatter id title)
-                  "\n")
-          ;; Re-sort so the just-inserted link ends up in the correct place
-          (let ((sorted-lines
-                 (sort (split-string (buffer-string) "\n" t)
-                       org-node-backlink-drawer-sorter)))
-            (when org-node-backlink-drawer-sort-in-reverse
-              (setq sorted-lines (nreverse sorted-lines)))
-            (atomic-change-group
-              (delete-region (point-min) (point-max))
-              (insert (string-join sorted-lines "\n")))))))))
+    (save-excursion
+      (save-restriction
+        (org-node-narrow-to-drawer-create
+          "BACKLINKS" org-node-backlink-drawer-positioner)
+        (catch 'break
+          (let (lines)
+            (while (search-forward "[[id:" (pos-eol) t)
+              (let ((id-found (buffer-substring-no-properties
+                               (point)
+                               (- (re-search-forward "].\\|::") 2))))
+                (if (equal id-found id)
+                    ;; No need to link to itself
+                    (throw 'break nil)
+                  (push (buffer-substring-no-properties (pos-bol) (pos-eol))
+                        lines)
+                  (forward-line 1))))
+            (let ((org-node-backlink--inhibit-flagging t))
+              (insert "\n"
+                      (funcall org-node-backlink-drawer-formatter id title)
+                      "\n")
+              ;; Re-sort so the just-inserted link ends up in the correct place
+              (let ((sorted-lines
+                     (sort (split-string (buffer-string) "\n" t)
+                           org-node-backlink-drawer-sorter)))
+                (when org-node-backlink-drawer-sort-in-reverse
+                  (setq sorted-lines (nreverse sorted-lines)))
+                (atomic-change-group
+                  (delete-region (point-min) (point-max))
+                  (insert (string-join sorted-lines "\n")))))))))))
 
 (defun org-node-backlink--fix-nearby-drawer (&optional remove)
   "Update nearby backlinks drawer so it reflects current reality.
@@ -690,43 +693,45 @@ If REMOVE non-nil, remove it instead."
                                    (org-node-get-reflinks-to node))
                            (mapcar (##plist-get % :origin))
                            (delete-dups))))
-      (save-restriction
-        (org-node-narrow-to-drawer-create
-          "BACKLINKS" org-node-backlink-drawer-positioner)
-        (let* ((lines (split-string (buffer-string) "\n" t))
-               (already-present-ids
-                (seq-keep #'org-node-backlink--extract-id lines))
-               (to-add      (seq-difference   origins already-present-ids))
-               (to-remove   (seq-difference   already-present-ids origins))
-               (to-reformat (seq-intersection already-present-ids origins)))
-          ;; Add new, remove stale, reformat the rest
-          (dolist (id to-remove)
-            (save-excursion
-              (search-forward id)
-              (delete-line)))
-          (dolist (id to-reformat)
-            (save-excursion
-              (search-forward id)
-              (back-to-indentation)
-              (let ((line (buffer-substring (point) (pos-eol))))
-                (atomic-change-group
-                  (delete-region (point) (pos-eol))
-                  (insert (org-node-backlink--reformat-line line))))))
-          (dolist (id to-add)
-            (when-let* ((known-node (gethash id org-nodes)))
-              (let ((title (org-node-get-title known-node)))
-                (indent-according-to-mode)
-                (insert (funcall org-node-backlink-drawer-formatter id title)
-                        "\n"))))
-          ;; Members are correct, now re-sort so the order is correct
-          (let ((sorted-lines
-                 (sort (split-string (buffer-string) "\n" t)
-                       org-node-backlink-drawer-sorter)))
-            (when org-node-backlink-drawer-sort-in-reverse
-              (setq sorted-lines (nreverse sorted-lines)))
-            (atomic-change-group
-              (delete-region (point-min) (point-max))
-              (insert (string-join sorted-lines "\n")))))))))
+      (save-excursion
+        (save-restriction
+          (org-node-narrow-to-drawer-create
+            "BACKLINKS" org-node-backlink-drawer-positioner)
+          (let* ((org-node-backlink--inhibit-flagging t)
+                 (lines (split-string (buffer-string) "\n" t))
+                 (already-present-ids
+                  (seq-keep #'org-node-backlink--extract-id lines))
+                 (to-add      (seq-difference   origins already-present-ids))
+                 (to-remove   (seq-difference   already-present-ids origins))
+                 (to-reformat (seq-intersection already-present-ids origins)))
+            ;; Add new, remove stale, reformat the rest
+            (dolist (id to-remove)
+              (save-excursion
+                (search-forward id)
+                (delete-line)))
+            (dolist (id to-reformat)
+              (save-excursion
+                (search-forward id)
+                (back-to-indentation)
+                (let ((line (buffer-substring (point) (pos-eol))))
+                  (atomic-change-group
+                    (delete-region (point) (pos-eol))
+                    (insert (org-node-backlink--reformat-line line))))))
+            (dolist (id to-add)
+              (when-let* ((known-node (gethash id org-nodes)))
+                (let ((title (org-node-get-title known-node)))
+                  (indent-according-to-mode)
+                  (insert (funcall org-node-backlink-drawer-formatter id title)
+                          "\n"))))
+            ;; Membership is correct, now re-sort so the order is correct
+            (let ((sorted-lines
+                   (sort (split-string (buffer-string) "\n" t)
+                         org-node-backlink-drawer-sorter)))
+              (when org-node-backlink-drawer-sort-in-reverse
+                (setq sorted-lines (nreverse sorted-lines)))
+              (atomic-change-group
+                (delete-region (point-min) (point-max))
+                (insert (string-join sorted-lines "\n"))))))))))
 
 (defun org-node-backlink--reformat-line (line)
   "Pass LINE back through `org-node-backlink-drawer-formatter'."
