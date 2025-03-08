@@ -233,8 +233,8 @@ Or if KIND is symbol `add-drawers', `del-drawers', `add-props', or
     ;; (message "Fixing file %s" buffer-file-name)
     (goto-char (point-min))
     (let ((case-fold-search t))
-      ;; NOTE: If there is an entry that has :BACKLINKS:, but no :ID:, it will
-      ;;       never be touched, but that's on the user.
+      ;; NOTE: If there is an entry that has :BACKLINKS:, but that has lost its
+      ;;       :ID:, it will never be touched again, but that's on the user.
       (while (re-search-forward "^[ \t]*:id:[ \t]*[[:graph:]]" nil t)
         (org-node-backlink--fix-nearby kind)))))
 
@@ -289,14 +289,15 @@ headings but you have only done work under one of them."
           (save-excursion
             (without-restriction
               ;; Iterate over each change-region.  Algorithm borrowed from
-              ;; `ws-butler-map-changes', odd but elegant.  Worth knowing that
-              ;; if you tell Emacs to search for text that has a given
+              ;; `ws-butler-map-changes', odd but elegant.  Worth knowing
+              ;; that if you tell Emacs to search for text that has a given
               ;; text-property with a nil value, that's the same as searching
               ;; for text without that property at all.  So if position START
-              ;; is in some unmodified area -- "org-node-flag" is effectively
-              ;; valued at nil -- this way of calling `text-property-not-all'
-              ;; means search forward until it is t.  Then calling it again has
-              ;; the opposite effect, searching until it is nil again.
+              ;; is in some unmodified area -- property `org-node-flag' is
+              ;; effectively valued at nil -- this way of calling
+              ;; `text-property-not-all' means search forward until it is t.
+              ;; Then calling it again has the opposite effect, searching
+              ;; until it is nil again.
               (let ((start (point-min-marker))
                     (end (make-marker))
                     (case-fold-search t)
@@ -622,7 +623,8 @@ May be useful with a non-default `org-id-method'."
   (string< (replace-regexp-in-string "\\[\\[id:.*?]" "" s1)
            (replace-regexp-in-string "\\[\\[id:.*?]" "" s2)))
 
-(defun org-node-backlink-format-like-org-super-links-default (id desc &optional time)
+(defun org-node-backlink-format-like-org-super-links-default
+    (id desc &optional time)
   "Example: \"[2025-02-21 Fri 14:39] <- [[id:ID][Node title]]\".
 ID and DESC are link id: and description, TIME a Lisp time value."
   (concat (format-time-string (org-time-stamp-format t t)
@@ -744,22 +746,27 @@ If REMOVE non-nil, remove it instead."
 
 ;;; Proactive fixing
 
+;; REVIEW: Only comes into effect on `org-node-rescan-functions', but could
+;;         also other times?  Possible the algo could be simpler, rather than
+;;         diffing `org-node--old-link-sets' from current, simply look in
+;;         `org-node-get-properties' of all nodes...
+
 (defcustom org-node-backlink-lazy nil
-  "Defer updating backlinks until user edits the affected entry.
+  "Inhibit cleaning up backlinks until user edits affected entry.
 
 Background: Regardless of this value, links inserted via most commands
-will also insert a backlink in real time, so long as
+will insert a backlink in real time, so long as
 `org-node-backlink-mode' is enabled.
 
-This value is instead about how eagerly to clean backlinks that have
-become stale.
+If in the future the user deletes that link, the corresponding backlink
+becomes stale.  This value controls what to do upon noticing that.
 
 When t, they are not cleaned until you carry out some edits under the
-heading that holds the stale backlinks, and save that buffer.
+heading that holds the stale backlink, and save that buffer.
 That can be desirable for e.g. quieter git diffs.
 
-When nil, all affected nodes are visited silently to update the
-:BACKLINKS: properties or drawers, to reflect reality at all times.
+When nil, all affected nodes are silently visited after a save if needed
+to ensure that their :BACKLINKS: properties or drawers reflect reality.
 
 To clarify, this is solely about the textual contents of :BACKLINKS:
 properties or drawers; the underlying link tables are up to date anyway.
@@ -788,6 +795,7 @@ To force an update at any time, use one of these commands:
              :test #'equal)
        do (let* ((id dest)
                  (node (or (gethash id org-nodes)
+                           ;; See if this is a ref and find the real id
                            (and (setq id (gethash dest org-node--ref<>id))
                                 (gethash id org-nodes)))))
             ;; (#59) Do nothing if this is an empty link like [[id:]]
@@ -816,10 +824,10 @@ To force an update at any time, use one of these commands:
                        (concat "^[\t\s]*:id: +" (regexp-quote id))
                        nil t)
                   (org-node-backlink--fix-nearby)))
+              ;; Normally, `org-node--with-quick-file-buffer' only saves
+              ;; buffers it had to open anew.  Let's save even if it was
+              ;; open previously.
               (unless user-is-editing
-                ;; Normally, `org-node--with-quick-file-buffer' only saves
-                ;; buffers it had to open anew.  Let's save even if it was
-                ;; open.
                 (let ((before-save-hook nil)
                       (after-save-hook nil))
                   (save-buffer)))))))))

@@ -281,7 +281,7 @@ Also set some variables, including global variables."
           ;; NOTE: Don't use `insert-file-contents-literally'!  It sets
           ;;       `coding-system-for-read' to `no-conversion', which results
           ;;       in wrong values for HEADING-POS when the file contains
-          ;;       Unicode.  We get close to similar performance just
+          ;;       Unicode.  You get close to similar performance just
           ;;       overriding `coding-system-for-read' to some fixed value, and
           ;;       especially minimizing `file-name-handler-alist'.
           (let ((inhibit-read-only t))
