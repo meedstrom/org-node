@@ -95,10 +95,12 @@
                    "2024-08-14"))))
 
 (ert-deftest org-node/test-parsing-testfile2.org ()
-  (org-node--scan-targeted
-   (list (file-name-concat (file-name-directory (locate-library "org-node"))
-                           "test"
-                           "testfile2.org")))
+  (let ((file (file-name-concat
+               (file-name-directory (locate-library "org-node"))
+               "test"
+               "testfile2.org")))
+    (should (file-exists-p file))
+    (org-node--scan-targeted (list file)))
   (org-node-cache-ensure t)
   (let ((node (gethash "bb02315f-f329-4566-805e-1bf17e6d892d" org-node--id<>node)))
     (should (equal (org-node-get-olp node) nil))
