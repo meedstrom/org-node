@@ -30,9 +30,8 @@ name: "CI"
 on:
   pull_request:
   push:
-    # Comment out this section to enable testing of all branches.
     branches:
-      - main
+      - dev
 
 jobs:
   build:
