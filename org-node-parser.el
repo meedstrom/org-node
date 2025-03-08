@@ -300,10 +300,12 @@ Also set some variables, including global variables."
               (progn
                 (setq FILE-ID nil)
                 (setq FILE-TITLE nil)
+                (setq LNUM 1)
                 (setq TODO-RE $global-todo-re))
             ;; Narrow until first heading
             (when (org-node-parser--next-heading)
               (narrow-to-region 1 (point))
+              (setq LNUM (line-number-at-pos))
               (goto-char 1))
             ;; Rough equivalent of `org-end-of-meta-data' for the file
             ;; level front matter, can jump somewhat too far but that's ok
@@ -408,7 +410,6 @@ Also set some variables, including global variables."
           ;; Loop over the file's headings
           (while (not (eobp))
             (catch 'entry-done
-              (setq LNUM (line-number-at-pos)) ;; slow-ish
               ;; Narrow til next heading
               (narrow-to-region (point)
                                 (save-excursion
@@ -562,6 +563,7 @@ Also set some variables, including global variables."
               (goto-char (or DRAWER-END HERE))
               (org-node-parser--collect-links-until (point-max) ID-HERE))
             (goto-char (point-max))
+            (setq LNUM (+ LNUM (line-number-at-pos)))
             (widen))
 
           (setq file-mtime
