@@ -1178,34 +1178,6 @@ JOB is the el-job object."
 (defvar org-node--mid-scan-hook nil
   "Hook run after tables were updated but before the final timestamp.")
 
-(defvar org-node--old-link-sets nil
-  "For use by `org-node-backlink-aggressive'.
-
-Alist of ((DEST . LINKS) (DEST . LINKS) ...), where LINKS is are sets of
-links with destination DEST.  These reflect a past state of
-`org-node--dest<>links', allowing for a diff operation against the
-up-to-date set.")
-
-(defun org-node--dirty-forget-links-from (dead-ids)
-  "Forget links with :origin matching any of DEAD-IDS."
-  (cl-loop with reduced-link-sets = nil
-           for dest being each hash-key of org-node--dest<>links
-           using (hash-values link-set) do
-           (cl-loop with update-this-dest = nil
-                    for link in link-set
-                    if (member (plist-get link :origin) dead-ids)
-                    do (setq update-this-dest t)
-                    else collect link into reduced-link-set
-                    finally do
-                    (when update-this-dest
-                      (push (cons dest reduced-link-set) reduced-link-sets)))
-           finally do
-           (cl-loop for (dest . links) in reduced-link-sets do
-                    (unless (bound-and-true-p org-node-backlink-lazy)
-                      (push (cons dest (gethash dest org-node--dest<>links))
-                            org-node--old-link-sets))
-                    (puthash dest links org-node--dest<>links))))
-
 (defun org-node--finalize-modified (results job)
   "Use RESULTS to update tables.
 Argument JOB is the el-job object."
@@ -1346,6 +1318,35 @@ be misleading."
 
 ;;;; "Dirty" functions
 ;; Help keep the cache reasonably in sync without having to do a full reset
+
+(defvar org-node--old-link-sets nil
+  "For use by `org-node-backlink-aggressive'.
+
+Alist of ((DEST . LINKS) (DEST . LINKS) ...), where LINKS is are sets of
+links with destination DEST.  These reflect a past state of
+`org-node--dest<>links', allowing for a diff operation against the
+up-to-date set.")
+
+(defun org-node--dirty-forget-links-from (dead-ids)
+  "Forget links with :origin matching any of DEAD-IDS."
+  (cl-loop with reduced-link-sets = nil
+           for dest being each hash-key of org-node--dest<>links
+           using (hash-values link-set) do
+           (cl-loop with update-this-dest = nil
+                    for link in link-set
+                    if (member (plist-get link :origin) dead-ids)
+                    do (setq update-this-dest t)
+                    else collect link into reduced-link-set
+                    finally do
+                    (when update-this-dest
+                      (push (cons dest reduced-link-set) reduced-link-sets)))
+           finally do
+           (cl-loop for (dest . links) in reduced-link-sets do
+                    (when (or (not (boundp 'org-node-backlink-lazy))
+                              (bound-and-true-p org-node-backlink-lazy))
+                      (push (cons dest (gethash dest org-node--dest<>links))
+                            org-node--old-link-sets))
+                    (puthash dest links org-node--dest<>links))))
 
 (defun org-node--dirty-forget-files (files)
   "Remove from cache, info about nodes/refs in FILES.
