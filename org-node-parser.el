@@ -390,7 +390,6 @@ Also set some variables, including global variables."
                             nil
                             FILE-TAGS
                             nil
-                            ;; Title mandatory
                             (or FILE-TITLE (file-name-nondirectory FILE))
                             nil)
                     found-nodes))

@@ -1114,8 +1114,8 @@ The alist is sorted by LNUM.")
                            (stringp org-super-links-backlink-into-drawer)
                            org-super-links-backlink-into-drawer)
                       "BACKLINKS")
-                  (or (bound-and-true-p org-node-backlink-drawer-name)
-                      "BACKLINKS"))))
+                  "BACKLINKS"
+                  "LOGBOOK")))
      (cons '$backlink-drawer-re
            (concat "^[\t\s]*:"
                    (or (and (require 'org-super-links nil t)
@@ -1311,12 +1311,7 @@ Argument JOB is the el-job object."
 
 (defun org-node--print-elapsed (&rest _)
   "Print time elapsed since start of `org-node--scan-all'.
-Also report statistics about the nodes and links found.
-
-Currently, the printed message implies that all of org-node\\='s
-data were collected within the time elapsed, so you should not
-run this function after only a partial scan, as the message would
-be misleading."
+Also report statistics about the nodes and links found."
   (if (not org-node-cache-mode)
       (message "Scan complete (Hint: Turn on org-node-cache-mode)")
     (let ((n-subtrees (cl-loop
