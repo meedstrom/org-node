@@ -7,8 +7,7 @@
 #+TEXINFO_DIR_TITLE: Org-node: (org-node).
 #+TEXINFO_DIR_DESC: Link org-id entries into a network.
 * News for v2.0 :noexport:
-# Oneliner because ox-texinfo does not understand #+BEGIN_HTML,
-# and GitHub's org parser does not understand #+BEGIN_EXPORT HTML.
+# Must use #+HTML oneliner because ox-texinfo does not understand #+BEGIN_HTML, and GitHub's org parser does not understand #+BEGIN_EXPORT HTML.
 #+HTML: <a href="https://repology.org/project/emacs%3Aorg-node/versions"> <img src="https://repology.org/badge/vertical-allrepos/emacs%3Aorg-node.svg" alt="Packaging status" align="right"> </a>
 
 Version 2.0 is out, with two major features:
@@ -72,23 +71,22 @@ To transition all files, you can run these two commands:
 : M-x org-node-backlink-mass-delete-props
 : M-x org-node-backlink-mass-update-drawers
 
-To see what can be customized:
+See what can be customized:
 
 : M-x customize-group RET org-node-backlink
 
 ** Context buffers
 
-The new context buffer replaces much of [[https://github.com/meedstrom/org-node-fakeroam][org-node-fakeroam]]'s hacks.
+The new context buffer replaces org-roam buffer, and with it, much of [[https://github.com/meedstrom/org-node-fakeroam][org-node-fakeroam]].
 
 Some direct substitutes:
-- Command =org-node-context-raise=
-  - Replaces =org-node-fakeroam-show-buffer=
-- Command =org-node-context-toggle=
-  - Replaces =org-roam-buffer-toggle=
-- Minor mode =org-node-context-follow-mode=
-  - Replaces =org-node-fakeroam-redisplay-mode=
-- Variable =org-node-context-persist-on-disk=
-  - Replaces =org-node-fakeroam-fast-render-persist=
+
+| New                              | Old (dependent on org-roam)           |
+|----------------------------------+---------------------------------------|
+| =org-node-context-raise=           | =org-node-fakeroam-show-buffer=         |
+| =org-node-context-toggle=          | =org-roam-buffer-toggle=                |
+| =org-node-context-follow-mode=     | =org-node-fakeroam-redisplay-mode=      |
+| =org-node-context-persist-on-disk= | =org-node-fakeroam-fast-render-persist= |
 
 You no longer need these:
 - Minor mode =org-node-fakeroam-jit-backlinks-mode=
@@ -98,7 +96,7 @@ MISSING features for now:
 - org-roam's "node-dedicated" buffers
 - grep sections (but see command =org-node-grep=)
 
-To see what can be customized:
+See what can be customized:
 
 : M-x customize-group RET org-node-context
 
@@ -106,11 +104,11 @@ To see what can be customized:
 
 1. Dropped support for Emacs 28.
    - Discovered that it likely has not worked for a while anyway.
-   - If you're on Emacs 28, you could try [[https://github.com/meedstrom/org-node/tree/v1.9][org-node v1.9]] (with dependency [[https://github.com/meedstrom/el-job/tree/v0.3][el-job v0.3]]), but no guarantees.  Or---since you're probably a Debian user---get Emacs 30 which recently landed in Debian trixie.
+   - If you're on Emacs 28, you could try [[https://github.com/meedstrom/org-node/tree/v1.9][org-node v1.9]] (with dependency [[https://github.com/meedstrom/el-job/tree/v0.3][el-job v0.3]] on latest commit within that branch), but no guarantees.  Or---since you're probably a Debian user---get Emacs 30 which recently landed in Debian trixie.
 2. Removed a number of [[https://github.com/meedstrom/org-node/blob/v1.9/org-node-changes.el#L140][deprecated aliases]].
 3. Bumped dependency [[https://github.com/meedstrom/el-job][el-job]] to the just-released v1.0.
 4. Struct type =org-node-link= removed.
-   - A link is now a plist, so use e.g. =(plist-get LINK :pos)= instead.
+   - A link is now a plist, so use e.g. =(plist-get LINK :pos)= instead of =(org-node-link-pos LINK)=.
 5. New option =org-node-backlink-do-drawers= implies a different default behavior from before, but a message will be printed to help you out.
    - Default was changed because timestamps are hard to reconstruct later -- so it's better that they are opt-out than opt-in.
 

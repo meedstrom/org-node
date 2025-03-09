@@ -262,20 +262,19 @@ Also set some variables, including global variables."
     (condition-case err
         (catch 'file-done
           (when (not (file-readable-p FILE))
-            ;; If FILE does not exist (not readable), user probably deleted
-            ;; or renamed a file.  If it was a rename, hopefully the new name
-            ;; is also in the file list.  Else, like if it was done outside
-            ;; Emacs by typing `mv' on the command line, it gets picked up on
-            ;; next scan.
+            ;; FILE does not exist, user probably deleted or renamed a file.
+            ;; If it was a rename, hopefully the new name is also in the file
+            ;; list.  Else, like if it was done outside Emacs by typing `mv' on
+            ;; the command line, it gets picked up on next scan.
             (setq missing-file FILE)
             (throw 'file-done t))
           ;; Skip symlinks for two reasons:
           ;; - Causes duplicates if the true file is also in the file list.
-          ;; - For performance, the codebase rarely uses `file-truename' or
-          ;;   `file-equal-p'.
-          ;; Note that symlinks should not count as missing files, since they
-          ;; get re-picked up every time by `org-node-list-files', leading to
-          ;; pointlessly repeating `org-node--forget-id-locations'.
+          ;; - The codebase rarely uses `file-truename' or `file-equal-p'.
+          ;; Note that symlinks should not be treated how we treat missing
+          ;; files, since they get re-picked up every time by
+          ;; `org-node-list-files', leading to pointlessly repeating
+          ;; `org-node--forget-id-locations'.
           (when (file-symlink-p FILE)
             (throw 'file-done t))
           ;; NOTE: Don't use `insert-file-contents-literally'!  It sets
@@ -287,7 +286,7 @@ Also set some variables, including global variables."
           (let ((inhibit-read-only t))
             (erase-buffer)
             (insert-file-contents FILE))
-          ;; Verify there is at least one ID-node
+          ;; PERF: Verify there is at least one ID-node
           (unless (or $cache-everything
                       (re-search-forward "^[\t\s]*:id: " nil t))
             (throw 'file-done t))

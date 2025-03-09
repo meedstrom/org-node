@@ -47,7 +47,6 @@
 
 ;;   + Compatible (you can use both packages and compare)
 ;;   + Fast
-;;     + Speedup factor around 500x
 ;;   + No SQLite
 ;;   + Never again sit through a slow `org-id-update-id-locations'
 ;;   + If you want, opt out of those file-level :PROPERTIES: drawers
@@ -236,7 +235,7 @@ Picking a specific system can speed up `org-node-reset' somewhat.
 Set nil to let Emacs figure it out anew on every file.
 
 This setting is likely only noticeable with a low
-`el-job--machine-cores' \(1-3) or you have a gigantic Org file.
+`num-processors' \(1-3) or you have a gigantic Org file.
 
 On MS Windows this probably should be nil.  Same if you access
 your files from multiple platforms.
@@ -388,8 +387,8 @@ In other words: you can match against the node's outline path, if
 as `org-node-affixation-fn' is set to `org-node-prefix-with-olp'
 \(default).
 
-\(Tip: users of the orderless library from July 2024 do not need this
-setting, they can match against the prefix and suffix in any command via
+\(Tip: users of the \"orderless\" library do not need this
+setting, they can always match against the prefix and suffix via
 `orderless-annotation', bound to the character \& by default.)
 
 Another consequence: this setting can lift the uniqueness constraint on
@@ -874,11 +873,11 @@ Only applicable if the buffer\\='s file had not yet been written to
 disk, and the buffer is unmodified.
 
 This exists to allow you to create a node, especially a journal note for
-today, change your mind, do an `undo' to empty the buffer, then browse
-to the previous day\\='s note.  When later you want to create today\\='s
-note after all, the sequence\\='s :creator function should be made to
-run again, but will only do so if the buffer has been properly deleted
-since, thus this hook."
+today via library \"org-node-seq\", change your mind, do an `undo' to
+empty the buffer, then browse to the previous day\\='s note.  When later
+you want to create today\\='s note after all, the seq\\='s :creator
+function should be made to run again, but it will not do so if the
+buffer appears to already exist, thus this hook."
   (unless (minibufferp)
     (dolist (buf org-node--new-unsaved-buffers)
       (if (or (not (buffer-live-p buf))
@@ -1473,7 +1472,9 @@ also necessary is `org-node--dirty-ensure-link-known' elsewhere."
   "Like `org-get-tags', but get only the inherited tags.
 Respects `org-tags-exclude-from-inheritance'."
   (let ((all-tags (if org-use-tag-inheritance
-                      ;; NOTE: Above variable can have complex rules
+                      ;; NOTE: Above option can have complex rules.
+                      ;; Ironically, this will handle them correctly, while
+                      ;; `org-node-parser--scan-file' will not.
                       (org-get-tags)
                     (let ((org-use-tag-inheritance t)
                           (org-trust-scanner-tags nil))
