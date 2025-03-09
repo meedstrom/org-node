@@ -368,19 +368,13 @@ nothing."
 (defun org-node-seq--jump (key)
   "Prompt for and jump to an entry in node seq identified by KEY."
   (let* ((seq (cdr (assoc key org-node-seqs)))
-         (sortstr (if (eq 2 (plist-get seq :version))
-                      (funcall (plist-get seq :prompter) key)
-                    (funcall (plist-get seq :prompter) seq)))
+         (sortstr (funcall (plist-get seq :prompter) key))
          (item (assoc sortstr (plist-get seq :sorted-items))))
     (if item
         (unless (funcall (plist-get seq :try-goto) item)
           (delete item (plist-get seq :sorted-items))
-          (if (eq 2 (plist-get seq :version))
-              (funcall (plist-get seq :creator) sortstr key)
-            (funcall (plist-get seq :creator) sortstr)))
-      (if (eq 2 (plist-get seq :version))
-          (funcall (plist-get seq :creator) sortstr key)
-        (funcall (plist-get seq :creator) sortstr)))))
+          (funcall (plist-get seq :creator) sortstr key))
+      (funcall (plist-get seq :creator) sortstr key))))
 
 (defun org-node-seq--goto-next (key)
   "Visit the next entry in node seq identified by KEY."
@@ -455,20 +449,18 @@ Unlike `org-node-proposed-seq', does not need to revert to nil.")
     ;; Almost identical to `org-node-seq--jump'
     (let* ((seq (cdr (assoc key org-node-seqs)))
            (sortstr (or org-node-proposed-title
-                        (if (eq 2 (plist-get seq :version))
-                            (funcall (plist-get seq :prompter) key)
-                          (funcall (plist-get seq :prompter) seq))))
+                        (funcall (plist-get seq :prompter) key)))
            (item (assoc sortstr (plist-get seq :sorted-items))))
       (when (or (null item)
                 (not (funcall (plist-get seq :try-goto) item)))
         ;; TODO: Move point after creation to most appropriate place
-        (if (eq 2 (plist-get seq :version))
-            (funcall (plist-get seq :creator) sortstr key)
-          (funcall (plist-get seq :creator) sortstr))))))
+        (funcall (plist-get seq :creator) sortstr key)))))
 
 (defun org-node-seq--build-from-def (def)
   "From DEF, make a plist for `org-node-seqs'.
 DEF is a seq-def from `org-node-seq-defs'."
+  (unless (plist-get def :version)
+    (user-error "Seq def :version must be 2 or higher"))
   (let ((classifier (org-node--try-ensure-compiled
                      (plist-get (cdr def) :classifier))))
     (nconc
