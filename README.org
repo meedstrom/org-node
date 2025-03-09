@@ -18,6 +18,8 @@ Version 2.0 is out, with two major features:
 
 Feedback welcome.
 
+(UPDATE: v2.2.1 fixes the backlink drawers, didn't /quite/ work right and could trigger an infinite loop freezing Emacs)
+
 ** Upgrade notice
 
 - Emacs 29+ required
