@@ -1456,7 +1456,9 @@ also necessary is `org-node--dirty-ensure-link-known' elsewhere."
                :level (or (org-current-level) 0)
                :olp (org-get-outline-path)
                ;; Less important
-               :lnum (line-number-at-pos (org-entry-beginning-position) t)
+               :lnum (line-number-at-pos
+                      (if heading (org-entry-beginning-position) 1)
+                      t)
                :properties props
                :tags-local (org-get-tags nil t)
                :tags-inherited (org-node--tags-at-point-inherited-only)
