@@ -1371,27 +1371,6 @@ be misleading."
 ;;;; "Dirty" functions
 ;; Help keep the cache reasonably in sync without having to do a full reset
 
-(defun org-node--dirty-forget-links-from (dead-ids)
-  "Forget links with :origin matching any of DEAD-IDS."
-  (cl-loop with reduced-link-sets = nil
-           for dest being each hash-key of org-node--dest<>links
-           using (hash-values link-set) do
-           (cl-loop with update-this-dest = nil
-                    for link in link-set
-                    if (member (plist-get link :origin) dead-ids)
-                    do (setq update-this-dest t)
-                    else collect link into reduced-link-set
-                    finally do
-                    (when update-this-dest
-                      (push (cons dest reduced-link-set) reduced-link-sets)))
-           finally do
-           (cl-loop for (dest . links) in reduced-link-sets do
-                    (when (and (boundp 'org-node-backlink-lazy)
-                               (not (bound-and-true-p org-node-backlink-lazy)))
-                      (push (cons dest (gethash dest org-node--dest<>links))
-                            org-node--old-link-sets))
-                    (puthash dest links org-node--dest<>links))))
-
 (defun org-node--dirty-forget-files (files)
   "Remove from cache, info about nodes/refs in FILES.
 
@@ -1424,6 +1403,32 @@ For a thorough cleanup, you should also run
      using (hash-values node)
      when (member (org-node-get-file node) files)
      do (remhash candidate org-node--candidate<>node))))
+
+(defun org-node--dirty-forget-links-from (dead-ids)
+  "Forget links with :origin matching any of DEAD-IDS.
+
+Note that this cleanup operation is rarely important, relative to the
+performance cost \(at worst, user may see \"undead backlinks\" for a
+while), so it is reasonable to omit this step and let the tables fix
+themselves the next time `org-node--idle-timer' fires."
+  (cl-loop with reduced-link-sets = nil
+           for dest being each hash-key of org-node--dest<>links
+           using (hash-values link-set) do
+           (cl-loop with update-this-dest = nil
+                    for link in link-set
+                    if (member (plist-get link :origin) dead-ids)
+                    do (setq update-this-dest t)
+                    else collect link into reduced-link-set
+                    finally do
+                    (when update-this-dest
+                      (push (cons dest reduced-link-set) reduced-link-sets)))
+           finally do
+           (cl-loop for (dest . links) in reduced-link-sets do
+                    (when (and (boundp 'org-node-backlink-lazy)
+                               (not (bound-and-true-p org-node-backlink-lazy)))
+                      (push (cons dest (gethash dest org-node--dest<>links))
+                            org-node--old-link-sets))
+                    (puthash dest links org-node--dest<>links))))
 
 (defun org-node--dirty-ensure-link-known (&optional id &rest _)
   "Record the ID-link at point.
