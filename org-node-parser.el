@@ -561,7 +561,7 @@ Also set some variables, including global variables."
               (goto-char (or DRAWER-END HERE))
               (org-node-parser--collect-links-until (point-max) ID-HERE))
             (goto-char (point-max))
-            (setq LNUM (+ LNUM (line-number-at-pos)))
+            (setq LNUM (+ (- LNUM 1) (line-number-at-pos)))
             (widen))
 
           (setq file-mtime
