@@ -250,7 +250,6 @@ Also set some variables, including global variables."
          (rx bol (* space) (or "#+todo: " "#+seq_todo: " "#+typ_todo: ")))
         missing-file
         found-nodes
-        unidentified-nodes
         file-mtime
         problem
         HEADING-POS HERE FAR END ID-HERE ID FILE-ID CRUMBS
@@ -300,12 +299,10 @@ Also set some variables, including global variables."
               (progn
                 (setq FILE-ID nil)
                 (setq FILE-TITLE nil)
-                (setq LNUM 1)
                 (setq TODO-RE $global-todo-re))
             ;; Narrow until first heading
             (when (org-node-parser--next-heading)
               (narrow-to-region 1 (point))
-              (setq LNUM (line-number-at-pos))
               (goto-char 1))
             ;; Rough equivalent of `org-end-of-meta-data' for the file
             ;; level front matter, can jump somewhat too far but that's ok
@@ -402,6 +399,7 @@ Also set some variables, including global variables."
             (widen))
 
           ;; Prep
+          (setq LNUM (line-number-at-pos))
           (setq CRUMBS nil)
           (setq FILE-TAGS (cl-loop for tag in FILE-TAGS
                                    unless (member tag $nonheritable-tags)

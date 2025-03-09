@@ -886,34 +886,36 @@ buffer appears to already exist, thus this hook."
           (setq org-node--new-unsaved-buffers
                 (delq buf org-node--new-unsaved-buffers))
         (with-current-buffer buf
-          (when (and (not (get-buffer-window buf t)) ;; Buffer is not visible
-                     (string-blank-p (buffer-string))
-                     (not (buffer-modified-p)))
+          (when (and (not (get-buffer-window buf t))
+                     (not (buffer-modified-p))
+                     (string-blank-p (buffer-string)))
             (when buffer-auto-save-file-name
               ;; Hopefully throw away a stale autosave
+              ;; since its existence annoys the user on re-creating the file
               (do-auto-save nil t))
             (org-node--dirty-forget-completions-in (list buffer-file-truename))
             (org-node--dirty-forget-files (list buffer-file-truename))
             (kill-buffer buf)))))))
 
 ;; Fixed in 036e8dcf0463517749f8b32ca828b923e584625f
-;; which unfortunately did NOT make it into Emacs 30.1's Org 9.7.11.
+;; which unfortunately did NOT make it into Emacs 30.1.
 (define-advice org-id-locations-load
     (:after () org-node--abbrev-org-id-locations)
   "Maybe abbreviate all filenames in `org-id-locations'.
 
-Due to an oversight, org-id does not re-abbreviate after reconstructing
-filenames if `org-id-locations-file-relative' is t.
+Due to an oversight, `org-id-locations-load' before Org 9.7.17 does not
+re-abbreviate filenames after reconstructing them if
+`org-id-locations-file-relative' is t.
 
-E.g. a path ~/org/file.org becomes /home/me/org/file.org after loading
-back from disk.
-
-Org-node never checks `file-equal-p', so this would be a problem."
+For example, a path ~/org/file.org becomes /home/me/org/file.org after
+loading back from disk.  That would at best cause duplicate entries in
+org-node\\='s tables since they almost never ensure `file-equal-p'."
   (when org-id-locations-file-relative
     (maphash (lambda (id file)
                (puthash id (org-node-abbrev-file-names file) org-id-locations))
              org-id-locations)))
 
+;; Undo above patch if not needed.
 (when (and (bound-and-true-p org-version) (version<= "9.7.17" org-version))
   (advice-remove 'org-id-locations-load
                  'org-id-locations-load@org-node--abbrev-org-id-locations))
@@ -1122,12 +1124,12 @@ Make it target only LINK-TYPES instead of all the cars of
   :group 'org-node
   :type 'boolean)
 
+(defvar org-node-before-update-tables-hook nil
+  "Hook run just before processing results from scan.")
+
 (defvar org-node--first-init t
   "Non-nil until org-node has been initialized, then nil.
 Mainly for muffling some messages.")
-
-(defvar org-node-before-update-tables-hook nil
-  "Hook run just before processing results from scan.")
 
 (defvar org-node--collisions nil
   "Alist of node title collisions.")
@@ -1441,8 +1443,8 @@ also necessary is `org-node--dirty-ensure-link-known' elsewhere."
             (org-node--record-nodes
              (list
               (org-node--make-obj
-               :title (or heading ftitle)
                :id id
+               :title (or heading ftitle)
                :file fpath
                :file-title ftitle
                :aliases (split-string-and-unquote
@@ -1454,10 +1456,9 @@ also necessary is `org-node--dirty-ensure-link-known' elsewhere."
                ;;       also does not correct for that
                :level (or (org-current-level) 0)
                :olp (org-get-outline-path)
-               ;; Less important
-               :lnum (line-number-at-pos
-                      (if heading (org-entry-beginning-position) 1)
-                      t)
+               :lnum (if heading (line-number-at-pos
+                                  (org-entry-beginning-position) t)
+                       1)
                :properties props
                :tags-local (org-get-tags nil t)
                :tags-inherited (org-node--tags-at-point-inherited-only)
