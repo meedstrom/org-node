@@ -1046,10 +1046,42 @@ In broad strokes:
      :inputs (ensure-list files)
      :callback #'org-node--finalize-modified)))
 
-;; New 2025-03-08
 ;; https://github.com/BurntSushi/ripgrep/discussions/3013
-(defvar org-node-cache-everything nil)
-(defvar org-node--file<>lnum.node (make-hash-table :test #'equal))
+(defcustom org-node-cache-everything nil
+  "Whether to scan all files and nodes, not just those with ID.
+
+This does not affect completion-candidates in user commands such as
+\\[org-node-find], which only include nodes with ID.
+
+Intended for programmers who may have use for data in
+`org-node--file<>lnum.node'.
+Nil by default, because it takes longer to scan that much data."
+  :type 'boolean
+  :package-version '(org-node . "2.3.0"))
+
+;; TODO: Possibly rename "node" to "entry" here.
+;;       Perhaps someone could define a complete glossary of terms.  Feel I
+;;       should crowd-source that effort to other pedants, as I'm undecided
+;;       on some things.  Often pros/cons to using a given term.
+(defvar org-node--file<>lnum.node (make-hash-table :test #'equal)
+  "1:N table mapping files to alists describing all Org entries inside.
+If the table is empty, see `org-node-cache-everything'.
+
+Each member of the alist looks like \(LNUM . NODE).
+
+Integer LNUM is the line-number of the heading \(or 1, if it represents
+the content before the first heading, although note that it could simply
+be a heading that starts on the first line - use `org-node-get-level' if
+you need to distinguish this).
+
+Object NODE has the same shape as any table value in
+`org-node--id<>node', but unlike those, the ID can be nil.
+
+In practice, you can often expect a given file in this table to be
+associated with a larger collection of nodes, than you would see in the
+result of `org-nodes-in-file', due to lack of constraint on having ID.
+
+The alist is sorted by LNUM.")
 
 (defun org-node--mk-work-vars ()
   "Return an alist of symbols and values to set in subprocesses."
@@ -1157,7 +1189,7 @@ JOB is the el-job object."
   (clrhash org-node--file<>mtime)
   (clrhash org-node--file<>lnum.node)
   (setq org-node--collisions nil) ;; To be populated by `org-node--record-nodes'
-  (seq-let (missing-files file.mtime nodes path.type links problems unidentified) results
+  (seq-let (missing-files file.mtime nodes path.type links problems) results
     (org-node--forget-id-locations missing-files)
     (dolist (link links)
       (push link (gethash (plist-get link :dest) org-node--dest<>links)))
@@ -1167,16 +1199,9 @@ JOB is the el-job object."
              do (puthash file mtime org-node--file<>mtime))
     ;; Update `org-id-files' even though it is not needed to keep org-id
     ;; functional, because downstream uses may assume that this variable
-    ;; reflects reality.
+    ;; reflects reality.  Costs some GC.
     (setq org-id-files (mapcar #'car file.mtime))
     (org-node--record-nodes nodes)
-    (when org-node-cache-everything
-      (dolist (node unidentified)
-        (let ((file (org-node-get-file node))
-              (lnum (org-node-get-lnum node)))
-          ;; already ordered by line number
-          ;; because any given file was scanned sequentially by a single process
-          (push (cons lnum node) (gethash file org-node--file<>lnum.node)))))
     (run-hooks 'org-node--mid-scan-hook)
     (setq org-node--time-elapsed
           ;; For more reproducible profiling: don't count time spent on
@@ -1235,45 +1260,54 @@ Argument JOB is the el-job object."
   (let ((affixator (org-node--try-ensure-compiled org-node-affixation-fn))
         (filterer (org-node--try-ensure-compiled org-node-filter-fn)))
     (dolist (node nodes)
-      (let* ((id (org-node-get-id node))
-             (file (org-node-get-file node))
-             (refs (org-node-get-refs node)))
-        ;; Share location with org-id & do so with manual `puthash'
-        ;; because `org-id-add-location' would run logic we've already run
-        (puthash id file org-id-locations)
-        ;; Register the node
-        (puthash id node org-node--id<>node)
-        (dolist (ref refs)
-          (puthash ref id org-node--ref<>id))
-        ;; Setup completion candidates
-        (when (funcall filterer node)
-          ;; Let refs work as aliases
+      (let ((id (org-node-get-id node))
+            (file (org-node-get-file node))
+            (refs (org-node-get-refs node))
+            (lnum (org-node-get-lnum node)))
+        (when org-node-cache-everything
+          (push (cons lnum node) (gethash file org-node--file<>lnum.node)))
+        (when id
+          ;; Share location with org-id & do so with manual `puthash'
+          ;; because `org-id-add-location' would run logic we've already run
+          (puthash id file org-id-locations)
+          ;; Register the node
+          (puthash id node org-node--id<>node)
           (dolist (ref refs)
-            (puthash ref node org-node--candidate<>node)
-            (puthash ref
-                     (let ((type (gethash ref org-node--ref-path<>ref-type)))
-                       (list (propertize ref 'face 'org-cite)
-                             (when type
-                               (propertize (concat type ":")
-                                           'face 'completions-annotations))
-                             nil))
-                     org-node--title<>affixation-triplet))
-          (dolist (title (cons (org-node-get-title node)
-                               (org-node-get-aliases node)))
-            (let ((collision (gethash title org-node--title<>id)))
-              (when (and collision (not (equal id collision)))
-                (push (list title id collision) org-node--collisions)))
-            (puthash title id org-node--title<>id)
-            (let ((affx (funcall affixator node title)))
-              (if org-node-alter-candidates
-                  ;; Absorb the affixations into one candidate string
-                  (puthash (concat (nth 1 affx) (nth 0 affx) (nth 2 affx))
-                           node
-                           org-node--candidate<>node)
-                ;; Bare title as candidate, to be affixated in realtime by
-                ;; `org-node-collection'
-                (puthash title affx org-node--title<>affixation-triplet)
-                (puthash title node org-node--candidate<>node)))))))))
+            (puthash ref id org-node--ref<>id))
+          ;; Setup completion candidates
+          (when (funcall filterer node)
+            ;; Let refs work as aliases
+            (dolist (ref refs)
+              (puthash ref node org-node--candidate<>node)
+              (puthash ref
+                       (let ((type (gethash ref org-node--ref-path<>ref-type)))
+                         (list (propertize ref 'face 'org-cite)
+                               (when type
+                                 (propertize (concat type ":")
+                                             'face 'completions-annotations))
+                               nil))
+                       org-node--title<>affixation-triplet))
+            ;; Normal completions
+            (dolist (title (cons (org-node-get-title node)
+                                 (org-node-get-aliases node)))
+              (let ((collision (gethash title org-node--title<>id)))
+                (when (and collision (not (equal id collision)))
+                  (push (list title id collision) org-node--collisions)))
+              (puthash title id org-node--title<>id)
+              (let ((affx (funcall affixator node title)))
+                ;; REVIEW: We could move this conditional into the internals of
+                ;;         `org-node--affixate-collection', keeping things
+                ;;         self-contained.  But doing it this early could help
+                ;;         perf in insane cases of having 50k+ nodes.
+                (if org-node-alter-candidates
+                    ;; Absorb the affixations into one candidate string
+                    (puthash (concat (nth 1 affx) (nth 0 affx) (nth 2 affx))
+                             node
+                             org-node--candidate<>node)
+                  ;; Bare title as candidate, to be affixated in realtime by
+                  ;; `org-node-collection'
+                  (puthash title affx org-node--title<>affixation-triplet)
+                  (puthash title node org-node--candidate<>node))))))))))
 
 (defun org-node--print-elapsed (&rest _)
   "Print time elapsed since start of `org-node--scan-all'.

@@ -347,7 +347,7 @@ Also set some variables, including global variables."
                                (org-node-parser--org-link-display-format
                                 (buffer-substring (point) (pos-eol)))))
             (setq FILE-ID (cdr (assoc "ID" PROPS)))
-            (when FILE-ID
+            (when (or FILE-ID $cache-everything)
               (goto-char HERE)
               ;; Don't count org-super-links backlinks as forward links
               ;; TODO: Rewrite more readably
@@ -505,34 +505,32 @@ Also set some variables, including global variables."
                        finally do
                        (push (list LEVEL TITLE ID HERITABLE-TAGS)
                              CRUMBS))
-              (let ((record
-                     (record 'org-node
-                             (split-string-and-unquote
-                              (or (cdr (assoc "ROAM_ALIASES" PROPS)) ""))
-                             DEADLINE
-                             FILE
-                             FILE-TITLE
-                             ID
-                             LEVEL
-                             LNUM
-                             (nreverse (mapcar #'cadr (cdr CRUMBS)))
-                             HEADING-POS
-                             PRIORITY
-                             PROPS
-                             (org-node-parser--split-refs-field
-                              (cdr (assoc "ROAM_REFS" PROPS)))
-                             SCHED
-                             TAGS
-                             (delete-dups
-                              (apply #'append
-                                     FILE-TAGS
-                                     (mapcar #'cadddr (cdr CRUMBS))))
-                             TITLE
-                             TODO-STATE)))
-                (if ID
-                    (push record found-nodes)
-                  (when $cache-everything
-                    (push record unidentified-nodes))))
+              (when (or ID $cache-everything)
+                (let ((node
+                       (record 'org-node
+                               (split-string-and-unquote
+                                (or (cdr (assoc "ROAM_ALIASES" PROPS)) ""))
+                               DEADLINE
+                               FILE
+                               FILE-TITLE
+                               ID
+                               LEVEL
+                               LNUM
+                               (nreverse (mapcar #'cadr (cdr CRUMBS)))
+                               HEADING-POS
+                               PRIORITY
+                               PROPS
+                               (org-node-parser--split-refs-field
+                                (cdr (assoc "ROAM_REFS" PROPS)))
+                               SCHED
+                               TAGS
+                               (delete-dups
+                                (apply #'append
+                                       FILE-TAGS
+                                       (mapcar #'cadddr (cdr CRUMBS))))
+                               TITLE
+                               TODO-STATE)))
+                  (push node found-nodes)))
 
               ;; Heading analyzed, now collect links in entry body!
 
@@ -581,8 +579,7 @@ Also set some variables, including global variables."
           found-nodes
           org-node-parser--paths-types
           org-node-parser--found-links
-          (if problem (list problem))
-          unidentified-nodes)))
+          (if problem (list problem)))))
 
 (provide 'org-node-parser)
 
