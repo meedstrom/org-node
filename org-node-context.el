@@ -20,6 +20,7 @@
 
 (require 'org)
 (require 'org-node)
+(require 'org-element)
 (require 'magit-section)
 
 (defgroup org-node-context nil "Preview backlink contexts in separate buffer."
@@ -437,7 +438,7 @@ that buffer."
               (dolist (link (sort links #'org-node-context--origin-title-lessp))
                 (org-node-context--insert-backlink link))
               (insert "\n"))))
-        (org-node-context--kill-work-buffers)
+        (org-node--kill-work-buffers)
         (run-hooks 'org-node-context-refresh-hook)))))
 
 (defun org-node-context--insert-backlink (link)
@@ -479,12 +480,13 @@ else briefly visit the file at LINK-POS and call
     (or (alist-get pos-diff (gethash id org-node-context--previews))
         (setf
          (alist-get pos-diff (gethash id org-node-context--previews))
-         (let (snippet)
-           (with-current-buffer (org-node-context--work-buffer-for
+         (let ((org-element-cache-persistent nil)
+               snippet)
+           (with-current-buffer (org-node--work-buffer-for
                                  (org-node-get-file node))
              (goto-char link-pos)
              (setq snippet (org-node-context--extract-entry-at-point)))
-           (with-current-buffer (org-node-context--general-org-work-buffer)
+           (with-current-buffer (org-node--general-org-work-buffer)
              (erase-buffer)
              (insert snippet)
              (goto-char pos-diff)
@@ -495,7 +497,8 @@ else briefly visit the file at LINK-POS and call
              ;;
              ;; It would be nice to do this before the postprocess hook instead
              ;; of after, to offer the possibility for users to override colors
-             ;; or something, but the hook also could be used to add text,
+             ;; or something, but the hook also could be used to add text and
+             ;; not just text properties, so we have to re-fontify in any case.
              (font-lock-ensure)
              (buffer-string)))))))
 
@@ -516,54 +519,6 @@ before the second title."
    (org-node-get-title (gethash (plist-get link-1 :origin) org-nodes))
    (org-node-get-title (gethash (plist-get link-2 :origin) org-nodes))))
 
-(defvar org-node-context--work-buffers nil
-  "All buffers spawned by `org-node-context--work-buffer-for'.")
-
-(defun org-node-context--kill-work-buffers ()
-  "Kill all buffers in `org-node-context--work-buffers'."
-  (while-let ((buf (pop org-node-context--work-buffers)))
-    (kill-buffer buf)))
-
-;; TODO: Either duplicate the org element cache of FILE,
-;;       or just actually visit FILE.
-;;       It would permit us to use the org element API without incurring a
-;;       massive performance hit,
-;;       since the parse tree would typically already be cached (one hopes).
-;;       (If we go the route of actually visiting the file, can this be merged
-;;       with `org-node--with-quick-file-buffer'?)
-(defun org-node-context--work-buffer-for (file)
-  "Get or create a hidden buffer, and read FILE contents into it.
-Also enable `org-mode', but ignore `org-mode-hook' and startup options.
-
-The buffer persists, so repeated calls with the same FILE skip the
-overhead of creation.  To clean up, call
-`org-node-context--kill-work-buffers' explicitly."
-  (let ((bufname (format " *org-node-context-%d*" (sxhash file)))
-        (org-inhibit-startup t)
-        (org-element-cache-persistent nil))
-    (or (get-buffer bufname)
-        (with-current-buffer (get-buffer-create bufname t)
-          (push (current-buffer) org-node-context--work-buffers)
-          (delay-mode-hooks (org-mode))
-          (insert-file-contents file)
-          ;; Ensure that attempted edits trip an error, since the buffer may be
-          ;; reused any number of times, and should always reflect FILE.
-          (setq-local buffer-read-only t)
-          (current-buffer)))))
-
-(defun org-node-context--general-org-work-buffer ()
-  "Get or create a hidden `org-mode' buffer.
-
-Like a temp buffer, but never dies.  You should probably use
-`erase-buffer' in case it already contains text.  Then finish up with
-`font-lock-ensure' if you need the contents fontified."
-  (let ((bufname " *org-node-work*")
-        (org-inhibit-startup t)
-        (org-element-cache-persistent nil))
-    (or (get-buffer bufname)
-        (with-current-buffer (get-buffer-create bufname t)
-          (delay-mode-hooks (org-mode))
-          (current-buffer)))))
 
 (provide 'org-node-context)
 

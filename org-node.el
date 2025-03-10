@@ -625,6 +625,18 @@ Also respect `org-tags-exclude-from-inheritance'."
   "Return t if NODE is a subtree instead of a file."
   (> (org-node-get-level node) 0))
 
+(defun org-node-get-olp-with-self (node)
+  "Get outline path to NODE, including NODE itself.
+See `org-get-outline-path' WITH-SELF parameter."
+  (append (org-node-get-olp node) (list (org-node-get-title node))))
+
+;; ... is this my life
+(defun org-node-get-olp-with-self-full (node &optional filename-fallback)
+  "Get outline path to NODE, including file title and NODE itself.
+FILENAME-FALLBACK as in `org-node-get-olp-full'."
+  (append (org-node-get-olp-full node filename-fallback)
+          (list (org-node-get-title node))))
+
 (defun org-node-get-olp-full (node &optional filename-fallback)
   "Get outline path to NODE, and include the file title if present.
 If FILENAME-FALLBACK is t, use the filename if title absent."
@@ -3546,7 +3558,8 @@ Argument INVISIBLE-OK as in that function.
 
 Like `org-back-to-heading-or-point-min' but should be faster in the case
 that an org-element cache has not been built for the buffer.  This can
-be the case in a buffer spawned by `org-roam-with-temp-buffer'.
+be the case in a buffer spawned by `org-roam-with-temp-buffer'
+or `org-node--work-buffer-for'.
 
 As bonus, do not land on an inlinetask, seek a real heading."
   (let ((inlinetask-re (when (fboundp 'org-inlinetask-outline-regexp)
@@ -3789,6 +3802,61 @@ BOUND as in `re-search-forward'."
         (push (cons beg (point)) skips)))
     (goto-char starting-pos)
     (nreverse skips)))
+
+(defvar org-node--work-buffers nil
+  "All buffers spawned by `org-node--work-buffer-for'.")
+
+(defun org-node--kill-work-buffers ()
+  "Kill all buffers in `org-node--work-buffers'."
+  (while-let ((buf (pop org-node--work-buffers)))
+    (kill-buffer buf)))
+
+;; TODO: Either duplicate the org element cache of FILE,
+;;       or just actually visit FILE.
+;;       It would permit us to use the org element API without incurring a
+;;       massive performance hit,
+;;       since the parse tree would typically already be cached (one hopes).
+;;       (If we go the route of actually visiting the file, can this be merged
+;;       with `org-node--with-quick-file-buffer'?)
+(defun org-node--work-buffer-for (file)
+  "Get or create a hidden buffer, and read FILE contents into it.
+Also enable `org-mode', but ignore `org-mode-hook' and startup options.
+
+The buffer persists, so calling again with the same FILE skips the
+overhead of creation.  To clean up, call
+`org-node--kill-work-buffers' explicitly."
+  (let ((bufname (format " *org-node-context-%d*" (sxhash file)))
+        (org-inhibit-startup t)
+        (org-element-cache-persistent nil))
+    (or (get-buffer bufname)
+        (with-current-buffer (get-buffer-create bufname t)
+          (push (current-buffer) org-node--work-buffers)
+          (delay-mode-hooks (org-mode))
+          (setq-local org-element-cache-persistent nil)
+          (insert-file-contents file)
+          ;; May be useful for `org-node-fakeroam-fast-render-mode'.
+          ;; No idea why `org-roam-with-temp-buffer' sets default-directory,
+          ;; but Chesterton's Fence.
+          (setq-local default-directory (file-name-directory file))
+          ;; Ensure that attempted edits trip an error, since the buffer may be
+          ;; reused any number of times, and should always reflect FILE.
+          (setq-local buffer-read-only t)
+          (current-buffer)))))
+
+(defun org-node--general-org-work-buffer ()
+  "Get or create a hidden `org-mode' buffer.
+
+Like a temp buffer, but never dies.  You should probably use
+`erase-buffer' in case it already contains text.  Then finish up with
+`font-lock-ensure' if you need the contents fontified."
+  (let ((bufname " *org-node-work*")
+        (org-inhibit-startup t)
+        (org-element-cache-persistent nil))
+    (or (get-buffer bufname)
+        (with-current-buffer (get-buffer-create bufname t)
+          (delay-mode-hooks (org-mode))
+          (setq-local org-element-cache-persistent nil)
+          (current-buffer)))))
 
 
 ;;;; API not used in this package at all
