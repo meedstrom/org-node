@@ -410,7 +410,7 @@ With non-nil argument NEXT, visit the next entry, not previous."
                     (setcdr tail (cddr tail))))
                 t)
               (when (y-or-n-p
-                     (format "Not in sequence \"%s\".  Jump to latest item in that sequence?"
+                     (format "Not in \"%s\".  Jump to latest in that sequence?"
                              (plist-get seq :name)))
                 (setq head (take 1 tail))
                 t))
@@ -459,7 +459,7 @@ Unlike `org-node-proposed-seq', does not need to revert to nil.")
 (defun org-node-seq--build-from-def (def)
   "From DEF, make a plist for `org-node-seqs'.
 DEF is a seq-def from `org-node-seq-defs'."
-  (unless (plist-get def :version)
+  (unless (plist-get (cdr def) :version)
     (user-error "Seq def :version must be 2 or higher"))
   (let ((classifier (org-node--try-ensure-compiled
                      (plist-get (cdr def) :classifier))))
