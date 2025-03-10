@@ -97,16 +97,16 @@
 (require 'org-node-parser)
 (require 'org-node-changes)
 
-;; Yes officer, I know what these names are.
+;; Yes officer, I know these names.
 (defvar consult-ripgrep-args)
 (defvar org-roam-capture-templates)
 (defvar org-node-backlink-mode)
 (declare-function org-node-backlink--fix-nearby "org-node-backlink")
 (declare-function tramp-tramp-file-p "tramp")
 (declare-function org-lint "org-lint")
-(declare-function consult--grep "consult")
-(declare-function consult--grep-make-builder "consult")
-(declare-function consult--ripgrep-make-builder "consult")
+(declare-function consult--grep "ext:consult")
+(declare-function consult--grep-make-builder "ext:consult")
+(declare-function consult--ripgrep-make-builder "ext:consult")
 
 
 ;;;; Options
