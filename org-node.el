@@ -2836,15 +2836,13 @@ from the beginning."
      :entries (cl-loop
                for (file . warning) in org-node--lint-warnings
                collect (let ((array (cadr warning)))
-                         (list warning
+                         (list (sxhash warning)
                                (vector
-                                (list (file-name-nondirectory file)
-                                      'face 'link
-                                      'action `(lambda (_button)
-                                                 (find-file ,file)
-                                                 (goto-line ,(string-to-number
-                                                              (elt array 0))))
-                                      'follow-link t)
+                                (buttonize (file-name-nondirectory file)
+                                           `(lambda (_button)
+                                              (find-file ,file)
+                                              (goto-line ,(string-to-number
+                                                           (elt array 0)))))
                                 (elt array 0)
                                 (elt array 1)
                                 (elt array 2))))))))
@@ -2904,17 +2902,13 @@ write_file(lisp_data, file.path(dirname(tsv), \"feedback-arcs.eld\"))")
                  as origin-node = (gethash origin org-nodes)
                  as dest-node = (gethash dest org-nodes)
                  collect
-                 (list (cons origin dest)
-                       (vector (list (org-node-get-title origin-node)
-                                     'face 'link
-                                     'action `(lambda (_button)
-                                                (org-node--goto ,origin-node))
-                                     'follow-link t)
-                               (list (org-node-get-title dest-node)
-                                     'face 'link
-                                     'action `(lambda (_button)
-                                                (org-node--goto ,dest-node))
-                                     'follow-link t))))))))
+                 (list (+ (sxhash origin) (sxhash dest))
+                       (vector (buttonize (org-node-get-title origin-node)
+                                          #'org-node--goto
+                                          origin-node)
+                               (buttonize (org-node-get-title dest-node)
+                                          #'org-node--goto
+                                          dest-node))))))))
 
 ;; TODO: Temp merge all refs into corresponding ID
 (defun org-node--make-digraph-tsv-string ()
@@ -2932,28 +2926,6 @@ from ID links found in `org-node--dest<>links'."
                        when (equal "id" (plist-get link :type))
                        collect (concat dest "\t" (plist-get link :origin)))))
     "\n")))
-
-(cl-defun org-node--pop-to-tabulated-list (&key buffer format entries reverter)
-  "Create, populate and display a `tabulated-list-mode' buffer.
-
-BUFFER is a buffer or buffer name where the list should be created.
-FORMAT is the value to which `tabulated-list-format' should be set.
-ENTRIES is the value to which `tabulated-list-entries' should be set.
-
-Optional argument REVERTER is a function to add buffer-locally to
-`tabulated-list-revert-hook'."
-  (unless (and buffer format)
-    (user-error
-     "org-node--pop-to-tabulated-list: Mandatory arguments are buffer, format, entries"))
-  (when (null entries)
-    (message "No entries to tabulate"))
-  (pop-to-buffer (get-buffer-create buffer))
-  (tabulated-list-mode)
-  (setq tabulated-list-format format)
-  (tabulated-list-init-header)
-  (setq tabulated-list-entries entries)
-  (when reverter (add-hook 'tabulated-list-revert-hook reverter nil t))
-  (tabulated-list-print t))
 
 (defvar org-node--found-coding-systems nil)
 (defvar org-node--list-file-coding-systems-files nil)
@@ -3021,30 +2993,28 @@ similar to another link, but not identical, so that likely only
 one of them is associated with a ROAM_REFS property."
   (interactive)
   (let* ((link-objects-excluding-id-type
-          (cl-loop
-           for list being each hash-value of org-node--dest<>links
-           append (cl-loop
-                   for LINK in list
-                   unless (equal "id" (plist-get LINK :type))
-                   collect LINK)))
+          (cl-loop for list being each hash-value of org-node--dest<>links
+                   append (cl-loop for link in list
+                                   unless (equal "id" (plist-get link :type))
+                                   collect link)))
          (entries
-          (cl-loop
-           for LINK in link-objects-excluding-id-type
-           collect (seq-let (_ origin _ pos _ type _ dest) LINK
-                     (let ((node (gethash origin org-nodes)))
-                       (list (sxhash LINK)
-                             (vector
-                              (if (gethash dest org-node--ref<>id) "*" "")
-                              (if node
-                                  (buttonize (org-node-get-title node)
-                                             `(lambda (_button)
-                                                (org-id-goto ,origin)
-                                                (goto-char ,pos)
-                                                (if (org-at-heading-p)
-                                                    (org-fold-show-entry)
-                                                  (org-fold-show-context))))
-                                origin)
-                              (if type (concat type ":" dest) dest))))))))
+          (cl-loop for (_ origin _ pos _ type _ dest)
+                   in link-objects-excluding-id-type
+                   collect
+                   (let ((node (gethash origin org-nodes)))
+                     (list (+ (sxhash origin) pos)
+                           (vector
+                            (if (gethash dest org-node--ref<>id) "*" "")
+                            (if node
+                                (buttonize (org-node-get-title node)
+                                           `(lambda (_button)
+                                              (org-id-goto ,origin)
+                                              (goto-char ,pos)
+                                              (if (org-at-heading-p)
+                                                  (org-fold-show-entry)
+                                                (org-fold-show-context))))
+                              origin)
+                            (if type (concat type ":" dest) dest)))))))
     (if entries
         (org-node--pop-to-tabulated-list
          :buffer "*org-node reflinks*"
@@ -3064,18 +3034,11 @@ one of them is associated with a ROAM_REFS property."
        :entries (cl-loop
                  for row in org-node--collisions
                  collect (seq-let (msg id1 id2) row
-                           (list row
-                                 (vector msg
-                                         (list id1
-                                               'action `(lambda (_button)
-                                                          (org-id-goto ,id1))
-                                               'face 'link
-                                               'follow-link t)
-                                         (list id2
-                                               'action `(lambda (_button)
-                                                          (org-id-goto ,id2))
-                                               'face 'link
-                                               'follow-link t))))))
+                           (list
+                            (sxhash row)
+                            (vector msg
+                                    (buttonize id1 #'org-id-goto id1)
+                                    (buttonize id2 #'org-id-goto id2))))))
     (message "Congratulations, no title collisions! (in %d filtered nodes)"
              (hash-table-count org-node--title<>id))))
 
@@ -3087,21 +3050,43 @@ one of them is associated with a ROAM_REFS property."
        :buffer "*org-node scan problems*"
        :format [("Scan choked near position" 27 t) ("Issue (newest on top)" 0 t)]
        :reverter #'org-node-list-scan-problems
-       :entries (cl-loop
-                 for problem in org-node--problems
-                 collect (seq-let (file pos signal) problem
-                           (list problem
-                                 (vector (list
-                                          (format "%s:%d"
-                                                  (file-name-nondirectory file) pos)
-                                          'face 'link
-                                          'action `(lambda (_button)
-                                                     (find-file ,file)
-                                                     (goto-char ,pos))
-                                          'follow-link t)
-                                         (format "%s" signal))))))
+       :entries
+       (cl-loop
+        for (file pos signal) in org-node--problems collect
+        (list (sxhash problem)
+              (vector
+               (buttonize (format "%s:%d" (file-name-nondirectory file) pos)
+                          `(lambda (_button)
+                             (find-file ,file)
+                             (goto-char ,pos)))
+               (format "%s" signal)))))
     (message "Congratulations, no problems scanning %d nodes!"
              (hash-table-count org-nodes))))
+
+
+;;;; Misc 2
+
+(cl-defun org-node--pop-to-tabulated-list (&key buffer format entries reverter)
+  "Create, populate and display a `tabulated-list-mode' buffer.
+
+BUFFER is a buffer or buffer name where the list should be created.
+FORMAT is the value to which `tabulated-list-format' should be set.
+ENTRIES is the value to which `tabulated-list-entries' should be set.
+
+Optional argument REVERTER is a function to add buffer-locally to
+`tabulated-list-revert-hook'."
+  (unless (and buffer format)
+    (user-error
+     "org-node--pop-to-tabulated-list: Mandatory arguments are buffer, format, entries"))
+  (when (null entries)
+    (message "No entries to tabulate"))
+  (pop-to-buffer (get-buffer-create buffer))
+  (tabulated-list-mode)
+  (setq tabulated-list-format format)
+  (tabulated-list-init-header)
+  (setq tabulated-list-entries entries)
+  (when reverter (add-hook 'tabulated-list-revert-hook reverter nil t))
+  (tabulated-list-print t))
 
 ;; Very important macro for the backlink mode, because backlink insertion opens
 ;; the target Org file in the background, and if doing that is laggy, then
