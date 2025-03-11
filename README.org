@@ -645,7 +645,7 @@ API cheatsheet between org-roam and org-node.
 | Get =ROAM_REFS=                           | =(org-roam-node-refs NODE)=        | =(org-node-get-refs NODE)=                              |
 | Get =ROAM_ALIASES=                        | =(org-roam-node-aliases NODE)=     | =(org-node-get-aliases NODE)=                           |
 | Get =ROAM_EXCLUDE=                        |                                  | =(assoc "ROAM_EXCLUDE" (org-node-get-properties NODE))= |
-| Get nodes in a file                     |                                  | =(org-nodes-in-files FILES)=                            |
+| Get nodes in a file                     |                                  | =(org-node-get-nodes-in-files FILES)=                            |
 | Ensure fresh data                       | =(org-roam-db-sync)=               | =(org-node-cache-ensure t t)=                           |
 
 ** Appendix II: How to rollback

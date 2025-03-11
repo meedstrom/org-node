@@ -195,6 +195,9 @@ NAME, ARGLIST and BODY as in `defun'."
 (define-obsolete-function-alias
   'org-node-get-is-subtree 'org-node-is-subtree "2025-03-03")
 
+(define-obsolete-function-alias
+  'org-nodes-in-file 'org-node-get-nodes-in-files "2025-03-11")
+
 
 ;;; Change in dependencies
 

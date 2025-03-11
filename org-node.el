@@ -649,6 +649,13 @@ If FILENAME-FALLBACK is t, use the filename if title absent."
           (org-node-get-olp node)))
     nil))
 
+(defun org-node-get-nodes-in-files (files)
+  "List all nodes in FILES."
+  (setq files (ensure-list files))
+  (cl-loop for node being the hash-values of org-nodes
+           when (member (org-node-get-file node) files)
+           collect node))
+
 ;; Should the names be shortened?
 (defalias 'org-node-get-props #'org-node-get-properties)
 ;; (defalias 'org-node-get-prio #'org-node-get-priority)
@@ -868,17 +875,7 @@ If not running, start it."
       (org-node--dirty-forget-files (list file))
       (org-node--dirty-forget-completions-in (list file))
       (org-node--dirty-forget-links-from
-       (mapcar #'org-node-get-id (org-nodes-in-files file))))))
-
-(define-obsolete-function-alias
-  'org-nodes-in-file 'org-nodes-in-files "2025-03-11")
-
-(defun org-nodes-in-files (files)
-  "List all nodes in FILES."
-  (setq files (ensure-list files))
-  (cl-loop for node being the hash-values of org-nodes
-           when (member (org-node-get-file node) files)
-           collect node))
+       (mapcar #'org-node-get-id (org-node-get-nodes-in-files file))))))
 
 (defvar org-node--new-unsaved-buffers nil
   "List of buffers created to hold a new node.")
