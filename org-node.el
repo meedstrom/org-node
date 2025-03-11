@@ -868,12 +868,16 @@ If not running, start it."
       (org-node--dirty-forget-files (list file))
       (org-node--dirty-forget-completions-in (list file))
       (org-node--dirty-forget-links-from
-       (mapcar #'org-node-get-id (org-nodes-in-file file))))))
+       (mapcar #'org-node-get-id (org-nodes-in-files file))))))
 
-(defun org-nodes-in-file (file)
-  "List all nodes in FILE."
+(define-obsolete-function-alias
+  'org-nodes-in-file 'org-nodes-in-files "2025-03-11")
+
+(defun org-nodes-in-files (files)
+  "List all nodes in FILES."
+  (setq files (ensure-list files))
   (cl-loop for node being the hash-values of org-nodes
-           when (string= file (org-node-get-file node))
+           when (member (org-node-get-file node) files)
            collect node))
 
 (defvar org-node--new-unsaved-buffers nil
