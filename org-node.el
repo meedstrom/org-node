@@ -3453,8 +3453,7 @@ Wrap the link in double-brackets if necessary."
 (defun org-node-add-tags (tags)
   "Add TAGS to the node at point or nearest ancestor that is a node.
 
-Uses `org-node--call-at-nearest-node'.  To always operate on the current
-entry, use `org-node-add-tags-here'."
+To always operate on the current entry, use `org-node-add-tags-here'."
   (interactive (list (org-node--read-tags)) org-mode)
   (org-node--call-at-nearest-node #'org-node-add-tags-here tags))
 
@@ -3497,13 +3496,15 @@ non-nil, because it may cause noticeable lag otherwise."
    (delete-dups
     (nconc (thread-last (append org-tag-persistent-alist
                                 org-tag-alist
-                                (when org-element-use-cache
-                                  (org-get-buffer-tags)))
+                                (and org-element-use-cache
+                                     (derived-mode-p 'org-mode)
+                                     (org-get-buffer-tags)))
                         (mapcar #'car)
                         (cl-remove-if #'keywordp)
                         (mapcar #'substring-no-properties))
            (cl-loop for node being each hash-value of org-nodes
-                    append (org-node-get-tags node))))))
+                    append (org-node-get-tags node))))
+   nil nil nil 'org-tags-history))
 
 (defun org-node--end-of-meta-data (&optional full)
   "Like `org-end-of-meta-data', but supports file-level metadata.
