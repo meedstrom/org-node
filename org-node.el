@@ -3050,7 +3050,7 @@ one of them is associated with a ROAM_REFS property."
        :entries
        (cl-loop
         for (file pos signal) in org-node--problems collect
-        (list (sxhash problem)
+        (list (+ (sxhash file) pos)
               (vector
                (buttonize (format "%s:%d" (file-name-nondirectory file) pos)
                           `(lambda (_button)
