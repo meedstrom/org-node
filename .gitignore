@@ -1,3 +1,4 @@
 *.elc
 *-pkg.el
 *-autoloads.el
+mothball/

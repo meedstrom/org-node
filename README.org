@@ -322,32 +322,6 @@ Running aforementioned command *may re-sort your backlinks and re-format their a
 
 Finally, lines without a proper Org link like =[[id:foo][bar]]= are *deleted*, which would mean *destroying any timestamp within.*
 
-* Optional: Fully replace org-roam
-
-There's a [[https://melpa.org/#/?q=roam][rich ecosystem]] of extensions to org-roam.  What if they could Just Work?
-
-Even if you never load org-roam?
-
-Here you go:
-
-#+begin_src elisp
-(use-package org-node
-  :config
-  (org-node-db-mode)
-  (require 'org-node-shims)
-  (mapc #'provide '( org-roam org-roam-id org-roam-db org-roam-node
-                     org-roam-utils org-roam-capture org-roam-mode)))
-#+end_src
-
-Or this *if you develop org-roam extensions* and need to build them locally.  May also help with other weird issues.
-
-#+begin_src elisp
-(use-package org-node
-  :config
-  (org-node-db-mode)
-  (require 'org-node-shims-unhygienic))
-#+end_src
-
 * Misc
 ** Manage org-id-locations
 
