@@ -3888,6 +3888,18 @@ heading, else the file-level node, whichever has an ID first."
                             () () () 'org-node-hist)
            org-node--candidate<>node))
 
+(defun org-node-get-links-from (origins)
+  "List all links that have :origin matching one of ORIGINS."
+  (let ((tbl (make-hash-table :test 'equal)))
+    ;; Build a complete "origin<>links" table
+    (maphash (lambda (_ links)
+               (dolist (link links)
+                 (push link (gethash (plist-get link :origin) tbl))))
+             org-node--dest<>links)
+    (if (stringp origins)
+        (gethash origins tbl)
+      (cl-loop for origin in origins
+               append (gethash origin tbl)))))
 
 (provide 'org-node)
 

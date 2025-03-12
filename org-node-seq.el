@@ -600,17 +600,21 @@ not exist."
                 t))
       (funcall (plist-get seq :creator) sortstr key))))
 
+(defvar org-node-seq--build-elapsed nil) ;; TODO: use it
 (defun org-node-seq--reset ()
   "Wipe and re-build all seqs.
 Must be done after the main org-node tables are up to date,
 not before."
   (setq org-node-seqs nil)
-  (dolist (def org-node-seq-defs)
-    (setf (alist-get (car def) org-node-seqs nil nil #'equal)
-          (org-node-seq--build-from-def def))
-    ;; TODO: Clear any old sequence from menu
-    (org-node-seq--add-to-dispatch (car def)
-                                   (plist-get (cdr def) :name))))
+  (setq org-node-seq--build-elapsed 0)
+  (let ((T (current-time)))
+    (dolist (def org-node-seq-defs)
+      (setf (alist-get (car def) org-node-seqs nil nil #'equal)
+            (org-node-seq--build-from-def def))
+      ;; TODO: Clear any old sequence from menu
+      (org-node-seq--add-to-dispatch (car def)
+                                     (plist-get (cdr def) :name))
+      (setq org-node-seq--build-elapsed (float-time (time-since T))))))
 
 (defun org-node-seq--enable-or-disable ()
   "If `org-node-cache-mode' is enabled, enable node sequences as well.
