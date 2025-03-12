@@ -43,7 +43,7 @@ For the cache location, see `org-node-data-dir'."
   :type 'boolean
   :package-version '(org-node . "2.0.0"))
 
-(defvar org-node-context--previews (make-hash-table :test #'equal)
+(defvar org-node-context--previews (make-hash-table :test 'equal)
   "1:N table mapping IDs to seen previews of backlink contexts.
 
 Each preview is a cons cell \(POS-DIFF .
@@ -103,7 +103,7 @@ No-op if user option `org-node-context-persist-on-disk' is nil."
 
 Note that each entry in that table has potentially many previews,
 but when this finds one of them stale, it removes that whole entry."
-  (let ((valid-positions (make-hash-table :test #'equal)))
+  (let ((valid-positions (make-hash-table :test 'equal)))
     (maphash
      (lambda (_ links)
        (dolist (link links)
@@ -146,7 +146,7 @@ but when this finds one of them stale, it removes that whole entry."
 ;;; History navigation
 
 ;; TODO
-(defvar org-node-context--remembered-state (make-hash-table :test #'equal)
+(defvar org-node-context--remembered-state (make-hash-table :test 'equal)
   "Table associating IDs with remembered context states.
 
 A context for a given node ID is the entirety of what would be rendered

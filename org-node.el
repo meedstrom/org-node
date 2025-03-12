@@ -497,7 +497,7 @@ For use as `org-node-affixation-fn'."
                           tags))
               "")))))
 
-(defvar org-node--title<>affixation-triplet (make-hash-table :test #'equal)
+(defvar org-node--title<>affixation-triplet (make-hash-table :test 'equal)
   "1:1 table mapping titles or aliases to affixation triplets.")
 
 (defun org-node--affixate-collection (coll)
@@ -667,24 +667,24 @@ If FILENAME-FALLBACK is t, use the filename if title absent."
 
 (defvaralias 'org-nodes 'org-node--id<>node)
 
-(defvar org-node--id<>node (make-hash-table :test #'equal)
+(defvar org-node--id<>node (make-hash-table :test 'equal)
   "1:1 table mapping IDs to nodes.
 
 To peek on the contents, try \\[org-node-peek] a few times, which
 can demonstrate the data format.  See also the type `org-node'.")
 
-(defvar org-node--candidate<>node (make-hash-table :test #'equal)
+(defvar org-node--candidate<>node (make-hash-table :test 'equal)
   "1:1 table mapping completion candidates to nodes.")
 
-(defvar org-node--title<>id (make-hash-table :test #'equal)
+(defvar org-node--title<>id (make-hash-table :test 'equal)
   "1:1 table mapping raw titles (and ROAM_ALIASES) to IDs.")
 
-(defvar org-node--ref<>id (make-hash-table :test #'equal)
+(defvar org-node--ref<>id (make-hash-table :test 'equal)
   "1:1 table mapping ROAM_REFS members to the nearby ID property.
 The exact form of such a member is determined by
 `org-node-parser--split-refs-field'.")
 
-(defvar org-node--ref-path<>ref-type (make-hash-table :test #'equal)
+(defvar org-node--ref-path<>ref-type (make-hash-table :test 'equal)
   "1:1 table mapping //paths to types:.
 
 While the same path can be found with multiple types \(e.g. http and
@@ -697,7 +697,7 @@ found anywhere.
 
 To see all links found anywhere, try \\[org-node-list-reflinks].")
 
-(defvar org-node--dest<>links (make-hash-table :test #'equal)
+(defvar org-node--dest<>links (make-hash-table :test 'equal)
   "1:N table of links.
 
 The table keys are destinations, i.e. values from a node's ID or
@@ -715,7 +715,7 @@ For more info see `org-node-get-id-links-to'.")
 ;; However, `org-node-list-files' needs a hash table anyway for best perf,
 ;; else it could simply have reused `org-id-files'.
 ;; Additionally, the MTIME is often useful downstream.
-(defvar org-node--file<>mtime (make-hash-table :test #'equal)
+(defvar org-node--file<>mtime (make-hash-table :test 'equal)
   "1:1 table mapping file paths to last-modification times.
 
 The mtimes are expressed as integer Unix time.
@@ -910,8 +910,7 @@ buffer appears to already exist, thus this hook."
             (org-node--dirty-forget-files (list buffer-file-truename))
             (kill-buffer buf)))))))
 
-;; Fixed in 036e8dcf0463517749f8b32ca828b923e584625f
-;; which unfortunately did NOT make it into Emacs 30.1.
+;; Fixed in 036e8dcf0463517749f8b32ca828b923e584625f (Emacs 31+).
 (define-advice org-id-locations-load
     (:after () org-node--abbrev-org-id-locations)
   "Maybe abbreviate all filenames in `org-id-locations'.
@@ -1076,7 +1075,7 @@ Nil by default, because it takes longer to scan that much data."
 ;;       Perhaps someone could define a complete glossary of terms.  Feel I
 ;;       should crowd-source that effort to other pedants, as I'm undecided
 ;;       on some things.  Often pros/cons to using a given term.
-(defvar org-node--file<>lnum.node (make-hash-table :test #'equal)
+(defvar org-node--file<>lnum.node (make-hash-table :test 'equal)
   "1:N table mapping files to alists describing all Org entries inside.
 If the table is empty, see `org-node-cache-everything'.
 
@@ -1235,7 +1234,8 @@ JOB is the el-job object."
     (setq org-node--first-init nil)))
 
 (defvar org-node--mid-scan-hook nil
-  "Hook run after tables were updated but before the final timestamp.")
+  "Hook run after tables were updated but before the final timestamp.
+NOT run on partial scan, see `org-node-rescan-functions'.")
 
 (defun org-node--finalize-modified (results job)
   "Use RESULTS to update tables.
@@ -1345,7 +1345,7 @@ Also report statistics about the nodes and links found."
                (float-time (time-since org-node--time-at-begin-full-scan))))))
 
 (defvar org-node--compile-timers nil)
-(defvar org-node--compiled-lambdas (make-hash-table :test #'equal)
+(defvar org-node--compiled-lambdas (make-hash-table :test 'equal)
   "1:1 table mapping lambda expressions to compiled bytecode.")
 
 (defun org-node--try-ensure-compiled (fn)

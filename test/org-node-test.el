@@ -118,8 +118,8 @@
   (write-region "" nil "/tmp/org-node/test2/emptyfile.org")
   (write-region "" nil "/tmp/org-node/test2/emptyfile2.org")
   (write-region "" nil "/tmp/org-node/test1/emptyfile3.org")
-  (let ((org-id-locations (make-hash-table :test #'equal))
-        (org-node--file<>mtime (make-hash-table :test #'equal))
+  (let ((org-id-locations (make-hash-table :test 'equal))
+        (org-node--file<>mtime (make-hash-table :test 'equal))
         (org-node-extra-id-dirs '("/tmp/org-node/test1/"
                                   "/tmp/org-node/test2/"))
         (org-node-ask-directory nil))
