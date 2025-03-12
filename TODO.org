@@ -4,19 +4,23 @@
 
 * Other
 
+- Get https://github.com/nobiot/org-transclusion/pull/268 into upstream and update command =org-node-insert-transclusion-as-subtree= to use it.
+
 - Write a glossary, to clarify e.g. what is a "ref" vs "reflink"
 
 - =org-node-seq-dispatch=: Free up keys "j", "n", "p", "c"
 
-- A workflow to allow untitled nodes (actually pseudo-untitled; the title would be an auto-assigned number)
+- A workflow to allow *untitled nodes*
+
+  (technically not untitled; the title would be an auto-assigned number)
 
   Already =org-node-grep= can be considered an equivalent to =org-node-find= (except it does not create new nodes).  We "just" need an equivalent to =org-node-insert-link=.  Basically, capture, refile, and insert-link would probably all reuse a subroutine for *identifying a node by a grep result.*
 
-- More org-node-seq-defs wrappers:
+- More =org-node-seq-defs= wrappers:
 
-  - Point at single "master node" that defines a seq: links in the body text are the seq.
+  - A wrapper that looks at a given "master node" that defines a seq: links in the body text become the seq.
 
-  - Define a seq from simply the files in a subdirectory with a given name
+  - A wrapper that defines a seq as simply the files in a given subdirectory.
 
 - Count some ref variants as the same ref
 
@@ -25,13 +29,3 @@
   Would prolly be a fairly expensive operation.  After building tables ref<>id and dest<>links, run thru every dest and check if an existing ref is a prefix of it, then simply nconc the value with the value for the corresponding dest.  But having to check for other dests that may also be a prefix is where it would get expensive... O(n^2) I guess.
 
   Hm... Sort all dests alphabetically.  All near-matches will be very close to each other, and indeed an alphabetic sort even results in a sort-by-length within each possible "group".  So just run down progressively shorter prefixes until the length goes up again, then we know we're in another group.  Rough idea, but O(n^2) looks beatable.
-
-- ... Inspired by variable =org-id-link-consider-parent-id=, maybe scan all Org entries whether they have an ID or no, for the option to show some ID-less entries according to an user-defined rule.
-
-  But better instead expend our efforts on https://edstrom.dev/hnzgj/proposal-make-org-mode-fast-for-real
-
-  - In almost the same vein: [[https://github.com/nobiot/org-transclusion/issues/237][some Doom users]] combine ID and heading links like =[[id:4a3fc3b3-caef-47d7-8e2d-ee0d246b63de::*Some heading]]=.
-
-    Not a fan.  Better if it is fine to assign IDs to every grain of sand in the universe, and if that's too many IDs for some use-case, then filter them for that use-case.
-
-    A sweet middle ground might be to set up a variety of local overrides for =org-id-prefix= and =org-id-method=, and then figure out some brainless way to make that work for you.

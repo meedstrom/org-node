@@ -147,40 +147,40 @@ Once a subtree has an ID you can link to, it's a "node" because it has joined th
 
 A comparison of three systems that all permit relying on org-id and don't lock you into the concept of "one-note-per-file".
 
-| Feature                        | org-roam       | org-node           | [[https://github.com/toshism/org-super-links][org-super-links]]      |
-|--------------------------------+----------------+--------------------+----------------------|
-| Backlinks                      | yes            | yes                | yes                  |
-| Node search and insert         | yes            | yes                | -- (suggests [[https://github.com/alphapapa/org-ql][org-ql]]) |
-| Node aliases                   | yes            | yes                | --                   |
-| Node exclusion                 | yes            | limited            | not applicable       |
-| Refile                         | yes            | yes                | --                   |
-| Rich backlinks buffer          | yes            | yes (org-roam's)   | --                   |
-| Customize how backlinks shown  | yes            | yes (org-roam's)   | yes                  |
-| Reflinks                       | yes            | yes (as backlinks) | --                   |
-| Ref search                     | yes            | yes (as aliases)   | not applicable       |
-| Org 9.5 @citations as refs     | yes            | yes                | not applicable       |
-| Support org-ref v3             | yes            | limited            | not applicable       |
-| Support org-ref v2             | yes            | --                 | not applicable       |
-| Work thru org-roam-capture     | yes            | yes                | ?                    |
-| Work thru org-capture          | --             | yes                | ?                    |
-| Daily-nodes                    | yes            | yes                | --                   |
-| Node sequences                 | --             | yes                | --                   |
-| Show backlinks in same window  | --             | yes                | yes                  |
-| Cooperate with org-super-links | --             | yes                | not applicable       |
-| Fix link descriptions          | --             | yes                | --                   |
-| List dead links                | --             | yes                | --                   |
-| Rename file when title changes | --             | yes                | --                   |
-| Warn about duplicate titles    | --             | yes                | --                   |
-| Principled "related-section"   | --             | --                 | yes                  |
-| Untitled notes                 | --             | --                 | --                   |
-| Support =roam:= links            | yes            | -- (WONTFIX)       | --                   |
-| Can have separate note piles   | yes (via hack) | -- (WONTFIX)       | not applicable       |
-|--------------------------------+----------------+--------------------+----------------------|
-| Some query-able cache          | EmacSQL        | hash tables        | --                   |
-| Async cache rebuild            | --             | yes                | not applicable       |
-| *Time to cache my 3000 nodes*    | *2m 48s*         | *0m 01s*             | not applicable       |
-| *Time to save file w/ 400 nodes* | *5--10s*         | *instant*            | ?                    |
-| *Time to open minibuffer*        | *1--3s*          | *instant*            | not applicable       |
+| Feature                        | org-roam | org-node           | [[https://github.com/toshism/org-super-links][org-super-links]]      |
+|--------------------------------+----------+--------------------+----------------------|
+| Backlinks                      | yes      | yes                | yes                  |
+| Node search and insert         | yes      | yes                | -- (suggests [[https://github.com/alphapapa/org-ql][org-ql]]) |
+| Node aliases                   | yes      | yes                | --                   |
+| Node exclusion                 | yes      | limited            | not applicable       |
+| Refile                         | yes      | yes                | --                   |
+| Rich backlinks buffer          | yes      | yes                | --                   |
+| Customize how backlinks shown  | yes      | yes                | yes                  |
+| Reflinks                       | yes      | yes (as backlinks) | --                   |
+| Ref search                     | yes      | yes (as aliases)   | not applicable       |
+| Org 9.5 @citations as refs     | yes      | yes                | not applicable       |
+| Support org-ref v3             | yes      | limited            | not applicable       |
+| Support org-ref v2             | yes      | --                 | not applicable       |
+| Work thru org-roam-capture     | yes      | yes                | ?                    |
+| Work thru org-capture          | --       | yes                | ?                    |
+| Daily-nodes                    | yes      | yes                | --                   |
+| Node sequences                 | --       | yes                | --                   |
+| Show backlinks in same window  | --       | yes                | yes                  |
+| Cooperate with org-super-links | --       | yes                | not applicable       |
+| Fix link descriptions          | --       | yes                | --                   |
+| List dead links                | --       | yes                | --                   |
+| Rename file when title changes | --       | yes                | --                   |
+| Warn about duplicate titles    | --       | yes                | --                   |
+| Principled "related-section"   | --       | yes                | yes                  |
+| Untitled notes                 | --       | --                 | --                   |
+| Support =roam:= links            | yes      | -- (wontfix)       | --                   |
+| Can have separate note piles   | yes      | -- (wontfix)       | not applicable       |
+|--------------------------------+----------+--------------------+----------------------|
+| Some query-able cache          | EmacSQL  | hash tables        | --                   |
+| Async cache rebuild            | --       | yes                | not applicable       |
+| *Time to cache my 3000 nodes*    | *2m 48s*   | *0m 01s*             | not applicable       |
+| *Time to save file w/ 400 nodes* | *5--10s*   | *instant*            | ?                    |
+| *Time to open minibuffer*        | *1--3s*    | *instant*            | not applicable       |
 
 * Setup
 ** Install
@@ -321,6 +321,32 @@ Running aforementioned command *may re-sort your backlinks and re-format their a
 - =org-node-backlink-drawer-formatter=
 
 Finally, lines without a proper Org link like =[[id:foo][bar]]= are *deleted*, which would mean *destroying any timestamp within.*
+
+* Optional: Fully replace org-roam
+
+There's a [[https://melpa.org/#/?q=roam][rich ecosystem]] of extensions to org-roam.  What if they could Just Work?
+
+Even if you never load org-roam?
+
+Here you go:
+
+#+begin_src elisp
+(use-package org-node
+  :config
+  (org-node-db-mode)
+  (require 'org-node-shims)
+  (mapc #'provide '( org-roam org-roam-id org-roam-db org-roam-node
+                     org-roam-utils org-roam-capture org-roam-mode)))
+#+end_src
+
+Or this *if you develop org-roam extensions* and need to build them locally.  May also help with other weird issues.
+
+#+begin_src elisp
+(use-package org-node
+  :config
+  (org-node-db-mode)
+  (require 'org-node-shims-unhygienic))
+#+end_src
 
 * Misc
 ** Manage org-id-locations
@@ -696,3 +722,10 @@ With [[https://github.com/radian-software/straight.el][Straight]]:
   :straight (org-node :type git :host github :repo "meedstrom/org-node"
                       :branch "v1.6"))
 #+end_src
+** Appendix III: Random tips
+
+Org-roam shipped the optional =(require '=org-roam-export)=, a patch to fix =id:= links in HTML export.
+
+Good news, upstream fixed the root of the issue in 5e9953fa0!  Update Org to 9.7+, then set
+
+: (setq org-html-prefer-user-labels t)

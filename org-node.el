@@ -3534,7 +3534,7 @@ to a position after any file-level properties and keywords."
   (if (org-before-first-heading-p)
       (progn
         (goto-char (point-min))
-        ;; Jump past comment lines and blank lines.
+        ;; Jump past comment lines and blank lines (NOT keywords).
         (while (looking-at-p (rx (*? space) (or "# " "\n")))
           (forward-line))
         (let ((case-fold-search t))
