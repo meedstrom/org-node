@@ -561,7 +561,9 @@ headings.  Point is at the beginning of the body text as determined by
 `org-node--end-of-meta-data'.
 
 The function may return anything, but if it returns an integer or
-marker, point will move to that position."
+marker, point will move to that position.
+
+Only called if a drawer was not already present."
   :type '(radio (const :tag "Leave at beginning of body" nil)
                 (function-item org-entry-end-position)
                 (function :tag "Custom function" :value (lambda ())))

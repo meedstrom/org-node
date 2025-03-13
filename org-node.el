@@ -62,6 +62,7 @@
 
 ;; Compared to denote:
 
+;;   + Compatible (you can use both packages and compare)
 ;;   + No mandatory filename style (can match Denote format if you like)
 ;;   + You can have as many "notes" as you want inside one file.
 ;;     + You could possibly use Denote for coarse browsing,
@@ -860,6 +861,7 @@ If not running, start it."
                 (seq-filter (##string-suffix-p ".org" %))
                 (seq-remove #'backup-file-name-p)
                 (seq-remove #'org-node--tramp-file-p)
+                ;; REVIEW: May not apply right to oldname?
                 (mapcar #'file-truename)
                 (org-node-abbrev-file-names))))
 
@@ -867,7 +869,7 @@ If not running, start it."
   "Arrange to forget nodes and links in FILE."
   (when (string-suffix-p ".org" file)
     (unless (org-node--tramp-file-p file)
-      (setq file (org-node-abbrev-file-names (file-truename file)))
+      (setq file (org-node-abbrev-file-names file))
       ;; Used to just hand the file to `org-node--scan-targeted' which will
       ;; have the same effect if the file is gone, but sometimes it is not
       ;; gone, thanks to `delete-by-moving-to-trash'.
@@ -1448,13 +1450,11 @@ point but assume it is a link to ID."
                 (dest (if (gethash id org-id-locations)
                           id
                         (let ((elm (org-element-context)))
-                          (when (equal "id" (org-element-property :type elm))
-                            (org-element-property :path elm))))))
-      (push (list :origin origin
-                  :pos (point)
-                  :type "id"
-                  :dest dest)
-            (gethash dest org-node--dest<>links)))))
+                          (and (equal "id" (org-element-property :type elm))
+                               (org-element-property :path elm)))))
+                (link (list :origin origin :pos (point) :type "id" :dest dest)))
+      (push link (gethash dest org-node--dest<>links))
+      (push link (gethash origin org-node--origin<>links)))))
 
 (defun org-node--dirty-ensure-node-known ()
   "Record the node at point.
@@ -2878,22 +2878,25 @@ network to quality-control it.  Rationale:
   (unless (executable-find "Rscript")
     (user-error
      "This command requires GNU R, with R packages: stringr, readr, igraph"))
-  (let* ((r-code "library(stringr)
-library(readr)
-library(igraph)
+  (let* ((r-code "
+          library(stringr)
+          library(readr)
+          library(igraph)
 
-tsv <- commandArgs(TRUE)[1]
-g <- graph_from_data_frame(read_tsv(tsv), directed = TRUE)
-fas1 <- feedback_arc_set(g, algo = \"approx_eades\")
+          tsv <- commandArgs(TRUE)[1]
+          g <- graph_from_data_frame(read_tsv(tsv), directed = TRUE)
+          fas1 <- feedback_arc_set(g, algo = \"approx_eades\")
 
-lisp_data <- str_c(\"(\\\"\", as_ids(fas1), \"\\\")\") |>
-  str_replace(\"\\\\|\", \"\\\" . \\\"\") |>
-  str_flatten(\"\n \") |>
-  (function(x) {
-    str_c(\"(\", x, \")\")
-  })()
+          lisp_data <- str_c(\"(\\\"\", as_ids(fas1), \"\\\")\") |>
+            str_replace(\"\\\\|\", \"\\\" . \\\"\") |>
+            str_flatten(\"\n \") |>
+            (function(x) {
+              str_c(\"(\", x, \")\")
+            })()
 
-write_file(lisp_data, file.path(dirname(tsv), \"feedback-arcs.eld\"))")
+          write_file(lisp_data,
+                     file.path(dirname(tsv),
+                     \"feedback-arcs.eld\"))")
          (tmpdir (file-name-concat temporary-file-directory "org-node"))
          (script-file (file-name-concat tmpdir "analyze_feedback_arcs.R"))
          (input-tsv (file-name-concat tmpdir "id_node_digraph.tsv"))
@@ -3862,12 +3865,16 @@ Like a temp buffer, but never dies.  You should probably use
           (current-buffer)))))
 
 
-;;;; API not used in this package at all
+;;;; API not used within this package
 
-(defun org-node-id-at-point ()
-  "Get the ID property in entry at point or some ancestor."
-  (declare (obsolete org-entry-get-with-inheritance "2024-11-18"))
-  (org-entry-get-with-inheritance "ID"))
+(let (tipped)
+  (defun org-node-id-at-point ()
+    "Get the ID property in entry at point or some ancestor."
+    (declare (obsolete org-entry-get-with-inheritance "2024-11-18"))
+    (unless tipped
+      (setq tipped t)
+      (message "Use `org-entry-get-with-inheritance' rather than `org-node-id-at-point'"))
+    (org-entry-get-with-inheritance "ID")))
 
 (defun org-node-at-point ()
   "Return the ID-node near point.

@@ -46,8 +46,7 @@ For the cache location, see `org-node-data-dir'."
 (defvar org-node-context--previews (make-hash-table :test 'equal)
   "1:N table mapping IDs to seen previews of backlink contexts.
 
-Each preview is a cons cell \(POS-DIFF .
- TEXT) where POS-DIFF
+Each preview is a cons cell \(POS-DIFF . TEXT) where POS-DIFF
 corresponds to a link\\='s buffer position relative to that of
 the heading that has said ID, and TEXT is an output of
 `org-node--get-preview'.")
