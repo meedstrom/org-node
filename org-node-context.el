@@ -168,7 +168,7 @@ time that context was shown in a visible window.  Including:
   (when-let* ((last (pop org-node-context--past)))
     (push org-node-context--current
           org-node-context--future)
-    (org-node-context--refresh nil last)))
+    (org-node-context--refresh nil last t)))
 
 (defun org-node-context-history-go-forward ()
   "Show the next context."
@@ -176,7 +176,7 @@ time that context was shown in a visible window.  Including:
   (when-let* ((next (pop org-node-context--future)))
     (push org-node-context--current
           org-node-context--past)
-    (org-node-context--refresh nil next)))
+    (org-node-context--refresh nil next t)))
 
 
 ;;; Porcelain
@@ -397,7 +397,7 @@ the user invokes the command."
 
 ;;; Plumbing
 
-(defun org-node-context--refresh (&optional buf id)
+(defun org-node-context--refresh (&optional buf id from-history-nav)
   "Refresh buffer BUF to show context for node known by ID.
 
 If argument BUF not supplied, use `org-node-context-main-buffer'.
@@ -416,8 +416,9 @@ that buffer."
                        (window-point)
                        (org-node-context--count-sections))
                  org-node-context--remembered-state)
-        (when org-node-context--current
-          (push org-node-context--current org-node-context--past)))
+        (and org-node-context--current
+             (not from-history-nav)
+             (push org-node-context--current org-node-context--past)))
       (setq org-node-context--current id)
       (let ((node (gethash id org-nodes)))
         (unless node
