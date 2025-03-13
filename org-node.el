@@ -1453,8 +1453,7 @@ point but assume it is a link to ID."
                           (and (equal "id" (org-element-property :type elm))
                                (org-element-property :path elm)))))
                 (link (list :origin origin :pos (point) :type "id" :dest dest)))
-      (push link (gethash dest org-node--dest<>links))
-      (push link (gethash origin org-node--origin<>links)))))
+      (push link (gethash dest org-node--dest<>links)))))
 
 (defun org-node--dirty-ensure-node-known ()
   "Record the node at point.
