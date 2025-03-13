@@ -282,7 +282,8 @@ properties.  Org-mode is enabled, but the org-element cache is not."
     (t ;; On GUI.
      :extend t
      :height 1.5
-     :inherit variable-pitch))
+     ;; :inherit variable-pitch ;; Too controversial
+     :weight bold))
   "Face for backlink node titles in the context buffer."
   :package-version '(org-node . "2.0.0"))
 
