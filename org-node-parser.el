@@ -343,9 +343,10 @@ Also set some variables, including global variables."
                          (string-join FILE-TODO-SETTINGS " ")))
                     $global-todo-re))
             (goto-char HERE)
-            (setq FILE-TITLE (when (re-search-forward "^#\\+title: " FAR t)
-                               (org-node-parser--org-link-display-format
-                                (buffer-substring (point) (pos-eol)))))
+            (setq FILE-TITLE (when (re-search-forward "^#\\+title: +" FAR t)
+                               (string-trim-right
+                                (org-node-parser--org-link-display-format
+                                 (buffer-substring (point) (pos-eol))))))
             (setq FILE-ID (cdr (assoc "ID" PROPS)))
             (when (or FILE-ID $cache-everything)
               (goto-char HERE)
@@ -439,11 +440,13 @@ Also set some variables, including global variables."
                   (progn
                     (goto-char (match-beginning 0))
                     (setq TAGS (split-string (match-string 0) ":" t " *"))
-                    (setq TITLE (org-node-parser--org-link-display-format
-                                 (buffer-substring HERE (point)))))
+                    (setq TITLE (string-trim-right
+                                 (org-node-parser--org-link-display-format
+                                  (buffer-substring HERE (point))))))
                 (setq TAGS nil)
-                (setq TITLE (org-node-parser--org-link-display-format
-                             (buffer-substring HERE (pos-eol)))))
+                (setq TITLE (string-trim-right
+                             (org-node-parser--org-link-display-format
+                              (buffer-substring HERE (pos-eol))))))
               ;; Gotta go forward 1 line, see if it is a planning-line, and
               ;; if it is, then go forward 1 more line, and if that is a
               ;; :PROPERTIES: line, then we're safe to collect properties
