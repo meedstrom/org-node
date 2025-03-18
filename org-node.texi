@@ -61,8 +61,8 @@ Backlink solution 1: displayed in a separate window
 Backlink solution 2: Print inside the file
 
 * Option 2A Automatic @samp{BACKLINKS} property::
-* Option 2B Automatic @samp{BACKLINKS...END} drawer: Option 2B Automatic @samp{BACKLINKSEND} drawer. 
-* Option 2C Semi-automatic @samp{BACKLINKS...END} drawer: Option 2C Semi-automatic @samp{BACKLINKSEND} drawer. 
+* Option 2B Automatic @samp{BACKLINKS...END} drawer: Option 2B Automatic @samp{BACKLINKSEND} drawer.
+* Option 2C Semi-automatic @samp{BACKLINKS...END} drawer: Option 2C Semi-automatic @samp{BACKLINKSEND} drawer.
 
 Misc
 
@@ -399,8 +399,8 @@ A complementary solution, which can also stand alone, is to have the backlinks @
 
 @menu
 * Option 2A Automatic @samp{BACKLINKS} property::
-* Option 2B Automatic @samp{BACKLINKS...END} drawer: Option 2B Automatic @samp{BACKLINKSEND} drawer. 
-* Option 2C Semi-automatic @samp{BACKLINKS...END} drawer: Option 2C Semi-automatic @samp{BACKLINKSEND} drawer. 
+* Option 2B Automatic @samp{BACKLINKS...END} drawer: Option 2B Automatic @samp{BACKLINKSEND} drawer.
+* Option 2C Semi-automatic @samp{BACKLINKS...END} drawer: Option 2C Semi-automatic @samp{BACKLINKSEND} drawer.
 @end menu
 
 @node Option 2A Automatic @samp{BACKLINKS} property
@@ -540,8 +540,8 @@ This could work by---for example---excluding anything tagged "project" or perhap
 (setq org-node-filter-fn
       (lambda (node)
         (not
-         (or (org-node-get-todo node)
-             (member "project" (org-node-get-tags node))
+         (or (indexed-todo-state node)
+             (member "project" (indexed-tags node))
              (assoc "ROAM_EXCLUDE" (org-node-get-properties node))))))
 @end lisp
 
@@ -550,7 +550,7 @@ Or you could go with a whitelist approach, to show only nodes from a certain dir
 @lisp
 (setq org-node-filter-fn
       (lambda (node)
-        (and (string-search "/my-personal-wiki/" (org-node-get-file node))
+        (and (string-search "/my-personal-wiki/" (indexed-file-name node))
              (not (assoc "ROAM_EXCLUDE" (org-node-get-properties node))))))
 @end lisp
 
@@ -574,7 +574,7 @@ It works well for me to filter out any file or directory that happens to contain
 @lisp
 (setq org-node-filter-fn
       (lambda (node)
-        (not (string-search "archive" (org-node-get-file node)))))
+        (not (string-search "archive" (indexed-file-name node)))))
 @end lisp
 
 Or put something like @samp{#+filetags: :hide_node:} at the top of each file, and set:
@@ -582,7 +582,7 @@ Or put something like @samp{#+filetags: :hide_node:} at the top of each file, an
 @lisp
 (setq org-node-filter-fn
       (lambda (node)
-        (not (member "hide_node" (org-node-get-tags node)))))
+        (not (member "hide_node" (indexed-tags node)))))
 @end lisp
 
 @node Org-capture
@@ -721,7 +721,7 @@ NB: for users of @samp{org-node-complete-at-point-mode}, this workaround won't h
 
 Org-node supports the Org 9.5 @@citations, but not fully the aftermarket @uref{https://github.com/jkitchin/org-ref, org-ref} &citations that emulate @LaTeX{} look-and-feel, because it would double the time taken by @samp{M-x org-node-reset}.
 
-What works is bracketed Org-ref v3 citations that start with "cite", e.g. @samp{[[citep:...]]}, @samp{[[citealt:...]]}, @samp{[[citeauthor:...]]}, since org-node-parser.el is able to pick them up for free.
+What works is bracketed Org-ref v3 citations that start with "cite", e.g. @samp{[[citep:...]]}, @samp{[[citealt:...]]}, @samp{[[citeauthor:...]]}, since indexed-org-parser.el is able to pick them up for free.
 
 What doesn't work is e.g. @samp{[[bibentry:...]]} since it doesn't start with "cite", nor plain @samp{citep:...} since it is not wrapped in brackets.
 
@@ -928,66 +928,66 @@ API cheatsheet between org-roam and org-node.
 @tab @samp{(org-node-read)}
 @item Get backlink objects
 @tab @samp{(org-roam-backlinks-get NODE)}
-@tab @samp{(org-node-get-id-links-to NODE)}
+@tab @samp{(indexed-id-links-to NODE)}
 @item Get reflink objects
 @tab @samp{(org-roam-reflinks-get NODE)}
-@tab @samp{(org-node-get-reflinks-to NODE)}
+@tab @samp{(indexed-roam-reflinks-to NODE)}
 @item Get title
 @tab @samp{(org-roam-node-title NODE)}
-@tab @samp{(org-node-get-title NODE)}
+@tab @samp{(indexed-title NODE)}
 @item Get title of file where NODE is
 @tab @samp{(org-roam-node-file-title NODE)}
-@tab @samp{(org-node-get-file-title NODE)}
+@tab @samp{(indexed-file-title NODE)}
 @item Get title @emph{or} name of file where NODE is
-@tab 
-@tab @samp{(org-node-get-file-title-or-basename NODE)}
+@tab
+@tab @samp{(indexed-file-title-or-basename NODE)}
 @item Get name of file where NODE is
 @tab @samp{(org-roam-node-file NODE)}
-@tab @samp{(org-node-get-file NODE)}
+@tab @samp{(indexed-file NODE)}
 @item Get ID
 @tab @samp{(org-roam-node-id NODE)}
-@tab @samp{(org-node-get-id NODE)}
+@tab @samp{(indexed-id NODE)}
 @item Get tags
 @tab @samp{(org-roam-node-tags NODE)}
-@tab @samp{(org-node-get-tags NODE)}
+@tab @samp{(indexed-tags NODE)}
 @item Get local tags
-@tab 
-@tab @samp{(org-node-get-tags-local NODE)}
+@tab
+@tab @samp{(indexed-tags-local NODE)}
 @item Get outline level
 @tab @samp{(org-roam-node-level NODE)}
-@tab @samp{(org-node-get-level NODE)}
+@tab @samp{(indexed-level NODE)}
 @item Get whether this is a subtree
 @tab @samp{(=< 0 (org-roam-node-level NODE))}
 @tab @samp{(org-node-is-subtree NODE)}
 @item Get char position
 @tab @samp{(org-roam-node-point NODE)}
-@tab @samp{(org-node-get-pos NODE)}
+@tab @samp{(indexed-pos NODE)}
 @item Get properties
 @tab @samp{(org-roam-node-properties NODE)}
 @tab @samp{(org-node-get-properties NODE)}, only includes explicit properties
 @item Get subtree TODO state
 @tab @samp{(org-roam-node-todo NODE)}
-@tab @samp{(org-node-get-todo NODE)}
+@tab @samp{(indexed-todo-state NODE)}
 @item Get subtree SCHEDULED
 @tab @samp{(org-roam-node-scheduled NODE)}
-@tab @samp{(org-node-get-scheduled NODE)}
+@tab @samp{(indexed-scheduled NODE)}
 @item Get subtree DEADLINE
 @tab @samp{(org-roam-node-deadline NODE)}
-@tab @samp{(org-node-get-deadline NODE)}
+@tab @samp{(indexed-deadline NODE)}
 @item Get subtree priority
 @tab @samp{(org-roam-node-priority NODE)}
 @tab @samp{(org-node-get-priority NODE)}
 @item Get outline-path
 @tab @samp{(org-roam-node-olp NODE)}
-@tab @samp{(org-node-get-olp NODE)}
+@tab @samp{(indexed-olp NODE)}
 @item Get @samp{ROAM_REFS}
 @tab @samp{(org-roam-node-refs NODE)}
-@tab @samp{(org-node-get-refs NODE)}
+@tab @samp{(indexed-refs NODE)}
 @item Get @samp{ROAM_ALIASES}
 @tab @samp{(org-roam-node-aliases NODE)}
-@tab @samp{(org-node-get-aliases NODE)}
+@tab @samp{(indexed-property :ROAM_ALIASES NODE)}
 @item Get @samp{ROAM_EXCLUDE}
-@tab 
+@tab
 @tab @samp{(assoc "ROAM_EXCLUDE" (org-node-get-properties NODE))}
 @item Ensure fresh data
 @tab @samp{(org-roam-db-sync)}

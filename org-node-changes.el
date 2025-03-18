@@ -34,6 +34,13 @@
 (require 'cl-lib)
 (require 'ol)
 (require 'el-job)
+(require 'indexed)
+(require 'indexed-x)
+(require 'indexed-roam)
+(require 'indexed-list)
+
+(defvar org-node-major-version 3
+  "Number incremented for breaking changes.")
 
 (defvar org-node-changes--new-names
   '()
@@ -145,7 +152,7 @@ NAME, ARGLIST and BODY as in `defun'."
 ;;; v1.9
 
 (org-node-changes--def-whiny-alias 'org-node-get-file-path
-                                   'org-node-get-file
+                                   'indexed-file-name
                                    "February 2025" "May")
 (org-node-changes--def-whiny-alias 'org-node-ref-add
                                    'org-node-add-refs
@@ -160,43 +167,100 @@ NAME, ARGLIST and BODY as in `defun'."
                                    'org-node-add-alias
                                    "February 2025" "April")
 
+(define-obsolete-variable-alias
+  'org-node-series-that-marks-calendar
+  'org-node-seq-that-marks-calendar "1.9.0")
+
 
 ;;; v2.0
-
-;; Removed the `org-node-link' struct.  Less cognitive work to read the
-;; familiar (plist-get LINK :origin) instead of (org-node-link-origin LINK) all
-;; over the place, and you can use `seq-let' / `map-let' syntactic sugar.
-(org-node-changes--def-whiny-fn org-node-link-origin (link)
-  "2.0.0 (March 2025)" "May" "use (plist-get LINK :origin) instead"
-  (plist-get link :origin))
-
-(org-node-changes--def-whiny-fn org-node-link-pos (link)
-  "2.0.0 (March 2025)" "May" "use (plist-get LINK :pos) instead"
-  (plist-get link :pos))
-
-(org-node-changes--def-whiny-fn org-node-link-type (link)
-  "2.0.0 (March 2025)" "May" "use (plist-get LINK :type) instead"
-  (plist-get link :type))
-
-(org-node-changes--def-whiny-fn org-node-link-dest (link)
-  "2.0.0 (March 2025)" "May" "use (plist-get LINK :dest) instead"
-  (plist-get link :dest))
 
 (org-node-changes--def-whiny-alias 'org-node-insert-link*-immediate
                                    'org-node-insert-link-novisit*
                                    "2.0.0 (March 2025)" "April" t)
 
-(define-obsolete-function-alias
-  'org-node-get-tags-with-inheritance 'org-node-get-tags "2025-03-03")
+
+;;; v3.0
 
-(define-obsolete-function-alias
-  'org-node-proposed-sequence 'org-node-proposed-seq "2025-03-03")
+(org-node-changes--def-whiny-alias 'org-node-get-tags-with-inheritance
+                                   'indexed-tags
+                                   "3.0.0 (March 2025)" "May")
+(org-node-changes--def-whiny-alias 'org-node-proposed-sequence
+                                   'org-node-proposed-seq
+                                   "3.0.0 (March 2025)" "May")
+(org-node-changes--def-whiny-alias 'org-nodes-in-file
+                                   'indexed-entries-in
+                                   "3.0.0 (March 2025)" "May")
 
-(define-obsolete-function-alias
-  'org-node-get-is-subtree 'org-node-is-subtree "2025-03-03")
+(org-node-changes--def-whiny-fn org-node-get-is-subtree (node)
+  "3.0.0 (March 2025)" "May" "use (/= 0 (indexed-heading-lvl ENTRY)) instead"
+  (/= 0 (indexed-heading-lvl node)))
 
-(define-obsolete-function-alias
-  'org-nodes-in-file 'org-node-get-nodes-in-files "2025-03-11")
+(org-node-changes--def-whiny-fn org-node-is-subtree (node)
+  "3.0.0 (March 2025)" "May" "use (/= 0 (indexed-heading-lvl ENTRY)) instead"
+  (/= 0 (indexed-heading-lvl node)))
+
+(org-node-changes--def-whiny-alias 'org-node-link-dest
+                                   'indexed-dest
+                                   "3.0.0 (March 2025)" "May" t)
+
+(org-node-changes--def-whiny-alias 'org-node-link-origin
+                                   'indexed-nearby-id
+                                   "3.0.0 (March 2025)" "May" t)
+
+(org-node-changes--def-whiny-alias 'org-node-link-pos
+                                   'indexed-pos
+                                   "3.0.0 (March 2025)" "May" t)
+
+(org-node-changes--def-whiny-alias 'org-node-link-type
+                                   'indexed-type
+                                   "3.0.0 (March 2025)" "May" t)
+
+(define-obsolete-variable-alias 'org-node--dest<>links              'indexed--dest<>links "2025-03-19")
+(define-obsolete-variable-alias 'org-node--id<>node                 'indexed--id<>entry "2025-03-19")
+(define-obsolete-variable-alias 'org-node--idle-timer               'indexed--timer "2025-03-19")
+(define-obsolete-variable-alias 'org-node--time-elapsed             'indexed--time-elapsed "2025-03-19")
+(define-obsolete-variable-alias 'org-node--title<>id                'indexed--title<>id "2025-03-19")
+(define-obsolete-variable-alias 'org-node-before-update-tables-hook 'indexed-pre-full-reset-functions "2025-03-19")
+(define-obsolete-variable-alias 'org-node-extra-id-dirs             'indexed-org-dirs "2025-03-19")
+(define-obsolete-variable-alias 'org-node-extra-id-dirs-exclude     'indexed-org-dirs-exclude "2025-03-19")
+(define-obsolete-variable-alias 'org-node-link-types                'indexed-seek-link-types "2025-03-19")
+(define-obsolete-variable-alias 'org-node-warn-title-collisions     'indexed-warn-title-collisions "2025-03-19")
+(define-obsolete-variable-alias 'org-node--ref-path<>ref-type       'indexed-roam--ref<>type "2025-03-19")
+
+(define-obsolete-function-alias 'org-node--dir-files-recursively     #'indexed--dir-files-recursive "2025-03-19")
+(define-obsolete-function-alias 'org-node--maybe-adjust-idle-timer   #'indexed--activate-timer "2025-03-19")
+(define-obsolete-function-alias 'org-node-abbrev-file-names          #'indexed--abbrev-file-names "2025-03-19")
+(define-obsolete-function-alias 'org-node-by-id                      #'indexed-entry-by-id "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-deadline               #'indexed-deadline "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-file                   #'indexed-file-name "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-file-title             #'indexed-file-title "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-file-title-or-basename #'indexed-file-title-or-basename "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-id                     #'indexed-id "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-id-links-to            #'indexed-id-links-to "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-level                  #'indexed-heading-lvl "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-links-from             #'indexed-links-from "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-lnum                   #'indexed-lnum "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-nodes-in-files         #'indexed-entries-in "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-olp                    #'indexed-olpath "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-olp-full               #'indexed-olpath-with-title "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-olp-with-self          #'indexed-olpath-with-self "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-olp-with-self-full     #'indexed-olpath-with-self-with-title "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-pos                    #'indexed-pos "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-priority               #'indexed-priority "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-aliases                #'indexed-roam-aliases "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-refs                   #'indexed-roam-refs "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-reflinks-to            #'indexed-roam-reflinks-to "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-scheduled              #'indexed-scheduled "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-tags                   #'indexed-tags "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-properties             #'indexed-properties "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-props                  #'indexed-properties "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-tags-inherited         #'indexed-tags-inherited "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-tags-local             #'indexed-tags-local "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-title                  #'indexed-title "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-todo                   #'indexed-todo-state "2025-03-19")
+(define-obsolete-function-alias 'org-node-list-collisions            #'indexed-list-title-collisions "2025-03-19")
+(define-obsolete-function-alias 'org-node-list-dead-links            #'indexed-list-dead-id-links "2025-03-19")
+(define-obsolete-function-alias 'org-node-list-scan-problems         #'indexed-list-problems "2025-03-19")
 
 
 ;;; Change in dependencies

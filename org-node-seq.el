@@ -34,6 +34,7 @@
 (require 'calendar)
 (require 'transient)
 (require 'org-node)
+(defvar org-node-proposed-seq)
 
 ;;; Easy wrappers to define a sequence
 
@@ -49,14 +50,15 @@ For KEY, NAME and CAPTURE, see `org-node-seq-defs'."
     :version 2
     :capture ,capture
     :classifier (lambda (node)
-                  (let ((sortstr (cdr (assoc ,prop (org-node-get-props node)))))
+                  (let ((sortstr (indexed-property ,prop node)))
                     (when (and sortstr (not (string-blank-p sortstr)))
-                      (cons (concat sortstr " " (org-node-get-title node))
-                            (org-node-get-id node)))))
+                      (cons (concat sortstr " " (indexed-title node))
+                            (indexed-id node)))))
     :whereami (lambda ()
                 (when-let* ((sortstr (org-entry-get nil ,prop t))
-                            (node (gethash (org-entry-get-with-inheritance "ID") org-nodes)))
-                  (concat sortstr " " (org-node-get-title node))))
+                            (node (gethash (org-entry-get-with-inheritance "ID")
+                                           org-nodes)))
+                  (concat sortstr " " (indexed-title node))))
     :prompter (lambda (key)
                 (let ((seq (cdr (assoc key org-node-seqs))))
                   (completing-read "Go to: " (plist-get seq :sorted-items))))
@@ -84,19 +86,19 @@ For KEY, NAME and CAPTURE, see `org-node-seq-defs'."
     :version 2
     :capture ,capture
     :classifier (lambda (node)
-                  (let ((sortstr (cdr (assoc ,prop (org-node-get-props node))))
+                  (let ((sortstr (indexed-property ,prop node))
                         (tagged (seq-intersection (split-string ,tags ":" t)
-                                                  (org-node-get-tags-local node))))
+                                                  (indexed-tags-local node))))
                     (when (and sortstr tagged (not (string-blank-p sortstr)))
-                      (cons (concat sortstr " " (org-node-get-title node))
-                            (org-node-get-id node)))))
+                      (cons (concat sortstr " " (indexed-title node))
+                            (indexed-id node)))))
     :whereami (lambda ()
                 (when (seq-intersection (split-string ,tags ":" t)
                                         (org-get-tags))
                   (let ((sortstr (org-entry-get nil ,prop t))
                         (node (gethash (org-entry-get-with-inheritance "ID") org-nodes)))
                     (when (and sortstr node)
-                      (concat sortstr " " (org-node-get-title node))))))
+                      (concat sortstr " " (indexed-title node))))))
     :prompter (lambda (key)
                 (let ((seq (cdr (assoc key org-node-seqs))))
                   (completing-read "Go to: " (plist-get seq :sorted-items))))
@@ -110,7 +112,7 @@ For KEY, NAME and CAPTURE, see `org-node-seq-defs'."
                (let ((adder (lambda ()
                               (org-entry-put nil ,prop sortstr)
                               (org-node-add-tags (split-string ,tags ":" t)))))
-                 (add-hook 'org-node-creation-hook adder)
+                 (add-hook 'org-node-creation-hook dadder)
                  (unwind-protect (org-node-create sortstr (org-id-new) key)
                    (remove-hook 'org-node-creation-hook adder))))))
 
@@ -138,8 +140,8 @@ YYYY-MM-DD format, e.g. \"2024-01-31.org\"."
     :version 2
     :capture ,capture
     :classifier (lambda (node)
-                  (when (string-prefix-p ,dir (org-node-get-file node))
-                    (let* ((path (org-node-get-file node))
+                  (when (string-prefix-p ,dir (indexed-file-name node))
+                    (let* ((path (indexed-file-name node))
                            (sortstr (file-name-base path)))
                       (cons sortstr path))))
     :whereami (lambda ()
@@ -367,6 +369,7 @@ nothing."
 
 (defun org-node-seq--jump (key)
   "Prompt for and jump to an entry in node seq identified by KEY."
+  (org-node--kill-blank-unsaved-buffers)
   (let* ((seq (cdr (assoc key org-node-seqs)))
          (sortstr (funcall (plist-get seq :prompter) key))
          (item (assoc sortstr (plist-get seq :sorted-items))))
@@ -432,6 +435,7 @@ Unlike `org-node-proposed-seq', does not need to revert to nil.")
 (defun org-node-seq-capture-target ()
   "Experimental."
   (org-node-cache-ensure)
+  (org-node--kill-blank-unsaved-buffers)
   (let ((key (or org-node-seq--current-key
                  (let* ((valid-keys (mapcar #'car org-node-seq-defs))
                         (elaborations
@@ -461,6 +465,7 @@ Unlike `org-node-proposed-seq', does not need to revert to nil.")
 DEF is a seq-def from `org-node-seq-defs'."
   (unless (plist-get (cdr def) :version)
     (user-error "Seq def :version must be 2 or higher"))
+
   (let ((classifier (org-node--try-ensure-compiled
                      (plist-get (cdr def) :classifier))))
     (nconc
@@ -479,6 +484,100 @@ DEF is a seq-def from `org-node-seq-defs'."
               (list :key (car def)
                     :sorted-items (delete-consecutive-dups
                                    (cl-sort items #'string> :key #'car)))))))
+
+(defcustom org-node-seq-that-marks-calendar nil
+  "Key for the sequence that should mark days in the calendar.
+
+This affects the appearance of the `org-read-date' calendar
+popup.  For example, you can use it to indicate which days have a
+daily-journal entry.
+
+This need usually not be customized!  When you use
+`org-node-seq-dispatch' to jump to a daily-note or some
+other date-based sequence, that sequence may be designed to
+temporarily set this variable.
+
+Customize this mainly if you want a given node seq to always be
+indicated, any time Org pops up a calendar for you.
+
+The sort-strings in the node seq for this key
+should be correctly parseable by `parse-time-string'."
+  :group 'org-node
+  :package-version '(org-node . "1.9.0")
+  :type '(choice key (const nil)))
+
+;; TODO: How to cooperate with preexisting marks?
+(defun org-node-seq--mark-days ()
+  "Mark days in the calendar popup.
+The user option `org-node-seq-that-marks-calendar' controls
+which dates to mark.
+
+Meant to sit on these hooks:
+- `calendar-today-invisible-hook'
+- `calendar-today-visible-hook'"
+  (when org-node-seq-that-marks-calendar
+    (calendar-unmark)
+    (let* ((seq (cdr (assoc org-node-seq-that-marks-calendar
+                            org-node-seqs)))
+           (sortstrs (mapcar #'car (plist-get seq :sorted-items)))
+           mdy)
+      (dolist (date sortstrs)
+        ;; Use `parse-time-string' rather than `iso8601-parse' to fail quietly
+        (setq date (parse-time-string date))
+        (when (seq-some #'natnump date) ;; Basic check that it could be parsed
+          (setq mdy (seq-let (_ _ _ d m y) date
+                      (list m d y)))
+          (when (calendar-date-is-visible-p mdy)
+            (calendar-mark-visible-date mdy)))))))
+
+;; Not used inside this package; a convenience for users.
+(defun org-node-seq-goto (key sortstr)
+  "Visit an entry in sequence identified by KEY.
+The entry to visit has sort-string SORTSTR.  Create if it does
+not exist."
+  (let* ((seq (cdr (assoc key org-node-seqs)))
+         (item (assoc sortstr (plist-get seq :sorted-items))))
+    (when (or (null item)
+              (if (funcall (plist-get seq :try-goto) item)
+                  nil
+                (delete item (plist-get seq :sorted-items))
+                t))
+      (funcall (plist-get seq :creator) sortstr key))))
+
+(defun org-node-seq--reset (&optional _)
+  "Wipe and re-build all seqs."
+  (setq org-node-seqs nil)
+  (let ((T (current-time)))
+    (dolist (def org-node-seq-defs)
+      (setf (alist-get (car def) org-node-seqs nil nil #'equal)
+            (org-node-seq--build-from-def def))
+      ;; TODO: Clear any old seq from menu
+      (org-node-seq--add-to-dispatch (car def) (plist-get (cdr def) :name)))
+    (when indexed--next-message
+      (setq indexed--next-message
+            (concat indexed--next-message
+                    (format " (+ %.2fs making org-node-seqs)"
+                            (float-time (time-since T))))))))
+
+;;;###autoload
+(define-minor-mode org-node-seq-mode
+  "Populate sequences according to `org-node-seq-defs'.
+This permits \\[org-node-seq-dispatch] to work."
+  :global t
+  :group 'org-node
+  (if org-node-seq-mode
+      (progn
+        ;; FIXME: A dirty-added node eventually disappears if its buffer is
+        ;;        never saved, and then the node seq stops working
+        (add-hook 'org-node-creation-hook        #'org-node-seq--add-item)
+        (add-hook 'indexed-post-full-reset-functions #'org-node-seq--reset 50)
+        ;; Put ourselves in front of org-roam-dailies unhygienic hook use.
+        (add-hook 'calendar-today-invisible-hook #'org-node-seq--mark-days 5)
+        (add-hook 'calendar-today-visible-hook   #'org-node-seq--mark-days 5))
+    (remove-hook 'org-node-creation-hook        #'org-node-seq--add-item)
+    (remove-hook 'indexed-post-full-reset-functions #'org-node-seq--reset)
+    (remove-hook 'calendar-today-invisible-hook #'org-node-seq--mark-days)
+    (remove-hook 'calendar-today-visible-hook   #'org-node-seq--mark-days)))
 
 (defun org-node-seq--add-to-dispatch (key name)
   "Use KEY and NAME to add a sequence to the Transient menu."
@@ -528,114 +627,27 @@ DEF is a seq-def from `org-node-seq-defs'."
                (setq org-node-seq--current-key nil)))
     (message "Choose sequence before navigating")))
 
-;; TODO: Don't use the invisible placeholder.
-;;       https://github.com/magit/transient/issues/49#issuecomment-2289762426
 ;; TODO: In Emacs 30, simplify to just ###autoload.
 ;;;###autoload (autoload 'org-node-seq-dispatch "org-node-seq" nil t)
 (transient-define-prefix org-node-seq-dispatch ()
   ["Sequence"
+   ;; TODO: Don't use the invisible placeholder.
+   ;; https://github.com/magit/transient/issues/49#issuecomment-2289762426
    ("|" "Invisible" "Placeholder" :if-nil t)]
   ["Navigation"
    ("p" "Previous in sequence" org-node-seq--goto-previous* :transient t)
    ("n" "Next in sequence" org-node-seq--goto-next* :transient t)
    ("j" "Jump (or create)" org-node-seq--jump*)
-   ("c" "Capture into" org-node-seq--capture)])
-
-(defcustom org-node-seq-that-marks-calendar nil
-  "Key for the sequence that should mark days in the calendar.
-
-This affects the appearance of the `org-read-date' calendar
-popup.  For example, you can use it to indicate which days have a
-daily-journal entry.
-
-This need usually not be customized!  When you use
-`org-node-seq-dispatch' to jump to a daily-note or some
-other date-based sequence, that sequence may be designed to
-temporarily set this variable.
-
-Customize this mainly if you want a given node seq to always be
-indicated, any time Org pops up a calendar for you.
-
-The sort-strings in the node seq for this key
-should be correctly parseable by `parse-time-string'."
-  :group 'org-node
-  :package-version '(org-node . "1.9.0")
-  :type '(choice key (const nil)))
-
-;; TODO: How to cooperate with preexisting marks?
-(defun org-node-seq--mark-days ()
-  "Mark days in the calendar popup.
-The user option `org-node-seq-that-marks-calendar' controls
-which dates to mark.
-
-Meant to sit on these hooks:
-- `calendar-today-invisible-hook'
-- `calendar-today-visible-hook'"
-  (calendar-unmark)
-  (when org-node-seq-that-marks-calendar
-    (let* ((seq (cdr (assoc org-node-seq-that-marks-calendar
-                            org-node-seqs)))
-           (sortstrs (mapcar #'car (plist-get seq :sorted-items)))
-           mdy)
-      (dolist (date sortstrs)
-        ;; Use `parse-time-string' rather than `iso8601-parse' to fail quietly
-        (setq date (parse-time-string date))
-        (when (seq-some #'natnump date) ;; Basic check that it could be parsed
-          (setq mdy (seq-let (_ _ _ d m y _ _ _) date
-                      (list m d y)))
-          (when (calendar-date-is-visible-p mdy)
-            (calendar-mark-visible-date mdy)))))))
-
-;; Not used inside this package; a convenience for users.
-(defun org-node-seq-goto (key sortstr)
-  "Visit an entry in sequence identified by KEY.
-The entry to visit has sort-string SORTSTR.  Create if it does
-not exist."
-  (let* ((seq (cdr (assoc key org-node-seqs)))
-         (item (assoc sortstr (plist-get seq :sorted-items))))
-    (when (or (null item)
-              (if (funcall (plist-get seq :try-goto) item)
-                  nil
-                (delete item (plist-get seq :sorted-items))
-                t))
-      (funcall (plist-get seq :creator) sortstr key))))
-
-(defvar org-node-seq--build-elapsed nil) ;; TODO: use it
-(defun org-node-seq--reset ()
-  "Wipe and re-build all seqs.
-Must be done after the main org-node tables are up to date,
-not before."
-  (setq org-node-seqs nil)
-  (setq org-node-seq--build-elapsed 0)
-  (let ((T (current-time)))
-    (dolist (def org-node-seq-defs)
-      (setf (alist-get (car def) org-node-seqs nil nil #'equal)
-            (org-node-seq--build-from-def def))
-      ;; TODO: Clear any old sequence from menu
-      (org-node-seq--add-to-dispatch (car def)
-                                     (plist-get (cdr def) :name))
-      (setq org-node-seq--build-elapsed (float-time (time-since T))))))
-
-(defun org-node-seq--enable-or-disable ()
-  "If `org-node-cache-mode' is enabled, enable node sequences as well.
-
-The reason this function is separated from `org-node-cache-mode' itself
-is purely to let you avoid loading org-node-seq.el if you do not use it."
-  (if org-node-cache-mode
-      (progn
-        ;; FIXME: A dirty-added node eventually disappears if its buffer is
-        ;;        never saved, and then the node seq stops working
-        (add-hook 'org-node-creation-hook        #'org-node-seq--add-item 90)
-        (add-hook 'calendar-today-invisible-hook #'org-node-seq--mark-days 5)
-        (add-hook 'calendar-today-visible-hook   #'org-node-seq--mark-days 5)
-        (add-hook 'org-node--mid-scan-hook       #'org-node-seq--reset))
-    (remove-hook 'org-node-creation-hook        #'org-node-seq--add-item)
-    (remove-hook 'calendar-today-invisible-hook #'org-node-seq--mark-days)
-    (remove-hook 'calendar-today-visible-hook   #'org-node-seq--mark-days)
-    (remove-hook 'org-node--mid-scan-hook       #'org-node-seq--reset)))
-
-(org-node-seq--enable-or-disable)
-(add-hook 'org-node-cache-mode-hook #'org-node-seq--enable-or-disable)
+   ("c" "Capture into" org-node-seq--capture)]
+  (interactive)
+  (cond ((not org-node-seq-defs)
+         (message "`org-node-seq-defs' not defined"))
+        ((not org-node-seq-mode)
+         (message "`org-node-seq-mode' not enabled"))
+        ((not org-node-seqs)
+         (org-node-seq--reset))
+        (t
+         (transient-setup 'org-node-seq-dispatch))))
 
 (provide 'org-node-seq)
 
