@@ -27,8 +27,10 @@
 (require 'seq)
 (require 'llama)
 (require 'org)
+(require 'org-element)
 (require 'org-node-changes)
 (require 'org-node)
+(require 'indexed)
 
 (defgroup org-node-backlink nil "In-file backlinks."
   :group 'org-node)
@@ -62,7 +64,7 @@ set `org-node-backlink-protect-org-super-links' to nil.")))
   "Warn if `org-node-backlink-do-drawers' is t but properties exist.
 If a warning was not needed, return nil."
   (and org-node-backlink-do-drawers
-       (org-node-backlink--props-exist-p)
+       (cl-some (##indexed-property "BACKLINKS" %) (indexed-org-entries))
        (display-warning 'org-node-backlink "
 User option `org-node-backlink-do-drawers' is t,
 but found :BACKLINKS: lines in some property drawers,
@@ -70,58 +72,48 @@ so doing nothing.
 This is a new default in v2, you probably just need to toggle it.
 Or use `org-node-backlink-mass-delete-props'.")))
 
-(defun org-node-backlink--props-exist-p ()
-  "Return t if property lines called :BACKLINKS: exist in some file."
-  (cl-loop for node being the hash-values of org-nodes
-           when (assoc-string "BACKLINKS" (org-node-get-properties node) t)
-           return t))
-
 
 ;;; Global minor mode
 
 ;;;###autoload
 (define-minor-mode org-node-backlink-mode
-  "Keep :BACKLINKS: properties updated.
+  "Keep :BACKLINKS: properties or drawers updated.
 
-See Info node `(org-node)'.
-
------"
+See Info node `(org-node)'."
   :global t
   (if org-node-backlink-mode
       (progn
-        (advice-add 'org-insert-link :after  #'org-node-backlink--add-in-target)
-        (add-hook 'org-node-rescan-functions #'org-node-backlink--maybe-fix-proactively)
-        (add-hook 'org-mode-hook             #'org-node-backlink--local-mode)
+        (advice-add 'org-insert-link :after #'org-node-backlink--add-in-target)
+        (add-hook 'org-mode-hook #'org-node-backlink--local-mode)
+        (add-hook 'indexed-post-incremental-update-functions
+                  #'org-node-backlink--maybe-fix-proactively)
         (dolist (buf (buffer-list))
           (with-current-buffer buf
             (when (derived-mode-p 'org-mode)
               (org-node-backlink--local-mode)))))
-    (advice-remove 'org-insert-link          #'org-node-backlink--add-in-target)
-    (remove-hook 'org-node-rescan-functions  #'org-node-backlink--maybe-fix-proactively)
-    (remove-hook 'org-mode-hook              #'org-node-backlink--local-mode)
+    (advice-remove 'org-insert-link #'org-node-backlink--add-in-target)
+    (remove-hook 'org-mode-hook #'org-node-backlink--local-mode)
+    (remove-hook 'org-roam-post-node-insert-hook
+                 #'indexed-x-ensure-link-at-point-known)
+    (remove-hook 'indexed-post-incremental-update-functions
+                 #'org-node-backlink--maybe-fix-proactively)
     (dolist (buf (buffer-list))
       (with-current-buffer buf
         (org-node-backlink--local-mode 0)))))
 
 (define-minor-mode org-node-backlink--local-mode
   "Buffer-local part of `org-node-backlink-mode'.
-
-NOT a local equivalent of aforementioned global mode, but adds a set of
-buffer-local hooks to the current buffer, in addition to the global
-hooks added by the global mode.  Enabling/disabling the global mode will
-also enable/disable this mode in relevant buffers.
-
-In short, this mode is not meant to be toggled on its own.
-
------"
+Not meant to be toggled on its own."
   :interactive nil
   (if org-node-backlink--local-mode
       (progn
+        (add-hook 'org-roam-post-node-insert-hook #'indexed-x-ensure-link-at-point-known -50 t)
         (add-hook 'org-roam-post-node-insert-hook #'org-node-backlink--add-in-target nil t)
         (add-hook 'org-node-insert-link-hook      #'org-node-backlink--add-in-target nil t)
         (add-hook 'after-change-functions         #'org-node-backlink--flag-buffer-modification nil t)
         (add-hook 'before-save-hook               #'org-node-backlink--fix-flagged-parts-of-buffer nil t))
 
+    (remove-hook 'org-roam-post-node-insert-hook  #'indexed-x-ensure-link-at-point-known t)
     (remove-hook 'org-roam-post-node-insert-hook  #'org-node-backlink--add-in-target t)
     (remove-hook 'org-node-insert-link-hook       #'org-node-backlink--add-in-target t)
     (remove-hook 'after-change-functions          #'org-node-backlink--flag-buffer-modification t)
@@ -148,14 +140,14 @@ In short, this mode is not meant to be toggled on its own.
   (interactive)
   (unless org-node-backlink-do-drawers
     (user-error "Asked to update :BACKLINKS: drawers, but `org-node-backlink-do-drawers' is nil"))
-  (org-node-backlink--fix-all-files 'add-drawers))
+  (org-node-backlink--fix-all-files 'update-drawers))
 
 (defun org-node-backlink-mass-update-props ()
   "Add or update backlinks properties in all files."
   (interactive)
   (when org-node-backlink-do-drawers
     (user-error "Asked to update :BACKLINKS: properties, but `org-node-backlink-do-drawers' is t"))
-  (org-node-backlink--fix-all-files 'add-props))
+  (org-node-backlink--fix-all-files 'update-props))
 
 (defun org-node-backlink-mass-delete-drawers ()
   "Delete all backlinks drawers in all files."
@@ -175,9 +167,9 @@ Can be quit midway through and resumed later.  With
 \\[universal-argument], start over instead of resuming."
   (interactive)
   (org-node-cache-ensure t)
-  (unless (or (and (memq kind '(add-drawers add-props))
+  (unless (or (and (memq kind '(update-drawers update-props))
                    (org-node-backlink--check-v2-misaligned-setting-p))
-              (and (eq kind 'add-drawers)
+              (and (eq kind 'update-drawers)
                    (org-node-backlink--check-osl-user-p)))
     ;; Maybe reset file list
     (unless (eq org-node-backlink--work-kind kind)
@@ -185,7 +177,7 @@ Can be quit midway through and resumed later.  With
       (setq org-node-backlink--work-files nil))
     (when (or (equal current-prefix-arg '(4))
               (null org-node-backlink--work-files))
-      (let* ((files (org-node-list-files t))
+      (let* ((files (indexed-org-files))
              (dirs (org-node--root-dirs files)))
         (when (y-or-n-p
                (format "Confirm: edit %d Org files in these %d directories?\n%s"
@@ -223,12 +215,12 @@ Can be quit midway through and resumed later.  With
   "Update :BACKLINKS: properties or drawers in all nodes in buffer.
 Let `org-node-backlink-do-drawers' determine which.
 
-Or if KIND is symbol `add-drawers', `del-drawers', `add-props', or
+Or if KIND is symbol `update-drawers', `del-drawers', `update-props', or
 `del-props', do the corresponding thing."
   (interactive)
-  (unless (or (and (memq kind '(add-drawers add-props))
+  (unless (or (and (memq kind '(update-drawers update-props))
                    (org-node-backlink--check-v2-misaligned-setting-p))
-              (and (eq kind 'add-drawers)
+              (and (eq kind 'update-drawers)
                    (org-node-backlink--check-osl-user-p)))
     ;; (message "Fixing file %s" buffer-file-name)
     (goto-char (point-min))
@@ -242,14 +234,14 @@ Or if KIND is symbol `add-drawers', `del-drawers', `add-props', or
   "In current entry, fix the backlinks drawer or property.
 Let `org-node-backlink-do-drawers' determine which.
 
-Or if KIND is symbol `add-drawers', `del-drawers', `add-props', or
+Or if KIND is symbol `update-drawers', `del-drawers', `update-props', or
 `del-props', do the corresponding thing."
   (if kind
       (pcase kind
         ('del-props   (org-node-backlink--fix-nearby-property t))
         ('del-drawers (org-node-backlink--fix-nearby-drawer t))
-        ('add-props   (org-node-backlink--fix-nearby-property))
-        ('add-drawers (org-node-backlink--fix-nearby-drawer)))
+        ('update-props   (org-node-backlink--fix-nearby-property))
+        ('update-drawers (org-node-backlink--fix-nearby-drawer)))
     (if org-node-backlink-do-drawers
         (org-node-backlink--fix-nearby-drawer)
       (org-node-backlink--fix-nearby-property))))
@@ -350,9 +342,9 @@ If REMOVE is non-nil, remove it instead."
       (if (not (and id node))
           (org-entry-delete nil "BACKLINKS")
         (let* ((origins (thread-last
-                          (append (org-node-get-id-links-to node)
-                                  (org-node-get-reflinks-to node))
-                          (mapcar (##plist-get % :origin))
+                          (append (indexed-id-links-to node)
+                                  (indexed-roam-reflinks-to node))
+                          (mapcar #'indexed-origin)
                           (delete-dups)
                           ;; Sort for deterministic order for less noisy diffs.
                           (seq-sort #'string<)))
@@ -362,7 +354,7 @@ If REMOVE is non-nil, remove it instead."
                        when origin-node
                        collect (org-link-make-string
                                 (concat "id:" origin)
-                                (org-node-get-title origin-node))))
+                                (indexed-title origin-node))))
                (links-string (string-join links "  ")))
           (if links
               (unless (equal links-string (org-entry-get nil "BACKLINKS"))
@@ -441,7 +433,6 @@ If REMOVE is non-nil, remove it instead."
 
 (defun org-node-backlink--add-in-target (&rest _)
   "For known link at point, leave a backlink in the target node."
-  (require 'org-element)
   (unless (derived-mode-p 'org-mode)
     (error "Backlink function called in non-Org buffer"))
   (org-node-cache-ensure)
@@ -451,18 +442,19 @@ If REMOVE is non-nil, remove it instead."
          dest-id dest-file)
     ;; In a link such as [[id:abc1234]], TYPE is "id" and PATH is "abc1234".
     (when (and type path)
+      (indexed-x-ensure-link-at-point-known)
       (if (equal "id" type)
           ;; A classic backlink
           (progn
             (setq dest-id path)
             ;; `org-id-find-id-file' has terrible fallback behavior
             (setq dest-file (ignore-errors
-                              (org-node-get-file
+                              (indexed-file-name
                                (gethash dest-id org-nodes)))))
         ;; A "reflink"
-        (setq dest-id (gethash path org-node--ref<>id))
+        (setq dest-id (gethash path indexed-roam--ref<>id))
         (setq dest-file (ignore-errors
-                          (org-node-get-file
+                          (indexed-file-name
                            (gethash dest-id org-nodes)))))
       (when (null dest-file)
         (push dest-id org-node-backlink--fails))
@@ -484,7 +476,7 @@ If REMOVE is non-nil, remove it instead."
               ;; Ensure that
               ;; `org-node-backlink--fix-flagged-parts-of-buffer' will not
               ;; later remove the backlink we're adding
-              (org-node--dirty-ensure-node-known)
+              (indexed-x-ensure-entry-at-point-known)
               (org-node--with-quick-file-buffer dest-file
                 :about-to-do "Org-node going to add backlink to the target of the link you just inserted"
                 (when (and (boundp 'org-transclusion-exclude-elements)
@@ -693,9 +685,9 @@ If REMOVE non-nil, remove it instead."
     (when-let* ((id (org-entry-get nil "ID"))
                 (node (gethash id org-nodes))
                 (origins (thread-last
-                           (append (org-node-get-id-links-to node)
-                                   (org-node-get-reflinks-to node))
-                           (mapcar (##plist-get % :origin))
+                           (append (indexed-id-links-to node)
+                                   (indexed-roam-reflinks-to node))
+                           (mapcar #'indexed-origin)
                            (delete-dups))))
       (save-excursion
         (save-restriction
@@ -723,7 +715,7 @@ If REMOVE non-nil, remove it instead."
                     (insert (org-node-backlink--reformat-line line))))))
             (dolist (id to-add)
               (when-let* ((known-node (gethash id org-nodes)))
-                (let ((title (org-node-get-title known-node)))
+                (let ((title (indexed-title known-node)))
                   (indent-according-to-mode)
                   (insert (funcall org-node-backlink-drawer-formatter id title)
                           "\n"))))
@@ -748,10 +740,11 @@ If REMOVE non-nil, remove it instead."
 
 ;;; Proactive fixing
 
-;; REVIEW: Only comes into effect on `org-node-rescan-functions', but could
-;;         also other times?  Possible the algo could be simpler, rather than
-;;         diffing `org-node--old-link-sets' from current, simply look in
-;;         `org-node-get-properties' of all nodes...
+;; REVIEW: Only comes into effect on
+;;         `indexed-post-incremental-update-functions', but could also other
+;;         times?  Possible the algo could be simpler, rather than diffing
+;;         `org-node--old-link-sets' from current, simply look in
+;;         `indexed-properties' of all nodes...
 
 (defcustom org-node-backlink-lazy nil
   "Inhibit cleaning up backlinks until user edits affected entry.
@@ -784,21 +777,19 @@ To force an update at any time, use one of these commands:
   :package-version '(org-node . "2.0.0"))
 
 (defun org-node-backlink--maybe-fix-proactively (_)
-  "Designed for `org-node-rescan-functions'."
+  "Designed for `indexed-post-incremental-update-functions'."
   (unless org-node-backlink-lazy
     (let (affected-dests)
       (cl-loop
        for (dest . old-links) in org-node--old-link-sets
        when (cl-set-exclusive-or
-             (mapcar (##plist-get % :origin)
-                     old-links)
-             (mapcar (##plist-get % :origin)
-                     (gethash dest org-node--dest<>links))
+             (mapcar #'indexed-origin old-links)
+             (mapcar #'indexed-origin (gethash dest indexed--dest<>links))
              :test #'equal)
        do (let* ((id dest)
                  (node (or (gethash id org-nodes)
                            ;; See if this is a ref and find the real id
-                           (and (setq id (gethash dest org-node--ref<>id))
+                           (and (setq id (gethash dest indexed-roam--ref<>id))
                                 (gethash id org-nodes)))))
             ;; (#59) Do nothing if this is an empty link like [[id:]]
             (when node
@@ -806,7 +797,7 @@ To force an update at any time, use one of these commands:
               ;;   ((file1 . (origin1 origin2 origin3 ...))
               ;;    (file2 . (...))
               ;;    (file3 . (...)))
-              (push id (alist-get (org-node-get-file node)
+              (push id (alist-get (indexed-file-name node)
                                   affected-dests
                                   nil
                                   nil
