@@ -262,6 +262,13 @@ Then remind the user to run \\[org-node-reset]."
        "Remember to run M-x org-node-reset after configuring %S" sym)))
   (custom-set-default sym val))
 
+(defcustom org-node-custom-link-format-fn nil
+  "Function to format inserted links specially.
+Takes a node as argument, should return a string."
+  :type '(choice (const nil)
+                 function)
+  :package-version '(org-node . "2.3.3"))
+
 (defcustom org-node-filter-fn
   (lambda (node)
     (not (assoc "ROAM_EXCLUDE" (org-node-get-properties node))))
@@ -2163,6 +2170,9 @@ Argument IMMEDIATE means behave as
          (node (gethash input org-node--candidate<>node))
          (id (if node (org-node-get-id node) (org-id-new)))
          (link-desc (or region-text
+                        (and node
+                             org-node-custom-link-format-fn
+                             (funcall org-node-custom-link-format-fn node))
                         (and (not org-node-alter-candidates) input)
                         (and node (seq-find (##string-search % input)
                                             (org-node-get-aliases node)))
