@@ -2645,11 +2645,19 @@ so it matches the destination\\='s current title."
                        (node (gethash id org-nodes))
                        (true-title (when node
                                      (org-node-get-title node)))
+                       (custom-desc
+                        (and org-node-custom-link-format-fn
+                             (funcall org-node-custom-link-format-fn node)))
                        (answered-yes nil))
                   (when (and id node desc
-                             (not (string-equal-ignore-case desc true-title))
-                             (not (member-ignore-case
-                                   desc (org-node-get-aliases node))))
+                             (or (and custom-desc
+                                      (not (equal desc custom-desc)))
+                                 (and (not (string-equal-ignore-case
+                                            desc
+                                            true-title))
+                                      (not (member-ignore-case
+                                            desc
+                                            (org-node-get-aliases node))))))
                     (switch-to-buffer (current-buffer))
                     (goto-char end)
                     (if (org-at-heading-p)
@@ -2661,15 +2669,17 @@ so it matches the destination\\='s current title."
                         (setq answered-yes
                               (y-or-n-p
                                (format "Rewrite link? Will become:  \"%s\""
-                                       true-title)))
+                                       (or custom-desc true-title))))
                       (unhighlight-regexp exact-link))
                     (when answered-yes
                       (goto-char beg)
                       (atomic-change-group
                         (delete-region beg end)
-                        (insert (org-link-make-string target true-title)))
-                      ;; Give user a moment to glimpse the result before hopping
-                      ;; to the next link in case of a replacement gone wrong
+                        (insert (org-link-make-string
+                                 target (or custom-desc true-title))))
+                      ;; Give user a moment to glimpse the result before
+                      ;; hopping to the next link, in case of a replacement
+                      ;; gone wrong
                       (redisplay)
                       (sleep-for .15))
                     (goto-char end)))))))))))
