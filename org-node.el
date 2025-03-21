@@ -2647,6 +2647,7 @@ so it matches the destination\\='s current title."
                                      (org-node-get-title node)))
                        (custom-desc
                         (and org-node-custom-link-format-fn
+                             node
                              (funcall org-node-custom-link-format-fn node)))
                        (answered-yes nil))
                   (when (and id node desc
@@ -2681,7 +2682,7 @@ so it matches the destination\\='s current title."
                       ;; hopping to the next link, in case of a replacement
                       ;; gone wrong
                       (redisplay)
-                      (sleep-for .15))
+                      (sleep-for .12))
                     (goto-char end)))))))))))
 
 ;;;###autoload
