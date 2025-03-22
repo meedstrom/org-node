@@ -2624,7 +2624,8 @@ so it matches the destination\\='s current title."
   (when (org-node--consent-to-bothersome-modes-for-mass-edit)
     (let ((n-links 0)
           (n-files 0))
-      (dolist (file (or files (org-node-list-files t)))
+      (dolist (file (or files (sort (org-node-list-files t)
+                                    (##natnump (random) _&*))))
         (cl-incf n-files)
         (with-current-buffer (delay-mode-hooks (find-file-noselect file))
           (save-excursion
