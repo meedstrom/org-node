@@ -476,13 +476,14 @@ When called from Lisp, peek on any hash table HT."
 (define-minor-mode org-node-cache-mode
   "Instruct various hooks to keep the cache updated."
   :global t
-  (message "
-Org-node v3 enabling `indexed-updater-mode' and `indexed-roam-mode' for you.
-If you don't want to see this message, enable those modes first.")
-  (indexed-roam-mode)
-  (indexed-updater-mode)
   (cond
    (org-node-cache-mode
+    (unless (and indexed-updater-mode indexed-roam-mode)
+      (message "
+Org-node v3 enabling `indexed-updater-mode' and `indexed-roam-mode' for you.
+If you don't want to see this message, enable those modes first.")
+      (indexed-roam-mode)
+      (indexed-updater-mode))
     (add-hook 'indexed-pre-full-reset-functions #'org-node--wipe-completions)
     (add-hook 'indexed-pre-incremental-update-functions #'org-node--forget-some-completions)
     (add-hook 'indexed-record-entry-functions #'org-node--snitch-to-org-id)
