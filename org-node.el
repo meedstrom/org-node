@@ -2651,14 +2651,14 @@ so it matches the destination\\='s current title."
                              (funcall org-node-custom-link-format-fn node)))
                        (answered-yes nil))
                   (when (and id node desc
-                             (or (and custom-desc
-                                      (not (equal desc custom-desc)))
-                                 (and (not (string-equal-ignore-case
-                                            desc
-                                            true-title))
-                                      (not (member-ignore-case
-                                            desc
-                                            (org-node-get-aliases node))))))
+                             (if custom-desc
+                                 (not (string-equal desc custom-desc))
+                               (and (not (string-equal-ignore-case
+                                          desc
+                                          true-title))
+                                    (not (member-ignore-case
+                                          desc
+                                          (org-node-get-aliases node))))))
                     (switch-to-buffer (current-buffer))
                     (goto-char end)
                     (if (org-at-heading-p)
