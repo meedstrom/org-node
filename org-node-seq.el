@@ -537,6 +537,8 @@ The entry to visit has sort-string SORTSTR.  Create if it does
 not exist."
   (let* ((seq (cdr (assoc key org-node-seqs)))
          (item (assoc sortstr (plist-get seq :sorted-items))))
+    (unless seq
+      (error "No seq with key %s, maybe do `org-node-reset'?" key))
     (when (or (null item)
               (if (funcall (plist-get seq :try-goto) item)
                   nil
