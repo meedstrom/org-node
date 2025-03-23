@@ -6,8 +6,10 @@
 #+TEXINFO_DIR_CATEGORY: Emacs
 #+TEXINFO_DIR_TITLE: Org-node: (org-node).
 #+TEXINFO_DIR_DESC: Link org-id entries into a network.
-* News for v3 :export:
-A lot of code has been spun into a new library https://github.com/meedstrom/indexed, now a dependency.  Reduces codebase by 25%.  This may allow other projects to create interesting stuff without org-node.
+* News for v3 :noexport:
+A lot of code has been spun into a new library https://github.com/meedstrom/indexed, now a dependency.  Reduces codebase by 25--33%.  This may allow other projects to create interesting stuff without org-node.
+
+Not much new features in v3 -- it mainly throws out a lot of plumbing.
 
 Update initfiles when you can.  Direct renames:
 
@@ -17,7 +19,7 @@ Update initfiles when you can.  Direct renames:
 | org-node-extra-id-dirs-exclude | indexed-org-dirs-exclude |
 | org-node-link-types            | indexed-seek-link-types  |
 
-Also you'll get messages about it, but enable two modes before =org-node-cache-mode=:
+Also (you'll get messages about it) enable two modes before =org-node-cache-mode=:
 
 #+begin_src elisp
 (indexed-roam-mode)
@@ -25,13 +27,15 @@ Also you'll get messages about it, but enable two modes before =org-node-cache-m
 (org-node-cache-mode)
 #+end_src
 
+The hope is to eventually remove =org-node-cache-mode=, but we're not there yet.
+
 Node seqs, if you use them, now require turning on explicitly.
 
 #+begin_src elisp
 (org-node-seq-mode)
 #+end_src
 
-For reference, check out the full list of obsoletions near the bottom of file =org-node-changes.el=.
+For reference, check out the full list of obsoletions near the bottom of file [[https://github.com/meedstrom/org-node/blob/2504b7f0a8848c0fbc3dcddc2d1edeb0adbbc9ac/org-node-changes.el][org-node-changes.el]].
 
 * News for v2 :noexport:
 # Must use #+HTML oneliner because ox-texinfo does not understand #+BEGIN_HTML, and GitHub's org parser does not understand #+BEGIN_EXPORT HTML.

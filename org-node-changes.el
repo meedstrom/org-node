@@ -47,9 +47,7 @@
   "Alist of deprecated symbol names and their new names.
 Names here will cause complaints if bound.")
 
-(defvar org-node-changes--warned-about-roam-id nil)
-(defvar org-node-changes--warned-once nil)
-(defvar org-node-changes--warned-about-lazy nil
+(defvar org-node-changes--warned-about-roam-id nil
   "Non-nil if did warn about org-roam overriding a link parameter.")
 
 (defun org-node-changes--warn-and-copy ()
@@ -90,8 +88,8 @@ Then do other one-shot warnings while we\\='re at it."
        "%s" "Note: org-roam overrides ID-link behavior to prefer its own DB!
 This becomes a problem if the DB goes outdated: clicking a link can
 send you to an empty file due to an uncaught rename, for example.
-Org-node always keeps `org-id-locations' up to date for you.
-So you can revert ID-link behavior to its default,
+Org-node keeps `org-id-locations' up to date for you,
+so you can revert ID-link behavior to its default,
 by adding to initfiles AFTER org-roam loads:
 (org-link-set-parameters
  \"id\" :follow #'org-id-open :store #'org-id-store-link-maybe)"))))
@@ -201,19 +199,19 @@ NAME, ARGLIST and BODY as in `defun'."
 
 (org-node-changes--def-whiny-alias 'org-node-link-dest
                                    'indexed-dest
-                                   "3.0.0 (March 2025)" "May" t)
+                                   "3.0.0 (March 2025)" "May")
 
 (org-node-changes--def-whiny-alias 'org-node-link-origin
                                    'indexed-nearby-id
-                                   "3.0.0 (March 2025)" "May" t)
+                                   "3.0.0 (March 2025)" "May")
 
 (org-node-changes--def-whiny-alias 'org-node-link-pos
                                    'indexed-pos
-                                   "3.0.0 (March 2025)" "May" t)
+                                   "3.0.0 (March 2025)" "May")
 
 (org-node-changes--def-whiny-alias 'org-node-link-type
                                    'indexed-type
-                                   "3.0.0 (March 2025)" "May" t)
+                                   "3.0.0 (March 2025)" "May")
 
 (define-obsolete-variable-alias 'org-node--dest<>links              'indexed--dest<>links "2025-03-19")
 (define-obsolete-variable-alias 'org-node--id<>node                 'indexed--id<>entry "2025-03-19")

@@ -19,10 +19,11 @@
 ;; URL:      https://github.com/meedstrom/org-node
 ;; Created:  2024-04-13
 ;; Keywords: org, hypermedia
-;; Package-Requires: ((emacs "29.1") (llama "0.5.0") (indexed "0.1.0") (el-job "2.2.0") (magit-section "4.3.0"))
+;; Package-Requires: ((emacs "29.1") (llama "0.5.0") (indexed "0.4.0") (el-job "2.2.0") (magit-section "4.3.0"))
 
 ;; NOTE: Looking for Package-Version?  Consult the Git tag.
 ;;       2.0.0 was released on 20250303, i.e. March 3.
+;;       3.0.0 was released on 20250322, i.e. March 22.
 
 ;;; Commentary:
 
@@ -82,8 +83,6 @@
 ;; so that you do not see them in org-node commands.
 
 ;;; Code:
-
-;; TODO: Main file should not load org, and let you call org-node-find anyway!
 
 ;; Built-in
 (require 'seq)
@@ -384,7 +383,7 @@ match anything.
 
 Arguments STR, PRED and ACTION are handled behind the scenes,
 see Info node `(elisp)Programmed Completion'."
-    (if (eq action 'metadata)
+  (if (eq action 'metadata)
       (cons 'metadata (unless org-node-alter-candidates
                         (list (cons 'affixation-function
                                     #'org-node--affixate-collection))))
@@ -406,6 +405,7 @@ see Info node `(elisp)Programmed Completion'."
 (defvar org-node--candidate<>node (make-hash-table :test 'equal)
   "1:1 table mapping completion candidates to nodes.")
 
+;; TODO: Deprecate. Much better: (inspector-inspect org-nodes)
 (defun org-node-peek (&optional ht)
   "Print some random values of table `org-nodes'.
 When called from Lisp, peek on any hash table HT."
@@ -436,23 +436,24 @@ When called from Lisp, peek on any hash table HT."
   "Wipe table `org-node--candidate<>node'."
   (clrhash org-node--candidate<>node))
 
-;; NOTE: This will not make Indexed actually scan those IDs, so it is purely to
-;;       keep ID-links working.  This departs from org-node v1/v2.
 (defun org-node--snitch-to-org-id (node)
-  "Add NODE to `org-id-locations', ensuring that ID-links work."
+  "Add NODE to `org-id-locations', ensuring that ID-links work.
+
+If `indexed-check-org-id-locations' is t, this naturally also results in
+causing NODE\\='s file to be scanned for nodes in the future regardless
+of whether or not the file is a descendant of `indexed-org-dirs'."
   (org-node--init-org-id)
   (puthash (indexed-id node) (indexed-file-name node) org-id-locations))
 
 (defun org-node--record-completion-candidates (node)
   "Cache completion candidates for NODE and its aliases."
   (when (and (indexed-id node)
-             (funcall (org-node--try-ensure-compiled org-node-filter-fn)
-                      node))
+             (funcall (org-node--try-ensure-compiled org-node-filter-fn) node))
     (dolist (title (cons (indexed-title node)
                          (indexed-roam-aliases node)))
-          (let ((affx (funcall (org-node--try-ensure-compiled org-node-affixation-fn)
-                               node title)))
-      (if org-node-alter-candidates
+      (let ((affx (funcall (org-node--try-ensure-compiled org-node-affixation-fn)
+                           node title)))
+        (if org-node-alter-candidates
             ;; Absorb the affixations into one candidate string
             (puthash (concat (nth 1 affx) (nth 0 affx) (nth 2 affx))
                      node
@@ -464,9 +465,8 @@ When called from Lisp, peek on any hash table HT."
 (defun org-node--forget-some-completions (parse-results)
   (seq-let (missing-files file-data entries) parse-results
     (org-node--forget-id-locations missing-files)
-    (org-node--dirty-forget-completions-in missing-files)
     (org-node--dirty-forget-completions-in
-     (mapcar #'indexed-file-name file-data))
+     (append missing-files (mapcar #'indexed-file-name file-data)))
     (dolist (entry entries)
       (when (member (indexed-file-name entry) missing-files)
         (mapc (##remhash % indexed--title<>id)
@@ -655,21 +655,22 @@ up-to-date set.")
 
 - If FN is an anonymous lambda, compile it, cache the resulting
   bytecode, and return that bytecode."
-  (let (byte-compile-warnings)
-    (cond ((compiled-function-p fn) fn)
-          ((symbolp fn)
-           (if (compiled-function-p (symbol-function fn))
-               fn
+  (cond ((compiled-function-p fn) fn)
+        ((symbolp fn)
+         (if (compiled-function-p (symbol-function fn))
+             fn
+           (let (byte-compile-warnings)
              (if (native-comp-available-p)
                  (unless (alist-get fn org-node--compile-timers)
                    (setf (alist-get fn org-node--compile-timers)
                          (run-with-idle-timer
                           (+ 5 (random 5)) nil (##native-compile fn))))
-               (byte-compile fn))
-             ;; May remain uncompiled until native comp is done
-             fn))
-          ((gethash fn org-node--compiled-lambdas))
-          ((puthash fn (byte-compile fn) org-node--compiled-lambdas)))))
+               (byte-compile fn)))
+           ;; May remain uncompiled until native comp is done
+           fn))
+        ((gethash fn org-node--compiled-lambdas))
+        ((let (byte-compile-warnings)
+           (puthash fn (byte-compile fn) org-node--compiled-lambdas)))))
 
 
 ;;;; "Dirty" functions
@@ -1675,8 +1676,9 @@ Argument INTERACTIVE automatically set."
               (set-visited-file-name new-path t t))
             (message "File '%s' renamed to '%s'" name new-name)))))))))
 
-;; FIXME: Kill opened buffers.  First make sure it can pick up where it left
-;;        off.  Maybe use `org-node--in-files-do'.
+;; FIXME: Kill opened buffers that were not edited.
+;;        First make sure it can pick up where it left off.
+;;        Maybe use `org-node--in-files-do'.
 ;;;###autoload
 (defun org-node-rewrite-links-ask (&optional files)
   "Update desynced link descriptions, interactively.
@@ -1699,7 +1701,7 @@ so it matches the destination\\='s current title."
     (let ((n-links 0)
           (n-files 0))
       (dolist (file (or files (sort (indexed-org-files)
-                                    (##natnump (random) _&*))))
+                                    (lambda (_ _) (natnump (random))))))
         (cl-incf n-files)
         (with-current-buffer (delay-mode-hooks (find-file-noselect file))
           (save-excursion
