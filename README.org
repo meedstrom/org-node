@@ -7,9 +7,9 @@
 #+TEXINFO_DIR_TITLE: Org-node: (org-node).
 #+TEXINFO_DIR_DESC: Link org-id entries into a network.
 * News for v3 :noexport:
-A lot of code has been spun into a new library https://github.com/meedstrom/indexed, now a dependency.  Reduces codebase by 25--33%.  This may allow other projects to create interesting stuff without org-node.
+A lot of code has been spun into a new library https://github.com/meedstrom/indexed, now a dependency.  Reduces codebase by 30%.
 
-Not much new features in v3 -- it mainly throws out a lot of plumbing.
+Not much new features -- mainly a change of plumbing.
 
 Update initfiles when you can.  Direct renames:
 
@@ -38,7 +38,6 @@ Node seqs, if you use them, now require turning on explicitly.
 For reference, check out the full list of obsoletions near the bottom of file [[https://github.com/meedstrom/org-node/blob/2504b7f0a8848c0fbc3dcddc2d1edeb0adbbc9ac/org-node-changes.el][org-node-changes.el]].
 
 * News for v2 :noexport:
-# Must use #+HTML oneliner because ox-texinfo does not understand #+BEGIN_HTML, and GitHub's org parser does not understand #+BEGIN_EXPORT HTML.
 #+HTML: <a href="https://repology.org/project/emacs%3Aorg-node/versions"> <img src="https://repology.org/badge/vertical-allrepos/emacs%3Aorg-node.svg" alt="Packaging status" align="right"> </a>
 
 Version 2.0 is out, with two major features:
@@ -47,8 +46,6 @@ Version 2.0 is out, with two major features:
 - context buffers!
 
 Feedback welcome.
-
-(UPDATE: v2.2.1 fixes the backlink drawers, didn't /quite/ work right and could trigger an infinite loop freezing Emacs)
 
 ** Upgrade notice
 
@@ -139,7 +136,8 @@ See what can be customized:
 2. Removed a number of [[https://github.com/meedstrom/org-node/blob/v1.9/org-node-changes.el#L140][deprecated aliases]].
 3. Bumped dependency [[https://github.com/meedstrom/el-job][el-job]] to the just-released v1.0.
 4. Struct type =org-node-link= removed.
-   - A link is now a plist, so use e.g. =(plist-get LINK :pos)= instead of =(org-node-link-pos LINK)=.
+   - +A link is now a plist, so use e.g. =(plist-get LINK :pos)= instead of =(org-node-link-pos LINK)=.+
+     - In v3, use =(indexed-pos LINK)=
 5. New option =org-node-backlink-do-drawers= implies a different default behavior from before, but a message will be printed to help you out.
    - Default was changed because timestamps are hard to reconstruct later -- so it's better that they are opt-out than opt-in.
 
@@ -221,15 +219,37 @@ Assuming your package manager knows about [[https://melpa.org/#/getting-started]
 
 #+begin_src elisp
 (use-package org-node
-  :after org
-  :config (org-node-cache-mode))
+  :config
+  (indexed-updater-mode)
+  (indexed-roam-mode)
+  (org-node-cache-mode))
 #+end_src
 
-If you use org-roam, you /may/ want the following module as well, at least during a transition period.  Check its README to make org-node [[https://github.com/meedstrom/org-node-fakeroam][work smoothly with org-roam]]!
+If you're coming here from org-roam and still want to use some of its features, try
 
 #+begin_src elisp
+(use-package org-node
+  :init
+  ;; For org-roam users who find saving slow with
+  ;; `org-roam-db-autosync-mode',
+  ;; do org-roam's job for it and write to its DB
+  (setq org-roam-db-update-on-save nil)
+  (setq indexed-roam-overwrite t)
+  ;; Use org-roam-capture
+  (setq org-node-creation-fn #'org-node-new-via-roam-capture)
+  ;; Filenames like org-roam
+  (setq org-node-slug-fn #'org-node-slugify-like-roam-default)
+  (setq org-node-datestamp-format "%Y%m%d%H%M%S-")
+  :config
+  (indexed-updater-mode)
+  (indexed-roam-mode)
+  (org-node-cache-mode))
+
+;; Speed up the org-roam buffer
+;; (NOTE: subject to removal if upstream finally patches this)
 (use-package org-node-fakeroam
-  :defer)
+  :config
+  (org-node-fakeroam-fast-render-mode))
 #+end_src
 
 *** An update broke things?
@@ -260,7 +280,7 @@ Backlinks are the butter on the bread that is your notes.  If you've ever seen a
 Believe it or not, it Just Works.  So long as you install [[https://github.com/meedstrom/org-node-fakeroam][org-node-fakeroam]] -- which pulls in org-roam with it -- and add to initfiles:
 
 #+begin_src elisp
-(org-node-fakeroam-redisplay-mode)
+(org-node-fakeroam-redisplay-mode) ;; optional behavior
 (org-node-fakeroam-jit-backlinks-mode) ;; shim so no SQLite needed
 (org-node-fakeroam-fast-render-mode) ;; perf fixes
 
@@ -278,7 +298,7 @@ Org-node ships a complete rewrite of the org-roam buffer.
 Add to initfiles:
 
 #+begin_src elisp
-(org-node-context-follow-mode)
+(org-node-context-follow-mode) ;; optional behavior
 
 ;; Example keybindings
 (keymap-set org-mode-map "M-s M-t" #'org-node-context-toggle)

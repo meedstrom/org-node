@@ -19,11 +19,11 @@
 ;; URL:      https://github.com/meedstrom/org-node
 ;; Created:  2024-04-13
 ;; Keywords: org, hypermedia
-;; Package-Requires: ((emacs "29.1") (llama "0.5.0") (indexed "0.4.0") (el-job "2.2.0") (magit-section "4.3.0"))
+;; Package-Requires: ((emacs "29.1") (llama "0.5.0") (indexed "0.4.1") (el-job "2.2.0") (magit-section "4.3.0"))
 
 ;; NOTE: Looking for Package-Version?  Consult the Git tag.
 ;;       2.0.0 was released on 20250303, i.e. March 3.
-;;       3.0.0 was released on 20250322, i.e. March 22.
+;;       3.0.0 was released on 20250324, i.e. March 24.
 
 ;;; Commentary:
 
@@ -88,10 +88,11 @@
 (require 'seq)
 (require 'cl-lib)
 (require 'subr-x)
-(require 'org)
-(require 'org-id)
-(require 'org-macs)
-(require 'org-element)
+(eval-when-compile
+  (require 'org)
+  (require 'org-id)
+  (require 'org-macs)
+  (require 'org-element))
 
 ;; External
 (require 'llama)
@@ -1046,6 +1047,24 @@ necessary variables are set."
       (push (current-buffer) org-node--new-unsaved-buffers)
       (run-hooks 'org-node-creation-hook))))
 
+(defun org-node-new-via-roam-capture ()
+  "Call `org-roam-capture-' with predetermined arguments.
+Meant to be called indirectly as `org-node-creation-fn', at which
+time some necessary variables are set."
+  (when (or (null org-node-proposed-title)
+            (null org-node-proposed-id))
+    (error "`org-node-fakeroam-new-via-roam-capture' is meant to be called indirectly via `org-node-create'"))
+  (unless (require 'org-roam nil t)
+    (error "`org-node-fakeroam-new-via-roam-capture' requires library \"org-roam\""))
+  (when (and (fboundp 'org-roam-capture-)
+             (fboundp 'org-roam-node-create))
+    (org-roam-capture- :node (org-roam-node-create
+                              :title org-node-proposed-title
+                              :id    org-node-proposed-id))))
+
+(defalias 'org-node-fakeroam-new-via-roam-capture
+  #'org-node-new-via-roam-capture)
+
 (defun org-node-capture-target ()
   "Can be used as target in a capture template.
 See `org-capture-templates' for more info about targets.
@@ -1148,18 +1167,6 @@ To behave like `org-roam-node-find' when creating new nodes, set
   (let* ((input (completing-read "Go to ID-node: " #'org-node-collection
                                  () () () 'org-node-hist))
          (node (gethash input org-node--candidate<>node)))
-    (if node
-        (org-node--goto node)
-      (if (string-blank-p input)
-          (message "Won't create untitled node")
-        (org-node-create input (org-id-new))))))
-
-(defun org-node-find-any-entry ()
-  (interactive)
-  (org-node-cache-ensure)
-  (let* ((input (completing-read "Go to ID-node: " (indexed-org-entries)
-                                 () () () 'org-node-hist))
-         (node (gethash input org-node--id<>node)))
     (if node
         (org-node--goto node)
       (if (string-blank-p input)
@@ -2921,7 +2928,6 @@ heading, else the file-level node, whichever has an ID first."
   (gethash (completing-read "Node: " #'org-node-collection
                             () () () 'org-node-hist)
            org-node--candidate<>node))
-
 
 (provide 'org-node)
 
