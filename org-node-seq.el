@@ -34,6 +34,7 @@
 (require 'calendar)
 (require 'transient)
 (require 'org-node)
+(require 'org)
 (defvar org-node-proposed-seq)
 
 ;;; Easy wrappers to define a sequence

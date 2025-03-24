@@ -32,12 +32,13 @@
 (require 'seq)
 (require 'subr-x)
 (require 'cl-lib)
-(require 'ol)
 (require 'el-job)
 (require 'indexed)
 (require 'indexed-x)
 (require 'indexed-roam)
 (require 'indexed-list)
+(eval-when-compile
+  (require 'ol))
 
 (defvar org-node-major-version 3
   "Number incremented for breaking changes.")
