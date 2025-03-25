@@ -533,14 +533,15 @@ buffer appears to already exist, thus this hook."
 
 ;;;; Scanning files to cache info about them
 
+;; TODO: Deprec
 ;;;###autoload
 (defun org-node-reset ()
   "Wipe and rebuild the cache."
   (interactive)
   (call-interactively #'indexed-reset)
-  (org-node-cache-ensure nil t))
+  (org-node-cache-ensure))
 
-;; TODO: Deprec
+;; TODO Deprec/shrink. Now mainly useful for the blocking effect.
 (defun org-node-cache-ensure (&optional synchronous force)
   "Ensure that org-node is ready for use.
 Specifically, do the following:

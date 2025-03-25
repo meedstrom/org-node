@@ -62,8 +62,6 @@ Then do other one-shot warnings while we\\='re at it."
   (let ((names org-node-changes--new-names))
     (while-let ((row (pop names)))
       (seq-let (old new removed-by) row
-        (unless removed-by
-          (setq removed-by "v2.0"))
         (when (boundp old)
           (if new
               (progn
@@ -104,7 +102,6 @@ If INTERACTIVE, define it as an interactive function.  Optional
 string WHEN says when it was deprecated and REMOVED-BY when it
 may be removed.  When these strings are omitted, fall back on
 hardcoded strings."
-  (setq removed-by (or removed-by "April"))
   `(let (warned-once)
      (add-to-list 'org-node-changes--new-names '(,(cadr old) ,(cadr new) ,removed-by))
      (defun ,(cadr old) (&rest args)
@@ -172,6 +169,7 @@ NAME, ARGLIST and BODY as in `defun'."
 
 
 ;;; v2.0
+;; (There was more here, but some of same things got renamed again)
 
 (org-node-changes--def-whiny-alias 'org-node-insert-link*-immediate
                                    'org-node-insert-link-novisit*
