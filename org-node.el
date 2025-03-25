@@ -22,8 +22,8 @@
 ;; Package-Requires: ((emacs "29.1") (llama "0.5.0") (indexed "0.4.1") (el-job "2.2.0") (magit-section "4.3.0"))
 
 ;; NOTE: Looking for Package-Version?  Consult the Git tag.
-;;       2.0.0 was released on 20250303, i.e. March 3.
-;;       3.0.0 was released on 20250324, i.e. March 24.
+;;       MELPA versions above 20250303 is v2.
+;;       MELPA versions above 20250325 is v3.
 
 ;;; Commentary:
 
@@ -1924,8 +1924,8 @@ In case of unsolvable problems, how to wipe org-id-locations:
 
 ;; TODO: Make something like a find-dired buffer instead, handy!  Not the
 ;; actual find-dired, that'll be slow if we begin the search from fs
-;; root... Dired operates on lines output by `ls', we ought to be able to fake
-;; some.
+;; root... Dired operates on lines output by `ls', we ought to be able to
+;; prepare such lines.
 (defun org-node-list-files (&optional deprecated-arg)
   (interactive)
   (if deprecated-arg

@@ -221,29 +221,34 @@ Assuming your package manager knows about [[https://melpa.org/#/getting-started]
 #+begin_src elisp
 (use-package org-node
   :config
+  (setq indexed-check-org-id-locations t)
   (indexed-updater-mode)
-  (indexed-roam-mode)
+  (indexed-roam-mode) ;; Support ROAM_REFS
   (org-node-cache-mode))
 #+end_src
 
-If you're coming here from org-roam and still want to use some of its features, try
+If you're *coming here from org-roam* and still want to use some of its features or just feel at home, try
 
 #+begin_src elisp
 (use-package org-node
   :init
-  ;; For org-roam users who find saving slow with
-  ;; `org-roam-db-autosync-mode',
-  ;; do org-roam's job for it and write to its DB
-  (setq org-roam-db-update-on-save nil)
-  (setq indexed-roam-overwrite t)
-  ;; Use org-roam-capture
-  (setq org-node-creation-fn #'org-node-new-via-roam-capture)
-  ;; Filenames like org-roam
+  ;; Use org-roam's style of file names
   (setq org-node-slug-fn #'org-node-slugify-like-roam-default)
   (setq org-node-datestamp-format "%Y%m%d%H%M%S-")
+  ;; Use org-roam-capture
+  (setq org-node-creation-fn #'org-node-new-via-roam-capture)
+  ;; For org-roam users who find saving slow with
+  ;; `org-roam-db-autosync-mode',
+  ;; take over that part of its job and write to its DB
+  (setq org-roam-db-update-on-save nil)
+  (setq indexed-roam-overwrite t)
+  ;; Tip (not related to org-node): uncomment to further speed up saving
+  ;; (setq org-roam-link-auto-replace nil)
+
   :config
+  (setq indexed-check-org-id-locations t)
   (indexed-updater-mode)
-  (indexed-roam-mode)
+  (indexed-roam-mode) ;; Support ROAM_REFS
   (org-node-cache-mode))
 
 ;; Speed up the org-roam buffer
