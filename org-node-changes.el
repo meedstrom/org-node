@@ -275,6 +275,10 @@ NAME, ARGLIST and BODY as in `defun'."
   (when (fboundp 'org-super-links-convert-link-to-super)
     (org-super-links-convert-link-to-super nil)))
 
+(unless (fboundp 'indexed--ensure-org-id-table-p)
+  (display-warning
+   'org-node "Update indexed to use this version of org-node"))
+
 (provide 'org-node-changes)
 
 ;;; org-node-changes.el ends here
