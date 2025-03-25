@@ -343,7 +343,8 @@ If REMOVE is non-nil, remove it instead."
           (org-entry-delete nil "BACKLINKS")
         (let* ((origins (thread-last
                           (append (indexed-id-links-to node)
-                                  (indexed-roam-reflinks-to node))
+                                  (when indexed-roam-mode
+                                    (indexed-roam-reflinks-to node)))
                           (mapcar #'indexed-origin)
                           (delete-dups)
                           ;; Sort for deterministic order for less noisy diffs.
@@ -686,7 +687,8 @@ If REMOVE non-nil, remove it instead."
                 (node (gethash id org-nodes))
                 (origins (thread-last
                            (append (indexed-id-links-to node)
-                                   (indexed-roam-reflinks-to node))
+                                   (when indexed-roam-mode
+                                     (indexed-roam-reflinks-to node)))
                            (mapcar #'indexed-origin)
                            (delete-dups))))
       (save-excursion

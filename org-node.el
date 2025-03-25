@@ -422,16 +422,17 @@ When called from Lisp, peek on any hash table HT."
 
 (defun org-node--let-refs-be-aliases (node)
   "Add ROAM_REFS of NODE as completions for `org-node-collection'."
-  (dolist (ref (indexed-roam-refs node))
-    (puthash ref node org-node--candidate<>node)
-    (puthash ref
-             (let ((type (gethash ref indexed-roam--ref<>type)))
-               (list (propertize ref 'face 'org-cite)
-                     (when type
-                       (propertize (concat type ":")
-                                   'face 'completions-annotations))
-                     nil))
-             org-node--title<>affixation-triplet)))
+  (when indexed-roam-mode
+    (dolist (ref (indexed-roam-refs node))
+      (puthash ref node org-node--candidate<>node)
+      (puthash ref
+               (let ((type (gethash ref indexed-roam--ref<>type)))
+                 (list (propertize ref 'face 'org-cite)
+                       (when type
+                         (propertize (concat type ":")
+                                     'face 'completions-annotations))
+                       nil))
+               org-node--title<>affixation-triplet))))
 
 (defun org-node--wipe-completions (_parse-results)
   "Wipe table `org-node--candidate<>node'."
@@ -468,10 +469,11 @@ of whether or not the file is a descendant of `indexed-org-dirs'."
     (org-node--forget-id-locations missing-files)
     (org-node--dirty-forget-completions-in
      (append missing-files (mapcar #'indexed-file-name file-data)))
-    (dolist (entry entries)
-      (when (member (indexed-file-name entry) missing-files)
-        (mapc (##remhash % indexed--title<>id)
-              (indexed-roam-refs entry))))))
+    (when indexed-roam-mode
+      (dolist (entry entries)
+        (when (member (indexed-file-name entry) missing-files)
+          (mapc (##remhash % indexed--title<>id)
+                (indexed-roam-refs entry)))))))
 
 ;;;###autoload
 (define-minor-mode org-node-cache-mode

@@ -24,7 +24,7 @@ Update initfiles when you can.  Direct renames:
 Also (you'll get messages about it) enable two modes before =org-node-cache-mode=:
 
 #+begin_src elisp
-(indexed-roam-mode)
+(indexed-roam-mode) ;; For ROAM_REFS
 (indexed-updater-mode)
 (org-node-cache-mode)
 #+end_src

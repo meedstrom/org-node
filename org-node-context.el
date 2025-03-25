@@ -434,11 +434,12 @@ that buffer."
               (magit-insert-heading "ID backlinks:")
               (org-node-context--insert-backlink-sections links)
               (insert "\n")))
-          (when-let* ((links (indexed-roam-reflinks-to node)))
-            (magit-insert-section (org-node-context 'reflinks)
-              (magit-insert-heading "Ref backlinks:")
-              (org-node-context--insert-backlink-sections links)
-              (insert "\n"))))
+          (when indexed-roam-mode
+            (when-let* ((links (indexed-roam-reflinks-to node)))
+              (magit-insert-section (org-node-context 'reflinks)
+                (magit-insert-heading "Ref backlinks:")
+                (org-node-context--insert-backlink-sections links)
+                (insert "\n")))))
         (org-node--kill-work-buffers)
         (run-hooks 'org-node-context-refresh-hook)))))
 
