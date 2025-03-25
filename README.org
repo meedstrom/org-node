@@ -21,15 +21,16 @@ Update initfiles when you can.  Direct renames:
 | org-node-extra-id-dirs-exclude | indexed-org-dirs-exclude |
 | org-node-link-types            | indexed-seek-link-types  |
 
-Also (you'll get messages about it) enable two modes before =org-node-cache-mode=:
+Also enable =indexed-updater-mode=.  Here's a new basic-install snippet:
 
 #+begin_src elisp
-(indexed-roam-mode) ;; For ROAM_REFS
-(indexed-updater-mode)
-(org-node-cache-mode)
+(use-package org-node
+  :config
+  (setq indexed-check-org-id-locations t)
+  (indexed-updater-mode)
+  (indexed-roam-mode) ;; optional: support ROAM_REFS
+  (org-node-cache-mode))
 #+end_src
-
-The hope is to eventually remove =org-node-cache-mode=, but we're not there yet.
 
 Node seqs, if you use them, now require turning on explicitly.
 
@@ -227,7 +228,7 @@ Assuming your package manager knows about [[https://melpa.org/#/getting-started]
   (org-node-cache-mode))
 #+end_src
 
-If you're *coming here from org-roam* and still want to use some of its features or just feel at home, try
+If you're *coming here from org-roam*, try this instead:
 
 #+begin_src elisp
 (use-package org-node
@@ -240,10 +241,10 @@ If you're *coming here from org-roam* and still want to use some of its features
   ;; For org-roam users who find saving slow with
   ;; `org-roam-db-autosync-mode',
   ;; take over that part of its job and write to its DB
-  (setq org-roam-db-update-on-save nil)
   (setq indexed-roam-overwrite t)
-  ;; Tip (not related to org-node): uncomment to further speed up saving
-  ;; (setq org-roam-link-auto-replace nil)
+  (setq org-roam-db-update-on-save nil)
+  ;; Faster save if you don't use "roam:" links
+  (setq org-roam-link-auto-replace nil)
 
   :config
   (setq indexed-check-org-id-locations t)
@@ -252,8 +253,10 @@ If you're *coming here from org-roam* and still want to use some of its features
   (org-node-cache-mode))
 
 ;; Speed up the org-roam buffer
-;; (NOTE: subject to removal if upstream finally patches this)
+;; NOTE: You can use org-node's context buffers instead
+;; NOTE: Subject to removal, if upstream finally patches this
 (use-package org-node-fakeroam
+  :after org-roam
   :config
   (org-node-fakeroam-fast-render-mode))
 #+end_src
@@ -348,7 +351,7 @@ Then add to initfiles:
 
 *** Option 2C: Semi-automatic =:BACKLINKS:...:END:= drawer
 
-If you were previously using [[https://github.com/toshism/org-super-links][org-super-links]], you can continue letting it manage them, and leave org-node out of the matter.
+If you were previously using [[https://github.com/toshism/org-super-links][org-super-links]], you can continue letting it manage its drawers, and leave org-node out of the matter.
 
 Just add to initfiles:
 
@@ -357,7 +360,7 @@ Just add to initfiles:
           #'org-super-links-convert-link-to-super)
 #+end_src
 
-Now, you have some bonus tools:
+Org-node still gives you some bonus tools:
 
 - 1. You can list any dead forward-links to fix them manually:
 
@@ -396,14 +399,14 @@ Example setting:
 
 Do a =M-x org-node-reset= and see if it can find your notes now.
 
-*** Undoing a Roam hack
+*** Undoing an org-roam hack
 
 If you have org-roam loaded, but no longer update the DB, opening a link can sometimes send you to an outdated file path due to [[https://github.com/org-roam/org-roam/blob/2a630476b3d49d7106f582e7f62b515c62430714/org-roam-id.el#L91][a line in org-roam-id.el]] that causes org-id to /preferentially/ look up the org-roam DB instead of org-id's own table!
 
 Either revert that with the following snippet, or if the extension [[https://github.com/meedstrom/org-node-fakeroam][org-node-fakeroam]] covers your needs, simply delete the DB (normally located at "~/.emacs.d/org-roam.db").
 
 #+begin_src elisp
-;; Undo a Roam override
+;; Undo an org-roam override
 (with-eval-after-load 'org-roam-id
   (org-link-set-parameters
    ;; This was default value at least from Org 9.1 to 9.7+
@@ -504,7 +507,7 @@ To complete words at point into known node titles:
 
 #+begin_src elisp
 (org-node-complete-at-point-mode)
-(setq org-roam-completion-everywhere nil) ;; Prevent Roam's variant
+(setq org-roam-completion-everywhere nil) ;; Prevent org-roam's
 #+end_src
 
 ** FAQ: Any analogue to =org-roam-node-display-template=?
@@ -527,7 +530,7 @@ If you have Ripgrep installed on the computer, and [[https://github.com/minad/co
 (keymap-set global-map "M-s M-g" #'org-node-grep)
 #+end_src
 
-This can be a power tool for mass edits.  Say you want to rename some Org tag =:math:= to =:Math:= absolutely everywhere.  Then you could follow a procedure such as:
+This can be a power-tool for mass edits.  Say you want to rename some Org tag =:math:= to =:Math:= absolutely everywhere.  Then you could follow a procedure such as:
 
 1. Use =org-node-grep= and type =:math:=
 2. Use =embark-export= (from package [[https://github.com/oantolin/embark][Embark]])
@@ -537,6 +540,7 @@ This can be a power tool for mass edits.  Say you want to rename some Org tag =:
 
 ** Let org-open-at-point detect refs
 
+# XXX
 (For background, consult the docstring of =org-node-link-types=.)
 
 Say there's a link to a web URL, and you've forgotten you also have a node listing that exact URL in its =ROAM_REFS= property.
