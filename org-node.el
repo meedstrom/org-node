@@ -19,7 +19,7 @@
 ;; URL:      https://github.com/meedstrom/org-node
 ;; Created:  2024-04-13
 ;; Keywords: org, hypermedia
-;; Package-Requires: ((emacs "29.1") (llama "0.5.0") (indexed "0.4.1") (el-job "2.2.0") (magit-section "4.3.0"))
+;; Package-Requires: ((emacs "29.1") (llama "0.5.0") (indexed "0.5.1") (el-job "2.2.0") (magit-section "4.3.0"))
 
 ;; NOTE: Looking for Package-Version?  Consult the Git tag.
 ;;       MELPA versions above 20250303 is v2.
@@ -438,14 +438,7 @@ When called from Lisp, peek on any hash table HT."
   "Wipe table `org-node--candidate<>node'."
   (clrhash org-node--candidate<>node))
 
-(defun org-node--snitch-to-org-id (node)
-  "Add NODE to `org-id-locations', ensuring that ID-links work.
-
-If `indexed-check-org-id-locations' is t, this naturally also results in
-causing NODE\\='s file to be scanned for nodes in the future regardless
-of whether or not the file is a descendant of `indexed-org-dirs'."
-  (org-node--init-org-id)
-  (puthash (indexed-id node) (indexed-file-name node) org-id-locations))
+(defalias 'org-node--snitch-to-org-id 'indexed-x-snitch-to-org-id)
 
 (defun org-node--record-completion-candidates (node)
   "Cache completion candidates for NODE and its aliases."
@@ -545,10 +538,10 @@ buffer appears to already exist, thus this hook."
 ;; TODO Deprec/shrink. Now mainly useful for the blocking effect.
 (defun org-node-cache-ensure (&optional synchronous force)
   "Ensure that org-node is ready for use.
-Specifically, do the following:
+Specifically,
 
-- Run `org-node--init-org-id'.
-- \(Re-)build the cache if it is empty, or if FORCE is t.
+- ensure that `indexed-updater-mode' is enabled
+- re-cache if cache is empty, or if FORCE is t.
 
 The primary use case is at the start of autoloaded commands.
 
@@ -561,16 +554,15 @@ would mean that the `org-nodes' table could be still outdated
 by the time you query it, but that is acceptable in many
 situations such as in an user command since the table is mostly
 correct - and fully correct by the time of the next invocation.
-qe
-If the `org-nodes' table is currently empty, behave as if
-SYNCHRONOUS t, unless SYNCHRONOUS is the symbol `must-async'."
+
+If the `org-node--candidate<>node' table is currently empty, behave as
+if SYNCHRONOUS t, unless SYNCHRONOUS is the symbol `must-async'."
   (unless (and indexed-updater-mode)
     (when (y-or-n-p
            "Let org-node enable `indexed-updater-mode'?")
       (indexed-updater-mode)))
   (org-node-changes--warn-and-copy)
-  (org-node--init-org-id)
-  (when (hash-table-empty-p org-nodes)
+  (when (hash-table-empty-p org-node--candidate<>node)
     (setq synchronous (if (eq synchronous 'must-async) nil t))
     (setq force t))
   (when force
@@ -579,55 +571,8 @@ SYNCHRONOUS t, unless SYNCHRONOUS is the symbol `must-async'."
     ;; Block until all processes finish
     (if org-node-cache-mode
         (el-job-await 'indexed 9 "org-node indexing files...")
+      ;; In case user just runs a command, not having enabled any modes
       (el-job-await 'indexed 9 "org-node indexing files... (Hint: Avoid this hang by enabling org-node-cache-mode at init)"))))
-
-;; BUG: A heisenbug lurks inside (or is revealed by) org-id.
-;; https://emacs.stackexchange.com/questions/81794/
-;; When it appears, backtrace will show this, which makes no sense --
-;; `org-id-alist-to-hash' is correctly being passed a list:
-;;     Debugger entered--Lisp error: (wrong-type-argument listp #<hash-table equal 3142/5277) 0x190d581ba129>
-;;       org-id-alist-to-hash((("/home/kept/roam/semantic-tabs-in-2024.org" "f21c984c-13f3-428c-8223-0dc1a2a694df") ("/home/kept/roam/semicolons-make-javascript-h..." "b40a0757-bff4-4188-b212-e17e3fc54e13") ...))
-;;       org-node--init-org-id()
-;;       ...
-;; Moral of the story: don't make variables that change type.
-(defun org-node--init-org-id ()
-  "Ensure that org-id is ready for use.
-
-In broad strokes:
-- Run `org-id-locations-load' if needed.
-- Ensure `org-id-locations' is a hash table and not an alist.
-- Throw error if `org-id-locations' is still empty after this,
-  unless `org-node-extra-id-dirs' has members.
-- Wipe `org-id-locations' if it appears afflicted by a known bug that
-  makes the symbol value an indeterminate superposition of one of two
-  possible values \(a hash table or an alist) depending on which code
-  accesses it -- like Schrödinger\\='s cat -- and tell the user to
-  rebuild the value, since even org-id\\='s internal functions are
-  unable to fix it."
-  (require 'org-id)
-  (when (not org-id-track-globally)
-    (user-error "Org-node requires `org-id-track-globally'"))
-  (when (null org-id-locations)
-    (when (file-exists-p org-id-locations-file)
-      (ignore-errors (org-id-locations-load))))
-  (when (listp org-id-locations)
-    (ignore-errors
-      (setq org-id-locations (org-id-alist-to-hash org-id-locations))))
-  (when (listp org-id-locations)
-    (setq org-id-locations nil)
-    (org-node--die
-     "Found org-id heisenbug!  Wiped org-id-locations, repair with `org-node-reset' or `org-roam-update-org-id-locations'"))
-  (when (hash-table-p org-id-locations)
-    (when (hash-table-empty-p org-id-locations)
-      (org-id-locations-load)
-      (when (and (hash-table-empty-p org-id-locations)
-                 (null org-node-extra-id-dirs))
-        (org-node--die
-         (concat
-          "No org-ids found.  If this was unexpected, try M-x `org-id-update-id-locations' or M-x `org-roam-update-org-id-locations'.
-\tIf this is your first time using org-id, first assign an ID to some
-\trandom heading with M-x `org-id-get-create', so that at least one exists
-\ton disk, then do M-x `org-node-reset' and it should work from then on."))))))
 
 (defvar org-node--first-init t
   "Non-nil until org-node has been initialized, then nil.
@@ -1948,7 +1893,6 @@ from where it stopped.  With prefix argument, start over
 from the beginning."
   (interactive)
   (require 'org-lint)
-  (org-node--init-org-id)
   (let (files)
     (when (or (equal current-prefix-arg '(4))
               (and (null org-node--unlinted)
