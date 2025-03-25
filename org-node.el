@@ -19,7 +19,7 @@
 ;; URL:      https://github.com/meedstrom/org-node
 ;; Created:  2024-04-13
 ;; Keywords: org, hypermedia
-;; Package-Requires: ((emacs "29.1") (llama "0.5.0") (indexed "0.5.1") (el-job "2.2.0") (magit-section "4.3.0"))
+;; Package-Requires: ((emacs "29.1") (llama "0.5.0") (indexed "0.5.2") (el-job "2.2.0") (magit-section "4.3.0"))
 
 ;; NOTE: Looking for Package-Version?  Consult the Git tag.
 ;;       MELPA versions above 20250303 is v2.
@@ -440,6 +440,22 @@ When called from Lisp, peek on any hash table HT."
 
 (defalias 'org-node--snitch-to-org-id 'indexed-x-snitch-to-org-id)
 
+;; TODO: Upstream, this is just the inverse of above
+(defun org-node--forget-id-locations (files)
+  "Remove references to FILES in `org-id-locations'.
+You might consider committing the effect to disk afterwards by calling
+`org-id-locations-save', which this function will not do for you.
+
+FILES are assumed to be abbreviated truenames."
+  (when files
+    (when (listp org-id-locations)
+      (message "org-node--forget-id-locations: Surprised that `org-id-locations' is an alist at this time.  Converting to hash table.")
+      (setq org-id-locations (org-id-alist-to-hash org-id-locations)))
+    (maphash (lambda (id file)
+               (when (member file files)
+                 (remhash id org-id-locations)))
+             org-id-locations)))
+
 (defun org-node--record-completion-candidates (node)
   "Cache completion candidates for NODE and its aliases."
   (when (and (indexed-id node)
@@ -659,25 +675,6 @@ operation."
                            (format "%S is active - proceed anyway?" mode))))
            return nil
            finally return t))
-
-;; XXX?? how do we use org-id now
-(defun org-node--forget-id-locations (files)
-  "Remove references to FILES in `org-id-locations'.
-You might consider committing the effect to disk afterwards by calling
-`org-id-locations-save', which this function will not do for you.
-
-FILES are assumed to be abbreviated truenames."
-  (when files
-    (when (listp org-id-locations)
-      (message "org-node--forget-id-locations: Surprised that `org-id-locations' is an alist at this time.  Converting to hash table.")
-      (setq org-id-locations (org-id-alist-to-hash org-id-locations)))
-    (dolist (file files)
-      (remhash file indexed--file<>data)
-      (remhash file indexed--file<>entries))
-    (maphash (lambda (id file)
-               (when (member file files)
-                 (remhash id org-id-locations)))
-             org-id-locations)))
 
 
 ;;;; Filename functions
@@ -999,9 +996,9 @@ Meant to be called indirectly as `org-node-creation-fn', at which
 time some necessary variables are set."
   (when (or (null org-node-proposed-title)
             (null org-node-proposed-id))
-    (error "`org-node-fakeroam-new-via-roam-capture' is meant to be called indirectly via `org-node-create'"))
+    (error "`org-node-new-via-roam-capture' is meant to be called indirectly via `org-node-create'"))
   (unless (require 'org-roam nil t)
-    (error "`org-node-fakeroam-new-via-roam-capture' requires library \"org-roam\""))
+    (error "`org-node-new-via-roam-capture' requires library \"org-roam\""))
   (when (and (fboundp 'org-roam-capture-)
              (fboundp 'org-roam-node-create))
     (org-roam-capture- :node (org-roam-node-create
