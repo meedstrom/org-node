@@ -481,11 +481,10 @@ of whether or not the file is a descendant of `indexed-org-dirs'."
   :global t
   (cond
    (org-node-cache-mode
-    (unless (and indexed-updater-mode indexed-roam-mode)
+    (unless (and indexed-updater-mode)
       (message "
-Org-node v3 enabling `indexed-updater-mode' and `indexed-roam-mode' for you.
+Org-node v3 enabling `indexed-updater-mode' for you.
 If you don't want to see this message, enable those modes first.")
-      (indexed-roam-mode)
       (indexed-updater-mode))
     (add-hook 'indexed-pre-full-reset-functions #'org-node--wipe-completions)
     (add-hook 'indexed-pre-incremental-update-functions #'org-node--forget-some-completions)
@@ -565,10 +564,9 @@ correct - and fully correct by the time of the next invocation.
 qe
 If the `org-nodes' table is currently empty, behave as if
 SYNCHRONOUS t, unless SYNCHRONOUS is the symbol `must-async'."
-  (unless (and indexed-updater-mode indexed-roam-mode)
+  (unless (and indexed-updater-mode)
     (when (y-or-n-p
-           "Let org-node enable `indexed-updater-mode' and `indexed-roam-mode'?")
-      (indexed-roam-mode)
+           "Let org-node enable `indexed-updater-mode'?")
       (indexed-updater-mode)))
   (org-node-changes--warn-and-copy)
   (org-node--init-org-id)
