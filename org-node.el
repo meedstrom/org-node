@@ -173,19 +173,18 @@ Takes a node as argument, should return a string."
     (not (indexed-property "ROAM_EXCLUDE" node)))
   "Predicate returning non-nil to include a node, or nil to exclude it.
 
-The filtering only has an impact on the table
-`org-node--candidate<>node', which forms the basis for
-completions in the minibuffer, and `indexed--title<>id', used
-by `org-node-complete-at-point-mode'.
+The filtering affects two tables:
+- `org-node--candidate<>node', used by completions in the minibuffer
+- `indexed--title<>id', used by `org-node-complete-at-point-mode'
 
 In other words, passing nil means the user cannot autocomplete to the
-node, but Lisp code can still find it in the \"main\" table
-`org-nodes', and backlinks are discovered normally.
+node, but Lisp code can still find it in the output of
+`indexed-org-id-nodes', and backlinks are discovered normally.
 
 This function is applied once for every ID-node found, and
 receives the node data as a single argument: an object which form
 you can observe in examples from \\[org-node-peek] and specified
-in the type `org-node' (C-h o org-node RET).
+in the type `indexed-org-entry' (C-h o indexed-org-entry RET).
 
 See the following example for a way to filter out nodes with a
 ROAM_EXCLUDE property, or that have any kind of TODO state, or
