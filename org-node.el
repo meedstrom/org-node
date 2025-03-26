@@ -227,7 +227,7 @@ Filesystem creation-time cannot be relied on."
 
 (unless (featurep 'org-node)
   (add-hook 'org-node-creation-hook #'org-node-put-created -95)
-  (add-hook 'org-node-creation-hook #'indexed-x-ensure-node-at-point-known -90))
+  (add-hook 'org-node-creation-hook #'indexed-x-ensure-entry-at-point-known -90))
 
 
 ;;;; Pretty completion
