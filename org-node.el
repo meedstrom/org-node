@@ -1771,9 +1771,9 @@ user quits, do not apply any modifications."
 (defun org-node-forget-dir (dir)
   "Remove references in `org-id-locations' to files in DIR.
 
-Note that if DIR can be found under `org-node-extra-id-dirs',
+Note that if DIR can be found under `indexed-org-dirs',
 this action may make no practical impact unless you also add DIR
-to `org-node-extra-id-dirs-exclude'.
+to `indexed-org-dirs-exclude'.
 
 In case of unsolvable problems, how to wipe org-id-locations:
 
