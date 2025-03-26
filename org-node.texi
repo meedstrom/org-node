@@ -388,7 +388,9 @@ Backlinks are the butter on the bread that is your notes.  If you've ever seen a
 @node Option 1A Reuse the org-roam buffer
 @subsection Option 1A: Reuse the org-roam buffer
 
-Believe it or not@comma{} it Just Works.  So long as you install @uref{https://github.com/meedstrom/org-node-fakeroam, org-node-fakeroam} -- which pulls in org-roam with it -- and add to initfiles:
+Believe it or not@comma{} you can use it without the rest of org-roam.
+
+Install @uref{https://github.com/meedstrom/org-node-fakeroam, org-node-fakeroam} and add to initfiles:
 
 @lisp
 (org-node-fakeroam-redisplay-mode) ;; optional behavior
@@ -503,7 +505,7 @@ Running aforementioned command @strong{may re-sort your backlinks and re-format 
 @samp{org-node-backlink-drawer-formatter}
 @end itemize
 
-Finally@comma{} lines without a proper Org link like @samp{[[id:foo][bar]]} are @strong{deleted}@comma{} which would mean @strong{destroying any timestamp within.}
+Finally@comma{} lines that contain no Org link such as @samp{[[id:1234][Title]]} are @strong{deleted}@comma{} which would mean @strong{destroying any other info within.}  Same if a backlink is stale and no longer valid.
 
 @node Misc
 @chapter Misc
@@ -564,7 +566,7 @@ Either revert that with the following snippet@comma{} or if the extension @uref{
 
 One user had over a thousand project-nodes@comma{} but only just began to do a knowledge base@comma{} and wished to avoid seeing the project nodes.
 
-This could work by---for example---excluding anything tagged "project" or perhaps anything that has a TODO state.  This excludes both:
+This could work by---for example---excluding anything tagged "project" or perhaps anything that has a TODO state.  This excludes both@comma{} as well as those with a @samp{:ROAM_EXCLUDE:} property:
 
 @lisp
 (setq org-node-filter-fn
@@ -584,7 +586,7 @@ Or you could go with a whitelist approach@comma{} to show only nodes from a cert
              (not (indexed-property "ROAM_EXCLUDE" node)))))
 @end lisp
 
-(NB: if you don't know what @samp{ROAM_EXCLUDE} is@comma{} feel free to omit that clause)
+(NB: if you don't know what @samp{ROAM_EXCLUDE} is@comma{} feel free to omit that rule)
 
 @menu
 * Limitation @samp{ROAM_EXCLUDE}::
@@ -660,7 +662,7 @@ To complete words at point into known node titles:
 
 @lisp
 (org-node-complete-at-point-mode)
-(setq org-roam-completion-everywhere nil) ;; Prevent org-roam's
+(setq org-roam-completion-everywhere nil) ;; Stop org-roam equivalent.
 @end lisp
 
 @node FAQ Any analogue to @samp{org-roam-node-display-template}?
@@ -749,7 +751,7 @@ NB: for users of @samp{org-node-complete-at-point-mode}@comma{} this workaround 
 @node Limitation Org-ref
 @section Limitation: Org-ref
 
-Org-node supports the Org 9.5 @@citations@comma{} but not fully the aftermarket @uref{https://github.com/jkitchin/org-ref, org-ref} &citations that emulate @LaTeX{} look-and-feel@comma{} because it would double the time taken by @samp{M-x org-node-reset}.
+Org-node supports the Org 9.5 @@citations@comma{} but not fully the aftermarket @uref{https://github.com/jkitchin/org-ref, org-ref} &citations that emulate @LaTeX{} look-and-feel.
 
 What works is bracketed Org-ref v3 citations that start with "cite"@comma{} e.g. @samp{[[citep:...]]}@comma{} @samp{[[citealt:...]]}@comma{} @samp{[[citeauthor:...]]}@comma{} since indexed-org-parser.el is able to pick them up for free.
 
@@ -960,7 +962,7 @@ API cheatsheet between org-roam and org-node.
 @tab @samp{(org-node-read)}
 @item Get node by ID
 @tab 
-@tab @samp{(org-node-by-id ID)}
+@tab @samp{(indexed-entry-by-id ID)}
 @item Get list of files
 @tab @samp{(org-roam-list-files)}
 @tab @samp{(indexed-org-files)}
@@ -1029,7 +1031,7 @@ API cheatsheet between org-roam and org-node.
 @tab @samp{(indexed-roam-refs NODE)}
 @item Get @samp{ROAM_ALIASES}
 @tab @samp{(org-roam-node-aliases NODE)}
-@tab @samp{(indexed-property "ROAM_ALIASES" NODE)}
+@tab @samp{(indexed-roam-aliases NODE)}
 @item Get @samp{ROAM_EXCLUDE}
 @tab 
 @tab @samp{(indexed-property "ROAM_EXCLUDE" NODE)}
