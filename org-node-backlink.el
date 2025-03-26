@@ -683,53 +683,57 @@ Designed for use by `org-node-backlink--fix-nearby'.
 If REMOVE non-nil, remove it instead."
   (if remove
       (org-node--delete-drawer "BACKLINKS")
-    (when-let* ((id (org-entry-get nil "ID"))
-                (node (gethash id org-nodes))
-                (origins (thread-last
-                           (append (indexed-id-links-to node)
-                                   (when indexed-roam-mode
-                                     (indexed-roam-reflinks-to node)))
-                           (mapcar #'indexed-origin)
-                           (delete-dups))))
-      (save-excursion
-        (save-restriction
-          (org-node-narrow-to-drawer-create
-            "BACKLINKS" org-node-backlink-drawer-positioner)
-          (let* ((org-node-backlink--inhibit-flagging t)
-                 (lines (split-string (buffer-string) "\n" t))
-                 (already-present-ids
-                  (seq-keep #'org-node-backlink--extract-id lines))
-                 (to-add      (seq-difference   origins already-present-ids))
-                 (to-remove   (seq-difference   already-present-ids origins))
-                 (to-reformat (seq-intersection already-present-ids origins)))
-            ;; Add new, remove stale, reformat the rest
-            (dolist (id to-remove)
-              (save-excursion
-                (search-forward id)
-                (delete-line)))
-            (dolist (id to-reformat)
-              (save-excursion
-                (search-forward id)
-                (back-to-indentation)
-                (let ((line (buffer-substring (point) (pos-eol))))
-                  (atomic-change-group
-                    (delete-region (point) (pos-eol))
-                    (insert (org-node-backlink--reformat-line line))))))
-            (dolist (id to-add)
-              (when-let* ((known-node (gethash id org-nodes)))
-                (let ((title (indexed-title known-node)))
-                  (indent-according-to-mode)
-                  (insert (funcall org-node-backlink-drawer-formatter id title)
-                          "\n"))))
-            ;; Membership is correct, now re-sort so the order is correct
-            (let ((sorted-lines
-                   (sort (split-string (buffer-string) "\n" t)
-                         org-node-backlink-drawer-sorter)))
-              (when org-node-backlink-drawer-sort-in-reverse
-                (setq sorted-lines (nreverse sorted-lines)))
-              (atomic-change-group
-                (delete-region (point-min) (point-max))
-                (insert (string-join sorted-lines "\n"))))))))))
+    (let* ((id (org-entry-get nil "ID"))
+           (node (gethash id org-nodes))
+           (origins (when node
+                      (thread-last
+                        (append (indexed-id-links-to node)
+                                (when indexed-roam-mode
+                                  (indexed-roam-reflinks-to node)))
+                        (mapcar #'indexed-origin)
+                        (delete-dups)))))
+      (if (null origins)
+          (save-excursion
+            (org-node--delete-drawer "BACKLINKS"))
+        (save-excursion
+          (save-restriction
+            (org-node-narrow-to-drawer-create
+             "BACKLINKS" org-node-backlink-drawer-positioner)
+            (let* ((org-node-backlink--inhibit-flagging t)
+                   (lines (split-string (buffer-string) "\n" t))
+                   (already-present-ids
+                    (seq-keep #'org-node-backlink--extract-id lines))
+                   (to-add      (seq-difference   origins already-present-ids))
+                   (to-remove   (seq-difference   already-present-ids origins))
+                   (to-reformat (seq-intersection already-present-ids origins)))
+              ;; Add new, remove stale, reformat the rest
+              (dolist (id to-remove)
+                (save-excursion
+                  (search-forward id)
+                  (delete-line)))
+              (dolist (id to-reformat)
+                (save-excursion
+                  (search-forward id)
+                  (back-to-indentation)
+                  (let ((line (buffer-substring (point) (pos-eol))))
+                    (atomic-change-group
+                      (delete-region (point) (pos-eol))
+                      (insert (org-node-backlink--reformat-line line))))))
+              (dolist (id to-add)
+                (when-let* ((known-node (gethash id org-nodes)))
+                  (let ((title (indexed-title known-node)))
+                    (indent-according-to-mode)
+                    (insert (funcall org-node-backlink-drawer-formatter id title)
+                            "\n"))))
+              ;; Membership is correct, now re-sort so the order is correct
+              (let ((sorted-lines
+                     (sort (split-string (buffer-string) "\n" t)
+                           org-node-backlink-drawer-sorter)))
+                (when org-node-backlink-drawer-sort-in-reverse
+                  (setq sorted-lines (nreverse sorted-lines)))
+                (atomic-change-group
+                  (delete-region (point-min) (point-max))
+                  (insert (string-join sorted-lines "\n")))))))))))
 
 (defun org-node-backlink--reformat-line (line)
   "Pass LINE back through `org-node-backlink-drawer-formatter'."
