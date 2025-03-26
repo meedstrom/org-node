@@ -27,8 +27,8 @@ Also enable =indexed-updater-mode=.  Here's a new basic-install snippet:
 (use-package org-node
   :config
   (setq indexed-sync-with-org-id t) ;; optional
-  (indexed-updater-mode)
   (indexed-roam-mode) ;; optional: support ROAM_REFS
+  (indexed-updater-mode)
   (org-node-cache-mode))
 #+end_src
 
@@ -386,7 +386,7 @@ Ever run into "ID not found" situations?  Org-node gives you an extra way to fee
 Example setting:
 
 #+begin_src elisp
-(setq org-node-extra-id-dirs
+(setq indexed-org-dirs
       '("~/org/"
         "~/Syncthing/"
         "/mnt/stuff/"))
