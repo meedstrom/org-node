@@ -225,7 +225,7 @@ NAME, ARGLIST and BODY as in `defun'."
 (define-obsolete-variable-alias 'org-node--ref-path<>ref-type       'indexed-roam--ref<>type "2025-03-19")
 
 (define-obsolete-function-alias 'org-node--dir-files-recursively     #'indexed--dir-files-recursive "2025-03-19")
-(define-obsolete-function-alias 'org-node--maybe-adjust-idle-timer   #'indexed--activate-timer "2025-03-19")
+(define-obsolete-function-alias 'org-node--maybe-adjust-idle-timer   #'indexed-x--activate-timer "2025-03-19")
 (define-obsolete-function-alias 'org-node-abbrev-file-names          #'indexed--abbrev-file-names "2025-03-19")
 (define-obsolete-function-alias 'org-node-by-id                      #'indexed-entry-by-id "2025-03-19")
 (define-obsolete-function-alias 'org-node-get-deadline               #'indexed-deadline "2025-03-19")
@@ -275,7 +275,7 @@ NAME, ARGLIST and BODY as in `defun'."
   (when (fboundp 'org-super-links-convert-link-to-super)
     (org-super-links-convert-link-to-super nil)))
 
-(unless (fboundp 'indexed--ensure-org-id-table-p)
+(unless (boundp 'indexed-sync-with-org-id)
   (display-warning
    'org-node "Update indexed to use this version of org-node"))
 
