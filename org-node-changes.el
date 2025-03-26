@@ -79,7 +79,8 @@ Then do other one-shot warnings while we\\='re at it."
                    old))))))
   ;; 2024-10-18
   (unless org-node-changes--warned-about-roam-id
-    (when (and (not (and (bound-and-true-p org-roam-autosync-mode)
+    (when (and (fboundp 'org-link-get-parameter)
+               (not (and (bound-and-true-p org-roam-autosync-mode)
                          (bound-and-true-p org-roam-db-update-on-save)))
                (eq (org-link-get-parameter "id" :follow) 'org-roam-id-open))
       (setq org-node-changes--warned-about-roam-id t)
