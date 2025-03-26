@@ -379,7 +379,7 @@ Running aforementioned command *may re-sort your backlinks and re-format their a
 - =org-node-backlink-drawer-sorter=
 - =org-node-backlink-drawer-formatter=
 
-Finally, lines without a proper Org link like =[[id:foo][bar]]= are *deleted*, which would mean *destroying any timestamp within.*
+Finally, lines that contain no Org link such as =[[id:1234][Title]]= are *deleted*, which would mean *destroying any other info within.*  Same if a backlink is stale and no longer valid.
 
 * Misc
 ** Manage org-id-locations
@@ -415,7 +415,7 @@ Either revert that with the following snippet, or if the extension [[https://git
 
 One user had over a thousand project-nodes, but only just began to do a knowledge base, and wished to avoid seeing the project nodes.
 
-This could work by---for example---excluding anything tagged "project" or perhaps anything that has a TODO state.  This excludes both:
+This could work by---for example---excluding anything tagged "project" or perhaps anything that has a TODO state.  This excludes both, as well as those with a =:ROAM_EXCLUDE:= property:
 
 #+begin_src elisp
 (setq org-node-filter-fn
@@ -435,7 +435,7 @@ Or you could go with a whitelist approach, to show only nodes from a certain dir
              (not (indexed-property "ROAM_EXCLUDE" node)))))
 #+end_src
 
-(NB: if you don't know what =ROAM_EXCLUDE= is, feel free to omit that clause)
+(NB: if you don't know what =ROAM_EXCLUDE= is, feel free to omit that rule)
 
 *** Limitation: =ROAM_EXCLUDE=
 
@@ -505,7 +505,7 @@ To complete words at point into known node titles:
 
 #+begin_src elisp
 (org-node-complete-at-point-mode)
-(setq org-roam-completion-everywhere nil) ;; Prevent org-roam's
+(setq org-roam-completion-everywhere nil) ;; Stop org-roam equivalent.
 #+end_src
 
 ** FAQ: Any analogue to =org-roam-node-display-template=?
@@ -575,7 +575,7 @@ NB: for users of =org-node-complete-at-point-mode=, this workaround won't help t
 
 ** Limitation: Org-ref
 
-Org-node supports the Org 9.5 @citations, but not fully the aftermarket [[https://github.com/jkitchin/org-ref][org-ref]] &citations that emulate LaTeX look-and-feel, because it would double the time taken by =M-x org-node-reset=.
+Org-node supports the Org 9.5 @citations, but not fully the aftermarket [[https://github.com/jkitchin/org-ref][org-ref]] &citations that emulate LaTeX look-and-feel.
 
 What works is bracketed Org-ref v3 citations that start with "cite", e.g. =[[citep:...]]=, =[[citealt:...]]=, =[[citeauthor:...]]=, since indexed-org-parser.el is able to pick them up for free.
 
@@ -675,37 +675,37 @@ Thus, fundamentally, any "journal" or "dailies" software are just operating on a
 
 API cheatsheet between org-roam and org-node.
 
-| Action                                  | org-roam                        | org-node                              |
-|-----------------------------------------+---------------------------------+---------------------------------------|
-| Get ID near point                       | =(org-roam-id-at-point)=          | =(org-entry-get-with-inheritance "ID")= |
-| Get node at point                       | =(org-roam-node-at-point)=        | =(org-node-at-point)=                   |
-| Prompt user to pick a node              | =(org-roam-node-read)=            | =(org-node-read)=                       |
-| Get node by ID                          |                                 | =(org-node-by-id ID)=                   |
-| Get list of files                       | =(org-roam-list-files)=           | =(indexed-org-files)=                     |
-| Get nodes in a file                     |                                 | =(indexed-entries-in FILES)=            |
-| Get backlink objects                    | =(org-roam-backlinks-get NODE)=   | =(indexed-id-links-to NODE)=            |
-| Get reflink objects                     | =(org-roam-reflinks-get NODE)=    | =(indexed-roam-reflinks-to NODE)=            |
-| Get title                               | =(org-roam-node-title NODE)=      | =(indexed-title NODE)=                  |
-| Get title of file where NODE is         | =(org-roam-node-file-title NODE)= | =(indexed-file-title NODE)=             |
-| Get title /or/ name of file where NODE is |                                 | =(indexed-file-title-or-basename NODE)= |
-| Get full path to file where NODE is     | =(org-roam-node-file NODE)=       | =(indexed-file-name NODE)=                   |
-| Get ID                                  | =(org-roam-node-id NODE)=         | =(indexed-id NODE)=                     |
-| Get tags                                | =(org-roam-node-tags NODE)=       | =(indexed-tags NODE)=                   |
-| Get tags (local only)                   |                                 | =(indexed-tags-local NODE)=             |
-| Get tags (inherited only)               |                                 | =(indexed-tags-inherited NODE)=         |
-| Get outline level                       | =(org-roam-node-level NODE)=      | =(indexed-level NODE)=                  |
-| Get char position                       | =(org-roam-node-point NODE)=      | =(indexed-pos NODE)=                    |
-| Get line number                         |                                 | =(indexed-lnum NODE)=                   |
-| Get properties                          | =(org-roam-node-properties NODE)= | =(indexed-properties NODE)=             |
-| Get subtree TODO state                  | =(org-roam-node-todo NODE)=       | =(indexed-todo-state NODE)=                   |
-| Get subtree SCHEDULED                   | =(org-roam-node-scheduled NODE)=  | =(indexed-scheduled NODE)=              |
-| Get subtree DEADLINE                    | =(org-roam-node-deadline NODE)=   | =(indexed-deadline NODE)=               |
-| Get subtree priority                    | =(org-roam-node-priority NODE)=   | =(indexed-priority NODE)=               |
-| Get outline-path                        | =(org-roam-node-olp NODE)=        | =(indexed-olpath NODE)=                 |
-| Get =ROAM_REFS=                           | =(org-roam-node-refs NODE)=       | =(indexed-roam-refs NODE)=              |
-| Get =ROAM_ALIASES=                        | =(org-roam-node-aliases NODE)=    | =(indexed-property "ROAM_ALIASES" NODE)= |
+| Action                                  | org-roam                        | org-node                               |
+|-----------------------------------------+---------------------------------+----------------------------------------|
+| Get ID near point                       | =(org-roam-id-at-point)=          | =(org-entry-get-with-inheritance "ID")=  |
+| Get node at point                       | =(org-roam-node-at-point)=        | =(org-node-at-point)=                    |
+| Prompt user to pick a node              | =(org-roam-node-read)=            | =(org-node-read)=                        |
+| Get node by ID                          |                                 | =(indexed-entry-by-id ID)=               |
+| Get list of files                       | =(org-roam-list-files)=           | =(indexed-org-files)=                    |
+| Get nodes in a file                     |                                 | =(indexed-entries-in FILES)=             |
+| Get backlink objects                    | =(org-roam-backlinks-get NODE)=   | =(indexed-id-links-to NODE)=             |
+| Get reflink objects                     | =(org-roam-reflinks-get NODE)=    | =(indexed-roam-reflinks-to NODE)=        |
+| Get title                               | =(org-roam-node-title NODE)=      | =(indexed-title NODE)=                   |
+| Get title of file where NODE is         | =(org-roam-node-file-title NODE)= | =(indexed-file-title NODE)=              |
+| Get title /or/ name of file where NODE is |                                 | =(indexed-file-title-or-basename NODE)=  |
+| Get full path to file where NODE is     | =(org-roam-node-file NODE)=       | =(indexed-file-name NODE)=               |
+| Get ID                                  | =(org-roam-node-id NODE)=         | =(indexed-id NODE)=                      |
+| Get tags                                | =(org-roam-node-tags NODE)=       | =(indexed-tags NODE)=                    |
+| Get tags (local only)                   |                                 | =(indexed-tags-local NODE)=              |
+| Get tags (inherited only)               |                                 | =(indexed-tags-inherited NODE)=          |
+| Get outline level                       | =(org-roam-node-level NODE)=      | =(indexed-level NODE)=                   |
+| Get char position                       | =(org-roam-node-point NODE)=      | =(indexed-pos NODE)=                     |
+| Get line number                         |                                 | =(indexed-lnum NODE)=                    |
+| Get properties                          | =(org-roam-node-properties NODE)= | =(indexed-properties NODE)=              |
+| Get subtree TODO state                  | =(org-roam-node-todo NODE)=       | =(indexed-todo-state NODE)=              |
+| Get subtree SCHEDULED                   | =(org-roam-node-scheduled NODE)=  | =(indexed-scheduled NODE)=               |
+| Get subtree DEADLINE                    | =(org-roam-node-deadline NODE)=   | =(indexed-deadline NODE)=                |
+| Get subtree priority                    | =(org-roam-node-priority NODE)=   | =(indexed-priority NODE)=                |
+| Get outline-path                        | =(org-roam-node-olp NODE)=        | =(indexed-olpath NODE)=                  |
+| Get =ROAM_REFS=                           | =(org-roam-node-refs NODE)=       | =(indexed-roam-refs NODE)=               |
+| Get =ROAM_ALIASES=                        | =(org-roam-node-aliases NODE)=    | =(indexed-roam-aliases NODE)=            |
 | Get =ROAM_EXCLUDE=                        |                                 | =(indexed-property "ROAM_EXCLUDE" NODE)= |
-| Ensure fresh data                       | =(org-roam-db-sync)=              | =(org-node-cache-ensure t t)=           |
+| Ensure fresh data                       | =(org-roam-db-sync)=              | =(org-node-cache-ensure t t)=            |
 
 ** Appendix II: How to rollback
 
@@ -755,6 +755,7 @@ With [[https://github.com/radian-software/straight.el][Straight]]:
   :straight (org-node :type git :host github :repo "meedstrom/org-node"
                       :branch "v1.6"))
 #+end_src
+
 ** Appendix III: Random tips
 
 Org-roam shipped the optional =(require '=org-roam-export)=, a patch to fix =id:= links in HTML export.
