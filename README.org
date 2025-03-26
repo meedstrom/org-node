@@ -9,7 +9,7 @@
 #+HTML: <a href="https://repology.org/project/emacs%3Aorg-node/versions"> <img src="https://repology.org/badge/vertical-allrepos/emacs%3Aorg-node.svg" alt="Packaging status" align="right"> </a>
 * News for v3 :noexport:
 
-A lot of code has been spun into a new library https://github.com/meedstrom/indexed, now a dependency.  Reduces codebase by 30%.
+A lot of code has been spun into a new library https://github.com/meedstrom/indexed, now a dependency.  Reduces codebase by 30%.  No longer need to load Org to use =org-node-find= at init.
 
 Not much new features -- mainly a change of plumbing.
 
@@ -281,7 +281,10 @@ Backlinks are the butter on the bread that is your notes.  If you've ever seen a
 
 ** Backlink solution 1: displayed in a separate window
 *** Option 1A: Reuse the org-roam buffer
-Believe it or not, it Just Works.  So long as you install [[https://github.com/meedstrom/org-node-fakeroam][org-node-fakeroam]] -- which pulls in org-roam with it -- and add to initfiles:
+
+Believe it or not, you can use it without the rest of org-roam.
+
+Install [[https://github.com/meedstrom/org-node-fakeroam][org-node-fakeroam]] and add to initfiles:
 
 #+begin_src elisp
 (org-node-fakeroam-redisplay-mode) ;; optional behavior
