@@ -35,7 +35,9 @@
 (require 'transient)
 (require 'org-node)
 (require 'org)
+(require 'indexed)
 (defvar org-node-proposed-seq)
+(defvar indexed--next-message)
 
 ;;; Easy wrappers to define a sequence
 
@@ -559,7 +561,7 @@ not exist."
     (when indexed--next-message
       (setq indexed--next-message
             (concat indexed--next-message
-                    (format " (+ %.2fs making org-node-seqs)"
+                    (format " + %.2fs making org-node-seqs"
                             (float-time (time-since T))))))))
 
 ;;;###autoload

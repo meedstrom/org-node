@@ -26,7 +26,7 @@ Also enable =indexed-updater-mode=.  Here's a new basic-install snippet:
 #+begin_src elisp
 (use-package org-node
   :config
-  (setq indexed-check-org-id-locations t)
+  (setq indexed-sync-with-org-id t) ;; optional
   (indexed-updater-mode)
   (indexed-roam-mode) ;; optional: support ROAM_REFS
   (org-node-cache-mode))
@@ -40,6 +40,8 @@ Node seqs, if you use them, now require turning on explicitly.
 
 For reference, check out the full list of obsoletions near the bottom of file [[https://github.com/meedstrom/org-node/blob/2504b7f0a8848c0fbc3dcddc2d1edeb0adbbc9ac/org-node-changes.el][org-node-changes.el]].
 
+A silent obsoletion: links are not plists anymore, but =plist-get= is unhelpfully polite and just returns nil when given invalid input.   Use e.g. =(indexed-pos LINK)= instead of =(plist-get LINK :pos)=.
+
 * News for v2 :noexport:
 
 Version 2.0 is out, with two major features:
@@ -48,18 +50,11 @@ Version 2.0 is out, with two major features:
 - context buffers!
 
 Feedback welcome.
-
 ** Upgrade notice
 
 - Emacs 29+ required
 
-- If you were using *org-node 1.8.7 or older (November 2024)*, you'll have a smoother ride if you:
-
-  1. first upgrade to the latest in [[https://github.com/meedstrom/org-node/tree/v1.9][v1.9 branch]] (with dependency [[https://github.com/meedstrom/el-job/tree/v0.3][el-job v0.3]]),
-  2. deal with any transitional warnings,
-  3. /then/ upgrade to the latest version (which is the [[https://github.com/meedstrom/org-node/branches][main branch]]).
-
-  Or skip all that, and just check that you're not using any of [[https://github.com/meedstrom/org-node/blob/v1.9/org-node-changes.el#L140][these aliases]].
+- If you were using *org-node 1.8.7 or older (November 2024)*, check that you're not using any of [[https://github.com/meedstrom/org-node/blob/v1.9/org-node-changes.el#L140][these aliases]].
 
 ** Backlinks drawer
 
@@ -107,7 +102,7 @@ See what can be customized:
 
 ** Context buffers
 
-The new context buffer replaces org-roam buffer, and with it, much of [[https://github.com/meedstrom/org-node-fakeroam][org-node-fakeroam]].
+The new context buffer replaces the org-roam buffer, and with it, much of [[https://github.com/meedstrom/org-node-fakeroam][org-node-fakeroam]].
 
 Some direct substitutes:
 
@@ -222,7 +217,7 @@ Assuming your package manager knows about [[https://melpa.org/#/getting-started]
 #+begin_src elisp
 (use-package org-node
   :config
-  (setq indexed-check-org-id-locations t)
+  (setq indexed-sync-with-org-id t)
   (indexed-updater-mode)
   (indexed-roam-mode) ;; Support ROAM_REFS
   (org-node-cache-mode))
@@ -247,7 +242,7 @@ If you're *coming here from org-roam*, try this instead:
   (setq org-roam-link-auto-replace nil)
 
   :config
-  (setq indexed-check-org-id-locations t)
+  (setq indexed-sync-with-org-id t)
   (indexed-updater-mode)
   (indexed-roam-mode) ;; Support ROAM_REFS
   (org-node-cache-mode))

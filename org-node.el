@@ -19,7 +19,7 @@
 ;; URL:      https://github.com/meedstrom/org-node
 ;; Created:  2024-04-13
 ;; Keywords: org, hypermedia
-;; Package-Requires: ((emacs "29.1") (llama "0.5.0") (indexed "0.5.2") (el-job "2.2.0") (magit-section "4.3.0"))
+;; Package-Requires: ((emacs "29.1") (llama "0.5.0") (indexed "0.6.0") (el-job "2.2.0") (magit-section "4.3.0"))
 
 ;; NOTE: Looking for Package-Version?  Consult the Git tag.
 ;;       MELPA versions above 20250303 is v2.
@@ -112,7 +112,7 @@
 (declare-function consult--grep "ext:consult")
 (declare-function consult--grep-make-builder "ext:consult")
 (declare-function consult--ripgrep-make-builder "ext:consult")
-(declare-function indexed-x-ensure-node-at-point-known "indexed")
+(declare-function indexed-x-ensure-entry-at-point-known "indexed")
 
 (defvaralias 'org-nodes 'indexed--id<>entry)
 
@@ -438,24 +438,6 @@ When called from Lisp, peek on any hash table HT."
   "Wipe table `org-node--candidate<>node'."
   (clrhash org-node--candidate<>node))
 
-(defalias 'org-node--snitch-to-org-id 'indexed-x-snitch-to-org-id)
-
-;; TODO: Upstream, this is just the inverse of above
-(defun org-node--forget-id-locations (files)
-  "Remove references to FILES in `org-id-locations'.
-You might consider committing the effect to disk afterwards by calling
-`org-id-locations-save', which this function will not do for you.
-
-FILES are assumed to be abbreviated truenames."
-  (when files
-    (when (listp org-id-locations)
-      (message "org-node--forget-id-locations: Surprised that `org-id-locations' is an alist at this time.  Converting to hash table.")
-      (setq org-id-locations (org-id-alist-to-hash org-id-locations)))
-    (maphash (lambda (id file)
-               (when (member file files)
-                 (remhash id org-id-locations)))
-             org-id-locations)))
-
 (defun org-node--record-completion-candidates (node)
   "Cache completion candidates for NODE and its aliases."
   (when (and (indexed-id node)
@@ -475,14 +457,13 @@ FILES are assumed to be abbreviated truenames."
 
 (defun org-node--forget-some-completions (parse-results)
   (seq-let (missing-files file-data entries) parse-results
-    (org-node--forget-id-locations missing-files)
     (org-node--dirty-forget-completions-in
      (append missing-files (mapcar #'indexed-file-name file-data)))
     (when indexed-roam-mode
       (dolist (entry entries)
         (when (member (indexed-file-name entry) missing-files)
-          (mapc (##remhash % indexed--title<>id)
-                (indexed-roam-refs entry)))))))
+          (dolist (ref (indexed-roam-refs entry))
+            (remhash ref indexed--title<>id)))))))
 
 ;;;###autoload
 (define-minor-mode org-node-cache-mode
@@ -497,13 +478,11 @@ If you don't want to see this message, enable those modes first.")
       (indexed-updater-mode))
     (add-hook 'indexed-pre-full-reset-functions #'org-node--wipe-completions)
     (add-hook 'indexed-pre-incremental-update-functions #'org-node--forget-some-completions)
-    (add-hook 'indexed-record-entry-functions #'org-node--snitch-to-org-id)
     (add-hook 'indexed-record-entry-functions #'org-node--record-completion-candidates)
     (add-hook 'indexed-record-entry-functions #'org-node--let-refs-be-aliases))
    (t
     (remove-hook 'indexed-pre-full-reset-functions #'org-node--wipe-completions)
     (remove-hook 'indexed-pre-incremental-update-functions #'org-node--forget-some-completions)
-    (remove-hook 'indexed-record-entry-functions #'org-node--snitch-to-org-id)
     (remove-hook 'indexed-record-entry-functions #'org-node--record-completion-candidates)
     (remove-hook 'indexed-record-entry-functions #'org-node--let-refs-be-aliases))))
 
@@ -896,6 +875,8 @@ Automatically set, should be nil most of the time.")
                     (recenter 0))
                 (unless (pos-visible-in-window-p pos)
                   (goto-char pos))))
+          ;; NOTE: If this happens a lot,
+          ;;       maybe change to just (indexed-x--forget-files file).
           (message "org-node: Didn't find file, resetting...")
           (indexed--scan-full)))
     (error "`org-node--goto' received a nil argument")))
@@ -1813,8 +1794,12 @@ In case of unsolvable problems, how to wipe org-id-locations:
     (when files
       (message "Forgetting all IDs in directory %s..." dir)
       (redisplay)
-      (org-node--forget-id-locations files)
+      (maphash (lambda (id file)
+                 (when (member file files)
+                   (remhash id org-id-locations)))
+               org-id-locations)
       (dolist (file files)
+        (remhash file indexed--file<>entries)
         (remhash file indexed--file<>data))
       (org-id-locations-save)
       (org-node-reset))))
