@@ -1889,9 +1889,12 @@ from the beginning."
           :msg "Running org-lint (you can quit and resume)"
           :about-to-do "About to visit a file to run org-lint"
           :call (lambda ()
-                  (when-let* ((warning (org-lint)))
-                    (push (cons buffer-file-name (car warning))
-                          org-node--lint-warnings)))))
+                  ;; Org-lint's `org-lint-invalid-id-link' can cause spam, bc
+                  ;; `org-id-update-id-locations' SILENT argument not perfect.
+                  (let ((inhibit-message t))
+                    (when-let* ((warning (org-lint)))
+                      (push (cons buffer-file-name (car warning))
+                            org-node--lint-warnings))))))
   (when org-node--lint-warnings
     (indexed-list--pop-to-tabulated-buffer
      :buffer "*org lint results*"
