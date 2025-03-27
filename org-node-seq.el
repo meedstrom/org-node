@@ -34,10 +34,11 @@
 (require 'calendar)
 (require 'transient)
 (require 'org-node)
-(require 'org)
 (require 'indexed)
 (defvar org-node-proposed-seq)
 (defvar indexed--next-message)
+(declare-function org-entry-get-with-inheritance "org")
+(declare-function org-up-heading-or-point-min "org")
 
 ;;; Easy wrappers to define a sequence
 
@@ -373,6 +374,7 @@ nothing."
 (defun org-node-seq--jump (key)
   "Prompt for and jump to an entry in node seq identified by KEY."
   (org-node--kill-blank-unsaved-buffers)
+  (require 'org)
   (let* ((seq (cdr (assoc key org-node-seqs)))
          (sortstr (funcall (plist-get seq :prompter) key))
          (item (assoc sortstr (plist-get seq :sorted-items))))
@@ -454,6 +456,7 @@ Unlike `org-node-proposed-seq', does not need to revert to nil.")
                                 (mapcar #'string-to-char valid-keys))))
                    (char-to-string input)))))
     ;; Almost identical to `org-node-seq--jump'
+    (require 'org)
     (let* ((seq (cdr (assoc key org-node-seqs)))
            (sortstr (or org-node-proposed-title
                         (funcall (plist-get seq :prompter) key)))
@@ -550,6 +553,7 @@ not exist."
          (item (assoc sortstr (plist-get seq :sorted-items))))
     (unless seq
       (error "No seq with key %s, maybe do `org-node-reset'?" key))
+    (require 'org)
     (when (or (null item)
               (if (funcall (plist-get seq :try-goto) item)
                   nil
