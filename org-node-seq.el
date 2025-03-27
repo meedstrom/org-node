@@ -533,11 +533,19 @@ Meant to sit on these hooks:
           (when (calendar-date-is-visible-p mdy)
             (calendar-mark-visible-date mdy)))))))
 
+(defvar org-node-seq--auto-enabled-once nil)
+
 ;; Not used inside this package; a convenience for users.
 (defun org-node-seq-goto (key sortstr)
   "Visit an entry in sequence identified by KEY.
 The entry to visit has sort-string SORTSTR.  Create if it does
 not exist."
+  (when org-node-seq-defs
+    (unless (assoc key org-node-seqs)
+      (unless org-node-seq--auto-enabled-once
+        (setq org-node-seq--auto-enabled-once t)
+        (org-node-seq-mode)
+        (org-node-seq--reset))))
   (let* ((seq (cdr (assoc key org-node-seqs)))
          (item (assoc sortstr (plist-get seq :sorted-items))))
     (unless seq
@@ -645,6 +653,12 @@ This permits \\[org-node-seq-dispatch] to work."
    ("j" "Jump (or create)" org-node-seq--jump*)
    ("c" "Capture into" org-node-seq--capture)]
   (interactive)
+  (when org-node-seq-defs
+    (unless (and org-node-seq-mode org-node-seqs)
+      (unless org-node-seq--auto-enabled-once
+        (setq org-node-seq--auto-enabled-once t)
+        (org-node-seq-mode)
+        (org-node-seq--reset))))
   (cond ((not org-node-seq-defs)
          (message "`org-node-seq-defs' not defined"))
         ((not org-node-seq-mode)
