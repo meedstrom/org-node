@@ -432,7 +432,7 @@ With non-nil argument NEXT, visit the next entry, not previous."
                                    (plist-get seq :name))))))
 
 (defvar org-node-seq--current-key nil
-  "Key identifying the node seq currently being browsed with the menu.
+  "Key identifying the node seq currently being browsed in dispatch.
 Unlike `org-node-proposed-seq', does not need to revert to nil.")
 
 (defun org-node-seq-capture-target ()
@@ -562,7 +562,7 @@ not exist."
   (setq org-node-seqs nil)
   (let ((T (current-time)))
     (dolist (def org-node-seq-defs)
-      (setf (alist-get (car def) org-node-seqs nil nil #'equal)
+      (setf (alist-get (car def) org-node-seqs () () #'equal)
             (org-node-seq--build-from-def def))
       ;; TODO: Clear any old seq from menu
       (org-node-seq--add-to-dispatch (car def) (plist-get (cdr def) :name)))
@@ -580,11 +580,12 @@ This permits \\[org-node-seq-dispatch] to work."
   :group 'org-node
   (if org-node-seq-mode
       (progn
-        ;; FIXME: A dirty-added node eventually disappears if its buffer is
-        ;;        never saved, and then the node seq stops working
+        ;; FIXME: A new node (cached w `indexed-x-ensure-entry-at-point-known')
+        ;;        eventually disappears from cache if its buffer is never
+        ;;        saved, and then the node seq stops working
         (add-hook 'org-node-creation-hook        #'org-node-seq--add-item)
         (add-hook 'indexed-post-full-reset-functions #'org-node-seq--reset 50)
-        ;; Put ourselves in front of org-roam-dailies unhygienic hook use.
+        ;; Put ourselves in front of org-roam-dailies unhygienic hook.
         (add-hook 'calendar-today-invisible-hook #'org-node-seq--mark-days 5)
         (add-hook 'calendar-today-visible-hook   #'org-node-seq--mark-days 5))
     (remove-hook 'org-node-creation-hook        #'org-node-seq--add-item)
@@ -598,7 +599,7 @@ This permits \\[org-node-seq-dispatch] to work."
     (transient-remove-suffix 'org-node-seq-dispatch key))
   (transient-append-suffix 'org-node-seq-dispatch '(0 -1)
     (list key name key))
-  ;; Make the sequence switches mutually exclusive
+  ;; Make the switches mutually exclusive
   (let ((old (car (slot-value (get 'org-node-seq-dispatch 'transient--prefix)
                               'incompatible))))
     (setf (slot-value (get 'org-node-seq-dispatch 'transient--prefix)
