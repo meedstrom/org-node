@@ -473,7 +473,7 @@ When called from Lisp, peek on any hash table HT."
     (unless (and indexed-updater-mode)
       (message "
 Org-node v3 enabling `indexed-updater-mode' for you.
-If you don't want to see this message, enable those modes first.")
+If you don't want to see this message, enable that mode first.")
       (indexed-updater-mode))
     (add-hook 'indexed-pre-full-reset-functions #'org-node--wipe-completions)
     (add-hook 'indexed-pre-incremental-update-functions #'org-node--forget-some-completions)
@@ -1606,9 +1606,10 @@ Argument INTERACTIVE automatically set."
               (set-visited-file-name new-path t t))
             (message "File '%s' renamed to '%s'" name new-name)))))))))
 
-;; FIXME: Kill opened buffers that were not edited.
-;;        First make sure it can pick up where it left off.
-;;        Maybe use `org-node--in-files-do'.
+;; TODO: Kill opened buffers that were not edited.
+;;       First make sure it can pick up where it left off.
+;;       Maybe use `org-node--in-files-do'.
+;; TODO: Skip links to nodes not satisfying `org-node-filter-fn'.
 ;;;###autoload
 (defun org-node-rewrite-links-ask (&optional files)
   "Update desynced link descriptions, interactively.
