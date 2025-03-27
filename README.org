@@ -145,8 +145,6 @@ I like [[https://github.com/org-roam/org-roam][org-roam]] but found it too slow,
 
 - *If you were using org-roam*, there is nothing to migrate.  You can use both packages.  It's the same on-disk format: "notes" are identified by their org-id.
 
-  With optional shims, you can even *skip syncing the org-roam DB* and continue using its rich backlinks buffer!
-
   In pursuit of being "just org-id", this package has no equivalent setting to =org-roam-directory= -- it just looks up the =org-id-locations= table.
 
 - *If you were not using org-roam*, maybe think of it as somewhat like [[https://github.com/alphapapa/org-recent-headings][org-recent-headings]] tooled-up to the extent that you won't need other methods of browsing, as long as you give IDs to all objects of interest.
@@ -219,7 +217,7 @@ Assuming your package manager knows about [[https://melpa.org/#/getting-started]
   :config
   (setq indexed-sync-with-org-id t)
   (indexed-updater-mode)
-  (indexed-roam-mode) ;; Support ROAM_REFS
+  (indexed-roam-mode) ;; Optional: support ROAM_REFS
   (org-node-cache-mode))
 #+end_src
 
@@ -249,7 +247,6 @@ If you're *coming here from org-roam*, try this instead:
 
 ;; Speed up the org-roam buffer
 ;; NOTE: You can use org-node's context buffers instead
-;; NOTE: Subject to removal, if upstream finally patches this
 (use-package org-node-fakeroam
   :after org-roam
   :config
@@ -258,6 +255,9 @@ If you're *coming here from org-roam*, try this instead:
 
 *** An update broke things?
 See [[https://github.com/meedstrom/org-node#appendix-ii-how-to-rollback][How to rollback]] at the end of this readme.
+
+*** Can't find any nodes?
+See [[https://github.com/meedstrom/org-node#manage-org-id-locations][Manage org-id-locations]].
 
 ** Quick start
 
@@ -282,7 +282,7 @@ Backlinks are the butter on the bread that is your notes.  If you've ever seen a
 ** Backlink solution 1: displayed in a separate window
 *** Option 1A: Reuse the org-roam buffer
 
-Believe it or not, you can use it without the rest of org-roam.
+Believe it or not, you can use the org-roam buffer without the rest of org-roam.
 
 Install [[https://github.com/meedstrom/org-node-fakeroam][org-node-fakeroam]] and add to initfiles:
 
@@ -298,7 +298,7 @@ Install [[https://github.com/meedstrom/org-node-fakeroam][org-node-fakeroam]] an
 (keymap-set global-map "M-s M-r" #'org-node-fakeroam-show-buffer)
 #+end_src
 
-*** Option 2A: Use the new org-node-context buffer
+*** Option 2A: Use the org-node-context buffer
 
 Org-node ships a complete rewrite of the org-roam buffer.
 
@@ -331,7 +331,7 @@ For a first-time run, type =M-x org-node-backlink-mass-update-props=.  (Don't wo
 
 NOTE 1: To be clear, this mode never generates new IDs.  That's your own business.  This only adds/edits =:BACKLINKS:= properties.
 
-That also means that *not all links create a backlink,* only links located in an entry that has an ID.  After all, there must be something to link back to.
+That means *not all links create a backlink,* only links located in an entry that has or inherits an ID.  After all, there must be something to link back to.
 
 NOTE 2:  People who prefer to hard-wrap text, instead of enabling =visual-line-mode= or similar, may prefer Option 2B.
 
@@ -358,7 +358,7 @@ Just add to initfiles:
           #'org-super-links-convert-link-to-super)
 #+end_src
 
-Org-node still gives you some bonus tools:
+You may find these tools useful:
 
 - 1. You can list any dead forward-links to fix them manually:
 
@@ -384,12 +384,11 @@ Finally, lines that contain no Org link such as =[[id:1234][Title]]= are *delete
 * Misc
 ** Manage org-id-locations
 
-Ever run into "ID not found" situations?  Org-node gives you an extra way to feed data to org-id, as [[http://edstrom.dev/wjwrl/taking-ownership-of-org-id][I find clumsy the built-in options]].
-
-Example setting:
+Ever run into "ID not found" situations?  Here's an extra way to feed data to org-id, as [[http://edstrom.dev/wjwrl/taking-ownership-of-org-id][I find clumsy the built-in options]].
 
 #+begin_src elisp
-(setq indexed-org-dirs
+(setq indexed-sync-with-org-id t)
+(setq indexed-org-dirs ;; Configure me
       '("~/org/"
         "~/Syncthing/"
         "/mnt/stuff/"))
@@ -401,7 +400,7 @@ Do a =M-x org-node-reset= and see if it can find your notes now.
 
 If you have org-roam loaded, but no longer update the DB, opening a link can sometimes send you to an outdated file path due to [[https://github.com/org-roam/org-roam/blob/2a630476b3d49d7106f582e7f62b515c62430714/org-roam-id.el#L91][a line in org-roam-id.el]] that causes org-id to /preferentially/ look up the org-roam DB instead of org-id's own table!
 
-Either revert that with the following snippet, or if the extension [[https://github.com/meedstrom/org-node-fakeroam][org-node-fakeroam]] covers your needs, simply delete the DB (normally located at "~/.emacs.d/org-roam.db").
+Either revert that with the following snippet, or simply delete the DB (often located at "~/.emacs.d/org-roam.db").
 
 #+begin_src elisp
 ;; Undo an org-roam override
@@ -411,11 +410,48 @@ Either revert that with the following snippet, or if the extension [[https://git
    "id" :follow #'org-id-open :store #'org-id-store-link-maybe))
 #+end_src
 
+** Org-capture
+
+You may have heard that org-roam has a set of meta-capture templates: the =org-roam-capture-templates=.
+
+People who understand the magic of capture templates, they may take this in stride.  Me, I never felt confident using a second-order abstraction over an already leaky abstraction.
+
+Can we just use vanilla org-capture?  That'd be less scary.  The answer is yes!
+
+The secret sauce is =(function org-node-capture-target)=:
+
+#+begin_src elisp
+(setq org-capture-templates
+      '(("i" "Capture into ID node"
+         plain (function org-node-capture-target) nil
+         :empty-lines-after 1)
+
+        ("j" "Jump to ID node"
+         plain (function org-node-capture-target) nil
+         :jump-to-captured t
+         :immediate-finish t)
+
+        ;; Sometimes handy after `org-node-insert-link', to
+        ;; make a stub you plan to fill in later, without
+        ;; leaving the current buffer for now
+        ("s" "Make quick stub ID node"
+         plain (function org-node-capture-target) nil
+         :immediate-finish t)))
+#+end_src
+
+With that done, you can optionally configure the everyday commands =org-node-find= & =org-node-insert-link= to outsource to org-capture when they try to create new nodes:
+
+#+begin_src elisp
+(setq org-node-creation-fn #'org-capture)
+#+end_src
+
+That last optional functionality may be confusing if I describe it -- better you give it a spin and see if you like.
+
 ** Exclude uninteresting nodes
 
 One user had over a thousand project-nodes, but only just began to do a knowledge base, and wished to avoid seeing the project nodes.
 
-This could work by---for example---excluding anything tagged "project" or perhaps anything that has a TODO state.  This excludes both, as well as those with a =:ROAM_EXCLUDE:= property:
+This could work by---for example---excluding anything tagged "project" or perhaps anything that has a TODO state.  Here's a way to exclude both, plus anything with a =:ROAM_EXCLUDE:= property:
 
 #+begin_src elisp
 (setq org-node-filter-fn
@@ -463,43 +499,6 @@ Or put something like =#+filetags: :hide_node:= at the top of each file, and set
         (not (member "hide_node" (indexed-tags node)))))
 #+end_src
 
-** Org-capture
-
-You may have heard that org-roam has a set of meta-capture templates: the =org-roam-capture-templates=.
-
-People who understand the magic of capture templates, they may take this in stride.  Me, I never felt confident using a second-order abstraction over an already leaky abstraction.
-
-Can we just use vanilla org-capture?  That'd be less scary.  The answer is yes!
-
-The secret sauce is =(function org-node-capture-target)=:
-
-#+begin_src elisp
-(setq org-capture-templates
-      '(("i" "Capture into ID node"
-         plain (function org-node-capture-target) nil
-         :empty-lines-after 1)
-
-        ("j" "Jump to ID node"
-         plain (function org-node-capture-target) nil
-         :jump-to-captured t
-         :immediate-finish t)
-
-        ;; Sometimes handy after `org-node-insert-link', to
-        ;; make a stub you plan to fill in later, without
-        ;; leaving the current buffer for now
-        ("s" "Make quick stub ID node"
-         plain (function org-node-capture-target) nil
-         :immediate-finish t)))
-#+end_src
-
-With that done, you can optionally configure the everyday commands =org-node-find= & =org-node-insert-link= to outsource to org-capture when they try to create new nodes:
-
-#+begin_src elisp
-(setq org-node-creation-fn #'org-capture)
-#+end_src
-
-That last optional functionality may be confusing if I describe it -- better you give it a spin and see if you like.
-
 ** Completion-at-point
 To complete words at point into known node titles:
 
@@ -508,7 +507,9 @@ To complete words at point into known node titles:
 (setq org-roam-completion-everywhere nil) ;; Stop org-roam equivalent.
 #+end_src
 
-** FAQ: Any analogue to =org-roam-node-display-template=?
+** Customize appearance
+
+(Analogue to =org-roam-node-display-template=)
 
 To customize how the nodes look in the minibuffer, configure =org-node-affixation-fn=:
 
@@ -538,8 +539,7 @@ This can be a power-tool for mass edits.  Say you want to rename some Org tag =:
 
 ** Let org-open-at-point detect refs
 
-# XXX
-(For background, consult the docstring of =org-node-link-types=.)
+(For background, see [[https://github.com/meedstrom/org-node#appendix-iv-what-are-roam_refs][What are ROAM_REFS?]] at the end of this README.)
 
 Say there's a link to a web URL, and you've forgotten you also have a node listing that exact URL in its =ROAM_REFS= property.
 
@@ -758,8 +758,42 @@ With [[https://github.com/radian-software/straight.el][Straight]]:
 
 ** Appendix III: Random tips
 
-Org-roam shipped the optional =(require '=org-roam-export)=, a patch to fix =id:= links in HTML export.
+Org-roam shipped the optional =(require 'org-roam-export)=, a patch to fix =id:= links in HTML export.
 
 Good news, upstream fixed the root of the issue in 5e9953fa0!  Update Org to 9.7+, then set this.
 
 : (setq org-html-prefer-user-labels t)
+** Appendix IV: What are =ROAM_REFS=?
+
+Here's the start of one of my note files.  Note the =:ROAM_REFS:= line.
+
+#+begin_src org
+:PROPERTIES:
+:CREATED:  [2023-09-11 Mon 12:00]
+:ID:       3bf9opc0tik0
+:ROAM_REFS: https://www.greaterwrong.com/s/pFatcKW3JJhTSxqAF https://mindingourway.com/guilt/
+:END:
+,#+filetags: :pub:
+,#+options: toc:t
+,#+title: Replacing Guilt
+
+Takeaways from Nate Soares' excellent "Replacing Guilt" series.
+
+...
+#+end_src
+
+An explanation: think of them as like IDs.  While org-node is built around the ID property because it acts as a singular identifier, the concept can be generalized.
+
+In another universe, =ROAM_REFS= might have been called =EXTRA_IDS= because in many ways it is just a list of additional IDs for the same node.
+
+For performance reasons, not just any string of text is accepted -- it must have valid links per Org syntax, such as =[[https://gnu.org][GNU Website]]= or =https://gnu.org=.  That is because the [[https://github.com/meedstrom/indexed][indexed]] library searches for links anyway in all body text, making it cheap to see after-the-fact where else this same "extra ID" may have been mentioned, and generate a backlink!
+
+Org-roam calls such backlinks /reflinks/.  In my view, adding a new word for such a similar concept just increases the air of mystery.  That's why in org-node's context buffer, they're just called "ref backlinks" -- as opposed to "ID backlinks".
+
+*** What's it actually used for?
+
+People often use it to write notes about a specific web-page or PDF file, and call it a ref-node for that resource.
+
+*** Citations
+
+As a special case, citation keys such as "@ioannidis2005" also work in =ROAM_REFS=, corresponding to Org 9.5 citations like =[cite:@ioannidis2005]=.
