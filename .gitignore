@@ -2,3 +2,5 @@
 *-pkg.el
 *-autoloads.el
 mothball/
+.aider*
+.aider*/
