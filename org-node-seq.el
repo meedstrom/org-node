@@ -17,8 +17,15 @@
 
 ;;; Commentary:
 
-;; Support programmatically defining node sequences based on such
-;; things as tags and date-stamps.
+;; Support programmatically defining node-sequences, based on such things as
+;; Org tags, time-stamps and file-names.  Then support easily navigating them.
+
+;; Trivia: Here was a failed rename.  The concept was initally called "series",
+;; not "seq", and in retrospect that was better name IMO as:
+;; 1. It's less ambiguous, you don't have to clarify that you're talking
+;;    about a "node seq" as oppposed to some other kind of seq.
+;; 2. The name doesn't beg to be abbreviated.
+;; Anyway, it's not a big enough deal to be worth changing back now.
 
 ;;; Code:
 
@@ -188,7 +195,7 @@ instead of calling this function."
 
 ;;;###autoload
 (defun org-node-seq-try-goto-id (id)
-  "Try to visit org-id ID and return non-nil, else nil on fail."
+  "Try to visit org-id ID and return non-nil, else return nil."
   (let ((node (gethash id org-nodes)))
     (when node
       (org-node--goto node)
@@ -262,9 +269,6 @@ format-constructs occur before these."
 
 (defcustom org-node-seq-defs nil
   "Alist defining each node sequence.
-
-This functionality is still experimental, and likely to have
-higher-level wrappers in the future.
 
 Each item looks like
 
@@ -554,11 +558,22 @@ not exist."
     (unless seq
       (error "No seq with key %s, maybe do `org-node-reset'?" key))
     (require 'org)
+    ;; TODO: When `item' not found, still run :try-goto and pass it a
+    ;;       list that contains only `sortstr', so it has a shot at finding a
+    ;;       pre-existing file/id even if `org-node-seqs' is not up to date
+    ;;       for some reason.
+    ;;       Would be nice, but we'd need to be able to assume that any
+    ;;       :try-goto in the wild can handle being passed such input, so
+    ;;       we first need to update the definition language and document
+    ;;       the new constraint.
     (when (or (null item)
               (if (funcall (plist-get seq :try-goto) item)
                   nil
                 (delete item (plist-get seq :sorted-items))
                 t))
+      ;; FIXME: Sometimes we hit an error here if :creator tries to create a
+      ;; file that already exists -- :try-goto failed because the file
+      ;; contains no IDs so :classifier did not create an item for it.
       (funcall (plist-get seq :creator) sortstr key))))
 
 (defun org-node-seq--reset (&optional _)

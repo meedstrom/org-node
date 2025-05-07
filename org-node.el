@@ -213,7 +213,7 @@ Applied by `org-node-new-file', `org-node-capture-target',
 `org-node-insert-heading', `org-node-nodeify-entry' and
 `org-node-extract-subtree'.
 
-NOT applied by `org-node-fakeroam-new-via-roam-capture' -- see
+NOT applied by `org-node-new-via-roam-capture' -- see
 org-roam\\='s `org-roam-capture-new-node-hook' instead.
 
 A good function for this hook is `org-node-put-created', since
@@ -680,8 +680,10 @@ On finding more than one root, sort by count of files they contain
 recursively, so that the most populous root directory will be the first
 element.
 
-This function does not consult the filesystem,
-so FILE-LIST must be a list of full paths that can be compared.
+This function does not consult the filesystem, so FILE-LIST must be a
+list of full paths that can be compared as strings, so e.g. there must
+e.g. not be instances of substring \"~\" as well as instances of
+substring \"/home/me\" referring to the same location.
 
 
 For Org users, it is pragmatic to know that if FILE-LIST was the
@@ -718,22 +720,22 @@ various subdirectories)."
        finally return (mapcar #'car (cl-sort dir-counters #'> :key #'cdr))))))
 
 (defcustom org-node-ask-directory nil
-  "Whether to ask the user where to save a new file node.
+  "Whether to ask the user where to save a new file.
 
 - Symbol nil: put file in the most populous root directory in
               `org-id-locations' without asking
 - String: a directory path in which to put the file
 - Symbol t: ask every time
 
-This variable controls the directory component, but the file
-basename is controlled by `org-node-slug-fn' and
-`org-node-datestamp-format'."
+This variable determines the directory component, but the file basename
+is determined by `org-node-slug-fn' and `org-node-datestamp-format'."
   :group 'org-node
   :type '(choice boolean string))
 
 (defun org-node-guess-or-ask-dir (prompt)
-  "Maybe prompt for a directory, and if so, show string PROMPT.
-Behavior depends on the user option `org-node-ask-directory'."
+  "Maybe prompt for a directory, and if so, use string PROMPT.
+Behavior depends on user option `org-node-ask-directory'.
+In any case, return a directory."
   (if (eq t org-node-ask-directory)
       (read-directory-name prompt)
     (if (stringp org-node-ask-directory)
@@ -818,7 +820,7 @@ belonging to an alphabet or number system."
                (replace-regexp-in-string "^-" "")
                (replace-regexp-in-string "-$" "")))
 
-;; Useful test cases if you want to hack on the above!
+;; Hacking on the above?  Some useful test cases!
 
 ;; (org-node-slugify-for-web "A/B testing")
 ;; (org-node-slugify-for-web "\"But there's still a chance, right?\"")
@@ -886,7 +888,7 @@ Used by commands such as `org-node-find'.
 
 Some choices:
 - `org-node-new-file'
-- `org-node-fakeroam-new-via-roam-capture'
+- `org-node-new-via-roam-capture'
 - `org-capture'
 
 It is pointless to choose `org-capture' here unless you configure
@@ -972,8 +974,7 @@ necessary variables are set."
 
 (defun org-node-new-via-roam-capture ()
   "Call `org-roam-capture-' with predetermined arguments.
-Meant to be called indirectly as `org-node-creation-fn', at which
-time some necessary variables are set."
+Meant to be called indirectly as `org-node-creation-fn'."
   (when (or (null org-node-proposed-title)
             (null org-node-proposed-id))
     (error "`org-node-new-via-roam-capture' is meant to be called indirectly via `org-node-create'"))
@@ -1083,8 +1084,8 @@ type the name of a node that does not exist.  That enables this
 (defun org-node-find ()
   "Select and visit one of your ID nodes.
 
-To behave like `org-roam-node-find' when creating new nodes, set
-`org-node-creation-fn' to `org-node-fakeroam-new-via-roam-capture'."
+To make this behave like `org-roam-node-find' when creating new nodes,
+set `org-node-creation-fn' to `org-node-new-via-roam-capture'."
   (interactive)
   (org-node-cache-ensure)
   (let* ((input (completing-read "Go to ID-node: " #'org-node-collection
@@ -1314,8 +1315,10 @@ adding keywords to the things to exclude:
     (set-marker link-marker nil)
     (run-hooks 'org-node-insert-link-hook)))
 
+;; TODO: Maybe concat the link type...
 (defun org-node-insert-raw-link ()
-  "Complete to a link that already exists in some file, and insert it."
+  "Insert at point a link that exists in some Org file somewhere.
+Works in non-Org buffers."
   (interactive)
   (insert (completing-read "Insert raw link: "
                            (org-node--list-known-raw-links)
@@ -1350,8 +1353,7 @@ adding keywords to the things to exclude:
 ;;;###autoload
 (defun org-node-extract-subtree ()
   "Extract subtree at point into a file of its own.
-Leave a link in the source file, and show the newly created file
-as current buffer.
+Leave a link in the source file, and display the newly created file.
 
 You may find it a common situation that the subtree had not yet
 been assigned an ID nor any other property that you normally
@@ -1364,7 +1366,7 @@ inherited \"CREATED\" property, if an ancestor had such a
 property.  It is subjective whether you\\='d want this behavior,
 but it can be desirable if you know the subtree had been part of
 the source file for ages so that you regard the ancestor\\='s
-creation-date as more \"truthful\" than today\\='s date.
+creation-date as more truthful or useful than today\\='s date.
 
 \(advice-add \\='org-node-extract-subtree :around
             (defun my-inherit-creation-date (orig-fn &rest args)
@@ -1495,6 +1497,7 @@ need to compute once."
                (cons format
                      (let ((example (format-time-string format)))
                        (if (string-match-p (rx (any "^*+([\\")) example)
+                           ;; TODO: Improve error message, now it presumes caller
                            (error "org-node: Unable to safely rename with current `org-node-datestamp-format'.  This is not inherent in your choice of format, I am just not smart enough")
                          (concat "^"
                                  (string-replace
@@ -1526,7 +1529,7 @@ a file is not there, it is not considered in any case."
   "Rename the current file according to `org-node-slug-fn'.
 
 Also attempt to check for a prefix in the style of
-`org-node-datestamp-format', and avoid overwriting it.
+`org-node-datestamp-format', and preserve any such prefix.  Otherwise, add one.
 
 Suitable at the end of `after-save-hook'.  If called from a hook
 \(or from Lisp in general), only operate on files in
@@ -1607,9 +1610,9 @@ Argument INTERACTIVE automatically set."
             (message "File '%s' renamed to '%s'" name new-name)))))))))
 
 ;; TODO: Kill opened buffers that were not edited.
-;;       First make sure it can pick up where it left off.
-;;       Maybe use `org-node--in-files-do'.
-;; TODO: Skip links to nodes not satisfying `org-node-filter-fn'.
+;;       But first make sure it can pick up where it left off if canceled
+;;       midway.  Maybe use `org-node--in-files-do'.
+;; REVIEW: Verify `org-node-filter-fn' is used correctly.
 ;;;###autoload
 (defun org-node-rewrite-links-ask (&optional files)
   "Update desynced link descriptions, interactively.
@@ -1771,11 +1774,11 @@ user quits, do not apply any modifications."
 (defun org-node-forget-dir (dir)
   "Remove references in `org-id-locations' to files in DIR.
 
-Note that if DIR can be found under `indexed-org-dirs',
-this action may make no practical impact unless you also add DIR
-to `indexed-org-dirs-exclude'.
+Note that if DIR descends from a member of `indexed-org-dirs',
+this action may make no practical impact unless you add DIR to
+`indexed-org-dirs-exclude'.
 
-In case of unsolvable problems, how to wipe org-id-locations:
+Tip: In case of unsolvable problems, eval this to wipe org-id-locations:
 
 \(progn
  (delete-file org-id-locations-file)
@@ -1832,7 +1835,7 @@ In case of unsolvable problems, how to wipe org-id-locations:
                        nil)))))
 
 (defun org-node-insert-link-into-drawer ()
-  "Experimental; insert a link into a RELATED drawer."
+  "Experimental; insert a link into a RELATED drawer in current entry."
   (interactive "*" org-mode)
   (save-excursion
     (save-restriction
@@ -2285,7 +2288,7 @@ user to proceed with a message based on string ABOUT-TO-DO, else do
 nothing and return nil.
 
 Very presumptive!  Like `find-file-noselect' but intended as a
-subroutine for `org-node--in-files-do' or any program that has
+subroutine for `org-node--in-files-do' or any caller that has
 already ensured that ABBR-TRUENAME:
 
 - is an abbreviated file truename
@@ -2340,12 +2343,12 @@ already ensured that ABBR-TRUENAME:
 (defun org-node--call-at-nearest-node (function &rest args)
   "With point at the relevant heading, call FUNCTION with ARGS.
 
-Prefer the closest ancestor heading that has an ID, else go to
-the file-level property drawer if that contains an ID, else fall
-back on the heading for the current entry.
+Prefer the closest ancestor heading that has an ID property, else go to
+the file-level property drawer if that has an ID, else fall back on
+the heading for the current entry.
 
-Afterwards, maybe restore point to where it had been previously,
-so long as the affected heading would still be visible in the
+Afterwards, maybe restore point to where it had been previously, so long
+as the heading where FUNCTION was called would still be visible in the
 window."
   (let* ((where-i-was (point-marker))
          (id (org-entry-get-with-inheritance "ID"))
@@ -2391,7 +2394,7 @@ as \"%20\", wrap VALUE in quotes if it has spaces."
                                       (cons value old))))))))
 
 (defun org-node-add-alias ()
-  "Add to ROAM_ALIASES in nearest relevant property drawer."
+  "Add alias to ROAM_ALIASES in nearest relevant property drawer."
   (interactive () org-mode)
   (org-node--add-to-property-keep-space
    "ROAM_ALIASES" (string-trim (read-string "Alias: "))))
@@ -2499,9 +2502,9 @@ heading, you should probably verify that `org-at-heading-p' is nil and
 `point' has changed, else do `backward-char' or `open-line' prior to
 inserting any text.
 
-Argument FULL same as in `org-end-of-meta-data' when point is in a subtree,
-meaningless otherwise.  When point is before the first heading, always jump
-to a position after any file-level properties and keywords."
+Argument FULL same as in `org-end-of-meta-data' when point is in a
+subtree, but meaningless when point is before the first heading, in which
+case always skip past all file-level properties and keywords."
   (if (org-before-first-heading-p)
       (progn
         (goto-char (point-min))
@@ -2545,12 +2548,11 @@ As bonus, do not land on an inlinetask, seek a real heading."
     (point)))
 
 
-;;;; CAPF (Completion-At-Point Function)
-;; Also known as in-buffer completion.
+;;;; CAPF (Completion-At-Point Function) aka. in-buffer completion
 
 (defun org-node-complete-at-point ()
-  "Complete word at point to a known node title, and linkify.
-Designed for `completion-at-point-functions', which see."
+  "Expand word at point to a known node title, and linkify.
+Designed for `completion-at-point-functions'."
   (when-let* ((bounds (bounds-of-thing-at-point 'word)))
     (and (not (org-in-src-block-p))
          (not (save-match-data (org-in-regexp org-link-any-re)))
@@ -2592,10 +2594,10 @@ Designed for `completion-at-point-functions', which see."
 ;;;; Misc
 
 (defun org-node-try-visit-ref-node ()
-  "Designed to be added to `org-open-at-point-functions'.
+  "Designed for `org-open-at-point-functions'.
 
 For the link at point, if there exists an org-ID node that has
-the link in its ROAM_REFS property, visit that node rather than
+the same link in its ROAM_REFS property, visit that node rather than
 following the link normally.
 
 If already visiting that node, then follow the link normally."
@@ -2642,11 +2644,10 @@ Search current entry only, via subroutine `org-node-narrow-to-drawer-p'.
 
 When drawer is created, insert it near the beginning of the entry
 \(after any properties and logbook drawers\), unless CREATE-WHERE is a
-function, in which case call it to reposition point prior to calling
-`org-insert-drawer'.
+function, in which case call it to reposition point prior to creating
+the drawer.
 
-If CREATE-WHERE returns an integer or marker, go to that position, else
-trust it to have done the appropriate buffer movements."
+If CREATE-WHERE returns an integer or marker, go to that position."
   (org-node-narrow-to-drawer-p name t create-where))
 
 (defun org-node-narrow-to-drawer-p
@@ -2655,9 +2656,9 @@ trust it to have done the appropriate buffer movements."
 This also works at the file top level, before the first entry.
 
 If a drawer was found, return t.
-Otherwise do not narrow, and return nil.
+Otherwise do nothing, do not narrow, and return nil.
 
-When found, narrow to the region between :NAME: and :END:, exclusive.
+Narrow to the region between :NAME: and :END:, exclusive.
 Place point at the beginning of that region, after any indentation.
 If the drawer was empty, ensure there is one blank line.
 
@@ -2669,7 +2670,7 @@ A way you might invoke this function:
         \(message \"No such drawer in this entry\")))
 
 With CREATE-MISSING t, create a new drawer if one was not found.
-However, instead of passing that argument, it is recommended for clarity
+However, instead of passing that argument, it is clearer
 to call `org-node-narrow-to-drawer-create' instead.
 Also see that function for meaning of CREATE-WHERE."
   (let ((start (point))
@@ -2706,7 +2707,7 @@ Also see that function for meaning of CREATE-WHERE."
             (back-to-indentation)
             (narrow-to-region (pos-bol) drawend))
           t)))
-     ;; No dice; create new.
+     ;; No drawer; create new.
      (create-missing
       (when create-where
         (let ((where (funcall create-where)))
