@@ -165,7 +165,7 @@ YYYY-MM-DD format, e.g. \"2024-01-31.org\"."
                   (let ((seq (cdr (assoc key org-node-seqs))))
                     (completing-read "Go to: " (plist-get seq :sorted-items)))))
     :try-goto (lambda (item)
-                (org-node-seq-try-visit-file (cdr item)))
+                (org-node-seq-try-goto-file (cdr item)))
     :creator (lambda (sortstr key)
                (let ((org-node-creation-fn #'org-node-new-file)
                      (org-node-ask-directory ,dir))
@@ -202,7 +202,7 @@ instead of calling this function."
       t)))
 
 ;;;###autoload
-(defun org-node-seq-try-visit-file (file)
+(defun org-node-seq-try-goto-file (file)
   "If FILE exists or a buffer has it as filename, visit that.
 On success, return non-nil; else nil.  Never create FILE anew."
   (let ((buf (find-buffer-visiting file)))
@@ -212,7 +212,7 @@ On success, return non-nil; else nil.  Never create FILE anew."
         (find-file file)))))
 
 ;; REVIEW: Rename?
-;; (defalias 'org-node-seq-try-goto-file 'org-node-seq-try-visit-file)
+;; (defalias 'org-node-seq-try-goto-file 'org-node-seq-try-goto-file)
 
 ;;;###autoload
 (defun org-node-seq-filename->ymd (path)
@@ -533,12 +533,13 @@ Meant to sit on these hooks:
            mdy)
       (dolist (date sortstrs)
         ;; Use `parse-time-string' rather than `iso8601-parse' to fail quietly
-        (setq date (parse-time-string date))
-        (when (seq-some #'natnump date) ;; Basic check that it could be parsed
-          (setq mdy (seq-let (_ _ _ d m y) date
-                      (list m d y)))
-          (when (calendar-date-is-visible-p mdy)
-            (calendar-mark-visible-date mdy)))))))
+        (let ((decoded-time (parse-time-string date)))
+          ;; Basic check that it could be parsed
+          (when (seq-some #'natnump decoded-time)
+            (setq mdy (seq-let (_ _ _ d m y) decoded-time
+                        (list m d y)))
+            (when (calendar-date-is-visible-p mdy)
+              (calendar-mark-visible-date mdy))))))))
 
 (defvar org-node-seq--auto-enabled-once nil)
 

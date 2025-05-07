@@ -260,6 +260,8 @@ NAME, ARGLIST and BODY as in `defun'."
 (define-obsolete-function-alias 'org-node-list-dead-links            #'indexed-list-dead-id-links "2025-03-19")
 (define-obsolete-function-alias 'org-node-list-scan-problems         #'indexed-list-problems "2025-03-19")
 
+(define-obsolete-function-alias 'org-node-seq-try-visit-file 'org-node-seq-try-goto-file "2025-04-26")
+
 
 ;;; Change in dependencies
 

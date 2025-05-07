@@ -551,9 +551,8 @@ correct - and fully correct by the time of the next invocation.
 
 If the `org-node--candidate<>node' table is currently empty, behave as
 if SYNCHRONOUS t, unless SYNCHRONOUS is the symbol `must-async'."
-  (unless (and indexed-updater-mode)
-    (when (y-or-n-p
-           "Let org-node enable `indexed-updater-mode'?")
+  (unless indexed-updater-mode
+    (when (y-or-n-p "Let org-node enable `indexed-updater-mode'?")
       (indexed-updater-mode)))
   (org-node-changes--warn-and-copy)
   (when (hash-table-empty-p org-node--candidate<>node)
@@ -694,13 +693,13 @@ output of something like
 this function will in many cases spit out a list of exactly one item
 because many people keep their Org files in one root directory \(with
 various subdirectories)."
-  (let* ((files (seq-uniq file-list))
+  (let* ((files (delete-dups (copy-sequence file-list)))
          (dirs (sort (delete-consecutive-dups
                       (sort (mapcar #'file-name-directory files) #'string<))
                      (##length< %1 (length %2))))
          root-dirs)
     ;; Example: if there is /home/roam/courses/Math1A/, but ancestor dir
-    ;; /home/roam/ is also a member of the set, throw out the child.
+    ;; /home/roam/ is also a member of the set, throw out the child dir.
     (while-let ((dir (car (last dirs))))
       ;; REVIEW: Maybe more elegant to use `nreverse' twice
       (setq dirs (nbutlast dirs))
@@ -764,14 +763,12 @@ the first heading in a file that has no #+TITLE.
 Built-in choices:
 - `org-node-slugify-for-web'
 - `org-node-slugify-like-roam-default'
-- `org-node-fakeroam-slugify-via-roam'
 
 It is popular to also prefix filenames with a datestamp.  To do
 that, configure `org-node-datestamp-format'."
   :type '(radio
           (function-item org-node-slugify-for-web)
           (function-item org-node-slugify-like-roam-default)
-          (function-item org-node-fakeroam-slugify-via-roam)
           (function :tag "Custom function" :value (lambda (title) title))))
 
 (defun org-node-slugify-like-roam-default (title)
@@ -828,7 +825,7 @@ belonging to an alphabet or number system."
 ;; (org-node-slugify-for-web "Mañana Çedilla")
 ;; (org-node-slugify-for-web "How to convince me that 2 + 2 = 3")
 ;; (org-node-slugify-for-web "E. T. Jaynes")
-;; (org-node-slugify-for-web "Amnesic recentf? Solution: Foo.")
+;; (org-node-slugify-for-web "Amnesic recentf? Solution: Run kill-emacs-hook every 2 minutes.")
 ;; (org-node-slugify-for-web "Slimline/\"pizza box\" computer chassis")
 ;; (org-node-slugify-for-web "#emacs")
 ;; (org-node-slugify-for-web "칹え🐛")
@@ -902,7 +899,7 @@ the function is called: `org-node-proposed-title' and
   :group 'org-node
   :type '(radio
           (function-item org-node-new-file)
-          (function-item org-node-fakeroam-new-via-roam-capture)
+          (function-item org-node-new-via-roam-capture)
           (function-item org-capture)
           (function :tag "Custom function" :value (lambda ()))))
 
@@ -948,13 +945,14 @@ necessary variables are set."
     (let* ((dir (org-node-guess-or-ask-dir "New file in which directory? "))
            (path-to-write
             (file-name-concat
-             dir (concat (format-time-string org-node-datestamp-format)
-                         (funcall org-node-slug-fn org-node-proposed-title)
-                         ".org"))))
+             dir
+             (concat (format-time-string org-node-datestamp-format)
+                     (funcall org-node-slug-fn org-node-proposed-title)
+                     ".org"))))
       (when (file-exists-p path-to-write)
-        (user-error "File already exists: %s" path-to-write))
+        (error "File already exists: %s" path-to-write))
       (when (find-buffer-visiting path-to-write)
-        (user-error "A buffer already exists for filename %s" path-to-write))
+        (error "A buffer already exists for filename %s" path-to-write))
       (mkdir dir t)
       (find-file path-to-write)
       (if org-node-prefer-with-heading
@@ -1106,7 +1104,7 @@ set `org-node-creation-fn' to `org-node-new-via-roam-capture'."
                        (hash-table-values org-node--candidate<>node))))
 
 ;;;###autoload
-(defun org-node-insert-link (&optional region-as-initial-input immediate)
+(defun org-node-insert-link (&optional region-as-initial-input novisit)
   "Insert a link to one of your ID nodes.
 
 To behave exactly like org-roam\\='s `org-roam-node-insert',
@@ -1115,7 +1113,7 @@ see `org-node-insert-link*' and its docstring.
 Optional argument REGION-AS-INITIAL-INPUT t means behave as
 `org-node-insert-link*'.
 
-Argument IMMEDIATE means behave as
+Argument NOVISIT means behave as
 `org-node-insert-link-novisit'."
   (interactive "*" org-mode)
   (unless (derived-mode-p 'org-mode)
@@ -1138,7 +1136,7 @@ Argument IMMEDIATE means behave as
                             (try-completion region-text indexed--title<>id)))
                       region-text
                     nil))
-         (input (if (and immediate initial)
+         (input (if (and novisit initial)
                     initial
                   (completing-read "Node: " #'org-node-collection
                                    () () initial 'org-node-hist)))
@@ -1240,10 +1238,11 @@ Prompt for NODE if needed.
 Result will basically look like:
 
 ** [[Note]]
-#+transclude: [[Note]] :level :no-first-heading
+#+transclude: [[Note]] :level 3
 
-but adapt to the surrounding outline level.  I recommend
-adding keywords to the things to exclude:
+but adapt to the surrounding outline level.
+If you often transclude file-level nodes, consider adding keywords to
+`org-transclusion-exclude-elements':
 
 \(setq org-transclusion-exclude-elements
       \\='(property-drawer comment keyword))"
@@ -1268,24 +1267,27 @@ adding keywords to the things to exclude:
     (insert "#+transclude: ")
     (goto-char (pos-eol))
     (insert " :level " (number-to-string (+ 2 level)))
-    ;; If the target is a subtree rather than file-level node, I'd like to
-    ;; cut out the initial heading because we already made an outer heading.
-    ;; (We made the outer heading so that this transclusion will count as a
-    ;; backlink, plus it makes more sense to me on export to HTML).
-    ;;
-    ;; Unfortunately cutting it out with the :lines trick would prevent
-    ;; `org-transclusion-exclude-elements' from having an effect, and the
-    ;; subtree's property drawer shows up!
-    ;; TODO: https://github.com/nobiot/org-transclusion/pull/268
-    ;;
-    ;; For now, just let it nest an extra heading. Looks odd, but doesn't
-    ;; break things.
     (goto-char (marker-position m1))
     (set-marker m1 nil)
     (run-hooks 'org-node-insert-link-hook)))
 
+;; TODO: New default once this PR is merged:
+;; https://github.com/nobiot/org-transclusion/pull/268
 (defun org-node-insert-transclusion-as-subtree-pull268 (&optional node)
-  "NEW; depends on org-transclusion pull 268."
+  "Insert a link and a transclusion.
+Prompt for NODE if needed.
+
+Result will basically look like:
+
+** [[Note]]
+#+transclude: [[Note]] :level :no-first-heading
+
+but adapt to the surrounding outline level.
+If you often transclude file-level nodes, consider adding keywords to
+`org-transclusion-exclude-elements':
+
+\(setq org-transclusion-exclude-elements
+      \\='(property-drawer comment keyword))"
   (interactive () org-mode)
   (unless (derived-mode-p 'org-mode)
     (error "Only works in org-mode buffers"))
@@ -1758,7 +1760,7 @@ user quits, do not apply any modifications."
 (defun org-node-nodeify-entry ()
   "Add an ID to entry at point and run `org-node-creation-hook'."
   (interactive "*" org-mode)
-  (org-node-cache-ensure)
+  (org-node-cache-ensure) ;; Because the hook could contain anything
   (org-id-get-create)
   (run-hooks 'org-node-creation-hook))
 
@@ -1829,7 +1831,7 @@ Tip: In case of unsolvable problems, eval this to wipe org-id-locations:
         ;; Much slower!  Vanilla grep does not have Ripgrep's --type=org, so
         ;; must target thousands of files and not a handful of dirs, a calling
         ;; pattern that would also slow Ripgrep down.
-        (consult--grep "Grep in files known to org-node: "
+        (consult--grep "(Ripgrep not found) Grep in files known to org-node: "
                        #'consult--grep-make-builder
                        (indexed-org-files)
                        nil)))))
@@ -1889,7 +1891,7 @@ from the beginning."
   (setq org-node--unlinted
         (org-node--in-files-do
           :files org-node--unlinted
-          :msg "Running org-lint (you can quit and resume)"
+          :msg "Running org-lint (you can quit and resume anytime)"
           :about-to-do "About to visit a file to run org-lint"
           :call (lambda ()
                   ;; Org-lint's `org-lint-invalid-id-link' can cause spam, bc
