@@ -201,7 +201,7 @@ A comparison of three systems that all permit relying on org-id and don't lock y
 | Support =roam:= links            | yes      | -- (wontfix)     | --                   |
 | Can have separate note piles   | yes      | -- (wontfix)     | not applicable       |
 |--------------------------------+----------+------------------+----------------------|
-| Some query-able cache          | EmacSQL  | hash tables      | --                   |
+| Some query-able cache          | yes      | yes              | --                   |
 | Async cache rebuild            | --       | yes              | not applicable       |
 | *Time to cache my 3000 nodes*    | *2m 48s*   | *0m 01s*           | not applicable       |
 | *Time to save file w/ 400 nodes* | *5--10s*   | *instant*          | ?                    |
@@ -796,4 +796,4 @@ People often use it to write notes about a specific web-page or PDF file, and ca
 
 *** Citations
 
-As a special case, citation keys such as "@ioannidis2005" also work in =ROAM_REFS=, corresponding to Org 9.5 citations like =[cite:@ioannidis2005]=.
+As a special case, citation keys such as "@ioannidis2005" also work in =ROAM_REFS=, corresponding to Org citations like =[cite:@ioannidis2005]=.
