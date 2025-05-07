@@ -685,7 +685,8 @@ This permits \\[org-node-seq-dispatch] to work."
         ((not org-node-seq-mode)
          (message "`org-node-seq-mode' not enabled"))
         ((not org-node-seqs)
-         (org-node-seq--reset))
+         (org-node-seq--reset)
+         (transient-setup 'org-node-seq-dispatch))
         (t
          (transient-setup 'org-node-seq-dispatch))))
 
