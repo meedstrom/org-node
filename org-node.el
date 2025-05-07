@@ -1664,6 +1664,7 @@ so it matches the destination\\='s current title."
                              (funcall org-node-custom-link-format-fn node)))
                        (answered-yes nil))
                   (when (and id node desc
+                             (funcall org-node-filter-fn node)
                              (if custom-desc
                                  (not (string-equal desc custom-desc))
                                (and (not (string-equal-ignore-case
