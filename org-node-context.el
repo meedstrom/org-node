@@ -106,9 +106,9 @@ but when this finds one of them stale, it removes that whole entry."
     (maphash
      (lambda (_ links)
        (dolist (link links)
-         (push (indexed-pos link)
-               (gethash (indexed-origin link) valid-positions))))
-     indexed--dest<>links)
+         (push (org-mem-link-pos link)
+               (gethash (org-mem-link-nearby-id link) valid-positions))))
+     org-mem--dest<>links)
 
     (maphash
      (lambda (id previews)
@@ -117,7 +117,7 @@ but when this finds one of them stale, it removes that whole entry."
          (or (and node
                   (cl-loop
                    for (pos-diff . _text) in previews
-                   always (memq (+ pos-diff (indexed-pos node)) valid)))
+                   always (memq (+ pos-diff (org-mem-entry-pos node)) valid)))
              (remhash id org-node-context--previews))))
      org-node-context--previews)))
 
@@ -318,12 +318,12 @@ properties.  Org-mode is enabled, but the org-element cache is not."
     (error "`org-node-context-visit-thing' called outside context buffer"))
   (let* ((value-atpt (oref (magit-current-section) value))
          link-pos
-         (node (if (indexed-org-entry-p value-atpt)
-                   ;; Bit magical, but `magit-insert-section' could "store" the
+         (node (if (org-mem-entry-p value-atpt)
+                   ;; Bit magical, but `magit-insert-section' could store the
                    ;; node as the "value" at that section.
                    value-atpt
-                 (setq link-pos (indexed-pos value-atpt))
-                 (gethash (indexed-origin value-atpt) org-nodes))))
+                 (setq link-pos (org-mem-link-pos value-atpt))
+                 (gethash (org-mem-link-nearby-id value-atpt) org-nodes))))
     (org-node--goto node)
     (when link-pos
       (goto-char link-pos)
@@ -427,34 +427,33 @@ that buffer."
           (error "org-node-context: ID not known: %s" id))
         (erase-buffer)
         (setq header-line-format
-              (concat "Context for " (indexed-title node)))
+              (concat "Context for " (org-mem-entry-title node)))
         (magit-insert-section (org-node-context node)
-          (when-let* ((links (indexed-id-links-to node)))
+          (when-let* ((links (org-mem-id-links-to-entry node)))
             (magit-insert-section (org-node-context 'id-links)
               (magit-insert-heading "ID backlinks:")
               (org-node-context--insert-backlink-sections links)
               (insert "\n")))
-          (when indexed-roam-mode
-            (when-let* ((links (indexed-roam-reflinks-to node)))
-              (magit-insert-section (org-node-context 'reflinks)
-                (magit-insert-heading "Ref backlinks:")
-                (org-node-context--insert-backlink-sections links)
-                (insert "\n")))))
+          (when-let* ((links (org-mem-roam-reflinks-to-entry node)))
+            (magit-insert-section (org-node-context 'reflinks)
+              (magit-insert-heading "Ref backlinks:")
+              (org-node-context--insert-backlink-sections links)
+              (insert "\n"))))
         (org-node--kill-work-buffers)
         (run-hooks 'org-node-context-refresh-hook)))))
 
 (defun org-node-context--insert-backlink-sections (links)
   "Insert a section displaying a preview of LINK."
   (dolist (link (sort links #'org-node-context--origin-title-lessp))
-    (let* ((node (or (gethash (indexed-origin link) org-nodes)
+    (let* ((node (or (gethash (org-mem-link-nearby-id link) org-nodes)
                      (error "Origin not found for link: %S" link)))
-           (breadcrumbs (if-let* ((olp (indexed-olpath-with-title node)))
+           (breadcrumbs (if-let* ((olp (org-mem-entry-olpath-with-title node)))
                             (string-join olp " > ")
                           "Top")))
       (magit-insert-section (org-node-context link)
         (magit-insert-heading
           (format "%s (%s)"
-                  (propertize (indexed-title node)
+                  (propertize (org-mem-entry-title node)
                               'face
                               'org-node-context-origin-title)
                   (propertize breadcrumbs 'face 'completions-annotations)))
@@ -468,8 +467,8 @@ that buffer."
 Actually, if a snippet was previously cached, return the cached version,
 else briefly visit the file at LINK-POS and call
 `org-node-context--extract-entry-at-point'."
-  (let* ((id (indexed-id node))
-         (link-pos (indexed-pos link))
+  (let* ((id (org-mem-entry-id node))
+         (link-pos (org-mem-link-pos link))
          ;; NOTE: `pos-diff' is not necessary in a simple implementation, but
          ;; this level of granularity lets us avoid wiping all cached previews
          ;; in a large file every time it is saved -- doing so would make the
@@ -479,14 +478,14 @@ else briefly visit the file at LINK-POS and call
          ;; Instead, we just don't wipe anything, and trust in a sloppy rule of
          ;; thumb: when the text between a link and its heading get edited,
          ;; that will almost always result in a new unique `pos-diff'.
-         (pos-diff (- link-pos (indexed-pos node))))
+         (pos-diff (- link-pos (org-mem-entry-pos node))))
     (or (alist-get pos-diff (gethash id org-node-context--previews))
         (setf
          (alist-get pos-diff (gethash id org-node-context--previews))
          (let ((org-element-cache-persistent nil)
                snippet)
            (with-current-buffer (org-node--work-buffer-for
-                                 (indexed-file-name node))
+                                 (org-mem-entry-file node))
              (goto-char link-pos)
              (setq snippet (org-node-context--extract-entry-at-point)))
            (with-current-buffer (org-node--general-org-work-buffer)
@@ -519,8 +518,8 @@ Decide this by getting the titles of the nodes wherein the links were
 found, and checking if the first title would come lexicographically
 before the second title."
   (string<
-   (indexed-title (gethash (indexed-origin link-1) org-nodes))
-   (indexed-title (gethash (indexed-origin link-2) org-nodes))))
+   (org-mem-entry-title (gethash (org-mem-link-nearby-id link-1) org-nodes))
+   (org-mem-entry-title (gethash (org-mem-link-nearby-id link-2) org-nodes))))
 
 (provide 'org-node-context)
 

@@ -41,9 +41,9 @@
 (require 'calendar)
 (require 'transient)
 (require 'org-node)
-(require 'indexed)
+(require 'org-mem)
 (defvar org-node-proposed-seq)
-(defvar indexed--next-message)
+(defvar org-mem--next-message)
 (declare-function org-entry-get-with-inheritance "org")
 (declare-function org-up-heading-or-point-min "org")
 
@@ -61,15 +61,15 @@ For KEY, NAME and CAPTURE, see `org-node-seq-defs'."
     :version 2
     :capture ,capture
     :classifier (lambda (node)
-                  (let ((sortstr (indexed-property ,prop node)))
+                  (let ((sortstr (org-mem-entry-property ,prop node)))
                     (when (and sortstr (not (string-blank-p sortstr)))
-                      (cons (concat sortstr " " (indexed-title node))
-                            (indexed-id node)))))
+                      (cons (concat sortstr " " (org-mem-entry-title node))
+                            (org-mem-entry-id node)))))
     :whereami (lambda ()
                 (when-let* ((sortstr (org-entry-get nil ,prop t))
                             (node (gethash (org-entry-get-with-inheritance "ID")
                                            org-nodes)))
-                  (concat sortstr " " (indexed-title node))))
+                  (concat sortstr " " (org-mem-entry-title node))))
     :prompter (lambda (key)
                 (let ((seq (cdr (assoc key org-node-seqs))))
                   (completing-read "Go to: " (plist-get seq :sorted-items))))
@@ -97,19 +97,19 @@ For KEY, NAME and CAPTURE, see `org-node-seq-defs'."
     :version 2
     :capture ,capture
     :classifier (lambda (node)
-                  (let ((sortstr (indexed-property ,prop node))
+                  (let ((sortstr (org-mem-entry-property ,prop node))
                         (tagged (seq-intersection (split-string ,tags ":" t)
-                                                  (indexed-tags-local node))))
+                                                  (org-mem-entry-tags-local node))))
                     (when (and sortstr tagged (not (string-blank-p sortstr)))
-                      (cons (concat sortstr " " (indexed-title node))
-                            (indexed-id node)))))
+                      (cons (concat sortstr " " (org-mem-entry-title node))
+                            (org-mem-entry-id node)))))
     :whereami (lambda ()
                 (when (seq-intersection (split-string ,tags ":" t)
                                         (org-get-tags))
                   (let ((sortstr (org-entry-get nil ,prop t))
                         (node (gethash (org-entry-get-with-inheritance "ID") org-nodes)))
                     (when (and sortstr node)
-                      (concat sortstr " " (indexed-title node))))))
+                      (concat sortstr " " (org-mem-entry-title node))))))
     :prompter (lambda (key)
                 (let ((seq (cdr (assoc key org-node-seqs))))
                   (completing-read "Go to: " (plist-get seq :sorted-items))))
@@ -151,8 +151,8 @@ YYYY-MM-DD format, e.g. \"2024-01-31.org\"."
     :version 2
     :capture ,capture
     :classifier (lambda (node)
-                  (when (string-prefix-p ,dir (indexed-file-name node))
-                    (let* ((path (indexed-file-name node))
+                  (when (string-prefix-p ,dir (org-mem-entry-file node))
+                    (let* ((path (org-mem-entry-file node))
                            (sortstr (file-name-base path)))
                       (cons sortstr path))))
     :whereami (lambda ()
@@ -557,7 +557,7 @@ not exist."
   (let* ((seq (cdr (assoc key org-node-seqs)))
          (item (assoc sortstr (plist-get seq :sorted-items))))
     (unless seq
-      (error "No seq with key %s, maybe do `org-node-reset'?" key))
+      (error "No seq with key %s, maybe do `org-mem-reset'?" key))
     (require 'org)
     ;; TODO: When `item' not found, still run :try-goto and pass it a
     ;;       list that contains only `sortstr', so it has a shot at finding a
@@ -586,9 +586,9 @@ not exist."
             (org-node-seq--build-from-def def))
       ;; TODO: Clear any old seq from menu
       (org-node-seq--add-to-dispatch (car def) (plist-get (cdr def) :name)))
-    (when indexed--next-message
-      (setq indexed--next-message
-            (concat indexed--next-message
+    (when org-mem--next-message
+      (setq org-mem--next-message
+            (concat org-mem--next-message
                     (format " + %.2fs making org-node-seqs"
                             (float-time (time-since T))))))))
 
@@ -600,16 +600,16 @@ This permits \\[org-node-seq-dispatch] to work."
   :group 'org-node
   (if org-node-seq-mode
       (progn
-        ;; FIXME: A new node (cached w `indexed-x-ensure-entry-at-point-known')
+        ;; FIXME: A new node (cached w `org-mem-x-ensure-entry-at-point-known')
         ;;        eventually disappears from cache if its buffer is never
         ;;        saved, and then the node seq stops working
         (add-hook 'org-node-creation-hook        #'org-node-seq--add-item)
-        (add-hook 'indexed-post-full-reset-functions #'org-node-seq--reset 50)
+        (add-hook 'org-mem-post-full-scan-functions #'org-node-seq--reset 50)
         ;; Put ourselves in front of org-roam-dailies unhygienic hook.
         (add-hook 'calendar-today-invisible-hook #'org-node-seq--mark-days 5)
         (add-hook 'calendar-today-visible-hook   #'org-node-seq--mark-days 5))
     (remove-hook 'org-node-creation-hook        #'org-node-seq--add-item)
-    (remove-hook 'indexed-post-full-reset-functions #'org-node-seq--reset)
+    (remove-hook 'org-mem-post-full-scan-functions #'org-node-seq--reset)
     (remove-hook 'calendar-today-invisible-hook #'org-node-seq--mark-days)
     (remove-hook 'calendar-today-visible-hook   #'org-node-seq--mark-days)))
 

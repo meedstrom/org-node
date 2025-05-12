@@ -30,7 +30,7 @@
 (require 'org-element)
 (require 'org-node-changes)
 (require 'org-node)
-(require 'indexed)
+(require 'org-mem)
 
 (defgroup org-node-backlink nil "In-file backlinks."
   :group 'org-node)
@@ -64,7 +64,7 @@ set `org-node-backlink-protect-org-super-links' to nil.")))
   "Warn if `org-node-backlink-do-drawers' is t but properties exist.
 If a warning was not needed, return nil."
   (and org-node-backlink-do-drawers
-       (cl-some (##indexed-property "BACKLINKS" %) (indexed-org-entries))
+       (cl-some (##org-mem-entry-property "BACKLINKS" %) (org-mem-all-entries))
        (display-warning 'org-node-backlink "
 User option `org-node-backlink-do-drawers' is t,
 but found :BACKLINKS: lines in some property drawers,
@@ -85,18 +85,15 @@ See Info node `(org-node)'."
       (progn
         (advice-add 'org-insert-link :after #'org-node-backlink--add-in-target)
         (add-hook 'org-mode-hook #'org-node-backlink--local-mode)
-        (add-hook 'indexed-post-incremental-update-functions
-                  #'org-node-backlink--maybe-fix-proactively)
+        (add-hook 'org-mem-post-targeted-scan-functions #'org-node-backlink--maybe-fix-proactively)
         (dolist (buf (buffer-list))
           (with-current-buffer buf
             (when (derived-mode-p 'org-mode)
               (org-node-backlink--local-mode)))))
     (advice-remove 'org-insert-link #'org-node-backlink--add-in-target)
     (remove-hook 'org-mode-hook #'org-node-backlink--local-mode)
-    (remove-hook 'org-roam-post-node-insert-hook
-                 #'indexed-x-ensure-link-at-point-known)
-    (remove-hook 'indexed-post-incremental-update-functions
-                 #'org-node-backlink--maybe-fix-proactively)
+    (remove-hook 'org-roam-post-node-insert-hook #'org-mem-x-ensure-link-at-point-known)
+    (remove-hook 'org-mem-post-targeted-scan-functions #'org-node-backlink--maybe-fix-proactively)
     (dolist (buf (buffer-list))
       (with-current-buffer buf
         (org-node-backlink--local-mode 0)))))
@@ -107,13 +104,13 @@ Not meant to be toggled on its own."
   :interactive nil
   (if org-node-backlink--local-mode
       (progn
-        (add-hook 'org-roam-post-node-insert-hook #'indexed-x-ensure-link-at-point-known -50 t)
+        (add-hook 'org-roam-post-node-insert-hook #'org-mem-x-ensure-link-at-point-known -50 t)
         (add-hook 'org-roam-post-node-insert-hook #'org-node-backlink--add-in-target nil t)
         (add-hook 'org-node-insert-link-hook      #'org-node-backlink--add-in-target nil t)
         (add-hook 'after-change-functions         #'org-node-backlink--flag-buffer-modification nil t)
         (add-hook 'before-save-hook               #'org-node-backlink--fix-flagged-parts-of-buffer nil t))
 
-    (remove-hook 'org-roam-post-node-insert-hook  #'indexed-x-ensure-link-at-point-known t)
+    (remove-hook 'org-roam-post-node-insert-hook  #'org-mem-x-ensure-link-at-point-known t)
     (remove-hook 'org-roam-post-node-insert-hook  #'org-node-backlink--add-in-target t)
     (remove-hook 'org-node-insert-link-hook       #'org-node-backlink--add-in-target t)
     (remove-hook 'after-change-functions          #'org-node-backlink--flag-buffer-modification t)
@@ -177,7 +174,7 @@ Can be quit midway through and resumed later.  With
       (setq org-node-backlink--work-files nil))
     (when (or (equal current-prefix-arg '(4))
               (null org-node-backlink--work-files))
-      (let* ((files (indexed-org-files))
+      (let* ((files (org-mem-all-files))
              (dirs (org-node--root-dirs files)))
         (when (y-or-n-p
                (format "Confirm: edit %d Org files in these %d directories?\n%s"
@@ -338,28 +335,26 @@ If REMOVE is non-nil, remove it instead."
   (if remove
       (org-entry-delete nil "BACKLINKS")
     (let* ((id (org-entry-get nil "ID"))
-           (node (gethash id org-nodes)))
-      (if (not (and id node))
+           (entry (gethash id org-nodes)))
+      (if (not (and id entry))
           (org-entry-delete nil "BACKLINKS")
         (let* ((origins (thread-last
-                          (append (indexed-id-links-to node)
-                                  (when indexed-roam-mode
-                                    (indexed-roam-reflinks-to node)))
-                          (mapcar #'indexed-origin)
+                          (append (org-mem-id-links-to entry)
+                                  (org-mem-roam-reflinks-to entry))
+                          (mapcar #'org-mem-link-nearby-id)
                           (delete-dups)
-                          ;; Sort for deterministic order for less noisy diffs.
-                          (seq-sort #'string<)))
-               (links (cl-loop
-                       for origin in origins
-                       as origin-node = (gethash origin org-nodes)
-                       when origin-node
-                       collect (org-link-make-string
-                                (concat "id:" origin)
-                                (indexed-title origin-node))))
-               (links-string (string-join links "  ")))
-          (if links
-              (unless (equal links-string (org-entry-get nil "BACKLINKS"))
-                (org-entry-put nil "BACKLINKS" links-string))
+                          ;; Sort deterministically for less noisy diffs.
+                          (seq-sort #'string<)
+                          (seq-keep #'org-mem-entry-by-id)))
+               (backlinks (cl-loop
+                           for ogn in origins
+                           collect (org-link-make-string
+                                    (concat "id:" (org-mem-entry-id ogn))
+                                    (org-mem-entry-title ogn))))
+               (new-value (string-join backlinks "  ")))
+          (if backlinks
+              (unless (equal new-value (org-entry-get nil "BACKLINKS"))
+                (org-entry-put nil "BACKLINKS" new-value))
             (org-entry-delete nil "BACKLINKS")))))))
 
 (defun org-node-backlink--add-to-property (id title)
@@ -443,19 +438,19 @@ If REMOVE is non-nil, remove it instead."
          dest-id dest-file)
     ;; In a link such as [[id:abc1234]], TYPE is "id" and PATH is "abc1234".
     (when (and type path)
-      (indexed-x-ensure-link-at-point-known)
+      (org-mem-x-ensure-link-at-point-known)
       (if (equal "id" type)
           ;; A classic backlink
           (progn
             (setq dest-id path)
             ;; `org-id-find-id-file' has terrible fallback behavior
             (setq dest-file (ignore-errors
-                              (indexed-file-name
+                              (org-mem-entry-file
                                (gethash dest-id org-nodes)))))
         ;; A "reflink"
-        (setq dest-id (gethash path indexed-roam--ref<>id))
+        (setq dest-id (gethash path org-mem--roam-ref<>id))
         (setq dest-file (ignore-errors
-                          (indexed-file-name
+                          (org-mem-entry-file
                            (gethash dest-id org-nodes)))))
       (when (null dest-file)
         (push dest-id org-node-backlink--fails))
@@ -477,7 +472,7 @@ If REMOVE is non-nil, remove it instead."
               ;; Ensure that
               ;; `org-node-backlink--fix-flagged-parts-of-buffer' will not
               ;; later remove the backlink we're adding
-              (indexed-x-ensure-entry-at-point-known)
+              (org-mem-x-ensure-entry-at-point-known)
               (org-node--with-quick-file-buffer dest-file
                 :about-to-do "Org-node going to add backlink to the target of the link you just inserted"
                 (when (and (boundp 'org-transclusion-exclude-elements)
@@ -684,13 +679,12 @@ If REMOVE non-nil, remove it instead."
   (if remove
       (org-node--delete-drawer "BACKLINKS")
     (let* ((id (org-entry-get nil "ID"))
-           (node (gethash id org-nodes))
-           (origins (when node
+           (entry (gethash id org-nodes))
+           (origins (when entry
                       (thread-last
-                        (append (indexed-id-links-to node)
-                                (when indexed-roam-mode
-                                  (indexed-roam-reflinks-to node)))
-                        (mapcar #'indexed-origin)
+                        (append (org-mem-id-links-to-entry entry)
+                                (org-mem-roam-reflinks-to-entry entry))
+                        (mapcar #'org-mem-link-nearby-id)
                         (delete-dups)))))
       (if (null origins)
           (save-excursion
@@ -721,7 +715,7 @@ If REMOVE non-nil, remove it instead."
                       (insert (org-node-backlink--reformat-line line))))))
               (dolist (id to-add)
                 (when-let* ((known-node (gethash id org-nodes)))
-                  (let ((title (indexed-title known-node)))
+                  (let ((title (org-mem-entry-title known-node)))
                     (indent-according-to-mode)
                     (insert (funcall org-node-backlink-drawer-formatter id title)
                             "\n"))))
@@ -747,10 +741,10 @@ If REMOVE non-nil, remove it instead."
 ;;; Proactive fixing
 
 ;; REVIEW: Only comes into effect on
-;;         `indexed-post-incremental-update-functions', but could also other
+;;         `org-mem-post-targeted-scan-functions', but could also other
 ;;         times?  Possible the algo could be simpler, rather than diffing
 ;;         `org-node--old-link-sets' from current, simply look in
-;;         `indexed-properties' of all nodes...
+;;         `org-mem-entry-properties' of all nodes...
 
 (defcustom org-node-backlink-lazy nil
   "Inhibit cleaning up backlinks until user edits affected entry.
@@ -783,27 +777,27 @@ To force an update at any time, use one of these commands:
   :package-version '(org-node . "2.0.0"))
 
 (defun org-node-backlink--maybe-fix-proactively (_)
-  "Designed for `indexed-post-incremental-update-functions'."
+  "Designed for `org-mem-post-targeted-scan-functions'."
   (unless org-node-backlink-lazy
     (let (affected-dests)
       (cl-loop
        for (dest . old-links) in org-node--old-link-sets
        when (cl-set-exclusive-or
-             (mapcar #'indexed-origin old-links)
-             (mapcar #'indexed-origin (gethash dest indexed--dest<>links))
+             (mapcar #'org-mem-link-nearby-id old-links)
+             (mapcar #'org-mem-link-nearby-id (gethash dest org-mem--dest<>links))
              :test #'equal)
        do (let* ((id dest)
-                 (node (or (gethash id org-nodes)
+                 (entry (or (gethash id org-nodes)
                            ;; See if this is a ref and find the real id
-                           (and (setq id (gethash dest indexed-roam--ref<>id))
+                           (and (setq id (gethash dest org-mem--roam-ref<>id))
                                 (gethash id org-nodes)))))
             ;; (#59) Do nothing if this is an empty link like [[id:]]
-            (when node
+            (when entry
               ;; Add to the dataset `affected-dests', which looks like:
               ;;   ((file1 . (origin1 origin2 origin3 ...))
               ;;    (file2 . (...))
               ;;    (file3 . (...)))
-              (push id (alist-get (indexed-file-name node)
+              (push id (alist-get (org-mem-entry-file entry)
                                   affected-dests
                                   nil
                                   nil
