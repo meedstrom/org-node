@@ -9,26 +9,26 @@
 #+HTML: <a href="https://repology.org/project/emacs%3Aorg-node/versions"> <img src="https://repology.org/badge/vertical-allrepos/emacs%3Aorg-node.svg" alt="Packaging status" align="right"> </a>
 * News for v3 :noexport:
 
-A lot of code has been spun into a new library https://github.com/meedstrom/indexed, now a dependency.  Reduces codebase by 30%.  No longer need to load Org to use =org-node-find= at init.
+A lot of code has been spun into a new library https://github.com/meedstrom/org-mem, now a dependency.  Reduces codebase by 30%.
 
 Not much new features -- mainly a change of plumbing.
 
 Update initfiles when you can.  Direct renames:
 
-| Old user option                | New user option          |
-|--------------------------------+--------------------------|
-| org-node-extra-id-dirs         | indexed-org-dirs         |
-| org-node-extra-id-dirs-exclude | indexed-org-dirs-exclude |
-| org-node-link-types            | indexed-seek-link-types  |
+| Old user option                | New user option                  |
+|--------------------------------+----------------------------------|
+| org-node-extra-id-dirs         | org-mem-watch-dirs               |
+| org-node-extra-id-dirs-exclude | org-mem-watch-dirs-exclude       |
+| org-node-link-types            | org-mem-seek-link-types          |
+| org-node-warn-title-collisions | org-mem-do-warn-title-collisions |
 
-Also enable =indexed-updater-mode=.  Here's a new basic-install snippet:
+Also enable =org-mem-updater-mode=.  Here's a new basic-install snippet:
 
 #+begin_src elisp
 (use-package org-node
   :config
-  (setq indexed-sync-with-org-id t) ;; optional
-  (indexed-roam-mode) ;; optional: support ROAM_REFS
-  (indexed-updater-mode)
+  (setq org-mem-do-sync-with-org-id t) ;; optional
+  (org-mem-updater-mode)
   (org-node-cache-mode))
 #+end_src
 
@@ -40,7 +40,7 @@ Node seqs, if you use them, now require turning on explicitly.
 
 For reference, check out the full list of obsoletions near the bottom of file [[https://github.com/meedstrom/org-node/blob/2504b7f0a8848c0fbc3dcddc2d1edeb0adbbc9ac/org-node-changes.el][org-node-changes.el]].
 
-A silent obsoletion: links are not plists anymore, but =plist-get= is unhelpfully polite and just returns nil when given invalid input.   Use e.g. =(indexed-pos LINK)= instead of =(plist-get LINK :pos)=.
+A *silent* obsoletion: links are not plists anymore, but =plist-get= is unhelpfully polite and just returns nil when given invalid input.   Use e.g. =(org-mem-link-pos link)= instead of =(plist-get LINK :pos)=.
 
 * News for v2 :noexport:
 
@@ -134,7 +134,7 @@ See what can be customized:
 3. Bumped dependency [[https://github.com/meedstrom/el-job][el-job]] to the just-released v1.0.
 4. Struct type =org-node-link= removed.
    - +A link is now a plist, so use e.g. =(plist-get LINK :pos)= instead of =(org-node-link-pos LINK)=.+
-     - In v3, use =(indexed-pos LINK)=
+     - In v3, use =(org-mem-link-pos link)=
 5. New option =org-node-backlink-do-drawers= implies a different default behavior from before, but a message will be printed to help you out.
    - Default was changed because timestamps are hard to reconstruct later -- so it's better that they are opt-out than opt-in.
 
@@ -215,9 +215,9 @@ Assuming your package manager knows about [[https://melpa.org/#/getting-started]
 #+begin_src elisp
 (use-package org-node
   :config
-  (setq indexed-sync-with-org-id t)
-  (indexed-updater-mode)
-  (indexed-roam-mode) ;; Optional: support ROAM_REFS
+  (setq org-mem-do-sync-with-org-id t)
+  (org-mem-updater-mode)
+  (org-mem-roamy-db-mode) ;; Optional: support ROAM_REFS
   (org-node-cache-mode))
 #+end_src
 
@@ -234,15 +234,15 @@ If you're *coming here from org-roam*, try this instead:
   ;; For org-roam users who find saving slow with
   ;; `org-roam-db-autosync-mode',
   ;; take over that part of its job and write to its DB
-  (setq indexed-roam-overwrite t)
+  (setq org-mem-roamy-do-overwrite-real-db t)
   (setq org-roam-db-update-on-save nil)
   ;; Faster save if you don't use "roam:" links
   (setq org-roam-link-auto-replace nil)
 
   :config
-  (setq indexed-sync-with-org-id t)
-  (indexed-updater-mode)
-  (indexed-roam-mode) ;; Support ROAM_REFS
+  (setq org-mem-do-sync-with-org-id t)
+  (org-mem-updater-mode)
+  (org-mem-roamy-db-mode)
   (org-node-cache-mode))
 
 ;; Speed up the org-roam buffer
@@ -387,14 +387,14 @@ Finally, lines that contain no Org link such as =[[id:1234][Title]]= are *delete
 Ever run into "ID not found" situations?  Here's an extra way to feed data to org-id, as [[http://edstrom.dev/wjwrl/taking-ownership-of-org-id][I find clumsy the built-in options]].
 
 #+begin_src elisp
-(setq indexed-sync-with-org-id t)
-(setq indexed-org-dirs ;; Configure me
+(setq org-mem-do-sync-with-org-id t)
+(setq org-mem-watch-dirs ;; Configure me
       '("~/org/"
         "~/Syncthing/"
         "/mnt/stuff/"))
 #+end_src
 
-Do a =M-x org-node-reset= and see if it can find your notes now.
+Do a =M-x org-mem-reset= and see if it can find your notes now.
 
 *** Undoing an org-roam hack
 
@@ -457,9 +457,9 @@ This could work by---for example---excluding anything tagged "project" or perhap
 (setq org-node-filter-fn
       (lambda (node)
         (not
-         (or (indexed-todo-state node)
-             (member "project" (indexed-tags node))
-             (indexed-property "ROAM_EXCLUDE" node)))))
+         (or (org-mem-entry-todo-state node)
+             (member "project" (org-mem-entry-tags node))
+             (org-mem-entry-property "ROAM_EXCLUDE" node)))))
 #+end_src
 
 Or you could go with a whitelist approach, to show only nodes from a certain directory we'll call "my-personal-wiki":
@@ -467,8 +467,8 @@ Or you could go with a whitelist approach, to show only nodes from a certain dir
 #+begin_src elisp
 (setq org-node-filter-fn
       (lambda (node)
-        (and (string-search "/my-personal-wiki/" (indexed-file-name node))
-             (not (indexed-property "ROAM_EXCLUDE" node)))))
+        (and (string-search "/my-personal-wiki/" (org-mem-entry-file node))
+             (not (org-mem-entry-property "ROAM_EXCLUDE" node)))))
 #+end_src
 
 (NB: if you don't know what =ROAM_EXCLUDE= is, feel free to omit that rule)
@@ -488,7 +488,7 @@ It works well for me to filter out any file or directory that happens to contain
 #+begin_src elisp
 (setq org-node-filter-fn
       (lambda (node)
-        (not (string-search "archive" (indexed-file-name node)))))
+        (not (string-search "archive" (org-mem-entry-file node)))))
 #+end_src
 
 Or put something like =#+filetags: :hide_node:= at the top of each file, and set:
@@ -496,7 +496,7 @@ Or put something like =#+filetags: :hide_node:= at the top of each file, and set
 #+begin_src elisp
 (setq org-node-filter-fn
       (lambda (node)
-        (not (member "hide_node" (indexed-tags node)))))
+        (not (member "hide_node" (org-mem-entry-tags node)))))
 #+end_src
 
 ** Completion-at-point
@@ -577,7 +577,7 @@ NB: for users of =org-node-complete-at-point-mode=, this workaround won't help t
 
 Org-node supports the Org 9.5 @citations, but not fully the aftermarket [[https://github.com/jkitchin/org-ref][org-ref]] &citations that emulate LaTeX look-and-feel.
 
-What works is bracketed Org-ref v3 citations that start with "cite", e.g. =[[citep:...]]=, =[[citealt:...]]=, =[[citeauthor:...]]=, since indexed-org-parser.el is able to pick them up for free.
+What works is bracketed Org-ref v3 citations that start with "cite", e.g. =[[citep:...]]=, =[[citealt:...]]=, =[[citeauthor:...]]=, since org-mem-parser.el is able to pick them up for free.
 
 What doesn't work is e.g. =[[bibentry:...]]= since it doesn't start with "cite", nor plain =citep:...= since it is not wrapped in brackets.
 
@@ -680,31 +680,30 @@ API cheatsheet between org-roam and org-node.
 | Get ID near point                       | =(org-roam-id-at-point)=          | =(org-entry-get-with-inheritance "ID")=  |
 | Get node at point                       | =(org-roam-node-at-point)=        | =(org-node-at-point)=                    |
 | Prompt user to pick a node              | =(org-roam-node-read)=            | =(org-node-read)=                        |
-| Get node by ID                          |                                 | =(indexed-entry-by-id ID)=               |
-| Get list of files                       | =(org-roam-list-files)=           | =(indexed-org-files)=                    |
-| Get nodes in a file                     |                                 | =(indexed-entries-in FILES)=             |
-| Get backlink objects                    | =(org-roam-backlinks-get NODE)=   | =(indexed-id-links-to NODE)=             |
-| Get reflink objects                     | =(org-roam-reflinks-get NODE)=    | =(indexed-roam-reflinks-to NODE)=        |
-| Get title                               | =(org-roam-node-title NODE)=      | =(indexed-title NODE)=                   |
-| Get title of file where NODE is         | =(org-roam-node-file-title NODE)= | =(indexed-file-title NODE)=              |
-| Get title /or/ name of file where NODE is |                                 | =(indexed-file-title-or-basename NODE)=  |
-| Get full path to file where NODE is     | =(org-roam-node-file NODE)=       | =(indexed-file-name NODE)=               |
-| Get ID                                  | =(org-roam-node-id NODE)=         | =(indexed-id NODE)=                      |
-| Get tags                                | =(org-roam-node-tags NODE)=       | =(indexed-tags NODE)=                    |
-| Get tags (local only)                   |                                 | =(indexed-tags-local NODE)=              |
-| Get tags (inherited only)               |                                 | =(indexed-tags-inherited NODE)=          |
-| Get outline level                       | =(org-roam-node-level NODE)=      | =(indexed-level NODE)=                   |
-| Get char position                       | =(org-roam-node-point NODE)=      | =(indexed-pos NODE)=                     |
-| Get line number                         |                                 | =(indexed-lnum NODE)=                    |
-| Get properties                          | =(org-roam-node-properties NODE)= | =(indexed-properties NODE)=              |
-| Get subtree TODO state                  | =(org-roam-node-todo NODE)=       | =(indexed-todo-state NODE)=              |
-| Get subtree SCHEDULED                   | =(org-roam-node-scheduled NODE)=  | =(indexed-scheduled NODE)=               |
-| Get subtree DEADLINE                    | =(org-roam-node-deadline NODE)=   | =(indexed-deadline NODE)=                |
-| Get subtree priority                    | =(org-roam-node-priority NODE)=   | =(indexed-priority NODE)=                |
-| Get outline-path                        | =(org-roam-node-olp NODE)=        | =(indexed-olpath NODE)=                  |
-| Get =ROAM_REFS=                           | =(org-roam-node-refs NODE)=       | =(indexed-roam-refs NODE)=               |
-| Get =ROAM_ALIASES=                        | =(org-roam-node-aliases NODE)=    | =(indexed-roam-aliases NODE)=            |
-| Get =ROAM_EXCLUDE=                        |                                 | =(indexed-property "ROAM_EXCLUDE" NODE)= |
+| Get node by ID                          |                                 | =(org-mem-entry-by-id ID)=               |
+| Get list of files                       | =(org-roam-list-files)=           | =(org-mem-all-files)=                    |
+| Get backlink objects                    | =(org-roam-backlinks-get NODE)=   | =(org-mem-id-links-to-entry NODE)=             |
+| Get reflink objects                     | =(org-roam-reflinks-get NODE)=    | =(org-mem-roam-reflinks-to-entry NODE)=        |
+| Get title                               | =(org-roam-node-title NODE)=      | =(org-mem-entry-title NODE)=                   |
+| Get title of file where NODE is         | =(org-roam-node-file-title NODE)= | =(org-mem-entry-file-title NODE)=              |
+| Get title /or/ name of file where NODE is |                                 | =(org-mem-entry-file-title-or-basename NODE)=  |
+| Get full path to file where NODE is     | =(org-roam-node-file NODE)=       | =(org-mem-entry-file NODE)=               |
+| Get ID                                  | =(org-roam-node-id NODE)=         | =(org-mem-entry-id NODE)=                      |
+| Get tags                                | =(org-roam-node-tags NODE)=       | =(org-mem-entry-tags NODE)=                    |
+| Get tags (local only)                   |                                 | =(org-mem-entry-tags-local NODE)=              |
+| Get tags (inherited only)               |                                 | =(org-mem-entry-tags-inherited NODE)=          |
+| Get outline level                       | =(org-roam-node-level NODE)=      | =(org-mem-level NODE)=                   |
+| Get char position                       | =(org-roam-node-point NODE)=      | =(org-mem-entry-pos node)=                     |
+| Get line number                         |                                 | =(org-mem-entry-lnum NODE)=                    |
+| Get properties                          | =(org-roam-node-properties NODE)= | =(org-mem-entry-properties NODE)=              |
+| Get subtree TODO state                  | =(org-roam-node-todo NODE)=       | =(org-mem-entry-todo-state NODE)=              |
+| Get subtree SCHEDULED                   | =(org-roam-node-scheduled NODE)=  | =(org-mem-entry-scheduled NODE)=               |
+| Get subtree DEADLINE                    | =(org-roam-node-deadline NODE)=   | =(org-mem-entry-deadline NODE)=                |
+| Get subtree priority                    | =(org-roam-node-priority NODE)=   | =(org-mem-entry-priority NODE)=                |
+| Get outline-path                        | =(org-roam-node-olp NODE)=        | =(org-mem-entry-olpath NODE)=                  |
+| Get =ROAM_REFS=                           | =(org-roam-node-refs NODE)=       | =(org-mem-entry-roam-refs NODE)=               |
+| Get =ROAM_ALIASES=                        | =(org-roam-node-aliases NODE)=    | =(org-mem-entry-roam-aliases NODE)=            |
+| Get =ROAM_EXCLUDE=                        |                                 | =(org-mem-entry-property "ROAM_EXCLUDE" NODE)= |
 | Ensure fresh data                       | =(org-roam-db-sync)=              | =(org-node-cache-ensure t t)=            |
 
 ** Appendix II: How to rollback
@@ -786,7 +785,7 @@ An explanation: think of them as like IDs.  While org-node is built around the I
 
 In another universe, =ROAM_REFS= might have been called =EXTRA_IDS= because in many ways it is just a list of additional IDs for the same node.
 
-For performance reasons, not just any string of text is accepted -- it must have valid links per Org syntax, such as =[[https://gnu.org][GNU Website]]= or =https://gnu.org=.  That is because the [[https://github.com/meedstrom/indexed][indexed]] library searches for links anyway in all body text, making it cheap to see after-the-fact where else this same "extra ID" may have been mentioned, and generate a backlink!
+For performance reasons, not just any string of text is accepted -- it must have valid links per Org syntax, such as =[[https://gnu.org][GNU Website]]= or =https://gnu.org=.  That is because the [[https://github.com/meedstrom/org-mem][org-mem]] library searches for links anyway in all body text, making it cheap to see after-the-fact where else this same "extra ID" may have been mentioned, and generate a backlink!
 
 Org-roam calls such backlinks /reflinks/.  In my view, adding a new word for such a similar concept just increases the air of mystery.  That's why in org-node's context buffer, they're just called "ref backlinks" -- as opposed to "ID backlinks".
 

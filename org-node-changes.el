@@ -33,10 +33,9 @@
 (require 'subr-x)
 (require 'cl-lib)
 (require 'el-job)
-(require 'indexed)
-(require 'indexed-x)
-(require 'indexed-roam)
-(require 'indexed-list)
+(require 'org-mem)
+(require 'org-mem-x)
+(require 'org-mem-list)
 (eval-when-compile
   (require 'ol))
 
@@ -51,7 +50,7 @@ Names here will cause complaints if bound.")
 (defvar org-node-changes--warned-about-roam-id nil
   "Non-nil if did warn about org-roam overriding a link parameter.")
 
-(defun org-node-changes--warn-and-copy ()
+(defun org-node-changes--onetime-warn-and-copy ()
   "Maybe print one-shot warnings, then become a no-op.
 
 First, warn if any old name in `org-node-changes--new-names' is bound.
@@ -149,7 +148,7 @@ NAME, ARGLIST and BODY as in `defun'."
 ;;; v1.9
 
 (org-node-changes--def-whiny-alias 'org-node-get-file-path
-                                   'indexed-file-name
+                                   'org-mem-entry-file
                                    "February 2025" "May")
 (org-node-changes--def-whiny-alias 'org-node-ref-add
                                    'org-node-add-refs
@@ -180,107 +179,82 @@ NAME, ARGLIST and BODY as in `defun'."
 ;;; v3.0
 
 (org-node-changes--def-whiny-alias 'org-node-get-tags-with-inheritance
-                                   'indexed-tags
+                                   'org-mem-entry-tags
                                    "3.0.0 (March 2025)" "May")
 (org-node-changes--def-whiny-alias 'org-node-proposed-sequence
                                    'org-node-proposed-seq
                                    "3.0.0 (March 2025)" "May")
 (org-node-changes--def-whiny-alias 'org-nodes-in-file
-                                   'indexed-entries-in
+                                   'org-mem-id-nodes-in-files
                                    "3.0.0 (March 2025)" "May")
 
-(org-node-changes--def-whiny-fn org-node-get-is-subtree (node)
-  "3.0.0 (March 2025)" "May" "use (/= 0 (indexed-heading-lvl ENTRY)) instead"
-  (/= 0 (indexed-heading-lvl node)))
-
-(org-node-changes--def-whiny-fn org-node-is-subtree (node)
-  "3.0.0 (March 2025)" "May" "use (/= 0 (indexed-heading-lvl ENTRY)) instead"
-  (/= 0 (indexed-heading-lvl node)))
-
 (org-node-changes--def-whiny-alias 'org-node-link-dest
-                                   'indexed-dest
+                                   'org-mem-link-dest
                                    "3.0.0 (March 2025)" "May")
 
 (org-node-changes--def-whiny-alias 'org-node-link-origin
-                                   'indexed-nearby-id
+                                   'org-mem-link-nearby-id
                                    "3.0.0 (March 2025)" "May")
 
 (org-node-changes--def-whiny-alias 'org-node-link-pos
-                                   'indexed-pos
+                                   'org-mem-link-pos
                                    "3.0.0 (March 2025)" "May")
 
 (org-node-changes--def-whiny-alias 'org-node-link-type
-                                   'indexed-type
+                                   'org-mem-link-type
                                    "3.0.0 (March 2025)" "May")
 
-(define-obsolete-variable-alias 'org-node--dest<>links              'indexed--dest<>links "2025-03-19")
-(define-obsolete-variable-alias 'org-node--id<>node                 'indexed--id<>entry "2025-03-19")
-(define-obsolete-variable-alias 'org-node--idle-timer               'indexed--timer "2025-03-19")
-(define-obsolete-variable-alias 'org-node--time-elapsed             'indexed--time-elapsed "2025-03-19")
-(define-obsolete-variable-alias 'org-node--title<>id                'indexed--title<>id "2025-03-19")
-(define-obsolete-variable-alias 'org-node-before-update-tables-hook 'indexed-pre-full-reset-functions "2025-03-19")
-(define-obsolete-variable-alias 'org-node-extra-id-dirs             'indexed-org-dirs "2025-03-19")
-(define-obsolete-variable-alias 'org-node-extra-id-dirs-exclude     'indexed-org-dirs-exclude "2025-03-19")
-(define-obsolete-variable-alias 'org-node-link-types                'indexed-seek-link-types "2025-03-19")
-(define-obsolete-variable-alias 'org-node-warn-title-collisions     'indexed-warn-title-collisions "2025-03-19")
-(define-obsolete-variable-alias 'org-node--ref-path<>ref-type       'indexed-roam--ref<>type "2025-03-19")
+(define-obsolete-variable-alias 'org-node--dest<>links              'org-mem--dest<>links "2025-03-19")
+(define-obsolete-variable-alias 'org-node--id<>node                 'org-mem--id<>entry "2025-03-19")
+(define-obsolete-variable-alias 'org-node--title<>id                'org-mem--title<>id "2025-03-19")
+(define-obsolete-variable-alias 'org-node--time-elapsed             'org-mem--time-elapsed "2025-03-19")
+(define-obsolete-variable-alias 'org-node--idle-timer               'org-mem-x--timer "2025-03-19")
+(define-obsolete-variable-alias 'org-node-before-update-tables-hook 'org-mem-pre-full-scan-functions "2025-03-19")
+(define-obsolete-variable-alias 'org-node-extra-id-dirs             'org-mem-watch-dirs "2025-03-19")
+(define-obsolete-variable-alias 'org-node-extra-id-dirs-exclude     'org-mem-watch-dirs-exclude "2025-03-19")
+(define-obsolete-variable-alias 'org-node-link-types                'org-mem-seek-link-types "2025-03-19")
+(define-obsolete-variable-alias 'org-node-warn-title-collisions     'org-mem-do-warn-title-collisions "2025-03-19")
+(define-obsolete-variable-alias 'org-node--ref-path<>ref-type       'org-mem--roam-ref<>type "2025-03-19")
 
-(define-obsolete-function-alias 'org-node--dir-files-recursively     #'indexed--dir-files-recursive "2025-03-19")
-(define-obsolete-function-alias 'org-node--maybe-adjust-idle-timer   #'indexed-x--activate-timer "2025-03-19")
-(define-obsolete-function-alias 'org-node-abbrev-file-names          #'indexed--abbrev-file-names "2025-03-19")
-(define-obsolete-function-alias 'org-node-by-id                      #'indexed-entry-by-id "2025-03-19")
-(define-obsolete-function-alias 'org-node-get-deadline               #'indexed-deadline "2025-03-19")
-(define-obsolete-function-alias 'org-node-get-file                   #'indexed-file-name "2025-03-19")
-(define-obsolete-function-alias 'org-node-get-file-title             #'indexed-file-title "2025-03-19")
-(define-obsolete-function-alias 'org-node-get-file-title-or-basename #'indexed-file-title-or-basename "2025-03-19")
-(define-obsolete-function-alias 'org-node-get-id                     #'indexed-id "2025-03-19")
-(define-obsolete-function-alias 'org-node-get-id-links-to            #'indexed-id-links-to "2025-03-19")
-(define-obsolete-function-alias 'org-node-get-level                  #'indexed-heading-lvl "2025-03-19")
-(define-obsolete-function-alias 'org-node-get-links-from             #'indexed-links-from "2025-03-19")
-(define-obsolete-function-alias 'org-node-get-lnum                   #'indexed-lnum "2025-03-19")
-(define-obsolete-function-alias 'org-node-get-nodes-in-files         #'indexed-entries-in "2025-03-19")
-(define-obsolete-function-alias 'org-node-get-olp                    #'indexed-olpath "2025-03-19")
-(define-obsolete-function-alias 'org-node-get-olp-full               #'indexed-olpath-with-title "2025-03-19")
-(define-obsolete-function-alias 'org-node-get-olp-with-self          #'indexed-olpath-with-self "2025-03-19")
-(define-obsolete-function-alias 'org-node-get-olp-with-self-full     #'indexed-olpath-with-self-with-title "2025-03-19")
-(define-obsolete-function-alias 'org-node-get-pos                    #'indexed-pos "2025-03-19")
-(define-obsolete-function-alias 'org-node-get-priority               #'indexed-priority "2025-03-19")
-(define-obsolete-function-alias 'org-node-get-aliases                #'indexed-roam-aliases "2025-03-19")
-(define-obsolete-function-alias 'org-node-get-refs                   #'indexed-roam-refs "2025-03-19")
-(define-obsolete-function-alias 'org-node-get-reflinks-to            #'indexed-roam-reflinks-to "2025-03-19")
-(define-obsolete-function-alias 'org-node-get-scheduled              #'indexed-scheduled "2025-03-19")
-(define-obsolete-function-alias 'org-node-get-tags                   #'indexed-tags "2025-03-19")
-(define-obsolete-function-alias 'org-node-get-properties             #'indexed-properties "2025-03-19")
-(define-obsolete-function-alias 'org-node-get-props                  #'indexed-properties "2025-03-19")
-(define-obsolete-function-alias 'org-node-get-tags-inherited         #'indexed-tags-inherited "2025-03-19")
-(define-obsolete-function-alias 'org-node-get-tags-local             #'indexed-tags-local "2025-03-19")
-(define-obsolete-function-alias 'org-node-get-title                  #'indexed-title "2025-03-19")
-(define-obsolete-function-alias 'org-node-get-todo                   #'indexed-todo-state "2025-03-19")
-(define-obsolete-function-alias 'org-node-list-collisions            #'indexed-list-title-collisions "2025-03-19")
-(define-obsolete-function-alias 'org-node-list-dead-links            #'indexed-list-dead-id-links "2025-03-19")
-(define-obsolete-function-alias 'org-node-list-scan-problems         #'indexed-list-problems "2025-03-19")
+(define-obsolete-function-alias 'org-node--dir-files-recursively     #'org-mem--dir-files-recursive "2025-03-19")
+(define-obsolete-function-alias 'org-node--maybe-adjust-idle-timer   #'org-mem-x--activate-timer "2025-03-19")
+(define-obsolete-function-alias 'org-node-abbrev-file-names          #'org-mem--fast-abbrev "2025-03-19")
+(define-obsolete-function-alias 'org-node-by-id                      #'org-mem-entry-by-id "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-is-subtree             #'org-mem-entry-subtree-p "2025-03-19")
+(define-obsolete-function-alias 'org-node-is-subtree                 #'org-mem-entry-subtree-p "2025-03-19")
+(define-obsolete-function-alias 'org-node-subtree-p                  #'org-mem-entry-subtree-p "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-deadline               #'org-mem-entry-deadline "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-file                   #'org-mem-entry-file "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-file-title             #'org-mem-file-title-strict "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-file-title-or-basename #'org-mem-file-title-or-basename "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-id                     #'org-mem-entry-id "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-id-links-to            #'org-mem-id-links-to-entry "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-level                  #'org-mem-entry-level "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-links-from             #'org-mem-links-from-id "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-lnum                   #'org-mem-entry-lnum "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-nodes-in-files         #'org-mem-entries-in "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-olp                    #'org-mem-entry-olpath "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-olp-full               #'org-mem-entry-olpath-with-title "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-olp-with-self          #'org-mem-entry-olpath-with-self "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-olp-with-self-full     #'org-mem-entry-olpath-with-self-with-title "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-pos                    #'org-mem-entry-pos "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-priority               #'org-mem-entry-priority "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-aliases                #'org-mem-entry-roam-aliases "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-refs                   #'org-mem-entry-roam-refs "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-reflinks-to            #'org-mem-roam-reflinks-to-entry "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-scheduled              #'org-mem-entry-scheduled "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-tags                   #'org-mem-entry-tags "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-properties             #'org-mem-entry-properties "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-props                  #'org-mem-entry-properties "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-tags-inherited         #'org-mem-entry-tags-inherited "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-tags-local             #'org-mem-entry-tags-local "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-title                  #'org-mem-entry-title "2025-03-19")
+(define-obsolete-function-alias 'org-node-get-todo                   #'org-mem-entry-todo-state "2025-03-19")
+(define-obsolete-function-alias 'org-node-list-collisions            #'org-mem-list-title-collisions "2025-03-19")
+(define-obsolete-function-alias 'org-node-list-dead-links            #'org-mem-list-dead-id-links "2025-03-19")
+(define-obsolete-function-alias 'org-node-list-scan-problems         #'org-mem-list-problems "2025-03-19")
 
 (define-obsolete-function-alias 'org-node-seq-try-visit-file 'org-node-seq-try-goto-file "2025-04-26")
-
-
-;;; Change in dependencies
-
-(unless (and (boundp 'el-job-major-version)
-             (>= el-job-major-version 1))
-  (display-warning
-   'org-node "Update el-job to use this version of org-node"))
-
-;; https://github.com/toshism/org-super-links/pull/104
-(org-node-changes--def-whiny-fn org-node-convert-link-to-super (&rest _)
-  "March 2025" "May"
-  "upgrade org-super-links and use their `org-super-links-convert-link-to-super' instead."
-  (require 'org-super-links)
-  (when (fboundp 'org-super-links-convert-link-to-super)
-    (org-super-links-convert-link-to-super nil)))
-
-(unless (boundp 'indexed-sync-with-org-id)
-  (display-warning
-   'org-node "Update indexed to use this version of org-node"))
 
 (provide 'org-node-changes)
 

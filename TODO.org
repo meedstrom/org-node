@@ -34,7 +34,7 @@
 
   - Not sure I understand "completion categories", but IIUC, we don't really have a completion-category representing "an Org entry somewhere /which is not necessarily in the current buffer"/.
 
-    Might need agreement with upstream Org for the shape of a data object representing that?  Something like [[https://github.com/meedstrom/indexed/blob/main/indexed.el][indexed.el]]'s struct =indexed-org-entry=?  Once that's in, then embark and such packages could easily build in handlers for that, then org-roam and such packages can automatically benefit if they translate from their internal data objects.
+    Might need agreement with upstream Org for the shape of a data object representing that?  Something like [[https://github.com/meedstrom/org-mem/blob/main/indexed.el][org-mem.el]]'s struct =org-mem-entry=?  Once that's in, then embark and such packages could easily build in handlers for that, then org-roam and such packages can automatically benefit if they translate from their internal data objects.
 
 - Implement a =:MODIFIED:= property
 

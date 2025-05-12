@@ -19,7 +19,7 @@
 ;; URL:      https://github.com/meedstrom/org-node
 ;; Created:  2024-04-13
 ;; Keywords: org, hypermedia
-;; Package-Requires: ((emacs "29.1") (llama "0.5.0") (indexed "0.6.0") (el-job "2.2.0") (magit-section "4.3.0"))
+;; Package-Requires: ((emacs "29.1") (llama "0.5.0") (org-mem "0.6.3.50-git") (magit-section "4.3.0"))
 
 ;; NOTE: Looking for Package-Version?  Consult the Git tag.
 ;;       MELPA versions above 20250303 is v2.
@@ -96,12 +96,10 @@
 
 ;; External
 (require 'llama)
-(require 'el-job)
 (require 'org-node-changes)
-(require 'indexed)
-(require 'indexed-x)
-(require 'indexed-roam)
-(require 'indexed-list)
+(require 'org-mem)
+(require 'org-mem-x)
+(require 'org-mem-list)
 
 (defvar consult-ripgrep-args)
 (defvar org-roam-capture-templates)
@@ -112,9 +110,9 @@
 (declare-function consult--grep "ext:consult")
 (declare-function consult--grep-make-builder "ext:consult")
 (declare-function consult--ripgrep-make-builder "ext:consult")
-(declare-function indexed-x-ensure-entry-at-point-known "indexed")
+(declare-function org-mem-x-ensure-entry-at-point-known "org-mem")
 
-(defvaralias 'org-nodes 'indexed--id<>entry)
+(defvaralias 'org-nodes 'org-mem--id<>entry)
 
 
 ;;;; Options
@@ -148,7 +146,7 @@ transition the files you already have with the Org-roam commands
 
 (defun org-node--set-and-remind-reset (sym val)
   "Set SYM to VAL.
-Then remind the user to run \\[org-node-reset]."
+Then remind the user to run \\[org-mem-reset]."
   (let ((caller (cadr (backtrace-frame 5))))
     (when (and (boundp 'org-node--first-init)
                (not org-node--first-init)
@@ -158,7 +156,7 @@ Then remind the user to run \\[org-node-reset]."
              "org-node--set-and-remind-reset called by %s" caller)
       (run-with-timer
        .1 nil #'message
-       "Remember to run M-x org-node-reset after configuring %S" sym)))
+       "Remember to run M-x org-mem-reset after configuring %S" sym)))
   (custom-set-default sym val))
 
 (defcustom org-node-custom-link-format-fn nil
@@ -170,21 +168,21 @@ Takes a node as argument, should return a string."
 
 (defcustom org-node-filter-fn
   (lambda (node)
-    (not (indexed-property "ROAM_EXCLUDE" node)))
+    (not (org-mem-entry-property "ROAM_EXCLUDE" node)))
   "Predicate returning non-nil to include a node, or nil to exclude it.
 
 The filtering affects two tables:
-- `org-node--candidate<>node', used by completions in the minibuffer
-- `indexed--title<>id', used by `org-node-complete-at-point-mode'
+- `org-node--candidate<>entry', used by completions in the minibuffer
+- `org-mem--title<>id', used by `org-node-complete-at-point-mode'
 
 In other words, passing nil means the user cannot autocomplete to the
 node, but Lisp code can still find it in the output of
-`indexed-org-id-nodes', and backlinks are discovered normally.
+`org-mem-all-id-nodes', and backlinks are discovered normally.
 
 This function is applied once for every ID-node found, and
 receives the node data as a single argument: an object which form
 you can observe in examples from \\[org-node-peek] and specified
-in the type `indexed-org-entry' (C-h o indexed-org-entry RET).
+in the type `org-mem-entry' (C-h o org-mem-entry RET).
 
 See the following example for a way to filter out nodes with a
 ROAM_EXCLUDE property, or that have any kind of TODO state, or
@@ -193,14 +191,14 @@ directory named \"archive\".
 
 \(setq org-node-filter-fn
       (lambda (node)
-        (not (or (indexed-property \"ROAM_EXCLUDE\" node)
-                 (indexed-todo-state node)
-                 (string-search \"/archive/\" (indexed-file-name node))
-                 (member \"drill\" (indexed-tags node))))))" ;; XXX docstring
+        (not (or (org-mem-entry-property \"ROAM_EXCLUDE\" node)
+                 (org-mem-entry-todo-state node)
+                 (string-search \"/archive/\" (org-mem-entry-file node))
+                 (member \"drill\" (org-mem-entry-tags node))))))" ;; XXX docstring
   :type 'function
   :set #'org-node--set-and-remind-reset)
 
-(defcustom org-node-insert-link-hook '(indexed-x-ensure-link-at-point-known)
+(defcustom org-node-insert-link-hook '(org-mem-x-ensure-link-at-point-known)
   "Hook run after inserting a link to an Org-ID node.
 
 Called with point in the new link."
@@ -226,7 +224,7 @@ Filesystem creation-time cannot be relied on."
 
 (unless (featurep 'org-node)
   (add-hook 'org-node-creation-hook #'org-node-put-created -95)
-  (add-hook 'org-node-creation-hook #'indexed-x-ensure-entry-at-point-known -90))
+  (add-hook 'org-node-creation-hook #'org-mem-x-ensure-entry-at-point-known -90))
 
 
 ;;;; Pretty completion
@@ -251,11 +249,11 @@ Another consequence: this setting can lift the uniqueness constraint on
 note titles: you\\='ll be able to have two nodes with the same name, so
 long as their prefix or suffix differ in some way.
 
-After changing this setting, run \\[org-node-reset]."
+After changing this setting, run \\[org-mem-reset]."
   :type 'boolean
   :set #'org-node--set-and-remind-reset)
 
-;; NOTE: For context see :affixation-function in `completion-extra-properties',
+;; For context see :affixation-function in `completion-extra-properties',
 ;; however the following function is expected to operate on one candidate at a
 ;; time, instead of a list.  The code flow is a bit roundabout, but the results
 ;; are ultimately used by `org-node-collection'.
@@ -272,7 +270,7 @@ Built-in choices:
 - `org-node-prefix-with-tags'
 - `org-node-affix-with-olp-and-tags'
 
-After changing this setting, run \\[org-node-reset].
+After changing this setting, run \\[org-mem-reset].
 
 ------
 Info for writing a custom function
@@ -292,6 +290,7 @@ aliases."
           (function-item org-node-affix-bare)
           (function-item org-node-prefix-with-olp)
           (function-item org-node-prefix-with-tags)
+          (function-item org-node-prefix-with-tags-and-olp)
           (function-item org-node-affix-with-olp-and-tags)
           (function :tag "Custom function"
                     :value (lambda (node title) (list title "" ""))))
@@ -307,7 +306,7 @@ For use as `org-node-affixation-fn'."
   "Prepend NODE's tags to TITLE.
 For use as `org-node-affixation-fn'."
   (list title
-        (let ((tags (indexed-tags node)))
+        (let ((tags (org-mem-entry-tags node)))
           (if tags
               (propertize (concat "(" (string-join tags ", ") ") ")
                           'face 'org-tag)
@@ -320,11 +319,28 @@ For use as `org-node-affixation-fn'."
   (list title
         (if-let* ((fontified-ancestors
                    (cl-loop
-                    for ancestor in (indexed-olpath-with-title node t)
+                    for ancestor in (org-mem-entry-olpath-with-title node)
                     collect
                     (propertize ancestor 'face 'completions-annotations))))
             (concat (string-join fontified-ancestors " > ") " > ")
           "")
+        ""))
+
+(defun org-node-prefix-with-tags-and-olp (node title)
+  "Prepend NODE's tags and outline path to TITLE."
+  (list title
+        (let ((tags (org-mem-entry-tags node))
+              (fontified-ancestors
+               (cl-loop
+                for ancestor in (org-mem-entry-olpath-with-title node)
+                collect (propertize ancestor 'face 'completions-annotations))))
+          (concat
+           ;; TODO: Fallback on other face before org init
+           (and tags (propertize (concat "(" (string-join tags ", ") ") ")
+                                 'face 'org-tag))
+           (and fontified-ancestors
+                (concat (and tags " ")
+                        (string-join fontified-ancestors " > ") " > "))))
         ""))
 
 (defun org-node-affix-with-olp-and-tags (node title)
@@ -332,8 +348,8 @@ For use as `org-node-affixation-fn'."
 For use as `org-node-affixation-fn'."
   (let ((prefix-len 0))
     (list title
-          (if (/= 0 (indexed-heading-lvl node))
-              (let ((ancestors (indexed-olpath-with-title node t))
+          (if (org-mem-entry-subtree-p node)
+              (let ((ancestors (org-mem-entry-olpath-with-title node))
                     (result nil))
                 (dolist (anc ancestors)
                   (push (propertize anc 'face 'completions-annotations) result)
@@ -342,7 +358,7 @@ For use as `org-node-affixation-fn'."
                 (setq prefix-len (length result))
                 result)
             "")
-          (let ((tags (indexed-tags node)))
+          (let ((tags (org-mem-entry-tags node)))
             (if tags
                 (progn
                   (setq tags (propertize (concat (string-join tags ":"))
@@ -368,16 +384,16 @@ For use as `org-node-affixation-fn'."
   "Custom COLLECTION for `completing-read'.
 
 Ahead of time, org-node takes titles and aliases from
-`indexed--title<>id', runs `org-node-affixation-fn' on each, and
+`org-mem--title<>id', runs `org-node-affixation-fn' on each, and
 depending on the user option `org-node-alter-candidates', it
 either saves the affixated thing directly into
-`org-node--candidate<>node', or into a secondary table
+`org-node--candidate<>entry', or into a secondary table
 `org-node--title<>affixation-triplet'.  Finally, this function
 then either simply reads candidates off the candidates table, or
 attaches the affixes in realtime.
 
 Regardless of which, all completions are guaranteed to be keys of
-`org-node--candidate<>node', but remember that it is possible for
+`org-node--candidate<>entry', but remember that it is possible for
 `completing-read' to exit with user-entered input that didn\\='t
 match anything.
 
@@ -387,7 +403,7 @@ see Info node `(elisp)Programmed Completion'."
       (cons 'metadata (unless org-node-alter-candidates
                         (list (cons 'affixation-function
                                     #'org-node--affixate-collection))))
-    (complete-with-action action org-node--candidate<>node str pred)))
+    (complete-with-action action org-node--candidate<>entry str pred)))
 
 (defvar org-node-hist nil
   "Minibuffer history.")
@@ -401,104 +417,96 @@ see Info node `(elisp)Programmed Completion'."
      (put 'org-node-hist 'history-length 1000))
 
 
-
-(defvar org-node--candidate<>node (make-hash-table :test 'equal)
-  "1:1 table mapping completion candidates to nodes.")
-
-;; TODO: Deprecate. Much better: (inspector-inspect org-nodes)
-(defun org-node-peek (&optional ht)
-  "Print some random values of table `org-nodes'.
-When called from Lisp, peek on any hash table HT."
-  (interactive)
-  (let ((rows (hash-table-values (or ht org-nodes)))
-        (print-length nil))
-    (dotimes (_ 3)
-      (print '----------------------------)
-      (cl-prin1 (nth (random (length rows)) rows)))))
-
-
 ;;;; The mode
 
-(defun org-node--let-refs-be-aliases (node)
-  "Add ROAM_REFS of NODE as completions for `org-node-collection'."
-  (when indexed-roam-mode
-    (dolist (ref (indexed-roam-refs node))
-      (puthash ref node org-node--candidate<>node)
-      (puthash ref
-               (let ((type (gethash ref indexed-roam--ref<>type)))
-                 (list (propertize ref 'face 'org-cite)
-                       (when type
-                         (propertize (concat type ":")
-                                     'face 'completions-annotations))
-                       nil))
-               org-node--title<>affixation-triplet))))
+(defvar org-node--candidate<>entry (make-hash-table :test 'equal)
+  "1:1 table mapping completion candidates to nodes.")
 
-(defun org-node--wipe-completions (_parse-results)
-  "Wipe table `org-node--candidate<>node'."
-  (clrhash org-node--candidate<>node))
+(defun org-node--let-refs-be-aliases (node)
+  "Add ROAM_REFS of NODE as extra completion candidates."
+  (dolist (ref (org-mem-entry-roam-refs node))
+    (puthash ref node org-node--candidate<>entry)
+    (puthash ref
+             (let ((type (gethash ref org-mem--roam-ref<>type)))
+               (list (propertize ref 'face 'org-cite)
+                     (when type
+                       (propertize (concat type ":")
+                                   'face 'completions-annotations))
+                     nil))
+             org-node--title<>affixation-triplet)))
 
 (defun org-node--record-completion-candidates (node)
   "Cache completion candidates for NODE and its aliases."
-  (when (and (indexed-id node)
+  (when (and (org-mem-entry-id node)
              (funcall (org-node--try-ensure-compiled org-node-filter-fn) node))
-    (dolist (title (cons (indexed-title node)
-                         (indexed-roam-aliases node)))
+    (dolist (title (cons (org-mem-entry-title node)
+                         (org-mem-entry-roam-aliases node)))
       (let ((affx (funcall (org-node--try-ensure-compiled org-node-affixation-fn)
-                           node title)))
+                           node
+                           title)))
         (if org-node-alter-candidates
             ;; Absorb the affixations into one candidate string
             (puthash (concat (nth 1 affx) (nth 0 affx) (nth 2 affx))
                      node
-                     org-node--candidate<>node))
+                     org-node--candidate<>entry))
         ;; Bare title, to be affixated later by `org-node-collection'
         (puthash title affx org-node--title<>affixation-triplet)
-        (puthash title node org-node--candidate<>node)))))
+        (puthash title node org-node--candidate<>entry)))))
 
-(defun org-node--forget-some-completions (parse-results)
-  (seq-let (missing-files file-data entries) parse-results
-    (org-node--dirty-forget-completions-in
-     (append missing-files (mapcar #'indexed-file-name file-data)))
-    (when indexed-roam-mode
-      (dolist (entry entries)
-        (when (member (indexed-file-name entry) missing-files)
-          (dolist (ref (indexed-roam-refs entry))
-            (remhash ref indexed--title<>id)))))))
+(defun org-node--wipe-completions (_parse-results)
+  "Clear table `org-node--candidate<>entry'."
+  (clrhash org-node--candidate<>entry))
+
+;; Could have used `org-mem-forget-file-functions', but more efficient to loop
+;; over entire parse-results once.
+(defun org-node--forget-completions-in-results (parse-results)
+  "Remove old completions where PARSE-RESULTS has new data."
+  (seq-let (bad-paths file-data) parse-results
+    (org-node--forget-completions-in-files
+     (append bad-paths (mapcar #'car file-data)))))
+
+(defun org-node--forget-completions-in-files (files)
+  "Remove the completion candidates for all nodes in FILES."
+  (when files
+    (org-mem-delete (##member (org-mem-entry-file %2) files)
+                    org-node--candidate<>entry)
+    ;; Undo an effect of `org-node--let-refs-be-aliases'
+    (dolist (ref (seq-mapcat #'org-mem-entry-roam-refs
+                             (org-mem-entries-in-files files)))
+      (remhash ref org-mem--title<>id))))
 
 ;;;###autoload
 (define-minor-mode org-node-cache-mode
-  "Instruct various hooks to keep the cache updated."
+  "Cache completion candidates every time Org-mem updates its cache.
+You should also turn on `org-mem-updater-mode'."
   :global t
   (cond
    (org-node-cache-mode
-    (unless (and indexed-updater-mode)
-      (message "
-Org-node v3 enabling `indexed-updater-mode' for you.
-If you don't want to see this message, enable that mode first.")
-      (indexed-updater-mode))
-    (add-hook 'indexed-pre-full-reset-functions #'org-node--wipe-completions)
-    (add-hook 'indexed-pre-incremental-update-functions #'org-node--forget-some-completions)
-    (add-hook 'indexed-record-entry-functions #'org-node--record-completion-candidates)
-    (add-hook 'indexed-record-entry-functions #'org-node--let-refs-be-aliases))
+    (add-hook 'org-mem-pre-full-scan-functions #'org-node--wipe-completions)
+    (add-hook 'org-mem-pre-targeted-scan-functions #'org-node--forget-completions-in-results)
+    (add-hook 'org-mem-record-entry-functions #'org-node--record-completion-candidates)
+    (add-hook 'org-mem-record-entry-functions #'org-node--let-refs-be-aliases)
+    (org-mem--scan-full))
    (t
-    (remove-hook 'indexed-pre-full-reset-functions #'org-node--wipe-completions)
-    (remove-hook 'indexed-pre-incremental-update-functions #'org-node--forget-some-completions)
-    (remove-hook 'indexed-record-entry-functions #'org-node--record-completion-candidates)
-    (remove-hook 'indexed-record-entry-functions #'org-node--let-refs-be-aliases))))
+    (remove-hook 'org-mem-pre-full-scan-functions #'org-node--wipe-completions)
+    (remove-hook 'org-mem-pre-targeted-scan-functions #'org-node--forget-completions-in-results)
+    (remove-hook 'org-mem-record-entry-functions #'org-node--record-completion-candidates)
+    (remove-hook 'org-mem-record-entry-functions #'org-node--let-refs-be-aliases))))
 
 (defvar org-node--new-unsaved-buffers nil
-  "List of buffers created to hold a new node.")
+  "List of file-visiting buffers that have never written to the file.")
 
+;; TODO: Could the :creator just check if the buffer is unmodified and empty?
+;;       But possible pitfall that the user may have important stuff in undo.
 (defun org-node--kill-blank-unsaved-buffers (&rest _)
-  "Kill buffers created by org-node that have become blank.
-Only applicable if the buffer\\='s file had not yet been written to
-disk, and the buffer is unmodified.
+  "Kill buffers created by org-node that have always been blank.
 
 This exists to allow you to create a node, especially a journal note for
-today via library \"org-node-seq\", change your mind, do an `undo' to
+today via package \"org-node-seq\", change your mind, do an `undo' to
 empty the buffer, then browse to the previous day\\='s note.  When later
 you want to create today\\='s note after all, the seq\\='s :creator
 function should be made to run again, but it will not do so if the
-buffer appears to already exist, thus this hook."
+buffer already exists, so the buffer stays blank.  Thus this hook."
   (unless (minibufferp)
     (dolist (buf org-node--new-unsaved-buffers)
       (if (or (not (buffer-live-p buf))
@@ -514,69 +522,59 @@ buffer appears to already exist, thus this hook."
               ;; Hopefully throw away a stale autosave
               ;; since its existence annoys the user on re-creating the file
               (do-auto-save nil t))
-            (indexed-x--forget-files (list buffer-file-truename))
-            (org-node--dirty-forget-completions-in (list buffer-file-truename))
+            (org-mem-x--forget-file-contents (list buffer-file-truename))
+            (org-node--forget-completions-in-files (list buffer-file-truename))
             (kill-buffer buf)))))))
 
 
 ;;;; Scanning files to cache info about them
 
-;; TODO: Deprec
 ;;;###autoload
-(defun org-node-reset ()
-  "Wipe and rebuild the cache."
-  (interactive)
-  (call-interactively #'indexed-reset)
-  (org-node-cache-ensure))
+(define-obsolete-function-alias 'org-node-reset #'org-mem-reset "2025-05-09")
 
-;; TODO Deprec/shrink. Now mainly useful for the blocking effect.
-(defun org-node-cache-ensure (&optional synchronous force)
+(defun org-node-cache-ensure (&optional block force)
   "Ensure that org-node is ready for use.
-Specifically,
+Ensure that modes `org-node-cache-mode' and `org-mem-updater-mode' are
+enabled.  If FORCE, trigger org-mem to rebuild cache.  If BLOCK and a
+cache build is underway \(perhaps started by FORCE), block Emacs until
+it finishes.
 
-- ensure that `indexed-updater-mode' is enabled
-- re-cache if cache is empty, or if FORCE is t.
+If cache has never been built, act as if both FORCE and BLOCK.
 
-The primary use case is at the start of autoloaded commands.
+It is good to call this function at the start of autoloaded commands.
+Most of the time, you can expect it to no-op.
 
-Optional argument SYNCHRONOUS t means that if a cache build is
-needed or already ongoing, block Emacs until it is done.
-
-When SYNCHRONOUS is nil, return immediately and let the caching
-proceed in the background.  As that may take a few seconds, that
-would mean that the `org-nodes' table could be still outdated
-by the time you query it, but that is acceptable in many
-situations such as in an user command since the table is mostly
-correct - and fully correct by the time of the next invocation.
-
-If the `org-node--candidate<>node' table is currently empty, behave as
-if SYNCHRONOUS t, unless SYNCHRONOUS is the symbol `must-async'."
-  (unless indexed-updater-mode
-    (when (y-or-n-p "Let org-node enable `indexed-updater-mode'?")
-      (indexed-updater-mode)))
-  (org-node-changes--warn-and-copy)
-  (when (hash-table-empty-p org-node--candidate<>node)
-    (setq synchronous (if (eq synchronous 'must-async) nil t))
+These builds are normally async, so without BLOCK, this returns
+immediately and can mean that the data you will next query
+from org-mem is still out of date."
+  (org-node-changes--onetime-warn-and-copy)
+  (unless org-node-cache-mode
+    (when (y-or-n-p "Org-node needs `org-node-cache-mode', enable? ")
+      (org-node-cache-mode))
+    (setq force t))
+  (unless org-mem-updater-mode
+    (when (y-or-n-p "Org-node needs `org-mem-updater-mode', enable? ")
+      (org-mem-updater-mode))
+    (setq force t))
+  (when (hash-table-empty-p org-node--candidate<>entry)
+    (setq block t)
     (setq force t))
   (when force
-    (indexed--scan-full))
-  (when (eq t synchronous)
-    ;; Block until all processes finish
-    (if org-node-cache-mode
-        (el-job-await 'indexed 9 "org-node indexing files...")
-      ;; In case user just runs a command, not having enabled any modes
-      (el-job-await 'indexed 9 "org-node indexing files... (Hint: Avoid this hang by enabling org-node-cache-mode at init)"))))
+    (org-mem--scan-full))
+  (when block
+    (org-mem-block 'org-node 10)))
 
 (defvar org-node--first-init t
   "Non-nil until org-node has been initialized, then nil.
 Mainly for muffling some messages.")
 
+;; FIXME
 (defvar org-node--old-link-sets nil
   "For use by `org-node-backlink-lazy'.
 
 Alist of ((DEST . LINKS) (DEST . LINKS) ...), where LINKS is are sets of
 links with destination DEST.  These reflect a past state of
-`indexed--dest<>links', allowing for a diff operation against the
+`org-mem--dest<>links', allowing for a diff operation against the
 up-to-date set.")
 
 (defvar org-node--compile-timers nil)
@@ -587,14 +585,15 @@ up-to-date set.")
   "Try to return FN as a compiled function.
 
 - If FN is a symbol with uncompiled function definition, return
-  the same symbol and arrange to natively compile it after some
-  idle time.
-
-  If this Emacs does not support native compilation, byte-compile the
-  symbol right away.
+  the same symbol, and arrange to natively compile it after some
+  idle time.  Or if native-comp missing, byte-compile right away.
 
 - If FN is an anonymous lambda, compile it, cache the resulting
-  bytecode, and return that bytecode."
+  bytecode, and return that bytecode.
+
+Normally Emacs already does this kind of thing for definitions in an
+installed library, but it can be handy for user-provided lambdas that
+must be called a lot."
   (cond ((compiled-function-p fn) fn)
         ((symbolp fn)
          (if (compiled-function-p (symbol-function fn))
@@ -611,19 +610,6 @@ up-to-date set.")
         ((gethash fn org-node--compiled-lambdas))
         ((let (byte-compile-warnings)
            (puthash fn (byte-compile fn) org-node--compiled-lambdas)))))
-
-
-;;;; "Dirty" functions
-;; Help keep the cache reasonably in sync without having to do a full reset
-
-(defun org-node--dirty-forget-completions-in (files)
-  "Remove the completion candidates for all nodes in FILES."
-  (when files
-    (cl-loop
-     for candidate being each hash-key of org-node--candidate<>node
-     using (hash-values node)
-     when (member (indexed-file-name node) files)
-     do (remhash candidate org-node--candidate<>node))))
 
 
 ;;;; Etc
@@ -701,7 +687,7 @@ various subdirectories)."
     ;; Example: if there is /home/roam/courses/Math1A/, but ancestor dir
     ;; /home/roam/ is also a member of the set, throw out the child dir.
     (while-let ((dir (car (last dirs))))
-      ;; REVIEW: Maybe more elegant to use `nreverse' twice
+      ;; REVIEW: Maybe more elegant to use `nreverse' twice?
       (setq dirs (nbutlast dirs))
       (cl-loop for other-dir in dirs
                when (string-prefix-p other-dir dir)
@@ -739,7 +725,7 @@ In any case, return a directory."
       (read-directory-name prompt)
     (if (stringp org-node-ask-directory)
         org-node-ask-directory
-      (car (org-node--root-dirs (indexed-org-files))))))
+      (car (org-node--root-dirs (org-mem-all-files))))))
 
 (defcustom org-node-datestamp-format ""
   "Passed to `format-time-string' to prepend to filenames.
@@ -848,9 +834,9 @@ Automatically set, should be nil most of the time.")
 (defun org-node--goto (node &optional pos)
   "Visit NODE."
   (if node
-      (let ((file (indexed-file-name node)))
+      (let ((file (org-mem-entry-file node)))
         (if (file-exists-p file)
-            (let ((pos (or pos (indexed-pos node))))
+            (let ((pos (or pos (org-mem-entry-pos node))))
               (when (not (file-readable-p file))
                 (error "org-node: Couldn't visit unreadable file %s" file))
               (find-file file)
@@ -862,10 +848,10 @@ Automatically set, should be nil most of the time.")
               ;; moved point, and that could be good enough.  So: move
               ;; point to node heading, unless heading is already inside
               ;; visible part of buffer and point is at or under it
-              (if (/= 0 (indexed-heading-lvl node))
+              (if (/= 0 (org-mem-entry-level node))
                   (unless (and (pos-visible-in-window-p pos)
                                (not (org-invisible-p pos))
-                               (equal (indexed-title node)
+                               (equal (org-mem-entry-title node)
                                       (org-get-heading t t t t)))
                     (goto-char pos)
                     (org-fold-show-entry)
@@ -874,9 +860,9 @@ Automatically set, should be nil most of the time.")
                 (unless (pos-visible-in-window-p pos)
                   (goto-char pos))))
           ;; NOTE: If this happens a lot,
-          ;;       maybe change to just (indexed-x--forget-files file).
+          ;;       maybe change to just (org-mem-x--forget-file-contents file).
           (message "org-node: Didn't find file, resetting...")
-          (indexed--scan-full)))
+          (org-mem--scan-full)))
     (error "`org-node--goto' received a nil argument")))
 
 (defcustom org-node-creation-fn #'org-node-new-file
@@ -1021,24 +1007,24 @@ type the name of a node that does not exist.  That enables this
         (progn
           (setq title org-node-proposed-title)
           (setq id org-node-proposed-id)
-          (setq node (gethash title org-node--candidate<>node)))
+          (setq node (gethash title org-node--candidate<>entry)))
       ;; Was called from `org-capture', which means the user has not yet typed
       ;; the title; let them type it now
       (let ((input (completing-read "Node: " #'org-node-collection
                                     () () () 'org-node-hist)))
-        (setq node (gethash input org-node--candidate<>node))
+        (setq node (gethash input org-node--candidate<>entry))
         (if node
             (progn
-              (setq title (indexed-title node))
-              (setq id (indexed-id node)))
+              (setq title (org-mem-entry-title node))
+              (setq id (org-mem-entry-id node)))
           (setq title input)
           (setq id (org-id-new)))))
     (if node
         ;; Node exists; capture into it
         (progn
-          (find-file (indexed-file-name node))
+          (find-file (org-mem-entry-file node))
           (widen)
-          (goto-char (indexed-pos node))
+          (goto-char (org-mem-entry-pos node))
           (org-reveal)
           ;; TODO: Figure out how to play well with :prepend vs not :prepend.
           ;; Now it's just like it always prepends, I think?
@@ -1088,7 +1074,7 @@ set `org-node-creation-fn' to `org-node-new-via-roam-capture'."
   (org-node-cache-ensure)
   (let* ((input (completing-read "Go to ID-node: " #'org-node-collection
                                  () () () 'org-node-hist))
-         (node (gethash input org-node--candidate<>node)))
+         (node (gethash input org-node--candidate<>entry)))
     (if node
         (org-node--goto node)
       (if (string-blank-p input)
@@ -1100,8 +1086,8 @@ set `org-node-creation-fn' to `org-node-new-via-roam-capture'."
   "Visit a random node."
   (interactive)
   (org-node-cache-ensure)
-  (org-node--goto (nth (random (hash-table-count org-node--candidate<>node))
-                       (hash-table-values org-node--candidate<>node))))
+  (org-node--goto (nth (random (hash-table-count org-node--candidate<>entry))
+                       (hash-table-values org-node--candidate<>entry))))
 
 ;;;###autoload
 (defun org-node-insert-link (&optional region-as-initial-input novisit)
@@ -1133,23 +1119,23 @@ Argument NOVISIT means behave as
                          (buffer-substring-no-properties beg end))))
          (initial (if (or region-as-initial-input
                           (when region-text
-                            (try-completion region-text indexed--title<>id)))
+                            (try-completion region-text org-mem--title<>id)))
                       region-text
                     nil))
          (input (if (and novisit initial)
                     initial
                   (completing-read "Node: " #'org-node-collection
                                    () () initial 'org-node-hist)))
-         (node (gethash input org-node--candidate<>node))
-         (id (if node (indexed-id node) (org-id-new)))
+         (node (gethash input org-node--candidate<>entry))
+         (id (if node (org-mem-entry-id node) (org-id-new)))
          (link-desc (or region-text
                         (and node
                              org-node-custom-link-format-fn
                              (funcall org-node-custom-link-format-fn node))
                         (and (not org-node-alter-candidates) input)
                         (and node (seq-find (##string-search % input)
-                                            (indexed-roam-aliases node)))
-                        (and node (indexed-title node))
+                                            (org-mem-entry-roam-aliases node)))
+                        (and node (org-mem-entry-title node))
                         input)))
     (atomic-change-group
       (when region-text
@@ -1219,9 +1205,9 @@ create it and then visit it.  This will not visit it."
   (unless node
     (setq node (gethash (completing-read "Node: " #'org-node-collection
                                          () () () 'org-node-hist)
-                        org-node--candidate<>node)))
-  (let ((id (indexed-id node))
-        (title (indexed-title node))
+                        org-node--candidate<>entry)))
+  (let ((id (org-mem-entry-id node))
+        (title (org-mem-entry-title node))
         (level (or (org-current-level) 0)))
     (insert (org-link-make-string (concat "id:" id) title))
     (goto-char (pos-bol))
@@ -1253,9 +1239,9 @@ If you often transclude file-level nodes, consider adding keywords to
   (unless node
     (setq node (gethash (completing-read "Node: " #'org-node-collection
                                          () () () 'org-node-hist)
-                        org-node--candidate<>node)))
-  (let ((id (indexed-id node))
-        (title (indexed-title node))
+                        org-node--candidate<>entry)))
+  (let ((id (org-mem-entry-id node))
+        (title (org-mem-entry-title node))
         (level (or (org-current-level) 0))
         (m1 (make-marker)))
     (insert (org-link-make-string (concat "id:" id) title))
@@ -1295,9 +1281,9 @@ If you often transclude file-level nodes, consider adding keywords to
   (unless node
     (setq node (gethash (completing-read "Node: " #'org-node-collection
                                          () () () 'org-node-hist)
-                        org-node--candidate<>node)))
-  (let ((id (indexed-id node))
-        (title (indexed-title node))
+                        org-node--candidate<>entry)))
+  (let ((id (org-mem-entry-id node))
+        (title (org-mem-entry-title node))
         (level (org-current-level))
         (link-marker (make-marker)))
     (goto-char (pos-eol))
@@ -1337,7 +1323,7 @@ Works in non-Org buffers."
     (user-error "Better not run this command in an invisible region"))
   (let* ((input (completing-read "Refile into ID-node: " #'org-node-collection
                                  () () () 'org-node-hist))
-         (node (gethash input org-node--candidate<>node)))
+         (node (gethash input org-node--candidate<>entry)))
     (unless node
       (error "Node not found %s" input))
     (org-back-to-heading t)
@@ -1350,7 +1336,7 @@ Works in non-Org buffers."
     (when (outline-next-heading)
       (backward-char 1))
     (org-paste-subtree)
-    (indexed-x-ensure-entry-at-point-known)))
+    (org-mem-x-ensure-entry-at-point-known)))
 
 ;;;###autoload
 (defun org-node-extract-subtree ()
@@ -1434,7 +1420,7 @@ creation-date as more truthful or useful than today\\='s date.
                      (format "%s Created " (org-time-stamp-format t t)))
                     (org-link-make-string (concat "id:" id) title)
                     "\n")
-            (indexed-x-ensure-link-at-point-known id)))
+            (org-mem-x-ensure-link-at-point-known id)))
         (find-file path-to-write)
         (org-paste-subtree)
         (unless org-node-prefer-with-heading
@@ -1458,7 +1444,7 @@ creation-date as more truthful or useful than today\\='s date.
              "")
            "\n#+title: " title
            "\n"))
-        (indexed-x-ensure-entry-at-point-known)
+        (org-mem-x-ensure-entry-at-point-known)
         (push (current-buffer) org-node--new-unsaved-buffers)
         (run-hooks 'org-node-creation-hook)
         (when (bound-and-true-p org-node-backlink-mode)
@@ -1636,7 +1622,7 @@ so it matches the destination\\='s current title."
   (when (org-node--consent-to-bothersome-modes-for-mass-edit)
     (let ((n-links 0)
           (n-files 0))
-      (dolist (file (or files (sort (indexed-org-files)
+      (dolist (file (or files (sort (org-mem-all-files)
                                     (lambda (_ _) (natnump (random))))))
         (cl-incf n-files)
         (with-current-buffer (delay-mode-hooks (find-file-noselect file))
@@ -1657,7 +1643,7 @@ so it matches the destination\\='s current title."
                              (substring target 3)))
                        (node (gethash id org-nodes))
                        (true-title (when node
-                                     (indexed-title node)))
+                                     (org-mem-entry-title node)))
                        (custom-desc
                         (and org-node-custom-link-format-fn
                              node
@@ -1672,7 +1658,7 @@ so it matches the destination\\='s current title."
                                           true-title))
                                     (not (member-ignore-case
                                           desc
-                                          (indexed-roam-aliases node))))))
+                                          (org-mem-entry-roam-aliases node))))))
                     (switch-to-buffer (current-buffer))
                     (goto-char end)
                     (if (org-at-heading-p)
@@ -1714,7 +1700,7 @@ user quits, do not apply any modifications."
     (user-error "This command requires the wgrep package"))
   (when (and (fboundp 'wgrep-change-to-wgrep-mode)
              (fboundp 'wgrep-finish-edit))
-    (let ((root (car (org-node--root-dirs (indexed-org-files))))
+    (let ((root (car (org-node--root-dirs (org-mem-all-files))))
           (default-directory default-directory))
       (or (equal default-directory root)
           (if (y-or-n-p (format "Go to folder \"%s\"?" root))
@@ -1777,9 +1763,9 @@ user quits, do not apply any modifications."
 (defun org-node-forget-dir (dir)
   "Remove references in `org-id-locations' to files in DIR.
 
-Note that if DIR descends from a member of `indexed-org-dirs',
+Note that if DIR descends from a member of `org-mem-watch-dirs',
 this action may make no practical impact unless you add DIR to
-`indexed-org-dirs-exclude'.
+`org-mem-watch-dirs-exclude'.
 
 Tip: In case of unsolvable problems, eval this to wipe org-id-locations:
 
@@ -1792,12 +1778,10 @@ Tip: In case of unsolvable problems, eval this to wipe org-id-locations:
  (setq org-id-extra-files nil))"
   (interactive "DForget all IDs in directory: ")
   (org-node-cache-ensure t)
-  (let ((files
-         (indexed--abbrev-file-names
-          (nconc
-           (indexed--dir-files-recursive (file-truename dir) ".org_exclude" nil)
-           (indexed--dir-files-recursive (file-truename dir) ".org" nil)))))
+  (let ((files (nconc (org-mem--dir-files-recursive dir ".org_exclude" nil)
+                      (org-mem--dir-files-recursive dir ".org" nil))))
     (when files
+      (setq files (nconc files (mapcar #'org-mem--abbr-truename files)))
       (message "Forgetting all IDs in directory %s..." dir)
       (redisplay)
       (maphash (lambda (id file)
@@ -1805,10 +1789,10 @@ Tip: In case of unsolvable problems, eval this to wipe org-id-locations:
                    (remhash id org-id-locations)))
                org-id-locations)
       (dolist (file files)
-        (remhash file indexed--file<>entries)
-        (remhash file indexed--file<>data))
+        (remhash file org-mem--file<>entries)
+        (remhash file org-mem--file<>metadata))
       (org-id-locations-save)
-      (org-node-reset))))
+      (org-mem-reset))))
 
 ;; TODO: Optionally obey filter-fn
 ;;;###autoload
@@ -1827,14 +1811,14 @@ Tip: In case of unsolvable problems, eval this to wipe org-id-locations:
       (if (executable-find "rg")
           (consult--grep "Grep in files known to org-node: "
                          #'consult--ripgrep-make-builder
-                         (org-node--root-dirs (indexed-org-files))
+                         (org-node--root-dirs (org-mem-all-files))
                          nil)
         ;; Much slower!  Vanilla grep does not have Ripgrep's --type=org, so
         ;; must target thousands of files and not a handful of dirs, a calling
         ;; pattern that would also slow Ripgrep down.
         (consult--grep "(Ripgrep not found) Grep in files known to org-node: "
                        #'consult--grep-make-builder
-                       (indexed-org-files)
+                       (org-mem-all-files)
                        nil)))))
 
 (defun org-node-insert-link-into-drawer ()
@@ -1861,13 +1845,13 @@ Tip: In case of unsolvable problems, eval this to wipe org-id-locations:
   (interactive)
   (if deprecated-arg
       (progn
-        (message "Function `org-node-list-files' obsoleted by `indexed-org-files'")
-        (indexed-org-files))
-    (indexed-list--pop-to-tabulated-buffer
+        (message "Function `org-node-list-files' obsoleted by `org-mem-all-files'")
+        (org-mem-all-files))
+    (org-mem-list--pop-to-tabulated-buffer
      :buffer "*org-node files*"
      :format [("File" 0 t)]
      :entries (cl-loop
-               for file in (indexed-org-files)
+               for file in (org-mem-all-files)
                collect (list (sxhash file)
                              (vector (buttonize file #'find-file file)))))))
 
@@ -1884,7 +1868,7 @@ from the beginning."
   (let (files)
     (when (or (equal current-prefix-arg '(4))
               (and (null org-node--unlinted)
-                   (setq files (indexed-org-files))
+                   (setq files (org-mem-all-files))
                    (y-or-n-p (format "Lint %d files?"
                                      (length files)))))
       (setq org-node--unlinted files)
@@ -1902,7 +1886,7 @@ from the beginning."
                       (push (cons buffer-file-name (car warning))
                             org-node--lint-warnings))))))
   (when org-node--lint-warnings
-    (indexed-list--pop-to-tabulated-buffer
+    (org-mem-list--pop-to-tabulated-buffer
      :buffer "*org lint results*"
      :format [("File" 30 t) ("Line" 5 t) ("Trust" 5 t) ("Explanation" 0 t)]
      :reverter #'org-node-lint-all-files
@@ -1970,7 +1954,7 @@ network to quality-control it.  Rationale:
     (let ((feedbacks (with-temp-buffer
                        (insert-file-contents output-eld)
                        (read (buffer-string)))))
-      (indexed-list--pop-to-tabulated-buffer
+      (org-mem-list--pop-to-tabulated-buffer
        :buffer "*org-node feedback arcs*"
        :format [("Node containing link" 39 t) ("Target of link" 0 t)]
        :entries (cl-loop
@@ -1979,10 +1963,10 @@ network to quality-control it.  Rationale:
                  as dest-node = (gethash dest org-nodes)
                  collect
                  (list (+ (sxhash origin) (sxhash dest))
-                       (vector (buttonize (indexed-title origin-node)
+                       (vector (buttonize (org-mem-entry-title origin-node)
                                           #'org-node--goto
                                           origin-node)
-                               (buttonize (indexed-title dest-node)
+                               (buttonize (org-mem-entry-title dest-node)
                                           #'org-node--goto
                                           dest-node))))))))
 
@@ -1990,20 +1974,20 @@ network to quality-control it.  Rationale:
 (defun org-node--make-digraph-tsv-string ()
   "Generate a string in Tab-Separated Values form.
 The string is a 2-column table of destination-origin pairs, made
-from ID links found in `indexed--dest<>links'."
+from ID links found in `org-mem--dest<>links'."
   (concat
    "src\tdest\n"
    (string-join
     (seq-uniq (cl-loop
-               for dest being each hash-key of indexed--dest<>links
+               for dest being each hash-key of org-mem--dest<>links
                using (hash-values links)
                append (cl-loop
                        for link in links
-                       when (equal "id" (indexed-type link))
-                       collect (concat dest "\t" (indexed-origin link)))))
+                       when (equal "id" (org-mem-link-type link))
+                       collect (concat dest "\t" (org-mem-link-nearby-id link)))))
     "\n")))
 
-;; TODO: Maybe expunge to indexed.el after I figure out how to use fileloop well
+;; TODO: Maybe expunge to org-mem.el after I figure out how to use fileloop well
 (defvar org-node--found-coding-systems nil)
 (defvar org-node--list-file-coding-systems-files nil)
 (defun org-node-list-file-coding-systems ()
@@ -2015,8 +1999,8 @@ with \\[universal-argument] prefix."
   (when (or (equal current-prefix-arg '(4))
             (and (null org-node--list-file-coding-systems-files)
                  (y-or-n-p (format "Check coding systems in %d files?  They will not be modified."
-                                   (length (indexed-org-files))))))
-    (setq org-node--list-file-coding-systems-files (indexed-org-files))
+                                   (length (org-mem-all-files))))))
+    (setq org-node--list-file-coding-systems-files (org-mem-all-files))
     (setq org-node--found-coding-systems nil))
   (setq org-node--list-file-coding-systems-files
         (org-node--in-files-do
@@ -2027,7 +2011,7 @@ with \\[universal-argument] prefix."
           :call (lambda ()
                   (push (cons buffer-file-name buffer-file-coding-system)
                         org-node--found-coding-systems))))
-  (indexed-list--pop-to-tabulated-buffer
+  (org-mem-list--pop-to-tabulated-buffer
    :buffer "*org file coding systems*"
    :format [("Coding system" 20 t) ("File" 40 t)]
    :entries (cl-loop for (file . sys) in org-node--found-coding-systems
@@ -2043,22 +2027,22 @@ one of them is associated with a ROAM_REFS property."
   (interactive)
   (let ((entries
          (cl-loop
-          for link in (indexed-org-links-and-citations)
-          unless (equal "id" (indexed-type link))
+          for link in (org-mem-all-links)
+          unless (equal "id" (org-mem-link-type link))
           collect
-          (let ((node (gethash (indexed-origin link) org-nodes))
-                (type (indexed-type link))
-                (dest (indexed-dest link))
-                (pos (indexed-pos link))
-                (origin (indexed-origin link))
-                (file-name (indexed-file-name link)))
+          (let ((node (gethash (org-mem-link-nearby-id link) org-nodes))
+                (type (org-mem-link-type link))
+                (dest (org-mem-link-dest link))
+                (pos (org-mem-link-pos link))
+                (origin (org-mem-link-nearby-id link))
+                (file-name (org-mem-link-file link)))
             (list (sxhash link)
                   (vector
-                   (if (gethash dest indexed-roam--ref<>id)
+                   (if (gethash dest org-mem--roam-ref<>id)
                        "*"
                      "")
                    (if node
-                       (buttonize (indexed-title node)
+                       (buttonize (org-mem-entry-title node)
                                   `(lambda (_button)
                                      (find-file ,file-name)
                                      (goto-char ,pos)
@@ -2067,7 +2051,7 @@ one of them is associated with a ROAM_REFS property."
                      origin)
                    (if type (concat type ":" dest) dest)))))))
     (if entries
-        (indexed-list--pop-to-tabulated-buffer
+        (org-mem-list--pop-to-tabulated-buffer
          :buffer "*org-node reflinks*"
          :format [("Ref" 4 t) ("Inside node" 30 t) ("Link" 0 t)]
          :reverter #'org-node-list-reflinks
@@ -2081,10 +2065,9 @@ one of them is associated with a ROAM_REFS property."
 ;; the target Org file in the background, and if doing that is laggy, then
 ;; every link insertion is laggy.
 (defmacro org-node--with-quick-file-buffer (file &rest body)
-  "Pseudo-backport of Emacs 29 `org-with-file-buffer'.
-Also integrates `org-with-wide-buffer' behavior, and tries to
-execute minimal hooks in order to open and close FILE as quickly
-as possible.
+  "Like `org-with-file-buffer' and `org-with-wide-buffer'.
+Tries to execute minimal hooks in order to open and close FILE as
+quickly as possible.
 
 In detail:
 
@@ -2128,8 +2111,7 @@ Optional keyword argument ABOUT-TO-DO as in
                 (--buf-- (or --was-open--
                              (delay-mode-hooks
                                (org-node--find-file-noselect
-                                (indexed--abbrev-file-names
-                                 (file-truename ,file))
+                                (org-mem--abbr-truename ,file)
                                 ,why)))))
            (when (bufferp --buf--)
              (with-current-buffer --buf--
@@ -2430,14 +2412,14 @@ Wrap the link in double-brackets if necessary."
   (let (result)
     (maphash
      (lambda (dest links)
-       (let ((types (mapcar (##plist-get % :type) links)))
+       (let ((types (mapcar #'org-mem-link-type links)))
          (when (memq nil types)
            ;; Type nil is a @citation
            (push dest result)
            (setq types (delq nil types)))
          (dolist (type (delete-dups (delete "id" types)))
            (push (concat type ":" dest) result))))
-     indexed--dest<>links)
+     org-mem--dest<>links)
     result))
 
 (defun org-node-add-tags (tags)
@@ -2493,7 +2475,7 @@ non-nil, because it may cause noticeable lag otherwise."
                         (cl-remove-if #'keywordp)
                         (mapcar #'substring-no-properties))
            (cl-loop for node being each hash-value of org-nodes
-                    append (indexed-tags node))))
+                    append (org-mem-entry-tags node))))
    nil nil nil 'org-tags-history))
 
 (defun org-node--end-of-meta-data (&optional full)
@@ -2561,11 +2543,11 @@ Designed for `completion-at-point-functions'."
          (not (save-match-data (org-in-regexp org-link-any-re)))
          (list (car bounds)
                (cdr bounds)
-               indexed--title<>id
+               org-mem--title<>id
                :exclusive 'no
                :exit-function
                (lambda (text _)
-                 (when-let* ((id (gethash text indexed--title<>id)))
+                 (when-let* ((id (gethash text org-mem--title<>id)))
                    (atomic-change-group
                      (delete-char (- (length text)))
                      (insert (org-link-make-string (concat "id:" id) text)))
@@ -2596,6 +2578,16 @@ Designed for `completion-at-point-functions'."
 
 ;;;; Misc
 
+(defun org-node-peek (&optional ht)
+  "Print some random `org-mem-entry' objects.
+Tip: way better is a package called \"inspector\"!"
+  (interactive)
+  (let ((rows (hash-table-values (or ht org-nodes)))
+        (print-length nil))
+    (dotimes (_ 3)
+      (print '----------------------------)
+      (cl-prin1 (nth (random (length rows)) rows)))))
+
 (defun org-node-try-visit-ref-node ()
   "Designed for `org-open-at-point-functions'.
 
@@ -2606,16 +2598,16 @@ following the link normally.
 If already visiting that node, then follow the link normally."
   (when-let* ((url (thing-at-point 'url)))
     ;; Rarely more than one car
-    (let* ((dest (car (indexed-roam-split-refs-field url)))
+    (let* ((dest (car (org-mem--split-roam-refs-field url)))
            (found (cl-loop for node being each hash-value of org-nodes
-                           when (member dest (indexed-roam-refs node))
+                           when (member dest (org-mem-entry-roam-refs node))
                            return node)))
       (if (and found
                ;; Check that point is not already in said ref node (if so,
                ;; better to fallback to default `org-open-at-point' logic)
                (not (and (derived-mode-p 'org-mode)
                          (equal (org-entry-get-with-inheritance "ID")
-                                (indexed-id found)))))
+                                (org-mem-entry-id found)))))
           (progn (org-node--goto found)
                  t)
         nil))))
@@ -2748,7 +2740,7 @@ but to use `org-node--map-matches-skip-some-regions' instead."
         (goto-char starting-pos)
         nil))))
 
-;; unused for now; likely something like this will go in indexed-org-parser.el
+;; unused for now; likely something like this will go in org-mem-parser.el
 (defun org-node--map-matches-skip-some-regions (regexp fn &optional bound)
   "Go to each match for REGEXP and call FN.
 BOUND as in `re-search-forward'."
@@ -2861,7 +2853,7 @@ heading, else the file-level node, whichever has an ID first."
   "Prompt for a known ID-node."
   (gethash (completing-read "Node: " #'org-node-collection
                             () () () 'org-node-hist)
-           org-node--candidate<>node))
+           org-node--candidate<>entry))
 
 (provide 'org-node)
 
