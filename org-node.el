@@ -2042,15 +2042,18 @@ with \\[universal-argument] prefix."
 
 Useful to see how many times you\\='ve inserted a link that is very
 similar to another link, but not identical, so that likely only
-one of them is associated with a ROAM_REFS property."
+one of them is associated with a ROAM_REFS property.
+
+Excludes reflinks not coming from an ID node."
   (interactive)
   (let ((entries
          (cl-loop
           for link in (org-mem-all-links)
           unless (equal "id" (org-mem-link-type link))
+          as node = (org-mem-entry-by-id (org-mem-link-nearby-id link))
+          ;; when entry
           collect
-          (let ((node (gethash (org-mem-link-nearby-id link) org-nodes))
-                (type (org-mem-link-type link))
+          (let ((type (org-mem-link-type link))
                 (dest (org-mem-link-dest link))
                 (pos (org-mem-link-pos link))
                 (origin (org-mem-link-nearby-id link))
@@ -2060,7 +2063,7 @@ one of them is associated with a ROAM_REFS property."
                    (if (gethash dest org-mem--roam-ref<>id)
                        "*"
                      "")
-                   (if node
+                   (if (and node (org-mem-entry-title node))
                        (buttonize (org-mem-entry-title node)
                                   `(lambda (_button)
                                      (find-file ,file-name)
