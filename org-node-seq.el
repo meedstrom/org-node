@@ -557,7 +557,7 @@ not exist."
   (let* ((seq (cdr (assoc key org-node-seqs)))
          (item (assoc sortstr (plist-get seq :sorted-items))))
     (unless seq
-      (error "No seq with key %s, maybe do `org-mem-reset'?" key))
+      (error "No seq with key %s, maybe do M-x org-mem-reset?" key))
     (require 'org)
     ;; TODO: When `item' not found, still run :try-goto and pass it a
     ;;       list that contains only `sortstr', so it has a shot at finding a
@@ -586,7 +586,8 @@ not exist."
             (org-node-seq--build-from-def def))
       ;; TODO: Clear any old seq from menu
       (org-node-seq--add-to-dispatch (car def) (plist-get (cdr def) :name)))
-    (when org-mem--next-message
+    (when (and org-mem--next-message
+               org-node-seqs)
       (setq org-mem--next-message
             (concat org-mem--next-message
                     (format " + %.2fs making org-node-seqs"

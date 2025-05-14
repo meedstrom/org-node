@@ -49,7 +49,7 @@ For the cache location, see `org-node-data-dir'."
 Each preview is a cons cell \(POS-DIFF . TEXT) where POS-DIFF
 corresponds to a link\\='s buffer position relative to that of
 the heading that has said ID, and TEXT is an output of
-`org-node--get-preview'.")
+`org-node-context--get-preview'.")
 
 (defvar org-node-context--persist-timer (timer-create))
 (defvar org-node-context--last-tbl-state 0)
@@ -457,11 +457,11 @@ that buffer."
                               'face
                               'org-node-context-origin-title)
                   (propertize breadcrumbs 'face 'completions-annotations)))
-        (insert (org-node--get-preview node link))
+        (insert (org-node-context--get-preview node link))
         (insert "\n")))))
 
 (defvar org-node-context--snippet-link)
-(defun org-node--get-preview (node link)
+(defun org-node-context--get-preview (node link)
   "Get a preview snippet out of NODE file, where LINK is.
 
 Actually, if a snippet was previously cached, return the cached version,
