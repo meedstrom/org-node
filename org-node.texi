@@ -1,0 +1,1140 @@
+\input texinfo    @c -*- texinfo -*-
+@c %**start of header
+@setfilename org-node.info
+@settitle org-node
+@documentencoding UTF-8
+@documentlanguage en
+@c %**end of header
+
+@dircategory Emacs
+@direntry
+* Org-node: (org-node). Link org-id entries into a network.
+@end direntry
+
+@finalout
+@titlepage
+@title org-node
+@author Martin Edström
+@end titlepage
+
+@ifnottex
+@node Top
+@top org-node
+@end ifnottex
+
+@menu
+* Background::
+* Setup::
+* Backlinks::
+* Misc::
+* Appendix::
+
+@detailmenu
+--- The Detailed Node Listing ---
+
+Background
+
+* What's all this::
+* What's a "node"?::
+* Features::
+
+Setup
+
+* Install::
+* Quick start::
+
+Install
+
+* An update broke things?::
+* Can't find any nodes?::
+
+Backlinks
+
+* Backlink solution 1 displayed in a separate window::
+* Backlink solution 2 Print inside the file::
+
+Backlink solution 1: displayed in a separate window
+
+* Option 1A Reuse the org-roam buffer::
+* Option 2A Use the org-node-context buffer::
+
+Backlink solution 2: Print inside the file
+
+* Option 2A Automatic @samp{BACKLINKS} property::
+* Option 2B Automatic @samp{BACKLINKS...END} drawer: Option 2B Automatic @samp{BACKLINKSEND} drawer. 
+* Option 2C Semi-automatic @samp{BACKLINKS...END} drawer: Option 2C Semi-automatic @samp{BACKLINKSEND} drawer. 
+
+Misc
+
+* Manage org-id-locations::
+* Org-capture::
+* Exclude uninteresting nodes::
+* Completion-at-point::
+* Customize appearance::
+* Grep::
+* Let org-open-at-point detect refs::
+* Limitation TRAMP::
+* Limitation Encryption::
+* Limitation Unique titles::
+* Limitation Org-ref::
+* Toolbox::
+* Experimental Node sequences::
+
+Manage org-id-locations
+
+* Undoing an org-roam hack::
+
+Exclude uninteresting nodes
+
+* Limitation @samp{ROAM_EXCLUDE}::
+
+Experimental: Node sequences
+
+* What are node seqs?::
+
+Appendix
+
+* Appendix I Rosetta stone::
+* Appendix II How to rollback::
+* Appendix III Random tips::
+* Appendix IV What are @samp{ROAM_REFS}?::
+
+Appendix IV: What are @samp{ROAM_REFS}?
+
+* What's it actually used for?::
+* Citations::
+
+@end detailmenu
+@end menu
+
+@node Background
+@chapter Background
+
+@menu
+* What's all this::
+* What's a "node"?::
+* Features::
+@end menu
+
+@node What's all this
+@section What's all this
+
+I like @uref{https://github.com/org-roam/org-roam, org-roam} but found it too slow@comma{} so I made @uref{https://github.com/meedstrom/quickroam, quickroam}.  And that idea spun off into this package@comma{} a standalone thing.  It may also be easier to pick up than org-roam.
+
+@itemize
+@item
+@strong{If you were using org-roam}@comma{} there is nothing to migrate.  You can use both packages.  It's the same on-disk format: "notes" are identified by their org-id.
+
+In pursuit of being "just org-id"@comma{} this package has no equivalent setting to @samp{org-roam-directory} -- it just looks up the @samp{org-id-locations} table.
+
+@item
+@strong{If you were not using org-roam}@comma{} maybe think of it as somewhat like @uref{https://github.com/alphapapa/org-recent-headings, org-recent-headings} tooled-up to the extent that you won't need other methods of browsing@comma{} as long as you give IDs to all objects of interest.
+
+If you were the sort of person to prefer ID-links over file links or any other type of link@comma{} you're in the right place!  Now you can rely on IDs@comma{} and---if you want---stop worrying about filenames@comma{} directories and subtree hierarchies.  As long as you've assigned an ID to a heading or file@comma{} you can find it later.
+@end itemize
+
+@node What's a "node"?
+@section What's a "node"?
+
+My life can be divided into two periods "@strong{before org-roam}" and "@strong{after org-roam}".  I crossed a kind of gap once I got a good way to link between my notes.  It's odd to remember when I just relied on browsing subtrees and filesystem directories -- what a strange way to work!
+
+I used to lose track of things I had written@comma{} under some forgotten heading in a forgotten file in a forgotten directory.  The org-roam method let me @strong{find and build on} my own work@comma{} instead of @uref{https://en.wikipedia.org/wiki/Cryptomnesia, recreating it all the time}.
+
+At the core@comma{} all the "notetaking packages" (@uref{https://github.com/rtrppl/orgrr, orgrr}/@uref{https://github.com/localauthor/zk, zk}/@uref{https://github.com/EFLS/zetteldeft, zetteldeft}/@uref{https://github.com/org-roam/org-roam, org-roam}/@uref{https://github.com/protesilaos/denote, denote}/@uref{https://github.com/kaorahi/howm, howm}/@uref{https://github.com/kisaragi-hiu/minaduki, minaduki}/@dots{}) try to help you with this: make it easy to link between notes and explore them.
+
+Right off the bat@comma{} that imposes two requirements: a method to search for notes@comma{} since you can't link to something you can't search for@comma{} and a design-choice about what kinds of things should turn up as search hits.  What's a "note"?
+
+Just searching for Org files is too coarse.  Just searching for any subtree anywhere brings in too much clutter.
+
+@strong{Here's what org-roam invented.}  It turns out that if you limit the search-hits to just those files and subtrees you've deigned to assign an org-id -- which roughly maps to @emph{everything you've ever thought it was worth linking to} -- it filters out the noise excellently.
+
+Once a subtree has an ID you can link to@comma{} it's a "node" because it has joined the wider graph@comma{} the network of linked nodes.  I wish the English language had more distinct sounds for the words "node" and "note"@comma{} but to clarify@comma{} I'll say "ID-node" when the distinction matters.
+
+@node Features
+@section Features
+
+A comparison of three systems that all permit relying on org-id and don't lock you into the concept of "one-note-per-file".
+
+@multitable {aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa} {aaaaaaaa} {aaaaaaaaaaaaaaaa} {aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}
+@headitem Feature
+@tab org-roam
+@tab org-node
+@tab @uref{https://github.com/toshism/org-super-links, org-super-links}
+@item Backlinks
+@tab yes
+@tab yes
+@tab yes
+@item Node search and insert
+@tab yes
+@tab yes
+@tab -- (suggests @uref{https://github.com/alphapapa/org-ql, org-ql})
+@item Node aliases
+@tab yes
+@tab yes
+@tab --
+@item Node exclusion
+@tab yes
+@tab limited
+@tab not applicable
+@item Refile
+@tab yes
+@tab yes
+@tab --
+@item Rich backlinks buffer
+@tab yes
+@tab yes
+@tab --
+@item Customize how backlinks shown
+@tab yes
+@tab yes
+@tab yes
+@item Reflinks
+@tab yes
+@tab yes
+@tab --
+@item Ref search
+@tab yes
+@tab yes (as aliases)
+@tab not applicable
+@item Org 9.5 @@citations as refs
+@tab yes
+@tab yes
+@tab not applicable
+@item Support org-ref v3
+@tab yes
+@tab limited
+@tab not applicable
+@item Support org-ref v2
+@tab yes
+@tab --
+@tab not applicable
+@item Work thru org-roam-capture
+@tab yes
+@tab yes
+@tab ?
+@item Work thru org-capture
+@tab --
+@tab yes
+@tab ?
+@item Daily-nodes
+@tab yes
+@tab yes
+@tab --
+@item Node sequences
+@tab --
+@tab yes
+@tab --
+@item Show backlinks in same window
+@tab --
+@tab yes
+@tab yes
+@item Cooperate with org-super-links
+@tab --
+@tab yes
+@tab not applicable
+@item Fix link descriptions
+@tab --
+@tab yes
+@tab --
+@item List dead links
+@tab --
+@tab yes
+@tab --
+@item Rename file when title changes
+@tab --
+@tab yes
+@tab --
+@item Warn about duplicate titles
+@tab --
+@tab yes
+@tab --
+@item Principled "related-section"
+@tab --
+@tab yes
+@tab yes
+@item Untitled notes
+@tab --
+@tab --
+@tab --
+@item org-protocol extension
+@tab yes
+@tab --
+@tab --
+@item Support @samp{roam:} links
+@tab yes
+@tab -- (wontfix)
+@tab --
+@item Can have separate note piles
+@tab yes
+@tab -- (wontfix)
+@tab not applicable
+@item Some query-able cache
+@tab yes
+@tab yes
+@tab --
+@item Async cache rebuild
+@tab --
+@tab yes
+@tab not applicable
+@item @strong{Time to cache my 3000 nodes}
+@tab @strong{2m 48s}
+@tab @strong{0m 01s}
+@tab not applicable
+@item @strong{Time to save file w/ 400 nodes}
+@tab @strong{5--10s}
+@tab @strong{instant}
+@tab ?
+@item @strong{Time to open minibuffer}
+@tab @strong{1--3s}
+@tab @strong{instant}
+@tab not applicable
+@end multitable
+
+@node Setup
+@chapter Setup
+
+@menu
+* Install::
+* Quick start::
+@end menu
+
+@node Install
+@section Install
+
+Assuming your package manager knows about @uref{https://melpa.org/#/getting-started, MELPA}@comma{} add this initfile snippet:
+
+@lisp
+(use-package org-node
+  :config
+  (setq org-mem-do-sync-with-org-id t) ; optional
+  (setq org-mem-watch-dirs (list "~/org")) ; optional
+  (org-mem-updater-mode)
+  (org-node-cache-mode))
+@end lisp
+
+If you're @strong{coming here from org-roam}@comma{} try this instead:
+
+@lisp
+(use-package org-node
+  :config
+  (setq org-node-creation-fn #'org-node-new-via-roam-capture)
+  (setq org-node-slug-fn #'org-node-slugify-like-roam-default)
+  (setq org-node-datestamp-format "%Y%m%d%H%M%S-")
+  (setq org-mem-do-sync-with-org-id t)
+  (setq org-mem-watch-dirs
+        (list "~/org-roam/")) ;; Your org-roam-directory here
+  (org-mem-updater-mode)
+  (org-node-cache-mode)
+  (org-node-roam-accelerator-mode))
+@end lisp
+
+@menu
+* An update broke things?::
+* Can't find any nodes?::
+@end menu
+
+@node An update broke things?
+@subsection An update broke things?
+
+See @uref{https://github.com/meedstrom/org-node#appendix-ii-how-to-rollback, How to rollback} at the end of this readme.
+
+@node Can't find any nodes?
+@subsection Can't find any nodes?
+
+See @uref{https://github.com/meedstrom/org-node#manage-org-id-locations, Manage org-id-locations}.
+
+@node Quick start
+@section Quick start
+
+If you're new to these concepts@comma{} fear not.  The main things for day-to-day operation are two verbs: "find" and "insert".
+
+Pick some short keys and try them out.
+
+@lisp
+(keymap-set global-map "M-s M-f" #'org-node-find)
+(keymap-set org-mode-map "M-s M-i" #'org-node-insert-link)
+@end lisp
+
+To browse config options@comma{} type @samp{M-x customize-group RET org-node}.
+
+Final tip: there's @strong{no separate command} for creating a new node!  Reuse one of the commands above@comma{} and type the name of a node that doesn't exist.
+
+Try it and see what happens!
+
+@node Backlinks
+@chapter Backlinks
+
+Backlinks are the butter on the bread that is your notes.  If you've ever seen a "What links here" section on some webpage@comma{} that's exactly what it is.  Imagine seeing that@comma{} all the time.  The following sections outline two general ways to do so.
+
+@menu
+* Backlink solution 1 displayed in a separate window::
+* Backlink solution 2 Print inside the file::
+@end menu
+
+@node Backlink solution 1 displayed in a separate window
+@section Backlink solution 1: displayed in a separate window
+
+@menu
+* Option 1A Reuse the org-roam buffer::
+* Option 2A Use the org-node-context buffer::
+@end menu
+
+@node Option 1A Reuse the org-roam buffer
+@subsection Option 1A: Reuse the org-roam buffer
+
+Believe it or not@comma{} you can use the org-roam buffer without the rest of org-roam.
+
+Install @uref{https://github.com/meedstrom/org-node-fakeroam, org-node-fakeroam} and add to initfiles:
+
+@lisp
+(org-node-fakeroam-redisplay-mode) ;; optional behavior
+(org-node-fakeroam-jit-backlinks-mode) ;; shim so no SQLite needed
+(org-node-fakeroam-fast-render-mode) ;; perf fixes
+
+;; Example keybindings
+(keymap-set org-mode-map "M-s M-t M-t" #'org-roam-buffer-toggle)
+(keymap-set org-mode-map "M-s M-t M-d" #'org-roam-buffer-display-dedicated)
+;; if your window mgmt style is constantly lose all windows
+(keymap-set global-map "M-s M-r" #'org-node-fakeroam-show-buffer)
+@end lisp
+
+@node Option 2A Use the org-node-context buffer
+@subsection Option 2A: Use the org-node-context buffer
+
+Org-node ships a complete rewrite of the org-roam buffer.
+
+Add to initfiles:
+
+@lisp
+(org-node-context-follow-mode) ;; optional behavior
+
+;; Example keybindings
+(keymap-set org-mode-map "M-s M-t" #'org-node-context-toggle)
+;; if your window mgmt style is constantly lose all windows
+(keymap-set global-map "M-s M-r" #'org-node-context-raise)
+@end lisp
+
+@node Backlink solution 2 Print inside the file
+@section Backlink solution 2: Print inside the file
+
+I rarely have the screen space to display a backlink buffer.  Because it needs my active involvement to keep visible@comma{} I go long periods seeing no backlinks.
+
+A complementary solution@comma{} which can also stand alone@comma{} is to have the backlinks @emph{written into} the file@comma{} on an Org property line or in a drawer.
+
+@menu
+* Option 2A Automatic @samp{BACKLINKS} property::
+* Option 2B Automatic @samp{BACKLINKS...END} drawer: Option 2B Automatic @samp{BACKLINKSEND} drawer. 
+* Option 2C Semi-automatic @samp{BACKLINKS...END} drawer: Option 2C Semi-automatic @samp{BACKLINKSEND} drawer. 
+@end menu
+
+@node Option 2A Automatic @samp{BACKLINKS} property
+@subsection Option 2A: Automatic @samp{:BACKLINKS:} property
+
+Add to initfiles:
+
+@lisp
+(setq org-node-backlink-do-drawers nil)
+(org-node-backlink-mode)
+@end lisp
+
+For a first-time run@comma{} type @samp{M-x org-node-backlink-mass-update-props}.  (Don't worry if you change your mind; undo with @samp{M-x org-node-backlink-mass-delete-props}.)
+
+NOTE 1: To be clear@comma{} this mode never generates new IDs.  That's your own business.  This only adds/edits @samp{:BACKLINKS:} properties.
+
+That means @strong{not all links create a backlink@comma{}} only links located in an entry that has or inherits an ID@.  After all@comma{} there must be something to link back to.
+
+NOTE 2:  People who prefer to hard-wrap text@comma{} instead of enabling @samp{visual-line-mode} or similar@comma{} may prefer Option 2B@.
+
+@node Option 2B Automatic @samp{BACKLINKSEND} drawer
+@subsection Option 2B: Automatic @samp{:BACKLINKS:...:END:} drawer
+
+Same as Option 2A@comma{} but uses a multiline drawer.
+
+For a first-time run@comma{} type @samp{M-x org-node-backlink-mass-update-drawers}.  (Don't worry if you change your mind; undo with @samp{M-x org-node-mass-delete-drawers}.)
+
+Then add to initfiles:
+
+@lisp
+(org-node-backlink-mode)
+@end lisp
+
+@node Option 2C Semi-automatic @samp{BACKLINKSEND} drawer
+@subsection Option 2C: Semi-automatic @samp{:BACKLINKS:...:END:} drawer
+
+If you were previously using @uref{https://github.com/toshism/org-super-links, org-super-links}@comma{} you can continue letting it manage its drawers@comma{} and leave org-node out of the matter.
+
+Just add to initfiles:
+
+@lisp
+(add-hook 'org-node-insert-link-hook
+          #'org-super-links-convert-link-to-super)
+@end lisp
+
+You may find these tools useful:
+
+@itemize
+@item
+1. You can list any dead forward-links to fix them manually:
+
+@samp{M-x org-node-list-dead-links}
+
+@item
+2. You can add all missing backlinks in bulk:
+
+@samp{M-x org-node-backlink-mass-update-drawers}
+@end itemize
+
+The second command may be useful as a starting point if you're new to org-super-links@comma{} pre-populating the notes you already have.
+
+However@comma{} when you have pre-existing drawers@dots{} @strong{MAKE A FULL BACKUP} before trying it!
+
+Org-node has a different usage in mind than org-super-links.  You may be accustomed to having old manually formatted and sorted drawers.
+
+Running aforementioned command @strong{may re-sort your backlinks and re-format their appearance into something you don't want}; double-check the following options:
+
+@itemize
+@item
+@samp{org-node-backlink-drawer-sorter}
+@item
+@samp{org-node-backlink-drawer-formatter}
+@end itemize
+
+Finally@comma{} lines that contain no Org link such as @samp{[[id:1234][Title]]} are @strong{deleted}@comma{} which would mean @strong{destroying any other info within.}  Same if a backlink is stale and no longer valid.
+
+@node Misc
+@chapter Misc
+
+@menu
+* Manage org-id-locations::
+* Org-capture::
+* Exclude uninteresting nodes::
+* Completion-at-point::
+* Customize appearance::
+* Grep::
+* Let org-open-at-point detect refs::
+* Limitation TRAMP::
+* Limitation Encryption::
+* Limitation Unique titles::
+* Limitation Org-ref::
+* Toolbox::
+* Experimental Node sequences::
+@end menu
+
+@node Manage org-id-locations
+@section Manage org-id-locations
+
+Ever run into "ID not found" situations?  Here's an extra way to feed data to org-id@comma{} as @uref{http://edstrom.dev/wjwrl/taking-ownership-of-org-id, I find clumsy the built-in options}.
+
+@lisp
+(setq org-mem-do-sync-with-org-id t)
+(setq org-mem-watch-dirs ;; Configure me
+      '("~/org/"
+        "~/Syncthing/"
+        "/mnt/stuff/"))
+@end lisp
+
+Do a @samp{M-x org-mem-reset} and see if it can find your notes now.
+
+@menu
+* Undoing an org-roam hack::
+@end menu
+
+@node Undoing an org-roam hack
+@subsection Undoing an org-roam hack
+
+If you have org-roam loaded@comma{} but no longer update the DB@comma{} opening a link can sometimes send you to an outdated file path due to @uref{https://github.com/org-roam/org-roam/blob/2a630476b3d49d7106f582e7f62b515c62430714/org-roam-id.el#L91, a line in org-roam-id.el} that causes org-id to @emph{preferentially} look up the org-roam DB instead of org-id's own table!
+
+Either revert that with the following snippet@comma{} or simply delete the DB (often located at "~/.emacs.d/org-roam.db").
+
+@lisp
+;; Undo an org-roam override
+(with-eval-after-load 'org-roam-id
+  (org-link-set-parameters
+   ;; This was default value at least from Org 9.1 to 9.7+
+   "id" :follow #'org-id-open :store #'org-id-store-link-maybe))
+@end lisp
+
+@node Org-capture
+@section Org-capture
+
+You may have heard that org-roam has a set of meta-capture templates: the @samp{org-roam-capture-templates}.
+
+People who understand the magic of capture templates@comma{} they may take this in stride.  Me@comma{} I never felt confident using a second-order abstraction over an already leaky abstraction.
+
+Can we just use vanilla org-capture?  That'd be less scary.  The answer is yes!
+
+The secret sauce is @samp{(function org-node-capture-target)}:
+
+@lisp
+(setq org-capture-templates
+      '(("i" "Capture into ID node"
+         plain (function org-node-capture-target) nil
+         :empty-lines-after 1)
+
+        ("j" "Jump to ID node"
+         plain (function org-node-capture-target) nil
+         :jump-to-captured t
+         :immediate-finish t)
+
+        ;; Sometimes handy after `org-node-insert-link'@comma{} to
+        ;; make a stub you plan to fill in later@comma{} without
+        ;; leaving the current buffer for now
+        ("s" "Make quick stub ID node"
+         plain (function org-node-capture-target) nil
+         :immediate-finish t)))
+@end lisp
+
+With that done@comma{} you can optionally configure the everyday commands @samp{org-node-find} & @samp{org-node-insert-link} to outsource to org-capture when they try to create new nodes:
+
+@lisp
+(setq org-node-creation-fn #'org-capture)
+@end lisp
+
+That last optional functionality may be confusing if I describe it -- better you give it a spin and see if you like.
+
+@node Exclude uninteresting nodes
+@section Exclude uninteresting nodes
+
+One user had over a thousand project-nodes@comma{} but only just began to do a knowledge base@comma{} and wished to avoid seeing the project nodes.
+
+This could work by---for example---excluding anything tagged "project" or perhaps anything that has a TODO state.  Here's a way to exclude both@comma{} plus anything with a @samp{:ROAM_EXCLUDE:} property:
+
+@lisp
+(setq org-node-filter-fn
+      (lambda (node)
+        (not
+         (or (org-mem-entry-todo-state node)
+             (member "project" (org-mem-entry-tags node))
+             (org-mem-entry-property "ROAM_EXCLUDE" node)))))
+@end lisp
+
+Or you could go with a whitelist approach@comma{} to show only nodes from a certain directory we'll call "my-personal-wiki":
+
+@lisp
+(setq org-node-filter-fn
+      (lambda (node)
+        (and (string-search "/my-personal-wiki/" (org-mem-entry-file node))
+             (not (org-mem-entry-property "ROAM_EXCLUDE" node)))))
+@end lisp
+
+(NB: if you don't know what @samp{ROAM_EXCLUDE} is@comma{} feel free to omit that rule)
+
+@menu
+* Limitation @samp{ROAM_EXCLUDE}::
+@end menu
+
+@node Limitation @samp{ROAM_EXCLUDE}
+@subsection Limitation: @samp{ROAM_EXCLUDE}
+
+Let's say you have a big archive file@comma{} fulla IDs@comma{} and you want all the nodes within out of sight.
+
+Putting a @samp{:ROAM_EXCLUDE: t} at the top won't do it@comma{} because unlike in org-roam@comma{} @strong{child ID nodes of an excluded node are not excluded!}  The @samp{org-node-filter-fn} applies its ruleset to each node in isolation.
+
+However@comma{} nodes in isolation do still have inherited tags.  So you can exploit that@comma{} or the outline path or file name.
+
+It works well for me to filter out any file or directory that happens to contain "archive" in the name:
+
+@lisp
+(setq org-node-filter-fn
+      (lambda (node)
+        (not (string-search "archive" (org-mem-entry-file node)))))
+@end lisp
+
+Or put something like @samp{#+filetags: :hide_node:} at the top of each file@comma{} and set:
+
+@lisp
+(setq org-node-filter-fn
+      (lambda (node)
+        (not (member "hide_node" (org-mem-entry-tags node)))))
+@end lisp
+
+@node Completion-at-point
+@section Completion-at-point
+
+To complete words at point into known node titles:
+
+@lisp
+(org-node-complete-at-point-mode)
+(setq org-roam-completion-everywhere nil) ;; Stop org-roam equivalent.
+@end lisp
+
+@node Customize appearance
+@section Customize appearance
+
+(Analogue to @samp{org-roam-node-display-template})
+
+To customize how the nodes look in the minibuffer@comma{} configure @samp{org-node-affixation-fn}:
+
+@example
+M-x customize-variable RET org-node-affixation-fn
+@end example
+
+
+A related option is @samp{org-node-alter-candidates}@comma{} which lets you match against the annotations as well as the title:
+
+@lisp
+(setq org-node-alter-candidates t)
+@end lisp
+
+@node Grep
+@section Grep
+
+If you have Ripgrep installed on the computer@comma{} and @uref{https://github.com/minad/consult, Consult} installed on Emacs@comma{} you can use this command to grep across all your Org files at any time.
+
+@lisp
+(keymap-set global-map "M-s M-g" #'org-node-grep)
+@end lisp
+
+This can be a power-tool for mass edits.  Say you want to rename some Org tag @samp{:math:} to @samp{:Math:} absolutely everywhere.  Then you could follow a procedure such as:
+
+@enumerate
+@item
+Use @samp{org-node-grep} and type @samp{:math:}
+@item
+Use @samp{embark-export} (from package @uref{https://github.com/oantolin/embark, Embark})
+@item
+Use @samp{wgrep-change-to-wgrep-mode} (from package @uref{https://github.com/mhayashi1120/Emacs-wgrep, wgrep})
+@item
+Do a query-replace (@code{M-%}) to replace all @samp{:math:} with @samp{:Math:}
+@item
+Type @code{C-c C-c} to apply the changes
+@end enumerate
+
+@node Let org-open-at-point detect refs
+@section Let org-open-at-point detect refs
+
+(For background@comma{} see @uref{https://github.com/meedstrom/org-node#appendix-iv-what-are-roam_refs, What are ROAM@math{_REFS}?} at the end of this README@.)
+
+Say there's a link to a web URL@comma{} and you've forgotten you also have a node listing that exact URL in its @samp{ROAM_REFS} property.
+
+Wouldn't it be nice if@comma{} clicking on that link@comma{} you automatically visit that node first instead of being sent to the web?  Here you go:
+
+@lisp
+(add-hook 'org-open-at-point-functions
+          #'org-node-try-visit-ref-node)
+@end lisp
+
+@node Limitation TRAMP
+@section Limitation: TRAMP
+
+Working with files over TRAMP is unsupported for now.  Org-node tries to be very fast@comma{} often nulling @samp{file-name-handler-alist}@comma{} which TRAMP needs.
+
+The best way to change this is to @uref{https://github.com/meedstrom/org-node/issues, file an issue} to show you care :-)
+
+@node Limitation Encryption
+@section Limitation: Encryption
+
+Encrypted nodes probably won't be found.  As with TRAMP@comma{} file an issue.
+
+@node Limitation Unique titles
+@section Limitation: Unique titles
+
+If two ID-nodes exist with the same title@comma{} one of them disappears from minibuffer completions.
+
+That's just the nature of completion.  Much can be said for embracing the uniqueness constraint@comma{} and org-node will print messages about collisions.
+
+Anyway@dots{} there's a workaround.  Assuming you leave @samp{org-node-affixation-fn} at its default setting@comma{} adding this to initfiles tends to do the trick:
+
+@lisp
+(setq org-node-alter-candidates t)
+@end lisp
+
+This lets you match against the node outline path and not only the title@comma{} which resolves most conflicts given that the most likely source of conflict is subheadings in disparate files@comma{} that happen to be named the same.  @uref{https://fosstodon.org/@@nickanderson/112249581810196258, Some people} make this trick part of their workflow.
+
+NB: for users of @samp{org-node-complete-at-point-mode}@comma{} this workaround won't help those completions.  With some luck you'll rarely insert the wrong link@comma{} but it's worth being aware. (@uref{https://github.com/meedstrom/org-node/issues/62, #62})
+
+@node Limitation Org-ref
+@section Limitation: Org-ref
+
+Org-node supports the Org 9.5 @@citations@comma{} but not fully the aftermarket @uref{https://github.com/jkitchin/org-ref, org-ref} &citations that emulate @LaTeX{} look-and-feel.
+
+What works is bracketed Org-ref v3 citations that start with "cite"@comma{} e.g. @samp{[[citep:...]]}@comma{} @samp{[[citealt:...]]}@comma{} @samp{[[citeauthor:...]]}@comma{} since org-mem-parser.el is able to pick them up for free.
+
+What doesn't work is e.g. @samp{[[bibentry:...]]} since it doesn't start with "cite"@comma{} nor plain @samp{citep:...} since it is not wrapped in brackets.
+
+If you need more of Org-ref@comma{} you have at least two options:
+
+@itemize
+@item
+Use org-roam - see discussions on boosting its performance @uref{https://org-roam.discourse.group/t/rewriting-org-roam-node-list-for-speed-it-is-not-sqlite/3475/92, here} and @uref{https://org-roam.discourse.group/t/improving-performance-of-node-find-et-al/3326/33, here}
+
+@item
+Get your elbows dirty and try to revive the archived branch @uref{https://github.com/meedstrom/org-node/branches, "orgref"}@comma{} see @uref{https://github.com/meedstrom/org-node/commit/90b0e503ac75428a5d3ca6a4c8c51b5e075064d3, relevant commit}.
+@end itemize
+
+@node Toolbox
+@section Toolbox
+
+Basic commands:
+
+@itemize
+@item
+@samp{org-node-find}
+@item
+@samp{org-node-insert-link}
+@item
+@samp{org-node-insert-transclusion}
+@item
+@samp{org-node-insert-transclusion-as-subtree}
+@item
+@samp{org-node-visit-random}
+@item
+@samp{org-node-refile}
+@item
+@samp{org-node-context-raise}
+@item
+@samp{org-node-context-toggle}
+@item
+@samp{org-node-seq-dispatch}
+@itemize
+@item
+Browse node series -- see README
+@end itemize
+@item
+@samp{org-node-extract-subtree}
+@itemize
+@item
+A bizarro counterpart to @samp{org-roam-extract-subtree}.  Export the subtree at point into a file-level node@comma{} @strong{leave a link in the outline parent of where the subtree was}@comma{} and show the new file as current buffer.
+@end itemize
+@item
+@samp{org-node-nodeify-entry}
+@itemize
+@item
+(Trivial) Give an ID to the subtree at point@comma{} and run the hook @samp{org-node-creation-hook}
+@end itemize
+@item
+@samp{org-node-insert-heading}
+@itemize
+@item
+(Trivial) Shortcut for @samp{org-insert-heading} + @samp{org-node-nodeify-entry}
+@end itemize
+@item
+@samp{org-node-grep}
+@itemize
+@item
+(Requires @uref{https://github.com/minad/consult, consult}) Grep across all known Org files.
+@end itemize
+@end itemize
+
+Rarer commands:
+
+@itemize
+@item
+@samp{org-node-rewrite-links-ask}
+@itemize
+@item
+Look for link descriptions that got out of sync with the corresponding node title@comma{} then prompt at each link to update it
+@end itemize
+
+@item
+@samp{org-node-rename-file-by-title}
+@itemize
+@item
+Auto-rename the file based on the current @samp{#+title} or first heading
+@itemize
+@item
+Can be run manually or placed on @samp{after-save-hook}!  When run as a hook@comma{} it is conservative@comma{} doing nothing until you configure @samp{org-node-renames-allowed-dirs}.
+@item
+@strong{Please note} that if your filenames have datestamp prefixes@comma{} like org-roam's default behavior of making filenames such as @samp{20240831143302-node_title.org}@comma{} it is important to get @samp{org-node-datestamp-format} right or it @strong{may clobber a pre-existing datestamp}.
+
+A message is printed about the rename@comma{} but it's easy to miss.
+@end itemize
+@end itemize
+
+@item
+@samp{org-node-list-dead-links}
+@itemize
+@item
+List links where the destination ID could not be found
+@end itemize
+
+@item
+@samp{org-node-lint-all-files}
+@itemize
+@item
+Can help you fix a broken setup: it runs org-lint on all known files and generates a report of Org syntax problems@comma{} for you to correct manually.
+
+Org-node @uref{https://github.com/meedstrom/org-node/issues/8#issuecomment-2101316447, assumes all files have valid syntax}@comma{} but many of the reported problems are survivable.
+@end itemize
+
+@item
+@samp{org-node-list-reflinks}
+@itemize
+@item
+List all links that aren't @samp{id:} links.  Also includes citations@comma{} even though they are technically not links.
+@end itemize
+
+@item
+@samp{org-node-list-feedback-arcs}
+@itemize
+@item
+(Requires GNU R@comma{} with R packages stringr@comma{} readr and igraph)
+
+Explore @uref{https://en.wikipedia.org/wiki/Feedback_arc_set, feedback arcs} in your ID link network.  Can work as a sort of @uref{https://edstrom.dev/zvjjm/slipbox-workflow#ttqyc, occasional QA routine}.
+@end itemize
+
+@item
+@samp{org-node-rename-asset-and-rewrite-links}
+@itemize
+@item
+Interactively rename an asset such as an image file and try to update all Org links to them.  Requires @uref{https://github.com/mhayashi1120/Emacs-wgrep, wgrep}.
+@itemize
+@item
+NOTE: It prompts you for a certain root directory@comma{} and then only looks for links in there@comma{} and in sub and sub-subdirectories and so on -- but won't find a link elsewhere.
+
+Like if you have Org files under /mnt linking to assets in /home@comma{} then those links won't be updated.  Or if you choose ~/org/some-subdir as the root directory@comma{} then links in ~/org/file.org will not update.  So choose ~/org as the root even if you are renaming something in a subdir.
+@end itemize
+@end itemize
+@end itemize
+
+Rarer commands for org-node-backlink-mode:
+
+@itemize
+@item
+@samp{org-node-backlink-mass-update-drawers}
+@item
+@samp{org-node-backlink-mass-update-props}
+@item
+@samp{org-node-backlink-mass-delete-drawers}
+@item
+@samp{org-node-backlink-mass-delete-props}
+@item
+@samp{org-node-backlink-fix-buffer}
+@end itemize
+
+@node Experimental Node sequences
+@section Experimental: Node sequences
+
+Do you already know about "daily-notes"?  Then get started with a keybinding such as:
+
+@lisp
+(keymap-set global-map "M-s M-s" #'org-node-seq-dispatch)
+@end lisp
+
+and configure @samp{org-node-seq-defs}.  See @uref{https://github.com/meedstrom/org-node/wiki/Configuring-node-sequences, wiki} for premade examples.
+
+@menu
+* What are node seqs?::
+@end menu
+
+@node What are node seqs?
+@subsection What are node seqs?
+
+It's easiest to explain node sequences if we use "daily-notes" (aka "dailies") as an example.
+
+Org-roam's idea of a "daily-note" is the same as an @uref{https://github.com/bastibe/org-journal, org-journal} entry: a file/entry where the title is just today's date.
+
+You don't need software for that basic idea@comma{} only to make it extra convenient to navigate them and jump back and forth in the series.
+
+Thus@comma{} fundamentally@comma{} any "journal" or "dailies" software are just operating on a sorted series to navigate through.  A node sequence.  You could have sequences for@comma{} let's say@comma{} historical events@comma{} Star Trek episodes@comma{} your school curriculum@dots{}
+
+@node Appendix
+@chapter Appendix
+
+@menu
+* Appendix I Rosetta stone::
+* Appendix II How to rollback::
+* Appendix III Random tips::
+* Appendix IV What are @samp{ROAM_REFS}?::
+@end menu
+
+@node Appendix I Rosetta stone
+@section Appendix I: Rosetta stone
+
+API cheatsheet between org-roam and org-node.
+
+@multitable {aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa} {aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa} {aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}
+@headitem Action
+@tab org-roam
+@tab org-node
+@item Get ID near point
+@tab @samp{(org-roam-id-at-point)}
+@tab @samp{(org-entry-get-with-inheritance "ID")}
+@item Get node at point
+@tab @samp{(org-roam-node-at-point)}
+@tab @samp{(org-node-at-point)}
+@item Prompt user to pick a node
+@tab @samp{(org-roam-node-read)}
+@tab @samp{(org-node-read)}
+@item Get node by ID
+@tab 
+@tab @samp{(org-mem-entry-by-id ID)}
+@item Get list of files
+@tab @samp{(org-roam-list-files)}
+@tab @samp{(org-mem-all-files)}
+@item Get backlink objects
+@tab @samp{(org-roam-backlinks-get NODE)}
+@tab @samp{(org-mem-id-links-to-entry NODE)}
+@item Get reflink objects
+@tab @samp{(org-roam-reflinks-get NODE)}
+@tab @samp{(org-mem-roam-reflinks-to-entry NODE)}
+@item Get title
+@tab @samp{(org-roam-node-title NODE)}
+@tab @samp{(org-mem-entry-title NODE)}
+@item Get title of file where NODE is
+@tab @samp{(org-roam-node-file-title NODE)}
+@tab @samp{(org-mem-entry-file-title NODE)}
+@item Get title @emph{or} name of file where NODE is
+@tab 
+@tab @samp{(org-mem-entry-file-title-or-basename NODE)}
+@item Get full path to file where NODE is
+@tab @samp{(org-roam-node-file NODE)}
+@tab @samp{(org-mem-entry-file NODE)}
+@item Get ID
+@tab @samp{(org-roam-node-id NODE)}
+@tab @samp{(org-mem-entry-id NODE)}
+@item Get tags
+@tab @samp{(org-roam-node-tags NODE)}
+@tab @samp{(org-mem-entry-tags NODE)}
+@item Get tags (local only)
+@tab 
+@tab @samp{(org-mem-entry-tags-local NODE)}
+@item Get tags (inherited only)
+@tab 
+@tab @samp{(org-mem-entry-tags-inherited NODE)}
+@item Get outline level
+@tab @samp{(org-roam-node-level NODE)}
+@tab @samp{(org-mem-entry-level NODE)}
+@item Get char position
+@tab @samp{(org-roam-node-point NODE)}
+@tab @samp{(org-mem-entry-pos node)}
+@item Get line number
+@tab 
+@tab @samp{(org-mem-entry-lnum NODE)}
+@item Get properties
+@tab @samp{(org-roam-node-properties NODE)}
+@tab @samp{(org-mem-entry-properties NODE)}
+@item Get subtree TODO state
+@tab @samp{(org-roam-node-todo NODE)}
+@tab @samp{(org-mem-entry-todo-state NODE)}
+@item Get subtree SCHEDULED
+@tab @samp{(org-roam-node-scheduled NODE)}
+@tab @samp{(org-mem-entry-scheduled NODE)}
+@item Get subtree DEADLINE
+@tab @samp{(org-roam-node-deadline NODE)}
+@tab @samp{(org-mem-entry-deadline NODE)}
+@item Get subtree priority
+@tab @samp{(org-roam-node-priority NODE)}
+@tab @samp{(org-mem-entry-priority NODE)}
+@item Get outline-path
+@tab @samp{(org-roam-node-olp NODE)}
+@tab @samp{(org-mem-entry-olpath NODE)}
+@item Get @samp{ROAM_REFS}
+@tab @samp{(org-roam-node-refs NODE)}
+@tab @samp{(org-mem-entry-roam-refs NODE)}
+@item Get @samp{ROAM_ALIASES}
+@tab @samp{(org-roam-node-aliases NODE)}
+@tab @samp{(org-mem-entry-roam-aliases NODE)}
+@item Get @samp{ROAM_EXCLUDE}
+@tab 
+@tab @samp{(org-mem-entry-property "ROAM_EXCLUDE" NODE)}
+@item Ensure fresh data
+@tab @samp{(org-roam-db-sync)}
+@tab @samp{(org-node-cache-ensure t t)}
+@end multitable
+
+@node Appendix II How to rollback
+@section Appendix II: How to rollback
+
+Instructions to downgrade to @uref{https://github.com/meedstrom/org-node/tags, an older version}@comma{} let's say 1.6.2.
+
+With @uref{https://github.com/quelpa/quelpa, Quelpa}:
+@lisp
+(use-package org-node
+  :quelpa (org-node :fetcher github :repo "meedstrom/org-node"
+                    :branch "v1.6"))
+@end lisp
+
+With @uref{https://github.com/slotThe/vc-use-package, vc-use-package} on Emacs 29:
+@lisp
+(use-package org-node
+  :vc (:fetcher github :repo "meedstrom/org-node"
+       :branch "v1.6"))
+@end lisp
+
+With built-in @samp{:vc} on Emacs 30+ (but note default value of @samp{use-package-vc-prefer-newest} means you never update@comma{} since it is not aware of Git tags):
+@lisp
+(use-package org-node
+  :vc (:url "https://github.com/meedstrom/org-node"
+       :branch "v1.6"))
+@end lisp
+
+With @uref{https://github.com/progfolio/elpaca, Elpaca} as follows.  Note that recipe changes only take effect after you do @samp{M-x elpaca-delete} and it re-clones -- the idea is that Elpaca users will prefer to do it manually.
+
+@lisp
+(use-package org-node
+  :ensure (:fetcher github :repo "meedstrom/org-node"
+           :branch "v1.6"))
+@end lisp
+
+@dots{}Elpaca can also target an exact version tag.  Package manager of the future@comma{} it is:
+
+@lisp
+(use-package org-node
+  :ensure (:fetcher github :repo "meedstrom/org-node"
+           :tag "1.6.2"))
+@end lisp
+
+With @uref{https://github.com/radian-software/straight.el, Straight}:
+
+@lisp
+(use-package org-node
+  :straight (org-node :type git :host github :repo "meedstrom/org-node"
+                      :branch "v1.6"))
+@end lisp
+
+@node Appendix III Random tips
+@section Appendix III: Random tips
+
+Org-roam shipped the optional @samp{(require 'org-roam-export)}@comma{} a patch to fix @samp{id:} links in HTML export.
+
+Good news@comma{} upstream fixed the root of the issue in 5e9953fa0!  Update Org to 9.7+@comma{} then set this.
+
+@example
+(setq org-html-prefer-user-labels t)
+@end example
+
+@node Appendix IV What are @samp{ROAM_REFS}?
+@section Appendix IV: What are @samp{ROAM_REFS}?
+
+Here's the start of one of my note files.  Note the @samp{:ROAM_REFS:} line.
+
+@example
+:PROPERTIES:
+:CREATED:  [2023-09-11 Mon 12:00]
+:ID:       3bf9opc0tik0
+:ROAM_REFS: https://www.greaterwrong.com/s/pFatcKW3JJhTSxqAF https://mindingourway.com/guilt/
+:END:
+#+filetags: :pub:
+#+options: toc:t
+#+title: Replacing Guilt
+
+Takeaways from Nate Soares' excellent "Replacing Guilt" series.
+
+...
+@end example
+
+An explanation: think of them as like IDs.  While org-node is built around the ID property because it acts as a singular identifier@comma{} the concept can be generalized.
+
+In another universe@comma{} @samp{ROAM_REFS} might have been called @samp{EXTRA_IDS} because in many ways it is just a list of additional IDs for the same node.
+
+For performance reasons@comma{} not just any string of text is accepted -- it must have valid links per Org syntax@comma{} such as @samp{[[https://gnu.org][GNU Website]]} or @samp{https://gnu.org}.  That is because the @uref{https://github.com/meedstrom/org-mem, org-mem} library searches for links anyway in all body text@comma{} making it cheap to see after-the-fact where else this same "extra ID" may have been mentioned@comma{} and generate a backlink!
+
+Org-roam calls such backlinks @emph{reflinks}.  In my view@comma{} adding a new word for such a similar concept just increases the air of mystery.  That's why in org-node's context buffer@comma{} they're just called "ref backlinks" -- as opposed to "ID backlinks".
+
+@menu
+* What's it actually used for?::
+* Citations::
+@end menu
+
+@node What's it actually used for?
+@subsection What's it actually used for?
+
+People often use it to write notes about a specific web-page or PDF file@comma{} and call it a ref-node for that resource.
+
+@node Citations
+@subsection Citations
+
+As a special case@comma{} citation keys such as "@@ioannidis2005" also work in @samp{ROAM_REFS}@comma{} corresponding to Org citations like @samp{[cite:@@ioannidis2005]}.
+
+@bye

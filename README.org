@@ -27,7 +27,7 @@ Also enable =org-mem-updater-mode=.  Here's a new basic-install snippet:
 #+begin_src elisp
 (use-package org-node
   :config
-  (setq org-mem-do-sync-with-org-id t) ;; optional
+  (setq org-mem-do-sync-with-org-id t)
   (org-mem-updater-mode)
   (org-node-cache-mode))
 #+end_src
@@ -215,9 +215,9 @@ Assuming your package manager knows about [[https://melpa.org/#/getting-started]
 #+begin_src elisp
 (use-package org-node
   :config
-  (setq org-mem-do-sync-with-org-id t)
+  (setq org-mem-do-sync-with-org-id t) ; optional
+  (setq org-mem-watch-dirs (list "~/org")) ; optional
   (org-mem-updater-mode)
-  (org-mem-roamy-db-mode) ;; Optional: support ROAM_REFS
   (org-node-cache-mode))
 #+end_src
 
@@ -225,32 +225,16 @@ If you're *coming here from org-roam*, try this instead:
 
 #+begin_src elisp
 (use-package org-node
-  :init
-  ;; Use org-roam's style of file names
+  :config
+  (setq org-node-creation-fn #'org-node-new-via-roam-capture)
   (setq org-node-slug-fn #'org-node-slugify-like-roam-default)
   (setq org-node-datestamp-format "%Y%m%d%H%M%S-")
-  ;; Use org-roam-capture
-  (setq org-node-creation-fn #'org-node-new-via-roam-capture)
-  ;; For org-roam users who find saving slow with
-  ;; `org-roam-db-autosync-mode',
-  ;; take over that part of its job and write to its DB
-  (setq org-mem-roamy-do-overwrite-real-db t)
-  (setq org-roam-db-update-on-save nil)
-  ;; Faster save if you don't use "roam:" links
-  (setq org-roam-link-auto-replace nil)
-
-  :config
   (setq org-mem-do-sync-with-org-id t)
+  (setq org-mem-watch-dirs
+        (list "~/org-roam/")) ;; Your org-roam-directory here
   (org-mem-updater-mode)
-  (org-mem-roamy-db-mode)
-  (org-node-cache-mode))
-
-;; Speed up the org-roam buffer
-;; NOTE: You can use org-node's context buffers instead
-(use-package org-node-fakeroam
-  :after org-roam
-  :config
-  (org-node-fakeroam-fast-render-mode))
+  (org-node-cache-mode)
+  (org-node-roam-accelerator-mode))
 #+end_src
 
 *** An update broke things?
@@ -675,24 +659,24 @@ Thus, fundamentally, any "journal" or "dailies" software are just operating on a
 
 API cheatsheet between org-roam and org-node.
 
-| Action                                  | org-roam                        | org-node                               |
-|-----------------------------------------+---------------------------------+----------------------------------------|
-| Get ID near point                       | =(org-roam-id-at-point)=          | =(org-entry-get-with-inheritance "ID")=  |
-| Get node at point                       | =(org-roam-node-at-point)=        | =(org-node-at-point)=                    |
-| Prompt user to pick a node              | =(org-roam-node-read)=            | =(org-node-read)=                        |
-| Get node by ID                          |                                 | =(org-mem-entry-by-id ID)=               |
-| Get list of files                       | =(org-roam-list-files)=           | =(org-mem-all-files)=                    |
+| Action                                  | org-roam                        | org-node                                     |
+|-----------------------------------------+---------------------------------+----------------------------------------------|
+| Get ID near point                       | =(org-roam-id-at-point)=          | =(org-entry-get-with-inheritance "ID")=        |
+| Get node at point                       | =(org-roam-node-at-point)=        | =(org-node-at-point)=                          |
+| Prompt user to pick a node              | =(org-roam-node-read)=            | =(org-node-read)=                              |
+| Get node by ID                          |                                 | =(org-mem-entry-by-id ID)=                     |
+| Get list of files                       | =(org-roam-list-files)=           | =(org-mem-all-files)=                          |
 | Get backlink objects                    | =(org-roam-backlinks-get NODE)=   | =(org-mem-id-links-to-entry NODE)=             |
 | Get reflink objects                     | =(org-roam-reflinks-get NODE)=    | =(org-mem-roam-reflinks-to-entry NODE)=        |
 | Get title                               | =(org-roam-node-title NODE)=      | =(org-mem-entry-title NODE)=                   |
 | Get title of file where NODE is         | =(org-roam-node-file-title NODE)= | =(org-mem-entry-file-title NODE)=              |
 | Get title /or/ name of file where NODE is |                                 | =(org-mem-entry-file-title-or-basename NODE)=  |
-| Get full path to file where NODE is     | =(org-roam-node-file NODE)=       | =(org-mem-entry-file NODE)=               |
+| Get full path to file where NODE is     | =(org-roam-node-file NODE)=       | =(org-mem-entry-file NODE)=                    |
 | Get ID                                  | =(org-roam-node-id NODE)=         | =(org-mem-entry-id NODE)=                      |
 | Get tags                                | =(org-roam-node-tags NODE)=       | =(org-mem-entry-tags NODE)=                    |
 | Get tags (local only)                   |                                 | =(org-mem-entry-tags-local NODE)=              |
 | Get tags (inherited only)               |                                 | =(org-mem-entry-tags-inherited NODE)=          |
-| Get outline level                       | =(org-roam-node-level NODE)=      | =(org-mem-level NODE)=                   |
+| Get outline level                       | =(org-roam-node-level NODE)=      | =(org-mem-entry-level NODE)=                   |
 | Get char position                       | =(org-roam-node-point NODE)=      | =(org-mem-entry-pos node)=                     |
 | Get line number                         |                                 | =(org-mem-entry-lnum NODE)=                    |
 | Get properties                          | =(org-roam-node-properties NODE)= | =(org-mem-entry-properties NODE)=              |
@@ -704,7 +688,7 @@ API cheatsheet between org-roam and org-node.
 | Get =ROAM_REFS=                           | =(org-roam-node-refs NODE)=       | =(org-mem-entry-roam-refs NODE)=               |
 | Get =ROAM_ALIASES=                        | =(org-roam-node-aliases NODE)=    | =(org-mem-entry-roam-aliases NODE)=            |
 | Get =ROAM_EXCLUDE=                        |                                 | =(org-mem-entry-property "ROAM_EXCLUDE" NODE)= |
-| Ensure fresh data                       | =(org-roam-db-sync)=              | =(org-node-cache-ensure t t)=            |
+| Ensure fresh data                       | =(org-roam-db-sync)=              | =(org-node-cache-ensure t t)=                  |
 
 ** Appendix II: How to rollback
 
