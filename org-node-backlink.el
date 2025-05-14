@@ -743,7 +743,7 @@ If REMOVE non-nil, remove it instead."
 ;; REVIEW: Only comes into effect on
 ;;         `org-mem-post-targeted-scan-functions', but could also other
 ;;         times?  Possible the algo could be simpler, rather than diffing
-;;         `org-node--old-link-sets' from current, simply look in
+;;         `org-mem-x--old-link-sets' from current, simply look in
 ;;         `org-mem-entry-properties' of all nodes...
 
 (defcustom org-node-backlink-lazy nil
@@ -781,28 +781,25 @@ To force an update at any time, use one of these commands:
   (unless org-node-backlink-lazy
     (let (affected-dests)
       (cl-loop
-       for (dest . old-links) in org-node--old-link-sets
-       when (cl-set-exclusive-or
-             (mapcar #'org-mem-link-nearby-id old-links)
-             (mapcar #'org-mem-link-nearby-id (gethash dest org-mem--dest<>links))
-             :test #'equal)
-       do (let* ((id dest)
-                 (entry (or (gethash id org-nodes)
-                           ;; See if this is a ref and find the real id
-                           (and (setq id (gethash dest org-mem--roam-ref<>id))
-                                (gethash id org-nodes)))))
-            ;; (#59) Do nothing if this is an empty link like [[id:]]
-            (when entry
-              ;; Add to the dataset `affected-dests', which looks like:
-              ;;   ((file1 . (origin1 origin2 origin3 ...))
-              ;;    (file2 . (...))
-              ;;    (file3 . (...)))
-              (push id (alist-get (org-mem-entry-file entry)
-                                  affected-dests
-                                  nil
-                                  nil
-                                  #'equal)))))
-      (setq org-node--old-link-sets nil)
+       for dest being each hash-key of org-mem-x--dest<>old-id-links
+       using (hash-values old-id-links)
+       as entry = (or (org-mem-entry-by-id dest)
+                      (org-mem-entry-by-roam-ref dest))
+       when entry
+       when (not (seq-set-equal-p
+             (seq-keep #'org-mem-link-nearby-id old-id-links)
+             (seq-keep #'org-mem-link-nearby-id (gethash dest org-mem--dest<>links))))
+       ;; Something changed in the set of links targeting this entry.
+       ;; So we'll go to the entry to refresh backlinks.
+       do
+       ;; Alist `affected-dests' looks like:
+       ;;   ((file1 . (origin1 origin2 origin3 ...))
+       ;;    (file2 . (...))
+       ;;    (file3 . (...)))
+       ;; We do not use entry positions since they'll change after edit.
+       (push (org-mem-entry-id entry)
+             (alist-get (org-mem-entry-file entry) affected-dests () () #'equal)))
+
       (cl-loop
        for (file . ids) in affected-dests
        when (and (file-readable-p file)
