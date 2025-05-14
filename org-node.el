@@ -109,6 +109,8 @@
 (declare-function consult--grep-make-builder "ext:consult")
 (declare-function consult--ripgrep-make-builder "ext:consult")
 (declare-function org-mem-x-ensure-entry-at-point-known "org-mem")
+(declare-function org-mem-roamy-mk-backlinks "org-mem-roamy")
+(declare-function org-mem-roamy-mk-reflinks "org-mem-roamy")
 
 (defvaralias 'org-nodes 'org-mem--id<>entry)
 
@@ -2821,8 +2823,8 @@ overhead of creation.  To clean up, call
           (delay-mode-hooks (org-mode))
           (setq-local org-element-cache-persistent nil)
           (insert-file-contents file)
-          ;; May be useful for `org-node-fakeroam-fast-render-mode'.
-          ;; No idea why `org-roam-with-temp-buffer' sets default-directory,
+          ;; May be useful for `org-node-roam-accelerator-mode'.
+          ;; No idea why `org-roam-with-temp-buffer' sets default directory,
           ;; but Chesterton's Fence.
           (setq-local default-directory (file-name-directory file))
           ;; Ensure that attempted edits trip an error, since the buffer may be
@@ -2844,6 +2846,86 @@ Like a temp buffer, but never dies.  You should probably use
           (delay-mode-hooks (org-mode))
           (setq-local org-element-cache-persistent nil)
           (current-buffer)))))
+
+
+;;; Org-roam accelerator
+;; Just because we can.
+
+(defvar org-node--ad-roam-src-node nil)
+(defun org-node--ad-roam-node-insert-section (orig-fn &rest args)
+  "Designed as around-advice for `org-roam-node-insert-section'.
+
+Run ORIG-FN with ARGS, while overriding
+`org-roam-fontify-like-in-org-mode' so it does nothing.
+While we\\='re at it, inspect ARGS for its SOURCE-NODE argument and
+stash it in the variable `org-node--ad-roam-src-node'."
+  (setq org-node--ad-roam-src-node
+        (plist-get args :source-node))
+  (cl-letf (((symbol-function 'org-roam-fontify-like-in-org-mode) #'identity))
+    (apply orig-fn args)))
+
+(declare-function org-roam-node-id "ext:org-roam-node")
+(defvar org-roam-preview-function)
+(defvar org-roam-preview-postprocess-functions)
+(defvar org-node--ad-roam-id<>previews (make-hash-table :test #'equal))
+(defun org-node--ad-roam-preview-get-contents (file link-pos)
+  "Designed as override for `org-roam-preview-get-contents'.
+
+Normally the first time you open an org-roam buffer, Emacs hangs for as
+long as a minute on a slow machine when huge files are involved, due to
+having to fontify each file\\='s entire contents in a hidden buffer,
+then applying #+startup:indent and other options, then org-element cache
+has to do its thing even though the cache will be thrown away.
+
+This tries to eliminate all those problems.
+
+Aside from huge files, it is also slow when there are backlinks coming
+from many sources.  To deal with that:
+
+1. this reuses buffers if several backlinks originate from the same file
+2. even if all originate from different files, this caches all snippets
+   so that it should only be slow the first time."
+  (let* ((src-id (org-roam-node-id org-node--ad-roam-src-node))
+         (src (org-mem-entry-by-id src-id))
+         (_ (unless src
+              (error "Org-roam node unknown to Org-mem: %s" src-id)))
+         (pos-diff (- link-pos (org-mem-entry-pos src))))
+    (with-memoization
+        (alist-get pos-diff (gethash src-id org-node--ad-roam-id<>previews))
+      (let (snippet)
+        (with-current-buffer (org-node--work-buffer-for file)
+          (goto-char link-pos)
+          (cl-letf (((symbol-function 'org-back-to-heading-or-point-min)
+                     #'org-node--back-to-heading-or-point-min))
+            (setq snippet (funcall org-roam-preview-function))
+            (dolist (fn org-roam-preview-postprocess-functions)
+              (setq snippet (funcall fn snippet)))))
+        (with-current-buffer (org-node--general-org-work-buffer)
+          (erase-buffer)
+          (insert snippet)
+          (font-lock-ensure)
+          (buffer-string))))))
+
+;;;###autoload
+(define-minor-mode org-node-roam-accelerator-mode
+  "Advise the \"*org-roam*\" buffer to be faster.
+As a side effect, it can be used without the rest of org-roam."
+  :global t
+  (require 'org-roam)
+  (require 'org-mem-roamy)
+  (if org-node-roam-accelerator-mode
+      (progn
+        (advice-add 'org-roam-node-insert-section :around    #'org-node--ad-roam-node-insert-section)
+        (advice-add 'org-roam-preview-get-contents :override #'org-node--ad-roam-preview-get-contents)
+        (advice-add 'org-roam-buffer-render-contents :after  #'org-node--kill-work-buffers)
+        (advice-add 'org-roam-backlinks-get :override        #'org-mem-roamy-mk-backlinks)
+        (advice-add 'org-roam-reflinks-get  :override        #'org-mem-roamy-mk-reflinks))
+    (advice-remove 'org-roam-node-insert-section    #'org-node--ad-roam-node-insert-section)
+    (advice-remove 'org-roam-node-insert-section    #'org-node--ad-roam-node-insert-section)
+    (advice-remove 'org-roam-preview-get-contents   #'org-node--ad-roam-preview-get-contents)
+    (advice-remove 'org-roam-buffer-render-contents #'org-node--kill-work-buffers)
+    (advice-remove 'org-roam-backlinks-get          #'org-mem-roamy-mk-backlinks)
+    (advice-remove 'org-roam-reflinks-get           #'org-mem-roamy-mk-reflinks)))
 
 
 ;;;; API not used within this package
