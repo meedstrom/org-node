@@ -814,7 +814,7 @@ To force an update at any time, use one of these commands:
               (dolist (id (delete-dups ids))
                 (goto-char (point-min))
                 (when (re-search-forward
-                       (concat "^[\t\s]*:id: +" (regexp-quote id))
+                       (concat "^[\s\t]*:ID: +" (regexp-quote id))
                        nil t)
                   (org-node-backlink--fix-nearby)))
               ;; Normally, `org-node--with-quick-file-buffer' only saves

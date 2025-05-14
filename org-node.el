@@ -23,7 +23,6 @@
 
 ;; NOTE: Looking for Package-Version?  Consult the Git tag.
 ;;       MELPA versions above 20250303 is v2.
-;;       MELPA versions above 20250325 is v3.
 
 ;;; Commentary:
 
@@ -85,7 +84,6 @@
 ;;; Code:
 
 ;; Built-in
-(require 'seq)
 (require 'cl-lib)
 (require 'subr-x)
 (eval-when-compile
@@ -214,8 +212,8 @@ Applied by `org-node-new-file', `org-node-capture-target',
 NOT applied by `org-node-new-via-roam-capture' -- see
 org-roam\\='s `org-roam-capture-new-node-hook' instead.
 
-A good function for this hook is `org-node-put-created', since
-the default `org-node-datestamp-format' is empty.
+A good function for this hook is `'org-node-ensure-crtime-property',
+since the default `org-node-datestamp-format' is empty.
 
 In the author\\='s experience, recording the creation-date somewhere may
 prove useful later on, e.g. when publishing to a blog.
@@ -223,7 +221,7 @@ Filesystem creation-time cannot be relied on."
   :type 'hook)
 
 (unless (featurep 'org-node)
-  (add-hook 'org-node-creation-hook #'org-node-put-created -95)
+  (add-hook 'org-node-creation-hook #'org-node-ensure-crtime-property -95)
   (add-hook 'org-node-creation-hook #'org-mem-x-ensure-entry-at-point-known -90))
 
 
@@ -280,8 +278,8 @@ a list of three strings: title, prefix and suffix.  Of those three, the
 title should be TITLE unmodified.
 
 NODE is an object which form you can observe in examples from
-\\[org-node-peek] and specified in type `org-node'
-\(for docs, type \\[describe-symbol] org-node RET).
+\\[org-node-peek] and specified in type `org-mem-entry'
+\(for docs, type \\[describe-symbol] org-mem-entry RET).
 
 If a node has aliases, the same node is passed to this function
 again for every alias, in which case TITLE is actually one of the
@@ -292,6 +290,7 @@ aliases."
           (function-item org-node-prefix-with-tags)
           (function-item org-node-prefix-with-tags-and-olp)
           (function-item org-node-affix-with-olp-and-tags)
+          (function-item org-node-affix-with-olp-and-tags-legacy)
           (function :tag "Custom function"
                     :value (lambda (node title) (list title "" ""))))
   :package-version '(org-node . "0.9")
@@ -314,8 +313,7 @@ For use as `org-node-affixation-fn'."
         ""))
 
 (defun org-node-prefix-with-olp (node title)
-  "Prepend NODE's outline path to TITLE.
-For use as `org-node-affixation-fn'."
+  "Prepend NODE's outline path to TITLE."
   (list title
         (if-let* ((fontified-ancestors
                    (cl-loop
@@ -344,8 +342,27 @@ For use as `org-node-affixation-fn'."
         ""))
 
 (defun org-node-affix-with-olp-and-tags (node title)
+  "Prepend NODE's outline path to TITLE, and append NODE's tags."
+  (list title
+        (if (org-mem-entry-subtree-p node)
+            (let ((ancestors (org-mem-entry-olpath-with-title node))
+                  (result nil))
+              (dolist (anc ancestors)
+                (push (propertize anc 'face 'completions-annotations) result)
+                (push " > " result))
+              (setq result (apply #'concat (nreverse result)))
+              (setq prefix-len (length result))
+              result)
+          "")
+        (let ((tags (org-mem-entry-tags node)))
+          (if tags (propertize (concat "   :" (string-join tags ":") ":")
+                               'face 'org-tag)
+            ""))))
+
+;; Doubt many used this
+(defun org-node-affix-with-olp-and-tags-legacy (node title)
   "Prepend NODE's outline path to TITLE, and append NODE's tags.
-For use as `org-node-affixation-fn'."
+Legacy version."
   (let ((prefix-len 0))
     (list title
           (if (org-mem-entry-subtree-p node)
@@ -409,7 +426,7 @@ see Info node `(elisp)Programmed Completion'."
   "Minibuffer history.")
 
 ;; Boost this completion hist to at least 1000 elements, unless user has nerfed
-;; the global `history-length'.
+;; the default `history-length'.
 ;; Because you often narrow down the completions majorly, and still want to
 ;; sort among what's left.
 (and (>= history-length (car (get 'history-length 'standard-value)))
@@ -1268,7 +1285,6 @@ Result will basically look like:
 ** [[Note]]
 #+transclude: [[Note]] :level :no-first-heading
 
-but adapt to the surrounding outline level.
 If you often transclude file-level nodes, consider adding keywords to
 `org-transclusion-exclude-elements':
 
@@ -1758,6 +1774,7 @@ user quits, do not apply any modifications."
   (unless (org-entry-get nil "CREATED")
     (org-entry-put nil "CREATED"
                    (format-time-string (org-time-stamp-format t t)))))
+(defalias 'org-node-ensure-crtime-property 'org-node-put-created)
 
 ;;;###autoload
 (defun org-node-forget-dir (dir)
