@@ -23,12 +23,6 @@
 @end ifnottex
 
 @menu
-<<<<<<< HEAD
-<<<<<<< HEAD
-* News for v3::
-=======
-=======
->>>>>>> 6af9c5a (docs:)
 * Background::
 * Setup::
 * Backlinks::
@@ -52,10 +46,7 @@ Setup
 Install
 
 * An update broke things?::
-<<<<<<< HEAD
-=======
 * Can't find any nodes?::
->>>>>>> 6af9c5a (docs:)
 
 Backlinks
 
@@ -65,11 +56,7 @@ Backlinks
 Backlink solution 1: displayed in a separate window
 
 * Option 1A Reuse the org-roam buffer::
-<<<<<<< HEAD
-* Option 2A Use the new org-node-context buffer::
-=======
 * Option 2A Use the org-node-context buffer::
->>>>>>> 6af9c5a (docs:)
 
 Backlink solution 2: Print inside the file
 
@@ -80,17 +67,10 @@ Backlink solution 2: Print inside the file
 Misc
 
 * Manage org-id-locations::
-<<<<<<< HEAD
-* Exclude uninteresting nodes::
-* Org-capture::
-* Completion-at-point::
-* FAQ Any analogue to @samp{org-roam-node-display-template}?::
-=======
 * Org-capture::
 * Exclude uninteresting nodes::
 * Completion-at-point::
 * Customize appearance::
->>>>>>> 6af9c5a (docs:)
 * Grep::
 * Let org-open-at-point detect refs::
 * Limitation TRAMP::
@@ -117,48 +97,6 @@ Appendix
 * Appendix I Rosetta stone::
 * Appendix II How to rollback::
 * Appendix III Random tips::
-<<<<<<< HEAD
-
-@end detailmenu
->>>>>>> 511e0c5 (docs:)
-@end menu
-
-@node News for v3
-@chapter News for v3 :export:
-
-A lot of code has been spun into a new library @uref{https://github.com/meedstrom/indexed}@comma{} now a dependency.  Reduces codebase by 25%.  This may allow other projects to create interesting stuff without org-node.
-
-Update initfiles when you can.  Direct renames:
-
-<<<<<<< HEAD
-@multitable {aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa} {aaaaaaaaaaaaaaaaaaaaaaaa}
-@headitem Old user option
-@tab New user option
-@item org-node-extra-id-dirs
-@tab indexed-org-dirs
-@item org-node-extra-id-dirs-exclude
-@tab indexed-org-dirs-exclude
-@item org-node-link-types
-@tab indexed-seek-link-types
-@end multitable
-
-Also you'll get messages about it@comma{} but enable two modes before @samp{org-node-cache-mode}:
-
-@lisp
-(indexed-roam-mode)
-(indexed-updater-mode)
-(org-node-cache-mode)
-@end lisp
-
-Node seqs@comma{} if you use them@comma{} now require turning on explicitly.
-
-@lisp
-(org-node-seq-mode)
-@end lisp
-
-For reference@comma{} check out the full list of obsoletions near the bottom of file @samp{org-node-changes.el}.
-=======
-=======
 * Appendix IV What are @samp{ROAM_REFS}?::
 
 Appendix IV: What are @samp{ROAM_REFS}?
@@ -181,18 +119,12 @@ Appendix IV: What are @samp{ROAM_REFS}?
 @node What's all this
 @section What's all this
 
->>>>>>> 6af9c5a (docs:)
 I like @uref{https://github.com/org-roam/org-roam, org-roam} but found it too slow@comma{} so I made @uref{https://github.com/meedstrom/quickroam, quickroam}.  And that idea spun off into this package@comma{} a standalone thing.  It may also be easier to pick up than org-roam.
 
 @itemize
 @item
 @strong{If you were using org-roam}@comma{} there is nothing to migrate.  You can use both packages.  It's the same on-disk format: "notes" are identified by their org-id.
 
-<<<<<<< HEAD
-With optional shims@comma{} you can even @strong{skip syncing the org-roam DB} and continue using its rich backlinks buffer!
-
-=======
->>>>>>> 6af9c5a (docs:)
 In pursuit of being "just org-id"@comma{} this package has no equivalent setting to @samp{org-roam-directory} -- it just looks up the @samp{org-id-locations} table.
 
 @item
@@ -337,13 +269,8 @@ A comparison of three systems that all permit relying on org-id and don't lock y
 @tab -- (wontfix)
 @tab not applicable
 @item Some query-able cache
-<<<<<<< HEAD
-@tab EmacSQL
-@tab hash tables
-=======
 @tab yes
 @tab yes
->>>>>>> 6af9c5a (docs:)
 @tab --
 @item Async cache rebuild
 @tab --
@@ -379,15 +306,9 @@ Assuming your package manager knows about @uref{https://melpa.org/#/getting-star
 @lisp
 (use-package org-node
   :config
-<<<<<<< HEAD
-  (setq indexed-sync-with-org-id t)
-  (indexed-updater-mode)
-  (indexed-roam-mode) ;; Support ROAM_REFS
-=======
   (setq org-mem-do-sync-with-org-id t) ; optional
   (setq org-mem-watch-dirs (list "~/org")) ; optional
   (org-mem-updater-mode)
->>>>>>> 6af9c5a (docs:)
   (org-node-cache-mode))
 @end lisp
 
@@ -395,35 +316,6 @@ If you're @strong{coming here from org-roam}@comma{} try this instead:
 
 @lisp
 (use-package org-node
-<<<<<<< HEAD
-  :init
-  ;; Use org-roam's style of file names
-  (setq org-node-slug-fn #'org-node-slugify-like-roam-default)
-  (setq org-node-datestamp-format "%Y%m%d%H%M%S-")
-  ;; Use org-roam-capture
-  (setq org-node-creation-fn #'org-node-new-via-roam-capture)
-  ;; For org-roam users who find saving slow with
-  ;; `org-roam-db-autosync-mode'@comma{}
-  ;; take over that part of its job and write to its DB
-  (setq indexed-roam-overwrite t)
-  (setq org-roam-db-update-on-save nil)
-  ;; Faster save if you don't use "roam:" links
-  (setq org-roam-link-auto-replace nil)
-
-  :config
-  (setq indexed-sync-with-org-id t)
-  (indexed-updater-mode)
-  (indexed-roam-mode) ;; Support ROAM_REFS
-  (org-node-cache-mode))
-
-;; Speed up the org-roam buffer
-;; NOTE: You can use org-node's context buffers instead
-;; NOTE: Subject to removal@comma{} if upstream finally patches this
-(use-package org-node-fakeroam
-  :after org-roam
-  :config
-  (org-node-fakeroam-fast-render-mode))
-=======
   :config
   (setq org-node-creation-fn #'org-node-new-via-roam-capture)
   (setq org-node-slug-fn #'org-node-slugify-like-roam-default)
@@ -434,15 +326,11 @@ If you're @strong{coming here from org-roam}@comma{} try this instead:
   (org-mem-updater-mode)
   (org-node-cache-mode)
   (org-node-roam-accelerator-mode))
->>>>>>> 6af9c5a (docs:)
 @end lisp
 
 @menu
 * An update broke things?::
-<<<<<<< HEAD
-=======
 * Can't find any nodes?::
->>>>>>> 6af9c5a (docs:)
 @end menu
 
 @node An update broke things?
@@ -450,14 +338,11 @@ If you're @strong{coming here from org-roam}@comma{} try this instead:
 
 See @uref{https://github.com/meedstrom/org-node#appendix-ii-how-to-rollback, How to rollback} at the end of this readme.
 
-<<<<<<< HEAD
-=======
 @node Can't find any nodes?
 @subsection Can't find any nodes?
 
 See @uref{https://github.com/meedstrom/org-node#manage-org-id-locations, Manage org-id-locations}.
 
->>>>>>> 6af9c5a (docs:)
 @node Quick start
 @section Quick start
 
@@ -491,21 +376,13 @@ Backlinks are the butter on the bread that is your notes.  If you've ever seen a
 
 @menu
 * Option 1A Reuse the org-roam buffer::
-<<<<<<< HEAD
-* Option 2A Use the new org-node-context buffer::
-=======
 * Option 2A Use the org-node-context buffer::
->>>>>>> 6af9c5a (docs:)
 @end menu
 
 @node Option 1A Reuse the org-roam buffer
 @subsection Option 1A: Reuse the org-roam buffer
 
-<<<<<<< HEAD
-Believe it or not@comma{} you can use it without the rest of org-roam.
-=======
 Believe it or not@comma{} you can use the org-roam buffer without the rest of org-roam.
->>>>>>> 6af9c5a (docs:)
 
 Install @uref{https://github.com/meedstrom/org-node-fakeroam, org-node-fakeroam} and add to initfiles:
 
@@ -521,13 +398,8 @@ Install @uref{https://github.com/meedstrom/org-node-fakeroam, org-node-fakeroam}
 (keymap-set global-map "M-s M-r" #'org-node-fakeroam-show-buffer)
 @end lisp
 
-<<<<<<< HEAD
-@node Option 2A Use the new org-node-context buffer
-@subsection Option 2A: Use the new org-node-context buffer
-=======
 @node Option 2A Use the org-node-context buffer
 @subsection Option 2A: Use the org-node-context buffer
->>>>>>> 6af9c5a (docs:)
 
 Org-node ships a complete rewrite of the org-roam buffer.
 
@@ -569,11 +441,7 @@ For a first-time run@comma{} type @samp{M-x org-node-backlink-mass-update-props}
 
 NOTE 1: To be clear@comma{} this mode never generates new IDs.  That's your own business.  This only adds/edits @samp{:BACKLINKS:} properties.
 
-<<<<<<< HEAD
-That also means that @strong{not all links create a backlink@comma{}} only links located in an entry that has an ID@.  After all@comma{} there must be something to link back to.
-=======
 That means @strong{not all links create a backlink@comma{}} only links located in an entry that has or inherits an ID@.  After all@comma{} there must be something to link back to.
->>>>>>> 6af9c5a (docs:)
 
 NOTE 2:  People who prefer to hard-wrap text@comma{} instead of enabling @samp{visual-line-mode} or similar@comma{} may prefer Option 2B@.
 
@@ -602,11 +470,7 @@ Just add to initfiles:
           #'org-super-links-convert-link-to-super)
 @end lisp
 
-<<<<<<< HEAD
-Org-node still gives you some bonus tools:
-=======
 You may find these tools useful:
->>>>>>> 6af9c5a (docs:)
 
 @itemize
 @item
@@ -642,17 +506,10 @@ Finally@comma{} lines that contain no Org link such as @samp{[[id:1234][Title]]}
 
 @menu
 * Manage org-id-locations::
-<<<<<<< HEAD
-* Exclude uninteresting nodes::
-* Org-capture::
-* Completion-at-point::
-* FAQ Any analogue to @samp{org-roam-node-display-template}?::
-=======
 * Org-capture::
 * Exclude uninteresting nodes::
 * Completion-at-point::
 * Customize appearance::
->>>>>>> 6af9c5a (docs:)
 * Grep::
 * Let org-open-at-point detect refs::
 * Limitation TRAMP::
@@ -666,30 +523,17 @@ Finally@comma{} lines that contain no Org link such as @samp{[[id:1234][Title]]}
 @node Manage org-id-locations
 @section Manage org-id-locations
 
-<<<<<<< HEAD
-Ever run into "ID not found" situations?  Org-node gives you an extra way to feed data to org-id@comma{} as @uref{http://edstrom.dev/wjwrl/taking-ownership-of-org-id, I find clumsy the built-in options}.
-
-Example setting:
-
-@lisp
-(setq indexed-org-dirs
-=======
 Ever run into "ID not found" situations?  Here's an extra way to feed data to org-id@comma{} as @uref{http://edstrom.dev/wjwrl/taking-ownership-of-org-id, I find clumsy the built-in options}.
 
 @lisp
 (setq org-mem-do-sync-with-org-id t)
 (setq org-mem-watch-dirs ;; Configure me
->>>>>>> 6af9c5a (docs:)
       '("~/org/"
         "~/Syncthing/"
         "/mnt/stuff/"))
 @end lisp
 
-<<<<<<< HEAD
-Do a @samp{M-x org-node-reset} and see if it can find your notes now.
-=======
 Do a @samp{M-x org-mem-reset} and see if it can find your notes now.
->>>>>>> 6af9c5a (docs:)
 
 @menu
 * Undoing an org-roam hack::
@@ -700,11 +544,7 @@ Do a @samp{M-x org-mem-reset} and see if it can find your notes now.
 
 If you have org-roam loaded@comma{} but no longer update the DB@comma{} opening a link can sometimes send you to an outdated file path due to @uref{https://github.com/org-roam/org-roam/blob/2a630476b3d49d7106f582e7f62b515c62430714/org-roam-id.el#L91, a line in org-roam-id.el} that causes org-id to @emph{preferentially} look up the org-roam DB instead of org-id's own table!
 
-<<<<<<< HEAD
-Either revert that with the following snippet@comma{} or if the extension @uref{https://github.com/meedstrom/org-node-fakeroam, org-node-fakeroam} covers your needs@comma{} simply delete the DB (normally located at "~/.emacs.d/org-roam.db").
-=======
 Either revert that with the following snippet@comma{} or simply delete the DB (often located at "~/.emacs.d/org-roam.db").
->>>>>>> 6af9c5a (docs:)
 
 @lisp
 ;; Undo an org-roam override
@@ -714,65 +554,6 @@ Either revert that with the following snippet@comma{} or simply delete the DB (o
    "id" :follow #'org-id-open :store #'org-id-store-link-maybe))
 @end lisp
 
-<<<<<<< HEAD
-@node Exclude uninteresting nodes
-@section Exclude uninteresting nodes
-
-One user had over a thousand project-nodes@comma{} but only just began to do a knowledge base@comma{} and wished to avoid seeing the project nodes.
-
-This could work by---for example---excluding anything tagged "project" or perhaps anything that has a TODO state.  This excludes both@comma{} as well as those with a @samp{:ROAM_EXCLUDE:} property:
-
-@lisp
-(setq org-node-filter-fn
-      (lambda (node)
-        (not
-         (or (indexed-todo-state node)
-             (member "project" (indexed-tags node))
-             (indexed-property "ROAM_EXCLUDE" node)))))
-@end lisp
-
-Or you could go with a whitelist approach@comma{} to show only nodes from a certain directory we'll call "my-personal-wiki":
-
-@lisp
-(setq org-node-filter-fn
-      (lambda (node)
-        (and (string-search "/my-personal-wiki/" (indexed-file-name node))
-             (not (indexed-property "ROAM_EXCLUDE" node)))))
-@end lisp
-
-(NB: if you don't know what @samp{ROAM_EXCLUDE} is@comma{} feel free to omit that rule)
-
-@menu
-* Limitation @samp{ROAM_EXCLUDE}::
-@end menu
-
-@node Limitation @samp{ROAM_EXCLUDE}
-@subsection Limitation: @samp{ROAM_EXCLUDE}
-
-Let's say you have a big archive file@comma{} fulla IDs@comma{} and you want all the nodes within out of sight.
-
-Putting a @samp{:ROAM_EXCLUDE: t} at the top won't do it@comma{} because unlike in org-roam@comma{} @strong{child ID nodes of an excluded node are not excluded!}  The @samp{org-node-filter-fn} applies its ruleset to each node in isolation.
-
-However@comma{} nodes in isolation do still have inherited tags.  So you can exploit that@comma{} or the outline path or file name.
-
-It works well for me to filter out any file or directory that happens to contain "archive" in the name:
-
-@lisp
-(setq org-node-filter-fn
-      (lambda (node)
-        (not (string-search "archive" (indexed-file-name node)))))
-@end lisp
-
-Or put something like @samp{#+filetags: :hide_node:} at the top of each file@comma{} and set:
-
-@lisp
-(setq org-node-filter-fn
-      (lambda (node)
-        (not (member "hide_node" (indexed-tags node)))))
-@end lisp
-
-=======
->>>>>>> 6af9c5a (docs:)
 @node Org-capture
 @section Org-capture
 
@@ -811,8 +592,6 @@ With that done@comma{} you can optionally configure the everyday commands @samp{
 
 That last optional functionality may be confusing if I describe it -- better you give it a spin and see if you like.
 
-<<<<<<< HEAD
-=======
 @node Exclude uninteresting nodes
 @section Exclude uninteresting nodes
 
@@ -849,7 +628,7 @@ Or you could go with a whitelist approach@comma{} to show only nodes from a cert
 
 Let's say you have a big archive file@comma{} fulla IDs@comma{} and you want all the nodes within out of sight.
 
-Putting a @samp{:ROAM_EXCLUDE: t} at the top won't do it@comma{} because unlike in org-roam@comma{} @strong{child ID nodes of an excluded node are not excluded!}  The @samp{org-node-filter-fn} applies its ruleset to each node in isolation.
+Putting a @samp{:ROAM_EXCLUDE: t} at the top won't do it@comma{} because unlike in org-roam@comma{} @strong{child ID nodes of an excluded node are not excluded!}  The option @samp{org-node-filter-fn} applies to each node in isolation.
 
 However@comma{} nodes in isolation do still have inherited tags.  So you can exploit that@comma{} or the outline path or file name.
 
@@ -858,7 +637,7 @@ It works well for me to filter out any file or directory that happens to contain
 @lisp
 (setq org-node-filter-fn
       (lambda (node)
-        (not (string-search "archive" (org-mem-entry-file node)))))
+        (not (string-search "archive" (org-mem-file node)))))
 @end lisp
 
 Or put something like @samp{#+filetags: :hide_node:} at the top of each file@comma{} and set:
@@ -866,10 +645,9 @@ Or put something like @samp{#+filetags: :hide_node:} at the top of each file@com
 @lisp
 (setq org-node-filter-fn
       (lambda (node)
-        (not (member "hide_node" (org-mem-entry-tags node)))))
+        (not (member "hide_node" (org-mem-tags node)))))
 @end lisp
 
->>>>>>> 6af9c5a (docs:)
 @node Completion-at-point
 @section Completion-at-point
 
@@ -880,15 +658,10 @@ To complete words at point into known node titles:
 (setq org-roam-completion-everywhere nil) ;; Stop org-roam equivalent.
 @end lisp
 
-<<<<<<< HEAD
-@node FAQ Any analogue to @samp{org-roam-node-display-template}?
-@section FAQ: Any analogue to @samp{org-roam-node-display-template}?
-=======
 @node Customize appearance
 @section Customize appearance
 
 (Analogue to @samp{org-roam-node-display-template})
->>>>>>> 6af9c5a (docs:)
 
 To customize how the nodes look in the minibuffer@comma{} configure @samp{org-node-affixation-fn}:
 
@@ -930,11 +703,7 @@ Type @code{C-c C-c} to apply the changes
 @node Let org-open-at-point detect refs
 @section Let org-open-at-point detect refs
 
-<<<<<<< HEAD
-(For background@comma{} consult the docstring of @samp{org-node-link-types}.)
-=======
 (For background@comma{} see @uref{https://github.com/meedstrom/org-node#appendix-iv-what-are-roam_refs, What are ROAM@math{_REFS}?} at the end of this README@.)
->>>>>>> 6af9c5a (docs:)
 
 Say there's a link to a web URL@comma{} and you've forgotten you also have a node listing that exact URL in its @samp{ROAM_REFS} property.
 
@@ -948,9 +717,9 @@ Wouldn't it be nice if@comma{} clicking on that link@comma{} you automatically v
 @node Limitation TRAMP
 @section Limitation: TRAMP
 
-Working with files over TRAMP is unsupported for now.  Org-node tries to be very fast@comma{} often nulling @samp{file-name-handler-alist}@comma{} which TRAMP needs.
+Working with files over TRAMP is unsupported@comma{} because org-mem works in parallel subprocesses which do not inherit your TRAMP setup.
 
-The best way to change this is to @uref{https://github.com/meedstrom/org-node/issues, file an issue} to show you care :-)
+The best way to change this is to @uref{https://github.com/meedstrom/org-mem/issues, file an issue} to show you care :-)
 
 @node Limitation Encryption
 @section Limitation: Encryption
@@ -979,11 +748,7 @@ NB: for users of @samp{org-node-complete-at-point-mode}@comma{} this workaround 
 
 Org-node supports the Org 9.5 @@citations@comma{} but not fully the aftermarket @uref{https://github.com/jkitchin/org-ref, org-ref} &citations that emulate @LaTeX{} look-and-feel.
 
-<<<<<<< HEAD
-What works is bracketed Org-ref v3 citations that start with "cite"@comma{} e.g. @samp{[[citep:...]]}@comma{} @samp{[[citealt:...]]}@comma{} @samp{[[citeauthor:...]]}@comma{} since indexed-org-parser.el is able to pick them up for free.
-=======
 What works is bracketed Org-ref v3 citations that start with "cite"@comma{} e.g. @samp{[[citep:...]]}@comma{} @samp{[[citealt:...]]}@comma{} @samp{[[citeauthor:...]]}@comma{} since org-mem-parser.el is able to pick them up for free.
->>>>>>> 6af9c5a (docs:)
 
 What doesn't work is e.g. @samp{[[bibentry:...]]} since it doesn't start with "cite"@comma{} nor plain @samp{citep:...} since it is not wrapped in brackets.
 
@@ -994,7 +759,7 @@ If you need more of Org-ref@comma{} you have at least two options:
 Use org-roam - see discussions on boosting its performance @uref{https://org-roam.discourse.group/t/rewriting-org-roam-node-list-for-speed-it-is-not-sqlite/3475/92, here} and @uref{https://org-roam.discourse.group/t/improving-performance-of-node-find-et-al/3326/33, here}
 
 @item
-Get your elbows dirty and try to revive the archived branch @uref{https://github.com/meedstrom/org-node/branches, "orgref"}@comma{} see @uref{https://github.com/meedstrom/org-node/commit/90b0e503ac75428a5d3ca6a4c8c51b5e075064d3, relevant commit}.
+Contribute to @uref{https://github.com/meedstrom/org-mem, org-mem}@comma{} see function @samp{org-mem-parser--collect-links-until}.
 @end itemize
 
 @node Toolbox
@@ -1144,6 +909,7 @@ Do you already know about "daily-notes"?  Then get started with a keybinding suc
 
 @lisp
 (keymap-set global-map "M-s M-s" #'org-node-seq-dispatch)
+(org-node-seq-mode)
 @end lisp
 
 and configure @samp{org-node-seq-defs}.  See @uref{https://github.com/meedstrom/org-node/wiki/Configuring-node-sequences, wiki} for premade examples.
@@ -1170,10 +936,7 @@ Thus@comma{} fundamentally@comma{} any "journal" or "dailies" software are just 
 * Appendix I Rosetta stone::
 * Appendix II How to rollback::
 * Appendix III Random tips::
-<<<<<<< HEAD
-=======
 * Appendix IV What are @samp{ROAM_REFS}?::
->>>>>>> 6af9c5a (docs:)
 @end menu
 
 @node Appendix I Rosetta stone
@@ -1181,11 +944,7 @@ Thus@comma{} fundamentally@comma{} any "journal" or "dailies" software are just 
 
 API cheatsheet between org-roam and org-node.
 
-<<<<<<< HEAD
-@multitable {aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa} {aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa} {aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}
-=======
 @multitable {aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa} {aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa} {aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}
->>>>>>> 6af9c5a (docs:)
 @headitem Action
 @tab org-roam
 @tab org-node
@@ -1200,81 +959,6 @@ API cheatsheet between org-roam and org-node.
 @tab @samp{(org-node-read)}
 @item Get node by ID
 @tab 
-<<<<<<< HEAD
-@tab @samp{(indexed-entry-by-id ID)}
-@item Get list of files
-@tab @samp{(org-roam-list-files)}
-@tab @samp{(indexed-org-files)}
-@item Get nodes in a file
-@tab 
-@tab @samp{(indexed-entries-in FILES)}
-@item Get backlink objects
-@tab @samp{(org-roam-backlinks-get NODE)}
-@tab @samp{(indexed-id-links-to NODE)}
-@item Get reflink objects
-@tab @samp{(org-roam-reflinks-get NODE)}
-@tab @samp{(indexed-roam-reflinks-to NODE)}
-@item Get title
-@tab @samp{(org-roam-node-title NODE)}
-@tab @samp{(indexed-title NODE)}
-@item Get title of file where NODE is
-@tab @samp{(org-roam-node-file-title NODE)}
-@tab @samp{(indexed-file-title NODE)}
-@item Get title @emph{or} name of file where NODE is
-@tab 
-@tab @samp{(indexed-file-title-or-basename NODE)}
-@item Get full path to file where NODE is
-@tab @samp{(org-roam-node-file NODE)}
-@tab @samp{(indexed-file-name NODE)}
-@item Get ID
-@tab @samp{(org-roam-node-id NODE)}
-@tab @samp{(indexed-id NODE)}
-@item Get tags
-@tab @samp{(org-roam-node-tags NODE)}
-@tab @samp{(indexed-tags NODE)}
-@item Get tags (local only)
-@tab 
-@tab @samp{(indexed-tags-local NODE)}
-@item Get tags (inherited only)
-@tab 
-@tab @samp{(indexed-tags-inherited NODE)}
-@item Get outline level
-@tab @samp{(org-roam-node-level NODE)}
-@tab @samp{(indexed-level NODE)}
-@item Get char position
-@tab @samp{(org-roam-node-point NODE)}
-@tab @samp{(indexed-pos NODE)}
-@item Get line number
-@tab 
-@tab @samp{(indexed-lnum NODE)}
-@item Get properties
-@tab @samp{(org-roam-node-properties NODE)}
-@tab @samp{(indexed-properties NODE)}
-@item Get subtree TODO state
-@tab @samp{(org-roam-node-todo NODE)}
-@tab @samp{(indexed-todo-state NODE)}
-@item Get subtree SCHEDULED
-@tab @samp{(org-roam-node-scheduled NODE)}
-@tab @samp{(indexed-scheduled NODE)}
-@item Get subtree DEADLINE
-@tab @samp{(org-roam-node-deadline NODE)}
-@tab @samp{(indexed-deadline NODE)}
-@item Get subtree priority
-@tab @samp{(org-roam-node-priority NODE)}
-@tab @samp{(indexed-priority NODE)}
-@item Get outline-path
-@tab @samp{(org-roam-node-olp NODE)}
-@tab @samp{(indexed-olpath NODE)}
-@item Get @samp{ROAM_REFS}
-@tab @samp{(org-roam-node-refs NODE)}
-@tab @samp{(indexed-roam-refs NODE)}
-@item Get @samp{ROAM_ALIASES}
-@tab @samp{(org-roam-node-aliases NODE)}
-@tab @samp{(indexed-roam-aliases NODE)}
-@item Get @samp{ROAM_EXCLUDE}
-@tab 
-@tab @samp{(indexed-property "ROAM_EXCLUDE" NODE)}
-=======
 @tab @samp{(org-mem-entry-by-id ID)}
 @item Get list of files
 @tab @samp{(org-roam-list-files)}
@@ -1345,7 +1029,6 @@ API cheatsheet between org-roam and org-node.
 @item Get @samp{ROAM_EXCLUDE}
 @tab 
 @tab @samp{(org-mem-entry-property "ROAM_EXCLUDE" NODE)}
->>>>>>> 6af9c5a (docs:)
 @item Ensure fresh data
 @tab @samp{(org-roam-db-sync)}
 @tab @samp{(org-node-cache-ensure t t)}
@@ -1400,19 +1083,11 @@ With @uref{https://github.com/radian-software/straight.el, Straight}:
   :straight (org-node :type git :host github :repo "meedstrom/org-node"
                       :branch "v1.6"))
 @end lisp
-<<<<<<< HEAD
->>>>>>> 511e0c5 (docs:)
-=======
->>>>>>> 6af9c5a (docs:)
 
 @node Appendix III Random tips
 @section Appendix III: Random tips
 
-<<<<<<< HEAD
-Org-roam shipped the optional @samp{(require '=org-roam-export)}@comma{} a patch to fix @samp{id:} links in HTML export.
-=======
 Org-roam shipped the optional @samp{(require 'org-roam-export)}@comma{} a patch to fix @samp{id:} links in HTML export.
->>>>>>> 6af9c5a (docs:)
 
 Good news@comma{} upstream fixed the root of the issue in 5e9953fa0!  Update Org to 9.7+@comma{} then set this.
 
@@ -1420,8 +1095,6 @@ Good news@comma{} upstream fixed the root of the issue in 5e9953fa0!  Update Org
 (setq org-html-prefer-user-labels t)
 @end example
 
-<<<<<<< HEAD
-=======
 @node Appendix IV What are @samp{ROAM_REFS}?
 @section Appendix IV: What are @samp{ROAM_REFS}?
 
@@ -1465,5 +1138,4 @@ People often use it to write notes about a specific web-page or PDF file@comma{}
 
 As a special case@comma{} citation keys such as "@@ioannidis2005" also work in @samp{ROAM_REFS}@comma{} corresponding to Org citations like @samp{[cite:@@ioannidis2005]}.
 
->>>>>>> 6af9c5a (docs:)
 @bye
