@@ -204,7 +204,7 @@ NAME, ARGLIST and BODY as in `defun'."
 (define-obsolete-function-alias 'org-node-get-tags-inherited         #'org-mem-tags-inherited                      "3.0.0 (May 2025)")
 (define-obsolete-function-alias 'org-node-get-tags-local             #'org-mem-tags-local                          "3.0.0 (May 2025)")
 (define-obsolete-function-alias 'org-node-get-tags-with-inheritance  #'org-mem-tags                                "3.0.0 (May 2025)")
-(define-obsolete-function-alias 'org-node-get-title                  #'org-mem-title                               "3.0.0 (May 2025)")
+(define-obsolete-function-alias 'org-node-get-title                  #'org-mem-entry-title-maybe                   "3.0.0 (May 2025)")
 (define-obsolete-function-alias 'org-node-get-todo                   #'org-mem-todo-state                          "3.0.0 (May 2025)")
 (define-obsolete-function-alias 'org-node-is-subtree                 #'org-mem-subtree-p                           "3.0.0 (May 2025)")
 (define-obsolete-function-alias 'org-node-link-dest                  #'org-mem-link-target                         "3.0.0 (May 2025)")
