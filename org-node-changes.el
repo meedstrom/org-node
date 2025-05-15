@@ -47,9 +47,8 @@
   "Alist of deprecated symbol names and their new names.
 Names here will cause complaints if bound.")
 
-(defvar org-node-changes--warned-about-roam-id nil
-  "Non-nil if did warn about org-roam overriding a link parameter.")
-
+(defvar org-node-changes--warned-about-roam-id nil)
+(defvar org-node-changes--warned-about-fakeroam-v2 nil)
 (defun org-node-changes--onetime-warn-and-copy ()
   "Maybe print one-shot warnings, then become a no-op.
 
@@ -76,7 +75,12 @@ Then do other one-shot warnings while we\\='re at it."
                      old new)
             (lwarn 'org-node :warning "Your initfiles key-bind a removed command: %S"
                    old))))))
-  ;; 2024-10-18
+  (unless org-node-changes--warned-about-fakeroam-v2
+    (when (and (featurep 'org-node-fakeroam)
+               (not (fboundp 'org-node-fakeroam-placeholder-indicating-v3)))
+      (setq org-node-changes--warned-about-fakeroam-v2 t)
+      (display-warning
+       'org-node "Package org-node-fakeroam still v2, upgrade or remove")))
   (unless org-node-changes--warned-about-roam-id
     (when (and (fboundp 'org-link-get-parameter)
                (not (and (bound-and-true-p org-roam-autosync-mode)
@@ -184,10 +188,10 @@ NAME, ARGLIST and BODY as in `defun'."
 (define-obsolete-function-alias 'org-node-get-links-from             #'org-mem-links-from-id                       "3.0.0 (May 2025)")
 (define-obsolete-function-alias 'org-node-get-lnum                   #'org-mem-lnum                                "3.0.0 (May 2025)")
 (define-obsolete-function-alias 'org-node-get-nodes-in-files         #'org-mem-entries-in                          "3.0.0 (May 2025)")
-(define-obsolete-function-alias 'org-node-get-olp                    #'org-mem-olpath                        "3.0.0 (May 2025)")
-(define-obsolete-function-alias 'org-node-get-olp-full               #'org-mem-olpath-with-title             "3.0.0 (May 2025)")
-(define-obsolete-function-alias 'org-node-get-olp-with-self          #'org-mem-olpath-with-self              "3.0.0 (May 2025)")
-(define-obsolete-function-alias 'org-node-get-olp-with-self-full     #'org-mem-olpath-with-self-with-title   "3.0.0 (May 2025)")
+(define-obsolete-function-alias 'org-node-get-olp                    #'org-mem-olpath                              "3.0.0 (May 2025)")
+(define-obsolete-function-alias 'org-node-get-olp-full               #'org-mem-olpath-with-title                   "3.0.0 (May 2025)")
+(define-obsolete-function-alias 'org-node-get-olp-with-self          #'org-mem-olpath-with-self                    "3.0.0 (May 2025)")
+(define-obsolete-function-alias 'org-node-get-olp-with-self-full     #'org-mem-olpath-with-self-with-title         "3.0.0 (May 2025)")
 (define-obsolete-function-alias 'org-node-get-pos                    #'org-mem-pos                                 "3.0.0 (May 2025)")
 (define-obsolete-function-alias 'org-node-get-priority               #'org-mem-priority                            "3.0.0 (May 2025)")
 (define-obsolete-function-alias 'org-node-get-properties             #'org-mem-properties                          "3.0.0 (May 2025)")
@@ -215,8 +219,9 @@ NAME, ARGLIST and BODY as in `defun'."
 (define-obsolete-function-alias 'org-node-subtree-p                  #'org-mem-subtree-p                           "3.0.0 (May 2025)")
 (define-obsolete-function-alias 'org-nodes-in-file                   #'org-mem-id-nodes-in-files                   "3.0.0 (May 2025)")
 
-(defalias 'org-node-fakeroam-fast-render-mode 'org-node-roam-accelerator-mode)
-(defalias 'org-node-fakeroam-jit-backlinks-mode 'org-node-roam-accelerator-mode)
+(unless (featurep 'org-node-fakeroam)
+  (defalias 'org-node-fakeroam-fast-render-mode 'org-node-roam-accelerator-mode)
+  (defalias 'org-node-fakeroam-jit-backlinks-mode 'org-node-roam-accelerator-mode))
 
 (provide 'org-node-changes)
 
