@@ -435,29 +435,29 @@ If REMOVE is non-nil, remove it instead."
   (let* ((elm (org-element-context))
          (path (org-element-property :path elm))
          (type (org-element-property :type elm))
-         dest-id dest-file)
+         target-id target-file)
     ;; In a link such as [[id:abc1234]], TYPE is "id" and PATH is "abc1234".
     (when (and type path)
       (org-mem-x-ensure-link-at-point-known)
       (if (equal "id" type)
           ;; A classic backlink
           (progn
-            (setq dest-id path)
+            (setq target-id path)
             ;; `org-id-find-id-file' has terrible fallback behavior
-            (setq dest-file (ignore-errors
+            (setq target-file (ignore-errors
                               (org-mem-entry-file
-                               (gethash dest-id org-nodes)))))
+                               (gethash target-id org-nodes)))))
         ;; A "reflink"
-        (setq dest-id (gethash path org-mem--roam-ref<>id))
-        (setq dest-file (ignore-errors
+        (setq target-id (gethash path org-mem--roam-ref<>id))
+        (setq target-file (ignore-errors
                           (org-mem-entry-file
-                           (gethash dest-id org-nodes)))))
-      (when (null dest-file)
-        (push dest-id org-node-backlink--fails))
-      (when (and dest-id dest-file)
+                           (gethash target-id org-nodes)))))
+      (when (null target-file)
+        (push target-id org-node-backlink--fails))
+      (when (and target-id target-file)
         (let ((case-fold-search t)
               (origin-id (org-entry-get-with-inheritance "ID")))
-          (when (and origin-id (not (equal origin-id dest-id)))
+          (when (and origin-id (not (equal origin-id target-id)))
             (let ((origin-title
                    (save-excursion
                      (without-restriction
@@ -473,7 +473,7 @@ If REMOVE is non-nil, remove it instead."
               ;; `org-node-backlink--fix-flagged-parts-of-buffer' will not
               ;; later remove the backlink we're adding
               (org-mem-x-ensure-entry-at-point-known)
-              (org-node--with-quick-file-buffer dest-file
+              (org-node--with-quick-file-buffer target-file
                 :about-to-do "Org-node going to add backlink to the target of the link you just inserted"
                 (when (and (boundp 'org-transclusion-exclude-elements)
                            (not (memq 'property-drawer
@@ -482,7 +482,7 @@ If REMOVE is non-nil, remove it instead."
                 (goto-char (point-min))
                 (let ((case-fold-search t))
                   (if (re-search-forward (concat "^[ \t]*:id: +"
-                                                 (regexp-quote dest-id))
+                                                 (regexp-quote target-id))
                                          nil
                                          t)
                       (if (get-text-property (point) 'read-only)
@@ -494,7 +494,7 @@ If REMOVE is non-nil, remove it instead."
                           (error "org-node: Area seems to be read-only at %d in %s"
                                  (point) (buffer-name))
                         (org-node-backlink--add origin-id origin-title))
-                    (push dest-id org-node-backlink--fails)))))))))))
+                    (push target-id org-node-backlink--fails)))))))))))
 
 (defun org-node-backlink--add (id title)
   "Add link with ID and TITLE into local backlink drawer or property."
@@ -743,7 +743,7 @@ If REMOVE non-nil, remove it instead."
 ;; REVIEW: Only comes into effect on
 ;;         `org-mem-post-targeted-scan-functions', but could also other
 ;;         times?  Possible the algo could be simpler, rather than diffing
-;;         `org-mem-x--old-link-sets' from current, simply look in
+;;         `org-mem-x--target<>old-links' from current, simply look in
 ;;         `org-mem-entry-properties' of all nodes...
 
 (defcustom org-node-backlink-lazy nil
@@ -779,29 +779,34 @@ To force an update at any time, use one of these commands:
 (defun org-node-backlink--maybe-fix-proactively (_)
   "Designed for `org-mem-post-targeted-scan-functions'."
   (unless org-node-backlink-lazy
-    (let (affected-dests)
+    (let (affected-targets)
       (cl-loop
-       for dest being each hash-key of org-mem-x--dest<>old-id-links
-       using (hash-values old-id-links)
-       as entry = (or (org-mem-entry-by-id dest)
-                      (org-mem-entry-by-roam-ref dest))
+       for target being each hash-key of org-mem-x--target<>old-links
+       using (hash-values old-links)
+       as entry = (or (org-mem-entry-by-id target)
+                      (org-mem-entry-by-roam-ref target))
        when entry
        when (not (seq-set-equal-p
-             (seq-keep #'org-mem-link-nearby-id old-id-links)
-             (seq-keep #'org-mem-link-nearby-id (gethash dest org-mem--dest<>links))))
+                  (seq-keep #'org-mem-link-nearby-id
+                            (seq-filter (##or (org-mem-link-citation-p %)
+                                              (equal (org-mem-link-type %) "id"))
+                                        old-links))
+                  (seq-keep #'org-mem-link-nearby-id
+                            (append (org-mem-roam-reflinks-to-entry entry)
+                                    (org-mem-id-links-to-entry entry)))))
        ;; Something changed in the set of links targeting this entry.
        ;; So we'll go to the entry to refresh backlinks.
        do
-       ;; Alist `affected-dests' looks like:
+       ;; Alist `affected-targets' looks like:
        ;;   ((file1 . (origin1 origin2 origin3 ...))
        ;;    (file2 . (...))
        ;;    (file3 . (...)))
        ;; We do not use entry positions since they'll change after edit.
        (push (org-mem-entry-id entry)
-             (alist-get (org-mem-entry-file entry) affected-dests () () #'equal)))
+             (alist-get (org-mem-entry-file entry) affected-targets () () #'equal)))
 
       (cl-loop
-       for (file . ids) in affected-dests
+       for (file . ids) in affected-targets
        when (and (file-readable-p file)
                  (file-writable-p file))
        do (org-node--with-quick-file-buffer file

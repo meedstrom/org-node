@@ -181,7 +181,7 @@ NAME, ARGLIST and BODY as in `defun'."
 (org-node-changes--def-whiny-alias 'org-node-proposed-sequence 'org-node-proposed-seq "3.0.0 (May 2025)" "May")
 
 
-(define-obsolete-variable-alias 'org-node--dest<>links              'org-mem--dest<>links                        "3.0.0 (May 2025)")
+(define-obsolete-variable-alias 'org-node--dest<>links              'org-mem--target<>links                        "3.0.0 (May 2025)")
 (define-obsolete-variable-alias 'org-node--id<>node                 'org-mem--id<>entry                          "3.0.0 (May 2025)")
 (define-obsolete-variable-alias 'org-node--title<>id                'org-mem--title<>id                          "3.0.0 (May 2025)")
 (define-obsolete-variable-alias 'org-node--time-elapsed             'org-mem--time-elapsed                       "3.0.0 (May 2025)")
@@ -235,7 +235,7 @@ NAME, ARGLIST and BODY as in `defun'."
 (define-obsolete-function-alias 'org-node-list-scan-problems         #'org-mem-list-problems                     "3.0.0 (May 2025)")
 (define-obsolete-function-alias 'org-node-get-tags-with-inheritance #'org-mem-entry-tags "3.0.0 (May 2025)")
 (define-obsolete-function-alias 'org-nodes-in-file                  #'org-mem-id-nodes-in-files "3.0.0 (May 2025)")
-(define-obsolete-function-alias 'org-node-link-dest                 #'org-mem-link-dest "3.0.0 (May 2025)")
+(define-obsolete-function-alias 'org-node-link-dest                 #'org-mem-link-target "3.0.0 (May 2025)")
 (define-obsolete-function-alias 'org-node-link-origin               #'org-mem-link-nearby-id "3.0.0 (May 2025)")
 (define-obsolete-function-alias 'org-node-link-pos                  #'org-mem-link-pos "3.0.0 (May 2025)")
 (define-obsolete-function-alias 'org-node-link-type                 #'org-mem-link-type "3.0.0 (May 2025)")
