@@ -353,7 +353,6 @@ For use as `org-node-affixation-fn'."
                 (push (propertize anc 'face 'completions-annotations) result)
                 (push " > " result))
               (setq result (apply #'concat (nreverse result)))
-              (setq prefix-len (length result))
               result)
           "")
         (let ((tags (org-mem-entry-tags node)))
@@ -591,9 +590,9 @@ Mainly for muffling some messages.")
 (defvar org-node--old-link-sets nil
   "For use by `org-node-backlink-lazy'.
 
-Alist of ((DEST . LINKS) (DEST . LINKS) ...), where LINKS is are sets of
-links with destination DEST.  These reflect a past state of
-`org-mem--dest<>links', allowing for a diff operation against the
+Alist of ((TARGET . LINKS) (TARGET . LINKS) ...), where LINKS is are sets of
+links with destination TARGET.  These reflect a past state of
+`org-mem--target<>links', allowing for a diff operation against the
 up-to-date set.")
 
 (defvar org-node--compile-timers nil)
@@ -1977,33 +1976,33 @@ network to quality-control it.  Rationale:
        :buffer "*org-node feedback arcs*"
        :format [("Node containing link" 39 t) ("Target of link" 0 t)]
        :entries (cl-loop
-                 for (origin . dest) in feedbacks
+                 for (origin . target) in feedbacks
                  as origin-node = (gethash origin org-nodes)
-                 as dest-node = (gethash dest org-nodes)
+                 as target-node = (gethash target org-nodes)
                  collect
-                 (list (+ (sxhash origin) (sxhash dest))
+                 (list (+ (sxhash origin) (sxhash target))
                        (vector (buttonize (org-mem-entry-title origin-node)
                                           #'org-node--goto
                                           origin-node)
-                               (buttonize (org-mem-entry-title dest-node)
+                               (buttonize (org-mem-entry-title target-node)
                                           #'org-node--goto
-                                          dest-node))))))))
+                                          target-node))))))))
 
 ;; TODO: Temp merge all refs into corresponding ID
 (defun org-node--make-digraph-tsv-string ()
   "Generate a string in Tab-Separated Values form.
 The string is a 2-column table of destination-origin pairs, made
-from ID links found in `org-mem--dest<>links'."
+from ID links found in `org-mem--target<>links'."
   (concat
    "src\tdest\n"
    (string-join
     (seq-uniq (cl-loop
-               for dest being each hash-key of org-mem--dest<>links
+               for target being each hash-key of org-mem--target<>links
                using (hash-values links)
                append (cl-loop
                        for link in links
                        when (equal "id" (org-mem-link-type link))
-                       collect (concat dest "\t" (org-mem-link-nearby-id link)))))
+                       collect (concat target "\t" (org-mem-link-nearby-id link)))))
     "\n")))
 
 ;; TODO: Maybe expunge to org-mem.el after I figure out how to use fileloop well
@@ -2054,13 +2053,13 @@ Excludes reflinks not coming from an ID node."
           ;; when entry
           collect
           (let ((type (org-mem-link-type link))
-                (dest (org-mem-link-dest link))
+                (target (org-mem-link-target link))
                 (pos (org-mem-link-pos link))
                 (origin (org-mem-link-nearby-id link))
                 (file-name (org-mem-link-file link)))
             (list (sxhash link)
                   (vector
-                   (if (gethash dest org-mem--roam-ref<>id)
+                   (if (gethash target org-mem--roam-ref<>id)
                        "*"
                      "")
                    (if (and node (org-mem-entry-title node))
@@ -2071,7 +2070,7 @@ Excludes reflinks not coming from an ID node."
                                      (org-fold-show-entry)
                                      (org-fold-show-context)))
                      origin)
-                   (if type (concat type ":" dest) dest)))))))
+                   (if type (concat type ":" target) target)))))))
     (if entries
         (org-mem-list--pop-to-tabulated-buffer
          :buffer "*org-node reflinks*"
@@ -2433,15 +2432,15 @@ Wrap the link in double-brackets if necessary."
   "Return list of all links seen in all known files."
   (let (result)
     (maphash
-     (lambda (dest links)
+     (lambda (target links)
        (let ((types (mapcar #'org-mem-link-type links)))
          (when (memq nil types)
            ;; Type nil is a @citation
-           (push dest result)
+           (push target result)
            (setq types (delq nil types)))
          (dolist (type (delete-dups (delete "id" types)))
-           (push (concat type ":" dest) result))))
-     org-mem--dest<>links)
+           (push (concat type ":" target) result))))
+     org-mem--target<>links)
     result))
 
 (defun org-node-add-tags (tags)
@@ -2620,9 +2619,9 @@ following the link normally.
 If already visiting that node, then follow the link normally."
   (when-let* ((url (thing-at-point 'url)))
     ;; Rarely more than one car
-    (let* ((dest (car (org-mem--split-roam-refs-field url)))
+    (let* ((target (car (org-mem--split-roam-refs-field url)))
            (found (cl-loop for node being each hash-value of org-nodes
-                           when (member dest (org-mem-entry-roam-refs node))
+                           when (member target (org-mem-entry-roam-refs node))
                            return node)))
       (if (and found
                ;; Check that point is not already in said ref node (if so,

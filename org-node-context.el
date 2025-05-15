@@ -108,7 +108,7 @@ but when this finds one of them stale, it removes that whole entry."
        (dolist (link links)
          (push (org-mem-link-pos link)
                (gethash (org-mem-link-nearby-id link) valid-positions))))
-     org-mem--dest<>links)
+     org-mem--target<>links)
 
     (maphash
      (lambda (id previews)
