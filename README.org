@@ -38,16 +38,16 @@ Node seqs, if you use them, now require turning on explicitly.
 (org-node-seq-mode)
 #+end_src
 
-For reference, check out the full list of obsoletions near the bottom of file [[https://github.com/meedstrom/org-node/blob/2504b7f0a8848c0fbc3dcddc2d1edeb0adbbc9ac/org-node-changes.el][org-node-changes.el]].
+For reference, check out the full list of obsoletions near the bottom of file [[https://github.com/meedstrom/org-node/blob/main/org-node-changes.el][org-node-changes.el]].
 
 A *silent* obsoletion: links are not plists anymore, but =plist-get= is unhelpfully polite and returns nil when given invalid input.   Use e.g. =(org-mem-link-pos link)= instead of =(plist-get LINK :pos)=.
 
 Other changes you may notice:
 
 - Command =org-node-reset= (now aliased to =org-mem-reset=) has become a bit slower, because it scans all subtrees in all files rather than only ID-nodes.  Org-node itself does not use that information, but org-mem aims to be useful in a wider domain.
-- Package org-node-fakeroam deprecated
-  - New mode built-in: =org-node-roam-accelerator-mode=
-  - New mode built-in: =org-mem-roamy-db-mode=
+- Package [[https://github.com/meedstrom/org-node-fakeroam][org-node-fakeroam]] deprecated
+  - New built-in: =org-node-roam-accelerator-mode=
+  - New built-in: =org-mem-roamy-db-mode=
 
 * Background
 ** What's all this
@@ -177,20 +177,10 @@ Backlinks are the butter on the bread that is your notes.  If you've ever seen a
 ** Backlink solution 1: displayed in a separate window
 *** Option 1A: Reuse the org-roam buffer
 
-Believe it or not, you can use the org-roam buffer without the rest of org-roam.
-
-Install [[https://github.com/meedstrom/org-node-fakeroam][org-node-fakeroam]] and add to initfiles:
+You can use the org-roam buffer without the rest of org-roam.  Enable:
 
 #+begin_src elisp
-(org-node-fakeroam-redisplay-mode) ;; optional behavior
-(org-node-fakeroam-jit-backlinks-mode) ;; shim so no SQLite needed
-(org-node-fakeroam-fast-render-mode) ;; perf fixes
-
-;; Example keybindings
-(keymap-set org-mode-map "M-s M-t M-t" #'org-roam-buffer-toggle)
-(keymap-set org-mode-map "M-s M-t M-d" #'org-roam-buffer-display-dedicated)
-;; if your window mgmt style is constantly lose all windows
-(keymap-set global-map "M-s M-r" #'org-node-fakeroam-show-buffer)
+(org-node-roam-accelerator-mode)
 #+end_src
 
 *** Option 2A: Use the org-node-context buffer
