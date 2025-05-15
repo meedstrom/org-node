@@ -2407,7 +2407,7 @@ as \"%20\", wrap VALUE in quotes if it has spaces."
   (org-node--add-to-property-keep-space
    "ROAM_ALIASES" (string-trim (read-string "Alias: "))))
 
-;; FIXME: What if user yanks a [cite:... ... ...]?
+;; FIXME: What if user yanks a [cite:... @key1 ... @key2 ...]?
 (defun org-node-add-refs ()
   "Add a link to ROAM_REFS in nearest relevant property drawer.
 Wrap the link in double-brackets if necessary."
@@ -2422,10 +2422,8 @@ Wrap the link in double-brackets if necessary."
                         'org-node-link-hist)))
     (when (string-search " " ref)
       (if (string-match-p org-link-plain-re ref)
-          ;; If it is a link, it should be enclosed in brackets
-          (setq ref (concat "[["
-                            (string-trim ref (rx "[[") (rx "]]"))
-                            "]]"))
+          ;; If it is a link, ensure it is enclosed in brackets
+          (setq ref (concat "[[" (string-trim ref (rx "[[") (rx "]]")) "]]"))
         (message "Spaces in ref, not sure how to format correctly: %s" ref)))
     (org-node--add-to-property-keep-space "ROAM_REFS" ref)))
 
