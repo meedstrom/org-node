@@ -42,6 +42,13 @@ For reference, check out the full list of obsoletions near the bottom of file [[
 
 A *silent* obsoletion: links are not plists anymore, but =plist-get= is unhelpfully polite and returns nil when given invalid input.   Use e.g. =(org-mem-link-pos link)= instead of =(plist-get LINK :pos)=.
 
+Other changes you may notice:
+
+- Command =org-node-reset= (now aliased to =org-mem-reset=) has become a bit slower, because it scans all subtrees in all files rather than only ID-nodes.  Org-node itself does not use that information, but org-mem aims to be useful in a wider domain.
+- Package org-node-fakeroam deprecated
+  - New mode built-in: =org-node-roam-accelerator-mode=
+  - New mode built-in: =org-mem-roamy-db-mode=
+
 * Background
 ** What's all this
 
@@ -367,7 +374,7 @@ Let's say you have a big archive file, fulla IDs, and you want all the nodes wit
 
 # (simply giving it the file name extension =.org_archive= would do it)
 
-Putting a =:ROAM_EXCLUDE: t= at the top won't do it, because unlike in org-roam, *child ID nodes of an excluded node are not excluded!*  The =org-node-filter-fn= applies its ruleset to each node in isolation.
+Putting a =:ROAM_EXCLUDE: t= at the top won't do it, because unlike in org-roam, *child ID nodes of an excluded node are not excluded!*  The option =org-node-filter-fn= applies to each node in isolation.
 
 However, nodes in isolation do still have inherited tags.  So you can exploit that, or the outline path or file name.
 
@@ -376,7 +383,7 @@ It works well for me to filter out any file or directory that happens to contain
 #+begin_src elisp
 (setq org-node-filter-fn
       (lambda (node)
-        (not (string-search "archive" (org-mem-entry-file node)))))
+        (not (string-search "archive" (org-mem-file node)))))
 #+end_src
 
 Or put something like =#+filetags: :hide_node:= at the top of each file, and set:
@@ -384,7 +391,7 @@ Or put something like =#+filetags: :hide_node:= at the top of each file, and set
 #+begin_src elisp
 (setq org-node-filter-fn
       (lambda (node)
-        (not (member "hide_node" (org-mem-entry-tags node)))))
+        (not (member "hide_node" (org-mem-tags node)))))
 #+end_src
 
 ** Completion-at-point
@@ -439,9 +446,9 @@ Wouldn't it be nice if, clicking on that link, you automatically visit that node
 #+end_src
 
 ** Limitation: TRAMP
-Working with files over TRAMP is unsupported for now.  Org-node tries to be very fast, often nulling =file-name-handler-alist=, which TRAMP needs.
+Working with files over TRAMP is unsupported, because org-mem works in parallel subprocesses which do not inherit your TRAMP setup.
 
-The best way to change this is to [[https://github.com/meedstrom/org-node/issues][file an issue]] to show you care :-)
+The best way to change this is to [[https://github.com/meedstrom/org-mem/issues][file an issue]] to show you care :-)
 
 ** Limitation: Encryption
 Encrypted nodes probably won't be found.  As with TRAMP, file an issue.
@@ -473,7 +480,7 @@ If you need more of Org-ref, you have at least two options:
 
 - Use org-roam - see discussions on boosting its performance [[https://org-roam.discourse.group/t/rewriting-org-roam-node-list-for-speed-it-is-not-sqlite/3475/92][here]] and [[https://org-roam.discourse.group/t/improving-performance-of-node-find-et-al/3326/33][here]]
 
-- Get your elbows dirty and try to revive the archived branch [[https://github.com/meedstrom/org-node/branches]["orgref"]], see [[https://github.com/meedstrom/org-node/commit/90b0e503ac75428a5d3ca6a4c8c51b5e075064d3][relevant commit]].
+- Contribute to [[https://github.com/meedstrom/org-mem][org-mem]], see function =org-mem-parser--collect-links-until=.
 
 ** Toolbox
 
@@ -545,6 +552,7 @@ Do you already know about "daily-notes"?  Then get started with a keybinding suc
 
 #+begin_src elisp
 (keymap-set global-map "M-s M-s" #'org-node-seq-dispatch)
+(org-node-seq-mode)
 #+end_src
 
 and configure =org-node-seq-defs=.  See [[https://github.com/meedstrom/org-node/wiki/Configuring-node-sequences][wiki]] for premade examples.
@@ -650,6 +658,7 @@ Org-roam shipped the optional =(require 'org-roam-export)=, a patch to fix =id:=
 Good news, upstream fixed the root of the issue in 5e9953fa0!  Update Org to 9.7+, then set this.
 
 : (setq org-html-prefer-user-labels t)
+
 ** Appendix IV: What are =ROAM_REFS=?
 
 Here's the start of one of my note files.  Note the =:ROAM_REFS:= line.

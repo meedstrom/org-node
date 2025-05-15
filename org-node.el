@@ -19,10 +19,11 @@
 ;; URL:      https://github.com/meedstrom/org-node
 ;; Created:  2024-04-13
 ;; Keywords: org, hypermedia
-;; Package-Requires: ((emacs "29.1") (llama "0.5.0") (org-mem "0.6.3.50-git") (magit-section "4.3.0"))
+;; Package-Requires: ((emacs "29.1") (llama "0.5.0") (org-mem "0.8.1") (magit-section "4.3.0"))
 
-;; NOTE: Looking for Package-Version?  Consult the Git tag.
+;; Looking for Package-Version?  Consult the Git tag.
 ;;       MELPA versions above 20250303 is v2.
+;;       MELPA versions above 20250515 is v3.
 
 ;;; Commentary:
 
@@ -191,10 +192,10 @@ directory named \"archive\".
 
 \(setq org-node-filter-fn
       (lambda (node)
-        (not (or (org-mem-entry-property \"ROAM_EXCLUDE\" node)
-                 (org-mem-entry-todo-state node)
-                 (string-search \"/archive/\" (org-mem-entry-file node))
-                 (member \"drill\" (org-mem-entry-tags node))))))" ;; XXX docstring
+        (not (or (org-mem-property \"ROAM_EXCLUDE\" node)
+                 (org-mem-todo-state node)
+                 (string-search \"/archive/\" (org-mem-file node))
+                 (member \"drill\" (org-mem-tags node))))))" ;; XXX docstring
   :type 'function
   :set #'org-node--set-and-remind-reset)
 
