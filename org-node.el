@@ -1227,9 +1227,7 @@ The result includes NODE\\='s current file name, unfortunately required."
     (error "Only works in org-mode buffers"))
   (org-node-cache-ensure)
   (unless node
-    (setq node (gethash (completing-read "Node: " #'org-node-collection
-                                         () () () 'org-node-hist)
-                        org-node--candidate<>entry)))
+    (setq node (org-node-read)))
   (if (not node)
       (message "Node not known, create it first")
     (goto-char (pos-eol))
@@ -1249,17 +1247,17 @@ The result includes NODE\\='s current file name, unfortunately required."
     (user-error "Only works in org-mode buffers"))
   (org-node-cache-ensure)
   (unless node
-    (setq node (gethash (completing-read "Node: " #'org-node-collection
-                                         () () () 'org-node-hist)
-                        org-node--candidate<>entry)))
-  (let ((id (org-mem-entry-id node))
-        (title (org-mem-entry-title node))
-        (level (or (org-current-level) 0)))
-    (insert (org-link-make-string (concat "id:" id) title))
-    (goto-char (pos-bol))
-    (insert "#+transclude: ")
-    (goto-char (pos-eol))
-    (insert " :level " (number-to-string (+ 1 level)))))
+    (setq node (org-node-read)))
+  (if (not node)
+      (message "Node not known, create it first")
+    (let ((id (org-mem-entry-id node))
+          (title (org-mem-entry-title node))
+          (level (or (org-current-level) 0)))
+      (insert (org-link-make-string (concat "id:" id) title))
+      (goto-char (pos-bol))
+      (insert "#+transclude: ")
+      (goto-char (pos-eol))
+      (insert " :level " (number-to-string (+ 1 level))))))
 
 ;; TODO: Consider whether to use `org-node-custom-link-format-fn' here.
 ;;;###autoload
@@ -1283,25 +1281,25 @@ If you often transclude file-level nodes, consider adding keywords to
     (error "Only works in org-mode buffers"))
   (org-node-cache-ensure)
   (unless node
-    (setq node (gethash (completing-read "Node: " #'org-node-collection
-                                         () () () 'org-node-hist)
-                        org-node--candidate<>entry)))
-  (let ((id (org-mem-entry-id node))
-        (title (org-mem-entry-title node))
-        (level (or (org-current-level) 0))
-        (m1 (make-marker)))
-    (insert (org-link-make-string (concat "id:" id) title))
-    (set-marker m1 (1- (point)))
-    (duplicate-line)
-    (goto-char (pos-bol))
-    (insert (make-string (+ 1 level) ?\*) " ")
-    (forward-line 1)
-    (insert "#+transclude: ")
-    (goto-char (pos-eol))
-    (insert " :level " (number-to-string (+ 2 level)))
-    (goto-char (marker-position m1))
-    (set-marker m1 nil)
-    (run-hooks 'org-node-insert-link-hook)))
+    (setq node (org-node-read)))
+  (if (not node)
+      (message "Node not known, create it first")
+    (let ((id (org-mem-entry-id node))
+          (title (org-mem-entry-title node))
+          (level (or (org-current-level) 0))
+          (m1 (make-marker)))
+      (insert (org-link-make-string (concat "id:" id) title))
+      (set-marker m1 (1- (point)))
+      (duplicate-line)
+      (goto-char (pos-bol))
+      (insert (make-string (+ 1 level) ?\*) " ")
+      (forward-line 1)
+      (insert "#+transclude: ")
+      (goto-char (pos-eol))
+      (insert " :level " (number-to-string (+ 2 level)))
+      (goto-char (marker-position m1))
+      (set-marker m1 nil)
+      (run-hooks 'org-node-insert-link-hook))))
 
 ;; TODO: New default once this PR is merged:
 ;; https://github.com/nobiot/org-transclusion/pull/268
@@ -1315,6 +1313,7 @@ Result will basically look like:
 #+transclude: [[Note]] :level :no-first-heading
 
 but adapt to the surrounding outline level.
+Requires https://github.com/nobiot/org-transclusion/pull/268
 
 If you often transclude file-level nodes, consider adding keywords to
 `org-transclusion-exclude-elements':
@@ -1326,29 +1325,29 @@ If you often transclude file-level nodes, consider adding keywords to
     (error "Only works in org-mode buffers"))
   (org-node-cache-ensure)
   (unless node
-    (setq node (gethash (completing-read "Node: " #'org-node-collection
-                                         () () () 'org-node-hist)
-                        org-node--candidate<>entry)))
-  (let ((id (org-mem-entry-id node))
-        (title (org-mem-entry-title node))
-        (level (org-current-level))
-        (link-marker (make-marker)))
-    (goto-char (pos-eol))
-    (newline)
-    (insert (org-link-make-string (concat "id:" id) title))
-    (set-marker link-marker (1- (point)))
-    (duplicate-line)
-    (goto-char (pos-bol))
-    (if level
-        (insert (make-string (+ (if org-odd-levels-only 2 1) level) ?*) " ")
-      (insert "* "))
-    (forward-line 1)
-    (insert "#+transclude: ")
-    (goto-char (pos-eol))
-    (insert " :level :no-first-heading")
-    (goto-char (marker-position link-marker))
-    (set-marker link-marker nil)
-    (run-hooks 'org-node-insert-link-hook)))
+    (setq node (org-node-read)))
+  (if (not node)
+      (message "Node not known, create it first")
+    (let ((id (org-mem-entry-id node))
+          (title (org-mem-entry-title node))
+          (level (org-current-level))
+          (link-marker (make-marker)))
+      (goto-char (pos-eol))
+      (newline)
+      (insert (org-link-make-string (concat "id:" id) title))
+      (set-marker link-marker (1- (point)))
+      (duplicate-line)
+      (goto-char (pos-bol))
+      (if level
+          (insert (make-string (+ (if org-odd-levels-only 2 1) level) ?*) " ")
+        (insert "* "))
+      (forward-line 1)
+      (insert "#+transclude: ")
+      (goto-char (pos-eol))
+      (insert " :level :no-first-heading")
+      (goto-char (marker-position link-marker))
+      (set-marker link-marker nil)
+      (run-hooks 'org-node-insert-link-hook))))
 
 ;; TODO: Maybe concat the link type...
 (defun org-node-insert-raw-link ()
@@ -2978,9 +2977,9 @@ heading, else the file-level node, whichever has an ID first."
 
 ;; TODO: Add an extended variant that checks active region, like
 ;;       `org-node-insert-link' does.
-(defun org-node-read ()
-  "Prompt for a known ID-node."
-  (gethash (completing-read "Node: " #'org-node-collection
+(defun org-node-read (&optional prompt)
+  "PROMPT for a known node and return it."
+  (gethash (completing-read (or prompt "Node: ") #'org-node-collection
                             () () () 'org-node-hist)
            org-node--candidate<>entry))
 
