@@ -564,9 +564,10 @@ If cache has never been built, act as if both FORCE and BLOCK.
 It is good to call this function at the start of autoloaded commands.
 Most of the time, you can expect it to no-op.
 
-These builds are normally async, so without BLOCK, this returns
-immediately and can mean that the data you will next query
-from org-mem is still out of date."
+These cache builds are normally async, so without BLOCK, this returns
+immediately and can mean that the data you will next query from org-mem
+is still out of date.  That usually only matters if you had done
+something to change the facts on the ground just prior."
   (org-node-changes--onetime-warn-and-copy)
   (unless org-node-cache-mode
     (when (y-or-n-p "Org-node needs `org-node-cache-mode', enable? ")
@@ -1287,6 +1288,8 @@ Result will basically look like:
 
 ** [[Note]]
 #+transclude: [[Note]] :level :no-first-heading
+
+but adapt to the surrounding outline level.
 
 If you often transclude file-level nodes, consider adding keywords to
 `org-transclusion-exclude-elements':

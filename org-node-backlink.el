@@ -418,10 +418,10 @@ If REMOVE is non-nil, remove it instead."
 
 ;; 2. It's actually necessary, because a link being inserted does not mean we
 ;;    should check the current file but rather visit and edit the target file.
-;;    If we didn't have the below code, we'd have save the current buffer (in
-;;    order to update tables) and then open the target file and run
-;;    `org-node-backlink-fix-buffer', which can easily take a while for
-;;    a big target file.
+;;    If we didn't have the below code, we'd have to save the current buffer
+;;    (in order to update tables) and then open the target file and run
+;;    `org-node-backlink-fix-buffer', which can easily take a while for a big
+;;    target file.
 
 ;; TODO: Report when it has members
 (defvar org-node-backlink--fails nil
@@ -798,12 +798,13 @@ To force an update at any time, use one of these commands:
        ;; So we'll go to the entry to refresh backlinks.
        do
        ;; Alist `affected-targets' looks like:
-       ;;   ((file1 . (origin1 origin2 origin3 ...))
+       ;;   ((file1 . (id1 id2 id3 ...))
        ;;    (file2 . (...))
        ;;    (file3 . (...)))
        ;; We do not use entry positions since they'll change after edit.
        (push (org-mem-entry-id entry)
-             (alist-get (org-mem-entry-file entry) affected-targets () () #'equal)))
+             (alist-get
+              (org-mem-entry-file entry) affected-targets () () #'equal)))
 
       (cl-loop
        for (file . ids) in affected-targets

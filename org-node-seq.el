@@ -24,7 +24,7 @@
 ;; not "seq", and in retrospect that was better name IMO as:
 ;; 1. It's less ambiguous, you don't have to clarify that you're talking
 ;;    about a "node seq" as oppposed to some other kind of seq.
-;; 2. The name doesn't beg to be abbreviated.
+;; 2. The name doesn't beg to be abbreviated like "sequence" does.
 ;; Anyway, it's not a big enough deal to be worth changing back now.
 
 ;;; Code:
