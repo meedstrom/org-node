@@ -1216,9 +1216,34 @@ create it and then visit it.  This will not visit it."
                        '(:immediate-finish t)))))
     (org-node-insert-link t t)))
 
+(defun org-node-insert-include (&optional node)
+  "Insert an #+include referring to NODE.
+Tip: It can be previewed with package \"org-include-inline\".
+https://github.com/yibie/org-include-inline
+
+The result includes NODE\\='s current file name, unfortunately required."
+  (interactive () org-mode)
+  (unless (derived-mode-p 'org-mode)
+    (error "Only works in org-mode buffers"))
+  (org-node-cache-ensure)
+  (unless node
+    (setq node (gethash (completing-read "Node: " #'org-node-collection
+                                         () () () 'org-node-hist)
+                        org-node--candidate<>entry)))
+  (if (not node)
+      (message "Node not known, create it first")
+    (goto-char (pos-eol))
+    (insert "\n#+include: \""
+            (org-mem-file node)
+            "::"
+            (org-mem-id node)
+            "\"")
+    (backward-char)
+    (run-hooks 'org-node-insert-link-hook)))
+
 ;;;###autoload
 (defun org-node-insert-transclusion (&optional node)
-  "Insert a #+transclude: referring to NODE, prompting if needed."
+  "Insert a #+transclude: referring to NODE."
   (interactive () org-mode)
   (unless (derived-mode-p 'org-mode)
     (user-error "Only works in org-mode buffers"))
