@@ -468,10 +468,10 @@ see Info node `(elisp)Programmed Completion'."
             ;; Absorb the affixations into one candidate string
             (puthash (concat (nth 1 affx) (nth 0 affx) (nth 2 affx))
                      node
-                     org-node--candidate<>entry))
-        ;; Bare title, to be affixated later by `org-node-collection'
-        (puthash title affx org-node--title<>affixation-triplet)
-        (puthash title node org-node--candidate<>entry)))))
+                     org-node--candidate<>entry)
+          ;; Bare title, to be affixated later by `org-node-collection'
+          (puthash title affx org-node--title<>affixation-triplet)
+          (puthash title node org-node--candidate<>entry))))))
 
 (defun org-node--wipe-completions (_parse-results)
   "Clear table `org-node--candidate<>entry'."
