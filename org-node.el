@@ -2030,7 +2030,8 @@ from ID links found in `org-mem--target<>links'."
                using (hash-values links)
                append (cl-loop
                        for link in links
-                       when (equal "id" (org-mem-link-type link))
+                       when (and (org-mem-link-nearby-id link)
+                                 (equal "id" (org-mem-link-type link)))
                        collect (concat target "\t" (org-mem-link-nearby-id link)))))
     "\n")))
 
