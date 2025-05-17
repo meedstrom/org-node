@@ -382,20 +382,10 @@ Backlinks are the butter on the bread that is your notes.  If you've ever seen a
 @node Option 1A Reuse the org-roam buffer
 @subsection Option 1A: Reuse the org-roam buffer
 
-Believe it or not@comma{} you can use the org-roam buffer without the rest of org-roam.
-
-Install @uref{https://github.com/meedstrom/org-node-fakeroam, org-node-fakeroam} and add to initfiles:
+You can use the org-roam buffer without the rest of org-roam.  Enable:
 
 @lisp
-(org-node-fakeroam-redisplay-mode) ;; optional behavior
-(org-node-fakeroam-jit-backlinks-mode) ;; shim so no SQLite needed
-(org-node-fakeroam-fast-render-mode) ;; perf fixes
-
-;; Example keybindings
-(keymap-set org-mode-map "M-s M-t M-t" #'org-roam-buffer-toggle)
-(keymap-set org-mode-map "M-s M-t M-d" #'org-roam-buffer-display-dedicated)
-;; if your window mgmt style is constantly lose all windows
-(keymap-set global-map "M-s M-r" #'org-node-fakeroam-show-buffer)
+(org-node-roam-accelerator-mode)
 @end lisp
 
 @node Option 2A Use the org-node-context buffer
@@ -486,7 +476,7 @@ You may find these tools useful:
 
 The second command may be useful as a starting point if you're new to org-super-links@comma{} pre-populating the notes you already have.
 
-However@comma{} when you have pre-existing drawers@dots{} @strong{MAKE A FULL BACKUP} before trying it!
+However@comma{} when you have pre-existing drawers@dots{} @strong{make a full backup} before trying it!
 
 Org-node has a different usage in mind than org-super-links.  You may be accustomed to having old manually formatted and sorted drawers.
 

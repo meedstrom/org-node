@@ -40,7 +40,7 @@ Node seqs, if you use them, now require turning on explicitly.
 
 For reference, check out the full list of obsoletions near the bottom of file [[https://github.com/meedstrom/org-node/blob/main/org-node-changes.el][org-node-changes.el]].
 
-A *silent* obsoletion: links are not plists anymore, but =plist-get= is unhelpfully polite and returns nil when given invalid input.   Use e.g. =(org-mem-link-pos link)= instead of =(plist-get LINK :pos)=.
+A *silent* obsoletion: links are not plists anymore, but =plist-get= is unhelpfully polite and returns nil when given invalid input.   Use e.g. =(org-mem-link-pos LINK)= instead of =(plist-get LINK :pos)=.  Also, a link is a citation if =(org-mem-link-citation-p LINK)=.
 
 Other changes you may notice:
 
@@ -255,7 +255,7 @@ You may find these tools useful:
 
 The second command may be useful as a starting point if you're new to org-super-links, pre-populating the notes you already have.
 
-However, when you have pre-existing drawers... *MAKE A FULL BACKUP* before trying it!
+However, when you have pre-existing drawers... *make a full backup* before trying it!
 
 Org-node has a different usage in mind than org-super-links.  You may be accustomed to having old manually formatted and sorted drawers.
 
