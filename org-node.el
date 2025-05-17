@@ -2098,7 +2098,7 @@ Excludes reflinks not coming from an ID node."
                                      (goto-char ,pos)
                                      (org-fold-show-entry)
                                      (org-fold-show-context)))
-                     origin)
+                     (or origin ""))
                    (if type (concat type ":" target) target)))))))
     (if entries
         (org-mem-list--pop-to-tabulated-buffer
