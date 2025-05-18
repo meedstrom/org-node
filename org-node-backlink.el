@@ -27,6 +27,7 @@
 (require 'seq)
 (require 'llama)
 (require 'org)
+(require 'ol)
 (require 'org-element)
 (require 'org-node-changes)
 (require 'org-node)
@@ -38,7 +39,9 @@
   :group 'org-node)
 
 (defcustom org-node-backlink-do-drawers t
-  "Manage drawers instead of properties."
+  "Manage drawers instead of properties.
+A :BACKLINKS: property is more compact, but can run off the edge of the
+visible window without `visual-line-mode' or similar."
   :type 'boolean
   :package-version '(org-node . "2.0.0"))
 
@@ -55,8 +58,7 @@ If a warning was not needed, return nil."
   (and org-node-backlink-do-drawers
        org-node-backlink-protect-org-super-links
        (fboundp 'org-super-links-convert-link-to-super)
-       (display-warning 'org-node-backlink "
-A notice to users of org-super-links:
+       (display-warning 'org-node-backlink "A notice to users of org-super-links:
 To protect your pre-existing drawers,
 `org-node-backlink-mode' will do nothing.
 If you're OK with how it would reformat your backlinks drawers,
@@ -67,12 +69,10 @@ set `org-node-backlink-protect-org-super-links' to nil.")))
 If a warning was not needed, return nil."
   (and org-node-backlink-do-drawers
        (cl-some (##org-mem-entry-property "BACKLINKS" %) (org-mem-all-entries))
-       (display-warning 'org-node-backlink "
-User option `org-node-backlink-do-drawers' is t,
-but found :BACKLINKS: lines in some property drawers,
-so doing nothing.
+       (display-warning 'org-node-backlink "User option `org-node-backlink-do-drawers' is t,
+but found :BACKLINKS: lines in some property drawers, so doing nothing.
 This is a new default in v2, you probably just need to toggle it.
-Or use `org-node-backlink-mass-delete-props'.")))
+Or run this command once: `org-node-backlink-mass-delete-props'.")))
 
 
 ;;; Global minor mode
@@ -425,9 +425,12 @@ If REMOVE is non-nil, remove it instead."
 ;;    `org-node-backlink-fix-buffer', which can easily take a while for a big
 ;;    target file.
 
-;; TODO: Report when it has members
-(defvar org-node-backlink--fails nil
-  "List of IDs that could not be resolved.")
+;; REVIEW: In theory, it is possible to drop these advices, letting user insert
+;; links with zero Emacs lag, if we instead use something like
+;; `org-node-backlink--maybe-fix-proactively' after some idle...
+;; That would let us cut nearly 200 LoC.
+;; We'd keep these LoC just for the nicety of seeing backlinks appear in
+;; already-open buffers, but no need to visit non-open files until later.
 
 (defun org-node-backlink--add-in-target (&rest _)
   "For known link at point, leave a backlink in the target node."
@@ -455,7 +458,7 @@ If REMOVE is non-nil, remove it instead."
                           (org-mem-entry-file
                            (gethash target-id org-nodes)))))
       (when (null target-file)
-        (push target-id org-node-backlink--fails))
+        (message "`org-node-backlink--add-in-target' could not resolve ID: %s" target-id))
       (when (and target-id target-file)
         (let ((case-fold-search t)
               (origin-id (org-entry-get-with-inheritance "ID")))
@@ -480,6 +483,7 @@ If REMOVE is non-nil, remove it instead."
                 (when (and (boundp 'org-transclusion-exclude-elements)
                            (not (memq 'property-drawer
                                       org-transclusion-exclude-elements)))
+                  ;; Safety for when we search for literal :ID: line
                   (error "org-node-backlink-mode: List `org-transclusion-exclude-elements' must include `property-drawer'"))
                 (goto-char (point-min))
                 (let ((case-fold-search t))
@@ -496,7 +500,8 @@ If REMOVE is non-nil, remove it instead."
                           (error "org-node: Area seems to be read-only at %d in %s"
                                  (point) (buffer-name))
                         (org-node-backlink--add origin-id origin-title))
-                    (push target-id org-node-backlink--fails)))))))))))
+                    (message "`org-node-backlink--add-in-target' could not find ID %s in file %s"
+                             target-id target-file)))))))))))
 
 (defun org-node-backlink--add (id title)
   "Add link with ID and TITLE into local backlink drawer or property."
@@ -790,45 +795,53 @@ To force an update at any time, use one of these commands:
        when entry
        when (not (seq-set-equal-p
                   (seq-keep #'org-mem-link-nearby-id
-                            (seq-filter (##or (org-mem-link-citation-p %)
-                                              (equal (org-mem-link-type %) "id"))
+                            (seq-filter (##or (equal (org-mem-link-type %) "id")
+                                              (org-mem-link-citation-p %))
                                         old-links))
                   (seq-keep #'org-mem-link-nearby-id
-                            (append (org-mem-roam-reflinks-to-entry entry)
-                                    (org-mem-id-links-to-entry entry)))))
+                            (append (org-mem-roam-reflinks-to entry)
+                                    (org-mem-id-links-to entry)))))
        ;; Something changed in the set of links targeting this entry.
-       ;; So we'll go to the entry to refresh backlinks.
+       ;; So we'll visit the entry to re-print backlinks.
        do
        ;; Alist `affected-targets' looks like:
        ;;   ((file1 . (id1 id2 id3 ...))
        ;;    (file2 . (...))
        ;;    (file3 . (...)))
-       ;; We do not use entry positions since they'll change after edit.
+       ;; We'll find the entry by searching on id rather than entry positions,
+       ;; since positions will change after edit.
        (push (org-mem-entry-id entry)
              (alist-get
               (org-mem-entry-file entry) affected-targets () () #'equal)))
 
       (cl-loop
        for (file . ids) in affected-targets
-       when (and (file-readable-p file)
-                 (file-writable-p file))
-       do (org-node--with-quick-file-buffer file
-            :about-to-do "About to fix backlinks"
-            (let ((user-is-editing (buffer-modified-p))
-                  (case-fold-search t))
-              (dolist (id (delete-dups ids))
-                (goto-char (point-min))
-                (when (re-search-forward
-                       (concat "^[\s\t]*:ID: +" (regexp-quote id))
-                       nil t)
-                  (org-node-backlink--fix-nearby)))
-              ;; Normally, `org-node--with-quick-file-buffer' only saves
-              ;; buffers it had to open anew.  Let's save even if it was
-              ;; open previously.
-              (unless user-is-editing
-                (let ((before-save-hook nil)
-                      (after-save-hook nil))
-                  (save-buffer)))))))))
+       if (not (file-readable-p file))
+       do (message "Cannot edit backlinks in unreadable file: %s" file)
+       else if (not (file-readable-p file))
+       do (message "Cannot edit backlinks in unwritable file: %s" file)
+       else do
+       (when (and (boundp 'org-transclusion-exclude-elements)
+                  (not (memq 'property-drawer org-transclusion-exclude-elements)))
+         ;; Safety for when we search for literal :ID: line
+         (error "org-node-backlink-mode: List `org-transclusion-exclude-elements' must include `property-drawer'"))
+       (org-node--with-quick-file-buffer file
+         :about-to-do "About to fix backlinks"
+         (let ((user-is-editing (buffer-modified-p))
+               (case-fold-search t))
+           (dolist (id (delete-dups ids))
+             (goto-char (point-min))
+             (when (re-search-forward
+                    (concat "^[\s\t]*:ID: +" (regexp-quote id))
+                    nil t)
+               (org-node-backlink--fix-nearby)))
+           ;; Normally, `org-node--with-quick-file-buffer' only saves
+           ;; buffers it had to open anew.  Let's save even if it was
+           ;; open previously.
+           (unless user-is-editing
+             (let ((before-save-hook nil)
+                   (after-save-hook nil))
+               (save-buffer)))))))))
 
 (provide 'org-node-backlink)
 

@@ -149,6 +149,10 @@ NAME, ARGLIST and BODY as in `defun'."
                     ,when ,removed-by ,newname-or-expl)))
        ,@body)))
 
+;; So that `gethash' will error
+(defvar org-node--origin<>links :obsolete)
+(defvar org-node--file<>lnum.node :obsolete)
+
 (org-node-changes--def-whiny-alias 'org-node-get-file-path           #'org-mem-file                    "1.9.38 (February 2025)" "May")
 (org-node-changes--def-whiny-alias 'org-node-ref-add                  'org-node-add-refs               "1.9.38 (February 2025)" "April")
 (org-node-changes--def-whiny-alias 'org-node-tag-add                  'org-node-add-tags               "1.9.38 (February 2025)" "April")

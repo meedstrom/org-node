@@ -722,6 +722,10 @@ is determined by `org-node-slug-fn' and `org-node-datestamp-format'."
   :group 'org-node
   :type '(choice boolean string))
 
+;; TODO: It'd be more user-friendly if the interactive prompt also lets you
+;;       change the basename.  So, conditionally call `org-node-slug-fn'
+;;       here, then use `read-file-name' rather than `read-directory-name'.
+;;       But first we need some refactoring elsewhere.
 (defun org-node-guess-or-ask-dir (prompt)
   "Maybe prompt for a directory, and if so, use string PROMPT.
 Behavior depends on user option `org-node-ask-directory'.
@@ -1829,14 +1833,17 @@ Tip: In case of unsolvable problems, eval this to wipe org-id-locations:
       (org-id-locations-save)
       (org-mem-reset))))
 
-;; TODO: Optionally obey filter-fn
+(defvar consult-ripgrep-args)
+(declare-function consult--grep "ext:consult")
+(declare-function consult--grep-make-builder "ext:consult")
+(declare-function consult--ripgrep-make-builder "ext:consult")
+;; TODO: Optionally obey `org-node-filter-fn'
 ;;;###autoload
 (defun org-node-grep ()
   "Grep across all files known to org-node."
   (interactive)
   (unless (require 'consult nil t)
-    (user-error "This command requires the consult package"))
-  (require 'consult)
+    (user-error "This command requires package \"consult\""))
   (org-node-cache-ensure)
   ;; Prevent consult from turning the names relative, with such enlightening
   ;; directory paths as ../../../../../../.
@@ -1844,14 +1851,14 @@ Tip: In case of unsolvable problems, eval this to wipe org-id-locations:
              (lambda (name &optional _dir) name)))
     (let ((consult-ripgrep-args (concat consult-ripgrep-args " --type=org")))
       (if (executable-find "rg")
-          (consult--grep "Grep in files known to org-node: "
+          (consult--grep "Grep in files known to org-mem: "
                          #'consult--ripgrep-make-builder
                          (org-node--root-dirs (org-mem-all-files))
                          nil)
         ;; Much slower!  Vanilla grep does not have Ripgrep's --type=org, so
         ;; must target thousands of files and not a handful of dirs, a calling
         ;; pattern that would also slow Ripgrep down.
-        (consult--grep "(Ripgrep not found) Grep in files known to org-node: "
+        (consult--grep "(Ripgrep not found) Grep in files known to org-mem: "
                        #'consult--grep-make-builder
                        (org-mem-all-files)
                        nil)))))
@@ -2821,7 +2828,7 @@ BOUND as in `re-search-forward'."
 (defun org-node--kill-work-buffers ()
   "Kill all buffers in `org-node--work-buffers'."
   (while-let ((buf (pop org-node--work-buffers)))
-    (kill-buffer buf)))
+    (when buf (kill-buffer buf))))
 
 ;; TODO: Either duplicate the org element cache of FILE,
 ;;       or just actually visit FILE.
