@@ -385,7 +385,7 @@ If REMOVE is non-nil, remove it instead."
                    do (setq links (delete link links)))
           (push new-link links)
           (when (seq-some #'null links)
-            (org-node--die "nils in %S" links))
+            (error "org-node: nils in %S" links))
           ;; Enforce deterministic order to prevent unnecessary reordering
           ;; every time a node is linked that already has the backlink
           (sort links #'string-lessp)

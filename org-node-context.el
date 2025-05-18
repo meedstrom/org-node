@@ -21,6 +21,7 @@
 (require 'org)
 (require 'org-node)
 (require 'org-element)
+(require 'org-mem)
 (require 'magit-section)
 
 (defgroup org-node-context nil "Preview backlink contexts in separate buffer."
@@ -488,7 +489,7 @@ else briefly visit the file at LINK-POS and call
                                  (org-mem-entry-file node))
              (goto-char link-pos)
              (setq snippet (org-node-context--extract-entry-at-point)))
-           (with-current-buffer (org-node--general-org-work-buffer)
+           (with-current-buffer (org-mem-org-mode-scratch)
              (erase-buffer)
              (insert snippet)
              (goto-char pos-diff)

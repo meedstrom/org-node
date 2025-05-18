@@ -630,22 +630,11 @@ must be called a lot."
 
 ;;;; Etc
 
-(defun org-node--die (format-string &rest args)
-  "Like `error' but make sure the user sees it.
-Useful because not everyone has `debug-on-error' t, and then
-errors are very easy to miss.
-
-Arguments FORMAT-STRING and ARGS as in `format-message'."
-  (let ((err-string (apply #'format-message format-string args)))
-    (unless debug-on-error
-      (display-warning 'org-node err-string :error))
-    (error "%s" err-string)))
-
 (defun org-node--consent-to-bothersome-modes-for-mass-edit ()
   "Confirm about certain modes being enabled.
 These are modes such as `auto-save-visited-mode' that can
-interfere with user experience during an incremental mass editing
-operation."
+interfere with user experience during or after mass-editing operation."
+  ;; TODO: Expand the list, there are probably other annoying modes
   (cl-loop for mode in '(auto-save-visited-mode
                          git-auto-commit-mode)
            when (and (boundp mode)
@@ -2845,17 +2834,13 @@ BOUND as in `re-search-forward'."
   "Get or create a hidden buffer, and read FILE contents into it.
 Also enable `org-mode', but ignore `org-mode-hook' and startup options.
 
-The buffer persists, so calling again with the same FILE skips the
-overhead of creation.  To clean up, call
+A buffer persists for each FILE, so calling again with the same FILE
+skips the overhead of creation.  To clean up, call
 `org-node--kill-work-buffers' explicitly."
-  (let ((bufname (format " *org-node-context-%d*" (sxhash file)))
-        (org-inhibit-startup t)
-        (org-element-cache-persistent nil))
+  (let ((bufname (format " *org-node-work-%d*" (sxhash file))))
     (or (get-buffer bufname)
-        (with-current-buffer (get-buffer-create bufname t)
+        (with-current-buffer (org-mem-org-mode-scratch bufname)
           (push (current-buffer) org-node--work-buffers)
-          (delay-mode-hooks (org-mode))
-          (setq-local org-element-cache-persistent nil)
           (insert-file-contents file)
           ;; May be useful for `org-node-roam-accelerator-mode'.
           ;; No idea why `org-roam-with-temp-buffer' sets default directory,
@@ -2864,21 +2849,6 @@ overhead of creation.  To clean up, call
           ;; Ensure that attempted edits trip an error, since the buffer may be
           ;; reused any number of times, and should always reflect FILE.
           (setq-local buffer-read-only t)
-          (current-buffer)))))
-
-(defun org-node--general-org-work-buffer ()
-  "Get or create a hidden `org-mode' buffer.
-
-Like a temp buffer, but never dies.  You should probably use
-`erase-buffer' in case it already contains text.  Then finish up with
-`font-lock-ensure' if you need the contents fontified."
-  (let ((bufname " *org-node-work*")
-        (org-inhibit-startup t)
-        (org-element-cache-persistent nil))
-    (or (get-buffer bufname)
-        (with-current-buffer (get-buffer-create bufname t)
-          (delay-mode-hooks (org-mode))
-          (setq-local org-element-cache-persistent nil)
           (current-buffer)))))
 
 
@@ -2934,12 +2904,10 @@ from many sources.  To deal with that:
             (setq snippet (funcall org-roam-preview-function))
             (dolist (fn org-roam-preview-postprocess-functions)
               (setq snippet (funcall fn snippet)))))
-        (with-current-buffer (org-node--general-org-work-buffer)
-          (erase-buffer)
-          (insert snippet)
-          (font-lock-ensure)
-          (buffer-string))))))
+        (org-mem-fontify-like-org snippet)))))
 
+(declare-function org-mem-roamy-mk-backlinks "org-mem-roamy")
+(declare-function org-mem-roamy-mk-reflinks "org-mem-roamy")
 ;;;###autoload
 (define-minor-mode org-node-roam-accelerator-mode
   "Advise the \"*org-roam*\" buffer to be faster.

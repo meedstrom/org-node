@@ -220,6 +220,8 @@ NAME, ARGLIST and BODY as in `defun'."
 (define-obsolete-function-alias 'org-node-subtree-p                  #'org-mem-subtree-p                           "3.0.0 (May 2025)")
 (define-obsolete-function-alias 'org-nodes-in-file                   #'org-mem-id-nodes-in-files                   "3.0.0 (May 2025)")
 
+(define-obsolete-function-alias 'org-node--general-org-work-buffer  #'org-mem-org-mode-scratch "3.1.1 (2025-05-18)")
+
 (unless (featurep 'org-node-fakeroam)
   (defalias 'org-node-fakeroam-fast-render-mode 'org-node-roam-accelerator-mode)
   (defalias 'org-node-fakeroam-jit-backlinks-mode 'org-node-roam-accelerator-mode))
