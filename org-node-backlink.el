@@ -31,6 +31,8 @@
 (require 'org-node-changes)
 (require 'org-node)
 (require 'org-mem)
+(declare-function org-mem-updater-ensure-entry-at-point-known "org-mem-updater")
+(declare-function org-mem-updater-ensure-link-at-point-known "org-mem-updater")
 
 (defgroup org-node-backlink nil "In-file backlinks."
   :group 'org-node)
@@ -92,7 +94,7 @@ See Info node `(org-node)'."
               (org-node-backlink--local-mode)))))
     (advice-remove 'org-insert-link #'org-node-backlink--add-in-target)
     (remove-hook 'org-mode-hook #'org-node-backlink--local-mode)
-    (remove-hook 'org-roam-post-node-insert-hook #'org-mem-x-ensure-link-at-point-known)
+    (remove-hook 'org-roam-post-node-insert-hook #'org-mem-updater-ensure-link-at-point-known)
     (remove-hook 'org-mem-post-targeted-scan-functions #'org-node-backlink--maybe-fix-proactively)
     (dolist (buf (buffer-list))
       (with-current-buffer buf
@@ -104,13 +106,13 @@ Not meant to be toggled on its own."
   :interactive nil
   (if org-node-backlink--local-mode
       (progn
-        (add-hook 'org-roam-post-node-insert-hook #'org-mem-x-ensure-link-at-point-known -50 t)
+        (add-hook 'org-roam-post-node-insert-hook #'org-mem-updater-ensure-link-at-point-known -50 t)
         (add-hook 'org-roam-post-node-insert-hook #'org-node-backlink--add-in-target nil t)
         (add-hook 'org-node-insert-link-hook      #'org-node-backlink--add-in-target nil t)
         (add-hook 'after-change-functions         #'org-node-backlink--flag-buffer-modification nil t)
         (add-hook 'before-save-hook               #'org-node-backlink--fix-flagged-parts-of-buffer nil t))
 
-    (remove-hook 'org-roam-post-node-insert-hook  #'org-mem-x-ensure-link-at-point-known t)
+    (remove-hook 'org-roam-post-node-insert-hook  #'org-mem-updater-ensure-link-at-point-known t)
     (remove-hook 'org-roam-post-node-insert-hook  #'org-node-backlink--add-in-target t)
     (remove-hook 'org-node-insert-link-hook       #'org-node-backlink--add-in-target t)
     (remove-hook 'after-change-functions          #'org-node-backlink--flag-buffer-modification t)
@@ -438,7 +440,7 @@ If REMOVE is non-nil, remove it instead."
          target-id target-file)
     ;; In a link such as [[id:abc1234]], TYPE is "id" and PATH is "abc1234".
     (when (and type path)
-      (org-mem-x-ensure-link-at-point-known)
+      (org-mem-updater-ensure-link-at-point-known)
       (if (equal "id" type)
           ;; A classic backlink
           (progn
@@ -472,7 +474,7 @@ If REMOVE is non-nil, remove it instead."
               ;; Ensure that
               ;; `org-node-backlink--fix-flagged-parts-of-buffer' will not
               ;; later remove the backlink we're adding
-              (org-mem-x-ensure-entry-at-point-known)
+              (org-mem-updater-ensure-entry-at-point-known)
               (org-node--with-quick-file-buffer target-file
                 :about-to-do "Org-node going to add backlink to the target of the link you just inserted"
                 (when (and (boundp 'org-transclusion-exclude-elements)
@@ -743,7 +745,7 @@ If REMOVE non-nil, remove it instead."
 ;; REVIEW: Only comes into effect on
 ;;         `org-mem-post-targeted-scan-functions', but could also other
 ;;         times?  Possible the algo could be simpler, rather than diffing
-;;         `org-mem-x--target<>old-links' from current, simply look in
+;;         `org-mem-updater--target<>old-links' from current, simply look in
 ;;         `org-mem-entry-properties' of all nodes...
 
 (defcustom org-node-backlink-lazy nil
@@ -781,7 +783,7 @@ To force an update at any time, use one of these commands:
   (unless org-node-backlink-lazy
     (let (affected-targets)
       (cl-loop
-       for target being each hash-key of org-mem-x--target<>old-links
+       for target being each hash-key of org-mem-updater--target<>old-links
        using (hash-values old-links)
        as entry = (or (org-mem-entry-by-id target)
                       (org-mem-entry-by-roam-ref target))

@@ -622,7 +622,7 @@ This permits \\[org-node-seq-dispatch] to work."
   :group 'org-node
   (if org-node-seq-mode
       (progn
-        ;; FIXME: A new node (cached w `org-mem-x-ensure-entry-at-point-known')
+        ;; FIXME: A new node (cached w `org-mem-updater-ensure-entry-at-point-known')
         ;;        eventually disappears from cache if its buffer is never
         ;;        saved, and then the node seq stops working
         (add-hook 'org-node-creation-hook        #'org-node-seq--add-item)

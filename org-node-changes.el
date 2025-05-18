@@ -34,7 +34,7 @@
 (require 'cl-lib)
 (require 'el-job)
 (require 'org-mem)
-(require 'org-mem-x)
+(require 'org-mem-updater)
 (require 'org-mem-list)
 (eval-when-compile
   (require 'ol))
@@ -161,7 +161,7 @@ NAME, ARGLIST and BODY as in `defun'."
 (define-obsolete-variable-alias 'org-node--dest<>links                 'org-mem--target<>links             "3.0.0 (May 2025)")
 (define-obsolete-variable-alias 'org-node--id<>node                    'org-mem--id<>entry                 "3.0.0 (May 2025)")
 (define-obsolete-variable-alias 'org-node--id<>refs                    'org-mem--id<>roam-refs             "3.0.0 (May 2025)")
-(define-obsolete-variable-alias 'org-node--idle-timer                  'org-mem-x--timer                   "3.0.0 (May 2025)")
+(define-obsolete-variable-alias 'org-node--idle-timer                  'org-mem-updater--timer             "3.0.0 (May 2025)")
 (define-obsolete-variable-alias 'org-node--ref-path<>ref-type          'org-mem--roam-ref<>type            "3.0.0 (May 2025)")
 (define-obsolete-variable-alias 'org-node--ref<>id                     'org-mem--roam-ref<>id              "3.0.0 (May 2025)")
 (define-obsolete-variable-alias 'org-node--time-elapsed                'org-mem--time-elapsed              "3.0.0 (May 2025)")
@@ -174,7 +174,7 @@ NAME, ARGLIST and BODY as in `defun'."
 (org-node-changes--def-whiny-alias 'org-node-proposed-sequence         'org-node-proposed-seq              "3.0.0 (May 2025)" "August")
 
 (define-obsolete-function-alias 'org-node--dir-files-recursively     #'org-mem--dir-files-recursive                "3.0.0 (May 2025)")
-(define-obsolete-function-alias 'org-node--maybe-adjust-idle-timer   #'org-mem-x--activate-timer                   "3.0.0 (May 2025)")
+(define-obsolete-function-alias 'org-node--maybe-adjust-idle-timer   #'org-mem-updater--activate-timer             "3.0.0 (May 2025)")
 (define-obsolete-function-alias 'org-node-abbrev-file-names          #'org-mem--fast-abbrev                        "3.0.0 (May 2025)")
 (define-obsolete-function-alias 'org-node-by-id                      #'org-mem-entry-by-id                         "3.0.0 (May 2025)")
 (define-obsolete-function-alias 'org-node-get-aliases                #'org-mem-roam-aliases                        "3.0.0 (May 2025)")

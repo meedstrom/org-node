@@ -97,21 +97,23 @@
 (require 'llama)
 (require 'org-node-changes)
 (require 'org-mem)
-(require 'org-mem-x)
+(require 'org-mem-updater)
 (require 'org-mem-list)
 
-(defvar consult-ripgrep-args)
 (defvar org-roam-capture-templates)
 (defvar org-node-backlink-mode)
 (declare-function org-node-backlink--fix-nearby "org-node-backlink")
-(declare-function tramp-tramp-file-p "tramp")
-(declare-function org-lint "org-lint")
-(declare-function consult--grep "ext:consult")
-(declare-function consult--grep-make-builder "ext:consult")
-(declare-function consult--ripgrep-make-builder "ext:consult")
-(declare-function org-mem-x-ensure-entry-at-point-known "org-mem")
-(declare-function org-mem-roamy-mk-backlinks "org-mem-roamy")
-(declare-function org-mem-roamy-mk-reflinks "org-mem-roamy")
+(declare-function org-at-heading-p "org")
+(declare-function org-before-first-heading-p "org")
+(declare-function org-end-of-meta-data "org")
+(declare-function org-entry-get "org")
+(declare-function org-entry-put "org")
+(declare-function org-fold-show-context "org-fold")
+(declare-function org-fold-show-context "org-fold")
+(declare-function org-link-make-string "ol")
+(declare-function org-paste-subtree "org")
+(declare-function org-time-stamp-format "org")
+(declare-function org-mem-updater-ensure-entry-at-point-known "org-mem-updater")
 
 (defvaralias 'org-nodes 'org-mem--id<>entry)
 
@@ -199,7 +201,7 @@ directory named \"archive\".
   :type 'function
   :set #'org-node--set-and-remind-reset)
 
-(defcustom org-node-insert-link-hook '(org-mem-x-ensure-link-at-point-known)
+(defcustom org-node-insert-link-hook '(org-mem-updater-ensure-link-at-point-known)
   "Hook run after inserting a link to an Org-ID node.
 
 Called with point in the new link."
@@ -218,7 +220,7 @@ Filesystem creation-time cannot be relied on."
 
 (unless (featurep 'org-node)
   (add-hook 'org-node-creation-hook #'org-node-ensure-crtime-property -95)
-  (add-hook 'org-node-creation-hook #'org-mem-x-ensure-entry-at-point-known -90))
+  (add-hook 'org-node-creation-hook #'org-mem-updater-ensure-entry-at-point-known -90))
 
 
 ;;;; Pretty completion
@@ -535,7 +537,7 @@ buffer already exists, so the buffer stays blank.  Thus this hook."
               ;; Hopefully throw away a stale autosave
               ;; since its existence annoys the user on re-creating the file
               (do-auto-save nil t))
-            (org-mem-x--forget-file-contents (list buffer-file-truename))
+            (org-mem-updater--forget-file-contents (list buffer-file-truename))
             (org-node--forget-completions-in-files (list buffer-file-truename))
             (kill-buffer buf)))))))
 
@@ -874,7 +876,7 @@ Automatically set, should be nil most of the time.")
                 (unless (pos-visible-in-window-p pos)
                   (goto-char pos))))
           ;; NOTE: If this happens a lot,
-          ;;       maybe change to just (org-mem-x--forget-file-contents file).
+          ;;       maybe change to just (org-mem-updater--forget-file-contents file).
           (message "org-node: Didn't find file, resetting...")
           (org-mem--scan-full)))
     (error "`org-node--goto' received a nil argument")))
@@ -987,6 +989,7 @@ necessary variables are set."
                                     :id    org-node-proposed-id))
         (remove-hook 'org-roam-capture-new-node-hook creation-hook-runner)))))
 
+(declare-function org-reveal "org")
 (defun org-node-capture-target ()
   "Can be used as target in a capture template.
 See `org-capture-templates' for more info about targets.
@@ -1375,8 +1378,11 @@ Works in non-Org buffers."
     (when (outline-next-heading)
       (backward-char 1))
     (org-paste-subtree)
-    (org-mem-x-ensure-entry-at-point-known)))
+    (org-mem-updater-ensure-entry-at-point-known)))
 
+(declare-function org-up-heading-or-point-min "org")
+(declare-function org-promote "org")
+(declare-function org-map-region "org")
 ;;;###autoload
 (defun org-node-extract-subtree ()
   "Extract subtree at point into a file of its own.
@@ -1459,7 +1465,7 @@ creation-date as more truthful or useful than today\\='s date.
                      (format "%s Created " (org-time-stamp-format t t)))
                     (org-link-make-string (concat "id:" id) title)
                     "\n")
-            (org-mem-x-ensure-link-at-point-known id)))
+            (org-mem-updater-ensure-link-at-point-known id)))
         (find-file path-to-write)
         (org-paste-subtree)
         (unless org-node-prefer-with-heading
@@ -1483,7 +1489,7 @@ creation-date as more truthful or useful than today\\='s date.
              "")
            "\n#+title: " title
            "\n"))
-        (org-mem-x-ensure-entry-at-point-known)
+        (org-mem-updater-ensure-entry-at-point-known)
         (push (current-buffer) org-node--new-unsaved-buffers)
         (run-hooks 'org-node-creation-hook)
         (when (bound-and-true-p org-node-backlink-mode)
@@ -1895,6 +1901,7 @@ Tip: In case of unsolvable problems, eval this to wipe org-id-locations:
                collect (list (sxhash file)
                              (vector (buttonize file #'find-file file)))))))
 
+(declare-function org-lint "org-lint")
 (defvar org-node--unlinted nil)
 (defvar org-node--lint-warnings nil)
 (defun org-node-lint-all-files ()
@@ -2471,6 +2478,8 @@ To always operate on the current entry, use `org-node-add-tags-here'."
   (interactive (list (org-node--read-tags)) org-mode)
   (org-node--call-at-nearest-node #'org-node-add-tags-here tags))
 
+(declare-function org-set-tags "org")
+(declare-function org-collect-keywords "org")
 (defun org-node-add-tags-here (tags)
   "Add TAGS to the entry at point."
   (interactive (list (org-node--read-tags)) org-mode)
@@ -2498,6 +2507,7 @@ To always operate on the current entry, use `org-node-add-tags-here'."
       (org-back-to-heading)
       (org-set-tags (seq-uniq (append tags (org-get-tags)))))))
 
+(declare-function org-get-buffer-tags "org")
 (defun org-node--read-tags ()
   "Prompt for an Org tag or several.
 Pre-fill completions by collecting tags from all known ID-nodes, as well
@@ -2577,6 +2587,7 @@ As bonus, do not land on an inlinetask, seek a real heading."
 
 ;;;; CAPF (Completion-At-Point Function) aka. in-buffer completion
 
+(declare-function org-in-regexp "org-macs")
 (defun org-node-complete-at-point ()
   "Expand word at point to a known node title, and linkify.
 Designed for `completion-at-point-functions'."
@@ -2943,7 +2954,6 @@ As a side effect, it can be used without the rest of org-roam."
         (advice-add 'org-roam-buffer-render-contents :after  #'org-node--kill-work-buffers)
         (advice-add 'org-roam-backlinks-get :override        #'org-mem-roamy-mk-backlinks)
         (advice-add 'org-roam-reflinks-get  :override        #'org-mem-roamy-mk-reflinks))
-    (advice-remove 'org-roam-node-insert-section    #'org-node--ad-roam-node-insert-section)
     (advice-remove 'org-roam-node-insert-section    #'org-node--ad-roam-node-insert-section)
     (advice-remove 'org-roam-preview-get-contents   #'org-node--ad-roam-preview-get-contents)
     (advice-remove 'org-roam-buffer-render-contents #'org-node--kill-work-buffers)
