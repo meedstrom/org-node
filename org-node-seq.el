@@ -656,7 +656,7 @@ This permits \\[org-node-seq-dispatch] to work."
                         (capture-keys (plist-get seq :capture)))
                    (if capture-keys
                        (org-capture nil capture-keys)
-                     (message "No capture template for sequence %s"
+                     (message "No capture template for sequence: %s"
                               (plist-get seq :name))))
                (setq org-node-seq--current-key nil)))
     (message "Choose sequence before navigating")))

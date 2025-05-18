@@ -2010,10 +2010,10 @@ network to quality-control it.  Rationale:
                  as target-node = (gethash target org-nodes)
                  collect
                  (list (+ (sxhash origin) (sxhash target))
-                       (vector (buttonize (org-mem-entry-title origin-node)
+                       (vector (buttonize (org-mem-title origin-node)
                                           #'org-node--goto
                                           origin-node)
-                               (buttonize (org-mem-entry-title target-node)
+                               (buttonize (org-mem-title target-node)
                                           #'org-node--goto
                                           target-node))))))))
 

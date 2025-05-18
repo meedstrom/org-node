@@ -40,7 +40,7 @@
   (require 'ol))
 
 (defvar org-node-major-version 3
-  "Number incremented for breaking changes.")
+  "Number incremented for breaking changes with no automatic transition.")
 
 (defvar org-node-changes--new-names
   '()
@@ -93,9 +93,10 @@ This becomes a problem if the DB goes outdated: clicking a link can
 send you to an empty file due to an uncaught rename, for example.
 Org-node keeps `org-id-locations' up to date for you,
 so you can revert ID-link behavior to its default,
-by adding to initfiles AFTER org-roam loads:
-(org-link-set-parameters
- \"id\" :follow #'org-id-open :store #'org-id-store-link-maybe)"))))
+by adding to initfiles:
+(with-eval-after-load 'org-roam-id
+ (org-link-set-parameters
+  \"id\" :follow #'org-id-open :store #'org-id-store-link-maybe))"))))
 
 (defmacro org-node-changes--def-whiny-alias
     (old new when removed-by &optional interactive)
