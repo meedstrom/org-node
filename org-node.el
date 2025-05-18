@@ -208,13 +208,6 @@ Called with point in the new link."
 (defcustom org-node-creation-hook nil
   "Hook run with point in the newly created buffer or entry.
 
-Applied by `org-node-new-file', `org-node-capture-target',
-`org-node-insert-heading', `org-node-nodeify-entry' and
-`org-node-extract-subtree'.
-
-NOT applied by `org-node-new-via-roam-capture' -- see
-org-roam\\='s `org-roam-capture-new-node-hook' instead.
-
 A good function for this hook is `'org-node-ensure-crtime-property',
 since the default `org-node-datestamp-format' is empty.
 
@@ -978,21 +971,21 @@ necessary variables are set."
       (run-hooks 'org-node-creation-hook))))
 
 (defun org-node-new-via-roam-capture ()
-  "Call `org-roam-capture-' with predetermined arguments.
-Meant to be called indirectly as `org-node-creation-fn'."
+  "Call `org-roam-capture-' with predetermined arguments."
   (when (or (null org-node-proposed-title)
             (null org-node-proposed-id))
-    (error "`org-node-new-via-roam-capture' is meant to be called indirectly via `org-node-create'"))
+    (error "`org-node-new-via-roam-capture' meant to be called by `org-node-create'"))
   (unless (require 'org-roam nil t)
     (error "`org-node-new-via-roam-capture' requires library \"org-roam\""))
   (when (and (fboundp 'org-roam-capture-)
              (fboundp 'org-roam-node-create))
-    (org-roam-capture- :node (org-roam-node-create
-                              :title org-node-proposed-title
-                              :id    org-node-proposed-id))))
-
-(defalias 'org-node-fakeroam-new-via-roam-capture
-  #'org-node-new-via-roam-capture)
+    (let ((creation-hook-runner (lambda () (run-hooks 'org-node-creation-hook))))
+      (add-hook 'org-roam-capture-new-node-hook creation-hook-runner)
+      (unwind-protect
+          (org-roam-capture- :node (org-roam-node-create
+                                    :title org-node-proposed-title
+                                    :id    org-node-proposed-id))
+        (remove-hook 'org-roam-capture-new-node-hook creation-hook-runner)))))
 
 (defun org-node-capture-target ()
   "Can be used as target in a capture template.
