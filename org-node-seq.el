@@ -263,6 +263,28 @@ format-constructs occur before these."
                     "-"
                     (substring instance pos-day (+ pos-day 2)))))))))
 
+(defun org-node-seq-create-roam-daily (ymd seq-key &optional goto keys)
+  "Create an org-roam-dailies note, for a day implied by YMD.
+YMD must be a time string in YYYY-MM-DD form.
+
+SEQ-KEY is the key that corresponds to the member of `org-node-seq-defs'
+that should grow with the captured item after the capture is done.
+
+GOTO and KEYS like in `org-roam-dailies--capture'."
+  (unless (require 'org-roam-dailies nil t)
+    (error "`org-node-seq-create-roam-daily' requires library \"org-roam\""))
+  (when (fboundp 'org-roam-dailies--capture)
+    (let ((creation-hook-runner (lambda () (run-hooks 'org-node-creation-hook))))
+      (add-hook 'org-roam-capture-new-node-hook creation-hook-runner)
+      (setq org-node-proposed-seq seq-key)
+      (unwind-protect
+          (org-roam-dailies--capture
+           (encode-time
+            (parse-time-string (concat ymd (format-time-string " %T %z"))))
+           goto keys)
+        (remove-hook 'org-roam-capture-new-node-hook creation-hook-runner)
+        (setq org-node-proposed-seq nil)))))
+
 
 ;;;; Plumbing
 
