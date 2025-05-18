@@ -49,7 +49,6 @@
 ;;   + Compatible (you can use both packages and compare)
 ;;   + Fast
 ;;   + No SQLite
-;;   + Never again sit through a slow `org-id-update-id-locations'
 ;;   + If you want, opt out of those file-level :PROPERTIES: drawers
 ;;     + Set `org-node-prefer-with-heading'
 ;;   + Try to rely in a bare-metal way on upstream org-id and org-capture
@@ -57,9 +56,10 @@
 ;;   + An alternative way to display backlinks
 
 ;;   - No support for "roam:" links
-;;   - No `org-roam-db-query'
-;;     - There's an elisp API, but if you're more familiar with SQL,
-;;       it's still a downgrade
+;;   - Fewer support by packages in the ecosystem,
+;;     - But some org-roam packages may work if you configure
+;;       `org-mem-roamy-do-overwrite-real-db' and enable
+;;       `org-mem-roamy-db-mode'
 
 ;; Compared to denote:
 
