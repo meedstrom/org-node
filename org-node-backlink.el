@@ -835,9 +835,8 @@ To force an update at any time, use one of these commands:
                     (concat "^[\s\t]*:ID: +" (regexp-quote id))
                     nil t)
                (org-node-backlink--fix-nearby)))
-           ;; Normally, `org-node--with-quick-file-buffer' only saves
-           ;; buffers it had to open anew.  Let's save even if it was
-           ;; open previously.
+           ;; Normally, `org-node--with-quick-file-buffer' only saves buffers
+           ;; it had to open anew.  Let's save even if it was open previously.
            (unless user-is-editing
              (let ((before-save-hook nil)
                    (after-save-hook nil))

@@ -908,14 +908,13 @@ which buffer will be current afterwards, since it depends on
 `org-node-creation-fn', whether TITLE or ID had existed, and
 whether the user carried through with the creation.
 
-To operate on a node after creating it, either let-bind
-`org-node-creation-fn' so you know what you get, or hook
-`org-node-creation-hook' temporarily, or write:
+To operate on a node after creating it, hook onto
+`org-node-creation-hook' temporarily:
 
-    (org-node-create TITLE ID)
-    (org-node-cache-ensure t)
-    (let ((node (gethash ID org-nodes)))
-      (if node (org-node--goto node)))"
+    (let ((fix-up (lambda () ...)))
+      (add-hook 'org-node-creation-hook fix-up)
+      (unwind-protect (org-node-create TITLE ID)
+        (remove-hook 'org-node-creation-hook fix-up))"
   (setq org-node-proposed-title title)
   (setq org-node-proposed-id id)
   (setq org-node-proposed-seq seq-key)
@@ -1771,7 +1770,9 @@ user quits, do not apply any modifications."
 
 ;;;###autoload
 (defun org-node-insert-heading ()
-  "Insert a heading with ID and run `org-node-creation-hook'."
+  "Insert a heading with ID and run `org-node-creation-hook'.
+Tip: Command `org-node-nodeify-entry' is more widely applicable, it can
+be sufficient to key-bind that one."
   (interactive "*" org-mode)
   (org-insert-heading)
   (org-node-nodeify-entry))
@@ -2149,7 +2150,7 @@ Optional keyword argument ABOUT-TO-DO as in
 
 Take care!  This function presumes that FILES satisfy the assumptions
 made by `org-node--find-file-noselect'.  This is safe if FILES is
-the output of `org-node-list-files', but easily violated otherwise.
+the output of `org-mem-all-files', but easily violated otherwise.
 
 While the loop runs, print a message every now and then, composed
 of MSG and a counter for the amount of files left to visit.
