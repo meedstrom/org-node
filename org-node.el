@@ -1341,32 +1341,35 @@ Works in non-Org buffers."
                            (org-node--list-known-raw-links)
                            nil nil nil 'org-node-link-hist)))
 
-
 ;;;###autoload
 (defun org-node-refile ()
   "Experimental."
   (interactive () org-mode)
   (unless (derived-mode-p 'org-mode)
     (user-error "This command expects an org-mode buffer"))
-  (org-node-cache-ensure)
   (when (org-invisible-p)
     (user-error "Better not run this command in an invisible region"))
-  (let* ((input (completing-read "Refile into ID-node: " #'org-node-collection
-                                 () () () 'org-node-hist))
-         (node (gethash input org-node--candidate<>entry)))
-    (unless node
-      (error "Node not found %s" input))
-    (org-back-to-heading t)
-    (when (org-invisible-p)
-      ;; IDK... I'm scared of invisible regions, don't know how they work
-      (user-error "Better not run this command in an invisible region"))
-    (org-cut-subtree)
-    (org-node--goto node)
-    (widen)
-    (when (outline-next-heading)
-      (backward-char 1))
-    (org-paste-subtree)
-    (org-mem-updater-ensure-entry-at-point-known)))
+  (if (org-before-first-heading-p)
+      (user-error "`org-node-refile' only works on subtrees for now")
+    (org-node-cache-ensure)
+    (let* ((input (completing-read "Refile into ID-node: " #'org-node-collection
+                                   () () () 'org-node-hist))
+           (node (gethash input org-node--candidate<>entry))
+           (origin-buffer (current-buffer)))
+      (unless node
+        (error "Node not found %s" input))
+      (org-cut-subtree)
+      (condition-case err
+          (org-node--goto node t)
+        ((t error)
+         (switch-to-buffer origin-buffer)
+         (org-paste-subtree)
+         (signal (car err) (cdr err)))
+        (:success
+         (widen)
+         (forward-char)
+         (org-paste-subtree)
+         (run-hooks 'org-node-relocation-hook))))))
 
 (declare-function org-up-heading-or-point-min "org")
 (declare-function org-promote "org")
