@@ -85,17 +85,24 @@ See Info node `(org-node)'."
   :global t
   (if org-node-backlink-mode
       (progn
-        (advice-add 'org-insert-link :after #'org-node-backlink--add-in-target)
-        (add-hook 'org-mode-hook #'org-node-backlink--local-mode)
+        (add-hook 'org-mode-hook                        #'org-node-backlink--local-mode)
         (add-hook 'org-mem-post-targeted-scan-functions #'org-node-backlink--maybe-fix-proactively)
+        (add-hook 'org-node-relocation-hook             #'org-node-backlink--fix-nearby)
+        (add-hook 'org-roam-post-node-insert-hook       #'org-mem-updater-ensure-link-at-point-known -50)
+        (add-hook 'org-roam-post-node-insert-hook       #'org-node-backlink--add-in-target)
+        (add-hook 'org-node-insert-link-hook            #'org-node-backlink--add-in-target)
+        (advice-add 'org-insert-link :after             #'org-node-backlink--add-in-target)
         (dolist (buf (buffer-list))
           (with-current-buffer buf
             (when (derived-mode-p 'org-mode)
               (org-node-backlink--local-mode)))))
-    (advice-remove 'org-insert-link #'org-node-backlink--add-in-target)
-    (remove-hook 'org-mode-hook #'org-node-backlink--local-mode)
-    (remove-hook 'org-roam-post-node-insert-hook #'org-mem-updater-ensure-link-at-point-known)
+    (remove-hook 'org-mode-hook                        #'org-node-backlink--local-mode)
     (remove-hook 'org-mem-post-targeted-scan-functions #'org-node-backlink--maybe-fix-proactively)
+    (remove-hook 'org-node-relocation-hook             #'org-node-backlink--fix-nearby)
+    (remove-hook 'org-roam-post-node-insert-hook       #'org-mem-updater-ensure-link-at-point-known)
+    (remove-hook 'org-roam-post-node-insert-hook       #'org-node-backlink--add-in-target)
+    (remove-hook 'org-node-insert-link-hook            #'org-node-backlink--add-in-target)
+    (advice-remove 'org-insert-link                    #'org-node-backlink--add-in-target)
     (dolist (buf (buffer-list))
       (with-current-buffer buf
         (org-node-backlink--local-mode 0)))))
@@ -106,17 +113,10 @@ Not meant to be toggled on its own."
   :interactive nil
   (if org-node-backlink--local-mode
       (progn
-        (add-hook 'org-roam-post-node-insert-hook #'org-mem-updater-ensure-link-at-point-known -50 t)
-        (add-hook 'org-roam-post-node-insert-hook #'org-node-backlink--add-in-target nil t)
-        (add-hook 'org-node-insert-link-hook      #'org-node-backlink--add-in-target nil t)
-        (add-hook 'after-change-functions         #'org-node-backlink--flag-buffer-modification nil t)
-        (add-hook 'before-save-hook               #'org-node-backlink--fix-flagged-parts-of-buffer nil t))
-
-    (remove-hook 'org-roam-post-node-insert-hook  #'org-mem-updater-ensure-link-at-point-known t)
-    (remove-hook 'org-roam-post-node-insert-hook  #'org-node-backlink--add-in-target t)
-    (remove-hook 'org-node-insert-link-hook       #'org-node-backlink--add-in-target t)
-    (remove-hook 'after-change-functions          #'org-node-backlink--flag-buffer-modification t)
-    (remove-hook 'before-save-hook                #'org-node-backlink--fix-flagged-parts-of-buffer t)))
+        (add-hook 'after-change-functions #'org-node-backlink--flag-buffer-modification nil t)
+        (add-hook 'before-save-hook       #'org-node-backlink--fix-flagged-parts-of-buffer nil t))
+    (remove-hook 'after-change-functions  #'org-node-backlink--flag-buffer-modification t)
+    (remove-hook 'before-save-hook        #'org-node-backlink--fix-flagged-parts-of-buffer t)))
 
 (let (warned-once)
   (defun org-node-backlinks-mode (&rest args)

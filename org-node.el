@@ -194,26 +194,34 @@ directory named \"archive\".
   :type 'function
   :set #'org-node--set-and-remind-reset)
 
-(defcustom org-node-insert-link-hook '(org-mem-updater-ensure-link-at-point-known)
+(defcustom org-node-insert-link-hook '()
   "Hook run after inserting a link to an Org-ID node.
 
 Called with point in the new link."
   :type 'hook)
 
 (defcustom org-node-creation-hook nil
-  "Hook run with point in the newly created buffer or entry.
+  "Hook run with point in the newly created file or entry.
 
 A good function for this hook is `'org-node-ensure-crtime-property',
-since the default `org-node-datestamp-format' is empty.
-
-In the author\\='s experience, recording the creation-date somewhere may
-prove useful later on, e.g. when publishing to a blog.
-Filesystem creation-time cannot be relied on."
+since the default `org-node-datestamp-format' is empty."
   :type 'hook)
 
+(defcustom org-node-relocation-hook nil
+  "Hook run with point in the newly relocated file or entry.
+
+A relocation is an operation like `org-node-refile' or
+`org-node-extract-subtree', such that some of the node\\='s data was
+already known."
+  :type 'hook
+  :package-version '(org-node . "3.2.1"))
+
 (unless (featurep 'org-node)
-  (add-hook 'org-node-creation-hook #'org-node-ensure-crtime-property -95)
-  (add-hook 'org-node-creation-hook #'org-mem-updater-ensure-entry-at-point-known -90))
+  (add-hook 'org-node-insert-link-hook #'org-mem-updater-ensure-link-at-point-known -50)
+  (add-hook 'org-node-creation-hook #'org-id-get-create -90)
+  (add-hook 'org-node-creation-hook #'org-node-ensure-crtime-property -85)
+  (add-hook 'org-node-creation-hook #'org-mem-updater-ensure-entry-at-point-known -80)
+  (add-hook 'org-node-relocation-hook #'org-mem-updater-ensure-entry-at-point-known -80))
 
 
 ;;;; Pretty completion
@@ -1467,11 +1475,8 @@ creation-date as more truthful or useful than today\\='s date.
              "")
            "\n#+title: " title
            "\n"))
-        (org-mem-updater-ensure-entry-at-point-known)
         (push (current-buffer) org-node--new-unsaved-buffers)
-        (run-hooks 'org-node-creation-hook)
-        (when (bound-and-true-p org-node-backlink-mode)
-          (org-node-backlink--fix-nearby))))))
+        (run-hooks 'org-node-relocation-hook)))))
 
 (defun org-node-extract-file-name-datestamp (path)
   "From filename PATH, get the datestamp prefix if it has one.
