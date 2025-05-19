@@ -2094,21 +2094,23 @@ Optional keyword argument ABOUT-TO-DO as in
     `(let ((enable-local-variables :safe)
            (org-inhibit-startup t) ;; Don't apply startup #+options
            (find-file-hook nil)
-           (after-save-hook nil)
-           (before-save-hook nil)
            (org-agenda-files nil)
            (kill-buffer-hook nil) ;; Inhibit save-place etc
            (kill-buffer-query-functions nil)
-           (buffer-list-update-hook nil))
+           (buffer-list-update-hook nil)
+           (file ,file))
        ;; The cache is buggy, disable to be safe
        (org-element-with-disabled-cache
-         (let* ((--was-open-- (find-buffer-visiting ,file))
-                (_ (when (file-directory-p ,file)
-                     (error "Is a directory: %s" ,file)))
+         (let* ((--was-open-- (find-buffer-visiting file))
+                (_ (when (file-directory-p file)
+                     (error "Is a directory: %s" file)))
                 (--buf-- (or --was-open--
                              (delay-mode-hooks
                                (org-node--find-file-noselect
-                                (org-mem--abbr-truename ,file)
+                                ;; TODO: Move this check into `org-node--find-file-noselect' itself
+                                (or (org-mem--abbr-truename file)
+                                    (error "File name not safe for `org-node--find-file-noselect': %s"
+                                           file))
                                 ,why)))))
            (when (bufferp --buf--)
              (with-current-buffer --buf--
@@ -2119,7 +2121,9 @@ Optional keyword argument ABOUT-TO-DO as in
                    ;; Because the cache gets confused by changes
                    (org-element-cache-reset)
                  (when (buffer-modified-p)
-                   (let ((save-silently t)
+                   (let ((before-save-hook nil)
+                         (after-save-hook nil)
+                         (save-silently t)
                          (inhibit-message t))
                      (save-buffer)))
                  (kill-buffer)))))))))
