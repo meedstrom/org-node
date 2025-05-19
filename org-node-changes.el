@@ -147,6 +147,18 @@ NAME, ARGLIST and BODY as in `defun'."
                     ,when ,removed-by ,newname-or-expl)))
        ,@body)))
 
+(org-node-changes--def-whiny-fn org-node-seq--guess-daily-dir ()
+  "3.1.2 (May 2025)" "July" "hardcode a directory in your `org-node-seq-defs' instead."
+  (or (bound-and-true-p org-node-fakeroam-daily-dir)
+      (bound-and-true-p org-journal-dir)
+      (and (bound-and-true-p org-roam-directory)
+           (seq-find #'file-exists-p
+                     (list (file-name-concat org-roam-directory "daily/")
+                           (file-name-concat org-roam-directory "dailies/"))))
+      (seq-find #'file-exists-p
+                (list (file-name-concat org-directory "daily/")
+                      (file-name-concat org-directory "dailies/")))))
+
 ;; So that `gethash' will error
 (defvar org-node--origin<>links :obsolete)
 (defvar org-node--file<>lnum.node :obsolete)
@@ -158,7 +170,6 @@ NAME, ARGLIST and BODY as in `defun'."
 (org-node-changes--def-whiny-alias 'org-node-alias-add                'org-node-add-alias              "1.9.38 (February 2025)" "May")
 (define-obsolete-function-alias 'org-node-seq-try-visit-file          'org-node-seq-try-goto-file      "3.0.0 (May 2025)")
 
-(define-obsolete-variable-alias 'org-node-series-that-marks-calendar   'org-node-seq-that-marks-calendar   "1.9.0 (November 2024)")
 (define-obsolete-variable-alias 'org-node--dest<>links                 'org-mem--target<>links             "3.0.0 (May 2025)")
 (define-obsolete-variable-alias 'org-node--id<>node                    'org-mem--id<>entry                 "3.0.0 (May 2025)")
 (define-obsolete-variable-alias 'org-node--id<>refs                    'org-mem--id<>roam-refs             "3.0.0 (May 2025)")
@@ -172,7 +183,6 @@ NAME, ARGLIST and BODY as in `defun'."
 (define-obsolete-variable-alias 'org-node-extra-id-dirs-exclude        'org-mem-watch-dirs-exclude         "3.0.0 (May 2025)")
 (define-obsolete-variable-alias 'org-node-link-types                   'org-mem-seek-link-types            "3.0.0 (May 2025)")
 (define-obsolete-variable-alias 'org-node-warn-title-collisions        'org-mem-do-warn-title-collisions   "3.0.0 (May 2025)")
-(org-node-changes--def-whiny-alias 'org-node-proposed-sequence         'org-node-proposed-seq              "3.0.0 (May 2025)" "August")
 
 (define-obsolete-function-alias 'org-node--dir-files-recursively     #'org-mem--dir-files-recursive                "3.0.0 (May 2025)")
 (define-obsolete-function-alias 'org-node--maybe-adjust-idle-timer   #'org-mem-updater--activate-timer             "3.0.0 (May 2025)")
@@ -221,7 +231,8 @@ NAME, ARGLIST and BODY as in `defun'."
 (define-obsolete-function-alias 'org-node-subtree-p                  #'org-mem-subtree-p                           "3.0.0 (May 2025)")
 (define-obsolete-function-alias 'org-nodes-in-file                   #'org-mem-id-nodes-in-files                   "3.0.0 (May 2025)")
 
-(define-obsolete-function-alias 'org-node--general-org-work-buffer  #'org-mem-org-mode-scratch "3.1.1 (2025-05-18)")
+(define-obsolete-function-alias 'org-node--general-org-work-buffer  #'org-mem-org-mode-scratch   "3.1.1 (May 2025)")
+(define-obsolete-function-alias 'org-node-forget-dir                #'org-mem-scrub-id-locations "3.2.0 (May 2025)")
 
 (unless (featurep 'org-node-fakeroam)
   (defalias 'org-node-fakeroam-fast-render-mode 'org-node-roam-accelerator-mode)

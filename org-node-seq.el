@@ -173,25 +173,6 @@ YYYY-MM-DD format, e.g. \"2024-01-31.org\"."
 
 ;;; Helpers to use in a seq definition
 
-(defvar org-node-seq--guess-daily-dir nil
-  "Last result of function `org-node-seq--guess-daily-dir'.")
-
-;;;###autoload
-(defun org-node-seq--guess-daily-dir ()
-  "Do not rely on this.
-Better insert a hardcoded string in your seq def,
-instead of calling this function."
-  (with-memoization org-node-seq--guess-daily-dir
-    (or (bound-and-true-p org-node-fakeroam-daily-dir)
-        (bound-and-true-p org-journal-dir)
-        (and (bound-and-true-p org-roam-directory)
-             (seq-find #'file-exists-p
-                       (list (file-name-concat org-roam-directory "daily/")
-                             (file-name-concat org-roam-directory "dailies/"))))
-        (seq-find #'file-exists-p
-                  (list (file-name-concat org-directory "daily/")
-                        (file-name-concat org-directory "dailies/"))))))
-
 ;;;###autoload
 (defun org-node-seq-try-goto-id (id)
   "Try to visit org-id ID and return non-nil, else return nil."
@@ -383,6 +364,10 @@ definitions."
 The sequence is identified either by KEY, or if that is nil, by the
 current value of `org-node-proposed-seq'.  If that is also nil, do
 nothing."
+  (when (bound-and-true-p org-node-proposed-sequence)
+    ;; Old name existed 1.9.0 -> 2.0.0
+    (display-warning
+     'org-node "Variable org-node-proposed-sequence should be org-node-proposed-seq, check initfiles"))
   (when (or key org-node-proposed-seq)
     (let* ((seq (cdr (assoc (or key org-node-proposed-seq)
                             org-node-seqs)))
@@ -546,6 +531,10 @@ which dates to mark.
 Meant to sit on these hooks:
 - `calendar-today-invisible-hook'
 - `calendar-today-visible-hook'"
+  (when (bound-and-true-p org-node-series-that-marks-calendar)
+    ;; Old name existed until 1.9.0
+    (display-warning
+     'org-node "Variable org-node-series-that-marks-calendar should be org-node-seq-that-marks-calendar, check initfiles"))
   (when org-node-seq-that-marks-calendar
     (calendar-unmark)
     (let* ((seq (cdr (assoc org-node-seq-that-marks-calendar

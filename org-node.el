@@ -19,7 +19,7 @@
 ;; URL:      https://github.com/meedstrom/org-node
 ;; Created:  2024-04-13
 ;; Keywords: org, hypermedia
-;; Package-Requires: ((emacs "29.1") (llama "0.5.0") (org-mem "0.10.1") (magit-section "4.3.0"))
+;; Package-Requires: ((emacs "29.1") (llama "0.5.0") (org-mem "0.11.0") (magit-section "4.3.0"))
 
 ;; Looking for Package-Version?  Consult the Git tag.
 ;;       MELPA versions above 20250303 is v2.
@@ -1789,42 +1789,6 @@ user quits, do not apply any modifications."
     (org-entry-put nil "CREATED"
                    (format-time-string (org-time-stamp-format t t)))))
 (defalias 'org-node-ensure-crtime-property 'org-node-put-created)
-
-;;;###autoload
-(defun org-node-forget-dir (dir)
-  "Remove references in `org-id-locations' to files in DIR.
-
-Note that if DIR descends from a member of `org-mem-watch-dirs',
-this action may make no practical impact unless you add DIR to
-`org-mem-watch-dirs-exclude'.
-
-Tip: In case of unsolvable problems, eval this to wipe org-id-locations:
-
-\(progn
- (delete-file org-id-locations-file)
- (setq org-id-locations nil)
- (setq org-id--locations-checksum nil)
- (setq org-agenda-text-search-extra-files nil)
- (setq org-id-files nil)
- (setq org-id-extra-files nil))"
-  (interactive "DForget all IDs in directory: ")
-  (org-node-cache-ensure t)
-  (let ((files (nconc (org-mem--dir-files-recursive dir ".org_exclude" nil)
-                      (org-mem--dir-files-recursive dir ".org" nil))))
-    (when files
-      (setq files (nconc files (mapcar #'org-mem--abbr-truename files)))
-      (message "Forgetting all IDs in directory %s..." dir)
-      (redisplay)
-      (maphash (lambda (id file)
-                 (when (member file files)
-                   (remhash id org-id-locations)))
-               org-id-locations)
-      (dolist (file files)
-        (remhash file org-mem--file<>entries)
-        (remhash file org-mem--file<>metadata))
-      (org-id-locations-save)
-      (org-mem-reset))))
-;; (define-obsolete-function-alias 'org-node-forget-dir #'org-mem-scrub-id-locations ) ;; Soon
 
 (defvar consult-ripgrep-args)
 (declare-function consult--grep "ext:consult")
