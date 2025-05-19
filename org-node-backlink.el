@@ -810,15 +810,14 @@ To force an update at any time, use one of these commands:
        ;;    (file3 . (...)))
        ;; We'll find the entry by searching on id rather than entry positions,
        ;; since positions will change after edit.
-       (push (org-mem-entry-id entry)
-             (alist-get
-              (org-mem-entry-file entry) affected-targets () () #'equal)))
+       (push (org-mem-id entry)
+             (alist-get (org-mem-file entry) affected-targets () () #'equal)))
 
       (cl-loop
        for (file . ids) in affected-targets
        if (not (file-readable-p file))
        do (message "Cannot edit backlinks in unreadable file: %s" file)
-       else if (not (file-readable-p file))
+       else if (not (file-writable-p file))
        do (message "Cannot edit backlinks in unwritable file: %s" file)
        else do
        (when (and (boundp 'org-transclusion-exclude-elements)
@@ -830,11 +829,10 @@ To force an update at any time, use one of these commands:
          (let ((user-is-editing (buffer-modified-p))
                (case-fold-search t))
            (dolist (id (delete-dups ids))
-             (goto-char (point-min))
-             (when (re-search-forward
-                    (concat "^[\s\t]*:ID: +" (regexp-quote id))
-                    nil t)
-               (org-node-backlink--fix-nearby)))
+             (let ((pos (org-find-property "ID" id)))
+               (when pos
+                 (goto-char pos)
+                 (org-node-backlink--fix-nearby))))
            ;; Normally, `org-node--with-quick-file-buffer' only saves buffers
            ;; it had to open anew.  Let's save even if it was open previously.
            (unless user-is-editing

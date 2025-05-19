@@ -214,7 +214,7 @@ A relocation is an operation like `org-node-refile' or
 `org-node-extract-subtree', such that some of the node\\='s data was
 already known."
   :type 'hook
-  :package-version '(org-node . "3.2.1"))
+  :package-version '(org-node . "3.2.0"))
 
 (unless (featurep 'org-node)
   (add-hook 'org-node-insert-link-hook #'org-mem-updater-ensure-link-at-point-known -50)
@@ -911,10 +911,10 @@ whether the user carried through with the creation.
 To operate on a node after creating it, hook onto
 `org-node-creation-hook' temporarily:
 
-    (let ((fix-up (lambda () ...)))
-      (add-hook 'org-node-creation-hook fix-up)
+    \(let ((fix-up (lambda () ...)))
+      (add-hook \\='org-node-creation-hook fix-up)
       (unwind-protect (org-node-create TITLE ID)
-        (remove-hook 'org-node-creation-hook fix-up))"
+        (remove-hook \\='org-node-creation-hook fix-up))"
   (setq org-node-proposed-title title)
   (setq org-node-proposed-id id)
   (setq org-node-proposed-seq seq-key)
@@ -1782,7 +1782,6 @@ be sufficient to key-bind that one."
   "Add an ID to entry at point and run `org-node-creation-hook'."
   (interactive "*" org-mode)
   (org-node-cache-ensure) ;; Because the hook could contain anything
-  (org-id-get-create)
   (run-hooks 'org-node-creation-hook))
 
 ;;;###autoload
