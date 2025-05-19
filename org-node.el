@@ -564,6 +564,7 @@ immediately and can mean that the data you will next query from org-mem
 is still out of date.  That usually only matters if you had done
 something to change the facts on the ground just prior."
   (org-node-changes--onetime-warn-and-copy)
+  (setq org-node--first-init nil)
   (unless org-node-cache-mode
     (when (y-or-n-p "Org-node needs `org-node-cache-mode', enable? ")
       (org-node-cache-mode))
@@ -580,6 +581,7 @@ something to change the facts on the ground just prior."
   (when block
     (org-mem-block 'org-node 10)))
 
+;; TODO: Deprecate somehow
 (defvar org-node--first-init t
   "Non-nil until org-node has been initialized, then nil.
 Mainly for muffling some messages.")
