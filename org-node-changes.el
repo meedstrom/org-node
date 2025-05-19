@@ -36,11 +36,9 @@
 (require 'org-mem)
 (require 'org-mem-updater)
 (require 'org-mem-list)
-(eval-when-compile
-  (require 'ol))
 
 (defvar org-node-major-version 3
-  "Number incremented for breaking changes with no automatic transition.")
+  "Number incremented for breaking changes that require reading README.")
 
 (defvar org-node-changes--new-names
   '()
@@ -83,17 +81,17 @@ Then do other one-shot warnings while we\\='re at it."
        'org-node "Package org-node-fakeroam still v2, upgrade or remove")))
   (unless org-node-changes--warned-about-roam-id
     (when (and (fboundp 'org-link-get-parameter)
-               (not (and (bound-and-true-p org-roam-autosync-mode)
-                         (bound-and-true-p org-roam-db-update-on-save)))
+               (not (or (and (bound-and-true-p org-roam-autosync-mode)
+                             (bound-and-true-p org-roam-db-update-on-save))
+                        (and (bound-and-true-p org-mem-roamy-db-mode)
+                             (bound-and-true-p org-mem-roamy-do-overwrite-real-db))))
                (eq (org-link-get-parameter "id" :follow) 'org-roam-id-open))
       (setq org-node-changes--warned-about-roam-id t)
       (message
        "%s" "Note: org-roam overrides ID-link behavior to prefer its own DB!
-This becomes a problem if the DB goes outdated: clicking a link can
-send you to an empty file due to an uncaught rename, for example.
-Org-node keeps `org-id-locations' up to date for you,
-so you can revert ID-link behavior to its default,
-by adding to initfiles:
+As that DB is not being updated, links can send you to the wrong place.
+If `org-mem-do-sync-with-org-id', you can revert to default ID-link behavior.
+Add to initfiles:
 (with-eval-after-load 'org-roam-id
  (org-link-set-parameters
   \"id\" :follow #'org-id-open :store #'org-id-store-link-maybe))"))))
@@ -154,11 +152,10 @@ NAME, ARGLIST and BODY as in `defun'."
 (defvar org-node--file<>lnum.node :obsolete)
 
 (org-node-changes--def-whiny-alias 'org-node-get-file-path           #'org-mem-file                    "1.9.38 (February 2025)" "May")
-(org-node-changes--def-whiny-alias 'org-node-ref-add                  'org-node-add-refs               "1.9.38 (February 2025)" "April")
-(org-node-changes--def-whiny-alias 'org-node-tag-add                  'org-node-add-tags               "1.9.38 (February 2025)" "April")
-(org-node-changes--def-whiny-alias 'org-node-tag-add-here             'org-node-add-tags-here          "1.9.38 (February 2025)" "April")
-(org-node-changes--def-whiny-alias 'org-node-alias-add                'org-node-add-alias              "1.9.38 (February 2025)" "April")
-(org-node-changes--def-whiny-alias 'org-node-insert-link*-immediate   'org-node-insert-link-novisit*   "2.0.0 (March 2025)" "April" t)
+(org-node-changes--def-whiny-alias 'org-node-ref-add                  'org-node-add-refs               "1.9.38 (February 2025)" "May")
+(org-node-changes--def-whiny-alias 'org-node-tag-add                  'org-node-add-tags               "1.9.38 (February 2025)" "May")
+(org-node-changes--def-whiny-alias 'org-node-tag-add-here             'org-node-add-tags-here          "1.9.38 (February 2025)" "May")
+(org-node-changes--def-whiny-alias 'org-node-alias-add                'org-node-add-alias              "1.9.38 (February 2025)" "May")
 (define-obsolete-function-alias 'org-node-seq-try-visit-file          'org-node-seq-try-goto-file      "3.0.0 (May 2025)")
 
 (define-obsolete-variable-alias 'org-node-series-that-marks-calendar   'org-node-seq-that-marks-calendar   "1.9.0 (November 2024)")

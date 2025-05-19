@@ -586,15 +586,6 @@ something to change the facts on the ground just prior."
   "Non-nil until org-node has been initialized, then nil.
 Mainly for muffling some messages.")
 
-;; FIXME
-(defvar org-node--old-link-sets nil
-  "For use by `org-node-backlink-lazy'.
-
-Alist of ((TARGET . LINKS) (TARGET . LINKS) ...), where LINKS is are sets of
-links with destination TARGET.  These reflect a past state of
-`org-mem--target<>links', allowing for a diff operation against the
-up-to-date set.")
-
 (defvar org-node--compile-timers nil)
 (defvar org-node--compiled-lambdas (make-hash-table :test 'equal)
   "1:1 table mapping lambda expressions to compiled bytecode.")
@@ -843,11 +834,11 @@ Automatically set, should be nil most of the time.")
 Automatically set, should be nil most of the time.")
 
 (defun org-node--goto (node &optional pos)
-  "Visit NODE."
+  "Visit NODE, optionally go to POS instead of NODE\\='s position."
   (if node
-      (let ((file (org-mem-entry-file node)))
+      (let ((file (org-mem-file node)))
         (if (file-exists-p file)
-            (let ((pos (or pos (org-mem-entry-pos node))))
+            (let ((pos (or pos (org-mem-pos node))))
               (when (not (file-readable-p file))
                 (error "org-node: Couldn't visit unreadable file %s" file))
               (find-file file)
@@ -900,7 +891,6 @@ the function is called: `org-node-proposed-title' and
           (function-item org-capture)
           (function :tag "Custom function" :value (lambda ()))))
 
-;; TODO: "Create" sounds unspecific, rename to "New node"?
 (defun org-node-create (title id &optional seq-key)
   "Call `org-node-creation-fn' with necessary variables set.
 
@@ -1340,14 +1330,14 @@ If you often transclude file-level nodes, consider adding keywords to
       (set-marker link-marker nil)
       (run-hooks 'org-node-insert-link-hook))))
 
-;; TODO: Maybe concat the link type...
 (defun org-node-insert-raw-link ()
-  "Insert at point a link that exists in some Org file somewhere.
+  "Insert input at point, completing to links found in some Org file somewhere.
 Works in non-Org buffers."
   (interactive)
   (insert (completing-read "Insert raw link: "
                            (org-node--list-known-raw-links)
                            nil nil nil 'org-node-link-hist)))
+
 
 ;;;###autoload
 (defun org-node-refile ()
@@ -1834,6 +1824,7 @@ Tip: In case of unsolvable problems, eval this to wipe org-id-locations:
         (remhash file org-mem--file<>metadata))
       (org-id-locations-save)
       (org-mem-reset))))
+;; (define-obsolete-function-alias 'org-node-forget-dir #'org-mem-scrub-id-locations ) ;; Soon
 
 (defvar consult-ripgrep-args)
 (declare-function consult--grep "ext:consult")
@@ -2455,13 +2446,12 @@ Wrap the link in double-brackets if necessary."
 
 ;; TODO: Try to include all Firefox bookmarks and so on
 (defun org-node--list-known-raw-links ()
-  "Return list of all links seen in all known files."
+  "Return list of all \(non-ID\) links seen in all known files."
   (let (result)
     (maphash
      (lambda (target links)
        (let ((types (mapcar #'org-mem-link-type links)))
          (when (memq nil types)
-           ;; Type nil is a @citation
            (push target result)
            (setq types (delq nil types)))
          (dolist (type (delete-dups (delete "id" types)))

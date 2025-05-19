@@ -40,7 +40,7 @@ Node seqs, if you use them, now require turning on explicitly.
 
 For reference, check out the full list of obsoletions near the bottom of file [[https://github.com/meedstrom/org-node/blob/main/org-node-changes.el][org-node-changes.el]].
 
-A *silent* obsoletion: links are not plists anymore, but =plist-get= is unhelpfully polite and returns nil when given invalid input.   Use e.g. =(org-mem-link-pos LINK)= instead of =(plist-get LINK :pos)=.  Also, a link is a citation if =(org-mem-link-citation-p LINK)=.
+A *silent* obsoletion: links are not plists anymore, but =plist-get= is unhelpfully polite and returns nil when given invalid input.  Talk about weak typing!  Anyway, use e.g. =(org-mem-link-pos LINK)= instead of =(plist-get LINK :pos)=.  Also, a link is a citation if =(org-mem-link-citation-p LINK)=.
 
 Other changes you may notice:
 
@@ -114,7 +114,7 @@ A comparison of three systems that all permit relying on org-id and don't lock y
 |--------------------------------+----------+------------------+----------------------|
 | Some query-able cache          | yes      | yes              | --                   |
 | Async cache rebuild            | --       | yes              | not applicable       |
-| *Time to cache my 3000 nodes*    | *2m 48s*   | *0m 01s*           | not applicable       |
+| *Time to cache my 3000 nodes*    | *2m 48s*   | *0m 02s*           | not applicable       |
 | *Time to save file w/ 400 nodes* | *5--10s*   | *instant*          | ?                    |
 | *Time to open minibuffer*        | *1--3s*    | *instant*          | not applicable       |
 

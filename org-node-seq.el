@@ -517,7 +517,7 @@ DEF is a seq-def from `org-node-seq-defs'."
                                    (cl-sort items #'string> :key #'car)))))))
 
 (defcustom org-node-seq-that-marks-calendar nil
-  "Key for the sequence that should mark days in the calendar.
+  "Key for the node sequence that should mark days in the calendar.
 
 This affects the appearance of the `org-read-date' calendar
 popup.  For example, you can use it to indicate which days have a
@@ -611,7 +611,7 @@ not exist."
                org-node-seqs)
       (setq org-mem--next-message
             (concat org-mem--next-message
-                    (format " + %.2fs making org-node-seqs"
+                    (format " + %.2fs caching org-node-seqs"
                             (float-time (time-since T))))))))
 
 ;;;###autoload
