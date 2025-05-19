@@ -834,39 +834,41 @@ Automatically set, should be nil most of the time.")
   "Key that identifies a node sequence about to be added-to.
 Automatically set, should be nil most of the time.")
 
-(defun org-node--goto (node &optional pos)
-  "Visit NODE, optionally go to POS instead of NODE\\='s position."
-  (if node
-      (let ((file (org-mem-file node)))
-        (if (file-exists-p file)
-            (let ((pos (or pos (org-mem-pos node))))
-              (when (not (file-readable-p file))
-                (error "org-node: Couldn't visit unreadable file %s" file))
-              (find-file file)
-              (widen)
-              ;; TODO: Be friendly in this special case, but what's appropriate?
-              ;; (when (string-blank-p (buffer-string)))
+(defun org-node--goto (node &optional exact)
+  "Visit NODE file, and move point if not already close.
+EXACT means always move point."
+  (when (numberp exact)
+    (error "Function org-node--goto no longer takes a position argument"))
+  (unless node
+    (error "Function org-node--goto received a nil argument"))
+  (let ((file (org-mem-file node)))
+    (if (file-exists-p file)
+        (progn
+          (when (not (file-readable-p file))
+            (error "org-node: Couldn't visit unreadable file %s" file))
+          (find-file file)
+          (widen)
+          (let* ((id (org-mem-id node))
+                 (pos (and id (org-find-property "ID" id))))
+            (unless pos
+              (error "Could not find ID \"%s\" in buffer %s" id (current-buffer)))
+            ;; TODO: Be friendly in this special case, but what's appropriate?
+            ;; (when (string-blank-p (buffer-string)))
 
-              ;; Now `save-place-find-file-hook' has potentially already
-              ;; moved point, and that could be good enough.  So: move
-              ;; point to node heading, unless heading is already inside
-              ;; visible part of buffer and point is at or under it
-              (if (/= 0 (org-mem-entry-level node))
-                  (unless (and (pos-visible-in-window-p pos)
-                               (not (org-invisible-p pos))
-                               (equal (org-mem-entry-title-maybe node)
-                                      (org-get-heading t t t t)))
-                    (goto-char pos)
-                    (org-fold-show-entry)
-                    (org-fold-show-children)
-                    (recenter 0))
-                (unless (pos-visible-in-window-p pos)
-                  (goto-char pos))))
-          ;; NOTE: If this happens a lot,
-          ;;       maybe change to just (org-mem-updater--forget-file-contents file).
-          (message "org-node: Didn't find file, resetting...")
-          (org-mem--scan-full)))
-    (error "`org-node--goto' received a nil argument")))
+            ;; Now point may already be in a good place because a buffer was
+            ;; already visiting it, or because of save-place.
+            ;; No need to move point unnecessarily.
+            (when (or exact
+                      (not (equal id (org-entry-get-with-inheritance "ID")))
+                      (not (pos-visible-in-window-p pos))
+                      (org-invisible-p pos))
+              (goto-char pos)
+              (when (org-mem-subtree-p node)
+                (org-fold-show-entry)
+                (org-fold-show-children)
+                (recenter 0)))))
+      (message "org-node: Didn't find file, resetting...")
+      (org-mem--scan-full))))
 
 (defcustom org-node-creation-fn #'org-node-new-file
   "Function called to create a node that does not yet exist.
