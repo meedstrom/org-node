@@ -44,43 +44,36 @@
 ;; zettelkasten-inspired software.  In fact, out of the simplicity
 ;; arises something powerful, more to be experienced than explained.
 
-;; Compared to org-roam:
+;; Compared to Org-roam:
 
 ;;   + Compatible (you can use both packages and compare)
 ;;   + Fast
 ;;   + No SQLite
 ;;   + If you want, opt out of those file-level :PROPERTIES: drawers
-;;     + Set `org-node-prefer-with-heading'
+;;     + See user option `org-node-prefer-with-heading'
 ;;   + Try to rely in a bare-metal way on upstream org-id and org-capture
 ;;   + Extra utilities, notably to auto-rename files and links
 ;;   + An alternative way to display backlinks
 
 ;;   - No support for "roam:" links
-;;   - Fewer support by packages in the ecosystem,
-;;     - But some org-roam packages may work if you configure
-;;       `org-mem-roamy-do-overwrite-real-db' and enable
-;;       `org-mem-roamy-db-mode'
+;;   - Smaller package ecosystem
+;;     + Packages based on org-roam can still work!  Either by using
+;;       org-roam at the same time, or by configuring
+;;       `org-mem-roamy-do-overwrite-real-db' and enabling
+;;       `org-mem-roamy-db-mode'.
+;;   - Blind to TRAMP files (for now)
 
-;; Compared to denote:
+;; Compared to Denote:
 
 ;;   + Compatible (you can use both packages and compare)
 ;;   + No mandatory filename style (can match Denote format if you like)
 ;;   + You can have as many "notes" as you want inside one file.
 ;;     + You could possibly use Denote for coarse browsing,
-;;       and org-node for more granular browsing.
+;;       and Org-node for more granular browsing.
 
 ;;   - No support for "denote:" links
 ;;   - No support for Markdown or other file types
-
-;; Finally, an oddity:
-
-;; Due to relying on the org-id table, if a vendor README.org or other
-;; downloaded Org file has a heading with an ID, it's considered part of
-;; your collection -- simply because of the 1:1 correspondence, that if
-;; it's known to org-id, it's known to org-node.
-;;
-;; These headings can be filtered after-the-fact by `org-node-filter-fn',
-;; so that you do not see them in org-node commands.
+;;   - Blind to TRAMP files (for now)
 
 ;;; Code:
 
@@ -356,7 +349,7 @@ For use as `org-node-affixation-fn'."
                                'face 'org-tag)
             ""))))
 
-;; Doubt many used this
+;; Doubt many used this, it's bad
 (defun org-node-affix-with-olp-and-tags-legacy (node title)
   "Prepend NODE's outline path to TITLE, and append NODE's tags.
 Legacy version."
