@@ -24,7 +24,6 @@
 ;;; Code:
 
 (require 'cl-lib)
-(require 'seq)
 (require 'llama)
 (require 'org)
 (require 'ol)
@@ -32,6 +31,7 @@
 (require 'org-node-changes)
 (require 'org-node)
 (require 'org-mem)
+(require 'org-mem-updater)
 (declare-function org-mem-updater-ensure-entry-at-point-known "org-mem-updater")
 (declare-function org-mem-updater-ensure-link-at-point-known "org-mem-updater")
 

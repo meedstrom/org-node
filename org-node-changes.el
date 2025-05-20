@@ -32,7 +32,6 @@
 (require 'seq)
 (require 'subr-x)
 (require 'cl-lib)
-(require 'el-job)
 (require 'org-mem)
 (require 'org-mem-updater)
 (require 'org-mem-list)

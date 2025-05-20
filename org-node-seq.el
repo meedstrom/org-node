@@ -35,7 +35,6 @@
 ;;  - list files in a seq
 ;;  - get a seq w/o needing (alist-get "d" org-node-seqs () () #'equal)
 
-(require 'seq)
 (require 'subr-x)
 (require 'cl-lib)
 (require 'calendar)
