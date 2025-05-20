@@ -95,6 +95,7 @@
 
 (defvar org-roam-capture-templates)
 (defvar org-node-backlink-mode)
+(defvar org-drawer-regexp)
 (declare-function org-node-backlink--fix-nearby "org-node-backlink")
 (declare-function org-at-heading-p "org")
 (declare-function org-before-first-heading-p "org")
@@ -2507,30 +2508,39 @@ non-nil, because it may cause noticeable lag otherwise."
 
 As in `org-end-of-meta-data', point always lands on a newline \(or the
 end of buffer).  Since that newline may be the beginning of the next
-heading, you should probably verify that `org-at-heading-p' is nil and
-`point' has changed, else do `backward-char' or `open-line' prior to
-inserting any text.
+heading, you should probably verify that `org-at-heading-p' is nil,
+else do `backward-char' or `open-line' prior to inserting any text.
 
 Argument FULL same as in `org-end-of-meta-data' when point is in a
 subtree, but meaningless when point is before the first heading, in which
 case always skip past all file-level properties and keywords."
   (if (org-before-first-heading-p)
-      (progn
+      (save-restriction
+        (widen)
+        (narrow-to-region (point-min) (org-entry-end-position))
         (goto-char (point-min))
-        ;; Jump past comment lines and blank lines (NOT keywords).
-        (while (looking-at-p (rx (*? space) (or "# " "\n")))
+        ;; Jump past #+keywords, comments and blank lines.
+        (while (looking-at-p (rx (*? space) (or "#+" "# " "\n")))
           (forward-line))
+        ;; Jump past any drawers.
         (let ((case-fold-search t))
-          ;; Jump past top-level PROPERTIES drawer.
-          (when (looking-at-p "[ \t]*?:PROPERTIES: *?$")
-            (forward-line)
-            (while (looking-at-p "[ \t]*?:")
-              (forward-line))))
-        ;; Jump past #+keywords, comment lines and blank lines.
+          (while (looking-at-p org-drawer-regexp)
+            (while (not (looking-at-p "[\s\t]*:END:"))
+              (if (eobp) (error "Missing :END: in %s" (buffer-name))
+                (forward-line)))
+            (forward-line)))
+        ;; Jump past #+keywords, comments and blank lines again.
         (while (looking-at-p (rx (*? (any "\s\t")) (or "#+" "# " "\n")))
           (forward-line))
-        ;; Don't go past a "final stretch" of blanklines.
-        (unless (zerop (skip-chars-backward "\n"))
+        ;; Jump past drawers again.
+        (let ((case-fold-search t))
+          (while (looking-at-p org-drawer-regexp)
+            (while (not (looking-at-p "[\s\t]*:END:"))
+              (if (eobp) (error "Missing :END: in %s" (buffer-name))
+                (forward-line)))
+            (forward-line)))
+        ;; On a "final stretch" of blank lines, land on the first.
+        (unless (= 0 (skip-chars-backward "\n"))
           (forward-char 1)))
     ;; PERF: Override a bottleneck in `org-end-of-meta-data'.
     (cl-letf (((symbol-function 'org-back-to-heading)
