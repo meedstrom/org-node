@@ -182,6 +182,9 @@ NAME, ARGLIST and BODY as in `defun'."
 (require 'org-mem-updater)
 (require 'org-mem-list)
 
+(unless (fboundp 'org-mem-property)
+  (display-warning 'org-node "Update org-mem to use this version of org-node"))
+
 (define-obsolete-function-alias 'org-node--dir-files-recursively     #'org-mem--dir-files-recursive                "3.0.0 (May 2025)")
 (define-obsolete-function-alias 'org-node--maybe-adjust-idle-timer   #'org-mem-updater--activate-timer             "3.0.0 (May 2025)")
 (define-obsolete-function-alias 'org-node-abbrev-file-names          #'org-mem--fast-abbrev                        "3.0.0 (May 2025)")
