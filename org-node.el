@@ -162,9 +162,22 @@ Takes a node as argument, should return a string."
                  function)
   :package-version '(org-node . "2.3.3"))
 
-(defcustom org-node-filter-fn
-  (lambda (node)
-    (not (org-mem-entry-property "ROAM_EXCLUDE" node)))
+(defun org-node-reject-roam-exclude (node)
+  "Hide NODE if it has a :ROAM_EXCLUDE: property."
+  (not (org-mem-property "ROAM_EXCLUDE" node)))
+
+(defun org-node-reject-archive-file (node)
+  "Hide NODE if file name or any directory component ends with \"archive\"."
+  (not (seq-find (##string-suffix-p "archive" %)
+                 (file-name-split (org-mem-file node)))))
+
+(defun org-node-keep-only-watched-dir (node)
+  "Show NODE only if it is found in `org-mem-watch-dirs'."
+  (let ((file (org-mem-file node)))
+    (seq-find (##string-prefix-p % file) org-mem-watch-dirs)))
+
+;; FIXME Actually not using org-mem--title<>id anymore I think
+(defcustom org-node-filter-fn #'org-node-reject-roam-exclude
   "Predicate returning non-nil to include a node, or nil to exclude it.
 
 The filtering affects two tables:
@@ -191,8 +204,13 @@ directory named \"archive\".
                  (org-mem-todo-state node)
                  (string-search \"/archive/\" (org-mem-file node))
                  (member \"drill\" (org-mem-tags node))))))" ;; XXX docstring
-  :type 'function
-  :set #'org-node--set-and-remind-reset)
+  :type '(radio (function-item org-node-reject-roam-exclude)
+                (function-item org-node-reject-archive-file)
+                (function-item org-node-keep-only-watched-dir)
+                (function :tag "Custom function"
+                          :value (lambda (node) t)))
+  :set #'org-node--set-and-remind-reset
+  :package-version '(org-node . "3.2.1"))
 
 (defcustom org-node-insert-link-hook '()
   "Hook run after inserting a link to an Org-ID node.
