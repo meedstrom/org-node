@@ -166,10 +166,17 @@ Takes a node as argument, should return a string."
   "Hide NODE if it has a :ROAM_EXCLUDE: property."
   (not (org-mem-property "ROAM_EXCLUDE" node)))
 
+(defvar org-node--dir-separator nil)
 (defun org-node-reject-archive-file (node)
   "Hide NODE if file name or any directory component ends with \"archive\"."
   (not (seq-find (##string-suffix-p "archive" %)
-                 (file-name-split (org-mem-file node)))))
+                 ;; `file-name-split' is slow
+                 (split-string (org-mem-file node)
+                               (or org-node--dir-separator
+                                   (setq org-node--dir-separator
+                                         (substring (file-name-concat "a" "b")
+                                                    1 2)))
+                               t))))
 
 (defun org-node-keep-only-watched-dir (node)
   "Show NODE only if it is found in `org-mem-watch-dirs'."
