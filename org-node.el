@@ -1206,7 +1206,7 @@ create it and then visit it.  This will not visit it."
   (let ((org-roam-capture-templates
          (list (append (car (bound-and-true-p org-roam-capture-templates))
                        '(:immediate-finish t)))))
-    (org-node-insert-link t t)))
+    (org-node-insert-link nil t)))
 
 ;;;###autoload
 (defun org-node-insert-link-novisit* ()
