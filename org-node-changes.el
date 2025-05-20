@@ -22,19 +22,15 @@
 
 ;; But `define-obsolete-variable-alias' does not warn users about
 ;; user options, which means they can blissfully keep referring to a
-;; thrice-deprecated variable name for years and not know.
+;; thrice-deprecated variable name for years.
 
-;; Thus this file.  Actually tell the user, once, for each old symbol that
-;; they set or call.
+;; Thus this file.  Gradually increase the "whine level" for each name, over
+;; the months.
 
 ;;; Code:
 
-(require 'seq)
 (require 'subr-x)
 (require 'cl-lib)
-(require 'org-mem)
-(require 'org-mem-updater)
-(require 'org-mem-list)
 
 (defvar org-node-major-version 3
   "Number incremented for breaking changes that require reading README.")
@@ -162,9 +158,6 @@ NAME, ARGLIST and BODY as in `defun'."
 (defvar org-node--origin<>links :obsolete)
 (defvar org-node--file<>lnum.node :obsolete)
 
-(org-node-changes--def-whiny-alias 'org-node-get-file-path           #'org-mem-file                    "1.9.38 (February 2025)" "May")
-(define-obsolete-function-alias 'org-node-seq-try-visit-file          'org-node-seq-try-goto-file      "3.0.0 (May 2025)")
-
 (define-obsolete-variable-alias 'org-node--dest<>links                 'org-mem--target<>links             "3.0.0 (May 2025)")
 (define-obsolete-variable-alias 'org-node--id<>node                    'org-mem--id<>entry                 "3.0.0 (May 2025)")
 (define-obsolete-variable-alias 'org-node--id<>refs                    'org-mem--id<>roam-refs             "3.0.0 (May 2025)")
@@ -178,6 +171,16 @@ NAME, ARGLIST and BODY as in `defun'."
 (define-obsolete-variable-alias 'org-node-extra-id-dirs-exclude        'org-mem-watch-dirs-exclude         "3.0.0 (May 2025)")
 (define-obsolete-variable-alias 'org-node-link-types                   'org-mem-seek-link-types            "3.0.0 (May 2025)")
 (define-obsolete-variable-alias 'org-node-warn-title-collisions        'org-mem-do-warn-title-collisions   "3.0.0 (May 2025)")
+
+(define-obsolete-function-alias 'org-node-seq-try-visit-file   'org-node-seq-try-goto-file     "3.0.0 (May 2025)")
+
+(unless (featurep 'org-node-fakeroam)
+  (defalias 'org-node-fakeroam-fast-render-mode   'org-node-roam-accelerator-mode)
+  (defalias 'org-node-fakeroam-jit-backlinks-mode 'org-node-roam-accelerator-mode))
+
+(require 'org-mem)
+(require 'org-mem-updater)
+(require 'org-mem-list)
 
 (define-obsolete-function-alias 'org-node--dir-files-recursively     #'org-mem--dir-files-recursive                "3.0.0 (May 2025)")
 (define-obsolete-function-alias 'org-node--maybe-adjust-idle-timer   #'org-mem-updater--activate-timer             "3.0.0 (May 2025)")
@@ -226,12 +229,9 @@ NAME, ARGLIST and BODY as in `defun'."
 (define-obsolete-function-alias 'org-node-subtree-p                  #'org-mem-subtree-p                           "3.0.0 (May 2025)")
 (define-obsolete-function-alias 'org-nodes-in-file                   #'org-mem-id-nodes-in-files                   "3.0.0 (May 2025)")
 
-(define-obsolete-function-alias 'org-node--general-org-work-buffer  #'org-mem-org-mode-scratch   "3.1.1 (May 2025)")
-(define-obsolete-function-alias 'org-node-forget-dir                #'org-mem-scrub-id-locations "3.2.0 (May 2025)")
-
-(unless (featurep 'org-node-fakeroam)
-  (defalias 'org-node-fakeroam-fast-render-mode 'org-node-roam-accelerator-mode)
-  (defalias 'org-node-fakeroam-jit-backlinks-mode 'org-node-roam-accelerator-mode))
+(org-node-changes--def-whiny-alias 'org-node-get-file-path         #'org-mem-file                             "1.9.38 (February 2025)" "May")
+(define-obsolete-function-alias 'org-node--general-org-work-buffer #'org-mem-org-mode-scratch                 "3.1.1 (May 2025)")
+(define-obsolete-function-alias 'org-node-forget-dir               #'org-mem-forget-id-locations-recursively  "3.2.0 (May 2025)")
 
 (provide 'org-node-changes)
 
