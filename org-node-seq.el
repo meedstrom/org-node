@@ -191,9 +191,6 @@ On success, return non-nil; else nil.  Never create FILE anew."
       (when (file-readable-p file)
         (find-file file)))))
 
-;; REVIEW: Rename?
-;; (defalias 'org-node-seq-try-goto-file 'org-node-seq-try-goto-file)
-
 ;;;###autoload
 (defun org-node-seq-filename->ymd (path)
   "Check the filename PATH for a date, and return that date.
