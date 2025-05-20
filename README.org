@@ -40,7 +40,9 @@ Node seqs, if you use them, now require turning on explicitly.
 
 For reference, check out the full list of obsoletions near the bottom of file [[https://github.com/meedstrom/org-node/blob/main/org-node-changes.el][org-node-changes.el]].
 
-A *silent* obsoletion: links are not plists anymore, but =plist-get= is unhelpfully polite and returns nil when given invalid input.  Talk about weak typing!  Anyway, use e.g. =(org-mem-link-pos LINK)= instead of =(plist-get LINK :pos)=.  Also, a link is a citation if =(org-mem-link-citation-p LINK)=.
+A *silent* obsoletion: links are not plists anymore, but =plist-get= is unhelpfully polite and returns nil when given invalid input.  Talk about weak typing!  Anyway, use e.g. =(org-mem-link-pos LINK)= instead of =(plist-get LINK :pos)=.
+
+Another silent obsoletion: a link is a citation if =(org-mem-link-citation-p LINK)=.  Use that instead of =(null (org-mem-link-type LINK))=, which no longer carries that meaning.
 
 Other changes you may notice:
 
@@ -137,15 +139,15 @@ If you're coming here from *org-roam*, try this instead:
 #+begin_src elisp
 (use-package org-node
   :config
-  (setq org-node-creation-fn #'org-node-new-via-roam-capture)
-  (setq org-node-slug-fn #'org-node-slugify-like-roam-default)
-  (setq org-node-datestamp-format "%Y%m%d%H%M%S-")
   (setq org-mem-do-sync-with-org-id t)
   (setq org-mem-watch-dirs
         (list "~/org-roam/")) ;; Your org-roam-directory here
   (org-mem-updater-mode)
   (org-node-cache-mode)
-  (org-node-roam-accelerator-mode))
+  (org-node-roam-accelerator-mode)
+  (setq org-node-creation-fn #'org-node-new-via-roam-capture)
+  (setq org-node-slug-fn #'org-node-slugify-like-roam-default)
+  (setq org-node-datestamp-format "%Y%m%d%H%M%S-"))
 #+end_src
 
 *** An update broke things?
