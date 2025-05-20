@@ -164,10 +164,6 @@ NAME, ARGLIST and BODY as in `defun'."
 (defvar org-node--file<>lnum.node :obsolete)
 
 (org-node-changes--def-whiny-alias 'org-node-get-file-path           #'org-mem-file                    "1.9.38 (February 2025)" "May")
-(org-node-changes--def-whiny-alias 'org-node-ref-add                  'org-node-add-refs               "1.9.38 (February 2025)" "May")
-(org-node-changes--def-whiny-alias 'org-node-tag-add                  'org-node-add-tags               "1.9.38 (February 2025)" "May")
-(org-node-changes--def-whiny-alias 'org-node-tag-add-here             'org-node-add-tags-here          "1.9.38 (February 2025)" "May")
-(org-node-changes--def-whiny-alias 'org-node-alias-add                'org-node-add-alias              "1.9.38 (February 2025)" "May")
 (define-obsolete-function-alias 'org-node-seq-try-visit-file          'org-node-seq-try-goto-file      "3.0.0 (May 2025)")
 
 (define-obsolete-variable-alias 'org-node--dest<>links                 'org-mem--target<>links             "3.0.0 (May 2025)")

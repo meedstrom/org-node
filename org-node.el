@@ -930,7 +930,7 @@ Meant to be called indirectly as `org-node-creation-fn', so that some
 necessary variables are set."
   (if (or (null org-node-proposed-title)
           (null org-node-proposed-id))
-      (message "org-node-new-file is meant to be called indirectly")
+      (user-error "org-node-new-file is meant to be called indirectly")
     (let* ((dir (org-node-guess-or-ask-dir "New file in which directory? "))
            (path-to-write
             (file-name-concat

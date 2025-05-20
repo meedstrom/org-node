@@ -132,7 +132,7 @@ Assuming your package manager knows about [[https://melpa.org/#/getting-started]
   (org-node-cache-mode))
 #+end_src
 
-If you're *coming here from org-roam*, try this instead:
+If you're coming here from *org-roam*, try this instead:
 
 #+begin_src elisp
 (use-package org-node
