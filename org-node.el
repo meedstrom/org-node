@@ -176,41 +176,30 @@ Takes a node as argument, should return a string."
   (let ((file (org-mem-file node)))
     (seq-find (##string-prefix-p % file) org-mem-watch-dirs)))
 
-;; FIXME Actually not using org-mem--title<>id anymore I think
+;; REVIEW: Maybe take a list of functions?  Tho we lose free choice
+;;         between treating it as an allowlist or as denylist.
 (defcustom org-node-filter-fn #'org-node-reject-roam-exclude
   "Predicate returning non-nil to include a node, or nil to exclude it.
 
 The filtering affects two tables:
-- `org-node--candidate<>entry', used by completions in the minibuffer
-- `org-mem--title<>id', used by `org-node-complete-at-point-mode'
+- `org-node--candidate<>id-node', used by completions in the minibuffer
+- `org-node--title<>affixations', used by `org-node-complete-at-point-mode'
 
-In other words, passing nil means the user cannot autocomplete to the
+In other words, returning nil means the user cannot autocomplete to the
 node, but Lisp code can still find it in the output of
 `org-mem-all-id-nodes', and backlinks are discovered normally.
 
 This function is applied once for every ID-node found, and
 receives the node data as a single argument: an object which form
 you can observe in examples from \\[org-node-peek] and specified
-in the type `org-mem-entry' (C-h o org-mem-entry RET).
-
-See the following example for a way to filter out nodes with a
-ROAM_EXCLUDE property, or that have any kind of TODO state, or
-are tagged :drill:, or where the full file path contains a
-directory named \"archive\".
-
-\(setq org-node-filter-fn
-      (lambda (node)
-        (not (or (org-mem-property \"ROAM_EXCLUDE\" node)
-                 (org-mem-todo-state node)
-                 (string-search \"/archive/\" (org-mem-file node))
-                 (member \"drill\" (org-mem-tags node))))))" ;; XXX docstring
+in the type `org-mem-entry' (C-h o org-mem-entry RET)."
   :type '(radio (function-item org-node-reject-roam-exclude)
                 (function-item org-node-reject-archive-file)
                 (function-item org-node-keep-only-watched-dir)
                 (function :tag "Custom function"
                           :value (lambda (node) t)))
   :set #'org-node--set-and-remind-reset
-  :package-version '(org-node . "3.2.1"))
+  :package-version '(org-node . "3.3.0"))
 
 (defcustom org-node-insert-link-hook '()
   "Hook run after inserting a link to an Org-ID node.
@@ -375,7 +364,7 @@ For use as `org-node-affixation-fn'."
                                'face 'org-tag)
             ""))))
 
-;; Doubt many used this, it's bad
+;; Doubt many people used this, it's bad
 (defun org-node-affix-with-olp-and-tags-legacy (node title)
   "Prepend NODE's outline path to TITLE, and append NODE's tags.
 Legacy version."
@@ -403,30 +392,37 @@ Legacy version."
                           tags))
               "")))))
 
-(defvar org-node--title<>affixation-triplet (make-hash-table :test 'equal)
-  "1:1 table mapping titles or aliases to affixation triplets.")
+(defvar org-node--candidate<>id-node (make-hash-table :test 'equal)
+  "1:1 table mapping minibuffer completion candidates to ID-nodes.
+These candidates may or may not be pre-affixated, depending on
+user option `org-node-alter-candidates'.")
+
+(defvar org-node--title<>affixations (make-hash-table :test 'equal)
+  "1:1 table mapping titles or aliases to affixation triplets.
+Even when the triplets are not used, this table serves double-duty such
+that its keys constitute the subset of `org-mem--title<>id' that
+passed `org-node-filter-fn'.")
 
 (defun org-node--affixate-collection (coll)
   "From list COLL, make an alist of affixated members."
   (cl-loop for title in coll
-           collect (gethash title org-node--title<>affixation-triplet)))
+           collect (gethash title org-node--title<>affixations)))
 
 ;; TODO: Assign a category `org-node', then add an embark action to embark?
 ;; TODO: Bind a custom exporter to `embark-export'
 (defun org-node-collection (str pred action)
   "Custom COLLECTION for `completing-read'.
 
-Ahead of time, org-node takes titles and aliases from
-`org-mem--title<>id', runs `org-node-affixation-fn' on each, and
-depending on the user option `org-node-alter-candidates', it
-either saves the affixated thing directly into
-`org-node--candidate<>entry', or into a secondary table
-`org-node--title<>affixation-triplet'.  Finally, this function
-then either simply reads candidates off the candidates table, or
-attaches the affixes in realtime.
+Ahead of time, org-node takes titles and aliases from all nodes, runs
+`org-node-affixation-fn' on each, and depending on the user option
+`org-node-alter-candidates', it either saves the affixated thing
+directly into `org-node--candidate<>id-node', or into a secondary table
+`org-node--title<>affixations'.  Finally, this function then either
+simply reads candidates off the candidates table, or attaches the
+affixations in realtime.
 
 Regardless of which, all completions are guaranteed to be keys of
-`org-node--candidate<>entry', but remember that it is possible for
+`org-node--candidate<>id-node', but remember that it is possible for
 `completing-read' to exit with user-entered input that didn\\='t
 match anything.
 
@@ -436,7 +432,7 @@ see Info node `(elisp)Programmed Completion'."
       (cons 'metadata (unless org-node-alter-candidates
                         (list (cons 'affixation-function
                                     #'org-node--affixate-collection))))
-    (complete-with-action action org-node--candidate<>entry str pred)))
+    (complete-with-action action org-node--candidate<>id-node str pred)))
 
 (defvar org-node-hist nil
   "Minibuffer history.")
@@ -452,27 +448,18 @@ see Info node `(elisp)Programmed Completion'."
 
 ;;;; The mode
 
-(defvar org-node--candidate<>entry (make-hash-table :test 'equal)
-  "1:1 table mapping completion candidates to nodes.")
-
 (defun org-node--let-refs-be-aliases (node)
   "Add ROAM_REFS of NODE as extra minibuffer completions."
   (dolist (ref (org-mem-entry-roam-refs node))
-    (let ((affx (let ((type (gethash ref org-mem--roam-ref<>type)))
-                  (list (propertize ref 'face 'org-cite)
-                        (when type
-                          (propertize (concat type ":")
-                                      'face 'completions-annotations))
-                        nil))))
-      (if org-node-alter-candidates
-          (puthash (concat (nth 1 affx) (nth 0 affx) (nth 2 affx))
-                   node
-                   org-node--candidate<>entry)
-        (puthash ref node org-node--candidate<>entry)
-        (puthash ref affx org-node--title<>affixation-triplet)))))
+    (puthash (concat (when-let* ((type (gethash ref org-mem--roam-ref<>type)))
+                       (propertize (concat type ":")
+                                   'face 'completions-annotations))
+                     (propertize ref 'face 'org-cite))
+             node
+             org-node--candidate<>id-node)))
 
 (defun org-node--record-completion-candidates (node)
-  "Cache completion candidates for NODE and its aliases."
+  "Cache fancy completion candidates for NODE and its aliases."
   (when (and (org-mem-entry-id node)
              (org-mem-entry-title-maybe node)
              (funcall (org-node--try-ensure-compiled org-node-filter-fn) node))
@@ -481,21 +468,22 @@ see Info node `(elisp)Programmed Completion'."
       (let ((affx (funcall (org-node--try-ensure-compiled org-node-affixation-fn)
                            node
                            title)))
+        (puthash title affx org-node--title<>affixations)
         (if org-node-alter-candidates
             ;; Absorb the affixations into one candidate string
             (puthash (concat (nth 1 affx) (nth 0 affx) (nth 2 affx))
                      node
-                     org-node--candidate<>entry)
+                     org-node--candidate<>id-node)
           ;; Bare title, to be affixated later by `org-node-collection'
-          (puthash title affx org-node--title<>affixation-triplet)
-          (puthash title node org-node--candidate<>entry))))))
+          (puthash title node org-node--candidate<>id-node))))))
 
 (defun org-node--wipe-completions (_parse-results)
-  "Clear table `org-node--candidate<>entry'."
-  (clrhash org-node--candidate<>entry))
+  "Clear completions tables."
+  (clrhash org-node--title<>affixations)
+  (clrhash org-node--candidate<>id-node))
 
 ;; Could have used `org-mem-forget-file-functions', but more efficient to loop
-;; over entire parse-results once.
+;; over the whole parse-results.
 (defun org-node--forget-completions-in-results (parse-results)
   "Remove old completions where PARSE-RESULTS has new data."
   (seq-let (bad-paths file-data) parse-results
@@ -503,14 +491,10 @@ see Info node `(elisp)Programmed Completion'."
      (append bad-paths (mapcar #'car file-data)))))
 
 (defun org-node--forget-completions-in-files (files)
-  "Remove the completion candidates for all nodes in FILES."
+  "Remove the minibuffer completions for all nodes in FILES."
   (when files
     (org-mem-delete (##member (org-mem-entry-file %2) files)
-                    org-node--candidate<>entry)
-    ;; Undo an effect of `org-node--let-refs-be-aliases'
-    (dolist (ref (seq-mapcat #'org-mem-entry-roam-refs
-                             (org-mem-entries-in-files files)))
-      (remhash ref org-mem--title<>id))))
+                    org-node--candidate<>id-node)))
 
 ;;;###autoload
 (define-minor-mode org-node-cache-mode
@@ -595,7 +579,7 @@ something to change the facts on the ground just prior."
     (when (y-or-n-p "Org-node needs `org-mem-updater-mode', enable? ")
       (org-mem-updater-mode))
     (setq force t))
-  (when (hash-table-empty-p org-node--candidate<>entry)
+  (when (hash-table-empty-p org-node--candidate<>id-node)
     (setq block t)
     (setq force t))
   (when force
@@ -1032,12 +1016,12 @@ type the name of a node that does not exist.  That enables this
         (progn
           (setq title org-node-proposed-title)
           (setq id org-node-proposed-id)
-          (setq node (gethash title org-node--candidate<>entry)))
+          (setq node (gethash title org-node--candidate<>id-node)))
       ;; Was called from `org-capture', which means the user has not yet typed
       ;; the title; let them type it now
       (let ((input (completing-read "Node: " #'org-node-collection
                                     () () () 'org-node-hist)))
-        (setq node (gethash input org-node--candidate<>entry))
+        (setq node (gethash input org-node--candidate<>id-node))
         (if node
             (progn
               (setq title (org-mem-entry-title node))
@@ -1099,7 +1083,7 @@ set `org-node-creation-fn' to `org-node-new-via-roam-capture'."
   (org-node-cache-ensure)
   (let* ((input (completing-read "Go to ID-node: " #'org-node-collection
                                  () () () 'org-node-hist))
-         (node (gethash input org-node--candidate<>entry)))
+         (node (gethash input org-node--candidate<>id-node)))
     (if node
         (org-node--goto node)
       (if (string-blank-p input)
@@ -1111,8 +1095,8 @@ set `org-node-creation-fn' to `org-node-new-via-roam-capture'."
   "Visit a random node."
   (interactive)
   (org-node-cache-ensure)
-  (org-node--goto (nth (random (hash-table-count org-node--candidate<>entry))
-                       (hash-table-values org-node--candidate<>entry))))
+  (org-node--goto
+   (seq-random-elt (hash-table-values org-node--candidate<>id-node))))
 
 ;;;###autoload
 (defun org-node-insert-link (&optional region-as-initial-input novisit)
@@ -1143,16 +1127,17 @@ Argument NOVISIT means behave as
                         (org-link-display-format
                          (buffer-substring-no-properties beg end))))
          (initial (if (or region-as-initial-input
-                          (when region-text
-                            (try-completion region-text org-mem--title<>id)))
+                          (and region-text
+                               (try-completion region-text
+                                               org-node--title<>affixations)))
                       region-text
                     nil))
          (input (if (and novisit initial)
                     initial
                   (completing-read "Node: " #'org-node-collection
                                    () () initial 'org-node-hist)))
-         (node (gethash input org-node--candidate<>entry))
-         (id (if node (org-mem-entry-id node) (org-id-new)))
+         (node (gethash input org-node--candidate<>id-node))
+         (id (if node (org-mem-id node) (org-id-new)))
          (link-desc (or region-text
                         (and node
                              org-node-custom-link-format-fn
@@ -1374,7 +1359,7 @@ Works in non-Org buffers."
     (org-node-cache-ensure)
     (let* ((input (completing-read "Refile into ID-node: " #'org-node-collection
                                    () () () 'org-node-hist))
-           (node (gethash input org-node--candidate<>entry))
+           (node (gethash input org-node--candidate<>id-node))
            (origin-buffer (current-buffer)))
       (unless node
         (error "Node not found %s" input))
@@ -2576,7 +2561,7 @@ Designed for `completion-at-point-functions'."
          (not (save-match-data (org-in-regexp org-link-any-re)))
          (list (car bounds)
                (cdr bounds)
-               org-mem--title<>id
+               org-node--title<>affixations
                :exclusive 'no
                :exit-function
                (lambda (text _)
@@ -2944,7 +2929,7 @@ heading, else the file-level node, whichever has an ID first."
   "PROMPT for a known node and return it."
   (gethash (completing-read (or prompt "Node: ") #'org-node-collection
                             () () () 'org-node-hist)
-           org-node--candidate<>entry))
+           org-node--candidate<>id-node))
 
 (provide 'org-node)
 
