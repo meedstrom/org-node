@@ -456,17 +456,20 @@ see Info node `(elisp)Programmed Completion'."
   "1:1 table mapping completion candidates to nodes.")
 
 (defun org-node--let-refs-be-aliases (node)
-  "Add ROAM_REFS of NODE as extra completion candidates."
+  "Add ROAM_REFS of NODE as extra minibuffer completions."
   (dolist (ref (org-mem-entry-roam-refs node))
-    (puthash ref node org-node--candidate<>entry)
-    (puthash ref
-             (let ((type (gethash ref org-mem--roam-ref<>type)))
-               (list (propertize ref 'face 'org-cite)
-                     (when type
-                       (propertize (concat type ":")
-                                   'face 'completions-annotations))
-                     nil))
-             org-node--title<>affixation-triplet)))
+    (let ((affx (let ((type (gethash ref org-mem--roam-ref<>type)))
+                  (list (propertize ref 'face 'org-cite)
+                        (when type
+                          (propertize (concat type ":")
+                                      'face 'completions-annotations))
+                        nil))))
+      (if org-node-alter-candidates
+          (puthash (concat (nth 1 affx) (nth 0 affx) (nth 2 affx))
+                   node
+                   org-node--candidate<>entry)
+        (puthash ref node org-node--candidate<>entry)
+        (puthash ref affx org-node--title<>affixation-triplet)))))
 
 (defun org-node--record-completion-candidates (node)
   "Cache completion candidates for NODE and its aliases."
