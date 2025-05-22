@@ -171,8 +171,10 @@ Can be quit midway through and resumed later.  With
     (unless (eq org-node-backlink--work-kind kind)
       (setq org-node-backlink--work-kind kind)
       (setq org-node-backlink--work-files nil))
-    (when (or (equal current-prefix-arg '(4))
-              (null org-node-backlink--work-files))
+    (when (equal current-prefix-arg '(4))
+      (setq org-node-backlink--work-files nil))
+    (when (null org-node-backlink--work-files)
+      (org-node-cache-ensure t t)
       (let* ((files (seq-keep #'org-mem--truename-maybe (org-mem-all-files)))
              (dirs (org-node--root-dirs files)))
         (when (y-or-n-p
