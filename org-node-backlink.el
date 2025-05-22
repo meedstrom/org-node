@@ -754,35 +754,43 @@ To force an update at any time, use one of these commands:
   :type 'boolean
   :package-version '(org-node . "2.0.0"))
 
+;; XXX Broken 2025-05-22 (visits too many entries => saving big file is super slow)
+;;     No-op for now
 (defun org-node-backlink--maybe-fix-proactively (_)
   "Designed for `org-mem-post-targeted-scan-functions'."
-  (unless org-node-backlink-lazy
+  (unless nil ;; org-node-backlink-lazy
     (let (affected-targets)
       (cl-loop
-       for target being each hash-key of org-mem-updater--target<>old-links
+       for target being each hash-key of org-mem-updater--id-or-ref-target<>old-links
        using (hash-values old-links)
        as entry = (or (org-mem-entry-by-id target)
                       (org-mem-entry-by-roam-ref target))
-       when entry
+       ;; Entry must have ID or we can't use `org-find-property' later.
+       when (and entry (org-mem-entry-id entry))
        when (not (seq-set-equal-p
+                  (seq-keep #'org-mem-link-nearby-id old-links)
                   (seq-keep #'org-mem-link-nearby-id
-                            (seq-filter (##or (equal (org-mem-link-type %) "id")
-                                              (org-mem-link-citation-p %))
-                                        old-links))
-                  (seq-keep #'org-mem-link-nearby-id
-                            (append (org-mem-roam-reflinks-to entry)
-                                    (org-mem-id-links-to entry)))))
-       ;; Something changed in the set of links targeting this entry.
-       ;; So we'll visit the entry to re-print backlinks.
-       do
+                            (append (org-mem-roam-reflinks-to-entry entry)
+                                    (org-mem-id-links-to-entry entry)))))
+       ;; Something changed in the set of links targeting this entry.  So we'll
+       ;; visit the entry to re-print backlinks.
        ;; Alist `affected-targets' looks like:
        ;;   ((file1 . (id1 id2 id3 ...))
        ;;    (file2 . (...))
        ;;    (file3 . (...)))
-       ;; We'll find the entry by searching on id rather than entry positions,
-       ;; since positions will change after edit.
-       (push (org-mem-id entry)
-             (alist-get (org-mem-file entry) affected-targets () () #'equal)))
+       do
+       (push (org-mem-entry-id entry)
+             (alist-get (org-mem-entry-file-truename entry)
+                        affected-targets
+                        () () #'equal)))
+      (cl-loop for target in org-mem-updater--new-id-or-ref-targets
+               do (cl-loop
+                   for link in (gethash target org-mem--target<>links)
+                   as id = (org-mem-link-nearby-id link)
+                   when id do
+                   (push id (alist-get (org-mem-link-file-truename link)
+                                       affected-targets
+                                       () () #'equal))))
 
       (cl-loop
        for (file . ids) in affected-targets
@@ -791,24 +799,22 @@ To force an update at any time, use one of these commands:
        else if (not (file-writable-p file))
        do (message "Cannot edit backlinks in unwritable file: %s" file)
        else do
-       (when (and (boundp 'org-transclusion-exclude-elements)
-                  (not (memq 'property-drawer org-transclusion-exclude-elements)))
-         ;; Safety for when we search for literal :ID: line
-         (error "org-node-backlink-mode: List `org-transclusion-exclude-elements' must include `property-drawer'"))
        (org-node--with-quick-file-buffer file
          :about-to-do "About to fix backlinks"
-         (let ((user-is-editing (buffer-modified-p))
-               (case-fold-search t))
+         (org-node--assert-transclusion-safe)
+         (let ((user-is-editing (buffer-modified-p)))
            (dolist (id (delete-dups ids))
-             (let ((pos (org-find-property "ID" id)))
-               (when pos
-                 (goto-char pos)
-                 (org-node-backlink--fix-nearby))))
-           ;; Normally, `org-node--with-quick-file-buffer' only saves buffers
-           ;; it had to open anew.  Let's save even if it was open previously.
+             (if-let* ((pos (and id (org-find-property "ID" id))))
+                 (progn (goto-char pos)
+                        (org-node-backlink--fix-nearby))
+               (error "Could not find ID %s in file %s" id file)))
            (unless user-is-editing
+             ;; Normally, `org-node--with-quick-file-buffer' only saves buffers
+             ;; it had to open anew.  Let's save even if it was open previously.
              (let ((before-save-hook nil)
-                   (after-save-hook nil))
+                   (after-save-hook nil)
+                   (save-silently t)
+                   (inhibit-message t))
                (save-buffer)))))))))
 
 (provide 'org-node-backlink)
