@@ -950,39 +950,40 @@ To operate on a node after creating it, hook onto
     (setq org-node-proposed-seq nil)))
 
 (defun org-node-new-file ()
-  "Create a file-level node.
-Meant to be called indirectly as `org-node-creation-fn', so that some
-necessary variables are set."
-  (if (or (null org-node-proposed-title)
-          (null org-node-proposed-id))
-      (user-error "org-node-new-file is meant to be called indirectly")
-    (let* ((dir (org-node-guess-or-ask-dir "New file in which directory? "))
-           (path-to-write
-            (file-name-concat
-             dir
-             (concat (format-time-string org-node-datestamp-format)
-                     (funcall org-node-slug-fn org-node-proposed-title)
-                     ".org"))))
-      (when (file-exists-p path-to-write)
-        (error "File already exists: %s" path-to-write))
-      (when (find-buffer-visiting path-to-write)
-        (error "A buffer already exists for filename %s" path-to-write))
-      (mkdir dir t)
-      (find-file path-to-write)
-      (if org-node-prefer-with-heading
-          (insert "* " org-node-proposed-title
-                  "\n:PROPERTIES:"
-                  "\n:ID:       " org-node-proposed-id
-                  "\n:END:"
-                  "\n")
-        (insert ":PROPERTIES:"
+  "Create a new file with a new node.
+Designed for `org-node-creation-fn'."
+  (when (or (null org-node-proposed-title)
+            (null org-node-proposed-id))
+    (error "`org-node-new-file' meant to be called from `org-node-create'"))
+  (let* ((dir (org-node-guess-or-ask-dir "New file in which directory? "))
+         (path-to-write
+          (file-name-concat
+           dir
+           (concat (format-time-string org-node-datestamp-format)
+                   (funcall org-node-slug-fn org-node-proposed-title)
+                   ".org"))))
+    (when (file-exists-p path-to-write)
+      (org-mem--scan-full t)
+      (user-error "org-node: Resetting cache because file already exists: %s"
+                  path-to-write))
+    (when (find-buffer-visiting path-to-write)
+      (error "A buffer already exists for filename %s" path-to-write))
+    (mkdir dir t)
+    (find-file path-to-write)
+    (if org-node-prefer-with-heading
+        (insert "* " org-node-proposed-title
+                "\n:PROPERTIES:"
                 "\n:ID:       " org-node-proposed-id
                 "\n:END:"
-                "\n#+title: " org-node-proposed-title
-                "\n"))
-      (goto-char (point-max))
-      (push (current-buffer) org-node--new-unsaved-buffers)
-      (run-hooks 'org-node-creation-hook))))
+                "\n")
+      (insert ":PROPERTIES:"
+              "\n:ID:       " org-node-proposed-id
+              "\n:END:"
+              "\n#+title: " org-node-proposed-title
+              "\n"))
+    (goto-char (point-max))
+    (push (current-buffer) org-node--new-unsaved-buffers)
+    (run-hooks 'org-node-creation-hook)))
 
 (defun org-node-new-via-roam-capture ()
   "Call `org-roam-capture-' with predetermined arguments."
