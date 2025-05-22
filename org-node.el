@@ -2808,6 +2808,48 @@ BOUND as in `re-search-forward'."
     (goto-char starting-pos)
     (nreverse skips)))
 
+(defun org-node--in-transclusion-p (&optional pos)
+  "Non-nil if POS is inside a transclude-region."
+  (get-text-property (or pos (point)) 'org-transclusion-id))
+
+(defun org-node--assert-transclusion-safe ()
+  "Signal error if an active transclusion in buffer may affect Org-node.
+If so, inform user how to configure \"org-transclusion\" to be safe.
+
+Various Org-node commands use `org-entry-get-with-inheritance' or
+`org-find-property' to find a node in a file, and assume on success
+that it is the canonical node, not some mirror of it.
+This helps keep that assumption safe."
+  (when (boundp 'org-transclusion-exclude-elements)
+    (save-excursion
+      (without-restriction
+        (goto-char (point-min))
+        (let (danger-from-prop-drawer danger-from-keyword)
+          (when (and (text-property-search-forward 'org-transclusion-id)
+                     (or (and (not (memq 'property-drawer
+                                         org-transclusion-exclude-elements))
+                              (setq danger-from-prop-drawer t))
+                         (and (not (memq 'keyword
+                                         org-transclusion-exclude-elements))
+                              (org-collect-keywords "PROPERTY")
+                              (setq danger-from-keyword t))))
+            (display-warning 'org-node
+                             (concat "
+Found active org-transclusion in buffer "
+                                     (prin1-to-string (current-buffer))
+                                     ".
+To keep using them safely:"
+                                     (and danger-from-prop-drawer
+                                          "
+- eval (add-to-list 'org-transclusion-exclude-elements 'property-drawer)")
+                                     (and danger-from-keyword
+                                          "
+- do one of
+  - remove existing #+property: lines
+  - eval (add-to-list 'org-transclusion-exclude-elements 'keyword)")))
+            (user-error "Active org-transclusion in buffer %S, quitting"
+                        (current-buffer))))))))
+
 (defvar org-node--work-buffers nil
   "All buffers spawned by `org-node--work-buffer-for'.")
 
