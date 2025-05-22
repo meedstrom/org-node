@@ -173,8 +173,7 @@ NAME, ARGLIST and BODY as in `defun'."
 (define-obsolete-variable-alias 'org-node-warn-title-collisions        'org-mem-do-warn-title-collisions   "3.0.0 (May 2025)")
 
 (define-obsolete-function-alias 'org-node-seq-try-visit-file   'org-node-seq-try-goto-file     "3.0.0 (May 2025)")
-(define-obsolete-variable-alias 'org-node--candidate<>node     'org-node--candidate<>id-node   "3.0.0 (May 2025)")
-(define-obsolete-variable-alias 'org-node--candidate<>entry    'org-node--candidate<>id-node   "3.2.1 (May 2025)")
+(define-obsolete-variable-alias 'org-node--candidate<>node     'org-node--candidate<>entry   "3.0.0 (May 2025)")
 
 (unless (featurep 'org-node-fakeroam)
   (defalias 'org-node-fakeroam-fast-render-mode   'org-node-roam-accelerator-mode)

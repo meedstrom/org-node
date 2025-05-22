@@ -221,12 +221,20 @@ already known."
   :type 'hook
   :package-version '(org-node . "3.2.0"))
 
+(defun org-node--hack-record-candidate ()
+  "Largely so `org-node-mk-auto-title' can be spammed."
+  (when-let* ((title (or (org-get-heading t t t t)
+                         (org-get-title))))
+    (puthash title (list title "" "") org-node--title<>affixations)
+    (puthash title (org-mem-updater-mk-entry-atpt) org-node--candidate<>entry)))
+
 (unless (featurep 'org-node)
   (add-hook 'org-node-insert-link-hook #'org-mem-updater-ensure-link-at-point-known -50)
-  (add-hook 'org-node-creation-hook #'org-id-get-create -90)
-  (add-hook 'org-node-creation-hook #'org-node-ensure-crtime-property -85)
-  (add-hook 'org-node-creation-hook #'org-mem-updater-ensure-entry-at-point-known -80)
-  (add-hook 'org-node-relocation-hook #'org-mem-updater-ensure-entry-at-point-known -80))
+  (add-hook 'org-node-creation-hook    #'org-id-get-create -90)
+  (add-hook 'org-node-creation-hook    #'org-node-ensure-crtime-property -85)
+  (add-hook 'org-node-creation-hook    #'org-node--hack-record-candidate -80)
+  (add-hook 'org-node-creation-hook    #'org-mem-updater-ensure-id-node-at-point-known -70)
+  (add-hook 'org-node-relocation-hook  #'org-mem-updater-ensure-id-node-at-point-known -70))
 
 
 ;;;; Pretty completion
@@ -346,7 +354,6 @@ aliases."
                                'face 'org-tag)
             ""))))
 
-(defvar org-node--candidate<>id-node (make-hash-table :test 'equal)
 (defun org-node-append-tags-use-frame-width (node title)
   "Append NODE tags after TITLE and justify them to `frame-width'."
   (list title
@@ -370,6 +377,7 @@ aliases."
 (defalias 'org-node-affix-with-olp-and-tags   #'org-node-prepend-olp-append-tags)
 (defalias 'org-node-affix-with-olp-and-tags-legacy #'org-node-prepend-olp-append-tags)
 
+(defvar org-node--candidate<>entry (make-hash-table :test 'equal)
   "1:1 table mapping minibuffer completion candidates to ID-nodes.
 These candidates may or may not be pre-affixated, depending on
 user option `org-node-alter-candidates'.")
@@ -380,36 +388,71 @@ Even when the triplets are not used, this table serves double-duty such
 that its keys constitute the subset of `org-mem--title<>id' that
 passed `org-node-filter-fn'.")
 
-(defun org-node--affixate-collection (coll)
-  "From list COLL, make an alist of affixated members."
-  (cl-loop for title in coll
-           collect (gethash title org-node--title<>affixations)))
+(defcustom org-node-one-empty-candidate t
+  "Whether to add an empty completion candidate to some commands.
+It helps indicate that a blank input can be used there to
+create an untitled node."
+  :type 'boolean
+  :package-version '(org-node . "3.3.0"))
+
+(defun org-node-collection (&rest args)
+  "Pass ARGS to the right collection depending on user settings.
+See `org-node-collection-basic'."
+  (if org-node-one-empty-candidate
+      (apply #'org-node-collection-with-empty args)
+    (apply #'org-node-collection-basic args)))
 
 ;; TODO: Assign a category `org-node', then add an embark action to embark?
 ;; TODO: Bind a custom exporter to `embark-export'
-(defun org-node-collection (str pred action)
+;; TODO: Add user options to set 'group-function, 'display-sort-function etc?
+;; TODO: See consult-org-roam.
+(defun org-node-collection-basic (str pred action)
   "Custom COLLECTION for `completing-read'.
 
 Ahead of time, org-node takes titles and aliases from all nodes, runs
 `org-node-affixation-fn' on each, and depending on the user option
 `org-node-alter-candidates', it either saves the affixated thing
-directly into `org-node--candidate<>id-node', or into a secondary table
+directly into `org-node--candidate<>entry', or into a secondary table
 `org-node--title<>affixations'.  Finally, this function then either
 simply reads candidates off the candidates table, or attaches the
 affixations in realtime.
 
-Regardless of which, all completions are guaranteed to be keys of
-`org-node--candidate<>id-node', but remember that it is possible for
-`completing-read' to exit with user-entered input that didn\\='t
-match anything.
+Regardless of which, all completions except the empty string are
+guaranteed to be keys of `org-node--candidate<>entry' \(which is the
+main reason for this design\), but remember that it is possible for
+`completing-read' to exit with user-entered input that didn\\='t match
+anything.
 
 Arguments STR, PRED and ACTION are handled behind the scenes,
 see Info node `(elisp)Programmed Completion'."
   (if (eq action 'metadata)
-      (cons 'metadata (unless org-node-alter-candidates
-                        (list (cons 'affixation-function
-                                    #'org-node--affixate-collection))))
-    (complete-with-action action org-node--candidate<>id-node str pred)))
+      (cons 'metadata (list (cons 'affixation-function #'org-node--affixate)))
+    (complete-with-action action org-node--candidate<>entry str pred)))
+
+(defun org-node-collection-with-empty (str pred action)
+  "Like `org-node-collection' but add an empty candidate.
+STR, PRED and ACTION as in `org-node-collection-basic'."
+  (if (eq action 'metadata)
+      (cons 'metadata (list (cons 'affixation-function #'org-node--affixate)))
+    (complete-with-action
+     action (cons "" (hash-table-keys org-node--candidate<>entry)) str pred)))
+
+;; FIXME: Seems to create some strange glyphs
+(defun org-node--affixate (collection)
+  "From list COLLECTION, make an alist of ((TITLE PREFIX SUFFIX) ...)."
+  (if (equal "" (car collection))
+      (cons (list "" "" (propertize "(untitled node)"
+                                    'face 'completions-annotations))
+            (if org-node-alter-candidates
+                (cl-loop for candidate in (cdr collection)
+                         collect (list candidate "" ""))
+              (cl-loop for title in (cdr collection)
+                       collect (gethash title org-node--title<>affixations))))
+    (if org-node-alter-candidates
+        (cl-loop for candidate in collection
+                 collect (list candidate "" ""))
+      (cl-loop for title in collection
+               collect (gethash title org-node--title<>affixations)))))
 
 (defvar org-node-hist nil
   "Minibuffer history.")
@@ -433,7 +476,7 @@ see Info node `(elisp)Programmed Completion'."
                                    'face 'completions-annotations))
                      (propertize ref 'face 'org-cite))
              node
-             org-node--candidate<>id-node)))
+             org-node--candidate<>entry)))
 
 (defun org-node--record-completion-candidates (node)
   "Cache fancy completion candidates for NODE and its aliases."
@@ -450,14 +493,14 @@ see Info node `(elisp)Programmed Completion'."
             ;; Absorb the affixations into one candidate string
             (puthash (concat (nth 1 affx) (nth 0 affx) (nth 2 affx))
                      node
-                     org-node--candidate<>id-node)
+                     org-node--candidate<>entry)
           ;; Bare title, to be affixated later by `org-node-collection'
-          (puthash title node org-node--candidate<>id-node))))))
+          (puthash title node org-node--candidate<>entry))))))
 
 (defun org-node--wipe-completions (_parse-results)
   "Clear completions tables."
   (clrhash org-node--title<>affixations)
-  (clrhash org-node--candidate<>id-node))
+  (clrhash org-node--candidate<>entry))
 
 ;; Could have used `org-mem-forget-file-functions', but more efficient to loop
 ;; over the whole parse-results.
@@ -471,7 +514,7 @@ see Info node `(elisp)Programmed Completion'."
   "Remove the minibuffer completions for all nodes in FILES."
   (when files
     (org-mem-delete (##member (org-mem-entry-file %2) files)
-                    org-node--candidate<>id-node)))
+                    org-node--candidate<>entry)))
 
 ;;;###autoload
 (define-minor-mode org-node-cache-mode
@@ -556,7 +599,7 @@ something to change the facts on the ground just prior."
     (when (y-or-n-p "Org-node needs `org-mem-updater-mode', enable? ")
       (org-mem-updater-mode))
     (setq force t))
-  (when (hash-table-empty-p org-node--candidate<>id-node)
+  (when (hash-table-empty-p org-node--candidate<>entry)
     (setq block t)
     (setq force t))
   (when force
@@ -958,6 +1001,14 @@ necessary variables are set."
                                     :id    org-node-proposed-id))
         (remove-hook 'org-roam-capture-new-node-hook creation-hook-runner)))))
 
+(defun org-node-guess-node-by-title (title)
+  (let ((affx (gethash title org-node--title<>affixations)))
+    (when affx
+      (if org-node-alter-candidates
+          (gethash (concat (nth 1 affx) (nth 0 affx) (nth 2 affx))
+                   org-node--candidate<>entry)
+        (gethash title org-node--candidate<>entry)))))
+
 (declare-function org-reveal "org")
 (defun org-node-capture-target ()
   "Can be used as target in a capture template.
@@ -993,18 +1044,21 @@ type the name of a node that does not exist.  That enables this
         (progn
           (setq title org-node-proposed-title)
           (setq id org-node-proposed-id)
-          (setq node (gethash title org-node--candidate<>id-node)))
+          ;; FIXME: Why not use id?  Review when the proposed-id might be pre-set
+          (setq node (org-node-guess-node-by-title title)))
       ;; Was called from `org-capture', which means the user has not yet typed
       ;; the title; let them type it now
       (let ((input (completing-read "Node: " #'org-node-collection
                                     () () () 'org-node-hist)))
-        (setq node (gethash input org-node--candidate<>id-node))
+        (setq node (gethash input org-node--candidate<>entry))
         (if node
             (progn
-              (setq title (org-mem-entry-title node))
-              (setq id (org-mem-entry-id node)))
-          (setq title input)
-          (setq id (org-id-new)))))
+              (setq id (org-mem-entry-id node))
+              (setq title (org-mem-entry-title node)))
+          (setq id (org-id-new))
+          (setq title (if (string-blank-p input)
+                          (org-node-mk-auto-title id)
+                        input)))))
     (if node
         ;; Node exists; capture into it
         (progn
@@ -1050,6 +1104,14 @@ type the name of a node that does not exist.  That enables this
 
 ;;;; Commands
 
+(defvar org-node--untitled-ctr 1)
+(defun org-node-mk-auto-title (_id)
+  "Override this to change what to name an untitled node."
+  (cl-loop for title = (format "Untitled %d" org-node--untitled-ctr)
+           while (gethash title org-node--title<>affixations)
+           do (cl-incf org-node--untitled-ctr)
+           finally return title))
+
 ;;;###autoload
 (defun org-node-find ()
   "Select and visit one of your ID nodes.
@@ -1058,14 +1120,16 @@ To make this behave like `org-roam-node-find' when creating new nodes,
 set `org-node-creation-fn' to `org-node-new-via-roam-capture'."
   (interactive)
   (org-node-cache-ensure)
-  (let* ((input (completing-read "Go to ID-node: " #'org-node-collection
+  (let* ((input (completing-read "Visit or create node: "
+                                 #'org-node-collection-basic
                                  () () () 'org-node-hist))
-         (node (gethash input org-node--candidate<>id-node)))
+         (node (gethash input org-node--candidate<>entry)))
     (if node
         (org-node--goto node)
-      (if (string-blank-p input)
-          (message "Won't create untitled node")
-        (org-node-create input (org-id-new))))))
+      (let ((id (org-id-new)))
+        (if (string-blank-p input)
+            (org-node-create (org-node-mk-auto-title id) id)
+          (org-node-create input id))))))
 
 ;;;###autoload
 (defun org-node-visit-random ()
@@ -1073,7 +1137,7 @@ set `org-node-creation-fn' to `org-node-new-via-roam-capture'."
   (interactive)
   (org-node-cache-ensure)
   (org-node--goto
-   (seq-random-elt (hash-table-values org-node--candidate<>id-node))))
+   (seq-random-elt (hash-table-values org-node--candidate<>entry))))
 
 ;;;###autoload
 (defun org-node-insert-link (&optional region-as-initial-input novisit)
@@ -1113,7 +1177,7 @@ Argument NOVISIT means behave as
                     initial
                   (completing-read "Node: " #'org-node-collection
                                    () () initial 'org-node-hist)))
-         (node (gethash input org-node--candidate<>id-node))
+         (node (gethash input org-node--candidate<>entry))
          (id (if node (org-mem-id node) (org-id-new)))
          (link-desc (or region-text
                         (and node
@@ -1334,9 +1398,10 @@ Works in non-Org buffers."
   (if (org-before-first-heading-p)
       (user-error "`org-node-refile' only works on subtrees for now")
     (org-node-cache-ensure)
-    (let* ((input (completing-read "Refile into ID-node: " #'org-node-collection
+    (let* ((input (completing-read "Refile into ID-node: "
+                                   #'org-node-collection-basic
                                    () () () 'org-node-hist))
-           (node (gethash input org-node--candidate<>id-node))
+           (node (gethash input org-node--candidate<>entry))
            (origin-buffer (current-buffer)))
       (unless node
         (error "Node not found %s" input))
@@ -2939,9 +3004,10 @@ heading, else the file-level node, whichever has an ID first."
 ;;       `org-node-insert-link' does.
 (defun org-node-read (&optional prompt)
   "PROMPT for a known node and return it."
-  (gethash (completing-read (or prompt "Node: ") #'org-node-collection
+  (gethash (completing-read (or prompt "Node: ")
+                            #'org-node-collection-basic
                             () () () 'org-node-hist)
-           org-node--candidate<>id-node))
+           org-node--candidate<>entry))
 
 (provide 'org-node)
 
