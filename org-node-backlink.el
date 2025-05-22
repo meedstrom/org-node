@@ -28,7 +28,6 @@
 (require 'org)
 (require 'ol)
 (require 'org-element)
-(require 'org-node-changes)
 (require 'org-node)
 (require 'org-mem)
 (require 'org-mem-updater)
@@ -88,7 +87,6 @@ See Info node `(org-node)'."
         (add-hook 'org-mode-hook                        #'org-node-backlink--local-mode)
         (add-hook 'org-mem-post-targeted-scan-functions #'org-node-backlink--maybe-fix-proactively)
         (add-hook 'org-node-relocation-hook             #'org-node-backlink--fix-nearby)
-        (add-hook 'org-roam-post-node-insert-hook       #'org-mem-updater-ensure-link-at-point-known -50)
         (add-hook 'org-roam-post-node-insert-hook       #'org-node-backlink--add-in-target)
         (add-hook 'org-node-insert-link-hook            #'org-node-backlink--add-in-target)
         (advice-add 'org-insert-link :after             #'org-node-backlink--add-in-target)
@@ -99,7 +97,6 @@ See Info node `(org-node)'."
     (remove-hook 'org-mode-hook                        #'org-node-backlink--local-mode)
     (remove-hook 'org-mem-post-targeted-scan-functions #'org-node-backlink--maybe-fix-proactively)
     (remove-hook 'org-node-relocation-hook             #'org-node-backlink--fix-nearby)
-    (remove-hook 'org-roam-post-node-insert-hook       #'org-mem-updater-ensure-link-at-point-known)
     (remove-hook 'org-roam-post-node-insert-hook       #'org-node-backlink--add-in-target)
     (remove-hook 'org-node-insert-link-hook            #'org-node-backlink--add-in-target)
     (advice-remove 'org-insert-link                    #'org-node-backlink--add-in-target)
@@ -176,7 +173,7 @@ Can be quit midway through and resumed later.  With
       (setq org-node-backlink--work-files nil))
     (when (or (equal current-prefix-arg '(4))
               (null org-node-backlink--work-files))
-      (let* ((files (org-mem-all-files))
+      (let* ((files (seq-keep #'org-mem--truename-maybe (org-mem-all-files)))
              (dirs (org-node--root-dirs files)))
         (when (y-or-n-p
                (format "Confirm: edit %d Org files in these %d directories?\n%s"
@@ -223,6 +220,7 @@ Or if KIND is symbol `update-drawers', `del-drawers', `update-props', or
                    (org-node-backlink--check-osl-user-p)))
     ;; (message "Fixing file %s" buffer-file-name)
     (goto-char (point-min))
+    (org-node--assert-transclusion-safe)
     (let ((case-fold-search t))
       ;; NOTE: If there is an entry that has :BACKLINKS:, but that has lost its
       ;;       :ID:, it will never be touched again, but that's on the user.
@@ -308,13 +306,15 @@ headings but you have only done work under one of them."
                     (save-excursion
                       (and (org-entry-get-with-inheritance "ID")
                            (goto-char org-entry-property-inherited-from)
+                           (not (org-node--in-transclusion-p))
                            (org-node-backlink--fix-nearby)))
                     ;; ...and if the change-area is massive, spanning multiple
                     ;; subtrees (like after a big yank), update each subtree
                     ;; within
                     (while (and (< (point) end)
                                 (re-search-forward "^[\t\s]*:id: +" end t))
-                      (org-node-backlink--fix-nearby))
+                      (unless (org-node--in-transclusion-p)
+                        (org-node-backlink--fix-nearby)))
                     (remove-text-properties start end 'org-node-flag))
                   ;; This change-area dealt with, move on
                   (set-marker start (marker-position end)))
@@ -323,9 +323,6 @@ headings but you have only done work under one of them."
         (( error )
          (unless (remove-text-properties 1 (point-max) 'org-node-flag)
            (message "org-node: Did not remove org-node-flag text property"))
-         ;; Provide backtrace even tho we don't signal an error
-         (when debug-on-error
-           (backtrace))
          (message "org-node: Updating backlinks ran into an issue: %S" err))))))
 
 
@@ -334,6 +331,11 @@ headings but you have only done work under one of them."
 (defun org-node-backlink--fix-nearby-property (&optional remove)
   "Update the :BACKLINKS: property in the current entry.
 If REMOVE is non-nil, remove it instead."
+  (when-let* ((prop-pos (car (org-get-property-block))))
+    (when (get-text-property prop-pos 'read-only)
+      ;; Because `org-entry-put' is so unsafe that it inhibits read-only
+      (error "org-node-backlink: Area seems to be read-only at %d in %s"
+             prop-pos (buffer-name))))
   (if remove
       (org-entry-delete nil "BACKLINKS")
     (let* ((id (org-entry-get nil "ID"))
@@ -361,13 +363,18 @@ If REMOVE is non-nil, remove it instead."
 
 (defun org-node-backlink--add-to-property (id title)
   "Insert a link with ID and TITLE into nearby :BACKLINKS: property."
+  (when-let* ((prop-pos (car (org-get-property-block))))
+    (when (get-text-property prop-pos 'read-only)
+      ;; Because `org-entry-put' is so unsafe that it inhibits read-only
+      (error "org-node-backlink: Area seems to be read-only at %d in %s"
+             prop-pos (buffer-name))))
   (let ((current-backlinks-value (org-entry-get nil "BACKLINKS"))
         (new-link (org-link-make-string (concat "id:" id) title))
         new-value)
-    (and current-backlinks-value
-         (string-search "\f" current-backlinks-value)
-         (error "Form-feed character in BACKLINKS property near %d in %s"
-                (point) (buffer-name)))
+    (when (and current-backlinks-value
+               (string-search "\f" current-backlinks-value))
+      (error "Form-feed character in BACKLINKS property near %d in %s"
+             (point) (buffer-name)))
     (if current-backlinks-value
         ;; Build a temp list to check we don't add the same link twice.
         ;; There is an Org builtin `org-entry-add-to-multivalued-property',
@@ -376,7 +383,7 @@ If REMOVE is non-nil, remove it instead."
         ;; `split-string-and-unquote' even if we had wrapped the links in
         ;; quotes.
         (let ((links (split-string (replace-regexp-in-string
-                                    "]][\s\t]+\\[\\["
+                                    (rx "]]" (+ space) "[[")
                                     "]]\f[["
                                     (string-trim current-backlinks-value))
                                    "\f")))
@@ -454,58 +461,37 @@ If REMOVE is non-nil, remove it instead."
             (setq target-id path)
             ;; `org-id-find-id-file' has terrible fallback behavior
             (setq target-file (ignore-errors
-                              (org-mem-entry-file
-                               (gethash target-id org-nodes)))))
+                                (org-mem-entry-file
+                                 (gethash target-id org-nodes)))))
         ;; A "reflink"
         (setq target-id (gethash path org-mem--roam-ref<>id))
         (setq target-file (ignore-errors
-                          (org-mem-entry-file
-                           (gethash target-id org-nodes)))))
+                            (org-mem-entry-file
+                             (gethash target-id org-nodes)))))
       (when (null target-file)
         (message "`org-node-backlink--add-in-target' could not resolve ID: %s" target-id))
       (when (and target-id target-file)
-        (let ((case-fold-search t)
-              (origin-id (org-entry-get-with-inheritance "ID")))
+        (org-node--assert-transclusion-safe)
+        (let ((origin-id (org-entry-get-with-inheritance "ID")))
           (when (and origin-id (not (equal origin-id target-id)))
-            (let ((origin-title
-                   (save-excursion
-                     (without-restriction
-                       ;; This search can fail when point is on the heading
-                       ;; with the id-property below, but then point is in the
-                       ;; right place anyway.
-                       (re-search-backward (concat "^[ \t]*:id: +" origin-id)
-                                           nil t)
-                       (or (org-get-heading t t t t)
-                           (org-get-title)
-                           (file-name-nondirectory buffer-file-name))))))
+            (when-let* ((origin-title
+                         (save-excursion
+                           (without-restriction
+                             (goto-char org-entry-property-inherited-from)
+                             (or (org-get-heading t t t t)
+                                 (org-get-title))))))
               ;; Ensure that
               ;; `org-node-backlink--fix-flagged-parts-of-buffer' will not
               ;; later remove the backlink we're adding
               (org-mem-updater-ensure-id-node-at-point-known)
               (org-node--with-quick-file-buffer target-file
-                :about-to-do "Org-node going to add backlink to the target of the link you just inserted"
-                (when (and (boundp 'org-transclusion-exclude-elements)
-                           (not (memq 'property-drawer
-                                      org-transclusion-exclude-elements)))
-                  ;; Safety for when we search for literal :ID: line
-                  (error "org-node-backlink-mode: List `org-transclusion-exclude-elements' must include `property-drawer'"))
-                (goto-char (point-min))
-                (let ((case-fold-search t))
-                  (if (re-search-forward (concat "^[ \t]*:id: +"
-                                                 (regexp-quote target-id))
-                                         nil
-                                         t)
-                      (if (get-text-property (point) 'read-only)
-                          ;; If for some reason the search landed us in a
-                          ;; transclude region or other read-only area...  Note
-                          ;; that `org-entry-put' not only doesn't signal an
-                          ;; error, it inhibits read-only and goes ahead to
-                          ;; make edits!
-                          (error "org-node: Area seems to be read-only at %d in %s"
-                                 (point) (buffer-name))
-                        (org-node-backlink--add origin-id origin-title))
-                    (message "`org-node-backlink--add-in-target' could not find ID %s in file %s"
-                             target-id target-file)))))))))))
+                :about-to-do "Org-node going to add backlink in target of link you just inserted"
+                (org-node--assert-transclusion-safe)
+                (if-let* ((pos (org-find-property "ID" target-id)))
+                    (progn (goto-char pos)
+                           (org-node-backlink--add origin-id origin-title))
+                  (message "`org-node-backlink--add-in-target' could not find ID %s in file %s"
+                           target-id target-file))))))))))
 
 (defun org-node-backlink--add (id title)
   "Add link with ID and TITLE into local backlink drawer or property."
@@ -650,38 +636,26 @@ ID and DESC are link id and description, TIME a Lisp time value."
 (defun org-node-backlink--add-to-drawer (id title)
   "Add new backlink with ID and TITLE to nearby drawer.
 Designed for use by `org-node-backlink--add-in-target'."
+  (cl-assert id) ;; Don't want to insert empty [[id:]] ever
   (if (or (org-node-backlink--check-v2-misaligned-setting-p)
           (org-node-backlink--check-osl-user-p))
       (org-node-backlink-mode 0)
     (save-excursion
       (save-restriction
-        (org-node-narrow-to-drawer-create
-          "BACKLINKS" org-node-backlink-drawer-positioner)
-        (catch 'break
-          (let (lines)
-            (while (search-forward "[[id:" (pos-eol) t)
-              (let ((id-found (buffer-substring-no-properties
-                               (point)
-                               (- (re-search-forward "].\\|::") 2))))
-                (if (equal id-found id)
-                    ;; No need to link to itself
-                    (throw 'break nil)
-                  (push (buffer-substring-no-properties (pos-bol) (pos-eol))
-                        lines)
-                  (forward-line 1))))
-            (let ((org-node-backlink--inhibit-flagging t))
-              (insert "\n"
-                      (funcall org-node-backlink-drawer-formatter id title)
-                      "\n")
-              ;; Re-sort so the just-inserted link ends up in the correct place
-              (let ((sorted-lines
-                     (sort (split-string (buffer-string) "\n" t)
-                           org-node-backlink-drawer-sorter)))
-                (when org-node-backlink-drawer-sort-in-reverse
-                  (setq sorted-lines (nreverse sorted-lines)))
-                (atomic-change-group
-                  (delete-region (point-min) (point-max))
-                  (insert (string-join sorted-lines "\n")))))))))))
+        (let ((org-node-backlink--inhibit-flagging t))
+          (org-node-narrow-to-drawer-create
+           "BACKLINKS" org-node-backlink-drawer-positioner)
+          (unless (search-forward (concat "[[id:" id) nil t) ;; Already has it
+            (insert (funcall org-node-backlink-drawer-formatter id title))
+            (newline-and-indent)
+            ;; Re-sort so just-inserted link is placed correct among them
+            (let ((lines (sort (split-string (buffer-string) "\n" t)
+                               org-node-backlink-drawer-sorter)))
+              (when org-node-backlink-drawer-sort-in-reverse
+                (setq lines (nreverse lines)))
+              (atomic-change-group
+                (delete-region (point-min) (point-max))
+                (insert (string-join lines "\n"))))))))))
 
 (defun org-node-backlink--fix-nearby-drawer (&optional remove)
   "Update nearby backlinks drawer so it reflects current reality.
@@ -690,22 +664,24 @@ If REMOVE non-nil, remove it instead."
   (if remove
       (org-node--delete-drawer "BACKLINKS")
     (let* ((id (org-entry-get nil "ID"))
-           (entry (gethash id org-nodes))
+           (entry (org-mem-entry-by-id id))
            (origins (when entry
                       (thread-last
                         (append (org-mem-id-links-to-entry entry)
                                 (org-mem-roam-reflinks-to-entry entry))
                         (mapcar #'org-mem-link-nearby-id)
-                        (delete-dups)))))
+                        (delete-dups)
+                        ;; Shouldn't be necessary if tables are correct,
+                        ;; but don't assume `org-mem-updater-mode' is flawless
+                        (seq-filter #'org-mem-entry-by-id))))
+           (org-node-backlink--inhibit-flagging t))
       (if (null origins)
-          (save-excursion
-            (org-node--delete-drawer "BACKLINKS"))
+          (org-node--delete-drawer "BACKLINKS")
         (save-excursion
           (save-restriction
             (org-node-narrow-to-drawer-create
              "BACKLINKS" org-node-backlink-drawer-positioner)
-            (let* ((org-node-backlink--inhibit-flagging t)
-                   (lines (split-string (buffer-string) "\n" t))
+            (let* ((lines (split-string (buffer-string) "\n" t))
                    (already-present-ids
                     (seq-keep #'org-node-backlink--extract-id lines))
                    (to-add      (seq-difference   origins already-present-ids))
@@ -725,15 +701,12 @@ If REMOVE non-nil, remove it instead."
                       (delete-region (point) (pos-eol))
                       (insert (org-node-backlink--reformat-line line))))))
               (dolist (id to-add)
-                (when-let* ((known-node (gethash id org-nodes)))
-                  (let ((title (org-mem-entry-title known-node)))
-                    (indent-according-to-mode)
-                    (insert (funcall org-node-backlink-drawer-formatter id title)
-                            "\n"))))
-              ;; Membership is correct, now re-sort so the order is correct
-              (let ((sorted-lines
-                     (sort (split-string (buffer-string) "\n" t)
-                           org-node-backlink-drawer-sorter)))
+                (let ((title (org-mem-title-maybe (org-mem-entry-by-id id))))
+                  (insert (funcall org-node-backlink-drawer-formatter id title))
+                  (newline-and-indent)))
+              ;; Membership is correct, now re-sort
+              (let ((sorted-lines (sort (split-string (buffer-string) "\n" t)
+                                        org-node-backlink-drawer-sorter)))
                 (when org-node-backlink-drawer-sort-in-reverse
                   (setq sorted-lines (nreverse sorted-lines)))
                 (atomic-change-group
