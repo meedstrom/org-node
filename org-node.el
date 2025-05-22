@@ -2042,36 +2042,18 @@ from ID links found in `org-mem--target<>links'."
                        collect (concat target "\t" (org-mem-link-nearby-id link)))))
     "\n")))
 
-;; TODO: Maybe expunge to org-mem.el after I figure out how to use fileloop well
-(defvar org-node--found-coding-systems nil)
-(defvar org-node--list-file-coding-systems-files nil)
 (defun org-node-list-file-coding-systems ()
-  "Check coding systems of files found by `org-node-list-files'.
-This is done by temporarily visiting each file and checking what
-Emacs decides to decode it as.  To start over, run the command
-with \\[universal-argument] prefix."
+  "List coding systems detected in all files.
+This is done by checking how Emacs had decided to decode each file."
   (interactive)
-  (when (or (equal current-prefix-arg '(4))
-            (and (null org-node--list-file-coding-systems-files)
-                 (y-or-n-p (format "Check coding systems in %d files?  They will not be modified."
-                                   (length (org-mem-all-files))))))
-    (setq org-node--list-file-coding-systems-files (org-mem-all-files))
-    (setq org-node--found-coding-systems nil))
-  (setq org-node--list-file-coding-systems-files
-        (org-node--in-files-do
-          :files org-node--list-file-coding-systems-files
-          :fundamental-mode t
-          :msg "Checking file coding systems (you can quit and resume)"
-          :about-to-do "About to check file coding system"
-          :call (lambda ()
-                  (push (cons buffer-file-name buffer-file-coding-system)
-                        org-node--found-coding-systems))))
   (org-mem-list--pop-to-tabulated-buffer
    :buffer "*org file coding systems*"
    :format [("Coding system" 20 t) ("File" 40 t)]
-   :entries (cl-loop for (file . sys) in org-node--found-coding-systems
-                     collect (list file (vector (symbol-name sys) file)))
-   :reverter #'org-node-list-file-coding-systems))
+   :entries (cl-loop
+             for data being each hash-value of org-mem--file<>metadata
+             as file = (nth 0 data)
+             as sys = (nth 4 data)
+             collect (list file (vector (symbol-name sys) file)))))
 
 (defun org-node-list-reflinks ()
   "List all reflinks and their locations.
