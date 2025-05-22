@@ -107,7 +107,7 @@
 (declare-function org-link-make-string "ol")
 (declare-function org-paste-subtree "org")
 (declare-function org-time-stamp-format "org")
-(declare-function org-mem-updater-ensure-entry-at-point-known "org-mem-updater")
+(declare-function org-mem-updater-ensure-id-node-at-point-known "org-mem-updater")
 
 (defvaralias 'org-nodes 'org-mem--id<>entry)
 
@@ -565,8 +565,9 @@ buffer already exists, so the buffer stays blank.  Thus this hook."
               ;; Hopefully throw away a stale autosave
               ;; since its existence annoys the user on re-creating the file
               (do-auto-save nil t))
-            (org-mem-updater--forget-file-contents (list buffer-file-truename))
-            (org-node--forget-completions-in-files (list buffer-file-truename))
+            (when-let* ((file (org-mem--truename-maybe buffer-file-name)))
+              (org-mem-updater--forget-file-contents file)
+              (org-node--forget-completions-in-files file))
             (kill-buffer buf)))))))
 
 
@@ -607,7 +608,7 @@ something to change the facts on the ground just prior."
   (when force
     (org-mem--scan-full))
   (when block
-    (org-mem-block 'org-node 10)))
+    (org-mem-await 'org-node 10)))
 
 ;; TODO: Deprecate somehow
 (defvar org-node--first-init t
@@ -1935,9 +1936,9 @@ from the beginning."
   (let (files)
     (when (or (equal current-prefix-arg '(4))
               (and (null org-node--unlinted)
-                   (setq files (org-mem-all-files))
-                   (y-or-n-p (format "Lint %d files?"
-                                     (length files)))))
+                   (setq files (seq-keep #'org-mem--truename-maybe
+                                         (org-mem-all-files)))
+                   (y-or-n-p (format "Lint %d files?" (length files)))))
       (setq org-node--unlinted files)
       (setq org-node--lint-warnings nil)))
   (setq org-node--unlinted
@@ -2154,24 +2155,22 @@ Optional keyword argument ABOUT-TO-DO as in
            (kill-buffer-hook nil) ;; Inhibit save-place etc
            (kill-buffer-query-functions nil)
            (buffer-list-update-hook nil)
-           (file ,file))
+           (--file-- (org-mem--truename-maybe ,file)))
+       (unless --file--
+         (error "File does not exist or not valid to visit: %s" ,file))
+       (when (file-directory-p --file--)
+         (error "Is a directory: %s" --file--))
        ;; The cache is buggy, disable to be safe
        (org-element-with-disabled-cache
-         (let* ((--was-open-- (find-buffer-visiting file))
-                (_ (when (file-directory-p file)
-                     (error "Is a directory: %s" file)))
+         (let* ((--was-open-- (find-buffer-visiting --file--))
                 (--buf-- (or --was-open--
                              (delay-mode-hooks
-                               (org-node--find-file-noselect
-                                ;; TODO: Move this check into `org-node--find-file-noselect' itself
-                                (or (org-mem--abbr-truename file)
-                                    (error "File name not safe for `org-node--find-file-noselect': %s"
-                                           file))
-                                ,why)))))
+                               (org-node--find-file-noselect --file-- ,why)))))
            (when (bufferp --buf--)
              (with-current-buffer --buf--
                (save-excursion
                  (without-restriction
+                   (goto-char (point-min))
                    ,@body))
                (if --was-open--
                    ;; Because the cache gets confused by changes
@@ -2322,24 +2321,23 @@ CLEANUP is a kludge related to that."
 ;; Also better for silent background usage.  The argument ABOUT-TO-DO clarifies
 ;; what would otherwise be a mysterious error that's difficult for the user to
 ;; track down to this package.
-(defun org-node--find-file-noselect (abbr-truename about-to-do)
-  "Read file ABBR-TRUENAME into a buffer and return the buffer.
+(defun org-node--find-file-noselect (truename about-to-do)
+  "Read file at TRUENAME into a buffer and return the buffer.
 If there's a problem such as an auto-save file being newer, prompt the
 user to proceed with a message based on string ABOUT-TO-DO, else do
 nothing and return nil.
 
-Very presumptive!  Like `find-file-noselect' but intended as a
+Presumptive!  Like `find-file-noselect' but intended as a
 subroutine for `org-node--in-files-do' or any caller that has
-already ensured that ABBR-TRUENAME:
+already ensured that TRUENAME:
 
-- is an abbreviated file truename
-  - \(i.e. the equivalent of passing a wild filename through
-     `file-truename' and then `abbreviate-file-name')
+- is a file truename e.g. from `org-mem--truename-maybe'
 - does not satisfy `backup-file-name-p'
 - is not already being visited in another buffer
 - is not a directory"
-  (let ((attrs (file-attributes abbr-truename))
-        (buf (create-file-buffer abbr-truename)))
+  (let* ((abbr-truename (org-mem--fast-abbrev truename))
+         (attrs (file-attributes abbr-truename))
+         (buf (create-file-buffer abbr-truename)))
     (when (null attrs)
       (kill-buffer buf)
       (error "File appears to be gone/renamed: %s" abbr-truename))

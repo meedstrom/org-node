@@ -32,7 +32,7 @@
 (require 'org-node)
 (require 'org-mem)
 (require 'org-mem-updater)
-(declare-function org-mem-updater-ensure-entry-at-point-known "org-mem-updater")
+(declare-function org-mem-updater-ensure-id-node-at-point-known "org-mem-updater")
 (declare-function org-mem-updater-ensure-link-at-point-known "org-mem-updater")
 
 (defgroup org-node-backlink nil "In-file backlinks."
@@ -481,7 +481,7 @@ If REMOVE is non-nil, remove it instead."
               ;; Ensure that
               ;; `org-node-backlink--fix-flagged-parts-of-buffer' will not
               ;; later remove the backlink we're adding
-              (org-mem-updater-ensure-entry-at-point-known)
+              (org-mem-updater-ensure-id-node-at-point-known)
               (org-node--with-quick-file-buffer target-file
                 :about-to-do "Org-node going to add backlink to the target of the link you just inserted"
                 (when (and (boundp 'org-transclusion-exclude-elements)

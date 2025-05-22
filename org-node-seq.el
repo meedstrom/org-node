@@ -143,7 +143,8 @@ interactive Org date picker.
 
 For the date-picker to work as expected, you need file names in
 YYYY-MM-DD format, e.g. \"2024-01-31.org\"."
-  (setq dir (abbreviate-file-name (file-truename dir)))
+  (cl-assert (file-name-absolute-p dir))
+  (setq dir (file-truename dir))
   `(,key
     :name ,name
     :version 2
@@ -154,8 +155,9 @@ YYYY-MM-DD format, e.g. \"2024-01-31.org\"."
                            (sortstr (file-name-base path)))
                       (cons sortstr path))))
     :whereami (lambda ()
-                (when (string-prefix-p ,dir buffer-file-truename)
-                  (file-name-base buffer-file-truename)))
+                (let ((file-name (org-mem--truename-maybe buffer-file-name)))
+                  (when (string-prefix-p ,dir file-name)
+                    (file-name-base file-name))))
     :prompter (lambda (key)
                 (if ,date-picker
                     (let ((org-node-seq-that-marks-calendar key))
