@@ -1122,7 +1122,7 @@ set `org-node-creation-fn' to `org-node-new-via-roam-capture'."
   (interactive)
   (org-node-cache-ensure)
   (let* ((input (completing-read "Visit or create node: "
-                                 #'org-node-collection-basic
+                                 #'org-node-collection
                                  () () () 'org-node-hist))
          (node (gethash input org-node--candidate<>entry)))
     (if node
