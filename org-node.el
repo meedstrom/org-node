@@ -163,34 +163,25 @@ Takes a node as argument, should return a string."
                  function)
   :package-version '(org-node . "2.3.3"))
 
-(defun org-node-reject-roam-exclude (node)
-  "Hide NODE if it has a :ROAM_EXCLUDE: property."
+(defun org-node-filter-no-roam-exclude-p (node)
+  "Hide NODE if it has a :ROAM_EXCLUDE: property.
+Does not hide if it merely inherits that property from an ancestor."
   (not (org-mem-property "ROAM_EXCLUDE" node)))
 
-(defvar org-node--dir-separator nil)
-(defun org-node-reject-archive-file (node)
-  "Hide NODE if file name or any directory component ends with \"archive\"."
-  (not (seq-find (##string-suffix-p "archive" %)
-                 ;; `file-name-split' is slow
-                 (split-string (org-mem-file node)
-                               (or org-node--dir-separator
-                                   (setq org-node--dir-separator
-                                         (substring (file-name-concat "a" "b")
-                                                    1 2)))
-                               t))))
-
-(defun org-node-keep-only-watched-dir (node)
-  "Show NODE only if it is found in `org-mem-watch-dirs'."
+(defun org-node-filter-watched-dir-p (node)
+  "Show NODE only if it is found inside `org-mem-watch-dirs'."
   (let ((file (org-mem-file node)))
-    (seq-find (##string-prefix-p % file) org-mem-watch-dirs)))
+    (cl-some (lambda (dir) (string-prefix-p dir file))
+             (with-memoization (org-mem--table 0 'true-watch-dirs)
+               (with-temp-buffer ;; No buffer-env
+                 (mapcar #'file-truename org-mem-watch-dirs))))))
 
-;; REVIEW: Maybe take a list of functions?  Tho we lose free choice
-;;         between treating it as an allowlist or as denylist.
-(defcustom org-node-filter-fn #'org-node-reject-roam-exclude
+;; TODO: Compose a list of functions?
+(defcustom org-node-filter-fn #'org-node-filter-no-roam-exclude-p
   "Predicate returning non-nil to include a node, or nil to exclude it.
 
-The filtering affects two tables:
-- `org-node--candidate<>id-node', used by completions in the minibuffer
+The filter affects two tables:
+- `org-node--candidate<>entry', used by completions in the minibuffer
 - `org-node--title<>affixations', used by `org-node-complete-at-point-mode'
 
 In other words, returning nil means the user cannot autocomplete to the
@@ -201,9 +192,8 @@ This function is applied once for every ID-node found, and
 receives the node data as a single argument: an object which form
 you can observe in examples from \\[org-node-peek] and specified
 in the type `org-mem-entry' (C-h o org-mem-entry RET)."
-  :type '(radio (function-item org-node-reject-roam-exclude)
-                (function-item org-node-reject-archive-file)
-                (function-item org-node-keep-only-watched-dir)
+  :type '(radio (function-item org-node-filter-no-roam-exclude-p)
+                (function-item org-node-filter-watched-dir-p)
                 (function :tag "Custom function"
                           :value (lambda (node) t)))
   :set #'org-node--set-and-remind-reset
