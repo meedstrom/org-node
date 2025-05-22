@@ -1894,14 +1894,14 @@ be sufficient to key-bind that one."
   (interactive "*" org-mode)
   (save-excursion
     (save-restriction
-      (org-node-narrow-to-drawer-create "RELATED" t)
+      (org-node-narrow-to-drawer-create "RELATED" #'org-entry-end-position)
       ;; Here is something to ponder in the design of
       ;; `org-node-narrow-to-drawer-create'. Should it ensure a blank line?
       (let ((already-blank-line (eolp)))
         (atomic-change-group
           (org-node-insert-link nil t)
           (back-to-indentation)
-          (insert (format-time-string (org-time-stamp-format t t)) " <- ")
+          (insert (format-time-string (org-time-stamp-format t t)) " -> ")
           (unless already-blank-line
             (newline-and-indent)))))))
 
