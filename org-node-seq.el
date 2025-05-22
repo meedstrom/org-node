@@ -549,23 +549,47 @@ Meant to sit on these hooks:
             (when (calendar-date-is-visible-p mdy)
               (calendar-mark-visible-date mdy))))))))
 
+;;;###autoload
+(define-minor-mode org-node-seq-mode
+  "Populate sequences according to `org-node-seq-defs'.
+This permits \\[org-node-seq-dispatch] to work."
+  :global t
+  :group 'org-node
+  (if org-node-seq-mode
+      (progn
+        (org-node-cache-ensure t)
+        (org-node-seq--reset)
+        ;; FIXME: A new node (cached w `org-mem-updater-ensure-id-node-at-point-known')
+        ;;        eventually disappears from cache if its buffer is never
+        ;;        saved, and then the node seq stops working
+        (add-hook 'org-node-creation-hook        #'org-node-seq--add-item)
+        (add-hook 'org-mem-post-full-scan-functions #'org-node-seq--reset 50)
+        ;; Put ourselves in front of org-roam-dailies unhygienic hook.
+        (add-hook 'calendar-today-invisible-hook #'org-node-seq--mark-days 5)
+        (add-hook 'calendar-today-visible-hook   #'org-node-seq--mark-days 5))
+    (remove-hook 'org-node-creation-hook        #'org-node-seq--add-item)
+    (remove-hook 'org-mem-post-full-scan-functions #'org-node-seq--reset)
+    (remove-hook 'calendar-today-invisible-hook #'org-node-seq--mark-days)
+    (remove-hook 'calendar-today-visible-hook   #'org-node-seq--mark-days)))
+
 (defvar org-node-seq--auto-enabled-once nil)
 
-;; Not used inside this package; a convenience for users.
+;; Not used inside this package; a convenience for end users.
 (defun org-node-seq-goto (key sortstr)
   "Visit an entry in sequence identified by KEY.
 The entry to visit has sort-string SORTSTR.  Create if it does
 not exist."
-  (when org-node-seq-defs
-    (unless (assoc key org-node-seqs)
-      (unless org-node-seq--auto-enabled-once
-        (setq org-node-seq--auto-enabled-once t)
-        (org-node-seq-mode)
-        (org-node-seq--reset))))
+  (when (not (assoc key org-node-seqs))
+    (if org-node-seq-defs
+        (if org-node-seq-mode
+            (error "No seq for key \"%s\", maybe do M-x org-mem-reset?" key)
+          (if org-node-seq--auto-enabled-once
+              (user-error "`org-node-seq-mode' not enabled")
+            (setq org-node-seq--auto-enabled-once t)
+            (org-node-seq-mode)))
+      (error "`org-node-seq-defs' not configured for key \"%s\"" key)))
   (let* ((seq (cdr (assoc key org-node-seqs)))
          (item (assoc sortstr (plist-get seq :sorted-items))))
-    (unless seq
-      (error "No seq with key %s, maybe do M-x org-mem-reset?" key))
     (require 'org)
     ;; TODO: When `item' not found, still run :try-goto and pass it a
     ;;       list that contains only `sortstr', so it has a shot at finding a
@@ -601,27 +625,6 @@ not exist."
                     (format " + %.2fs caching org-node-seqs"
                             (float-time (time-since T))))))))
 
-;;;###autoload
-(define-minor-mode org-node-seq-mode
-  "Populate sequences according to `org-node-seq-defs'.
-This permits \\[org-node-seq-dispatch] to work."
-  :global t
-  :group 'org-node
-  (if org-node-seq-mode
-      (progn
-        ;; FIXME: A new node (cached w `org-mem-updater-ensure-entry-at-point-known')
-        ;;        eventually disappears from cache if its buffer is never
-        ;;        saved, and then the node seq stops working
-        (add-hook 'org-node-creation-hook        #'org-node-seq--add-item)
-        (add-hook 'org-mem-post-full-scan-functions #'org-node-seq--reset 50)
-        ;; Put ourselves in front of org-roam-dailies unhygienic hook.
-        (add-hook 'calendar-today-invisible-hook #'org-node-seq--mark-days 5)
-        (add-hook 'calendar-today-visible-hook   #'org-node-seq--mark-days 5))
-    (remove-hook 'org-node-creation-hook        #'org-node-seq--add-item)
-    (remove-hook 'org-mem-post-full-scan-functions #'org-node-seq--reset)
-    (remove-hook 'calendar-today-invisible-hook #'org-node-seq--mark-days)
-    (remove-hook 'calendar-today-visible-hook   #'org-node-seq--mark-days)))
-
 (defun org-node-seq--add-to-dispatch (key name)
   "Use KEY and NAME to add a sequence to the Transient menu."
   (when (ignore-errors (transient-get-suffix 'org-node-seq-dispatch key))
@@ -634,9 +637,6 @@ This permits \\[org-node-seq-dispatch] to work."
     (setf (slot-value (get 'org-node-seq-dispatch 'transient--prefix)
                       'incompatible)
           (list (seq-uniq (cons key old))))))
-
-;; These suffixes just exist due to a linter complaint, could have been
-;; lambdas inlined in the `org-node-seq-dispatch' definition.
 
 (transient-define-suffix org-node-seq--goto-previous* (args)
   (interactive (list (transient-args 'org-node-seq-dispatch)))
@@ -684,11 +684,10 @@ This permits \\[org-node-seq-dispatch] to work."
    ("c" "Capture into" org-node-seq--capture)]
   (interactive)
   (when org-node-seq-defs
-    (unless (and org-node-seq-mode org-node-seqs)
-      (unless org-node-seq--auto-enabled-once
-        (setq org-node-seq--auto-enabled-once t)
-        (org-node-seq-mode)
-        (org-node-seq--reset))))
+    (unless (or org-node-seq--auto-enabled-once
+                org-node-seq-mode)
+      (setq org-node-seq--auto-enabled-once t)
+      (org-node-seq-mode)))
   (cond ((not org-node-seq-defs)
          (message "`org-node-seq-defs' not defined"))
         ((not org-node-seq-mode)

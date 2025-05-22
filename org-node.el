@@ -574,7 +574,7 @@ buffer already exists, so the buffer stays blank.  Thus this hook."
 ;;;; Scanning files to cache info about them
 
 ;;;###autoload
-(define-obsolete-function-alias 'org-node-reset #'org-mem-reset "2025-05-09")
+(define-obsolete-function-alias 'org-node-reset #'org-mem-reset "3.0.0 (May 2025)")
 
 (defun org-node-cache-ensure (&optional block force)
   "Ensure that org-node is ready for use.
@@ -879,13 +879,14 @@ EXACT means always move point."
     (error "Function org-node--goto no longer takes a position argument"))
   (unless node
     (error "Function org-node--goto received a nil argument"))
-  (let ((file (org-mem-file node)))
+  (let ((file (org-mem-file-truename node)))
     (if (file-exists-p file)
         (progn
           (when (not (file-readable-p file))
             (error "org-node: Couldn't visit unreadable file %s" file))
           (find-file file)
           (widen)
+          (org-node--assert-transclusion-safe)
           (let* ((id (org-mem-id node))
                  (pos (and id (org-find-property "ID" id))))
             (unless pos
@@ -903,7 +904,7 @@ EXACT means always move point."
                 (org-fold-show-children)
                 (recenter 0)))))
       (message "org-node: Didn't find file, resetting...")
-      (org-mem--scan-full))))
+      (org-mem--scan-full t))))
 
 (defcustom org-node-creation-fn #'org-node-new-file
   "Function called to create a node that does not yet exist.
@@ -1007,12 +1008,12 @@ Designed for `org-node-creation-fn'."
     (error "`org-node-new-via-roam-capture' requires library \"org-roam\""))
   (when (and (fboundp 'org-roam-capture-)
              (fboundp 'org-roam-node-create))
-    (let ((creation-hook-runner (lambda () (run-hooks 'org-node-creation-hook))))
+    (let ((creation-hook-runner (##run-hooks 'org-node-creation-hook)))
       (add-hook 'org-roam-capture-new-node-hook creation-hook-runner)
-      (unwind-protect
-          (org-roam-capture- :node (org-roam-node-create
-                                    :title org-node-proposed-title
-                                    :id    org-node-proposed-id))
+      (unwind-protect (org-roam-capture-
+                       :node (org-roam-node-create
+                              :title org-node-proposed-title
+                              :id    org-node-proposed-id))
         (remove-hook 'org-roam-capture-new-node-hook creation-hook-runner)))))
 
 (defun org-node-guess-node-by-title (title)
@@ -2919,7 +2920,7 @@ stash it in the variable `org-node--ad-roam-src-node'."
 (declare-function org-roam-node-id "ext:org-roam-node")
 (defvar org-roam-preview-function)
 (defvar org-roam-preview-postprocess-functions)
-(defvar org-node--ad-roam-id<>previews (make-hash-table :test #'equal))
+(defvar org-node--ad-roam--id<>previews (make-hash-table :test #'equal))
 (defun org-node--ad-roam-preview-get-contents (file link-pos)
   "Designed as override for `org-roam-preview-get-contents'.
 
@@ -2943,7 +2944,7 @@ from many sources.  To deal with that:
               (error "Org-roam node unknown to Org-mem: %s" src-id)))
          (pos-diff (- link-pos (org-mem-entry-pos src))))
     (with-memoization
-        (alist-get pos-diff (gethash src-id org-node--ad-roam-id<>previews))
+        (alist-get pos-diff (gethash src-id org-node--ad-roam--id<>previews))
       (let (snippet)
         (with-current-buffer (org-node--work-buffer-for file)
           (goto-char link-pos)
