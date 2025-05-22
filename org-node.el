@@ -253,7 +253,7 @@ as `org-node-affixation-fn' is set to `org-node-prepend-olp'
 
 \(Tip: users of the \"orderless\" library do not need this
 setting, they can always match against the prefix and suffix via
-`orderless-annotation', bound to the character \& by default.)
+`orderless-annotation', bound to the character \& by default.\)
 
 Another consequence: this setting can lift the uniqueness constraint on
 note titles: you\\='ll be able to have two nodes with the same name, so
@@ -519,7 +519,9 @@ STR, PRED and ACTION as in `org-node-collection-basic'."
 ;;;###autoload
 (define-minor-mode org-node-cache-mode
   "Cache completion candidates every time Org-mem updates its cache.
-You should also turn on `org-mem-updater-mode'."
+You should also turn on `org-mem-updater-mode', ideally at nearly the
+same time in your init process, because then org-mem will tend to only
+scan files once rather than twice."
   :global t
   (cond
    (org-node-cache-mode
@@ -844,6 +846,16 @@ belonging to an alphabet or number system."
 ;; (org-node-slugify-for-web "#emacs")
 ;; (org-node-slugify-for-web "칹え🐛")
 
+;; TODO: For Denote users, you get valid filename with just the default slug fn,
+;;       and a datestamp "%Y%m%dT%H%M%S--".  However, the full format including
+;;       optional parts looks like:
+;;       DATE==SIGNATURE--TITLE__KEYWORDS.EXT
+;;
+;;       So either the user adds SIGNATURE and KEYWORDS themselves, and never
+;;       uses `org-node-rename-file-by-title'.  Or we could pass more arguments
+;;       into the slug fn, that it can use to systematically add these parts
+;;       based on some rule, like perhaps the content of an Org property.
+
 
 ;;;; How to create new nodes
 
@@ -860,7 +872,7 @@ Automatically set, should be nil most of the time.")
 Automatically set, should be nil most of the time.")
 
 (defun org-node--goto (node &optional exact)
-  "Visit NODE file, and move point if not already close.
+  "Visit NODE file, and move point unless already close.
 EXACT means always move point."
   (when (numberp exact)
     (error "Function org-node--goto no longer takes a position argument"))
@@ -877,9 +889,6 @@ EXACT means always move point."
                  (pos (and id (org-find-property "ID" id))))
             (unless pos
               (error "Could not find ID \"%s\" in buffer %s" id (current-buffer)))
-            ;; TODO: Be friendly in this special case, but what's appropriate?
-            ;; (when (string-blank-p (buffer-string)))
-
             ;; Now point may already be in a good place because a buffer was
             ;; already visiting it, or because of save-place.
             ;; No need to move point unnecessarily.
@@ -940,6 +949,8 @@ To operate on a node after creating it, hook onto
       (add-hook \\='org-node-creation-hook fix-up)
       (unwind-protect (org-node-create TITLE ID)
         (remove-hook \\='org-node-creation-hook fix-up))"
+  ;; TODO: Just use `let'.  Don't remember why I did it like this, was probably
+  ;; just uncertain about lexical binding.
   (setq org-node-proposed-title title)
   (setq org-node-proposed-id id)
   (setq org-node-proposed-seq seq-key)
@@ -986,7 +997,8 @@ Designed for `org-node-creation-fn'."
     (run-hooks 'org-node-creation-hook)))
 
 (defun org-node-new-via-roam-capture ()
-  "Call `org-roam-capture-' with predetermined arguments."
+  "Call `org-roam-capture-' with predetermined arguments.
+Designed for `org-node-creation-fn'."
   (when (or (null org-node-proposed-title)
             (null org-node-proposed-id))
     (error "`org-node-new-via-roam-capture' meant to be called by `org-node-create'"))
@@ -1117,7 +1129,7 @@ type the name of a node that does not exist.  That enables this
 (defun org-node-find ()
   "Select and visit one of your ID nodes.
 
-To make this behave like `org-roam-node-find' when creating new nodes,
+To behave like Org-roam when creating new nodes,
 set `org-node-creation-fn' to `org-node-new-via-roam-capture'."
   (interactive)
   (org-node-cache-ensure)
@@ -1145,13 +1157,9 @@ set `org-node-creation-fn' to `org-node-new-via-roam-capture'."
   "Insert a link to one of your ID nodes.
 
 To behave exactly like org-roam\\='s `org-roam-node-insert',
-see `org-node-insert-link*' and its docstring.
+see `org-node-insert-link*', or pass REGION-AS-INITIAL-INPUT t.
 
-Optional argument REGION-AS-INITIAL-INPUT t means behave as
-`org-node-insert-link*'.
-
-Argument NOVISIT means behave as
-`org-node-insert-link-novisit'."
+Argument NOVISIT means behave as `org-node-insert-link-novisit'."
   (interactive "*" org-mode)
   (unless (derived-mode-p 'org-mode)
     (user-error "Only works in org-mode buffers"))
@@ -1390,6 +1398,11 @@ Works in non-Org buffers."
                            (org-node--list-known-raw-links)
                            nil nil nil 'org-node-link-hist)))
 
+;; TODO: Allow refile from some capture templates.  (During a capture,
+;; `org-refile' is rebound to `org-capture-refile', which see).  It seems we
+;; can just temp override definition of `org-refile' with this one, if I am
+;; correct that that long function basically does the equivalent of
+;; org-cut-subtree and paste.
 ;;;###autoload
 (defun org-node-refile ()
   "Experimental."
@@ -2181,8 +2194,7 @@ Optional keyword argument ABOUT-TO-DO as in
   "Temporarily visit each file in FILES and call function CALL.
 
 Take care!  This function presumes that FILES satisfy the assumptions
-made by `org-node--find-file-noselect'.  This is safe if FILES is
-the output of `org-mem-all-files', but easily violated otherwise.
+made by `org-node--find-file-noselect'.
 
 While the loop runs, print a message every now and then, composed
 of MSG and a counter for the amount of files left to visit.

@@ -20,15 +20,11 @@
 
 - Let user preview the filename that will be created.  (Currently, when option =org-node-ask-directory= is t, it just asks you for a directory, which is weirdly restrictive.)
 
-- Make =org-node-list-files= pop open a find-dired buffer.
-
 - Make a command akin to =org-node-lint-all-files=, but that just runs =org-element-parse-buffer= with =org-element--cache-diagnostics= on, then prints those diagnostics.
 
   - Bonus: if we ensure the parse-trees stay cached, then every Org file just might become /way/ faster to open!  Speeding up the agenda etc.
 
 - Make =org-node-capture-target= a bit more robust and not need =:empty-lines after 1=.
-
-- Do not let main org-node.el load Org.  That way, you could use =org-node-find= early at init, before Org has loaded.
 
 - Help Embark and Marginalia integrate more deeply with =org-node-read= / =org-node-collection=
 

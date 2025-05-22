@@ -432,6 +432,10 @@ If REMOVE is non-nil, remove it instead."
 ;; We'd keep these LoC just for the nicety of seeing backlinks appear in
 ;; already-open buffers, but no need to visit non-open files until later.
 
+;; In fact, it might let us reason more easily about
+;; `org-node-backlink--maybe-fix-proactively' if we stop doing
+;; `org-mem-updater-ensure-link-at-point-known'.
+
 (defun org-node-backlink--add-in-target (&rest _)
   "For known link at point, leave a backlink in the target node."
   (unless (derived-mode-p 'org-mode)
@@ -623,7 +627,7 @@ May be useful with a non-default `org-id-method'."
 (defun org-node-backlink-format-like-org-super-links-default
     (id desc &optional time)
   "Example: \"[2025-02-21 Fri 14:39] <- [[id:ID][Node title]]\".
-ID and DESC are link id: and description, TIME a Lisp time value."
+ID and DESC are link id and description, TIME a Lisp time value."
   (concat (format-time-string (org-time-stamp-format t t)
                               (or time (current-time)))
           " <- "
@@ -631,7 +635,7 @@ ID and DESC are link id: and description, TIME a Lisp time value."
 
 (defun org-node-backlink-format-as-bullet-with-time (id desc &optional time)
   "Example: \"- [2025-02-21 Fri 14:39] [[id:ID][Node title]]\".
-ID and DESC are link id: and description, TIME a Lisp time value."
+ID and DESC are link id and description, TIME a Lisp time value."
   (concat "- "
           (format-time-string (org-time-stamp-format t t)
                               (or time (current-time)))
@@ -640,7 +644,7 @@ ID and DESC are link id: and description, TIME a Lisp time value."
 
 (defun org-node-backlink-format-as-bullet-no-time (id desc &optional _time)
   "Example: \"- [[id:ID][Node title]]\".
-ID and DESC are link id: and description, TIME a Lisp time value."
+ID and DESC are link id and description, TIME a Lisp time value."
   (concat "- " (org-link-make-string (concat "id:" id) desc)))
 
 (defun org-node-backlink--add-to-drawer (id title)
@@ -746,12 +750,6 @@ If REMOVE non-nil, remove it instead."
 
 
 ;;; Proactive fixing
-
-;; REVIEW: Only comes into effect on
-;;         `org-mem-post-targeted-scan-functions', but could also other
-;;         times?  Possible the algo could be simpler, rather than diffing
-;;         `org-mem-updater--target<>old-links' from current, simply look in
-;;         `org-mem-entry-properties' of all nodes...
 
 (defcustom org-node-backlink-lazy nil
   "Inhibit cleaning up backlinks until user edits affected entry.
