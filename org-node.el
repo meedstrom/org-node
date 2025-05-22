@@ -2533,6 +2533,28 @@ non-nil, because it may cause noticeable lag otherwise."
                     append (org-mem-entry-tags node))))
    nil nil nil 'org-tags-history))
 
+(defun org-node-goto-new-drawer-site ()
+  "Go to just after properties drawer."
+  (if (org-before-first-heading-p)
+      (org-node--after-drawers-before-keyword)
+    (org-end-of-meta-data)))
+
+(defun org-node--after-drawers-before-keyword ()
+  "Move point to after all consecutive drawers in the front matter.
+If there are no drawers, move point to the first #+keyword line,
+if there is any such line before the text body begins."
+  (goto-char (point-min))
+  ;; Jump past comments and blank lines.
+  (while (looking-at-p (rx (*? space) (or "# " "\n")))
+    (forward-line))
+  ;; Jump past any drawers.
+  (let ((case-fold-search t)
+        (bound (org-entry-end-position)))
+    (while (looking-at-p org-drawer-regexp)
+      (if (re-search-forward "^[ \t]*:END:[ \t]*$" bound t)
+          (forward-line)
+        (error "Missing :END: in %s" (buffer-name))))))
+
 (defun org-node--end-of-meta-data (&optional full)
   "Like `org-end-of-meta-data', but supports file-level metadata.
 
@@ -2547,22 +2569,11 @@ case always skip past all file-level properties and keywords."
   (if (org-before-first-heading-p)
       (save-restriction
         (widen)
-        (narrow-to-region (point-min) (org-entry-end-position))
-        (goto-char (point-min))
+        (org-node--after-drawers-before-keyword)
         ;; Jump past #+keywords, comments and blank lines.
         (while (looking-at-p (rx (*? space) (or "#+" "# " "\n")))
           (forward-line))
         ;; Jump past any drawers.
-        (let ((case-fold-search t))
-          (while (looking-at-p org-drawer-regexp)
-            (while (not (looking-at-p "[\s\t]*:END:"))
-              (if (eobp) (error "Missing :END: in %s" (buffer-name))
-                (forward-line)))
-            (forward-line)))
-        ;; Jump past #+keywords, comments and blank lines again.
-        (while (looking-at-p (rx (*? (any "\s\t")) (or "#+" "# " "\n")))
-          (forward-line))
-        ;; Jump past drawers again.
         (let ((case-fold-search t))
           (while (looking-at-p org-drawer-regexp)
             (while (not (looking-at-p "[\s\t]*:END:"))
@@ -2755,7 +2766,7 @@ CREATE-MISSING t.  Also see that function for meaning of CREATE-WHERE."
       (if create-missing
           ;; Create new
           (let ((where (if create-where (funcall create-where)
-                         (org-node--end-of-meta-data t))))
+                         (org-node-goto-new-drawer-site))))
             (when (number-or-marker-p where) (goto-char where))
             (org-insert-drawer nil name)
             (narrow-to-region (point) (point))

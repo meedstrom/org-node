@@ -539,7 +539,7 @@ It should return a string, with constraints:
           (function :tag "Custom function" :value (lambda (id title time))))
   :package-version '(org-node . "2.0.0"))
 
-(defcustom org-node-backlink-drawer-positioner nil
+(defcustom org-node-backlink-drawer-positioner #'org-node-goto-new-drawer-site
   "Function for moving point before placing a new drawer.
 Called in a buffer narrowed to one Org entry, excluding any other
 headings.  Point is at the beginning of the body text as determined by
@@ -549,8 +549,9 @@ The function may return anything, but if it returns an integer or
 marker, point will move to that position.
 
 Only called if a drawer was not already present."
-  :type '(radio (const :tag "Leave at beginning of body" nil)
+  :type '(radio (function-item org-node-goto-new-drawer-site)
                 (function-item org-entry-end-position)
+                (function-item org-node--end-of-meta-data)
                 (function :tag "Custom function" :value (lambda ())))
   :package-version '(org-node . "2.0.0"))
 
