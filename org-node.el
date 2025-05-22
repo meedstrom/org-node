@@ -1189,6 +1189,10 @@ Argument NOVISIT means behave as
                                             (org-mem-entry-roam-aliases node)))
                         (and node (org-mem-entry-title node))
                         input)))
+    (when (string-blank-p input)
+      (setq input (org-node-mk-auto-title id))
+      (unless region-text
+        (setq link-desc input)))
     (atomic-change-group
       (when region-text
         (delete-region beg end))
@@ -1199,9 +1203,7 @@ Argument NOVISIT means behave as
     (run-hooks 'org-node-insert-link-hook)
     ;; TODO: Delete the link if a node was not created
     (unless node
-      (if (string-blank-p input)
-          (message "Won't create untitled node")
-        (org-node-create input id)))))
+      (org-node-create input id))))
 
 ;;;###autoload
 (defun org-node-insert-link* ()
