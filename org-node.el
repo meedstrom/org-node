@@ -240,7 +240,7 @@ the minibuffer can match against the prefix and suffix as well as
 against the node title.
 
 In other words: you can match against the node's outline path, if
-as `org-node-affixation-fn' is set to `org-node-prefix-with-olp'
+as `org-node-affixation-fn' is set to `org-node-prepend-olp'
 \(default).
 
 \(Tip: users of the \"orderless\" library do not need this
@@ -255,22 +255,8 @@ After changing this setting, run \\[org-mem-reset]."
   :type 'boolean
   :set #'org-node--set-and-remind-reset)
 
-;; For context see :affixation-function in `completion-extra-properties',
-;; however the following function is expected to operate on one candidate at a
-;; time, instead of a list.  The code flow is a bit roundabout, but the results
-;; are ultimately used by `org-node-collection'.
-(defcustom org-node-affixation-fn #'org-node-prefix-with-olp
-  "Function to give prefix and suffix to completion candidates.
-
-The results will style the appearance of completions during
-\\[org-node-find], \\[org-node-insert-link] et al.
-
-Built-in choices:
-
-- `org-node-affix-bare'
-- `org-node-prefix-with-olp'
-- `org-node-prefix-with-tags'
-- `org-node-affix-with-olp-and-tags'
+(defcustom org-node-affixation-fn #'org-node-prepend-olp
+  "Function to give prefix and suffix to minibuffer completions.
 
 After changing this setting, run \\[org-mem-reset].
 
@@ -290,24 +276,22 @@ again for every alias, in which case TITLE is actually one of the
 aliases."
   :type '(radio
           (function-item org-node-affix-bare)
-          (function-item org-node-prefix-with-olp)
-          (function-item org-node-prefix-with-tags)
-          (function-item org-node-prefix-with-tags-and-olp)
-          (function-item org-node-affix-with-olp-and-tags)
-          (function-item org-node-affix-with-olp-and-tags-legacy)
+          (function-item org-node-prepend-olp)
+          (function-item org-node-prepend-tags)
+          (function-item org-node-prepend-tags-and-olp)
+          (function-item org-node-prepend-olp-append-tags)
+          (function-item org-node-append-tags-use-frame-width)
           (function :tag "Custom function"
                     :value (lambda (node title) (list title "" ""))))
   :package-version '(org-node . "0.9")
   :set #'org-node--set-and-remind-reset)
 
 (defun org-node-affix-bare (_node title)
-  "Use TITLE as-is.
-For use as `org-node-affixation-fn'."
+  "Use TITLE as-is."
   (list title "" ""))
 
-(defun org-node-prefix-with-tags (node title)
-  "Prepend NODE's tags to TITLE.
-For use as `org-node-affixation-fn'."
+(defun org-node-prepend-tags (node title)
+  "Prepend NODE\\='s tags to TITLE."
   (list title
         (let ((tags (org-mem-entry-tags node)))
           (if tags
@@ -316,8 +300,8 @@ For use as `org-node-affixation-fn'."
             ""))
         ""))
 
-(defun org-node-prefix-with-olp (node title)
-  "Prepend NODE's outline path to TITLE."
+(defun org-node-prepend-olp (node title)
+  "Prepend NODE\\='s outline path to TITLE."
   (list title
         (if-let* ((fontified-ancestors
                    (cl-loop
@@ -328,7 +312,7 @@ For use as `org-node-affixation-fn'."
           "")
         ""))
 
-(defun org-node-prefix-with-tags-and-olp (node title)
+(defun org-node-prepend-tags-and-olp (node title)
   "Prepend NODE's tags and outline path to TITLE."
   (list title
         (let ((tags (org-mem-entry-tags node))
@@ -345,8 +329,8 @@ For use as `org-node-affixation-fn'."
                         (string-join fontified-ancestors " > ") " > "))))
         ""))
 
-(defun org-node-affix-with-olp-and-tags (node title)
-  "Prepend NODE's outline path to TITLE, and append NODE's tags."
+(defun org-node-prepend-olp-append-tags (node title)
+  "Prepend NODE's outline path to TITLE, and append NODE\\='s tags."
   (list title
         (if (org-mem-entry-subtree-p node)
             (let ((ancestors (org-mem-entry-olpath-with-title node))
@@ -362,35 +346,30 @@ For use as `org-node-affixation-fn'."
                                'face 'org-tag)
             ""))))
 
-;; Doubt many people used this, it's bad
-(defun org-node-affix-with-olp-and-tags-legacy (node title)
-  "Prepend NODE's outline path to TITLE, and append NODE's tags.
-Legacy version."
-  (let ((prefix-len 0))
-    (list title
-          (if (org-mem-entry-subtree-p node)
-              (let ((ancestors (org-mem-entry-olpath-with-title node))
-                    (result nil))
-                (dolist (anc ancestors)
-                  (push (propertize anc 'face 'completions-annotations) result)
-                  (push " > " result))
-                (setq result (apply #'concat (nreverse result)))
-                (setq prefix-len (length result))
-                result)
-            "")
-          (let ((tags (org-mem-entry-tags node)))
-            (if tags
-                (progn
-                  (setq tags (propertize (concat (string-join tags ":"))
-                                         'face 'org-tag))
-                  (concat (make-string
-                           (max 2 (- (default-value 'fill-column)
-                                     (+ prefix-len (length title) (length tags))))
-                           ?\s)
-                          tags))
-              "")))))
-
 (defvar org-node--candidate<>id-node (make-hash-table :test 'equal)
+(defun org-node-append-tags-use-frame-width (node title)
+  "Append NODE tags after TITLE and justify them to `frame-width'."
+  (list title
+        ""
+        (concat
+         (let ((tags (org-mem-entry-tags node)))
+           (when tags
+             (setq tags (propertize (concat ":" (string-join tags ":") ":")
+                                    'face 'org-tag))
+             (concat (make-string (max 2 (- (frame-width)
+                                            (length title)
+                                            (length tags)
+                                            (fringe-columns 'right)
+                                            (fringe-columns 'left)))
+                                  ?\s)
+                     tags))))))
+
+(defalias 'org-node-prefix-with-olp           #'org-node-prepend-olp)
+(defalias 'org-node-prefix-with-tags-tags     #'org-node-prepend-tags)
+(defalias 'org-node-prefix-with-tags-and-olp  #'org-node-prepend-tags-and-olp)
+(defalias 'org-node-affix-with-olp-and-tags   #'org-node-prepend-olp-append-tags)
+(defalias 'org-node-affix-with-olp-and-tags-legacy #'org-node-prepend-olp-append-tags)
+
   "1:1 table mapping minibuffer completion candidates to ID-nodes.
 These candidates may or may not be pre-affixated, depending on
 user option `org-node-alter-candidates'.")
