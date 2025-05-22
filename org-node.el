@@ -2652,20 +2652,18 @@ If already visiting that node, then follow the link normally."
 
 (defun org-node--delete-drawer (name)
   "In current entry, seek and destroy drawer named NAME."
-  (save-restriction
-    (when (org-node-narrow-to-drawer-p name)
-      (delete-region (point-min) (point-max))
-      (widen)
-      (delete-blank-lines)
-      (forward-line -1)
-      (delete-line)
-      (delete-line))))
+  (save-excursion
+    (save-restriction
+      (when (org-node-narrow-to-drawer-p name)
+        (delete-region (point-min) (point-max))
+        (widen)
+        (delete-blank-lines)
+        (org-remove-empty-drawer-at (point))))))
 
-;; Home-made subroutine to find/create a drawer.  There's a trick used by
-;; org-super-links to let upstream code do the work: temporarily set
+;; Org ships no general tool to find/create a drawer, so roll our own.
+;; There's a trick used by org-super-links: temporarily set
 ;; `org-log-into-drawer' to "BACKLINKS", and then call `org-log-beginning'.
-;; That only works under an Org entry though, not before the first heading.
-;; Plus, our version is flexible.
+;; Only works under a heading though.
 
 (defun org-node-narrow-to-drawer-create (name &optional create-where)
   "Narrow to pre-existing drawer named NAME, creating it if necessary.
@@ -2674,93 +2672,79 @@ Search current entry only, via subroutine `org-node-narrow-to-drawer-p'.
 
 When drawer is created, insert it near the beginning of the entry
 \(after any properties and logbook drawers\), unless CREATE-WHERE is a
-function, in which case call it to reposition point prior to creating
-the drawer.
+function, in which case call it and hope it moved `point' to some
+appropriate position.
 
 If CREATE-WHERE returns an integer or marker, go to that position."
   (org-node-narrow-to-drawer-p name t create-where))
 
-(defun org-node-narrow-to-drawer-p
-    (name &optional create-missing create-where)
+(defun org-node-narrow-to-drawer-p (name &optional create-missing create-where)
   "Seek a drawer named NAME in the current entry, then narrow to it.
 This also works at the file top level, before the first entry.
 
 If a drawer was found, return t.
 Otherwise do nothing, do not narrow, and return nil.
 
-Narrow to the region between :NAME: and :END:, exclusive.
+Narrow to the region between :NAME:\\n and \\n:END:, exclusive.
 Place point at the beginning of that region, after any indentation.
-If the drawer was empty, ensure there is one blank line.
+If the drawer was empty, ensure one blank line.
 
 A way you might invoke this function:
 
     \(save-restriction
       \(if \(org-node-narrow-to-drawer-p \"MY_DRAWER\")
-          ...edit the narrowed buffer...
+           ...edit the narrowed buffer...
         \(message \"No such drawer in this entry\")))
 
-With CREATE-MISSING t, create a new drawer if one was not found.
-However, instead of passing that argument, it is clearer
-to call `org-node-narrow-to-drawer-create' instead.
-Also see that function for meaning of CREATE-WHERE."
+Instead of passing the optional arguments, consider calling
+`org-node-narrow-to-drawer-create' instead, which is equivalent to
+CREATE-MISSING t.  Also see that function for meaning of CREATE-WHERE."
   (let ((start (point))
         (entry-end (org-entry-end-position))
         (case-fold-search t))
-    (org-node--end-of-meta-data)
-    (cond
-     ;; Empty entry? (next line after heading was another heading)
-     ((org-at-heading-p)
+    (org-back-to-heading-or-point-min t)
+    (if (org-node--re-search-forward-skip-some-regions
+         (rx bol (* space) ":" (literal name) ":" (* space) eol)
+         entry-end
+         t)
+        ;; Found pre-existing drawer
+        (let ((drawbeg (progn (forward-line) (point))))
+          (unless (re-search-forward "^[ \t]*:END:[ \t]*$" entry-end t)
+            (error "No :END: of drawer at %d in %s" (point) (buffer-name)))
+          (forward-line 0)
+          (if (= drawbeg (point))
+              ;; Empty drawer with no newlines; add one newline
+              ;; so the result looks similar to after `org-insert-drawer'.
+              (open-line 1)
+            ;; Not an empty drawer, so it is safe to back up from :END: line
+            (backward-char))
+          (narrow-to-region drawbeg (point))
+          (goto-char drawbeg)
+          (back-to-indentation)
+          t)
       (if create-missing
-          (progn
+          ;; Create new
+          (let ((where (if create-where (funcall create-where)
+                         (org-node--end-of-meta-data t))))
+            (when (number-or-marker-p where) (goto-char where))
             (org-insert-drawer nil name)
             (narrow-to-region (point) (point))
             t)
+        ;; Do nothing
         (goto-char start)
-        nil))
-     ;; Pre-existing drawer?
-     ((org-node--re-search-forward-skip-some-regions
-       (concat "^[ \t]*:" (regexp-quote name) ":[ \t]*$")
-       entry-end)
-      (if (get-text-property (point) 'org-transclusion-id)
-          (error "Was about to operate on a drawer inside an org-transclusion, probably not intended")
-        (let ((drawbeg (progn (forward-line 1) (point))))
-          (re-search-forward "^[ \t]*:END:[ \t]*$" entry-end)
-          (forward-line 0)
-          (if (= drawbeg (point))
-              ;; Empty drawer with no newlines in-between; add one newline
-              ;; so the result looks similar to after `org-insert-drawer'.
-              (open-line 1)
-            ;; Not an empty drawer, so it is safe to back up from the :END: line
-            (backward-char))
-          (let ((drawend (point)))
-            (goto-char drawbeg)
-            (back-to-indentation)
-            (narrow-to-region (pos-bol) drawend))
-          t)))
-     ;; No drawer; create new.
-     (create-missing
-      (when create-where
-        (let ((where (funcall create-where)))
-          (when (number-or-marker-p where)
-            (goto-char where))))
-      (org-insert-drawer nil name)
-      (narrow-to-region (point) (point))
-      t)
-     (t (goto-char start)
         nil))))
 
-;; ... I don't know the org-element API at all.
-(defun org-node--re-search-forward-skip-some-regions (regexp &optional bound)
+;; ... I don't know the org-element API at all.  Might be useful here.
+(defun org-node--re-search-forward-skip-some-regions (regexp &optional bound noerror)
   "Like `re-search-forward', but do not search inside certain regions.
 These regions are delimited by lines that start with \"#+BEGIN\" or
 \"#+END\".  Upon finding such regions, jump to the end of that region,
 then continue the search.
 
-Argument BOUND as in `re-search-forward'.
-Always behave as if passing NOERROR t to `re-search-forward'.
+Argument BOUND and NOERROR as in `re-search-forward'.
 
 Each invocation has overhead, so to search for the same REGEXP
-repeatedly, it performs better not to iterate as in
+repeatedly, it performs better not to iterate per the common pattern
 \"(while (re-search-forward REGEXP nil t) ...)\",
 but to use `org-node--map-matches-skip-some-regions' instead."
   (let ((starting-pos (point))
@@ -2773,7 +2757,7 @@ but to use `org-node--map-matches-skip-some-regions' instead."
       (if (re-search-forward regexp bound t)
           (throw 'found (point))
         (goto-char starting-pos)
-        nil))))
+        (if noerror nil (signal 'search-failed (list regexp)))))))
 
 ;; unused for now; likely something like this will go in org-mem-parser.el
 (defun org-node--map-matches-skip-some-regions (regexp fn &optional bound)
