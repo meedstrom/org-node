@@ -432,17 +432,22 @@ see Info node `(elisp)Programmed Completion'."
 (defun org-node-collection-with-empty (str pred action)
   "Like `org-node-collection' but add an empty candidate.
 STR, PRED and ACTION as in `org-node-collection-basic'."
-  (if (eq action 'metadata)
-      (cons 'metadata (list (cons 'affixation-function #'org-node--affixate)))
-    (complete-with-action
-     action (cons "" (hash-table-keys org-node--candidate<>entry)) str pred)))
+  (let ((blank (if (bound-and-true-p helm-mode) " " "")))
+    (if (eq action 'metadata)
+        (cons 'metadata (list (cons 'affixation-function #'org-node--affixate)))
+      (complete-with-action
+       action
+       (cons blank (hash-table-keys org-node--candidate<>entry))
+       str
+       pred))))
 
 ;; FIXME: Seems to create some strange glyphs
 (defun org-node--affixate (collection)
   "From list COLLECTION, make an alist of ((TITLE PREFIX SUFFIX) ...)."
-  (if (equal "" (car collection))
-      (cons (list "" "" (propertize "(untitled node)"
-                                    'face 'completions-annotations))
+  (if (string-blank-p (car collection))
+      (cons (list (car collection)
+                  ""
+                  (propertize "(untitled node)" 'face 'completions-annotations))
             (if org-node-alter-candidates
                 (cl-loop for candidate in (cdr collection)
                          collect (list candidate "" ""))
