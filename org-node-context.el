@@ -88,7 +88,6 @@ No-op if user option `org-node-context-persist-on-disk' is nil."
       ;;       entries, but it's good enough this way.
       (when (not (eq org-node-context--last-tbl-state
                      (hash-table-count org-node-context--previews)))
-        (org-node-cache-ensure t)
         (org-node-context--clean-stale-previews)
         (setq org-node-context--last-tbl-state
               (hash-table-count org-node-context--previews))
@@ -113,7 +112,7 @@ but when this finds one of them stale, it removes that whole entry."
 
     (maphash
      (lambda (id previews)
-       (let ((node (gethash id org-nodes))
+       (let ((node (org-mem-entry-by-id id))
              (valid (gethash id valid-positions)))
          (or (and node
                   (cl-loop
@@ -423,7 +422,7 @@ that buffer."
              (not from-history-nav)
              (push org-node-context--current org-node-context--past)))
       (setq org-node-context--current id)
-      (let ((node (gethash id org-nodes)))
+      (let ((node (org-mem-entry-by-id id)))
         (unless node
           (error "org-node-context: ID not known: %s" id))
         (erase-buffer)
@@ -446,7 +445,7 @@ that buffer."
 (defun org-node-context--insert-backlink-sections (links)
   "Insert a section displaying a preview of LINK."
   (dolist (link (sort links #'org-node-context--origin-title-lessp))
-    (let* ((node (or (gethash (org-mem-link-nearby-id link) org-nodes)
+    (let* ((node (or (org-mem-entry-by-id (org-mem-link-nearby-id link))
                      (error "Origin not found for link: %S" link)))
            (breadcrumbs (if-let* ((olp (org-mem-entry-olpath-with-title node)))
                             (string-join olp " > ")
@@ -506,7 +505,7 @@ else briefly visit the file at LINK-POS and call
              (buffer-string)))))))
 
 (defun org-node-context--extract-entry-at-point ()
-  "Return whole entry at point as a string."
+  "Return whole entry at point as a string, including heading if any."
   (save-excursion
     (string-trim (buffer-substring-no-properties
                   (org-back-to-heading-or-point-min)
@@ -519,8 +518,8 @@ Decide this by getting the titles of the nodes wherein the links were
 found, and checking if the first title would come lexicographically
 before the second title."
   (string<
-   (org-mem-entry-title (gethash (org-mem-link-nearby-id link-1) org-nodes))
-   (org-mem-entry-title (gethash (org-mem-link-nearby-id link-2) org-nodes))))
+   (org-mem-entry-title (org-mem-entry-by-id (org-mem-link-nearby-id link-1)))
+   (org-mem-entry-title (org-mem-entry-by-id (org-mem-link-nearby-id link-2)))))
 
 (provide 'org-node-context)
 

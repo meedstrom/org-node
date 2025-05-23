@@ -96,6 +96,11 @@
 (defvar org-roam-capture-templates)
 (defvar org-node-backlink-mode)
 (defvar org-drawer-regexp)
+(defvar org-roam-preview-function)
+(defvar org-roam-preview-postprocess-functions)
+(declare-function org-mem-roamy-mk-backlinks "org-mem-roamy")
+(declare-function org-mem-roamy-mk-reflinks "org-mem-roamy")
+(declare-function org-roam-node-id "ext:org-roam-node")
 (declare-function org-node-backlink--fix-nearby "org-node-backlink")
 (declare-function org-at-heading-p "org")
 (declare-function org-before-first-heading-p "org")
@@ -2552,10 +2557,15 @@ non-nil, because it may cause noticeable lag otherwise."
       (org-node--after-drawers-before-keyword)
     (org-end-of-meta-data)))
 
+;; N/B: Org expects file-level :PROPERTIES: to come before #+title and
+;; other keyword lines, so keyword lines can be used as a natural barrier.
 (defun org-node--after-drawers-before-keyword ()
   "Move point to after all consecutive drawers in the front matter.
 If there are no drawers, move point to the first #+keyword line,
-if there is any such line before the text body begins."
+if there is any such line before the text body begins.
+
+Else move to the first text line.  Note that in such a degenerate case,
+this cannot be a file-level node that qualifies for backlinks anyway."
   (goto-char (point-min))
   ;; Jump past comments and blank lines.
   (while (looking-at-p (rx (*? space) (or "# " "\n")))
@@ -2944,9 +2954,6 @@ stash it in the variable `org-node--ad-roam-src-node'."
   (cl-letf (((symbol-function 'org-roam-fontify-like-in-org-mode) #'identity))
     (apply orig-fn args)))
 
-(declare-function org-roam-node-id "ext:org-roam-node")
-(defvar org-roam-preview-function)
-(defvar org-roam-preview-postprocess-functions)
 (defvar org-node--ad-roam--id<>previews (make-hash-table :test #'equal))
 (defun org-node--ad-roam-preview-get-contents (file link-pos)
   "Designed as override for `org-roam-preview-get-contents'.
@@ -2975,6 +2982,7 @@ from many sources.  To deal with that:
       (let (snippet)
         (with-current-buffer (org-node--work-buffer-for file)
           (goto-char link-pos)
+          ;; PERF: Override a bottleneck in `org-end-of-meta-data'.
           (cl-letf (((symbol-function 'org-back-to-heading-or-point-min)
                      #'org-node--back-to-heading-or-point-min))
             (setq snippet (funcall org-roam-preview-function))
@@ -2982,8 +2990,6 @@ from many sources.  To deal with that:
               (setq snippet (funcall fn snippet)))))
         (org-mem-fontify-like-org snippet)))))
 
-(declare-function org-mem-roamy-mk-backlinks "org-mem-roamy")
-(declare-function org-mem-roamy-mk-reflinks "org-mem-roamy")
 ;;;###autoload
 (define-minor-mode org-node-roam-accelerator-mode
   "Advise the \"*org-roam*\" buffer to be faster.
