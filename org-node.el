@@ -492,7 +492,7 @@ STR, PRED and ACTION as in `org-node-collection-basic'."
 (defun org-node--record-completion-candidates (node)
   "Cache fancy completion candidates for NODE and its aliases."
   (when (and (org-mem-entry-id node)
-             (org-mem-entry-title-maybe node)
+             (org-mem-entry-title node)
              (funcall (org-node--try-ensure-compiled org-node-filter-fn) node))
     (dolist (title (cons (org-mem-entry-title node)
                          (org-mem-entry-roam-aliases node)))
