@@ -239,6 +239,7 @@ NAME, ARGLIST and BODY as in `defun'."
 (org-node-changes--def-whiny-alias 'org-node-get-file-path         #'org-mem-file                             "1.9.38 (February 2025)" "May")
 (define-obsolete-function-alias 'org-node--general-org-work-buffer #'org-mem-org-mode-scratch                 "3.1.1 (May 2025)")
 (define-obsolete-function-alias 'org-node-forget-dir               #'org-mem-forget-id-locations-recursively  "3.2.0 (May 2025)")
+(define-obsolete-function-alias 'org-node-insert-link-into-drawer  #'org-node-insert-into-related             "3.3.3 (May 2025)")
 
 (provide 'org-node-changes)
 

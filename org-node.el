@@ -1889,19 +1889,27 @@ be sufficient to key-bind that one."
                        (org-mem-all-files)
                        nil)))))
 
-(defun org-node-insert-link-into-drawer ()
-  "Experimental; insert a link into a RELATED drawer in current entry."
+(defcustom org-node-name-of-links-drawer "RELATED"
+  "Name of drawer created by command `org-node-insert-into-related'."
+  :type 'string
+  :package-version '(org-node . "3.3.3"))
+
+(defun org-node-insert-into-related ()
+  "Insert a link into a RELATED drawer near the end of current entry.
+Unlike the BACKLINKS drawer, this drawer is not \"smart\" and will never
+be sorted, reformatted or erased, and the links count like any other
+forward-link.  The drawer can be moved, so long as it maintains the name
+set in `org-node-name-of-links-drawer'."
   (interactive "*" org-mode)
   (save-excursion
     (save-restriction
-      (org-node-narrow-to-drawer-create "RELATED" #'org-entry-end-position)
-      ;; Here is something to ponder in the design of
-      ;; `org-node-narrow-to-drawer-create'. Should it ensure a blank line?
+      (org-node-narrow-to-drawer-create org-node-name-of-links-drawer
+                                        #'org-entry-end-position)
       (let ((already-blank-line (eolp)))
         (atomic-change-group
-          (org-node-insert-link nil t)
           (back-to-indentation)
           (insert (format-time-string (org-time-stamp-format t t)) " -> ")
+          (org-node-insert-link nil t)
           (unless already-blank-line
             (newline-and-indent)))))))
 
@@ -2712,9 +2720,9 @@ If already visiting that node, then follow the link normally."
 Search current entry only, via subroutine `org-node-narrow-to-drawer-p'.
 
 When drawer is created, insert it near the beginning of the entry
-\(after any properties and logbook drawers\), unless CREATE-WHERE is a
-function, in which case call it and hope it moved `point' to some
-appropriate position.
+\(after any properties drawer\), unless CREATE-WHERE is a function, in
+which case call it and hope it moved `point' to some appropriate
+position.
 
 If CREATE-WHERE returns an integer or marker, go to that position."
   (org-node-narrow-to-drawer-p name t create-where))
@@ -2724,11 +2732,13 @@ If CREATE-WHERE returns an integer or marker, go to that position."
 This also works at the file top level, before the first entry.
 
 If a drawer was found, return t.
-Otherwise do nothing, do not narrow, and return nil.
+Otherwise do not narrow, and return nil.
 
 Narrow to the region between :NAME:\\n and \\n:END:, exclusive.
 Place point at the beginning of that region, after any indentation.
 If the drawer was empty, ensure one blank line.
+\(Put another way: if you delete all buffer contents, one blank line
+remains after un-narrowing.)
 
 A way you might invoke this function:
 
@@ -2752,11 +2762,12 @@ CREATE-MISSING t.  Also see that function for meaning of CREATE-WHERE."
         (let ((drawbeg (progn (forward-line) (point))))
           (unless (re-search-forward "^[ \t]*:END:[ \t]*$" entry-end t)
             (error "No :END: of drawer at %d in %s" (point) (buffer-name)))
-          (forward-line 0)
+          (goto-char (pos-bol))
           (if (= drawbeg (point))
               ;; Empty drawer with no newlines; add one newline
               ;; so the result looks similar to after `org-insert-drawer'.
-              (open-line 1)
+              (progn (open-line 1)
+                     (indent-according-to-mode t))
             ;; Not an empty drawer, so it is safe to back up from :END: line
             (backward-char))
           (narrow-to-region drawbeg (point))
