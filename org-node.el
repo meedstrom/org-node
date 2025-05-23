@@ -3038,6 +3038,15 @@ heading, else the file-level node, whichever has an ID first."
                             () () () 'org-node-hist)
            org-node--candidate<>entry))
 
+(defun org-node-p (entry)
+  "Return non-nil if ENTRY satisfies `org-node-filter-fn'."
+  (funcall org-node-filter-fn entry))
+
+(defun org-node-all-filtered-nodes ()
+  "List currently cached org-nodes that satisfied `org-node-filter-fn'."
+  (with-memoization (org-mem--table 0 'org-node-all-filtered-nodes)
+    (seq-uniq (hash-table-values org-node--candidate<>entry))))
+
 (provide 'org-node)
 
 ;;; org-node.el ends here
