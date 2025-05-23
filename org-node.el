@@ -107,6 +107,7 @@
 (declare-function org-end-of-meta-data "org")
 (declare-function org-entry-get "org")
 (declare-function org-entry-put "org")
+(declare-function org-in-block-p "org")
 (declare-function org-fold-show-context "org-fold")
 (declare-function org-fold-show-context "org-fold")
 (declare-function org-link-make-string "ol")
@@ -2762,10 +2763,12 @@ CREATE-MISSING t.  Also see that function for meaning of CREATE-WHERE."
         (entry-end (org-entry-end-position))
         (case-fold-search t))
     (org-back-to-heading-or-point-min t)
-    (if (re-search-forward
-         (rx bol (* space) ":" (literal name) ":" (* space) eol)
-         entry-end
-         t)
+    (if (cl-loop while (re-search-forward
+                        (rx bol (* space) ":" (literal name) ":" (* space) eol)
+                        entry-end
+                        t)
+                 unless (org-in-block-p '("src" "example"))
+                 return t)
         ;; Found pre-existing drawer
         (let ((drawbeg (progn (forward-line) (point))))
           (unless (re-search-forward "^[ \t]*:END:[ \t]*$" entry-end t)
@@ -2811,10 +2814,10 @@ but to use `org-node--map-matches-skip-some-regions' instead."
         (skips (org-node--find-regions-to-skip bound)))
     (catch 'found
       (cl-loop for (beg . end) in skips
-               if (re-search-forward regexp beg t)
+               if (re-search-forward regexp beg noerror)
                do (throw 'found (point))
                else do (goto-char end))
-      (if (re-search-forward regexp bound t)
+      (if (re-search-forward regexp bound noerror)
           (throw 'found (point))
         (goto-char starting-pos)
         (if noerror nil (signal 'search-failed (list regexp)))))))
