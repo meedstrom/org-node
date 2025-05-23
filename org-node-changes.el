@@ -184,9 +184,8 @@ NAME, ARGLIST and BODY as in `defun'."
 (require 'org-mem-updater)
 (require 'org-mem-list)
 
-(cond
- ((not (fboundp 'org-mem-updater-mk-entry-atpt))
-  (display-warning 'org-node "Update org-mem to use this version of org-node"))
+(if (not (fboundp 'org-mem-updater-mk-entry-atpt))
+    (display-warning 'org-node "Update org-mem to use this version of org-node")
  (if (boundp 'org-mem--bump-int)
      (cond ((< org-mem--bump-int 2)
             (message "Update org-mem if you see bugs in org-node")))))
