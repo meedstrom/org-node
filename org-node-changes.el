@@ -184,8 +184,12 @@ NAME, ARGLIST and BODY as in `defun'."
 (require 'org-mem-updater)
 (require 'org-mem-list)
 
-(unless (and (boundp 'org-mem--bump-int) (>= org-mem--bump-int 2))
+(cond
+ ((not (fboundp 'org-mem-updater-mk-entry-atpt))
   (display-warning 'org-node "Update org-mem to use this version of org-node"))
+ (if (boundp 'org-mem--bump-int)
+     (cond ((< org-mem--bump-int 2)
+            (message "Update org-mem if you see bugs in org-node")))))
 
 (define-obsolete-function-alias 'org-node--dir-files-recursively     #'org-mem--dir-files-recursive                "3.0.0 (May 2025)")
 (define-obsolete-function-alias 'org-node--maybe-adjust-idle-timer   #'org-mem-updater--activate-timer             "3.0.0 (May 2025)")
