@@ -2596,13 +2596,6 @@ case always skip past all file-level properties and keywords."
         ;; Jump past #+keywords, comments and blank lines.
         (while (looking-at-p (rx (*? space) (or "#+" "# " "\n")))
           (forward-line))
-        ;; Jump past any drawers.
-        (let ((case-fold-search t))
-          (while (looking-at-p org-drawer-regexp)
-            (while (not (looking-at-p "[\s\t]*:END:"))
-              (if (eobp) (error "Missing :END: in %s" (buffer-name))
-                (forward-line)))
-            (forward-line)))
         ;; On a "final stretch" of blank lines, land on the first.
         (unless (= 0 (skip-chars-backward "\n"))
           (forward-char 1)))
@@ -2769,7 +2762,7 @@ CREATE-MISSING t.  Also see that function for meaning of CREATE-WHERE."
         (entry-end (org-entry-end-position))
         (case-fold-search t))
     (org-back-to-heading-or-point-min t)
-    (if (org-node--re-search-forward-skip-some-regions
+    (if (re-search-forward
          (rx bol (* space) ":" (literal name) ":" (* space) eol)
          entry-end
          t)
