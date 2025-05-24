@@ -278,7 +278,7 @@ A comparison of three systems that all permit relying on org-id and don't lock y
 @tab not applicable
 @item @strong{Time to cache my 3000 nodes}
 @tab @strong{2m 48s}
-@tab @strong{0m 01s}
+@tab @strong{0m 02s}
 @tab not applicable
 @item @strong{Time to save file w/ 400 nodes}
 @tab @strong{5--10s}
@@ -312,20 +312,20 @@ Assuming your package manager knows about @uref{https://melpa.org/#/getting-star
   (org-node-cache-mode))
 @end lisp
 
-If you're @strong{coming here from org-roam}@comma{} try this instead:
+If you're coming here from @strong{org-roam}@comma{} try this instead:
 
 @lisp
 (use-package org-node
   :config
-  (setq org-node-creation-fn #'org-node-new-via-roam-capture)
-  (setq org-node-slug-fn #'org-node-slugify-like-roam-default)
-  (setq org-node-datestamp-format "%Y%m%d%H%M%S-")
   (setq org-mem-do-sync-with-org-id t)
   (setq org-mem-watch-dirs
         (list "~/org-roam/")) ;; Your org-roam-directory here
   (org-mem-updater-mode)
   (org-node-cache-mode)
-  (org-node-roam-accelerator-mode))
+  (org-node-roam-accelerator-mode)
+  (setq org-node-creation-fn #'org-node-new-via-roam-capture)
+  (setq org-node-slug-fn #'org-node-slugify-like-roam-default)
+  (setq org-node-datestamp-format "%Y%m%d%H%M%S-"))
 @end lisp
 
 @menu
@@ -587,15 +587,14 @@ That last optional functionality may be confusing if I describe it -- better you
 
 One user had over a thousand project-nodes@comma{} but only just began to do a knowledge base@comma{} and wished to avoid seeing the project nodes.
 
-This could work by---for example---excluding anything tagged "project" or perhaps anything that has a TODO state.  Here's a way to exclude both@comma{} plus anything with a @samp{:ROAM_EXCLUDE:} property:
+This could work by---for example---excluding anything tagged "project" or perhaps anything that has a TODO state.  Here's a way to exclude both:
 
 @lisp
 (setq org-node-filter-fn
       (lambda (node)
         (not
          (or (org-mem-entry-todo-state node)
-             (member "project" (org-mem-entry-tags node))
-             (org-mem-entry-property "ROAM_EXCLUDE" node)))))
+             (member "project" (org-mem-entry-tags node))))))
 @end lisp
 
 Or you could go with a whitelist approach@comma{} to show only nodes from a certain directory we'll call "my-personal-wiki":
@@ -603,11 +602,8 @@ Or you could go with a whitelist approach@comma{} to show only nodes from a cert
 @lisp
 (setq org-node-filter-fn
       (lambda (node)
-        (and (string-search "/my-personal-wiki/" (org-mem-entry-file node))
-             (not (org-mem-entry-property "ROAM_EXCLUDE" node)))))
+        (string-search "/my-personal-wiki/" (org-mem-entry-file node))))
 @end lisp
-
-(NB: if you don't know what @samp{ROAM_EXCLUDE} is@comma{} feel free to omit that rule)
 
 @menu
 * Limitation @samp{ROAM_EXCLUDE}::
@@ -618,7 +614,8 @@ Or you could go with a whitelist approach@comma{} to show only nodes from a cert
 
 Let's say you have a big archive file@comma{} fulla IDs@comma{} and you want all the nodes within out of sight.
 
-Putting a @samp{:ROAM_EXCLUDE: t} at the top won't do it@comma{} because unlike in org-roam@comma{} @strong{child ID nodes of an excluded node are not excluded!}  The option @samp{org-node-filter-fn} applies to each node in isolation.
+Putting a @samp{:ROAM_EXCLUDE: t} at the top won't do it@comma{} because unlike in org-roam@comma{} @strong{child ID nodes of an excluded node are not excluded!}  The default value of org-node-filter-fn is @samp{org-node-filter-no-roam-exclude-p}@comma{}
+but it applies to each node in isolation.
 
 However@comma{} nodes in isolation do still have inherited tags.  So you can exploit that@comma{} or the outline path or file name.
 
@@ -658,7 +655,6 @@ To customize how the nodes look in the minibuffer@comma{} configure @samp{org-no
 @example
 M-x customize-variable RET org-node-affixation-fn
 @end example
-
 
 A related option is @samp{org-node-alter-candidates}@comma{} which lets you match against the annotations as well as the title:
 

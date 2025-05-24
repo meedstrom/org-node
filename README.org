@@ -347,15 +347,14 @@ That last optional functionality may be confusing if I describe it -- better you
 
 One user had over a thousand project-nodes, but only just began to do a knowledge base, and wished to avoid seeing the project nodes.
 
-This could work by---for example---excluding anything tagged "project" or perhaps anything that has a TODO state.  Here's a way to exclude both, plus anything with a =:ROAM_EXCLUDE:= property:
+This could work by---for example---excluding anything tagged "project" or perhaps anything that has a TODO state.  Here's a way to exclude both:
 
 #+begin_src elisp
 (setq org-node-filter-fn
       (lambda (node)
         (not
          (or (org-mem-entry-todo-state node)
-             (member "project" (org-mem-entry-tags node))
-             (org-mem-entry-property "ROAM_EXCLUDE" node)))))
+             (member "project" (org-mem-entry-tags node))))))
 #+end_src
 
 Or you could go with a whitelist approach, to show only nodes from a certain directory we'll call "my-personal-wiki":
@@ -363,19 +362,15 @@ Or you could go with a whitelist approach, to show only nodes from a certain dir
 #+begin_src elisp
 (setq org-node-filter-fn
       (lambda (node)
-        (and (string-search "/my-personal-wiki/" (org-mem-entry-file node))
-             (not (org-mem-entry-property "ROAM_EXCLUDE" node)))))
+        (string-search "/my-personal-wiki/" (org-mem-entry-file node))))
 #+end_src
-
-(NB: if you don't know what =ROAM_EXCLUDE= is, feel free to omit that rule)
 
 *** Limitation: =ROAM_EXCLUDE=
 
 Let's say you have a big archive file, fulla IDs, and you want all the nodes within out of sight.
 
-# (simply giving it the file name extension =.org_archive= would do it)
-
-Putting a =:ROAM_EXCLUDE: t= at the top won't do it, because unlike in org-roam, *child ID nodes of an excluded node are not excluded!*  The option =org-node-filter-fn= applies to each node in isolation.
+Putting a =:ROAM_EXCLUDE: t= at the top won't do it, because unlike in org-roam, *child ID nodes of an excluded node are not excluded!*  The default value of org-node-filter-fn is =org-node-filter-no-roam-exclude-p=,
+but it applies to each node in isolation.
 
 However, nodes in isolation do still have inherited tags.  So you can exploit that, or the outline path or file name.
 
