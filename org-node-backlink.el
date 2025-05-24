@@ -93,7 +93,7 @@ marker, point will move to that position."
   :package-version '(org-node . "2.0.0"))
 
 (defcustom org-node-backlink-drawer-sorter
-  #'org-node-backlink-timestamp-lessp
+  #'org-node-backlink-id-blind-string-collate-lessp
   "Function for sorting lines in the backlinks drawer."
   :type '(radio
           (function-item org-node-backlink-timestamp-lessp)
@@ -106,7 +106,7 @@ marker, point will move to that position."
           (function-item string-lessp)
           (function-item string-collate-lessp)
           (function :tag "Custom function" :value (lambda (s1 s2))))
-  :package-version '(org-node . "2.0.0"))
+  :package-version '(org-node . "3.3.10"))
 
 (defun org-node-backlink-timestamp-lessp (s1 s2)
   "Sort on first Org timestamp in the line.
