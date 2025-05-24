@@ -763,11 +763,13 @@ is determined by `org-node-slug-fn' and `org-node-datestamp-format'."
   "Maybe prompt for a directory, and if so, use string PROMPT.
 Behavior depends on user option `org-node-ask-directory'.
 In any case, return a directory."
-  (if (eq t org-node-ask-directory)
-      (read-directory-name prompt)
-    (if (stringp org-node-ask-directory)
-        org-node-ask-directory
-      (car (org-node--root-dirs (org-mem-all-files))))))
+  (if (eq t org-node-ask-directory) (read-directory-name prompt)
+    (if (stringp org-node-ask-directory) org-node-ask-directory
+      (org-node-guess-dir))))
+
+(defun org-node-guess-dir ()
+  (with-memoization (org-mem--table 0 'org-node-guess-dir)
+    (car (org-node--root-dirs (org-mem-all-files)))))
 
 (defcustom org-node-datestamp-format ""
   "Passed to `format-time-string' to prepend to filenames.
@@ -798,6 +800,20 @@ that, configure `org-node-datestamp-format'."
           (function-item org-node-slugify-for-web)
           (function-item org-node-slugify-like-roam-default)
           (function :tag "Custom function" :value (lambda (title) title))))
+
+(defun org-node-title-to-basename (title)
+  "From TITLE, make the non-directory component of a file name."
+  (concat (format-time-string org-node-datestamp-format)
+          (funcall (org-node--try-ensure-compiled org-node-slug-fn) title)
+          ".org"))
+
+(defun org-node-title-to-filename (title)
+  "From TITLE, make a full file path."
+  (file-name-concat
+   (if (stringp org-node-ask-directory)
+       org-node-ask-directory
+     (org-node-guess-dir))
+   (org-node-title-to-basename title)))
 
 (defun org-node-slugify-like-roam-default (title)
   "From TITLE, make a filename slug in default org-roam style.
@@ -981,11 +997,7 @@ Designed for `org-node-creation-fn'."
     (error "`org-node-new-file' meant to be called from `org-node-create'"))
   (let* ((dir (org-node-guess-or-ask-dir "New file in which directory? "))
          (path-to-write
-          (file-name-concat
-           dir
-           (concat (format-time-string org-node-datestamp-format)
-                   (funcall org-node-slug-fn org-node-proposed-title)
-                   ".org"))))
+          (file-name-concat dir (org-node-title-to-basename org-node-proposed-title))))
     (when (file-exists-p path-to-write)
       (org-mem--scan-full t)
       (user-error "org-node: Resetting cache because file already exists: %s"
@@ -1103,10 +1115,7 @@ type the name of a node that does not exist.  That enables this
       ;; Node does not exist; capture into new file
       (let* ((dir (org-node-guess-or-ask-dir "New file in which directory? "))
              (path-to-write
-              (file-name-concat
-               dir (concat (format-time-string org-node-datestamp-format)
-                           (funcall org-node-slug-fn title)
-                           ".org"))))
+              (file-name-concat dir (org-node-title-to-basename title))))
         (when (file-exists-p path-to-write)
           (error "File already exists: %s" path-to-write))
         (when (find-buffer-visiting path-to-write)
@@ -1133,8 +1142,9 @@ type the name of a node that does not exist.  That enables this
 (defvar org-node--untitled-ctr 1)
 (defun org-node-mk-auto-title (_id)
   "Override this to change what to name an untitled node."
-  (cl-loop for title = (format "Untitled %d" org-node--untitled-ctr)
-           while (gethash title org-node--title<>affixations)
+  (cl-loop for title = (format "untitled-%d" org-node--untitled-ctr)
+           while (or (gethash title org-node--title<>affixations)
+                     (file-exists-p (org-node-title-to-filename title)))
            do (cl-incf org-node--untitled-ctr)
            finally return title))
 
@@ -1506,10 +1516,7 @@ creation-date as more truthful or useful than today\\='s date.
                         (##string-equal-ignore-case "CATEGORY" (car %))
                         (org-entry-properties nil 'standard)))
            (path-to-write
-            (file-name-concat
-             dir (concat (format-time-string org-node-datestamp-format)
-                         (funcall org-node-slug-fn title)
-                         ".org")))
+            (file-name-concat dir (org-node-title-to-basename title)))
            (parent-pos (save-excursion
                          (without-restriction
                            (org-up-heading-or-point-min)
