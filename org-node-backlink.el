@@ -239,11 +239,13 @@ ID and DESC are link id and description, TIME a Lisp time value."
 
 (defun org-node-backlink--reformat-line (line)
   "Pass LINE back through `org-node-backlink-drawer-formatter'."
-  (funcall org-node-backlink-drawer-formatter
-           (org-node-backlink--extract-id line)
-           (org-node-backlink--extract-link-desc line)
-           (encode-time (parse-time-string
-                         (org-node-backlink--extract-timestamp line)))))
+  (let ((time (org-node-backlink--extract-timestamp line)))
+    (funcall org-node-backlink-drawer-formatter
+             (org-node-backlink--extract-id line)
+             (org-node-backlink--extract-link-desc line)
+             (and time
+                  (encode-time (parse-time-string
+                                (org-node-backlink--extract-timestamp line)))))))
 
 
 ;;; Commands
