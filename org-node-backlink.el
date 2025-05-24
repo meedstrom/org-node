@@ -319,15 +319,13 @@ Argument KIND controls how to update them."
                                 #'org-node-backlink--loop-operator)
            (setq proceed t)))))
     (when proceed
-      ;; (cl-letf (((symbol-function 'find-file-noselect)
-      ;; #'org-node--find-file-noselect)))
-      (let ((delay-mode-hooks t)
+      (let ((find-file-hook nil)
+            (buffer-list-update-hook nil)
             (enable-local-variables :safe)
-            (find-file-hook nil)
+            (delay-mode-hooks t)
             (org-agenda-files nil) ;; Stop `org-mode' calling `org-agenda-files'
             (org-inhibit-startup t) ;; Don't apply startup #+options
-            (org-element-cache-persistent nil)
-            (buffer-list-update-hook nil))
+            (org-element-cache-persistent nil))
         (fileloop-continue)))))
 
 (defun org-node-backlink--loop-operator ()
@@ -341,7 +339,8 @@ Do `org-node-backlink-fix-buffer', then maybe save, maybe kill buffer."
     (org-node-backlink-fix-buffer org-node-backlink--work-kind)
     (when buffer-seems-new
       (when (buffer-modified-p)
-        (let ((before-save-hook nil)
+        (let ((write-file-functions nil) ;; recentf-track-opened-file
+              (before-save-hook nil)
               (after-save-hook nil))
           (save-buffer)))
       (kill-buffer))
