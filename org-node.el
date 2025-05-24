@@ -682,9 +682,6 @@ interfere with user experience during or after mass-editing operation."
 
 ;;;; Filename functions
 
-;; To benchmark:
-;; (progn (byte-compile #'org-node--root-dirs) (benchmark-run 10 (org-node--root-dirs (hash-table-values org-id-locations))))
-;; REVIEW: 75% of compute is in `file-name-directory', can that be improved?
 (defun org-node--root-dirs (file-list)
   "Infer root directories of FILE-LIST.
 
@@ -708,18 +705,10 @@ element.
 This function does not consult the filesystem, so FILE-LIST must be a
 list of full paths that can be compared as strings, so e.g. there must
 e.g. not be instances of substring \"~\" as well as instances of
-substring \"/home/me\" referring to the same location.
-
-
-For Org users, it is pragmatic to know that if FILE-LIST was the
-output of something like
-
-   \(hash-table-values org-id-locations)
-
-this function will in many cases spit out a list of exactly one item
-because many people keep their Org files in one root directory \(with
-various subdirectories)."
-  (let* ((files (delete-dups (copy-sequence file-list)))
+substring \"/home/me\" referring to the same location."
+  (let* (file-name-handler-alist ;; Otherwise 90% cpu in `file-name-directory'
+         ;; A lot of dups from e.g. (hash-table-values org-id-locations)
+         (files (seq-uniq file-list))
          (dirs (sort (delete-consecutive-dups
                       (sort (mapcar #'file-name-directory files) #'string<))
                      (##length< %1 (length %2))))
