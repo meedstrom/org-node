@@ -106,7 +106,7 @@ Only called if a drawer was not already present."
           (function-item org-node-backlink-link-description-lessp)
           (function-item org-node-backlink-link-description-collate-lessp)
           (function-item org-node-backlink-id-lessp)
-          (function-item org-node-backlink-id-reversed-lessp)
+          (function-item org-node-backlink-reversed-id-lessp)
           (function-item org-node-backlink-id-blind-string-lessp)
           (function-item org-node-backlink-id-blind-string-collate-lessp)
           (function-item string-lessp)
