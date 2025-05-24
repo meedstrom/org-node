@@ -176,10 +176,6 @@ NAME, ARGLIST and BODY as in `defun'."
 (define-obsolete-variable-alias 'org-node--candidate<>node     'org-node--candidate<>entry   "3.0.0 (May 2025)")
 (define-obsolete-function-alias 'org-node-insert-link-into-drawer  'org-node-insert-into-related "3.3.3 (May 2025)")
 
-(unless (featurep 'org-node-fakeroam)
-  (defalias 'org-node-fakeroam-fast-render-mode   'org-node-roam-accelerator-mode)
-  (defalias 'org-node-fakeroam-jit-backlinks-mode 'org-node-roam-accelerator-mode))
-
 (require 'org-mem)
 (require 'org-mem-updater)
 (require 'org-mem-list)

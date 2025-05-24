@@ -1912,6 +1912,8 @@ be sufficient to key-bind that one."
   :type 'string
   :package-version '(org-node . "3.3.3"))
 
+;; TODO: Actually prompt for a thing to insert first, so user does not see the
+;; temp narrowed buffer.
 (defun org-node-insert-into-related ()
   "Insert a link into a RELATED drawer near the end of current entry.
 Unlike the BACKLINKS drawer, this drawer is not \"smart\" and will never
