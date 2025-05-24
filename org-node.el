@@ -809,11 +809,10 @@ that, configure `org-node-datestamp-format'."
 
 (defun org-node-title-to-filename (title)
   "From TITLE, make a full file path."
-  (file-name-concat
-   (if (stringp org-node-ask-directory)
-       org-node-ask-directory
-     (org-node-guess-dir))
-   (org-node-title-to-basename title)))
+  (file-name-concat (if (stringp org-node-ask-directory)
+                        org-node-ask-directory
+                      (org-node-guess-dir))
+                    (org-node-title-to-basename title)))
 
 (defun org-node-slugify-like-roam-default (title)
   "From TITLE, make a filename slug in default org-roam style.
@@ -1040,12 +1039,11 @@ Designed for `org-node-creation-fn'."
         (remove-hook 'org-roam-capture-new-node-hook creation-hook-runner)))))
 
 (defun org-node-guess-node-by-title (title)
-  (let ((affx (gethash title org-node--title<>affixations)))
-    (when affx
-      (if org-node-alter-candidates
-          (gethash (concat (nth 1 affx) (nth 0 affx) (nth 2 affx))
-                   org-node--candidate<>entry)
-        (gethash title org-node--candidate<>entry)))))
+  (and-let* ((affx (gethash title org-node--title<>affixations)))
+    (if org-node-alter-candidates
+        (gethash (concat (nth 1 affx) (nth 0 affx) (nth 2 affx))
+                 org-node--candidate<>entry)
+      (gethash title org-node--candidate<>entry))))
 
 (declare-function org-reveal "org")
 (defun org-node-capture-target ()
@@ -1615,10 +1613,10 @@ need to compute once."
 (defcustom org-node-renames-allowed-dirs nil
   "Dirs in which files may be auto-renamed.
 Used if you have the function `org-node-rename-file-by-title' on
-`after-save-hook' or similar place.
+`after-save-hook' or otherwise call it from Lisp.
 
 To add exceptions, see `org-node-renames-exclude'."
-  :type '(repeat string))
+  :type '(repeat directory))
 
 (defcustom org-node-renames-exclude "\\(?:daily\\|dailies\\|journal\\)/"
   "Regexp matching paths of files not to auto-rename.
