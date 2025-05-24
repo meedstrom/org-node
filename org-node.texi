@@ -66,7 +66,6 @@ Backlink solution 2: Print inside the file
 
 Misc
 
-* Manage org-id-locations::
 * Org-capture::
 * Exclude uninteresting nodes::
 * Completion-at-point::
@@ -74,15 +73,10 @@ Misc
 * Grep::
 * Let org-open-at-point detect refs::
 * Limitation TRAMP::
-* Limitation Encryption::
 * Limitation Unique titles::
 * Limitation Org-ref::
 * Toolbox::
 * Experimental Node sequences::
-
-Manage org-id-locations
-
-* Undoing an org-roam hack::
 
 Exclude uninteresting nodes
 
@@ -411,6 +405,10 @@ I rarely have the screen space to display a backlink buffer.  Because it needs m
 
 A complementary solution@comma{} which can also stand alone@comma{} is to have the backlinks @emph{written into} the file@comma{} on an Org property line or in a drawer.
 
+NOTE: To be clear@comma{} this mode never generates new IDs.  That's your own business.  This only adds/edits @samp{:BACKLINKS:} properties.
+
+It's the same you observe in the backlink buffers from earlier: @strong{not all links create a backlink@comma{}} only links located in an entry that has or inherits an ID@.  After all@comma{} there must be something to link back to.
+
 @menu
 * Option 2A Automatic @samp{BACKLINKS} property::
 * Option 2B Automatic @samp{BACKLINKS...END} drawer: Option 2B Automatic @samp{BACKLINKSEND} drawer. 
@@ -428,12 +426,6 @@ Add to initfiles:
 @end lisp
 
 For a first-time run@comma{} type @samp{M-x org-node-backlink-mass-update-props}.  (Don't worry if you change your mind; undo with @samp{M-x org-node-backlink-mass-delete-props}.)
-
-NOTE 1: To be clear@comma{} this mode never generates new IDs.  That's your own business.  This only adds/edits @samp{:BACKLINKS:} properties.
-
-That means @strong{not all links create a backlink@comma{}} only links located in an entry that has or inherits an ID@.  After all@comma{} there must be something to link back to.
-
-NOTE 2:  People who prefer to hard-wrap text@comma{} instead of enabling @samp{visual-line-mode} or similar@comma{} may prefer Option 2B@.
 
 @node Option 2B Automatic @samp{BACKLINKSEND} drawer
 @subsection Option 2B: Automatic @samp{:BACKLINKS:...:END:} drawer
@@ -495,7 +487,6 @@ Finally@comma{} lines that contain no Org link such as @samp{[[id:1234][Title]]}
 @chapter Misc
 
 @menu
-* Manage org-id-locations::
 * Org-capture::
 * Exclude uninteresting nodes::
 * Completion-at-point::
@@ -503,46 +494,11 @@ Finally@comma{} lines that contain no Org link such as @samp{[[id:1234][Title]]}
 * Grep::
 * Let org-open-at-point detect refs::
 * Limitation TRAMP::
-* Limitation Encryption::
 * Limitation Unique titles::
 * Limitation Org-ref::
 * Toolbox::
 * Experimental Node sequences::
 @end menu
-
-@node Manage org-id-locations
-@section Manage org-id-locations
-
-Ever run into "ID not found" situations?  Here's an extra way to feed data to org-id@comma{} as @uref{http://edstrom.dev/wjwrl/taking-ownership-of-org-id, I find clumsy the built-in options}.
-
-@lisp
-(setq org-mem-do-sync-with-org-id t)
-(setq org-mem-watch-dirs ;; Configure me
-      '("~/org/"
-        "~/Syncthing/"
-        "/mnt/stuff/"))
-@end lisp
-
-Do a @samp{M-x org-mem-reset} and see if it can find your notes now.
-
-@menu
-* Undoing an org-roam hack::
-@end menu
-
-@node Undoing an org-roam hack
-@subsection Undoing an org-roam hack
-
-If you have org-roam loaded@comma{} but no longer update the DB@comma{} opening a link can sometimes send you to an outdated file path due to @uref{https://github.com/org-roam/org-roam/blob/2a630476b3d49d7106f582e7f62b515c62430714/org-roam-id.el#L91, a line in org-roam-id.el} that causes org-id to @emph{preferentially} look up the org-roam DB instead of org-id's own table!
-
-Either revert that with the following snippet@comma{} or simply delete the DB (often located at "~/.emacs.d/org-roam.db").
-
-@lisp
-;; Undo an org-roam override
-(with-eval-after-load 'org-roam-id
-  (org-link-set-parameters
-   ;; This was default value at least from Org 9.1 to 9.7+
-   "id" :follow #'org-id-open :store #'org-id-store-link-maybe))
-@end lisp
 
 @node Org-capture
 @section Org-capture
@@ -707,11 +663,6 @@ Working with files over TRAMP is unsupported@comma{} because org-mem works in pa
 
 The best way to change this is to @uref{https://github.com/meedstrom/org-mem/issues, file an issue} to show you care :-)
 
-@node Limitation Encryption
-@section Limitation: Encryption
-
-Encrypted nodes probably won't be found.  As with TRAMP@comma{} file an issue.
-
 @node Limitation Unique titles
 @section Limitation: Unique titles
 
@@ -758,6 +709,8 @@ Basic commands:
 @samp{org-node-find}
 @item
 @samp{org-node-insert-link}
+@item
+@samp{org-node-insert-into-related}
 @item
 @samp{org-node-insert-transclusion}
 @item

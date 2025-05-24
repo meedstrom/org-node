@@ -214,6 +214,10 @@ I rarely have the screen space to display a backlink buffer.  Because it needs m
 
 A complementary solution, which can also stand alone, is to have the backlinks /written into/ the file, on an Org property line or in a drawer.
 
+NOTE: To be clear, this mode never generates new IDs.  That's your own business.  This only adds/edits =:BACKLINKS:= properties.
+
+It's the same you observe in the backlink buffers from earlier: *not all links create a backlink,* only links located in an entry that has or inherits an ID.  After all, there must be something to link back to.
+
 *** Option 2A: Automatic =:BACKLINKS:= property
 
 Add to initfiles:
@@ -224,12 +228,6 @@ Add to initfiles:
 #+end_src
 
 For a first-time run, type =M-x org-node-backlink-mass-update-props=.  (Don't worry if you change your mind; undo with =M-x org-node-backlink-mass-delete-props=.)
-
-NOTE 1: To be clear, this mode never generates new IDs.  That's your own business.  This only adds/edits =:BACKLINKS:= properties.
-
-That means *not all links create a backlink,* only links located in an entry that has or inherits an ID.  After all, there must be something to link back to.
-
-NOTE 2:  People who prefer to hard-wrap text, instead of enabling =visual-line-mode= or similar, may prefer Option 2B.
 
 *** Option 2B: Automatic =:BACKLINKS:...:END:= drawer
 
@@ -278,34 +276,6 @@ Running aforementioned command *may re-sort your backlinks and re-format their a
 Finally, lines that contain no Org link such as =[[id:1234][Title]]= are *deleted*, which would mean *destroying any other info within.*  Same if a backlink is stale and no longer valid.
 
 * Misc
-** Manage org-id-locations
-
-Ever run into "ID not found" situations?  Here's an extra way to feed data to org-id, as [[http://edstrom.dev/wjwrl/taking-ownership-of-org-id][I find clumsy the built-in options]].
-
-#+begin_src elisp
-(setq org-mem-do-sync-with-org-id t)
-(setq org-mem-watch-dirs ;; Configure me
-      '("~/org/"
-        "~/Syncthing/"
-        "/mnt/stuff/"))
-#+end_src
-
-Do a =M-x org-mem-reset= and see if it can find your notes now.
-
-*** Undoing an org-roam hack
-
-If you have org-roam loaded, but no longer update the DB, opening a link can sometimes send you to an outdated file path due to [[https://github.com/org-roam/org-roam/blob/2a630476b3d49d7106f582e7f62b515c62430714/org-roam-id.el#L91][a line in org-roam-id.el]] that causes org-id to /preferentially/ look up the org-roam DB instead of org-id's own table!
-
-Either revert that with the following snippet, or simply delete the DB (often located at "~/.emacs.d/org-roam.db").
-
-#+begin_src elisp
-;; Undo an org-roam override
-(with-eval-after-load 'org-roam-id
-  (org-link-set-parameters
-   ;; This was default value at least from Org 9.1 to 9.7+
-   "id" :follow #'org-id-open :store #'org-id-store-link-maybe))
-#+end_src
-
 ** Org-capture
 
 You may have heard that org-roam has a set of meta-capture templates: the =org-roam-capture-templates=.
@@ -446,9 +416,6 @@ Working with files over TRAMP is unsupported, because org-mem works in parallel 
 
 The best way to change this is to [[https://github.com/meedstrom/org-mem/issues][file an issue]] to show you care :-)
 
-** Limitation: Encryption
-Encrypted nodes probably won't be found.  As with TRAMP, file an issue.
-
 ** Limitation: Unique titles
 If two ID-nodes exist with the same title, one of them disappears from minibuffer completions.
 
@@ -484,6 +451,7 @@ Basic commands:
 
 - =org-node-find=
 - =org-node-insert-link=
+- =org-node-insert-into-related=
 - =org-node-insert-transclusion=
 - =org-node-insert-transclusion-as-subtree=
 - =org-node-visit-random=
