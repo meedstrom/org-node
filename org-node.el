@@ -524,8 +524,10 @@ STR, PRED and ACTION as in `org-node-collection-basic'."
 (defun org-node--forget-completions-in-files (files)
   "Remove the minibuffer completions for all nodes in FILES."
   (when files
-    (org-mem-delete (##member (org-mem-entry-file %2) files)
-                    org-node--candidate<>entry)))
+    (maphash (lambda (candidate entry)
+               (when (member (org-mem-entry-file entry) files)
+                 (remhash candidate org-node--candidate<>entry)))
+             org-node--candidate<>entry)))
 
 ;;;###autoload
 (define-minor-mode org-node-cache-mode
