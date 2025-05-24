@@ -77,46 +77,6 @@ Or run this command once: `org-node-backlink-mass-delete-props'.")))
 
 ;;; Drawer config
 
-(defcustom org-node-backlink-drawer-sorter
-  #'org-node-backlink-timestamp-lessp
-  "Function for sorting lines in the backlinks drawer."
-  :type '(radio
-          (function-item org-node-backlink-timestamp-lessp)
-          (function-item org-node-backlink-link-description-lessp)
-          (function-item org-node-backlink-link-description-collate-lessp)
-          (function-item org-node-backlink-id-lessp)
-          (function-item org-node-backlink-id-reversed-lessp)
-          (function-item org-node-backlink-id-blind-string-lessp)
-          (function-item org-node-backlink-id-blind-string-collate-lessp)
-          (function-item string-lessp)
-          (function-item string-collate-lessp)
-          (function :tag "Custom function" :value (lambda (s1 s2))))
-  :package-version '(org-node . "2.0.0"))
-
-(defcustom org-node-backlink-drawer-sort-in-reverse nil
-  "Whether to reverse how lines are sorted in the backlinks drawer."
-  :type 'boolean
-  :package-version '(org-node . "2.0.0"))
-
-(defcustom org-node-backlink-drawer-formatter
-  #'org-node-backlink-format-like-org-super-links-default
-  "Function to format a new line for the backlinks drawer.
-
-It takes three arguments ID, TITLE and TIME.  The first two
-are strings, while the third is a Lisp time value.
-
-It should return a string, with constraints:
-
-- No initial whitespace.
-- No newlines.
-- Not more than one [[id:...]] construct."
-  :type '(radio
-          (function-item org-node-backlink-format-like-org-super-links-default)
-          (function-item org-node-backlink-format-as-bullet-with-time)
-          (function-item org-node-backlink-format-as-bullet-no-time)
-          (function :tag "Custom function" :value (lambda (id title time))))
-  :package-version '(org-node . "2.0.0"))
-
 (defcustom org-node-backlink-drawer-positioner #'org-node-goto-new-drawer-site
   "Function for moving point before placing a new drawer.
 Called in a buffer narrowed to one Org entry, excluding any other
@@ -133,33 +93,26 @@ Only called if a drawer was not already present."
                 (function :tag "Custom function" :value (lambda ())))
   :package-version '(org-node . "2.0.0"))
 
-(defun org-node-backlink--extract-timestamp (text)
-  "Get Org timestamp out of TEXT."
-  (when (string-match org-ts-regexp-both text)
-    (match-string 0 text)))
+(defcustom org-node-backlink-drawer-sort-in-reverse nil
+  "Whether to reverse how lines are sorted in the backlinks drawer."
+  :type 'boolean
+  :package-version '(org-node . "2.0.0"))
 
-(defun org-node-backlink--extract-id (text)
-  "Get first link description out of TEXT.
-That means the first part of a [[id][description]]."
-  (with-temp-buffer
-    (insert text)
-    (goto-char (point-min))
-    (when (search-forward "[[id:" nil t)
-      (buffer-substring-no-properties (point)
-                                      (- (re-search-forward "].\\|::")
-                                         2)))))
-
-(defun org-node-backlink--extract-link-desc (text)
-  "Get first link description out of TEXT.
-That means the second part of a [[id][description]]."
-  (with-temp-buffer
-    (insert text)
-    (goto-char (point-min))
-    (when (and (search-forward "[[id:" nil t)
-               (search-forward "][" nil t))
-      (buffer-substring-no-properties (point)
-                                      (- (search-forward "]]")
-                                         2)))))
+(defcustom org-node-backlink-drawer-sorter
+  #'org-node-backlink-timestamp-lessp
+  "Function for sorting lines in the backlinks drawer."
+  :type '(radio
+          (function-item org-node-backlink-timestamp-lessp)
+          (function-item org-node-backlink-link-description-lessp)
+          (function-item org-node-backlink-link-description-collate-lessp)
+          (function-item org-node-backlink-id-lessp)
+          (function-item org-node-backlink-id-reversed-lessp)
+          (function-item org-node-backlink-id-blind-string-lessp)
+          (function-item org-node-backlink-id-blind-string-collate-lessp)
+          (function-item string-lessp)
+          (function-item string-collate-lessp)
+          (function :tag "Custom function" :value (lambda (s1 s2))))
+  :package-version '(org-node . "2.0.0"))
 
 (defun org-node-backlink-timestamp-lessp (s1 s2)
   "Sort on first Org timestamp in the line.
@@ -214,6 +167,25 @@ S1 before S2 if the strings sans org-ids satisfy `string-collate-lessp'."
    (replace-regexp-in-string "\\[\\[id:.*?]" "" s1)
    (replace-regexp-in-string "\\[\\[id:.*?]" "" s2)))
 
+(defcustom org-node-backlink-drawer-formatter
+  #'org-node-backlink-format-like-org-super-links-default
+  "Function to format a new line for the backlinks drawer.
+
+It takes three arguments ID, TITLE and TIME.  The first two
+are strings, while the third is a Lisp time value.
+
+It should return a string, with constraints:
+
+- No initial whitespace.
+- No newlines.
+- Not more than one [[id:...]] construct."
+  :type '(radio
+          (function-item org-node-backlink-format-like-org-super-links-default)
+          (function-item org-node-backlink-format-as-bullet-with-time)
+          (function-item org-node-backlink-format-as-bullet-no-time)
+          (function :tag "Custom function" :value (lambda (id title time))))
+  :package-version '(org-node . "2.0.0"))
+
 (defun org-node-backlink-format-like-org-super-links-default
     (id desc &optional time)
   "Example: \"[2025-02-21 Fri 14:39] <- [[id:ID][Node title]]\".
@@ -246,6 +218,34 @@ ID and DESC are link id and description, TIME a Lisp time value."
              (and time
                   (encode-time (parse-time-string
                                 (org-node-backlink--extract-timestamp line)))))))
+
+(defun org-node-backlink--extract-timestamp (text)
+  "Get Org timestamp out of TEXT."
+  (when (string-match org-ts-regexp-both text)
+    (match-string 0 text)))
+
+(defun org-node-backlink--extract-id (text)
+  "Get first link description out of TEXT.
+That means the first part of a [[id][description]]."
+  (with-temp-buffer
+    (insert text)
+    (goto-char (point-min))
+    (when (search-forward "[[id:" nil t)
+      (buffer-substring-no-properties (point)
+                                      (- (re-search-forward "].\\|::")
+                                         2)))))
+
+(defun org-node-backlink--extract-link-desc (text)
+  "Get first link description out of TEXT.
+That means the second part of a [[id][description]]."
+  (with-temp-buffer
+    (insert text)
+    (goto-char (point-min))
+    (when (and (search-forward "[[id:" nil t)
+               (search-forward "][" nil t))
+      (buffer-substring-no-properties (point)
+                                      (- (search-forward "]]")
+                                         2)))))
 
 
 ;;; Commands
