@@ -523,7 +523,7 @@ STR, PRED and ACTION as in `org-node-collection-basic'."
   "Remove the minibuffer completions for all nodes in FILES."
   (when files
     (maphash (lambda (candidate entry)
-               (when (member (org-mem-entry-file entry) files)
+               (when (member (org-mem-entry-file-truename entry) files)
                  (remhash candidate org-node--candidate<>entry)))
              org-node--candidate<>entry)))
 
