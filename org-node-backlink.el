@@ -83,8 +83,11 @@ Or run this command once: `org-node-backlink-mass-delete-props'.")))
   :type '(radio
           (function-item org-node-backlink-timestamp-lessp)
           (function-item org-node-backlink-link-description-lessp)
+          (function-item org-node-backlink-link-description-collate-lessp)
           (function-item org-node-backlink-id-lessp)
-          (function-item org-node-backlink-id-blind-simple-lessp)
+          (function-item org-node-backlink-id-reversed-lessp)
+          (function-item org-node-backlink-id-blind-string-lessp)
+          (function-item org-node-backlink-id-blind-string-collate-lessp)
           (function-item string-lessp)
           (function-item string-collate-lessp)
           (function :tag "Custom function" :value (lambda (s1 s2))))
@@ -166,25 +169,50 @@ S1 before S2 if timestamp in S1 is earlier in time."
     (or (and ts-1 (not ts-2))
         (and ts-1 ts-2 (org-time< ts-1 ts-2)))))
 
+(defun org-node-backlink-id-lessp (s1 s2)
+  "Sort on content of [[id:...]].
+S1 before S2 if the IDs inside satisfy `string<'.
+
+May be useful with a non-default `org-id-method'."
+  (string< (org-node-backlink--extract-id s1)
+           (org-node-backlink--extract-id s2)))
+
+(defun org-node-backlink-reversed-id-lessp (s1 s2)
+  "Sort on content of [[id:...]] after reversing.
+S1 before S2 if the mirror images of IDs inside satisfy `string<'.
+
+May be useful when `org-id-method' is set to `org', because that is a
+timestamp with the digits reversed.  Then, the result is a
+chronological order of when those IDs were originally created
+\(not when the backlinks were created)."
+  (string< (org-node-backlink--extract-id (reverse s1))
+           (org-node-backlink--extract-id (reverse s2))))
+
 (defun org-node-backlink-link-description-lessp (s1 s2)
   "Sort on first link description in the line.
 S1 before S2 if link descriptions inside satisfy `string<'."
   (string< (org-node-backlink--extract-link-desc s1)
            (org-node-backlink--extract-link-desc s2)))
 
-(defun org-node-backlink-id-blind-simple-lessp (s1 s2)
+(defun org-node-backlink-link-description-collate-lessp (s1 s2)
+  "Sort on first link description in the line.
+S1 before S2 if link descriptions inside satisfy `string-collate-lessp'."
+  (string-collate-lessp
+   (org-node-backlink--extract-link-desc s1)
+   (org-node-backlink--extract-link-desc s2)))
+
+(defun org-node-backlink-id-blind-string-lessp (s1 s2)
   "Sort lexicographically, but ignoring nonsense inside [[id:...]].
 S1 before S2 if the strings sans org-ids satisfy `string<'."
   (string< (replace-regexp-in-string "\\[\\[id:.*?]" "" s1)
            (replace-regexp-in-string "\\[\\[id:.*?]" "" s2)))
 
-(defun org-node-backlink-id-lessp (s1 s2)
-  "Sort on first [[id:...]] in the line.
-S1 before S2 if the IDs inside satisfy `string<'.
-
-May be useful with a non-default `org-id-method'."
-  (string< (org-node-backlink--extract-id s1)
-           (org-node-backlink--extract-id s2)))
+(defun org-node-backlink-id-blind-string-collate-lessp (s1 s2)
+  "Sort lexicographically, but ignoring nonsense inside [[id:...]].
+S1 before S2 if the strings sans org-ids satisfy `string-collate-lessp'."
+  (string-collate-lessp
+   (replace-regexp-in-string "\\[\\[id:.*?]" "" s1)
+   (replace-regexp-in-string "\\[\\[id:.*?]" "" s2)))
 
 (defun org-node-backlink-format-like-org-super-links-default
     (id desc &optional time)
