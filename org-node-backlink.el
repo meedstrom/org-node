@@ -215,14 +215,14 @@ ID and DESC are link id and description, TIME a Lisp time value."
     (funcall org-node-backlink-drawer-formatter
              (org-node-backlink--extract-id line)
              (org-node-backlink--extract-link-desc line)
-             (and time
-                  (encode-time (parse-time-string
-                                (org-node-backlink--extract-timestamp line)))))))
+             (and time (encode-time (parse-time-string time))))))
 
 (defun org-node-backlink--extract-timestamp (text)
   "Get Org timestamp out of TEXT."
-  (when (string-match org-ts-regexp-both text)
-    (match-string 0 text)))
+  (let ((link-end (and (string-match org-link-bracket-re text)
+                       (match-end 0))))
+    (when (string-match (org-re-timestamp 'all) text link-end)
+      (match-string 0 text))))
 
 (defun org-node-backlink--extract-id (text)
   "Get first link description out of TEXT.
