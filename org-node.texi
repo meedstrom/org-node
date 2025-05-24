@@ -46,7 +46,6 @@ Setup
 Install
 
 * An update broke things?::
-* Can't find any nodes?::
 
 Backlinks
 
@@ -324,18 +323,12 @@ If you're coming here from @strong{org-roam}@comma{} try this instead:
 
 @menu
 * An update broke things?::
-* Can't find any nodes?::
 @end menu
 
 @node An update broke things?
 @subsection An update broke things?
 
 See @uref{https://github.com/meedstrom/org-node#appendix-ii-how-to-rollback, How to rollback} at the end of this readme.
-
-@node Can't find any nodes?
-@subsection Can't find any nodes?
-
-See @uref{https://github.com/meedstrom/org-node#manage-org-id-locations, Manage org-id-locations}.
 
 @node Quick start
 @section Quick start

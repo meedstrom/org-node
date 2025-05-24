@@ -162,9 +162,6 @@ If you're coming here from *org-roam*, try this instead:
 *** An update broke things?
 See [[https://github.com/meedstrom/org-node#appendix-ii-how-to-rollback][How to rollback]] at the end of this readme.
 
-*** Can't find any nodes?
-See [[https://github.com/meedstrom/org-node#manage-org-id-locations][Manage org-id-locations]].
-
 ** Quick start
 
 If you're new to these concepts, fear not.  The main things for day-to-day operation are two verbs: "find" and "insert".
