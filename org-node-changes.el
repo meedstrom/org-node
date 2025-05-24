@@ -187,7 +187,7 @@ NAME, ARGLIST and BODY as in `defun'."
             (message "Update org-mem if you see bugs in org-node")))))
 
 (define-obsolete-function-alias 'org-node--dir-files-recursively     #'org-mem--dir-files-recursive                "3.0.0 (May 2025)")
-(define-obsolete-function-alias 'org-node--maybe-adjust-idle-timer   #'org-mem-updater--activate-timer             "3.0.0 (May 2025)")
+(define-obsolete-function-alias 'org-node--maybe-adjust-idle-timer   #'org-mem-updater--adjust-timer             "3.0.0 (May 2025)")
 (define-obsolete-function-alias 'org-node-abbrev-file-names          #'org-mem--fast-abbrev                        "3.0.0 (May 2025)")
 (define-obsolete-function-alias 'org-node-by-id                      #'org-mem-entry-by-id                         "3.0.0 (May 2025)")
 (define-obsolete-function-alias 'org-node-get-aliases                #'org-mem-roam-aliases                        "3.0.0 (May 2025)")

@@ -1545,7 +1545,7 @@ creation-date as more truthful or useful than today\\='s date.
           ;; Replace the root heading and its properties with file-level
           ;; keywords &c.
           (goto-char (point-min))
-          (org-end-of-meta-data t)
+          (org-end-of-meta-data)
           (kill-region (point-min) (point))
           (org-map-region #'org-promote (point-min) (point-max))
           (insert
@@ -2106,7 +2106,7 @@ one of them is associated with a ROAM_REFS property."
           for link in (org-mem-all-links)
           unless (equal "id" (org-mem-link-type link))
           as node = (org-mem-entry-by-id (org-mem-link-nearby-id link))
-          ;; when entry
+          when node
           collect
           (let ((type (org-mem-link-type link))
                 (target (org-mem-link-target link))
