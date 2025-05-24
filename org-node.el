@@ -1589,10 +1589,7 @@ time without renaming existing files."
 In other words, if e.g. FORMAT is %Y-%m-%d, which can be
 instantiated in many ways such as 2024-08-10, then this should
 return a regexp that can match any of those ways it might turn
-out, with any year, month or day.
-
-Memoize the value, so consecutive calls with the same FORMAT only
-need to compute once."
+out, with any year, month or day."
   (if (equal format (car org-node--make-regexp-for-time-format))
       ;; Reuse memoized value on consecutive calls with same input
       (cdr org-node--make-regexp-for-time-format)
@@ -1924,16 +1921,15 @@ set in `org-node-name-of-links-drawer'."
     (save-restriction
       (org-node-narrow-to-drawer-create org-node-name-of-links-drawer
                                         #'org-entry-end-position)
-      (let ((already-blank-line (eolp)))
-        (atomic-change-group
-          (unless (eolp)
-            (newline-and-indent)
-            (forward-line -1)
-            (back-to-indentation))
-          (insert (format-time-string (org-time-stamp-format t t)) " -> ")
-          ;; Since insert-link can take user to another buffer, this should be
-          ;; the last action.
-          (org-node-insert-link nil t))))))
+      (atomic-change-group
+        (unless (eolp)
+          (newline-and-indent)
+          (forward-line -1)
+          (back-to-indentation))
+        (insert (format-time-string (org-time-stamp-format t t)) " -> ")
+        ;; Since insert-link can take user to another buffer, this should be
+        ;; the last action.
+        (org-node-insert-link nil t)))))
 
 ;; TODO: Make something like a find-dired buffer instead, handy!  Not the
 ;; actual find-dired, that'll be slow if we begin the search from fs
@@ -2014,9 +2010,7 @@ than cut them), the remaining links in the network will
 constitute a DAG (directed acyclic graph).
 
 You may consider this as merely one of many ways to view your
-network to quality-control it.  Rationale:
-
-    https://edstrom.dev/zvjjm/slipbox-workflow#ttqyc"
+network to quality-control it."
   (interactive)
   (unless (executable-find "Rscript")
     (user-error
@@ -2101,13 +2095,11 @@ This is done by checking how Emacs had decided to decode each file."
              collect (list file (vector (symbol-name sys) file)))))
 
 (defun org-node-list-reflinks ()
-  "List all reflinks and their locations.
+  "List all reflinks and the ID-nodes in which they were found.
 
 Useful to see how many times you\\='ve inserted a link that is very
-similar to another link, but not identical, so that likely only
-one of them is associated with a ROAM_REFS property.
-
-Excludes reflinks not coming from an ID node."
+similar to another link, but not identical, so that perhaps only
+one of them is associated with a ROAM_REFS property."
   (interactive)
   (let ((entries
          (cl-loop
@@ -2191,7 +2183,6 @@ Optional keyword argument ABOUT-TO-DO as in
          (error "File does not exist or not valid to visit: %s" ,file))
        (when (file-directory-p --file--)
          (error "Is a directory: %s" --file--))
-       ;; The cache is buggy, disable to be safe
        (org-element-with-disabled-cache
          (let* ((--was-open-- (find-buffer-visiting --file--))
                 (--buf-- (or --was-open--
@@ -2543,11 +2534,8 @@ To always operate on the current entry, use `org-node-add-tags-here'."
 (declare-function org-get-buffer-tags "org")
 (defun org-node--read-tags ()
   "Prompt for an Org tag or several.
-Pre-fill completions by collecting tags from all known ID-nodes, as well
-as the members of `org-tag-persistent-alist' and `org-tag-alist'.
-
-Also collect current buffer tags, but only if `org-element-use-cache' is
-non-nil, because it may cause noticeable lag otherwise."
+Pre-fill completions by collecting tags from all known Org files, as
+well as the members of `org-tag-persistent-alist' and `org-tag-alist'."
   (completing-read-multiple
    "Tags: "
    (delete-dups
@@ -2559,8 +2547,8 @@ non-nil, because it may cause noticeable lag otherwise."
                         (mapcar #'car)
                         (cl-remove-if #'keywordp)
                         (mapcar #'substring-no-properties))
-           (cl-loop for node being each hash-value of org-nodes
-                    append (org-mem-entry-tags node))))
+           (cl-loop for entry in (org-mem-all-entries)
+                    append (org-mem-entry-tags entry))))
    nil nil nil 'org-tags-history))
 
 (defun org-node-goto-new-drawer-site ()
