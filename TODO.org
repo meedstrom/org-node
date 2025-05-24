@@ -6,7 +6,7 @@
 
   - =org-node-narrow-to-drawer-p=
 
-  - =org-node--end-of-meta-data= (actually patch =org-end-of-meta-data=)
+  - =org-node-full-end-of-meta-data= (actually patch =org-end-of-meta-data=)
 
 - =org-node--with-quick-file-buffer= merge with =org-node--work-buffer-for= ??
 

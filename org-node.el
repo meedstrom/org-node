@@ -2400,7 +2400,7 @@ To always operate on the current entry, use `org-node-add-tags-here'."
                   (atomic-change-group
                     (delete-region (point) (pos-eol))
                     (insert ":" (string-join new-tags ":") ":")))
-              (org-node--end-of-meta-data)
+              (org-node-full-end-of-meta-data)
               (insert "#+filetags: :" (string-join new-tags ":") ":\n")))))
     (save-excursion
       (org-back-to-heading)
@@ -2432,8 +2432,8 @@ well as the members of `org-tag-persistent-alist' and `org-tag-alist'."
       (org-node--after-drawers-before-keyword)
     (org-end-of-meta-data)))
 
-;; N/B: Org expects file-level :PROPERTIES: to come before #+title and
-;; other keyword lines, so keyword lines can be used as a natural barrier.
+;; Keyword lines work as a natural barrier, because Org expects file-level
+;; :PROPERTIES: to come before #+title and other keyword lines.
 (defun org-node--after-drawers-before-keyword ()
   "Move point to after all consecutive drawers in the front matter.
 If there are no drawers, move point to the first #+keyword line,
@@ -2453,17 +2453,13 @@ this cannot be a file-level node that qualifies for backlinks anyway."
           (forward-line)
         (error "Missing :END: in %s" (buffer-name))))))
 
-(defun org-node--end-of-meta-data (&optional full)
-  "Like `org-end-of-meta-data', but supports file-level metadata.
+(defun org-node-full-end-of-meta-data (&optional _deprecated-arg)
+  "Skip properties and other drawers, and at the file-level, skip keywords.
 
 As in `org-end-of-meta-data', point always lands on a newline \(or the
 end of buffer).  Since that newline may be the beginning of the next
 heading, you should probably verify that `org-at-heading-p' is nil,
-else do `backward-char' or `open-line' prior to inserting any text.
-
-Argument FULL same as in `org-end-of-meta-data' when point is in a
-subtree, but meaningless when point is before the first heading, in which
-case always skip past all file-level properties and keywords."
+else do `backward-char' or `open-line' prior to inserting text."
   (if (org-before-first-heading-p)
       (save-restriction
         (widen)
@@ -2471,13 +2467,13 @@ case always skip past all file-level properties and keywords."
         ;; Jump past #+keywords, comments and blank lines.
         (while (looking-at-p (rx (*? space) (or "#+" "# " "\n")))
           (forward-line))
-        ;; On a "final stretch" of blank lines, land on the first.
+        ;; On a "final stretch" of blank lines, go back to the first.
         (unless (= 0 (skip-chars-backward "\n"))
           (forward-char 1)))
-    ;; PERF: Override a bottleneck in `org-end-of-meta-data'.
+    ;; PERF: Override a bottleneck inside `org-end-of-meta-data'.
     (cl-letf (((symbol-function 'org-back-to-heading)
                #'org-node--back-to-heading-or-point-min))
-      (org-end-of-meta-data full)))
+      (org-end-of-meta-data t)))
   (point))
 
 (defun org-node--back-to-heading-or-point-min (&optional invisible-ok)

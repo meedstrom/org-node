@@ -213,7 +213,7 @@ time that context was shown in a visible window.  Including:
 (defun org-node-context--strip-meta-data ()
   "Delete any heading and properties/logbook drawers."
   (save-excursion
-    (delete-region (point-min) (org-node--end-of-meta-data t))))
+    (delete-region (point-min) (org-node-full-end-of-meta-data))))
 
 (defun org-node-context--strip-backlinks ()
   "Delete any backlinks drawer."

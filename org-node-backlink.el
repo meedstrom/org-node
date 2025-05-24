@@ -83,9 +83,9 @@ The function may return anything, but if it returns an integer or
 marker, point will move to that position."
   :type '(radio (function-item org-node-goto-new-drawer-site)
                 (function-item org-entry-end-position)
-                (function-item org-node--end-of-meta-data)
+                (function-item org-node-full-end-of-meta-data)
                 (function :tag "Custom function" :value (lambda ())))
-  :package-version '(org-node . "2.0.0"))
+  :package-version '(org-node . "3.3.2"))
 
 (defcustom org-node-backlink-drawer-sort-in-reverse nil
   "Whether to reverse how lines are sorted in the backlinks drawer."
