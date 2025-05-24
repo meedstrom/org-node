@@ -1925,11 +1925,14 @@ set in `org-node-name-of-links-drawer'."
                                         #'org-entry-end-position)
       (let ((already-blank-line (eolp)))
         (atomic-change-group
-          (back-to-indentation)
+          (unless (eolp)
+            (newline-and-indent)
+            (forward-line -1)
+            (back-to-indentation))
           (insert (format-time-string (org-time-stamp-format t t)) " -> ")
-          (org-node-insert-link nil t)
-          (unless already-blank-line
-            (newline-and-indent)))))))
+          ;; Since insert-link can take user to another buffer, this should be
+          ;; the last action.
+          (org-node-insert-link nil t))))))
 
 ;; TODO: Make something like a find-dired buffer instead, handy!  Not the
 ;; actual find-dired, that'll be slow if we begin the search from fs
