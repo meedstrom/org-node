@@ -1940,53 +1940,72 @@ set in `org-node-name-of-links-drawer'."
 
 (declare-function org-lint "org-lint")
 (defvar org-node--unlinted nil)
+(defvar org-node--lint-current nil)
+(defvar org-node--lint-operator nil)
 (defvar org-node--lint-warnings nil)
 (defun org-node-lint-all-files ()
-  "Run `org-lint' on all known Org files, and report results.
-
-If last run was interrupted, resume working through the file list
-from where it stopped.  With prefix argument, start over
-from the beginning."
+  "Run `org-lint' on all known Org files, and report results."
   (interactive)
   (require 'org-lint)
-  (let (files)
-    (when (or (equal current-prefix-arg '(4))
-              (and (null org-node--unlinted)
-                   (setq files (seq-keep #'org-mem--truename-maybe
-                                         (org-mem-all-files)))
-                   (y-or-n-p (format "Lint %d files?" (length files)))))
-      (setq org-node--unlinted files)
-      (setq org-node--lint-warnings nil)))
-  (setq org-node--unlinted
-        (org-node--in-files-do
-          :files org-node--unlinted
-          :msg "Running org-lint (you can quit and resume anytime)"
-          :about-to-do "About to visit a file to run org-lint"
-          :call (lambda ()
-                  ;; Org-lint's `org-lint-invalid-id-link' can cause spam, bc
-                  ;; `org-id-update-id-locations' SILENT argument not perfect.
-                  (let ((inhibit-message t))
-                    (when-let* ((warning (org-lint)))
-                      (push (cons buffer-file-name (car warning))
-                            org-node--lint-warnings))))))
-  (when org-node--lint-warnings
-    (org-mem-list--pop-to-tabulated-buffer
-     :buffer "*org lint results*"
-     :format [("File" 30 t) ("Line" 5 t) ("Trust" 5 t) ("Explanation" 0 t)]
-     :reverter #'org-node-lint-all-files
-     :entries (cl-loop
-               for (file . warning) in org-node--lint-warnings
-               collect (let ((array (cadr warning)))
-                         (list (sxhash warning)
-                               (vector
-                                (buttonize (file-name-nondirectory file)
-                                           `(lambda (_button)
-                                              (find-file ,file)
-                                              (goto-line ,(string-to-number
-                                                           (elt array 0)))))
-                                (elt array 0)
-                                (elt array 1)
-                                (elt array 2))))))))
+  (let ((proceed (and org-node--unlinted
+                      (equal fileloop--operate-function
+                             #'org-node--lint-operator)))
+        (files (org-mem-all-files)))
+    (unless proceed
+      (when (y-or-n-p (format "Lint %d files?" (length files)))
+        (setq org-node--unlinted files)
+        (fileloop-initialize
+         files
+         (lambda ()
+           (let ((file (pop org-node--unlinted)))
+             (when (string-prefix-p "org" (file-name-extension file))
+               (setq org-node--lint-current file))))
+         #'org-node--lint-operator)
+        (setq org-node--lint-warnings nil)
+        (setq proceed t)))
+
+    (condition-case _
+        (when proceed
+          (cl-letf (((symbol-function 'recentf-add-file) #'ignore))
+            (let ((delay-mode-hooks t)
+                  (org-inhibit-startup t)
+                  (org-element-cache-persistent nil))
+              (fileloop-continue))))
+      (quit)))
+
+    (when org-node--lint-warnings
+      (org-mem-list--pop-to-tabulated-buffer
+       :buffer "*org lint results*"
+       :format [("File" 30 t) ("Line" 5 t) ("Trust" 5 t) ("Explanation" 0 t)]
+       :reverter #'org-node-lint-all-files
+       :entries (cl-loop
+                 for (file . warning) in org-node--lint-warnings
+                 collect (let ((array (cadr warning)))
+                           (list (sxhash warning)
+                                 (vector
+                                  (buttonize (file-name-nondirectory file)
+                                             `(lambda (_button)
+                                                (find-file ,file)
+                                                (goto-line ,(string-to-number
+                                                             (elt array 0)))))
+                                  (elt array 0)
+                                  (elt array 1)
+                                  (elt array 2))))))))
+
+(defun org-node--lint-operator ()
+  (let ((buffer-seems-new (and (not (buffer-modified-p))
+                               (not buffer-undo-list))))
+    (unless (derived-mode-p 'org-mode)
+      (org-mode))
+    ;; Muffle spam from `org-lint-invalid-id-link', bc
+    ;; `org-id-update-id-locations' SILENT argument not perfect.
+    (let ((inhibit-message t))
+      (when-let* ((warning (org-lint)))
+        (push (cons org-node--lint-current (car warning))
+              org-node--lint-warnings)))
+    (when buffer-seems-new
+      (kill-buffer))
+    t))
 
 (defun org-node-list-feedback-arcs ()
   "Show a feedback-arc-set of forward id-links.
