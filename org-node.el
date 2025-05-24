@@ -2538,7 +2538,7 @@ To always operate on the current entry, use `org-node-add-tags-here'."
               (insert "#+filetags: :" (string-join new-tags ":") ":\n")))))
     (save-excursion
       (org-back-to-heading)
-      (org-set-tags (seq-uniq (append tags (org-get-tags)))))))
+      (org-set-tags (seq-uniq (append tags (org-get-tags nil t)))))))
 
 (declare-function org-get-buffer-tags "org")
 (defun org-node--read-tags ()
