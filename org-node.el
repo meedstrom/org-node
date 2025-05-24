@@ -2178,6 +2178,7 @@ Optional keyword argument ABOUT-TO-DO as in
            (kill-buffer-hook nil) ;; Inhibit save-place etc
            (kill-buffer-query-functions nil)
            (buffer-list-update-hook nil)
+           (delay-mode-hooks t)
            (--file-- (org-mem--truename-maybe ,file)))
        (unless --file--
          (error "File does not exist or not valid to visit: %s" ,file))
@@ -2186,8 +2187,7 @@ Optional keyword argument ABOUT-TO-DO as in
        (org-element-with-disabled-cache
          (let* ((--was-open-- (find-buffer-visiting --file--))
                 (--buf-- (or --was-open--
-                             (delay-mode-hooks
-                               (org-node--find-file-noselect --file-- ,why)))))
+                             (org-node--find-file-noselect --file-- ,why))))
            (when (bufferp --buf--)
              (with-current-buffer --buf--
                (save-excursion
