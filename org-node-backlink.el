@@ -629,7 +629,8 @@ If REMOVE non-nil, remove it instead."
           (save-restriction
             (org-node-narrow-to-drawer-create
              "BACKLINKS" org-node-backlink-drawer-positioner)
-            (let* ((lines (split-string (buffer-string) "\n" t))
+            (let* ((col (current-indentation))
+                   (lines (split-string (buffer-string) "\n" t))
                    (already-present-ids
                     (seq-keep #'org-node-backlink--extract-id lines))
                    (to-add      (seq-difference   origins already-present-ids))
@@ -651,7 +652,8 @@ If REMOVE non-nil, remove it instead."
               (dolist (id to-add)
                 (let ((title (org-mem-title-maybe (org-mem-entry-by-id id))))
                   (insert (funcall org-node-backlink-drawer-formatter id title))
-                  (newline-and-indent)))
+                  (newline)
+                  (indent-to col)))
               ;; Membership is correct, now re-sort
               (let ((sorted-lines (sort (split-string (buffer-string) "\n" t)
                                         org-node-backlink-drawer-sorter)))
@@ -809,8 +811,10 @@ Designed for use by `org-node-backlink--add-in-target'."
           (org-node-narrow-to-drawer-create
            "BACKLINKS" org-node-backlink-drawer-positioner)
           (unless (search-forward (concat "[[id:" id) nil t) ;; Already has it
-            (insert (funcall org-node-backlink-drawer-formatter id title))
-            (newline-and-indent)
+            (let ((col (current-indentation)))
+              (insert (funcall org-node-backlink-drawer-formatter id title))
+              (newline)
+              (indent-to col))
             ;; Re-sort so just-inserted link is placed correct among them
             (let ((lines (sort (split-string (buffer-string) "\n" t)
                                org-node-backlink-drawer-sorter)))
