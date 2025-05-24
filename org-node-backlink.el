@@ -300,7 +300,7 @@ Can be quit midway through and resumed later.  With
 (defvar org-node-backlink--checked nil)
 (defun org-node-backlink-fix-buffer (&optional kind)
   "Update :BACKLINKS: properties or drawers in all nodes in buffer.
-Let `org-node-backlink-do-drawers' determine which.
+Let user option `org-node-backlink-do-drawers' determine which.
 
 Or if KIND is symbol `update-drawers', `del-drawers', `update-props', or
 `del-props', do the corresponding thing."
@@ -320,7 +320,7 @@ Or if KIND is symbol `update-drawers', `del-drawers', `update-props', or
         (outline-next-heading)))))
 
 
-;;; Save-hook to check only the changed parts of current buffer
+;;; Save-hook to update only the changed parts of current buffer
 
 (defvar org-node-backlink--inhibit-flagging nil)
 (defun org-node-backlink--flag-buffer-modification (beg end _n-deleted-chars)
@@ -616,7 +616,7 @@ If REMOVE non-nil, remove it instead."
 ;; navel-gaze its own content to see if it looks correct according to current
 ;; links tables.  Technically, that would be enough to result in correct
 ;; backlinks everywhere if you just run it on all files, and that's
-;; more-or-less how `org-node-backlink-fix-all-files' works, but we don't want
+;; more-or-less how `org-node-backlink--fix-all-files' works, but we don't want
 ;; to do that on every save.
 
 ;; By contrast, the below code does not look up tables, just reacts to the
@@ -634,9 +634,6 @@ If REMOVE non-nil, remove it instead."
 ;; REVIEW: In theory, it is possible to drop these advices, letting user insert
 ;; links with zero Emacs lag, if we instead use something like
 ;; `org-node-backlink--maybe-fix-proactively' after some idle...
-;; That would let us cut nearly 200 LoC.
-;; We'd keep these LoC just for the nicety of seeing backlinks appear in
-;; already-open buffers, but no need to visit non-open files until later.
 
 ;; In fact, it might let us reason more easily about
 ;; `org-node-backlink--maybe-fix-proactively' if we stop doing
