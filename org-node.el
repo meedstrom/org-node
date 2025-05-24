@@ -2097,9 +2097,8 @@ This is done by checking how Emacs had decided to decode each file."
    :buffer "*org file coding systems*"
    :format [("Coding system" 20 t) ("File" 40 t)]
    :entries (cl-loop
-             for data being each hash-value of org-mem--file<>metadata
-             as file = (nth 0 data)
-             as sys = (nth 4 data)
+             for file in (org-mem-all-files)
+             as sys = (org-mem-file-coding-system file)
              collect (list file (vector (symbol-name sys) file)))))
 
 (defun org-node-list-reflinks ()
