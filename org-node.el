@@ -1142,7 +1142,7 @@ type the name of a node that does not exist.  That enables this
 (defvar org-node--untitled-ctr 1)
 (defun org-node-mk-auto-title (_id)
   "Override this to change what to name an untitled node."
-  (cl-loop for title = (format "untitled-%d" org-node--untitled-ctr)
+  (cl-loop for title = (format "Untitled %d" org-node--untitled-ctr)
            while (or (gethash title org-node--title<>affixations)
                      (file-exists-p (org-node-title-to-filename title)))
            do (cl-incf org-node--untitled-ctr)
