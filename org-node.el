@@ -1920,23 +1920,27 @@ set in `org-node-name-of-links-drawer'."
         ;; the last action.
         (org-node-insert-link nil t)))))
 
-;; TODO: Make something like a find-dired buffer instead, handy!  Not the
-;; actual find-dired, that'll be slow if we begin the search from fs
-;; root... Dired operates on lines output by `ls', we ought to be able to
-;; prepare such lines.
-(defun org-node-list-files (&optional deprecated-arg)
+;; TODO: Make something like a find-dired buffer, handy!
+(defun org-node-list-files ()
   (interactive)
-  (if deprecated-arg
-      (progn
-        (message "Function `org-node-list-files' obsoleted by `org-mem-all-files'")
-        (org-mem-all-files))
-    (org-mem-list--pop-to-tabulated-buffer
-     :buffer "*org-node files*"
-     :format [("File" 0 t)]
-     :entries (cl-loop
-               for file in (org-mem-all-files)
-               collect (list (sxhash file)
-                             (vector (buttonize file #'find-file file)))))))
+  (org-mem-list--pop-to-tabulated-buffer
+   :buffer "*org-node files list*"
+   :format [("Modified" 11 t) ("Size" 7 t) ("File" 60 t) ("Title" 40 t) ("Lines" 6 t) ("Coding system" 15 t) ("Properties" 10)]
+   :entries
+   (cl-loop
+    for file in (org-mem-all-files)
+    as props = (org-mem-properties (car (org-mem-entries-in file)))
+    as kb = (/ (org-mem-file-size file) 1024.0)
+    collect
+    (list file
+          (vector (format-time-string "%F" (org-mem-file-mtime file))
+                  (format (if (< kb 1) "" "%d kB") kb)
+                  (buttonize file #'find-file file)
+                  (or (org-mem-file-title-topmost file) "")
+                  (number-to-string (org-mem-file-line-count file))
+                  (prin1-to-string (org-mem-file-coding-system file))
+                  (if props (prin1-to-string props) ""))))
+   :reverter #'org-node-list-files))
 
 (declare-function org-lint "org-lint")
 (defvar org-node--unlinted nil)
@@ -2088,18 +2092,6 @@ from ID links found in `org-mem--target<>links'."
                                  (equal "id" (org-mem-link-type link)))
                        collect (concat target "\t" (org-mem-link-nearby-id link)))))
     "\n")))
-
-(defun org-node-list-file-coding-systems ()
-  "List coding systems detected in all files.
-This is done by checking how Emacs had decided to decode each file."
-  (interactive)
-  (org-mem-list--pop-to-tabulated-buffer
-   :buffer "*org file coding systems*"
-   :format [("Coding system" 20 t) ("File" 40 t)]
-   :entries (cl-loop
-             for file in (org-mem-all-files)
-             as sys = (org-mem-file-coding-system file)
-             collect (list file (vector (symbol-name sys) file)))))
 
 (defun org-node-list-reflinks ()
   "List all reflinks and the ID-nodes in which they were found.
