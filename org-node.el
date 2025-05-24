@@ -77,16 +77,14 @@
 
 ;;; Code:
 
-;; Built-in
-(require 'cl-lib)
-(require 'subr-x)
 (eval-when-compile
   (require 'org)
   (require 'org-id)
   (require 'org-macs)
   (require 'org-element))
-
-;; External
+(require 'cl-lib)
+(require 'subr-x)
+(require 'fileloop)
 (require 'llama)
 (require 'org-node-changes)
 (require 'org-mem)

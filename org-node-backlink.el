@@ -32,8 +32,6 @@
 (require 'org-mem)
 (require 'org-mem-updater)
 (require 'org-node)
-(declare-function org-mem-updater-ensure-id-node-at-point-known "org-mem-updater")
-(declare-function org-mem-updater-ensure-link-at-point-known "org-mem-updater")
 
 (defgroup org-node-backlink nil "In-file backlinks."
   :group 'org-node)
@@ -79,14 +77,10 @@ Or run this command once: `org-node-backlink-mass-delete-props'.")))
 
 (defcustom org-node-backlink-drawer-positioner #'org-node-goto-new-drawer-site
   "Function for moving point before placing a new drawer.
-Called in a buffer narrowed to one Org entry, excluding any other
-headings.  Point is at the beginning of the body text as determined by
-`org-node--end-of-meta-data'.
+Called in a buffer narrowed to one Org entry, excluding any subtrees.
 
 The function may return anything, but if it returns an integer or
-marker, point will move to that position.
-
-Only called if a drawer was not already present."
+marker, point will move to that position."
   :type '(radio (function-item org-node-goto-new-drawer-site)
                 (function-item org-entry-end-position)
                 (function-item org-node--end-of-meta-data)
@@ -274,80 +268,83 @@ That means the second part of a [[id][description]]."
   (interactive)
   (org-node-backlink--fix-all-files 'del-props))
 
+;; NOTE: For a smaller example of basically the same algorithm, see
+;;       `org-node-lint-all-files'.
 (defvar org-node-backlink--work-remaining nil)
 (defvar org-node-backlink--work-kind nil)
 (defun org-node-backlink--fix-all-files (kind)
   "Update :BACKLINKS: in all known nodes.
-Argument KIND controls how to update them.
-
-Can be quit midway through and resumed later.  With
-\\[universal-argument], start over instead of resuming."
+Argument KIND controls how to update them."
   (interactive)
   (unless (boundp 'fileloop--operate-function)
-    (error "Dependency fileloop may have changed since org-node-backlink was written"))
-  (unless (or (and (memq kind '(update-drawers update-props))
-                   (org-node-backlink--check-v2-misaligned-setting-p))
-              (and (eq kind 'update-drawers)
-                   (org-node-backlink--check-osl-user-p)))
-    (let ((proceed (and org-node-backlink--work-remaining
-                        (eq org-node-backlink--work-kind kind)
-                        (equal fileloop--operate-function
-                               #'org-node-backlink--loop-operator))))
-      (unless proceed
-        (org-mem--scan-full)
-        (unless (org-mem-await 'org-node-backlink 30)
-          (user-error "org-node-backlink: Waited weirdly long for org-mem"))
-        (let* ((files (org-mem-all-files))
-               (dirs (org-node--root-dirs files))
-               (problematic (seq-filter (##and (boundp %) (symbol-value %))
-                                        '(org-node-backlink-mode
-                                          auto-save-visited-mode
-                                          git-auto-commit-mode))))
-          (when (y-or-n-p
-                 (format "Edit %d Org files in these %d directories?\n%S"
-                         (length files) (length dirs) dirs))
-            (when problematic
-              (y-or-n-p (concat "Disable "
-                                (string-join (mapcar #'symbol-name problematic)
-                                             ", ")
-                                "?"))
-              (dolist (mode problematic)
-                (funcall mode 0))
-              (setq problematic nil))
-            (when (not problematic)
-              (setq org-node-backlink--work-remaining files)
-              (setq org-node-backlink--work-kind kind)
-              (fileloop-initialize
-               files
-               (lambda ()
-                 (pop org-node-backlink--work-remaining)
-                 (and buffer-file-name
-                      (string-prefix-p "org" (file-name-extension
-                                              buffer-file-name))))
-               #'org-node-backlink--loop-operator)
-              (setq proceed t)))))
-      (when proceed
-        (cl-letf (((symbol-function 'recentf-add-file) #'ignore))
-          (let ((delay-mode-hooks t)
-                (org-inhibit-startup t)
-                (org-element-cache-persistent nil))
-            (fileloop-continue)))))))
+    (error "Probably org-node-backlink.el is not up to date with fileloop.el"))
+  (when (or (and (memq kind '(update-drawers update-props))
+                 (org-node-backlink--check-v2-misaligned-setting-p))
+            (and (eq kind 'update-drawers)
+                 (org-node-backlink--check-osl-user-p)))
+    (user-error "Not proceeding"))
+  (let ((proceed (and org-node-backlink--work-remaining
+                      (eq org-node-backlink--work-kind kind)
+                      (equal fileloop--operate-function
+                             #'org-node-backlink--loop-operator))))
+    (unless proceed
+      (org-mem--scan-full)
+      (unless (org-mem-await 'org-node-backlink 30)
+        (user-error "org-node-backlink: Waited weirdly long for org-mem"))
+      (let* ((files (org-mem-all-files))
+             (dirs (org-node--root-dirs files))
+             (problematic (seq-filter (##and (boundp %) (symbol-value %))
+                                      '(org-node-backlink-mode
+                                        auto-save-visited-mode
+                                        git-auto-commit-mode))))
+        (and
+         (y-or-n-p
+          (format "Edit %d Org files in these %d directories?\n%S"
+                  (length files) (length dirs) dirs))
+         (or (not problematic)
+             (and (y-or-n-p
+                   (concat "Disable "
+                           (string-join (mapcar #'symbol-name problematic)
+                                        ", ")
+                           "? "))
+                  (dolist (mode problematic t)
+                    (funcall mode 0))))
+         (progn
+           (setq org-node-backlink--work-remaining files)
+           (setq org-node-backlink--work-kind kind)
+           (fileloop-initialize files
+                                (lambda ()
+                                  (let ((file (pop org-node-backlink--work-remaining)))
+                                    (string-prefix-p "org" (file-name-extension file))))
+                                #'org-node-backlink--loop-operator)
+           (setq proceed t)))))
+    (when proceed
+      ;; (cl-letf (((symbol-function 'find-file-noselect)
+      ;; #'org-node--find-file-noselect)))
+      (let ((delay-mode-hooks t)
+            (enable-local-variables :safe)
+            (find-file-hook nil)
+            (org-agenda-files nil) ;; Stop `org-mode' calling `org-agenda-files'
+            (org-inhibit-startup t) ;; Don't apply startup #+options
+            (org-element-cache-persistent nil)
+            (buffer-list-update-hook nil))
+        (fileloop-continue)))))
 
 (defun org-node-backlink--loop-operator ()
   "An OPERATE-FUNCTION for `fileloop-initialize'.
-Wrapper to call `org-node-backlink-fix-buffer'."
+Do `org-node-backlink-fix-buffer', then maybe save, maybe kill buffer."
   (let ((buffer-seems-new (and (not (buffer-modified-p))
-                               (not buffer-undo-list))))
-    (if (not (derived-mode-p 'org-mode))
-        (message "Failed to enter Org mode in %s" (current-buffer))
-      (org-node-backlink-fix-buffer
-       org-node-backlink--work-kind)
-      (when buffer-seems-new
-        (when (buffer-modified-p)
-          (let ((before-save-hook nil)
-                (after-save-hook nil))
-            (save-buffer)))
-        (kill-buffer)))
+                               (not buffer-undo-list)))
+        (kill-buffer-hook nil)) ;; Inhibit save-place etc
+    (unless (derived-mode-p 'org-mode)
+      (org-mode))
+    (org-node-backlink-fix-buffer org-node-backlink--work-kind)
+    (when buffer-seems-new
+      (when (buffer-modified-p)
+        (let ((before-save-hook nil)
+              (after-save-hook nil))
+          (save-buffer)))
+      (kill-buffer))
     t))
 
 (defvar org-node-backlink--checked nil)
@@ -874,6 +871,9 @@ Not meant to be toggled on its own."
        .1 nil #'display-warning 'org-node
        "Your initfiles may have misspelled `org-node-backlink-mode' as `org-node-backlinks-mode'"))
     (apply #'org-node-backlink-mode args)))
+
+(define-obsolete-function-alias 'org-node-backlink-id-blind-simple-lessp
+  #'org-node-backlink-id-blind-string-lessp "2025-05-24")
 
 (provide 'org-node-backlink)
 
