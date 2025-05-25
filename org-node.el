@@ -402,7 +402,8 @@ Takes one argument: the ID that would be given to the node, if created.
 If you put a custom function here, you should check that the title does
 not exist in `org-node--title<>affixations', and that the output of
 `org-node-title-to-filename' does not exist on disk."
-  :type 'function
+  :type '(radio (function-item org-node-titlegen-untitled)
+                (function :tag "Custom function" :value (lambda (id))))
   :package-version '(org-node . "3.3.12"))
 
 (defvar org-node-untitled-format "untitled-%d")
@@ -1942,7 +1943,7 @@ set in `org-node-name-of-links-drawer'."
   (interactive)
   (org-mem-list--pop-to-tabulated-buffer
    :buffer "*org-node files list*"
-   :format [("Modified" 11 t) ("Size" 7 t) ("File" 60 t) ("Title" 40 t) ("Lines" 6 t) ("Coding system" 15 t) ("Properties" 10)]
+   :format [("Modified" 11 t) ("Size" 7 t) ("File" 70 t) ("Title" 40 t) ("Lines" 6 t) ("Coding system" 15 t) ("Properties" 10)]
    :entries
    (cl-loop
     for file in (org-mem-all-files)
@@ -2184,40 +2185,39 @@ Optional keyword argument ABOUT-TO-DO as in
 
 \(fn FILE [:about-to-do ABOUT-TO-DO] &rest BODY)"
   (declare (indent 1) (debug t))
-  (let ()
-    `(let ((enable-local-variables :safe)
-           (org-inhibit-startup t) ;; Don't apply startup #+options
-           (find-file-hook nil)
-           (org-agenda-files nil)
-           (kill-buffer-hook nil) ;; Inhibit save-place etc
-           (kill-buffer-query-functions nil)
-           (buffer-list-update-hook nil)
-           (delay-mode-hooks t)
-           (--file-- (org-mem--truename-maybe ,file)))
-       (unless --file--
-         (error "File does not exist or not valid to visit: %s" ,file))
-       (when (file-directory-p --file--)
-         (error "Is a directory: %s" --file--))
-       (org-element-with-disabled-cache
-         (let* ((--was-open-- (find-buffer-visiting --file--))
-                (--buf-- (or --was-open--
-                             (find-file-noselect --file--))))
-           (when (bufferp --buf--)
-             (with-current-buffer --buf--
-               (save-excursion
-                 (without-restriction
-                   (goto-char (point-min))
-                   ,@body))
-               (if --was-open--
-                   ;; Because the cache gets confused by changes
-                   (org-element-cache-reset)
-                 (when (buffer-modified-p)
-                   (let ((before-save-hook nil)
-                         (after-save-hook nil)
-                         (save-silently t)
-                         (inhibit-message t))
-                     (save-buffer)))
-                 (kill-buffer)))))))))
+  `(let ((enable-local-variables :safe)
+         (org-inhibit-startup t) ;; Don't apply startup #+options
+         (find-file-hook nil)
+         (org-agenda-files nil)
+         (kill-buffer-hook nil) ;; Inhibit save-place etc
+         (kill-buffer-query-functions nil)
+         (buffer-list-update-hook nil)
+         (delay-mode-hooks t)
+         (--file-- (org-mem--truename-maybe ,file)))
+     (unless --file--
+       (error "File does not exist or not valid to visit: %s" ,file))
+     (when (file-directory-p --file--)
+       (error "Is a directory: %s" --file--))
+     (org-element-with-disabled-cache
+       (let* ((--was-open-- (find-buffer-visiting --file--))
+              (--buf-- (or --was-open--
+                           (find-file-noselect --file--))))
+         (when (bufferp --buf--)
+           (with-current-buffer --buf--
+             (save-excursion
+               (without-restriction
+                 (goto-char (point-min))
+                 ,@body))
+             (if --was-open--
+                 ;; Because the cache gets confused by changes
+                 (org-element-cache-reset)
+               (when (buffer-modified-p)
+                 (let ((before-save-hook nil)
+                       (after-save-hook nil)
+                       (save-silently t)
+                       (inhibit-message t))
+                   (save-buffer)))
+               (kill-buffer))))))))
 
 
 ;;;; Commands to add tags/refs/alias
