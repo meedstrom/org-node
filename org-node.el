@@ -2184,9 +2184,7 @@ Optional keyword argument ABOUT-TO-DO as in
 
 \(fn FILE [:about-to-do ABOUT-TO-DO] &rest BODY)"
   (declare (indent 1) (debug t))
-  (let ((why (if (eq (car body) :about-to-do)
-                 (progn (pop body) (pop body))
-               "Org-node is about to look inside a file")))
+  (let ()
     `(let ((enable-local-variables :safe)
            (org-inhibit-startup t) ;; Don't apply startup #+options
            (find-file-hook nil)
@@ -2203,7 +2201,7 @@ Optional keyword argument ABOUT-TO-DO as in
        (org-element-with-disabled-cache
          (let* ((--was-open-- (find-buffer-visiting --file--))
                 (--buf-- (or --was-open--
-                             (org-node--find-file-noselect --file-- ,why))))
+                             (find-file-noselect --file--))))
            (when (bufferp --buf--)
              (with-current-buffer --buf--
                (save-excursion
@@ -2220,66 +2218,6 @@ Optional keyword argument ABOUT-TO-DO as in
                          (inhibit-message t))
                      (save-buffer)))
                  (kill-buffer)))))))))
-
-;; Somewhat faster than `find-file-noselect', not benchmarked.
-;; More importantly, the way it fails is better suited for loop usage, IMO.
-;; Also better for silent background usage.  The argument ABOUT-TO-DO clarifies
-;; what would otherwise be a mysterious error that's difficult for the user to
-;; track down to this package.
-(defun org-node--find-file-noselect (truename about-to-do)
-  "Read file at TRUENAME into a buffer and return the buffer.
-If there's a problem such as an auto-save file being newer, prompt the
-user to proceed with a message based on string ABOUT-TO-DO, else do
-nothing and return nil.
-
-Presumptive!  Like `find-file-noselect' but intended as a
-subroutine for `org-node--in-files-do' or any caller that has
-already ensured that TRUENAME:
-
-- is a file truename e.g. from `org-mem--truename-maybe'
-- does not satisfy `backup-file-name-p'
-- is not already being visited in another buffer
-- is not a directory"
-  (let* ((abbr-truename (org-mem--fast-abbrev truename))
-         (attrs (file-attributes abbr-truename))
-         (buf (create-file-buffer abbr-truename)))
-    (when (null attrs)
-      (kill-buffer buf)
-      (error "File appears to be gone/renamed: %s" abbr-truename))
-    (if (or (not (and large-file-warning-threshold
-                      (> (file-attribute-size attrs)
-                         large-file-warning-threshold)))
-            (y-or-n-p
-             (format "%s, but file %s is large (%s), open anyway? "
-                     about-to-do
-                     (file-name-nondirectory abbr-truename)
-                     (funcall byte-count-to-string-function
-                              large-file-warning-threshold))))
-        (with-current-buffer buf
-          (condition-case nil
-              (progn (insert-file-contents abbr-truename t)
-                     (set-buffer-multibyte t))
-	    (( file-error )
-             (kill-buffer buf)
-             (error "Problems reading file: %s" abbr-truename)))
-          (setq buffer-file-truename abbr-truename)
-          (setq buffer-file-number (file-attribute-file-identifier attrs))
-          (setq default-directory (file-name-directory buffer-file-name))
-          (if (and (not (and buffer-file-name auto-save-visited-file-name))
-                   (file-newer-than-file-p (or buffer-auto-save-file-name
-				               (make-auto-save-file-name))
-			                   buffer-file-name))
-              ;; Could try to call `recover-file' here, but I'm not sure the
-              ;; resulting behavior would be sane, so just bail
-              (progn
-                (message "%s, but skipped because it has an auto-save file: %s"
-                         about-to-do buffer-file-name)
-                nil)
-            (normal-mode t)
-            (current-buffer)))
-      (message "%s, but skipped because file exceeds `large-file-warning-threshold': %s"
-               about-to-do buffer-file-name)
-      nil)))
 
 
 ;;;; Commands to add tags/refs/alias
