@@ -1224,7 +1224,7 @@ Argument NOVISIT means behave as `org-node-insert-link-novisit'."
                         (and node (org-mem-entry-title node))
                         input)))
     (when (string-blank-p input)
-      (unless node
+      (when node
         (error "Did not expect node to exist with blank title: \"%s\"" input))
       (setq input (funcall org-node-blank-input-title-generator id))
       (unless region-text
