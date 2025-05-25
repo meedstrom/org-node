@@ -177,6 +177,7 @@ NAME, ARGLIST and BODY as in `defun'."
 (define-obsolete-function-alias 'org-node-insert-link-into-drawer  'org-node-insert-into-related   "3.3.3 (May 2025)")
 (define-obsolete-function-alias 'org-node--end-of-meta-data        'org-node-full-end-of-meta-data "3.3.10 (May 2025)")
 (define-obsolete-function-alias 'org-node-list-file-coding-systems 'org-node-list-files            "3.3.10 (May 2025)")
+(define-obsolete-function-alias 'org-node-collection               'org-node-collection-basic "3.3.12 (2025-05-25)")
 
 (require 'org-mem)
 (require 'org-mem-updater)

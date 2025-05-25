@@ -11,7 +11,7 @@
 
 - Fix some issues with backlink drawers ending up in the wrong place
 - New feature: create *untitled nodes* using the blank input
-  - Related new user option: =org-node-one-empty-candidate=
+  - Related new user option: =org-node-blank-input-hint=
 - New command =org-node-insert-into-related=
 - "Add bugs": stop proactively fixing backlinks, because it's broken for now
   - Doesn't affect you if you already set =org-node-backlink-lazy= t

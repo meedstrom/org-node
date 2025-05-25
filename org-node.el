@@ -226,7 +226,7 @@ already known."
   :package-version '(org-node . "3.2.0"))
 
 (defun org-node--hack-record-candidate ()
-  "Largely so `org-node-mk-auto-title' can be spammed."
+  "Ensure you can spam-create nodes with `org-node-titlegen-untitled'."
   (when-let* ((title (or (org-get-heading t t t t)
                          (org-get-title))))
     (puthash title (list title "" "") org-node--title<>affixations)
@@ -381,6 +381,40 @@ aliases."
 (defalias 'org-node-affix-with-olp-and-tags   #'org-node-prepend-olp-append-tags)
 (defalias 'org-node-affix-with-olp-and-tags-legacy #'org-node-prepend-olp-append-tags)
 
+(defcustom org-node-blank-input-hint
+  (propertize "(untitled node)" 'face 'completions-annotations)
+  "Whether to add an empty completion candidate to some commands.
+It helps indicate that a blank input can be used there to
+create an untitled node.
+If non-nil, the value is actually the annotation added to it, a
+propertized string."
+  :type '(choice string (const nil))
+  :package-version '(org-node . "3.3.0"))
+
+;; Perhaps it would be handy if the blank input could do smart things like
+;; create a daily-note, but it was not obvious how to shoehorn that into the
+;; system we already have.  This was what we could easily do.
+(defcustom org-node-blank-input-title-generator #'org-node-titlegen-untitled
+  "Function to generate a new unique title, given no user input.
+Used in some commands when exiting minibuffer with a blank string.
+Takes one argument: the ID that would be given to the node, if created.
+
+If you put a custom function here, you should check that the title does
+not exist in `org-node--title<>affixations', and that the output of
+`org-node-title-to-filename' does not exist on disk."
+  :type 'function
+  :package-version '(org-node . "3.3.12"))
+
+(defvar org-node-untitled-format "untitled-%d")
+(defvar org-node--untitled-ctr 1)
+(defun org-node-titlegen-untitled (_id)
+  "Combine a self-incrementing integer with `org-node-untitled-format'."
+  (cl-loop for title = (format org-node-untitled-format org-node--untitled-ctr)
+           while (or (gethash title org-node--title<>affixations)
+                     (file-exists-p (org-node-title-to-filename title)))
+           do (cl-incf org-node--untitled-ctr)
+           finally return title))
+
 (defvar org-node--candidate<>entry (make-hash-table :test 'equal)
   "1:1 table mapping minibuffer completion candidates to ID-nodes.
 These candidates may or may not be pre-affixated, depending on
@@ -392,18 +426,11 @@ Even when the triplets are not used, this table serves double-duty such
 that its keys constitute the subset of `org-mem--title<>id' that
 passed `org-node-filter-fn'.")
 
-(defcustom org-node-one-empty-candidate t
-  "Whether to add an empty completion candidate to some commands.
-It helps indicate that a blank input can be used there to
-create an untitled node."
-  :type 'boolean
-  :package-version '(org-node . "3.3.0"))
-
-(defun org-node-collection (&rest args)
+(defun org-node-collection-main (&rest args)
   "Pass ARGS to the right collection depending on user settings.
-See `org-node-collection-basic'."
-  (if org-node-one-empty-candidate
-      (apply #'org-node-collection-with-empty args)
+The collections are trivial variants of `org-node-collection-basic'."
+  (if org-node-blank-input-hint
+      (apply #'org-node-collection--with-empty args)
     (apply #'org-node-collection-basic args)))
 
 ;; TODO: Assign a category `org-node', then add an embark action to embark?
@@ -433,8 +460,8 @@ see Info node `(elisp)Programmed Completion'."
       (cons 'metadata (list (cons 'affixation-function #'org-node--affixate)))
     (complete-with-action action org-node--candidate<>entry str pred)))
 
-(defun org-node-collection-with-empty (str pred action)
-  "Like `org-node-collection' but add an empty candidate.
+(defun org-node-collection--with-empty (str pred action)
+  "A collection that includes an empty candidate at the front.
 STR, PRED and ACTION as in `org-node-collection-basic'."
   (let ((blank (if (bound-and-true-p helm-mode) " " "")))
     (if (eq action 'metadata)
@@ -449,9 +476,7 @@ STR, PRED and ACTION as in `org-node-collection-basic'."
 (defun org-node--affixate (collection)
   "From list COLLECTION, make an alist of ((TITLE PREFIX SUFFIX) ...)."
   (if (string-blank-p (car collection))
-      (cons (list (car collection)
-                  ""
-                  (propertize "(untitled node)" 'face 'completions-annotations))
+      (cons (list (car collection) "" (or org-node-blank-input-hint ""))
             (if org-node-alter-candidates
                 (cl-loop for candidate in (cdr collection)
                          collect (list candidate "" ""))
@@ -503,7 +528,7 @@ STR, PRED and ACTION as in `org-node-collection-basic'."
             (puthash (concat (nth 1 affx) (nth 0 affx) (nth 2 affx))
                      node
                      org-node--candidate<>entry)
-          ;; Bare title, to be affixated later by `org-node-collection'
+          ;; Bare title, to be affixated later
           (puthash title node org-node--candidate<>entry))))))
 
 (defun org-node--wipe-completions (_parse-results)
@@ -1073,7 +1098,7 @@ type the name of a node that does not exist.  That enables this
           (setq node (org-node-guess-node-by-title title)))
       ;; Was called from `org-capture', which means the user has not yet typed
       ;; the title; let them type it now
-      (let ((input (completing-read "Node: " #'org-node-collection
+      (let ((input (completing-read "Node: " #'org-node-collection-main
                                     () () () 'org-node-hist)))
         (setq node (gethash input org-node--candidate<>entry))
         (if node
@@ -1082,7 +1107,7 @@ type the name of a node that does not exist.  That enables this
               (setq title (org-mem-entry-title node)))
           (setq id (org-id-new))
           (setq title (if (string-blank-p input)
-                          (org-node-mk-auto-title id)
+                          (funcall org-node-blank-input-title-generator id)
                         input)))))
     (if node
         ;; Node exists; capture into it
@@ -1126,16 +1151,6 @@ type the name of a node that does not exist.  That enables this
 
 ;;;; Commands
 
-(defvar org-node-untitled-format "untitled-%d")
-(defvar org-node--untitled-ctr 1)
-(defun org-node-mk-auto-title (_id)
-  "Override this to change what to name an untitled node."
-  (cl-loop for title = (format org-node-untitled-format org-node--untitled-ctr)
-           while (or (gethash title org-node--title<>affixations)
-                     (file-exists-p (org-node-title-to-filename title)))
-           do (cl-incf org-node--untitled-ctr)
-           finally return title))
-
 ;;;###autoload
 (defun org-node-find ()
   "Select and visit one of your ID nodes.
@@ -1145,14 +1160,14 @@ set `org-node-creation-fn' to `org-node-new-via-roam-capture'."
   (interactive)
   (org-node-cache-ensure)
   (let* ((input (completing-read "Visit or create node: "
-                                 #'org-node-collection
+                                 #'org-node-collection-main
                                  () () () 'org-node-hist))
          (node (gethash input org-node--candidate<>entry)))
     (if node
         (org-node--goto node)
       (let ((id (org-id-new)))
         (if (string-blank-p input)
-            (org-node-create (org-node-mk-auto-title id) id)
+            (org-node-create (funcall org-node-blank-input-title-generator id) id)
           (org-node-create input id))))))
 
 ;;;###autoload
@@ -1195,7 +1210,7 @@ Argument NOVISIT means behave as `org-node-insert-link-novisit'."
                     nil))
          (input (if (and novisit initial)
                     initial
-                  (completing-read "Node: " #'org-node-collection
+                  (completing-read "Node: " #'org-node-collection-main
                                    () () initial 'org-node-hist)))
          (node (gethash input org-node--candidate<>entry))
          (id (if node (org-mem-id node) (org-id-new)))
@@ -1209,7 +1224,9 @@ Argument NOVISIT means behave as `org-node-insert-link-novisit'."
                         (and node (org-mem-entry-title node))
                         input)))
     (when (string-blank-p input)
-      (setq input (org-node-mk-auto-title id))
+      (unless node
+        (error "Did not expect node to exist with blank title: \"%s\"" input))
+      (setq input (funcall org-node-blank-input-title-generator id))
       (unless region-text
         (setq link-desc input)))
     (atomic-change-group
