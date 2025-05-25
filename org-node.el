@@ -2658,64 +2658,6 @@ CREATE-MISSING t.  Also see that function for meaning of CREATE-WHERE."
         (goto-char start)
         nil))))
 
-;; ... I don't know the org-element API at all.  Might be useful here.
-(defun org-node--re-search-forward-skip-some-regions (regexp &optional bound noerror)
-  "Like `re-search-forward', but do not search inside certain regions.
-These regions are delimited by lines that start with \"#+BEGIN\" or
-\"#+END\".  Upon finding such regions, jump to the end of that region,
-then continue the search.
-
-Argument BOUND and NOERROR as in `re-search-forward'.
-
-Each invocation has overhead, so to search for the same REGEXP
-repeatedly, it performs better not to iterate per the common pattern
-\"(while (re-search-forward REGEXP nil t) ...)\",
-but to use `org-node--map-matches-skip-some-regions' instead."
-  (let ((starting-pos (point))
-        (skips (org-node--find-regions-to-skip bound)))
-    (catch 'found
-      (cl-loop for (beg . end) in skips
-               if (re-search-forward regexp beg noerror)
-               do (throw 'found (point))
-               else do (goto-char end))
-      (if (re-search-forward regexp bound noerror)
-          (throw 'found (point))
-        (goto-char starting-pos)
-        (if noerror nil (signal 'search-failed (list regexp)))))))
-
-;; unused for now; likely something like this will go in org-mem-parser.el
-(defun org-node--map-matches-skip-some-regions (regexp fn &optional bound)
-  "Go to each match for REGEXP and call FN.
-BOUND as in `re-search-forward'."
-  (let ((last-search-hit (point))
-        (skips (org-node--find-regions-to-skip bound)))
-    (cl-loop for (beg . end) in skips do
-             (while (re-search-forward regexp beg t)
-               (setq last-search-hit (point))
-               (funcall fn))
-             (goto-char end))
-    (while (re-search-forward regexp bound t)
-      (setq last-search-hit (point))
-      (funcall fn))
-    (goto-char last-search-hit)))
-
-(defun org-node--find-regions-to-skip (&optional bound)
-  "Subroutine for `org-node--re-search-forward-skip-some-regions'.
-BOUND as in `re-search-forward'."
-  (let ((starting-pos (point))
-        (case-fold-search t)
-        skips)
-    (while (re-search-forward "^[ \t]*#\\+BEGIN" bound t)
-      (forward-line 0)
-      (let ((beg (point)))
-        (unless (re-search-forward "^[ \t]*#\\+END" bound t)
-          (error "org-node: Could not find #+end%s"
-                 (if bound (format " before search boundary %d" bound) "")))
-        (forward-line 1)
-        (push (cons beg (point)) skips)))
-    (goto-char starting-pos)
-    (nreverse skips)))
-
 (defun org-node--in-transclusion-p (&optional pos)
   "Non-nil if POS is inside a transclude-region."
   (get-text-property (or pos (point)) 'org-transclusion-id))
