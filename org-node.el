@@ -429,26 +429,31 @@ propertized string."
 ;; create a daily-note, but it was not obvious how to shoehorn that into the
 ;; system we already have.  This was what we could easily do.
 (defcustom org-node-blank-input-title-generator #'org-node-titlegen-untitled
-  "Function to generate a new unique title, given no user input.
-Used in some commands when exiting minibuffer with a blank string.
-Takes one argument: the ID that would be given to the node, if created.
-
-If you put a custom function here, you should check that the title is
-not a key of table `org-node--title<>affixations', and that the output
-of `org-node-title-to-filename' does not satisfy `file-exists-p'."
+  "Function to generate a title, given no user input.
+Used in some commands when exiting minibuffer with a blank string."
   :type '(radio (function-item org-node-titlegen-untitled)
-                (function :tag "Custom function" :value (lambda (id))))
+                (function-item org-node-titlegen-today)
+                (function-item org-node-titlegen-this-week)
+                (function :tag "Custom function" :value (lambda ())))
   :package-version '(org-node . "3.3.12"))
 
 (defvar org-node-untitled-format "untitled-%d")
 (defvar org-node--untitled-ctr 1)
-(defun org-node-titlegen-untitled (_id)
-  "Combine a self-incrementing integer with `org-node-untitled-format'."
+(defun org-node-titlegen-untitled ()
+  "Combine `org-node-untitled-format' with a new integer on every call."
   (cl-loop for title = (format org-node-untitled-format org-node--untitled-ctr)
            while (or (gethash title org-node--title<>affixations)
                      (file-exists-p (org-node-title-to-filename title)))
            do (cl-incf org-node--untitled-ctr)
            finally return title))
+
+(defun org-node-titlegen-today ()
+  "Get a node title for the day\\='s date."
+  (format-time-string "Assorted for %A, %d %b %Y"))
+
+(defun org-node-titlegen-this-week ()
+  "Get a node title for the current ISO8601 week."
+  (format-time-string "Assorted for Week %V, %G"))
 
 (defvar org-node--candidate<>entry (make-hash-table :test 'equal)
   "1:1 table mapping minibuffer completion candidates to ID-nodes.
@@ -994,9 +999,8 @@ To operate on a node after creating it, hook onto
 (defun org-node-new-file ()
   "Create a new file with a new node.
 Designed for `org-node-creation-fn'."
-  (when (or (null org-node-proposed-title)
-            (null org-node-proposed-id))
-    (error "`org-node-new-file' meant to be called from `org-node-create'"))
+  (unless org-node-proposed-title (error "Proposed title was nil"))
+  (unless org-node-proposed-id (error "Proposed ID was nil"))
   (let* ((dir (org-node-guess-or-ask-dir "New file in which directory? "))
          (path-to-write
           (file-name-concat dir (org-node-title-to-basename org-node-proposed-title))))
@@ -1026,9 +1030,8 @@ Designed for `org-node-creation-fn'."
 (defun org-node-new-via-roam-capture ()
   "Call `org-roam-capture-' with predetermined arguments.
 Designed for `org-node-creation-fn'."
-  (when (or (null org-node-proposed-title)
-            (null org-node-proposed-id))
-    (error "`org-node-new-via-roam-capture' meant to be called by `org-node-create'"))
+  (unless org-node-proposed-title (error "Proposed title was nil"))
+  (unless org-node-proposed-id (error "Proposed ID was nil"))
   (unless (require 'org-roam nil t)
     (error "`org-node-new-via-roam-capture' requires library \"org-roam\""))
   (when (and (fboundp 'org-roam-capture-)
@@ -1081,18 +1084,21 @@ type the name of a node that does not exist.  That enables this
           (setq id org-node-proposed-id)
           ;; FIXME: Why not use id?  Review when the proposed-id might be pre-set
           (setq node (org-node-guess-node-by-title title)))
+      (when org-node-proposed-id (error "Proposed title was nil"))
       ;; Was called from `org-capture', which means the user has not yet typed
       ;; the title; let them type it now
       (let ((input (org-node-read-candidate nil t)))
+        (when (string-blank-p input)
+          (setq input (funcall org-node-blank-input-title-generator)))
         (setq node (gethash input org-node--candidate<>entry))
         (if node
             (progn
               (setq id (org-mem-entry-id node))
               (setq title (org-mem-entry-title node)))
           (setq id (org-id-new))
-          (setq title (if (string-blank-p input)
-                          (funcall org-node-blank-input-title-generator id)
-                        input)))))
+          (setq title input))))
+
+    (unless title (error "Given title was nil"))
     (if node
         ;; Node exists; capture into it
         (progn
@@ -1144,13 +1150,13 @@ set `org-node-creation-fn' to `org-node-new-via-roam-capture'."
   (interactive)
   (org-node-cache-ensure)
   (let* ((input (org-node-read-candidate "Visit or create node: " t))
+         (_ (when (string-blank-p input)
+              (setq input (funcall org-node-blank-input-title-generator))))
          (node (gethash input org-node--candidate<>entry)))
     (if node
         (org-node--goto node)
       (let ((id (org-id-new)))
-        (if (string-blank-p input)
-            (org-node-create (funcall org-node-blank-input-title-generator id) id)
-          (org-node-create input id))))))
+        (org-node-create input id)))))
 
 ;;;###autoload
 (defun org-node-insert-heading ()
@@ -1247,6 +1253,8 @@ Argument NOVISIT for use by `org-node-insert-link-novisit'."
          (input (if (and novisit initial)
                     initial
                   (org-node-read-candidate nil t)))
+         (_ (when (string-blank-p input)
+              (setq input (funcall org-node-blank-input-title-generator))))
          (node (gethash input org-node--candidate<>entry))
          (id (if node (org-mem-id node) (org-id-new)))
          (link-desc (or region-text
@@ -1258,12 +1266,6 @@ Argument NOVISIT for use by `org-node-insert-link-novisit'."
                                             (org-mem-entry-roam-aliases node)))
                         (and node (org-mem-entry-title node))
                         input)))
-    (when (string-blank-p input)
-      (when node
-        (error "Did not expect node to exist with blank title: \"%s\"" input))
-      (setq input (funcall org-node-blank-input-title-generator id))
-      (unless region-text
-        (setq link-desc input)))
     (atomic-change-group
       (when region-text
         (delete-region beg end))

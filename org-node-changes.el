@@ -41,16 +41,15 @@
   "Alist of deprecated symbol names and their new names.
 Names here will cause complaints if bound.")
 
+(defvar org-node-changes--warned-about-titlegen nil)
 (defvar org-node-changes--warned-about-roam-id nil)
 (defvar org-node-changes--warned-about-fakeroam-v2 nil)
 (defun org-node-changes--onetime-warn-and-copy ()
-  "Maybe print one-shot warnings, then become a no-op.
+  "Maybe print one-shot warnings.
 
-First, warn if any old name in `org-node-changes--new-names' is bound.
+Also warn if any old name in `org-node-changes--new-names' is bound.
 Then copy the value in the old name so that the new name gets the same
-value.
-
-Then do other one-shot warnings while we\\='re at it."
+value."
   (let ((names org-node-changes--new-names))
     (while-let ((row (pop names)))
       (seq-let (old new removed-by) row
@@ -90,7 +89,12 @@ If `org-mem-do-sync-with-org-id', you can revert to default ID-link behavior.
 Add to initfiles:
 (with-eval-after-load 'org-roam-id
  (org-link-set-parameters
-  \"id\" :follow #'org-id-open :store #'org-id-store-link-maybe))"))))
+  \"id\" :follow #'org-id-open :store #'org-id-store-link-maybe))")))
+  (unless org-node-changes--warned-about-titlegen
+    (when (help-function-arglist org-node-blank-input-title-generator)
+      (setq org-node-changes--warned-about-titlegen t)
+      (display-warning
+       'org-node "User option org-node-blank-input-title-generator should be a function of no argument"))))
 
 (defmacro org-node-changes--def-whiny-alias
     (old new when removed-by &optional interactive)
