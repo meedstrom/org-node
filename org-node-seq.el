@@ -168,7 +168,7 @@ YYYY-MM-DD format, e.g. \"2024-01-31.org\"."
                 (org-node-seq-try-goto-file (cdr item)))
     :creator (lambda (sortstr key)
                (let ((org-node-creation-fn #'org-node-new-file)
-                     (org-node-ask-directory ,dir))
+                     (org-node-file-directory-ask ,dir))
                  (org-node-create sortstr (org-id-new) key)))))
 
 
@@ -198,7 +198,7 @@ On success, return non-nil; else nil.  Never create FILE anew."
 On failing to coerce a date, return nil.
 
 Only works for names starting with either an YYYY-MM-DD date, or a
-datestamp matching the style of `org-node-datestamp-format'.
+datestamp matching the style of `org-node-file-timestamp-format'.
 
 The latter uses a sloppy algorithm so not all formats work, see
 `org-node-seq-extract-ymd'."
@@ -210,7 +210,7 @@ The latter uses a sloppy algorithm so not all formats work, see
         ;; Even in a non-daily file, pretend it is a daily if possible,
         ;; to allow entering the sequence at a more relevant date
         (when-let* ((stamp (org-node-extract-file-name-datestamp path)))
-          (org-node-seq-extract-ymd stamp org-node-datestamp-format))))))
+          (org-node-seq-extract-ymd stamp org-node-file-timestamp-format))))))
 
 ;; TODO: Handle %s, %V, %y...  is there a library?
 ;;;###autoload

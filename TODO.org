@@ -18,7 +18,7 @@
 
 * Other
 
-- Let user preview the filename that will be created.  (Currently, when option =org-node-ask-directory= is t, it just asks you for a directory, which is weirdly restrictive.)
+- Let user preview the filename that will be created.  (Currently, when option =org-node-file-directory-ask= is t, it just asks you for a directory, which is weirdly restrictive.)
 
 - Make a command akin to =org-node-lint-all-files=, but that just runs =org-element-parse-buffer= with =org-element--cache-diagnostics= on, then prints those diagnostics.
 

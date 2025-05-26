@@ -221,8 +221,8 @@ Called with point in the new link."
 (defcustom org-node-creation-hook nil
   "Hook run with point in the newly created file or entry.
 
-A good function for this hook is `'org-node-ensure-crtime-property',
-since the default `org-node-datestamp-format' is empty."
+A good function for this hook is `org-node-ensure-crtime-property',
+since the default `org-node-file-timestamp-format' is empty."
   :type 'hook)
 
 (defcustom org-node-relocation-hook nil
@@ -691,45 +691,37 @@ buffer already exists, so the buffer stays blank.  Thus this hook."
 
 ;;;; Filename functions
 
-(defcustom org-node-ask-directory nil
+(defcustom org-node-file-directory-ask nil
   "Whether to ask the user where to save a new file.
 
-- Symbol nil: put file in the most populous root directory in
-              `org-id-locations' without asking
-- String: a directory path in which to put the file
-- Symbol t: ask every time
-
-This variable determines the directory component, but the file basename
-is determined by `org-node-slug-fn' and `org-node-datestamp-format'."
+- Value nil: Let `org-node-guess-dir' decide
+- Value t: Ask every time
+- String: A directory path in which to put the file"
   :group 'org-node
-  :type '(choice boolean string))
+  :type '(choice boolean directory))
 
 ;; This setting needs care with `org-node-rename-file-by-title' after changing.
 ;; https://blog.ganssle.io/articles/2023/01/attractive-nuisances.html
-(defcustom org-node-datestamp-format ""
+(defcustom org-node-file-timestamp-format ""
   "Passed to `format-time-string' to prepend to filenames.
 
 Example from Org-roam: %Y%m%d%H%M%S-
 Example from Denote: %Y%m%dT%H%M%S--
 
-For the rest of the filename, configure `org-node-slug-fn'."
+For the rest of the filename, configure `org-node-file-slug-fn'."
   :type '(radio
           (const :tag "None" :value "")
           (const :tag "Like Org-roam: %Y%m%d%H%M%S-" :value "%Y%m%d%H%M%S-")
           (const :tag "Like Denote: %Y%m%dT%H%M%S--" :value "%Y%m%dT%H%M%S--")
           (string :tag "Custom")))
 
-(defcustom org-node-slug-fn #'org-node-slugify-for-web
+(defcustom org-node-file-slug-fn #'org-node-slugify-for-web
   "Function taking a node title and returning a filename component.
 Receives one argument: the value of an Org #+TITLE keyword, or
 the first heading in a file that has no #+TITLE.
 
-Built-in choices:
-- `org-node-slugify-for-web'
-- `org-node-slugify-like-roam-default'
-
 It is popular to also prefix filenames with a datestamp.  To do
-that, configure `org-node-datestamp-format'."
+that, configure `org-node-file-timestamp-format'."
   :type '(radio
           (function-item org-node-slugify-for-web)
           (function-item org-node-slugify-like-roam-default)
@@ -788,15 +780,15 @@ substring \"/home/me\" referring to the same location."
 
 (defun org-node-title-to-filename (title)
   "From TITLE, make a full file path."
-  (file-name-concat (if (stringp org-node-ask-directory)
-                        org-node-ask-directory
+  (file-name-concat (if (stringp org-node-file-directory-ask)
+                        org-node-file-directory-ask
                       (org-node-guess-dir))
                     (org-node-title-to-basename title)))
 
 (defun org-node-title-to-basename (title)
   "From TITLE, make the non-directory component of a file name."
-  (concat (format-time-string org-node-datestamp-format)
-          (funcall (org-node--try-ensure-compiled org-node-slug-fn) title)
+  (concat (format-time-string org-node-file-timestamp-format)
+          (funcall (org-node--try-ensure-compiled org-node-file-slug-fn) title)
           ".org"))
 
 (defun org-node-guess-dir ()
@@ -804,14 +796,14 @@ substring \"/home/me\" referring to the same location."
   (car (org-node--root-dirs (org-mem-all-files))))
 
 ;; TODO: It'd be more user-friendly if the interactive prompt also lets you
-;;       change the basename.  So, conditionally call `org-node-slug-fn'
+;;       change the basename.  So, conditionally call `org-node-file-slug-fn'
 ;;       here, then use `read-file-name' rather than `read-directory-name'.
 ;;       But first we need some refactoring elsewhere.
 (defun org-node-guess-or-ask-dir (prompt)
   "Maybe prompt for a directory, and if so, use string PROMPT.
-Behavior depends on user option `org-node-ask-directory'."
-  (if (eq t org-node-ask-directory) (read-directory-name prompt)
-    (if (stringp org-node-ask-directory) org-node-ask-directory
+Behavior depends on user option `org-node-file-directory-ask'."
+  (if (eq t org-node-file-directory-ask) (read-directory-name prompt)
+    (if (stringp org-node-file-directory-ask) org-node-file-directory-ask
       (org-node-guess-dir))))
 
 (defun org-node-slugify-like-roam-default (title)
@@ -825,7 +817,7 @@ alphabets).  Also stripped are all glyphs not categorized in Unicode as
 belonging to an alphabet or number system.
 
 If you seek to emulate org-roam filenames, you may also want to
-configure `org-node-datestamp-format'."
+configure `org-node-file-timestamp-format'."
   (thread-last title
                (string-glyph-decompose)
                (seq-remove (lambda (char) (<= #x300 char #x331)))
@@ -1619,15 +1611,15 @@ creation-date as more truthful or useful than today\\='s date.
 
 (defun org-node-extract-file-name-datestamp (path)
   "From filename PATH, get the datestamp prefix if it has one.
-Do so by comparing with `org-node-datestamp-format'.
+Do so by comparing with `org-node-file-timestamp-format'.
 
 High risk of false positives if you have been changing formats over
 time without renaming existing files."
-  (when (and org-node-datestamp-format
-             (not (string-blank-p org-node-datestamp-format)))
+  (when (and org-node-file-timestamp-format
+             (not (string-blank-p org-node-file-timestamp-format)))
     (let ((name (file-name-nondirectory path)))
       (when (string-match
-             (org-node--make-regexp-for-time-format org-node-datestamp-format)
+             (org-node--make-regexp-for-time-format org-node-file-timestamp-format)
              name)
         (match-string 0 name)))))
 
@@ -1650,7 +1642,7 @@ out, with any year, month or day."
                      (let ((example (format-time-string format)))
                        (if (string-match-p (rx (any "^*+([\\")) example)
                            ;; TODO: Improve error message, now it presumes caller
-                           (error "org-node: Unable to safely rename with current `org-node-datestamp-format'.  This is not inherent in your choice of format, I am just not smart enough")
+                           (error "org-node: Unable to safely rename with current `org-node-file-timestamp-format'.  This is not inherent in your choice of format, I am just not smart enough")
                          (concat "^"
                                  (string-replace
                                   "." "\\."
@@ -1678,10 +1670,11 @@ a file is not there, it is not considered in any case."
 
 ;;;###autoload
 (defun org-node-rename-file-by-title (&optional interactive)
-  "Rename the current file according to `org-node-slug-fn'.
+  "Rename the current file according to `org-node-file-slug-fn'.
 
 Also attempt to check for a prefix in the style of
-`org-node-datestamp-format', and preserve any such prefix.  Otherwise, add one.
+`org-node-file-timestamp-format', and preserve such a prefix.
+Otherwise, add one.
 
 Suitable at the end of `after-save-hook'.  If called from a hook
 \(or from Lisp in general), only operate on files in
@@ -1731,8 +1724,8 @@ Argument INTERACTIVE automatically set."
         (let* ((name (file-name-nondirectory path))
                (date-prefix (or (org-node-extract-file-name-datestamp path)
                                 ;; Couldn't find date prefix, give a new one
-                                (format-time-string org-node-datestamp-format)))
-               (slug (funcall org-node-slug-fn title))
+                                (format-time-string org-node-file-timestamp-format)))
+               (slug (funcall org-node-file-slug-fn title))
                (new-name (concat date-prefix slug ".org"))
                (new-path
                 (file-name-concat (file-name-directory path) new-name)))

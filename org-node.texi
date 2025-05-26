@@ -60,8 +60,8 @@ Backlink solution 1: displayed in a separate window
 Backlink solution 2: Print inside the file
 
 * Option 2A Automatic @samp{BACKLINKS} property::
-* Option 2B Automatic @samp{BACKLINKS...END} drawer: Option 2B Automatic @samp{BACKLINKSEND} drawer. 
-* Option 2C Semi-automatic @samp{BACKLINKS...END} drawer: Option 2C Semi-automatic @samp{BACKLINKSEND} drawer. 
+* Option 2B Automatic @samp{BACKLINKS...END} drawer: Option 2B Automatic @samp{BACKLINKSEND} drawer.
+* Option 2C Semi-automatic @samp{BACKLINKS...END} drawer: Option 2C Semi-automatic @samp{BACKLINKSEND} drawer.
 
 Misc
 
@@ -317,8 +317,8 @@ If you're coming here from @strong{org-roam}@comma{} try this instead:
   (org-node-cache-mode)
   (org-node-roam-accelerator-mode)
   (setq org-node-creation-fn #'org-node-new-via-roam-capture)
-  (setq org-node-slug-fn #'org-node-slugify-like-roam-default)
-  (setq org-node-datestamp-format "%Y%m%d%H%M%S-"))
+  (setq org-node-file-slug-fn #'org-node-slugify-like-roam-default)
+  (setq org-node-file-timestamp-format "%Y%m%d%H%M%S-"))
 @end lisp
 
 @menu
@@ -404,8 +404,8 @@ It's the same you observe in the backlink buffers from earlier: @strong{not all 
 
 @menu
 * Option 2A Automatic @samp{BACKLINKS} property::
-* Option 2B Automatic @samp{BACKLINKS...END} drawer: Option 2B Automatic @samp{BACKLINKSEND} drawer. 
-* Option 2C Semi-automatic @samp{BACKLINKS...END} drawer: Option 2C Semi-automatic @samp{BACKLINKSEND} drawer. 
+* Option 2B Automatic @samp{BACKLINKS...END} drawer: Option 2B Automatic @samp{BACKLINKSEND} drawer.
+* Option 2C Semi-automatic @samp{BACKLINKS...END} drawer: Option 2C Semi-automatic @samp{BACKLINKSEND} drawer.
 @end menu
 
 @node Option 2A Automatic @samp{BACKLINKS} property
@@ -767,7 +767,7 @@ Auto-rename the file based on the current @samp{#+title} or first heading
 @item
 Can be run manually or placed on @samp{after-save-hook}!  When run as a hook@comma{} it is conservative@comma{} doing nothing until you configure @samp{org-node-renames-allowed-dirs}.
 @item
-@strong{Please note} that if your filenames have datestamp prefixes@comma{} like org-roam's default behavior of making filenames such as @samp{20240831143302-node_title.org}@comma{} it is important to get @samp{org-node-datestamp-format} right or it @strong{may clobber a pre-existing datestamp}.
+@strong{Please note} that if your filenames have datestamp prefixes@comma{} like org-roam's default behavior of making filenames such as @samp{20240831143302-node_title.org}@comma{} it is important to get @samp{org-node-file-timestamp-format} right or it @strong{may clobber a pre-existing datestamp}.
 
 A message is printed about the rename@comma{} but it's easy to miss.
 @end itemize
@@ -890,7 +890,7 @@ API cheatsheet between org-roam and org-node.
 @tab @samp{(org-roam-node-read)}
 @tab @samp{(org-node-read)}
 @item Get node by ID
-@tab 
+@tab
 @tab @samp{(org-mem-entry-by-id ID)}
 @item Get list of files
 @tab @samp{(org-roam-list-files)}
@@ -908,7 +908,7 @@ API cheatsheet between org-roam and org-node.
 @tab @samp{(org-roam-node-file-title NODE)}
 @tab @samp{(org-mem-entry-file-title NODE)}
 @item Get title @emph{or} name of file where NODE is
-@tab 
+@tab
 @tab @samp{(org-mem-entry-file-title-or-basename NODE)}
 @item Get full path to file where NODE is
 @tab @samp{(org-roam-node-file NODE)}
@@ -920,10 +920,10 @@ API cheatsheet between org-roam and org-node.
 @tab @samp{(org-roam-node-tags NODE)}
 @tab @samp{(org-mem-entry-tags NODE)}
 @item Get tags (local only)
-@tab 
+@tab
 @tab @samp{(org-mem-entry-tags-local NODE)}
 @item Get tags (inherited only)
-@tab 
+@tab
 @tab @samp{(org-mem-entry-tags-inherited NODE)}
 @item Get outline level
 @tab @samp{(org-roam-node-level NODE)}
@@ -932,7 +932,7 @@ API cheatsheet between org-roam and org-node.
 @tab @samp{(org-roam-node-point NODE)}
 @tab @samp{(org-mem-entry-pos node)}
 @item Get line number
-@tab 
+@tab
 @tab @samp{(org-mem-entry-lnum NODE)}
 @item Get properties
 @tab @samp{(org-roam-node-properties NODE)}
@@ -959,7 +959,7 @@ API cheatsheet between org-roam and org-node.
 @tab @samp{(org-roam-node-aliases NODE)}
 @tab @samp{(org-mem-entry-roam-aliases NODE)}
 @item Get @samp{ROAM_EXCLUDE}
-@tab 
+@tab
 @tab @samp{(org-mem-entry-property "ROAM_EXCLUDE" NODE)}
 @item Ensure fresh data
 @tab @samp{(org-roam-db-sync)}

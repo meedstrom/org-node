@@ -155,8 +155,8 @@ If you're coming here from *org-roam*, try this instead:
   (org-node-cache-mode)
   (org-node-roam-accelerator-mode)
   (setq org-node-creation-fn #'org-node-new-via-roam-capture)
-  (setq org-node-slug-fn #'org-node-slugify-like-roam-default)
-  (setq org-node-datestamp-format "%Y%m%d%H%M%S-"))
+  (setq org-node-file-slug-fn #'org-node-slugify-like-roam-default)
+  (setq org-node-file-timestamp-format "%Y%m%d%H%M%S-"))
 #+end_src
 
 *** An update broke things?
@@ -474,7 +474,7 @@ Rarer commands:
 - =org-node-rename-file-by-title=
   - Auto-rename the file based on the current =#+title= or first heading
     - Can be run manually or placed on =after-save-hook=!  When run as a hook, it is conservative, doing nothing until you configure =org-node-renames-allowed-dirs=.
-    - *Please note* that if your filenames have datestamp prefixes, like org-roam's default behavior of making filenames such as =20240831143302-node_title.org=, it is important to get =org-node-datestamp-format= right or it *may clobber a pre-existing datestamp*.
+    - *Please note* that if your filenames have datestamp prefixes, like org-roam's default behavior of making filenames such as =20240831143302-node_title.org=, it is important to get =org-node-file-timestamp-format= right or it *may clobber a pre-existing datestamp*.
 
       A message is printed about the rename, but it's easy to miss.
 
