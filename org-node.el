@@ -2834,6 +2834,18 @@ heading, else the file-level node, whichever has an ID first."
   (with-memoization (org-mem--table 0 'org-node-all-filtered-nodes)
     (seq-uniq (hash-table-values org-node--candidate<>entry))))
 
+
+(define-obsolete-function-alias 'org-node-prefix-with-olp                  #'org-node-prepend-olp               "3.3.0 (May 2025)")
+(define-obsolete-function-alias 'org-node-prefix-with-tags-tags            #'org-node-prepend-tags              "3.3.0 (May 2025)")
+(define-obsolete-function-alias 'org-node-prefix-with-tags-and-olp         #'org-node-prepend-tags-and-olp      "3.3.0 (May 2025)")
+(define-obsolete-function-alias 'org-node-affix-with-olp-and-tags          #'org-node-prepend-olp-append-tags   "3.3.0 (May 2025)")
+(define-obsolete-function-alias 'org-node-affix-with-olp-and-tags-legacy   #'org-node-prepend-olp-append-tags   "3.3.0 (May 2025)")
+(define-obsolete-function-alias 'org-node-insert-link-into-drawer          #'org-node-insert-into-related       "3.3.3 (May 2025)")
+(define-obsolete-function-alias 'org-node--end-of-meta-data                #'org-node-full-end-of-meta-data     "3.3.10 (May 2025)")
+(define-obsolete-function-alias 'org-node-list-file-coding-systems         #'org-node-list-files                "3.3.10 (May 2025)")
+(define-obsolete-function-alias 'org-node-collection                       #'org-node-collection-basic          "3.3.12 (May 2025)")
+(define-obsolete-function-alias 'org-node-mk-auto-title                    #'org-node-titlegen-untitled         "3.3.12 (May 2025)")
+
 (provide 'org-node)
 
 ;;; org-node.el ends here
