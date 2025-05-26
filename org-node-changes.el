@@ -143,6 +143,10 @@ NAME, ARGLIST and BODY as in `defun'."
                     ,when ,removed-by ,newname-or-expl)))
        ,@body)))
 
+;; An ancient typo.
+(when (boundp 'org-noden-hist)
+  (makunbound 'org-noden-hist))
+
 (org-node-changes--def-whiny-fn org-node-seq--guess-daily-dir ()
   "3.1.2 (May 2025)" "July" "hardcode a directory in your `org-node-seq-defs' instead."
   (or (bound-and-true-p org-node-fakeroam-daily-dir)

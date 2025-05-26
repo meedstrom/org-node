@@ -496,13 +496,35 @@ STR, PRED and ACTION as in `org-node-collection-basic'."
 (defvar org-node-hist nil
   "Minibuffer history.")
 
-;; Boost this completion hist to at least 1000 elements, unless user has nerfed
+;; Second hist introduced in 3.3.16; transition by copying from first.
+(if (boundp 'org-node-hist-altered)
+    (defvar org-node-hist-altered nil
+      "Minibuffer history.")
+  (defvar org-node-hist-altered org-node-hist
+    "Minibuffer history."))
+
+;; Boost completion hist to at least 1000 elements, unless user has nerfed
 ;; the default `history-length'.
 ;; Because you often narrow down the completions majorly, and still want to
 ;; sort among what's left.
-(and (>= history-length (car (get 'history-length 'standard-value)))
-     (< history-length 1000)
-     (put 'org-node-hist 'history-length 1000))
+(when (and (>= history-length (car (get 'history-length 'standard-value)))
+           (< history-length 1000))
+  (put 'org-node-hist 'history-length 1000)
+  (put 'org-node-hist-altered 'history-length 1000))
+
+;; Finally, tying it all together
+(defun org-node-read-candidate (&optional prompt blank-ok)
+  "PROMPT for a known node and return the input.
+If the input is not a key of `org-node--candidate<>entry',
+you can assume no such node exists.
+
+BLANK-OK means to obey `org-node-blank-input-hint'."
+  (completing-read (or prompt "Node: ")
+                   (if blank-ok #'org-node-collection-main
+                     #'org-node-collection-basic)
+                   () () ()
+                   (if org-node-alter-candidates 'org-node-hist-altered
+                     'org-node-hist)))
 
 
 ;;;; The cache mode
@@ -1034,8 +1056,7 @@ type the name of a node that does not exist.  That enables this
           (setq node (org-node-guess-node-by-title title)))
       ;; Was called from `org-capture', which means the user has not yet typed
       ;; the title; let them type it now
-      (let ((input (completing-read "Node: " #'org-node-collection-main
-                                    () () () 'org-node-hist)))
+      (let ((input (org-node-read-candidate nil t)))
         (setq node (gethash input org-node--candidate<>entry))
         (if node
             (progn
@@ -1095,9 +1116,7 @@ To behave like Org-roam when creating new nodes,
 set `org-node-creation-fn' to `org-node-new-via-roam-capture'."
   (interactive)
   (org-node-cache-ensure)
-  (let* ((input (completing-read "Visit or create node: "
-                                 #'org-node-collection-main
-                                 () () () 'org-node-hist))
+  (let* ((input (org-node-read-candidate "Visit or create node: " t))
          (node (gethash input org-node--candidate<>entry)))
     (if node
         (org-node--goto node)
@@ -1200,8 +1219,7 @@ Argument NOVISIT for use by `org-node-insert-link-novisit'."
                     nil))
          (input (if (and novisit initial)
                     initial
-                  (completing-read "Node: " #'org-node-collection-main
-                                   () () initial 'org-node-hist)))
+                  (org-node-read-candidate nil t)))
          (node (gethash input org-node--candidate<>entry))
          (id (if node (org-mem-id node) (org-id-new)))
          (link-desc (or region-text
@@ -1585,9 +1603,7 @@ creation-date as more truthful or useful than today\\='s date.
   (if (org-before-first-heading-p)
       (user-error "`org-node-refile' only works on subtrees for now")
     (org-node-cache-ensure)
-    (let* ((input (completing-read "Refile into ID-node: "
-                                   #'org-node-collection-basic
-                                   () () () 'org-node-hist))
+    (let* ((input (org-node-read-candidate "Refile into ID-node: "))
            (node (gethash input org-node--candidate<>entry))
            (origin-buffer (current-buffer)))
       (unless node
@@ -2806,9 +2822,7 @@ heading, else the file-level node, whichever has an ID first."
 ;;       `org-node-insert-link' does.
 (defun org-node-read (&optional prompt)
   "PROMPT for a known node and return it."
-  (gethash (completing-read (or prompt "Node: ")
-                            #'org-node-collection-basic
-                            () () () 'org-node-hist)
+  (gethash (org-node-read-candidate prompt)
            org-node--candidate<>entry))
 
 (defun org-node-p (entry)
