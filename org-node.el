@@ -2481,14 +2481,54 @@ Designed for `completion-at-point-functions'."
 ;;;; Misc
 
 (defun org-node-peek (&optional ht)
-  "Print some random `org-mem-entry' objects.
-Tip: way better is a package called \"inspector\"!"
+  "Print a random `org-mem-entry' object."
   (interactive)
-  (let ((rows (hash-table-values (or ht org-nodes)))
-        (print-length nil))
-    (dotimes (_ 3)
-      (print '----------------------------)
-      (cl-prin1 (nth (random (length rows)) rows)))))
+  (let* ((entry (seq-random-elt (hash-table-values org-mem--id<>entry)))
+         (1arg-funs '(org-mem-entry-active-timestamps
+                     org-mem-entry-closed
+                     org-mem-entry-deadline
+                     org-mem-entry-file
+                     org-mem-entry-file-truename
+                     org-mem-entry-id
+                     org-mem-entry-level
+                     org-mem-entry-lnum
+                     org-mem-entry-olpath
+                     org-mem-entry-olpath-with-self
+                     org-mem-entry-olpath-with-self-with-title
+                     org-mem-entry-olpath-with-title
+                     org-mem-entry-pos
+                     org-mem-entry-priority
+                     org-mem-entry-properties
+                     org-mem-entry-scheduled
+                     org-mem-entry-subtree-p
+                     org-mem-entry-tags
+                     org-mem-entry-tags-inherited
+                     org-mem-entry-tags-local
+                     org-mem-entry-title
+                     org-mem-entry-title-maybe
+                     org-mem-file-attributes
+                     org-mem-file-id-strict
+                     org-mem-file-id-topmost
+                     org-mem-file-line-count
+                     org-mem-file-mtime
+                     org-mem-file-ptmax
+                     org-mem-file-size
+                     org-mem-file-title-or-basename
+                     org-mem-file-title-strict
+                     org-mem-file-title-topmost
+                     org-mem-next-entry
+                     org-mem-previous-entry)))
+    (pop-to-buffer (get-buffer-create "*org-mem example*" t))
+    (emacs-lisp-mode)
+    (setq-local buffer-read-only t)
+    (let ((buffer-read-only nil))
+      (erase-buffer)
+      (insert "Example data taken from random node titled \"" (org-mem-entry-title entry) "\"\n\n")
+      (cl-loop for func in 1arg-funs
+               do (insert "(" (symbol-name func) " ENTRY) => "
+                          (prin1-to-string (funcall func entry))
+                          "\n"))
+      (align-regexp (point-min) (point-max) "\\(\\s-*\\) => "))))
 
 (defun org-node-try-visit-ref-node ()
   "Designed for `org-open-at-point-functions'.
