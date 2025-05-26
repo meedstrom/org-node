@@ -305,6 +305,7 @@ aliases."
           (function-item org-node-prepend-tags)
           (function-item org-node-prepend-tags-and-olp)
           (function-item org-node-prepend-olp-append-tags)
+          (function-item org-node-prepend-olp-append-tags-use-frame-width)
           (function-item org-node-append-tags-use-frame-width)
           (function :tag "Custom function"
                     :value (lambda (node title) (list title "" ""))))
@@ -381,12 +382,37 @@ aliases."
              (setq tags (propertize (concat ":" (string-join tags ":") ":")
                                     'face 'org-tag))
              (concat (make-string (max 2 (- (frame-width)
-                                            (length title)
-                                            (length tags)
+                                            (string-width title)
+                                            (string-width tags)
                                             (fringe-columns 'right)
                                             (fringe-columns 'left)))
                                   ?\s)
                      tags))))))
+
+(defun org-node-prepend-olp-append-tags-use-frame-width (node title)
+  "Prepend NODE's outline path to TITLE, and append NODE\\='s tags."
+  (let (olp)
+    (list title
+          (concat
+           (when (org-mem-entry-subtree-p node)
+             (let ((ancestors (org-mem-entry-olpath-with-title node)))
+               (dolist (anc ancestors)
+                 (push (propertize anc 'face 'completions-annotations) olp)
+                 (push " > " olp))
+               (setq olp (apply #'concat (nreverse olp))))))
+          (concat
+           (let ((tags (org-mem-entry-tags node)))
+             (when tags
+               (setq tags (propertize (concat ":" (string-join tags ":") ":")
+                                      'face 'org-tag))
+               (concat (make-string (max 2 (- (frame-width)
+                                              (string-width title)
+                                              (if olp (string-width olp) 0)
+                                              (string-width tags)
+                                              (fringe-columns 'right)
+                                              (fringe-columns 'left)))
+                                    ?\s)
+                       tags)))))))
 
 (defcustom org-node-blank-input-hint
   (propertize "(untitled node)" 'face 'completions-annotations)
