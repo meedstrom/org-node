@@ -6,27 +6,33 @@
 
   - =org-node-narrow-to-drawer-p=
 
-  - =org-node-full-end-of-meta-data= (actually patch =org-end-of-meta-data=)
+  - Patch =org-end-of-meta-data= to support file level (without FULL like =org-node-goto-new-drawer-site=, with FULL like =org-node-full-end-of-meta-data=)
 
-- =org-node--with-quick-file-buffer= merge with =org-node--work-buffer-for= ??
+- Upstream applicable parts of =org-node-roam-accelerator-mode= to Org-roam
 
-- =org-node--in-files-do=: rewrite to use built-in fileloop.el ??
-
-  - Possibly upstream some functionality to Emacs core such we don't need =org-node--find-file-noselect=.
-
-- Maybe merge =org-node-refile= with =org-node-extract-subtree= or reuse code between them?
+- Get https://github.com/nobiot/org-transclusion/pull/268 merged
 
 * Other
 
+- A workflow to allow *untitled nodes*
+
+  - [X] Create node without needing to type a title
+  - [X] =org-node-grep=
+  - [ ] Let =org-node-grep= create new nodes
+  - [ ] Rewrite =org-node-grep= so it does not need Consult
+  - [ ] Subroutine for *identifying a node by a grep result*, which could be used to insert/extract/capture/refile while only ever looking at grep lines
+
+- Let =org-node-grep= obey =org-node-filter-fn=
+
 - Let user preview the filename that will be created.  (Currently, when option =org-node-file-directory-ask= is t, it just asks you for a directory, which is weirdly restrictive.)
 
-- Make a command akin to =org-node-lint-all-files=, but that just runs =org-element-parse-buffer= with =org-element--cache-diagnostics= on, then prints those diagnostics.
+- Make a command akin to =org-node-lint-all-files=, but that just =runs org-element-parse-buffer= with =org-element--cache-diagnostics= on, then prints any issues.
 
-  - Bonus: if we ensure the parse-trees stay cached, then every Org file just might become /way/ faster to open!  Speeding up the agenda etc.
+  - Or rewrite org-mem so it uses =org-element-parse-buffer= from the start.
 
 - Make =org-node-capture-target= a bit more robust and not need =:empty-lines after 1=.
 
-- Help Embark and Marginalia integrate more deeply with =org-node-read= / =org-node-collection=
+- Help Embark and Marginalia integrate more deeply with =org-node-read-candidate=
 
   - Not sure I understand "completion categories", but IIUC, we don't really have a completion-category representing "an Org entry somewhere /which is not necessarily in the current buffer"/.
 
@@ -38,19 +44,11 @@
 
 - Get https://github.com/nobiot/org-transclusion/pull/268 into upstream and update command =org-node-insert-transclusion-as-subtree= to use it.
 
-- Let =org-node-grep= obey =org-node-filter-fn=
-
 - Make =org-node-rename-asset-and-rewrite-links= easier to use
 
 - Write a glossary, to clarify e.g. what is a "ref" vs "reflink"
 
 - =org-node-seq-dispatch=: Free up keys "j", "n", "p", "c"
-
-- A workflow to allow *untitled nodes*
-
-  (technically not untitled; the title would be an auto-assigned number)
-
-  Already =org-node-grep= can be considered an equivalent to =org-node-find= (except it does not create new nodes).  We "just" need an equivalent to =org-node-insert-link=.  Basically, capture, refile, and insert-link would probably all reuse a subroutine for *identifying a node by a grep result.*
 
 - More =org-node-seq-defs= wrappers:
 

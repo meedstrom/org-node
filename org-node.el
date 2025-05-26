@@ -2179,17 +2179,19 @@ from ID links found in `org-mem--target<>links'."
          #'org-node--lint-operator)
         (setq org-node--lint-warnings nil)
         (setq proceed t)))
-
     (condition-case _
         (when proceed
           (cl-letf (((symbol-function 'recentf-add-file) #'ignore))
-            (let ((delay-mode-hooks t)
+            (let ((find-file-hook nil)
+                  (enable-local-variables :safe)
+                  (delay-mode-hooks t)
+                  (org-agenda-files nil)
                   (org-inhibit-startup t)
                   (org-element-cache-persistent nil))
               (fileloop-continue))))
       (quit)))
 
-    (when org-node--lint-warnings
+  (when org-node--lint-warnings
       (org-mem-list--pop-to-tabulated-buffer
        :buffer "*org lint results*"
        :format [("File" 30 t) ("Line" 5 t) ("Trust" 5 t) ("Explanation" 0 t)]
@@ -2208,14 +2210,13 @@ from ID links found in `org-mem--target<>links'."
                                   (elt array 1)
                                   (elt array 2))))))))
 
+;; FIXME: ...Just one lint warning per file?
 (defun org-node--lint-operator ()
   "An OPERATE-FUNCTION for `fileloop-initialize'."
   (let ((buffer-seems-new (and (not (buffer-modified-p))
                                (not buffer-undo-list))))
-    (unless (derived-mode-p 'org-mode)
-      (org-mode))
-    ;; Set `inhibit-message' to muffle spam from `org-lint-invalid-id-link'.
-    (let ((inhibit-message t))
+    (unless (derived-mode-p 'org-mode) (org-mode))
+    (let ((inhibit-message t)) ; Muffle spam from `org-lint-invalid-id-link'
       (when-let* ((warning (org-lint)))
         (push (cons org-node--lint-current (car warning))
               org-node--lint-warnings)))
@@ -2695,9 +2696,7 @@ Optional keyword argument ABOUT-TO-DO as in
          (kill-buffer-query-functions nil)
          (buffer-list-update-hook nil)
          (delay-mode-hooks t)
-         (--file-- (org-mem--truename-maybe ,file)))
-     (unless --file--
-       (error "File does not exist or not valid to visit: %s" ,file))
+         (--file-- ,file))
      (when (file-directory-p --file--)
        (error "Is a directory: %s" --file--))
      (org-element-with-disabled-cache
