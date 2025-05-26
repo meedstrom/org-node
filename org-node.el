@@ -2297,15 +2297,13 @@ Wrap the link in double-brackets if necessary."
 (defun org-node--list-known-raw-links ()
   "Return list of all \(non-ID\) links seen in all known files."
   (let (result)
-    (maphash
-     (lambda (target links)
-       (let ((types (mapcar #'org-mem-link-type links)))
-         (when (memq nil types)
-           (push target result)
-           (setq types (delq nil types)))
-         (dolist (type (delete-dups (delete "id" types)))
-           (push (concat type ":" target) result))))
-     org-mem--target<>links)
+    (maphash (lambda (target links)
+               (let ((types (seq-keep #'org-mem-link-type
+                                      (seq-remove #'org-mem-link-citation-p
+                                                  links))))
+                 (dolist (type (delete-dups (delete "id" types)))
+                   (push (concat type ":" target) result))))
+             org-mem--target<>links)
     result))
 
 (defun org-node-add-tags (tags)
