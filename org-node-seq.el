@@ -177,7 +177,7 @@ YYYY-MM-DD format, e.g. \"2024-01-31.org\"."
 ;;;###autoload
 (defun org-node-seq-try-goto-id (id)
   "Try to visit org-id ID and return non-nil, else return nil."
-  (let ((node (gethash id org-nodes)))
+  (let ((node (org-mem-entry-by-id id)))
     (when node
       (org-node--goto node)
       t)))
@@ -369,7 +369,8 @@ nothing."
   (when (or key org-node-proposed-seq)
     (let* ((seq (cdr (assoc (or key org-node-proposed-seq)
                             org-node-seqs)))
-           (node-here (gethash (org-entry-get-with-inheritance "ID") org-nodes))
+           (node-here (org-mem-entry-by-id
+                       (org-entry-get-with-inheritance "ID")))
            (new-item (when node-here
                        (funcall (plist-get seq :classifier) node-here))))
       (when new-item
@@ -487,7 +488,7 @@ DEF is a seq-def from `org-node-seq-defs'."
               if (functionp elt)
               collect (org-node--try-ensure-compiled elt)
               else collect elt)
-     (cl-loop for node being each hash-value of org-nodes
+     (cl-loop for node in (org-mem-all-id-nodes)
               as result = (funcall classifier node)
               if (listp (car result))
               nconc result into items

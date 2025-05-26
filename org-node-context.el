@@ -327,7 +327,7 @@ properties.  Org-mode is enabled, but the org-element cache is not."
                    ;; node as the "value" at that section.
                    value-atpt
                  (setq link-pos (org-mem-link-pos value-atpt))
-                 (gethash (org-mem-link-nearby-id value-atpt) org-nodes))))
+                 (org-mem-entry-by-id (org-mem-link-nearby-id value-atpt)))))
     (org-node--goto node)
     (when link-pos
       (goto-char link-pos)

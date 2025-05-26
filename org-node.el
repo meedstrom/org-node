@@ -1812,7 +1812,7 @@ so it matches the destination\\='s current title."
                                (substring (cadr parts) 0 -2)))
                        (id (when (string-prefix-p "id:" target)
                              (substring target 3)))
-                       (node (gethash id org-nodes))
+                       (node (org-mem-entry-by-id id))
                        (true-title (when node
                                      (org-mem-entry-title node)))
                        (custom-desc
@@ -2081,8 +2081,8 @@ network to quality-control it."
        :format [("Node containing link" 39 t) ("Target of link" 0 t)]
        :entries (cl-loop
                  for (origin . target) in feedbacks
-                 as origin-node = (gethash origin org-nodes)
-                 as target-node = (gethash target org-nodes)
+                 as origin-node = (org-mem-entry-by-id origin)
+                 as target-node = (org-mem-entry-by-id target)
                  collect
                  (list (+ (sxhash origin) (sxhash target))
                        (vector (buttonize (org-mem-title origin-node)
@@ -2475,7 +2475,7 @@ If already visiting that node, then follow the link normally."
   (when-let* ((url (thing-at-point 'url)))
     ;; Rarely more than one car
     (let* ((target (car (org-mem--split-roam-refs-field url)))
-           (found (cl-loop for node being each hash-value of org-nodes
+           (found (cl-loop for node in (org-mem-all-id-nodes)
                            when (member target (org-mem-entry-roam-refs node))
                            return node)))
       (if (and found

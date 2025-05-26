@@ -579,7 +579,7 @@ If REMOVE is non-nil, remove it instead."
   (if remove
       (org-entry-delete nil "BACKLINKS")
     (let* ((id (org-entry-get nil "ID"))
-           (entry (gethash id org-nodes)))
+           (entry (org-mem-entry-by-id id)))
       (if (not (and id entry))
           (org-entry-delete nil "BACKLINKS")
         (let* ((origins (thread-last
@@ -709,12 +709,12 @@ If REMOVE non-nil, remove it instead."
             ;; `org-id-find-id-file' has terrible fallback behavior
             (setq target-file (ignore-errors
                                 (org-mem-entry-file
-                                 (gethash target-id org-nodes)))))
+                                 (org-mem-entry-by-id target-id)))))
         ;; A "reflink"
         (setq target-id (gethash path org-mem--roam-ref<>id))
         (setq target-file (ignore-errors
                             (org-mem-entry-file
-                             (gethash target-id org-nodes)))))
+                             (org-mem-entry-by-id target-id)))))
       (when (null target-file)
         (message "`org-node-backlink--add-in-target' could not resolve ID: %s" target-id))
       (when (and target-id target-file)
