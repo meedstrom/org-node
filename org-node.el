@@ -1189,7 +1189,7 @@ set `org-node-creation-fn' to `org-node-new-via-roam-capture'."
 To behave exactly like org-roam\\='s `org-roam-node-insert',
 see `org-node-insert-link*', or pass REGION-AS-INITIAL-INPUT t.
 
-Argument NOVISIT means behave as `org-node-insert-link-novisit'."
+Argument NOVISIT for use by `org-node-insert-link-novisit'."
   (interactive "*" org-mode)
   (unless (derived-mode-p 'org-mode)
     (user-error "Only works in org-mode buffers"))
@@ -1267,7 +1267,8 @@ The commands are the same, just differing in initial input."
 
 ;;;###autoload
 (defun org-node-insert-link-novisit ()
-  "Insert a link to one of your ID nodes without ever visiting it.
+  "(Unimplemented) Only supported with `org-node-new-via-roam-capture'.
+Insert a link to one of your ID nodes without ever visiting it.
 
 Normally, if the node does not exist, `org-node-insert-link' would
 create it and then visit it.  This will not visit it."
@@ -1279,7 +1280,8 @@ create it and then visit it.  This will not visit it."
 
 ;;;###autoload
 (defun org-node-insert-link-novisit* ()
-  "Insert a link to one of your ID nodes without ever visiting it.
+  "(Unimplemented) Only supported with `org-node-new-via-roam-capture'.
+Insert a link to one of your ID nodes without ever visiting it.
 
 Normally, if the node does not exist, `org-node-insert-link*' would
 create it and then visit it.  This will not visit it."
