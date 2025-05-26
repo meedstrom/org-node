@@ -91,29 +91,40 @@
 (require 'org-mem-updater)
 (require 'org-mem-list)
 
-(defvar org-roam-capture-templates)
-(defvar org-node-backlink-mode)
-(defvar org-drawer-regexp)
-(defvar org-roam-preview-function)
-(defvar org-roam-preview-postprocess-functions)
-(declare-function org-mem-roamy-mk-backlinks "org-mem-roamy")
-(declare-function org-mem-roamy-mk-reflinks "org-mem-roamy")
-(declare-function org-roam-node-id "ext:org-roam-node")
-(declare-function org-node-backlink--fix-nearby "org-node-backlink")
+(declare-function consult--grep "ext:consult")
+(declare-function consult--grep-make-builder "ext:consult")
+(declare-function consult--ripgrep-make-builder "ext:consult")
 (declare-function org-at-heading-p "org")
 (declare-function org-before-first-heading-p "org")
+(declare-function org-collect-keywords "org")
 (declare-function org-end-of-meta-data "org")
 (declare-function org-entry-get "org")
 (declare-function org-entry-put "org")
+(declare-function org-fold-show-context "org-fold")
+(declare-function org-fold-show-context "org-fold")
+(declare-function org-get-buffer-tags "org")
 (declare-function org-in-block-p "org")
-(declare-function org-fold-show-context "org-fold")
-(declare-function org-fold-show-context "org-fold")
+(declare-function org-in-regexp "org-macs")
 (declare-function org-link-make-string "ol")
-(declare-function org-paste-subtree "org")
-(declare-function org-time-stamp-format "org")
+(declare-function org-lint "org-lint")
+(declare-function org-map-region "org")
+(declare-function org-mem-roamy-mk-backlinks "org-mem-roamy")
+(declare-function org-mem-roamy-mk-reflinks "org-mem-roamy")
 (declare-function org-mem-updater-ensure-id-node-at-point-known "org-mem-updater")
-
-(defvaralias 'org-nodes 'org-mem--id<>entry)
+(declare-function org-node-backlink--fix-nearby "org-node-backlink")
+(declare-function org-paste-subtree "org")
+(declare-function org-promote "org")
+(declare-function org-reveal "org")
+(declare-function org-roam-node-id "ext:org-roam-node")
+(declare-function org-set-tags "org")
+(declare-function org-time-stamp-format "org")
+(declare-function org-up-heading-or-point-min "org")
+(defvar consult-ripgrep-args)
+(defvar org-drawer-regexp)
+(defvar org-node-backlink-mode)
+(defvar org-roam-capture-templates)
+(defvar org-roam-preview-function)
+(defvar org-roam-preview-postprocess-functions)
 
 
 ;;;; Options
@@ -163,8 +174,7 @@ Then remind the user to run \\[org-mem-reset]."
 (defcustom org-node-custom-link-format-fn nil
   "Function to format inserted links specially.
 Takes a node as argument, should return a string."
-  :type '(choice (const nil)
-                 function)
+  :type '(choice (const nil) function)
   :package-version '(org-node . "2.3.3"))
 
 (defun org-node-filter-no-roam-exclude-p (node)
@@ -203,7 +213,7 @@ in the type `org-mem-entry' (C-h o org-mem-entry RET)."
   :set #'org-node--set-and-remind-reset
   :package-version '(org-node . "3.3.0"))
 
-(defcustom org-node-insert-link-hook '()
+(defcustom org-node-insert-link-hook nil
   "Hook run after inserting a link to an Org-ID node.
 
 Called with point in the new link."
@@ -374,12 +384,6 @@ aliases."
                                             (fringe-columns 'left)))
                                   ?\s)
                      tags))))))
-
-(defalias 'org-node-prefix-with-olp           #'org-node-prepend-olp)
-(defalias 'org-node-prefix-with-tags-tags     #'org-node-prepend-tags)
-(defalias 'org-node-prefix-with-tags-and-olp  #'org-node-prepend-tags-and-olp)
-(defalias 'org-node-affix-with-olp-and-tags   #'org-node-prepend-olp-append-tags)
-(defalias 'org-node-affix-with-olp-and-tags-legacy #'org-node-prepend-olp-append-tags)
 
 (defcustom org-node-blank-input-hint
   (propertize "(untitled node)" 'face 'completions-annotations)
@@ -608,7 +612,6 @@ buffer already exists, so the buffer stays blank.  Thus this hook."
             (kill-buffer buf)))))))
 
 
-;;;; Scanning files to cache info about them
 
 ;;;###autoload
 (define-obsolete-function-alias 'org-node-reset #'org-mem-reset "3.0.0 (May 2025)")
@@ -783,9 +786,10 @@ In any case, return a directory."
       (org-node-guess-dir))))
 
 (defun org-node-guess-dir ()
-  (with-memoization (org-mem--table 0 'org-node-guess-dir)
-    (car (org-node--root-dirs (org-mem-all-files)))))
+  (car (org-node--root-dirs (org-mem-all-files))))
 
+;; Needs care with `org-node-rename-file-by-title' after changing.
+;; https://blog.ganssle.io/articles/2023/01/attractive-nuisances.html
 (defcustom org-node-datestamp-format ""
   "Passed to `format-time-string' to prepend to filenames.
 
@@ -899,7 +903,7 @@ belonging to an alphabet or number system."
 ;;       based on some rule, like perhaps the content of an Org property.
 
 
-;;;; How to create new nodes
+;;;; Creation functions
 
 (defvar org-node-proposed-title nil
   "For use by `org-node-creation-fn'.
@@ -1060,7 +1064,6 @@ Designed for `org-node-creation-fn'."
                  org-node--candidate<>entry)
       (gethash title org-node--candidate<>entry))))
 
-(declare-function org-reveal "org")
 (defun org-node-capture-target ()
   "Can be used as target in a capture template.
 See `org-capture-templates' for more info about targets.
@@ -1463,9 +1466,6 @@ Works in non-Org buffers."
          (org-paste-subtree)
          (run-hooks 'org-node-relocation-hook))))))
 
-(declare-function org-up-heading-or-point-min "org")
-(declare-function org-promote "org")
-(declare-function org-map-region "org")
 ;;;###autoload
 (defun org-node-extract-subtree ()
   "Extract subtree at point into a file of its own.
@@ -1880,10 +1880,6 @@ be sufficient to key-bind that one."
                    (format-time-string (org-time-stamp-format t t)))))
 (defalias 'org-node-ensure-crtime-property 'org-node-put-created)
 
-(defvar consult-ripgrep-args)
-(declare-function consult--grep "ext:consult")
-(declare-function consult--grep-make-builder "ext:consult")
-(declare-function consult--ripgrep-make-builder "ext:consult")
 ;; TODO: Optionally obey `org-node-filter-fn'
 ;;;###autoload
 (defun org-node-grep ()
@@ -1960,7 +1956,6 @@ set in `org-node-name-of-links-drawer'."
                   (if props (prin1-to-string props) ""))))
    :reverter #'org-node-list-files))
 
-(declare-function org-lint "org-lint")
 (defvar org-node--unlinted nil)
 (defvar org-node--lint-current nil)
 (defvar org-node--lint-operator nil)
@@ -2015,12 +2010,12 @@ set in `org-node-name-of-links-drawer'."
                                   (elt array 2))))))))
 
 (defun org-node--lint-operator ()
+  "An OPERATE-FUNCTION for `fileloop-initialize'."
   (let ((buffer-seems-new (and (not (buffer-modified-p))
                                (not buffer-undo-list))))
     (unless (derived-mode-p 'org-mode)
       (org-mode))
-    ;; Muffle spam from `org-lint-invalid-id-link', bc
-    ;; `org-id-update-id-locations' SILENT argument not perfect.
+    ;; Set `inhibit-message' to muffle spam from `org-lint-invalid-id-link'.
     (let ((inhibit-message t))
       (when-let* ((warning (org-lint)))
         (push (cons org-node--lint-current (car warning))
@@ -2323,8 +2318,6 @@ To always operate on the current entry, use `org-node-add-tags-here'."
   (interactive (list (org-node--read-tags)) org-mode)
   (org-node--call-at-nearest-node #'org-node-add-tags-here tags))
 
-(declare-function org-set-tags "org")
-(declare-function org-collect-keywords "org")
 (defun org-node-add-tags-here (tags)
   "Add TAGS to the entry at point."
   (interactive (list (org-node--read-tags)) org-mode)
@@ -2352,7 +2345,6 @@ To always operate on the current entry, use `org-node-add-tags-here'."
       (org-back-to-heading)
       (org-set-tags (seq-uniq (append tags (org-get-tags nil t)))))))
 
-(declare-function org-get-buffer-tags "org")
 (defun org-node--read-tags ()
   "Prompt for an Org tag or several.
 Pre-fill completions by collecting tags from all known Org files, as
@@ -2443,7 +2435,6 @@ As bonus, do not land on an inlinetask, seek a real heading."
 
 ;;;; CAPF (Completion-At-Point Function) aka. in-buffer completion
 
-(declare-function org-in-regexp "org-macs")
 (defun org-node-complete-at-point ()
   "Expand word at point to a known node title, and linkify.
 Designed for `completion-at-point-functions'."
@@ -2692,8 +2683,7 @@ skips the overhead of creation.  To clean up, call
           (current-buffer)))))
 
 
-;;; Org-roam accelerator
-;; Just because we can.
+;;;; Org-roam accelerator
 
 (defvar org-node--ad-roam-src-node nil)
 (defun org-node--ad-roam-node-insert-section (orig-fn &rest args)

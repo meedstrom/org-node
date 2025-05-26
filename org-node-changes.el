@@ -158,6 +158,9 @@ NAME, ARGLIST and BODY as in `defun'."
 (defvar org-node--origin<>links :obsolete)
 (defvar org-node--file<>lnum.node :obsolete)
 
+;; Old. Use `org-mem-entry-by-id' in new code.
+(defvaralias 'org-nodes 'org-mem--id<>entry)
+
 (define-obsolete-variable-alias 'org-node--dest<>links                 'org-mem--target<>links             "3.0.0 (May 2025)")
 (define-obsolete-variable-alias 'org-node--id<>node                    'org-mem--id<>entry                 "3.0.0 (May 2025)")
 (define-obsolete-variable-alias 'org-node--id<>refs                    'org-mem--id<>roam-refs             "3.0.0 (May 2025)")
@@ -172,14 +175,19 @@ NAME, ARGLIST and BODY as in `defun'."
 (define-obsolete-variable-alias 'org-node-link-types                   'org-mem-seek-link-types            "3.0.0 (May 2025)")
 (define-obsolete-variable-alias 'org-node-warn-title-collisions        'org-mem-do-warn-title-collisions   "3.0.0 (May 2025)")
 
-(define-obsolete-function-alias 'org-node-seq-try-visit-file       'org-node-seq-try-goto-file     "3.0.0 (May 2025)")
-(define-obsolete-variable-alias 'org-node--candidate<>node         'org-node--candidate<>entry     "3.0.0 (May 2025)")
-(define-obsolete-function-alias 'org-node-insert-link-into-drawer  'org-node-insert-into-related   "3.3.3 (May 2025)")
-(define-obsolete-function-alias 'org-node--end-of-meta-data        'org-node-full-end-of-meta-data "3.3.10 (May 2025)")
-(define-obsolete-function-alias 'org-node-list-file-coding-systems 'org-node-list-files            "3.3.10 (May 2025)")
-(define-obsolete-function-alias 'org-node-collection               'org-node-collection-basic      "3.3.12 (May 2025)")
-(define-obsolete-function-alias 'org-node-mk-auto-title            'org-node-titlegen-untitled     "3.3.12 (May 2025)")
-(define-obsolete-variable-alias 'org-node-one-empty-candidate      'org-node-blank-input-hint      "3.3.12 (May 2025)")
+(define-obsolete-function-alias 'org-node-seq-try-visit-file               'org-node-seq-try-goto-file        "3.0.0 (May 2025)")
+(define-obsolete-variable-alias 'org-node--candidate<>node                 'org-node--candidate<>entry        "3.0.0 (May 2025)")
+(define-obsolete-function-alias 'org-node-prefix-with-olp                  'org-node-prepend-olp              "3.3.0 (May 2025)")
+(define-obsolete-function-alias 'org-node-prefix-with-tags-tags            'org-node-prepend-tags             "3.3.0 (May 2025)")
+(define-obsolete-function-alias 'org-node-prefix-with-tags-and-olp         'org-node-prepend-tags-and-olp     "3.3.0 (May 2025)")
+(define-obsolete-function-alias 'org-node-affix-with-olp-and-tags          'org-node-prepend-olp-append-tags  "3.3.0 (May 2025)")
+(define-obsolete-function-alias 'org-node-affix-with-olp-and-tags-legacy   'org-node-prepend-olp-append-tags  "3.3.0 (May 2025)")
+(define-obsolete-function-alias 'org-node-insert-link-into-drawer          'org-node-insert-into-related      "3.3.3 (May 2025)")
+(define-obsolete-function-alias 'org-node--end-of-meta-data                'org-node-full-end-of-meta-data    "3.3.10 (May 2025)")
+(define-obsolete-function-alias 'org-node-list-file-coding-systems         'org-node-list-files               "3.3.10 (May 2025)")
+(define-obsolete-function-alias 'org-node-collection                       'org-node-collection-basic         "3.3.12 (May 2025)")
+(define-obsolete-function-alias 'org-node-mk-auto-title                    'org-node-titlegen-untitled        "3.3.12 (May 2025)")
+(define-obsolete-variable-alias 'org-node-one-empty-candidate              'org-node-blank-input-hint         "3.3.12 (May 2025)")
 
 (require 'org-mem)
 (require 'org-mem-updater)
