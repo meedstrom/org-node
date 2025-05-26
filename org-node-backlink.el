@@ -554,8 +554,8 @@ To force an update at any time, use one of these commands:
 
 (defun org-node-backlink--fix-nearby (&optional kind)
   "In current entry, fix the backlinks drawer or property.
-Let `org-node-backlink-do-drawers' determine which.
 
+Let user option `org-node-backlink-do-drawers' determine which.
 Or if KIND is symbol `update-drawers', `del-drawers', `update-props', or
 `del-props', do the corresponding thing."
   (if kind

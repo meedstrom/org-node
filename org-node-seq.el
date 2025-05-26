@@ -480,7 +480,6 @@ Unlike `org-node-proposed-seq', does not need to revert to nil.")
 DEF is a seq-def from `org-node-seq-defs'."
   (unless (plist-get (cdr def) :version)
     (user-error "Seq def :version must be 2 or higher"))
-
   (let ((classifier (org-node--try-ensure-compiled
                      (plist-get (cdr def) :classifier))))
     (nconc
@@ -698,6 +697,9 @@ not exist."
          (transient-setup 'org-node-seq-dispatch))
         (t
          (transient-setup 'org-node-seq-dispatch))))
+
+(define-obsolete-function-alias 'org-node-seq-try-visit-file
+  #'org-node-seq-try-goto-file "3.0.0 (May 2025)")
 
 (provide 'org-node-seq)
 

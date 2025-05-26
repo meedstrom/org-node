@@ -389,6 +389,7 @@ aliases."
   "Whether to add an empty completion candidate to some commands.
 It helps indicate that a blank input can be used there to
 create an untitled node.
+
 If non-nil, the value is actually the annotation added to it, a
 propertized string."
   :type '(choice string (const nil))
@@ -402,9 +403,9 @@ propertized string."
 Used in some commands when exiting minibuffer with a blank string.
 Takes one argument: the ID that would be given to the node, if created.
 
-If you put a custom function here, you should check that the title does
-not exist in `org-node--title<>affixations', and that the output of
-`org-node-title-to-filename' does not exist on disk."
+If you put a custom function here, you should check that the title is
+not a key of table `org-node--title<>affixations', and that the output
+of `org-node-title-to-filename' does not satisfy `file-exists-p'."
   :type '(radio (function-item org-node-titlegen-untitled)
                 (function :tag "Custom function" :value (lambda (id))))
   :package-version '(org-node . "3.3.12"))
@@ -2467,7 +2468,7 @@ Designed for `completion-at-point-functions'."
 (defun org-node-try-visit-ref-node ()
   "Designed for `org-open-at-point-functions'.
 
-For the link at point, if there exists an org-ID node that has
+For the link at point, if there exists an ID-node that has
 the same link in its ROAM_REFS property, visit that node rather than
 following the link normally.
 
@@ -2484,11 +2485,12 @@ If already visiting that node, then follow the link normally."
                (not (and (derived-mode-p 'org-mode)
                          (equal (org-entry-get-with-inheritance "ID")
                                 (org-mem-entry-id found)))))
-          (progn (org-node--goto found)
+          (progn (org-node--goto found t)
                  t)
         nil))))
 
 
+;;;; Drawer subroutines
 
 (defun org-node--delete-drawer (name)
   "In current entry, seek and destroy drawer named NAME."
@@ -2560,7 +2562,7 @@ CREATE-MISSING t.  Also see that function for meaning of CREATE-WHERE."
               ;; Empty drawer with no newlines; add one newline
               ;; so the result looks similar to after `org-insert-drawer'.
               (progn (open-line 1)
-                     (indent-according-to-mode t))
+                     (indent-according-to-mode))
             ;; Not an empty drawer, so it is safe to back up from :END: line
             (backward-char))
           (narrow-to-region drawbeg (point))
@@ -2590,13 +2592,6 @@ CREATE-MISSING t.  Also see that function for meaning of CREATE-WHERE."
   (while-let ((buf (pop org-node--work-buffers)))
     (when buf (kill-buffer buf))))
 
-;; TODO: Either duplicate the org element cache of FILE,
-;;       or just actually visit FILE.
-;;       It would permit us to use the org element API without incurring a
-;;       massive performance hit,
-;;       since the parse tree would typically already be cached (one hopes).
-;;       (If we go the route of actually visiting the file, can this be merged
-;;       with `org-node--with-quick-file-buffer'?)
 (defun org-node--work-buffer-for (file)
   "Get or create a hidden buffer, and read FILE contents into it.
 Also enable `org-mode', but ignore `org-mode-hook' and startup options.
@@ -2824,8 +2819,7 @@ heading, else the file-level node, whichever has an ID first."
 
 (defun org-node-all-filtered-nodes ()
   "List currently cached org-nodes that satisfied `org-node-filter-fn'."
-  (with-memoization (org-mem--table 0 'org-node-all-filtered-nodes)
-    (seq-uniq (hash-table-values org-node--candidate<>entry))))
+  (delete-dups (hash-table-values org-node--candidate<>entry)))
 
 
 (define-obsolete-function-alias 'org-node-prefix-with-olp                  #'org-node-prepend-olp               "3.3.0 (May 2025)")
