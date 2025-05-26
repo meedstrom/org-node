@@ -89,7 +89,6 @@
 (require 'org-node-changes)
 (require 'org-mem)
 (require 'org-mem-updater)
-(require 'org-mem-list)
 
 (declare-function consult--grep "ext:consult")
 (declare-function consult--grep-make-builder "ext:consult")
@@ -99,8 +98,8 @@
 (declare-function org-collect-keywords "org")
 (declare-function org-end-of-meta-data "org")
 (declare-function org-entry-get "org")
+(declare-function org-entry-get-with-inheritance "org")
 (declare-function org-entry-put "org")
-(declare-function org-fold-show-context "org-fold")
 (declare-function org-fold-show-context "org-fold")
 (declare-function org-get-buffer-tags "org")
 (declare-function org-in-block-p "org")
@@ -1976,6 +1975,7 @@ Useful to see how many times you\\='ve inserted a link that is very
 similar to another link, but not identical, so that perhaps only
 one of them is associated with a ROAM_REFS property."
   (interactive)
+  (require 'org-mem-list)
   (let ((entries
          (cl-loop
           for link in (org-mem-all-links)
@@ -2014,6 +2014,7 @@ one of them is associated with a ROAM_REFS property."
 (defun org-node-list-files ()
   "List files and associated information."
   (interactive)
+  (require 'org-mem-list)
   (org-mem-list--pop-to-tabulated-buffer
    :buffer "*org-node files list*"
    :format [("Modified" 11 t) ("Size" 7 t) ("File" 70 t) ("Title" 40 t) ("Lines" 6 t) ("Coding system" 15 t) ("Properties" 10)]
@@ -2046,6 +2047,7 @@ constitute a DAG (directed acyclic graph).
 You may consider this as merely one of many ways to view your
 network to quality-control it."
   (interactive)
+  (require 'org-mem-list)
   (unless (executable-find "Rscript")
     (user-error
      "This command requires GNU R, with R packages: stringr, readr, igraph"))

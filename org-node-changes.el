@@ -31,6 +31,7 @@
 
 (require 'subr-x)
 (require 'cl-lib)
+(declare-function org-entry-get-with-inheritance "org")
 
 (defvar org-node-major-version 3
   "Number incremented for breaking changes that require reading README.")

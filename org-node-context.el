@@ -431,7 +431,7 @@ that buffer."
           (error "org-node-context: ID not known: %s" id))
         (erase-buffer)
         (setq header-line-format
-              (concat "Context for " (org-mem-entry-title node)))
+              (concat "Context for \"" (org-mem-entry-title node) "\""))
         (magit-insert-section (org-node-context node)
           (when-let* ((links (org-mem-id-links-to-entry node)))
             (magit-insert-section (org-node-context 'id-links)
