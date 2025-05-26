@@ -153,7 +153,8 @@ This affects the behavior of `org-node-new-file',
 If you change your mind about this setting, you can
 transition the files you already have with the Org-roam commands
 `org-roam-promote-entire-buffer' and `org-roam-demote-entire-buffer'."
-  :type 'boolean)
+  :type 'boolean
+  :package-version '(org-node . "0"))
 
 (defun org-node--set-and-remind-reset (sym val)
   "Set SYM to VAL.
@@ -216,14 +217,16 @@ Does not hide if it merely inherits that property from an ancestor."
   "Hook run after inserting a link to an Org-ID node.
 
 Called with point in the new link."
-  :type 'hook)
+  :type 'hook
+  :package-version '(org-node . "0"))
 
 (defcustom org-node-creation-hook nil
   "Hook run with point in the newly created file or entry.
 
 A good function for this hook is `org-node-ensure-crtime-property',
 since the default `org-node-file-timestamp-format' is empty."
-  :type 'hook)
+  :type 'hook
+  :package-version '(org-node . "0"))
 
 (defcustom org-node-relocation-hook nil
   "Hook run with point in the newly relocated file or entry.
@@ -274,7 +277,8 @@ long as their prefix or suffix differ in some way.
 
 After changing this setting, run \\[org-mem-reset]."
   :type 'boolean
-  :set #'org-node--set-and-remind-reset)
+  :set #'org-node--set-and-remind-reset
+  :package-version '(org-node . "0"))
 
 (defcustom org-node-affixation-fn #'org-node-prepend-olp
   "Function to give prefix and suffix to minibuffer completions.
@@ -477,7 +481,6 @@ STR, PRED and ACTION as in `org-node-collection-basic'."
        str
        pred))))
 
-;; FIXME: Seems to create some strange glyphs
 (defun org-node--affixate (collection)
   "From list COLLECTION, make an alist of ((TITLE PREFIX SUFFIX) ...)."
   (if (and (car collection) (string-blank-p (car collection)))
@@ -642,9 +645,7 @@ something to change the facts on the ground just prior."
 ;;;; Etc
 
 (defvar org-node--compile-timers nil)
-(defvar org-node--compiled-lambdas (make-hash-table :test 'equal)
-  "1:1 table mapping lambda expressions to compiled bytecode.")
-
+(defvar org-node--compiled-lambdas (make-hash-table :test 'equal))
 (defun org-node--try-ensure-compiled (fn)
   "Try to return FN as a compiled function.
 
@@ -718,8 +719,8 @@ buffer already exists, so the buffer stays blank.  Thus this hook."
 - Value nil: Let `org-node-guess-dir' decide
 - Value t: Ask every time
 - String: A directory path in which to put the file"
-  :group 'org-node
-  :type '(choice boolean directory))
+  :type '(choice boolean directory)
+  :package-version '(org-node . "0"))
 
 ;; This setting needs care with `org-node-rename-file-by-title' after changing.
 ;; https://blog.ganssle.io/articles/2023/01/attractive-nuisances.html
@@ -734,7 +735,8 @@ For the rest of the filename, configure `org-node-file-slug-fn'."
           (const :tag "None" :value "")
           (const :tag "Like Org-roam: %Y%m%d%H%M%S-" :value "%Y%m%d%H%M%S-")
           (const :tag "Like Denote: %Y%m%dT%H%M%S--" :value "%Y%m%dT%H%M%S--")
-          (string :tag "Custom")))
+          (string :tag "Custom"))
+  :package-version '(org-node . "0"))
 
 (defcustom org-node-file-slug-fn #'org-node-slugify-for-web
   "Function taking a node title and returning a filename component.
@@ -746,7 +748,8 @@ that, configure `org-node-file-timestamp-format'."
   :type '(radio
           (function-item org-node-slugify-for-web)
           (function-item org-node-slugify-like-roam-default)
-          (function :tag "Custom function" :value (lambda (title) title))))
+          (function :tag "Custom function" :value (lambda (title) title)))
+  :package-version '(org-node . "0"))
 
 (defun org-node--root-dirs (file-list)
   "Infer root directories of FILE-LIST.
@@ -933,7 +936,8 @@ the function is called: `org-node-proposed-title' and
           (function-item org-node-new-file)
           (function-item org-node-new-via-roam-capture)
           (function-item org-capture)
-          (function :tag "Custom function" :value (lambda ()))))
+          (function :tag "Custom function" :value (lambda ())))
+  :package-version '(org-node . "0"))
 
 (defun org-node-create (title id &optional seq-key)
   "Call `org-node-creation-fn' with necessary variables set.
@@ -1012,11 +1016,8 @@ Designed for `org-node-creation-fn'."
         (remove-hook 'org-roam-capture-new-node-hook creation-hook-runner)))))
 
 (defun org-node-guess-node-by-title (title)
-  (and-let* ((affx (gethash title org-node--title<>affixations)))
-    (if org-node-alter-candidates
-        (gethash (concat (nth 1 affx) (nth 0 affx) (nth 2 affx))
-                 org-node--candidate<>entry)
-      (gethash title org-node--candidate<>entry))))
+  (and (gethash title org-node--title<>affixations)
+       (org-mem-entry-by-id (gethash title org-mem--title<>id))))
 
 (defun org-node-capture-target ()
   "Can be used as target in a capture template.
@@ -1673,7 +1674,8 @@ Used if you have the function `org-node-rename-file-by-title' on
 `after-save-hook' or otherwise call it from Lisp.
 
 To add exceptions, see `org-node-renames-exclude'."
-  :type '(repeat directory))
+  :type '(repeat directory)
+  :package-version '(org-node . "0"))
 
 (defcustom org-node-renames-exclude "\\(?:daily\\|dailies\\|journal\\)/"
   "Regexp matching paths of files not to auto-rename.
@@ -1681,7 +1683,8 @@ For use by `org-node-rename-file-by-title'.
 
 Only applied to files under `org-node-renames-allowed-dirs'.  If
 a file is not there, it is not considered in any case."
-  :type 'string)
+  :type 'string
+  :package-version '(org-node . "0"))
 
 ;;;###autoload
 (defun org-node-rename-file-by-title (&optional interactive)
