@@ -978,8 +978,8 @@ the function is called: `org-node-proposed-title' and
 (defun org-node-create (title id &optional seq-key)
   "Call `org-node-creation-fn' with necessary variables set.
 
-TITLE will be title of node, ID will be id of node \(use
-`org-id-new' if you don\\='t know\).
+TITLE will be title of node, ID will be id of node \(pass
+an output of `org-id-new' if you don\\='t know\).
 
 Optional argument SEQ-KEY means use the resulting node to
 maybe grow the corresponding sequence.
@@ -996,16 +996,10 @@ To operate on a node after creating it, hook onto
       (add-hook \\='org-node-creation-hook fix-up)
       (unwind-protect (org-node-create TITLE ID)
         (remove-hook \\='org-node-creation-hook fix-up))"
-  ;; TODO: Just use `let'.  Don't remember why I did it like this, was probably
-  ;; just uncertain about lexical binding.
-  (setq org-node-proposed-title title)
-  (setq org-node-proposed-id id)
-  (setq org-node-proposed-seq seq-key)
-  (unwind-protect
-      (funcall org-node-creation-fn)
-    (setq org-node-proposed-title nil)
-    (setq org-node-proposed-id nil)
-    (setq org-node-proposed-seq nil)))
+  (let ((org-node-proposed-title title)
+        (org-node-proposed-id id)
+        (org-node-proposed-seq seq-key))
+    (funcall org-node-creation-fn)))
 
 (defun org-node-new-file ()
   "Create a new file with a new node.
@@ -1938,6 +1932,7 @@ set in `org-node-name-of-links-drawer'."
 
 ;; TODO: Make something like a find-dired buffer, handy!
 (defun org-node-list-files ()
+  "List files and associated information."
   (interactive)
   (org-mem-list--pop-to-tabulated-buffer
    :buffer "*org-node files list*"
@@ -2813,7 +2808,7 @@ As a side effect, it can be used without the rest of org-roam."
 
 This may refer to the current Org heading, else an ancestor
 heading, else the file-level node, whichever has an ID first."
-  (gethash (org-entry-get-with-inheritance "ID") org-nodes))
+  (org-mem-entry-by-id (org-entry-get-with-inheritance "ID")))
 
 ;; TODO: Add an extended variant that checks active region, like
 ;;       `org-node-insert-link' does.
