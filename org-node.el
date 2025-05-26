@@ -521,12 +521,10 @@ STR, PRED and ACTION as in `org-node-collection-basic'."
   "Cache fancy completion candidates for NODE and its aliases."
   (when (and (org-mem-entry-id node)
              (org-mem-entry-title node)
-             (funcall (org-node--try-ensure-compiled org-node-filter-fn) node))
+             (funcall org-node-filter-fn node))
     (dolist (title (cons (org-mem-entry-title node)
                          (org-mem-entry-roam-aliases node)))
-      (let ((affx (funcall (org-node--try-ensure-compiled org-node-affixation-fn)
-                           node
-                           title)))
+      (let ((affx (funcall org-node-affixation-fn node title)))
         (puthash title affx org-node--title<>affixations)
         (if org-node-alter-candidates
             ;; Absorb the affixations into one candidate string
