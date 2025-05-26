@@ -476,13 +476,13 @@ STR, PRED and ACTION as in `org-node-collection-basic'."
 ;; FIXME: Seems to create some strange glyphs
 (defun org-node--affixate (collection)
   "From list COLLECTION, make an alist of ((TITLE PREFIX SUFFIX) ...)."
-  (if (string-blank-p (car collection))
-      (cons (list (car collection) "" (or org-node-blank-input-hint ""))
-            (if org-node-alter-candidates
-                (cl-loop for candidate in (cdr collection)
-                         collect (list candidate "" ""))
-              (cl-loop for title in (cdr collection)
-                       collect (gethash title org-node--title<>affixations))))
+  (if (and (car collection) (string-blank-p (car collection)))
+      (nconc (list (list (car collection) "" (or org-node-blank-input-hint "")))
+             (if org-node-alter-candidates
+                 (cl-loop for candidate in (cdr collection)
+                          collect (list candidate "" ""))
+               (cl-loop for title in (cdr collection)
+                        collect (gethash title org-node--title<>affixations))))
     (if org-node-alter-candidates
         (cl-loop for candidate in collection
                  collect (list candidate "" ""))
