@@ -2054,7 +2054,7 @@ one of them is associated with a ROAM_REFS property."
   (require 'org-mem-list)
   (org-mem-list--pop-to-tabulated-buffer
    :buffer "*org-node files list*"
-   :format [("Modified" 11 t) ("Size" 7 t) ("File" 70 t) ("Title" 40 t) ("Lines" 6 t) ("Coding system" 15 t) ("Properties" 10)]
+   :format [("Modified" 11 t) ("Size" 7 t) ("File" 70 t) ("Title" 40 t) ("Coding system" 15 t) ("Properties" 10 t)]
    :entries
    (cl-loop
     for file in (org-mem-all-files)
@@ -2066,7 +2066,6 @@ one of them is associated with a ROAM_REFS property."
                   (format (if (< kb 1) "" "%d kB") kb)
                   (buttonize file #'find-file file)
                   (or (org-mem-file-title-topmost file) "")
-                  (number-to-string (org-mem-file-line-count file))
                   (prin1-to-string (org-mem-file-coding-system file))
                   (if props (prin1-to-string props) ""))))
    :reverter #'org-node-list-files))
