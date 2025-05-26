@@ -154,6 +154,10 @@ NAME, ARGLIST and BODY as in `defun'."
                 (list (file-name-concat org-directory "daily/")
                       (file-name-concat org-directory "dailies/")))))
 
+(org-node-changes--def-whiny-fn org-node-id-at-point ()
+  "1.9.0 (November 2024)" "June 2025" "use `org-entry-get-with-inheritance' instead."
+  (org-entry-get-with-inheritance "ID"))
+
 ;; So that `gethash' will error
 (defvar org-node--origin<>links :obsolete)
 (defvar org-node--file<>lnum.node :obsolete)

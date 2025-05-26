@@ -127,7 +127,7 @@
 (defvar org-roam-preview-postprocess-functions)
 
 
-;;;; Options
+;;;; Some options
 
 (defgroup org-node nil
   "Support a zettelkasten of org-id files and subtrees."
@@ -177,19 +177,6 @@ Takes a node as argument, should return a string."
   :type '(choice (const nil) function)
   :package-version '(org-node . "2.3.3"))
 
-(defun org-node-filter-no-roam-exclude-p (node)
-  "Hide NODE if it has a :ROAM_EXCLUDE: property.
-Does not hide if it merely inherits that property from an ancestor."
-  (not (org-mem-property "ROAM_EXCLUDE" node)))
-
-(defun org-node-filter-watched-dir-p (node)
-  "Show NODE only if it is found inside `org-mem-watch-dirs'."
-  (let ((file (org-mem-file node)))
-    (cl-some (lambda (dir) (string-prefix-p dir file))
-             (with-memoization (org-mem--table 0 'true-watch-dirs)
-               (with-temp-buffer ;; No buffer-env
-                 (mapcar #'file-truename org-mem-watch-dirs))))))
-
 ;; TODO: Compose a list of functions?
 (defcustom org-node-filter-fn #'org-node-filter-no-roam-exclude-p
   "Predicate returning non-nil to include a node, or nil to exclude it.
@@ -212,6 +199,19 @@ in the type `org-mem-entry' (C-h o org-mem-entry RET)."
                           :value (lambda (node) t)))
   :set #'org-node--set-and-remind-reset
   :package-version '(org-node . "3.3.0"))
+
+(defun org-node-filter-no-roam-exclude-p (node)
+  "Hide NODE if it has a :ROAM_EXCLUDE: property.
+Does not hide if it merely inherits that property from an ancestor."
+  (not (org-mem-property "ROAM_EXCLUDE" node)))
+
+(defun org-node-filter-watched-dir-p (node)
+  "Show NODE only if it is found inside `org-mem-watch-dirs'."
+  (let ((file (org-mem-file node)))
+    (cl-some (lambda (dir) (string-prefix-p dir file))
+             (with-memoization (org-mem--table 0 'true-watch-dirs)
+               (with-temp-buffer ;; No buffer-env
+                 (mapcar #'file-truename org-mem-watch-dirs))))))
 
 (defcustom org-node-insert-link-hook nil
   "Hook run after inserting a link to an Org-ID node.
@@ -505,7 +505,7 @@ STR, PRED and ACTION as in `org-node-collection-basic'."
      (put 'org-node-hist 'history-length 1000))
 
 
-;;;; The mode
+;;;; The cache mode
 
 (defun org-node--let-refs-be-aliases (node)
   "Add ROAM_REFS of NODE as extra minibuffer completions."
@@ -577,44 +577,12 @@ scan files once rather than twice."
     (remove-hook 'org-mem-record-entry-functions #'org-node--record-completion-candidates)
     (remove-hook 'org-mem-record-entry-functions #'org-node--let-refs-be-aliases))))
 
-(defvar org-node--new-unsaved-buffers nil
-  "List of file-visiting buffers that have never written to the file.")
-
-;; TODO: Could the :creator just check if the buffer is unmodified and empty?
-;;       But possible pitfall that the user may have important stuff in undo.
-(defun org-node--kill-blank-unsaved-buffers (&rest _)
-  "Kill buffers created by org-node that have always been blank.
-
-This exists to allow you to create a node, especially a journal note for
-today via package \"org-node-seq\", change your mind, do an `undo' to
-empty the buffer, then browse to the previous day\\='s note.  When later
-you want to create today\\='s note after all, the seq\\='s :creator
-function should be made to run again, but it will not do so if the
-buffer already exists, so the buffer stays blank.  Thus this hook."
-  (unless (minibufferp)
-    (dolist (buf org-node--new-unsaved-buffers)
-      (if (or (not (buffer-live-p buf))
-              (file-exists-p (buffer-file-name buf)))
-          ;; Stop checking the buffer
-          (setq org-node--new-unsaved-buffers
-                (delq buf org-node--new-unsaved-buffers))
-        (with-current-buffer buf
-          (when (and (not (get-buffer-window buf t))
-                     (not (buffer-modified-p))
-                     (string-blank-p (buffer-string)))
-            (when buffer-auto-save-file-name
-              ;; Hopefully throw away a stale autosave
-              ;; since its existence annoys the user on re-creating the file
-              (do-auto-save nil t))
-            (when-let* ((file (org-mem--truename-maybe buffer-file-name)))
-              (org-mem-updater--forget-file-contents file)
-              (org-node--forget-completions-in-files file))
-            (kill-buffer buf)))))))
-
-
-
 ;;;###autoload
 (define-obsolete-function-alias 'org-node-reset #'org-mem-reset "3.0.0 (May 2025)")
+
+;; TODO: Deprecate somehow
+(defvar org-node--first-init t
+  "Non-nil until org-node has been initialized, then nil.")
 
 (defun org-node-cache-ensure (&optional block force)
   "Ensure that org-node is ready for use.
@@ -650,10 +618,8 @@ something to change the facts on the ground just prior."
   (when block
     (org-mem-await 'org-node 10)))
 
-;; TODO: Deprecate somehow
-(defvar org-node--first-init t
-  "Non-nil until org-node has been initialized, then nil.
-Mainly for muffling some messages.")
+
+;;;; Etc
 
 (defvar org-node--compile-timers nil)
 (defvar org-node--compiled-lambdas (make-hash-table :test 'equal)
@@ -689,25 +655,86 @@ must be called a lot."
         ((let (byte-compile-warnings)
            (puthash fn (byte-compile fn) org-node--compiled-lambdas)))))
 
-
-;;;; Etc
+(defvar org-node--new-unsaved-buffers nil
+  "List of file-visiting buffers that have never written to the file.")
 
-(defun org-node--consent-to-bothersome-modes-for-mass-edit ()
-  "Confirm about certain modes being enabled.
-These are modes such as `auto-save-visited-mode' that can
-interfere with user experience during or after mass-editing operation."
-  ;; TODO: Expand the list, there are probably other annoying modes
-  (cl-loop for mode in '(auto-save-visited-mode
-                         git-auto-commit-mode)
-           when (and (boundp mode)
-                     (symbol-value mode)
-                     (not (y-or-n-p
-                           (format "%S is active - proceed anyway?" mode))))
-           return nil
-           finally return t))
+;; TODO: Could the :creator just check if the buffer is unmodified and empty?
+;;       But possible pitfall that the user may have important stuff in undo.
+(defun org-node--kill-blank-unsaved-buffers (&rest _)
+  "Kill buffers created by org-node that have always been blank.
+
+This exists to allow you to create a node, especially a journal note for
+today via package \"org-node-seq\", change your mind, do an `undo' to
+empty the buffer, then browse to the previous day\\='s note.  When later
+you want to create today\\='s note after all, the seq\\='s :creator
+function should be made to run again, but it will not do so if the
+buffer already exists, so the buffer stays blank.  Thus this hook."
+  (unless (minibufferp)
+    (dolist (buf org-node--new-unsaved-buffers)
+      (if (or (not (buffer-live-p buf))
+              (file-exists-p (buffer-file-name buf)))
+          ;; Stop checking the buffer
+          (setq org-node--new-unsaved-buffers
+                (delq buf org-node--new-unsaved-buffers))
+        (with-current-buffer buf
+          (when (and (not (get-buffer-window buf t))
+                     (not (buffer-modified-p))
+                     (string-blank-p (buffer-string)))
+            (when buffer-auto-save-file-name
+              ;; Hopefully throw away a stale autosave
+              ;; since its existence annoys the user on re-creating the file
+              (do-auto-save nil t))
+            (when-let* ((file (org-mem--truename-maybe buffer-file-name)))
+              (org-mem-updater--forget-file-contents file)
+              (org-node--forget-completions-in-files file))
+            (kill-buffer buf)))))))
 
 
 ;;;; Filename functions
+
+(defcustom org-node-ask-directory nil
+  "Whether to ask the user where to save a new file.
+
+- Symbol nil: put file in the most populous root directory in
+              `org-id-locations' without asking
+- String: a directory path in which to put the file
+- Symbol t: ask every time
+
+This variable determines the directory component, but the file basename
+is determined by `org-node-slug-fn' and `org-node-datestamp-format'."
+  :group 'org-node
+  :type '(choice boolean string))
+
+;; This setting needs care with `org-node-rename-file-by-title' after changing.
+;; https://blog.ganssle.io/articles/2023/01/attractive-nuisances.html
+(defcustom org-node-datestamp-format ""
+  "Passed to `format-time-string' to prepend to filenames.
+
+Example from Org-roam: %Y%m%d%H%M%S-
+Example from Denote: %Y%m%dT%H%M%S--
+
+For the rest of the filename, configure `org-node-slug-fn'."
+  :type '(radio
+          (const :tag "None" :value "")
+          (const :tag "Like Org-roam: %Y%m%d%H%M%S-" :value "%Y%m%d%H%M%S-")
+          (const :tag "Like Denote: %Y%m%dT%H%M%S--" :value "%Y%m%dT%H%M%S--")
+          (string :tag "Custom")))
+
+(defcustom org-node-slug-fn #'org-node-slugify-for-web
+  "Function taking a node title and returning a filename component.
+Receives one argument: the value of an Org #+TITLE keyword, or
+the first heading in a file that has no #+TITLE.
+
+Built-in choices:
+- `org-node-slugify-for-web'
+- `org-node-slugify-like-roam-default'
+
+It is popular to also prefix filenames with a datestamp.  To do
+that, configure `org-node-datestamp-format'."
+  :type '(radio
+          (function-item org-node-slugify-for-web)
+          (function-item org-node-slugify-like-roam-default)
+          (function :tag "Custom function" :value (lambda (title) title))))
 
 (defun org-node--root-dirs (file-list)
   "Infer root directories of FILE-LIST.
@@ -760,65 +787,12 @@ substring \"/home/me\" referring to the same location."
                    return (cl-incf (cdr (assoc dir dir-counters))))
        finally return (mapcar #'car (cl-sort dir-counters #'> :key #'cdr))))))
 
-(defcustom org-node-ask-directory nil
-  "Whether to ask the user where to save a new file.
-
-- Symbol nil: put file in the most populous root directory in
-              `org-id-locations' without asking
-- String: a directory path in which to put the file
-- Symbol t: ask every time
-
-This variable determines the directory component, but the file basename
-is determined by `org-node-slug-fn' and `org-node-datestamp-format'."
-  :group 'org-node
-  :type '(choice boolean string))
-
-;; TODO: It'd be more user-friendly if the interactive prompt also lets you
-;;       change the basename.  So, conditionally call `org-node-slug-fn'
-;;       here, then use `read-file-name' rather than `read-directory-name'.
-;;       But first we need some refactoring elsewhere.
-(defun org-node-guess-or-ask-dir (prompt)
-  "Maybe prompt for a directory, and if so, use string PROMPT.
-Behavior depends on user option `org-node-ask-directory'.
-In any case, return a directory."
-  (if (eq t org-node-ask-directory) (read-directory-name prompt)
-    (if (stringp org-node-ask-directory) org-node-ask-directory
-      (org-node-guess-dir))))
-
-(defun org-node-guess-dir ()
-  (car (org-node--root-dirs (org-mem-all-files))))
-
-;; Needs care with `org-node-rename-file-by-title' after changing.
-;; https://blog.ganssle.io/articles/2023/01/attractive-nuisances.html
-(defcustom org-node-datestamp-format ""
-  "Passed to `format-time-string' to prepend to filenames.
-
-Example from Org-roam: %Y%m%d%H%M%S-
-Example from Denote: %Y%m%dT%H%M%S--
-
-For the rest of the filename, configure `org-node-slug-fn'."
-  :type '(radio
-          (const :tag "None" :value "")
-          (const :tag "Like Org-roam: %Y%m%d%H%M%S-" :value "%Y%m%d%H%M%S-")
-          (const :tag "Like Denote: %Y%m%dT%H%M%S--" :value "%Y%m%dT%H%M%S--")
-          (string :tag "Custom")))
-
-;; TODO: It should prolly receive the entire node as second argument
-(defcustom org-node-slug-fn #'org-node-slugify-for-web
-  "Function taking a node title and returning a filename component.
-Receives one argument: the value of an Org #+TITLE keyword, or
-the first heading in a file that has no #+TITLE.
-
-Built-in choices:
-- `org-node-slugify-for-web'
-- `org-node-slugify-like-roam-default'
-
-It is popular to also prefix filenames with a datestamp.  To do
-that, configure `org-node-datestamp-format'."
-  :type '(radio
-          (function-item org-node-slugify-for-web)
-          (function-item org-node-slugify-like-roam-default)
-          (function :tag "Custom function" :value (lambda (title) title))))
+(defun org-node-title-to-filename (title)
+  "From TITLE, make a full file path."
+  (file-name-concat (if (stringp org-node-ask-directory)
+                        org-node-ask-directory
+                      (org-node-guess-dir))
+                    (org-node-title-to-basename title)))
 
 (defun org-node-title-to-basename (title)
   "From TITLE, make the non-directory component of a file name."
@@ -826,12 +800,20 @@ that, configure `org-node-datestamp-format'."
           (funcall (org-node--try-ensure-compiled org-node-slug-fn) title)
           ".org"))
 
-(defun org-node-title-to-filename (title)
-  "From TITLE, make a full file path."
-  (file-name-concat (if (stringp org-node-ask-directory)
-                        org-node-ask-directory
-                      (org-node-guess-dir))
-                    (org-node-title-to-basename title)))
+(defun org-node-guess-dir ()
+  "Return the root level of user\\='s apparently most-used directories."
+  (car (org-node--root-dirs (org-mem-all-files))))
+
+;; TODO: It'd be more user-friendly if the interactive prompt also lets you
+;;       change the basename.  So, conditionally call `org-node-slug-fn'
+;;       here, then use `read-file-name' rather than `read-directory-name'.
+;;       But first we need some refactoring elsewhere.
+(defun org-node-guess-or-ask-dir (prompt)
+  "Maybe prompt for a directory, and if so, use string PROMPT.
+Behavior depends on user option `org-node-ask-directory'."
+  (if (eq t org-node-ask-directory) (read-directory-name prompt)
+    (if (stringp org-node-ask-directory) org-node-ask-directory
+      (org-node-guess-dir))))
 
 (defun org-node-slugify-like-roam-default (title)
   "From TITLE, make a filename slug in default org-roam style.
@@ -916,40 +898,6 @@ Automatically set, should be nil most of the time.")
 (defvar org-node-proposed-seq nil
   "Key that identifies a node sequence about to be added-to.
 Automatically set, should be nil most of the time.")
-
-(defun org-node--goto (node &optional exact)
-  "Visit NODE file, and move point unless already close.
-EXACT means always move point."
-  (when (numberp exact)
-    (error "Function org-node--goto no longer takes a position argument"))
-  (unless node
-    (error "Function org-node--goto received a nil argument"))
-  (let ((file (org-mem-file-truename node)))
-    (if (file-exists-p file)
-        (progn
-          (when (not (file-readable-p file))
-            (error "org-node: Couldn't visit unreadable file %s" file))
-          (find-file file)
-          (widen)
-          (org-node--assert-transclusion-safe)
-          (let* ((id (org-mem-id node))
-                 (pos (and id (org-find-property "ID" id))))
-            (unless pos
-              (error "Could not find ID \"%s\" in buffer %s" id (current-buffer)))
-            ;; Now point may already be in a good place because a buffer was
-            ;; already visiting it, or because of save-place.
-            ;; No need to move point unnecessarily.
-            (when (or exact
-                      (not (equal id (org-entry-get-with-inheritance "ID")))
-                      (not (pos-visible-in-window-p pos))
-                      (org-invisible-p pos))
-              (goto-char pos)
-              (when (org-mem-subtree-p node)
-                (org-fold-show-entry)
-                (org-fold-show-children)
-                (recenter 0)))))
-      (message "org-node: Didn't find file, resetting...")
-      (org-mem--scan-full t))))
 
 (defcustom org-node-creation-fn #'org-node-new-file
   "Function called to create a node that does not yet exist.
@@ -1147,7 +1095,7 @@ type the name of a node that does not exist.  That enables this
         (run-hooks 'org-node-creation-hook)))))
 
 
-;;;; Commands
+;;;; Commands 1: Cute little commands
 
 ;;;###autoload
 (defun org-node-find ()
@@ -1169,12 +1117,66 @@ set `org-node-creation-fn' to `org-node-new-via-roam-capture'."
           (org-node-create input id))))))
 
 ;;;###autoload
+(defun org-node-insert-heading ()
+  "Insert a heading with ID and run `org-node-creation-hook'.
+Tip: Command `org-node-nodeify-entry' is more widely applicable, it can
+be sufficient to key-bind that one."
+  (interactive "*" org-mode)
+  (org-insert-heading)
+  (org-node-nodeify-entry))
+
+;;;###autoload
+(defun org-node-nodeify-entry ()
+  "Add an ID to entry at point and run `org-node-creation-hook'."
+  (interactive "*" org-mode)
+  (org-node-cache-ensure) ;; Because the hook could contain anything
+  (run-hooks 'org-node-creation-hook))
+
+;;;###autoload
+(defun org-node-put-created ()
+  "Add a CREATED property to entry at point, if none already."
+  (interactive "*" org-mode)
+  (unless (org-entry-get nil "CREATED")
+    (org-entry-put nil "CREATED"
+                   (format-time-string (org-time-stamp-format t t)))))
+(defalias 'org-node-ensure-crtime-property 'org-node-put-created)
+
+;;;###autoload
 (defun org-node-visit-random ()
   "Visit a random node."
   (interactive)
   (org-node-cache-ensure)
   (org-node--goto
    (seq-random-elt (hash-table-values org-node--candidate<>entry))))
+
+;; TODO: Optionally obey `org-node-filter-fn'
+;;;###autoload
+(defun org-node-grep ()
+  "Grep across all files known to org-node."
+  (interactive)
+  (unless (require 'consult nil t)
+    (user-error "This command requires package \"consult\""))
+  (org-node-cache-ensure)
+  ;; Prevent consult from turning the names relative, with such enlightening
+  ;; directory paths as ../../../../../../.
+  (cl-letf (((symbol-function #'file-relative-name)
+             (lambda (name &optional _dir) name)))
+    (let ((consult-ripgrep-args (concat consult-ripgrep-args " --type=org")))
+      (if (executable-find "rg")
+          (consult--grep "Grep in files known to org-mem: "
+                         #'consult--ripgrep-make-builder
+                         (org-node--root-dirs (org-mem-all-files))
+                         nil)
+        ;; Much slower!  Vanilla grep does not have Ripgrep's --type=org, so
+        ;; must target thousands of files and not a handful of dirs, a calling
+        ;; pattern that would also slow Ripgrep down.
+        (consult--grep "(Ripgrep not found) Grep in files known to org-mem: "
+                       #'consult--grep-make-builder
+                       (org-mem-all-files)
+                       nil)))))
+
+
+;;;; Commands 2: Inserting things
 
 ;;;###autoload
 (defun org-node-insert-link (&optional region-as-initial-input novisit)
@@ -1419,48 +1421,57 @@ If you often transclude file-level nodes, consider adding keywords to
       (run-hooks 'org-node-insert-link-hook))))
 
 (defun org-node-insert-raw-link ()
-  "Insert input at point, completing to links found in some Org file somewhere.
+  "Insert input at point, completing to any link ever seen.
 Works in non-Org buffers."
   (interactive)
   (insert (completing-read "Insert raw link: "
                            (org-node--list-known-raw-links)
                            nil nil nil 'org-node-link-hist)))
 
-;; TODO: Allow refile from some capture templates.  (During a capture,
-;; `org-refile' is rebound to `org-capture-refile', which see).  It seems we
-;; can just temp override definition of `org-refile' with this one, if I am
-;; correct that that long function basically does the equivalent of
-;; org-cut-subtree and paste.
-;;;###autoload
-(defun org-node-refile ()
-  "Experimental."
-  (interactive () org-mode)
-  (unless (derived-mode-p 'org-mode)
-    (user-error "This command expects an org-mode buffer"))
-  (when (org-invisible-p)
-    (user-error "Better not run this command in an invisible region"))
-  (if (org-before-first-heading-p)
-      (user-error "`org-node-refile' only works on subtrees for now")
-    (org-node-cache-ensure)
-    (let* ((input (completing-read "Refile into ID-node: "
-                                   #'org-node-collection-basic
-                                   () () () 'org-node-hist))
-           (node (gethash input org-node--candidate<>entry))
-           (origin-buffer (current-buffer)))
-      (unless node
-        (error "Node not found %s" input))
-      (org-cut-subtree)
-      (condition-case err
-          (org-node--goto node t)
-        ((t error)
-         (switch-to-buffer origin-buffer)
-         (org-paste-subtree)
-         (signal (car err) (cdr err)))
-        (:success
-         (widen)
-         (forward-char)
-         (org-paste-subtree)
-         (run-hooks 'org-node-relocation-hook))))))
+;; TODO: Try to include all Firefox bookmarks and so on
+(defun org-node--list-known-raw-links ()
+  "Return list of all \(non-ID\) links seen in all known files."
+  (let (result)
+    (maphash (lambda (target links)
+               (let ((types (seq-keep #'org-mem-link-type
+                                      (seq-remove #'org-mem-link-citation-p
+                                                  links))))
+                 (dolist (type (delete-dups (delete "id" types)))
+                   (push (concat type ":" target) result))))
+             org-mem--target<>links)
+    result))
+
+(defcustom org-node-name-of-links-drawer "RELATED"
+  "Name of drawer created by command `org-node-insert-into-related'."
+  :type 'string
+  :package-version '(org-node . "3.3.3"))
+
+;; TODO: Actually prompt for a thing to insert first, so user does not see the
+;; temp narrowed buffer.
+(defun org-node-insert-into-related ()
+  "Insert a link into a RELATED drawer near the end of current entry.
+Unlike the BACKLINKS drawer, this drawer is not \"smart\" and will never
+be sorted, reformatted or erased, and the links count like any other
+forward-link.  The drawer can be moved, so long as it maintains the name
+set in `org-node-name-of-links-drawer'."
+  (interactive "*" org-mode)
+  (save-excursion
+    (save-restriction
+      (org-node-narrow-to-drawer-create org-node-name-of-links-drawer
+                                        #'org-entry-end-position)
+      (atomic-change-group
+        (unless (eolp)
+          (let ((col (current-indentation)))
+            (newline)
+            (indent-to col))
+          (forward-line -1)
+          (back-to-indentation))
+        (insert (format-time-string (org-time-stamp-format t t)) " -> ")
+        ;; This can take user to another buffer, so it must be at the end.
+        (org-node-insert-link-novisit)))))
+
+
+;;;; Commands 3: Extract and refile
 
 ;;;###autoload
 (defun org-node-extract-subtree ()
@@ -1567,6 +1578,45 @@ creation-date as more truthful or useful than today\\='s date.
            "\n"))
         (push (current-buffer) org-node--new-unsaved-buffers)
         (run-hooks 'org-node-relocation-hook)))))
+
+;; TODO: Allow refile from some capture templates.  (During a capture,
+;; `org-refile' is rebound to `org-capture-refile', which see).  It seems we
+;; can just temp override definition of `org-refile' with this one, if I am
+;; correct that that long function basically does the equivalent of
+;; org-cut-subtree and paste.
+;;;###autoload
+(defun org-node-refile ()
+  "Experimental."
+  (interactive () org-mode)
+  (unless (derived-mode-p 'org-mode)
+    (user-error "This command expects an org-mode buffer"))
+  (when (org-invisible-p)
+    (user-error "Better not run this command in an invisible region"))
+  (if (org-before-first-heading-p)
+      (user-error "`org-node-refile' only works on subtrees for now")
+    (org-node-cache-ensure)
+    (let* ((input (completing-read "Refile into ID-node: "
+                                   #'org-node-collection-basic
+                                   () () () 'org-node-hist))
+           (node (gethash input org-node--candidate<>entry))
+           (origin-buffer (current-buffer)))
+      (unless node
+        (error "Node not found %s" input))
+      (org-cut-subtree)
+      (condition-case err
+          (org-node--goto node t)
+        ((t error)
+         (switch-to-buffer origin-buffer)
+         (org-paste-subtree)
+         (signal (car err) (cdr err)))
+        (:success
+         (widen)
+         (forward-char)
+         (org-paste-subtree)
+         (run-hooks 'org-node-relocation-hook))))))
+
+
+;;;; Commands 4: Renaming things
 
 (defun org-node-extract-file-name-datestamp (path)
   "From filename PATH, get the datestamp prefix if it has one.
@@ -1712,6 +1762,20 @@ Argument INTERACTIVE automatically set."
               (set-visited-file-name new-path t t))
             (message "File '%s' renamed to '%s'" name new-name)))))))))
 
+(defun org-node--consent-to-bothersome-modes-for-mass-edit ()
+  "Confirm about certain modes being enabled.
+These are modes such as `auto-save-visited-mode' that can
+interfere with user experience during or after mass-editing operation."
+  ;; TODO: Expand the list, there are probably other annoying modes
+  (cl-loop for mode in '(auto-save-visited-mode
+                         git-auto-commit-mode)
+           when (and (boundp mode)
+                     (symbol-value mode)
+                     (not (y-or-n-p
+                           (format "%S is active - proceed anyway?" mode))))
+           return nil
+           finally return t))
+
 ;; TODO: Kill opened buffers that were not edited.
 ;;       But first make sure it can pick up where it left off if canceled
 ;;       midway.  Maybe use `org-node--in-files-do'.
@@ -1851,84 +1915,100 @@ user quits, do not apply any modifications."
              (message "File renamed from %s to %s" filename new))))
         (message "Waiting for rgrep to populate buffer...")))))
 
-;;;###autoload
-(defun org-node-insert-heading ()
-  "Insert a heading with ID and run `org-node-creation-hook'.
-Tip: Command `org-node-nodeify-entry' is more widely applicable, it can
-be sufficient to key-bind that one."
-  (interactive "*" org-mode)
-  (org-insert-heading)
-  (org-node-nodeify-entry))
+
+;;;; Commands 5: Listing things
 
-;;;###autoload
-(defun org-node-nodeify-entry ()
-  "Add an ID to entry at point and run `org-node-creation-hook'."
-  (interactive "*" org-mode)
-  (org-node-cache-ensure) ;; Because the hook could contain anything
-  (run-hooks 'org-node-creation-hook))
-
-;;;###autoload
-(defun org-node-put-created ()
-  "Add a CREATED property to entry at point, if none already."
-  (interactive "*" org-mode)
-  (unless (org-entry-get nil "CREATED")
-    (org-entry-put nil "CREATED"
-                   (format-time-string (org-time-stamp-format t t)))))
-(defalias 'org-node-ensure-crtime-property 'org-node-put-created)
-
-;; TODO: Optionally obey `org-node-filter-fn'
-;;;###autoload
-(defun org-node-grep ()
-  "Grep across all files known to org-node."
+(defun org-node-peek (&optional _deprecated-arg)
+  "Print a random `org-mem-entry' object."
   (interactive)
-  (unless (require 'consult nil t)
-    (user-error "This command requires package \"consult\""))
-  (org-node-cache-ensure)
-  ;; Prevent consult from turning the names relative, with such enlightening
-  ;; directory paths as ../../../../../../.
-  (cl-letf (((symbol-function #'file-relative-name)
-             (lambda (name &optional _dir) name)))
-    (let ((consult-ripgrep-args (concat consult-ripgrep-args " --type=org")))
-      (if (executable-find "rg")
-          (consult--grep "Grep in files known to org-mem: "
-                         #'consult--ripgrep-make-builder
-                         (org-node--root-dirs (org-mem-all-files))
-                         nil)
-        ;; Much slower!  Vanilla grep does not have Ripgrep's --type=org, so
-        ;; must target thousands of files and not a handful of dirs, a calling
-        ;; pattern that would also slow Ripgrep down.
-        (consult--grep "(Ripgrep not found) Grep in files known to org-mem: "
-                       #'consult--grep-make-builder
-                       (org-mem-all-files)
-                       nil)))))
+  (let ((entry (seq-random-elt (hash-table-values org-mem--id<>entry)))
+        (1arg-funs '(org-mem-entry-active-timestamps
+                     org-mem-entry-closed
+                     org-mem-entry-deadline
+                     org-mem-entry-file
+                     org-mem-entry-file-truename
+                     org-mem-entry-id
+                     org-mem-entry-level
+                     org-mem-entry-lnum
+                     org-mem-entry-olpath
+                     org-mem-entry-olpath-with-self
+                     org-mem-entry-olpath-with-self-with-title
+                     org-mem-entry-olpath-with-title
+                     org-mem-entry-pos
+                     org-mem-entry-priority
+                     org-mem-entry-properties
+                     org-mem-entry-scheduled
+                     org-mem-entry-subtree-p
+                     org-mem-entry-tags
+                     org-mem-entry-tags-inherited
+                     org-mem-entry-tags-local
+                     org-mem-entry-title
+                     org-mem-entry-title-maybe
+                     org-mem-file-attributes
+                     org-mem-file-id-strict
+                     org-mem-file-id-topmost
+                     org-mem-file-line-count
+                     org-mem-file-mtime
+                     org-mem-file-ptmax
+                     org-mem-file-size
+                     org-mem-file-title-or-basename
+                     org-mem-file-title-strict
+                     org-mem-file-title-topmost
+                     org-mem-next-entry
+                     org-mem-previous-entry)))
+    (pop-to-buffer (get-buffer-create "*org-mem example*" t))
+    (emacs-lisp-mode)
+    (setq-local buffer-read-only t)
+    (let ((buffer-read-only nil))
+      (erase-buffer)
+      (insert "Example data taken from random node titled \""
+              (org-mem-entry-title entry) "\"\n\n")
+      (cl-loop for func in 1arg-funs
+               do (insert "(" (symbol-name func) " ENTRY) => "
+                          (prin1-to-string (funcall func entry))
+                          "\n"))
+      (align-regexp (point-min) (point-max) "\\(\\s-*\\) => "))))
 
-(defcustom org-node-name-of-links-drawer "RELATED"
-  "Name of drawer created by command `org-node-insert-into-related'."
-  :type 'string
-  :package-version '(org-node . "3.3.3"))
+(defun org-node-list-reflinks ()
+  "List all reflinks and the ID-nodes in which they were found.
 
-;; TODO: Actually prompt for a thing to insert first, so user does not see the
-;; temp narrowed buffer.
-(defun org-node-insert-into-related ()
-  "Insert a link into a RELATED drawer near the end of current entry.
-Unlike the BACKLINKS drawer, this drawer is not \"smart\" and will never
-be sorted, reformatted or erased, and the links count like any other
-forward-link.  The drawer can be moved, so long as it maintains the name
-set in `org-node-name-of-links-drawer'."
-  (interactive "*" org-mode)
-  (save-excursion
-    (save-restriction
-      (org-node-narrow-to-drawer-create org-node-name-of-links-drawer
-                                        #'org-entry-end-position)
-      (atomic-change-group
-        (unless (eolp)
-          (newline-and-indent)
-          (forward-line -1)
-          (back-to-indentation))
-        (insert (format-time-string (org-time-stamp-format t t)) " -> ")
-        ;; Since insert-link can take user to another buffer, this should be
-        ;; the last action.
-        (org-node-insert-link nil t)))))
+Useful to see how many times you\\='ve inserted a link that is very
+similar to another link, but not identical, so that perhaps only
+one of them is associated with a ROAM_REFS property."
+  (interactive)
+  (let ((entries
+         (cl-loop
+          for link in (org-mem-all-links)
+          unless (equal "id" (org-mem-link-type link))
+          as node = (org-mem-entry-by-id (org-mem-link-nearby-id link))
+          when node
+          collect
+          (let ((type (org-mem-link-type link))
+                (target (org-mem-link-target link))
+                (pos (org-mem-link-pos link))
+                (origin (org-mem-link-nearby-id link))
+                (file-name (org-mem-link-file link)))
+            (list (sxhash link)
+                  (vector
+                   (if (gethash target org-mem--roam-ref<>id)
+                       "*"
+                     "")
+                   (if (and node (org-mem-entry-title node))
+                       (buttonize (org-mem-entry-title node)
+                                  `(lambda (_button)
+                                     (find-file ,file-name)
+                                     (goto-char ,pos)
+                                     (org-fold-show-entry)
+                                     (org-fold-show-context)))
+                     (or origin ""))
+                   (if type (concat type ":" target) target)))))))
+    (if entries
+        (org-mem-list--pop-to-tabulated-buffer
+         :buffer "*org-node reflinks*"
+         :format [("Ref" 4 t) ("Inside node" 30 t) ("Link" 0 t)]
+         :reverter #'org-node-list-reflinks
+         :entries entries)
+      (message "No links found"))))
 
 ;; TODO: Make something like a find-dired buffer, handy!
 (defun org-node-list-files ()
@@ -1952,74 +2032,6 @@ set in `org-node-name-of-links-drawer'."
                   (prin1-to-string (org-mem-file-coding-system file))
                   (if props (prin1-to-string props) ""))))
    :reverter #'org-node-list-files))
-
-(defvar org-node--unlinted nil)
-(defvar org-node--lint-current nil)
-(defvar org-node--lint-operator nil)
-(defvar org-node--lint-warnings nil)
-(defun org-node-lint-all-files ()
-  "Run `org-lint' on all known Org files, and report results."
-  (interactive)
-  (require 'org-lint)
-  (let ((proceed (and org-node--unlinted
-                      (equal fileloop--operate-function
-                             #'org-node--lint-operator)))
-        (files (org-mem-all-files)))
-    (unless proceed
-      (when (y-or-n-p (format "Lint %d files?" (length files)))
-        (setq org-node--unlinted files)
-        (fileloop-initialize
-         files
-         (lambda ()
-           (let ((file (pop org-node--unlinted)))
-             (when (string-prefix-p "org" (file-name-extension file))
-               (setq org-node--lint-current file))))
-         #'org-node--lint-operator)
-        (setq org-node--lint-warnings nil)
-        (setq proceed t)))
-
-    (condition-case _
-        (when proceed
-          (cl-letf (((symbol-function 'recentf-add-file) #'ignore))
-            (let ((delay-mode-hooks t)
-                  (org-inhibit-startup t)
-                  (org-element-cache-persistent nil))
-              (fileloop-continue))))
-      (quit)))
-
-    (when org-node--lint-warnings
-      (org-mem-list--pop-to-tabulated-buffer
-       :buffer "*org lint results*"
-       :format [("File" 30 t) ("Line" 5 t) ("Trust" 5 t) ("Explanation" 0 t)]
-       :reverter #'org-node-lint-all-files
-       :entries (cl-loop
-                 for (file . warning) in org-node--lint-warnings
-                 collect (let ((array (cadr warning)))
-                           (list (sxhash warning)
-                                 (vector
-                                  (buttonize (file-name-nondirectory file)
-                                             `(lambda (_button)
-                                                (find-file ,file)
-                                                (goto-line ,(string-to-number
-                                                             (elt array 0)))))
-                                  (elt array 0)
-                                  (elt array 1)
-                                  (elt array 2))))))))
-
-(defun org-node--lint-operator ()
-  "An OPERATE-FUNCTION for `fileloop-initialize'."
-  (let ((buffer-seems-new (and (not (buffer-modified-p))
-                               (not buffer-undo-list))))
-    (unless (derived-mode-p 'org-mode)
-      (org-mode))
-    ;; Set `inhibit-message' to muffle spam from `org-lint-invalid-id-link'.
-    (let ((inhibit-message t))
-      (when-let* ((warning (org-lint)))
-        (push (cons org-node--lint-current (car warning))
-              org-node--lint-warnings)))
-    (when buffer-seems-new
-      (kill-buffer))
-    t))
 
 (defun org-node-list-feedback-arcs ()
   "Show a feedback-arc-set of forward id-links.
@@ -2103,116 +2115,76 @@ from ID links found in `org-mem--target<>links'."
                        collect (concat target "\t" (org-mem-link-nearby-id link)))))
     "\n")))
 
-(defun org-node-list-reflinks ()
-  "List all reflinks and the ID-nodes in which they were found.
-
-Useful to see how many times you\\='ve inserted a link that is very
-similar to another link, but not identical, so that perhaps only
-one of them is associated with a ROAM_REFS property."
+(defvar org-node--unlinted nil)
+(defvar org-node--lint-current nil)
+(defvar org-node--lint-operator nil)
+(defvar org-node--lint-warnings nil)
+(defun org-node-lint-all-files ()
+  "Run `org-lint' on all known Org files, and report results."
   (interactive)
-  (let ((entries
-         (cl-loop
-          for link in (org-mem-all-links)
-          unless (equal "id" (org-mem-link-type link))
-          as node = (org-mem-entry-by-id (org-mem-link-nearby-id link))
-          when node
-          collect
-          (let ((type (org-mem-link-type link))
-                (target (org-mem-link-target link))
-                (pos (org-mem-link-pos link))
-                (origin (org-mem-link-nearby-id link))
-                (file-name (org-mem-link-file link)))
-            (list (sxhash link)
-                  (vector
-                   (if (gethash target org-mem--roam-ref<>id)
-                       "*"
-                     "")
-                   (if (and node (org-mem-entry-title node))
-                       (buttonize (org-mem-entry-title node)
-                                  `(lambda (_button)
-                                     (find-file ,file-name)
-                                     (goto-char ,pos)
-                                     (org-fold-show-entry)
-                                     (org-fold-show-context)))
-                     (or origin ""))
-                   (if type (concat type ":" target) target)))))))
-    (if entries
-        (org-mem-list--pop-to-tabulated-buffer
-         :buffer "*org-node reflinks*"
-         :format [("Ref" 4 t) ("Inside node" 30 t) ("Link" 0 t)]
-         :reverter #'org-node-list-reflinks
-         :entries entries)
-      (message "No links found"))))
+  (require 'org-lint)
+  (let ((proceed (and org-node--unlinted
+                      (equal fileloop--operate-function
+                             #'org-node--lint-operator)))
+        (files (org-mem-all-files)))
+    (unless proceed
+      (when (y-or-n-p (format "Lint %d files?" (length files)))
+        (setq org-node--unlinted files)
+        (fileloop-initialize
+         files
+         (lambda ()
+           (let ((file (pop org-node--unlinted)))
+             (when (string-prefix-p "org" (file-name-extension file))
+               (setq org-node--lint-current file))))
+         #'org-node--lint-operator)
+        (setq org-node--lint-warnings nil)
+        (setq proceed t)))
+
+    (condition-case _
+        (when proceed
+          (cl-letf (((symbol-function 'recentf-add-file) #'ignore))
+            (let ((delay-mode-hooks t)
+                  (org-inhibit-startup t)
+                  (org-element-cache-persistent nil))
+              (fileloop-continue))))
+      (quit)))
+
+    (when org-node--lint-warnings
+      (org-mem-list--pop-to-tabulated-buffer
+       :buffer "*org lint results*"
+       :format [("File" 30 t) ("Line" 5 t) ("Trust" 5 t) ("Explanation" 0 t)]
+       :reverter #'org-node-lint-all-files
+       :entries (cl-loop
+                 for (file . warning) in org-node--lint-warnings
+                 collect (let ((array (cadr warning)))
+                           (list (sxhash warning)
+                                 (vector
+                                  (buttonize (file-name-nondirectory file)
+                                             `(lambda (_button)
+                                                (find-file ,file)
+                                                (goto-line ,(string-to-number
+                                                             (elt array 0)))))
+                                  (elt array 0)
+                                  (elt array 1)
+                                  (elt array 2))))))))
+
+(defun org-node--lint-operator ()
+  "An OPERATE-FUNCTION for `fileloop-initialize'."
+  (let ((buffer-seems-new (and (not (buffer-modified-p))
+                               (not buffer-undo-list))))
+    (unless (derived-mode-p 'org-mode)
+      (org-mode))
+    ;; Set `inhibit-message' to muffle spam from `org-lint-invalid-id-link'.
+    (let ((inhibit-message t))
+      (when-let* ((warning (org-lint)))
+        (push (cons org-node--lint-current (car warning))
+              org-node--lint-warnings)))
+    (when buffer-seems-new
+      (kill-buffer))
+    t))
 
 
-;;;; Misc 2
-
-;; Very important macro for the backlink mode, because backlink insertion opens
-;; the target Org file in the background, and if doing that is laggy, then
-;; every link insertion is laggy.
-(defmacro org-node--with-quick-file-buffer (file &rest body)
-  "Like `org-with-file-buffer' and `org-with-wide-buffer'.
-Tries to execute minimal hooks in order to open and close FILE as
-quickly as possible.
-
-In detail:
-
-1. If a buffer was visiting FILE, reuse that buffer, else visit
-   FILE in a new buffer, in which case ignore most of the Org
-   startup checks and don\\='t ask about file-local variables.
-
-2. Temporarily `widen' the buffer, execute BODY, then restore
-   point.
-
-3a. If a new buffer had to be opened: save and kill it.
-    \(Mandatory because buffers opened in the quick way look
-    \"wrong\", e.g. no indent-mode, no visual wrap etc.)  Also
-    skip any save hooks and kill hooks.
-
-3b. If a buffer had been open: leave it open and leave it
-    unsaved.
-
-Optional keyword argument ABOUT-TO-DO as in
-`org-node--in-files-do'.
-
-\(fn FILE [:about-to-do ABOUT-TO-DO] &rest BODY)"
-  (declare (indent 1) (debug t))
-  `(let ((enable-local-variables :safe)
-         (org-inhibit-startup t) ;; Don't apply startup #+options
-         (find-file-hook nil)
-         (org-agenda-files nil)
-         (kill-buffer-hook nil) ;; Inhibit save-place etc
-         (kill-buffer-query-functions nil)
-         (buffer-list-update-hook nil)
-         (delay-mode-hooks t)
-         (--file-- (org-mem--truename-maybe ,file)))
-     (unless --file--
-       (error "File does not exist or not valid to visit: %s" ,file))
-     (when (file-directory-p --file--)
-       (error "Is a directory: %s" --file--))
-     (org-element-with-disabled-cache
-       (let* ((--was-open-- (find-buffer-visiting --file--))
-              (--buf-- (or --was-open--
-                           (find-file-noselect --file--))))
-         (when (bufferp --buf--)
-           (with-current-buffer --buf--
-             (save-excursion
-               (without-restriction
-                 (goto-char (point-min))
-                 ,@body))
-             (if --was-open--
-                 ;; Because the cache gets confused by changes
-                 (org-element-cache-reset)
-               (when (buffer-modified-p)
-                 (let ((before-save-hook nil)
-                       (after-save-hook nil)
-                       (save-silently t)
-                       (inhibit-message t))
-                   (save-buffer)))
-               (kill-buffer))))))))
-
-
-;;;; Commands to add tags/refs/alias
+;;;; Commands 6: Editing tags / refs / aliases
 
 (defun org-node--call-at-nearest-node (function &rest args)
   "With point at the relevant heading, call FUNCTION with ARGS.
@@ -2293,19 +2265,6 @@ Wrap the link in double-brackets if necessary."
         (message "Spaces in ref, not sure how to format correctly: %s" ref)))
     (org-node--add-to-property-keep-space "ROAM_REFS" ref)))
 
-;; TODO: Try to include all Firefox bookmarks and so on
-(defun org-node--list-known-raw-links ()
-  "Return list of all \(non-ID\) links seen in all known files."
-  (let (result)
-    (maphash (lambda (target links)
-               (let ((types (seq-keep #'org-mem-link-type
-                                      (seq-remove #'org-mem-link-citation-p
-                                                  links))))
-                 (dolist (type (delete-dups (delete "id" types)))
-                   (push (concat type ":" target) result))))
-             org-mem--target<>links)
-    result))
-
 (defun org-node-add-tags (tags)
   "Add TAGS to the node at point or nearest ancestor that is a node.
 
@@ -2358,6 +2317,43 @@ well as the members of `org-tag-persistent-alist' and `org-tag-alist'."
            (cl-loop for entry in (org-mem-all-entries)
                     append (org-mem-entry-tags entry))))
    nil nil nil 'org-tags-history))
+
+
+;;;; Gotos
+
+(defun org-node--goto (node &optional exact)
+  "Visit NODE file, and move point unless already close.
+EXACT means always move point."
+  (when (numberp exact)
+    (error "Function org-node--goto no longer takes a position argument"))
+  (unless node
+    (error "Function org-node--goto received a nil argument"))
+  (let ((file (org-mem-file-truename node)))
+    (if (file-exists-p file)
+        (progn
+          (when (not (file-readable-p file))
+            (error "org-node: Couldn't visit unreadable file %s" file))
+          (find-file file)
+          (widen)
+          (org-node--assert-transclusion-safe)
+          (let* ((id (org-mem-id node))
+                 (pos (and id (org-find-property "ID" id))))
+            (unless pos
+              (error "Could not find ID \"%s\" in buffer %s" id (current-buffer)))
+            ;; Now point may already be in a good place because a buffer was
+            ;; already visiting it, or because of save-place.
+            ;; No need to move point unnecessarily.
+            (when (or exact
+                      (not (equal id (org-entry-get-with-inheritance "ID")))
+                      (not (pos-visible-in-window-p pos))
+                      (org-invisible-p pos))
+              (goto-char pos)
+              (when (org-mem-subtree-p node)
+                (org-fold-show-entry)
+                (org-fold-show-children)
+                (recenter 0)))))
+      (message "org-node: Didn't find file, resetting...")
+      (org-mem--scan-full t))))
 
 (defun org-node-goto-new-drawer-site ()
   "Go to just after properties drawer."
@@ -2471,57 +2467,7 @@ Designed for `completion-at-point-functions'."
   org-node-complete-at-point--try-enable)
 
 
-;;;; Misc
-
-(defun org-node-peek (&optional ht)
-  "Print a random `org-mem-entry' object."
-  (interactive)
-  (let* ((entry (seq-random-elt (hash-table-values org-mem--id<>entry)))
-         (1arg-funs '(org-mem-entry-active-timestamps
-                     org-mem-entry-closed
-                     org-mem-entry-deadline
-                     org-mem-entry-file
-                     org-mem-entry-file-truename
-                     org-mem-entry-id
-                     org-mem-entry-level
-                     org-mem-entry-lnum
-                     org-mem-entry-olpath
-                     org-mem-entry-olpath-with-self
-                     org-mem-entry-olpath-with-self-with-title
-                     org-mem-entry-olpath-with-title
-                     org-mem-entry-pos
-                     org-mem-entry-priority
-                     org-mem-entry-properties
-                     org-mem-entry-scheduled
-                     org-mem-entry-subtree-p
-                     org-mem-entry-tags
-                     org-mem-entry-tags-inherited
-                     org-mem-entry-tags-local
-                     org-mem-entry-title
-                     org-mem-entry-title-maybe
-                     org-mem-file-attributes
-                     org-mem-file-id-strict
-                     org-mem-file-id-topmost
-                     org-mem-file-line-count
-                     org-mem-file-mtime
-                     org-mem-file-ptmax
-                     org-mem-file-size
-                     org-mem-file-title-or-basename
-                     org-mem-file-title-strict
-                     org-mem-file-title-topmost
-                     org-mem-next-entry
-                     org-mem-previous-entry)))
-    (pop-to-buffer (get-buffer-create "*org-mem example*" t))
-    (emacs-lisp-mode)
-    (setq-local buffer-read-only t)
-    (let ((buffer-read-only nil))
-      (erase-buffer)
-      (insert "Example data taken from random node titled \"" (org-mem-entry-title entry) "\"\n\n")
-      (cl-loop for func in 1arg-funs
-               do (insert "(" (symbol-name func) " ENTRY) => "
-                          (prin1-to-string (funcall func entry))
-                          "\n"))
-      (align-regexp (point-min) (point-max) "\\(\\s-*\\) => "))))
+;;;; Misc features
 
 (defun org-node-try-visit-ref-node ()
   "Designed for `org-open-at-point-functions'.
@@ -2548,7 +2494,6 @@ If already visiting that node, then follow the link normally."
         nil))))
 
 
-;;;; API used by some submodule(s)
 
 (defun org-node--delete-drawer (name)
   "In current entry, seek and destroy drawer named NAME."
@@ -2639,6 +2584,112 @@ CREATE-MISSING t.  Also see that function for meaning of CREATE-WHERE."
         (goto-char start)
         nil))))
 
+
+;;;; API used by some submodule(s)
+
+(defvar org-node--work-buffers nil
+  "All buffers spawned by `org-node--work-buffer-for'.")
+
+(defun org-node--kill-work-buffers ()
+  "Kill all buffers in `org-node--work-buffers'."
+  (while-let ((buf (pop org-node--work-buffers)))
+    (when buf (kill-buffer buf))))
+
+;; TODO: Either duplicate the org element cache of FILE,
+;;       or just actually visit FILE.
+;;       It would permit us to use the org element API without incurring a
+;;       massive performance hit,
+;;       since the parse tree would typically already be cached (one hopes).
+;;       (If we go the route of actually visiting the file, can this be merged
+;;       with `org-node--with-quick-file-buffer'?)
+(defun org-node--work-buffer-for (file)
+  "Get or create a hidden buffer, and read FILE contents into it.
+Also enable `org-mode', but ignore `org-mode-hook' and startup options.
+
+A buffer persists for each FILE, so calling again with the same FILE
+skips the overhead of creation.  To clean up, call
+`org-node--kill-work-buffers' explicitly."
+  (let ((bufname (format " *org-node-work-%d*" (sxhash file))))
+    (or (get-buffer bufname)
+        (with-current-buffer (org-mem-org-mode-scratch bufname)
+          (push (current-buffer) org-node--work-buffers)
+          (insert-file-contents file)
+          ;; May be useful for `org-node-roam-accelerator-mode'.
+          ;; No idea why `org-roam-with-temp-buffer' sets default directory,
+          ;; but Chesterton's Fence.
+          (setq-local default-directory (file-name-directory file))
+          ;; Ensure that attempted edits trip an error, since the buffer may be
+          ;; reused any number of times, and should always reflect FILE.
+          (setq-local buffer-read-only t)
+          (current-buffer)))))
+
+;; Very important macro for the backlink mode, because backlink insertion opens
+;; the target Org file in the background, and if doing that is laggy, then
+;; every link insertion is laggy.
+(defmacro org-node--with-quick-file-buffer (file &rest body)
+  "Like `org-with-file-buffer' and `org-with-wide-buffer'.
+Tries to execute minimal hooks in order to open and close FILE as
+quickly as possible.
+
+In detail:
+
+1. If a buffer was visiting FILE, reuse that buffer, else visit
+   FILE in a new buffer, in which case ignore most of the Org
+   startup checks and don\\='t ask about file-local variables.
+
+2. Temporarily `widen' the buffer, execute BODY, then restore
+   point.
+
+3a. If a new buffer had to be opened: save and kill it.
+    \(Mandatory because buffers opened in the quick way look
+    \"wrong\", e.g. no indent-mode, no visual wrap etc.)  Also
+    skip any save hooks and kill hooks.
+
+3b. If a buffer had been open: leave it open and leave it
+    unsaved.
+
+Optional keyword argument ABOUT-TO-DO as in
+`org-node--in-files-do'.
+
+\(fn FILE [:about-to-do ABOUT-TO-DO] &rest BODY)"
+  (declare (indent 1) (debug t))
+  `(let ((enable-local-variables :safe)
+         (org-inhibit-startup t) ;; Don't apply startup #+options
+         (find-file-hook nil)
+         (org-agenda-files nil)
+         (kill-buffer-hook nil) ;; Inhibit save-place etc
+         (kill-buffer-query-functions nil)
+         (buffer-list-update-hook nil)
+         (delay-mode-hooks t)
+         (--file-- (org-mem--truename-maybe ,file)))
+     (unless --file--
+       (error "File does not exist or not valid to visit: %s" ,file))
+     (when (file-directory-p --file--)
+       (error "Is a directory: %s" --file--))
+     (org-element-with-disabled-cache
+       (let* ((--was-open-- (find-buffer-visiting --file--))
+              (--buf-- (or --was-open--
+                           (find-file-noselect --file--))))
+         (when (bufferp --buf--)
+           (with-current-buffer --buf--
+             (save-excursion
+               (without-restriction
+                 (goto-char (point-min))
+                 ,@body))
+             (if --was-open--
+                 ;; Because the cache gets confused by changes
+                 (org-element-cache-reset)
+               (when (buffer-modified-p)
+                 (let ((before-save-hook nil)
+                       (after-save-hook nil)
+                       (save-silently t)
+                       (inhibit-message t))
+                   (save-buffer)))
+               (kill-buffer))))))))
+
+
+;;;; Transclusion safety
+
 (defun org-node--in-transclusion-p (&optional pos)
   "Non-nil if POS is inside a transclude-region."
   (get-text-property (or pos (point)) 'org-transclusion-id))
@@ -2680,42 +2731,6 @@ To keep using them safely:"
   - eval (add-to-list 'org-transclusion-exclude-elements 'keyword)")))
             (user-error "Active org-transclusion in buffer %S, quitting"
                         (current-buffer))))))))
-
-(defvar org-node--work-buffers nil
-  "All buffers spawned by `org-node--work-buffer-for'.")
-
-(defun org-node--kill-work-buffers ()
-  "Kill all buffers in `org-node--work-buffers'."
-  (while-let ((buf (pop org-node--work-buffers)))
-    (when buf (kill-buffer buf))))
-
-;; TODO: Either duplicate the org element cache of FILE,
-;;       or just actually visit FILE.
-;;       It would permit us to use the org element API without incurring a
-;;       massive performance hit,
-;;       since the parse tree would typically already be cached (one hopes).
-;;       (If we go the route of actually visiting the file, can this be merged
-;;       with `org-node--with-quick-file-buffer'?)
-(defun org-node--work-buffer-for (file)
-  "Get or create a hidden buffer, and read FILE contents into it.
-Also enable `org-mode', but ignore `org-mode-hook' and startup options.
-
-A buffer persists for each FILE, so calling again with the same FILE
-skips the overhead of creation.  To clean up, call
-`org-node--kill-work-buffers' explicitly."
-  (let ((bufname (format " *org-node-work-%d*" (sxhash file))))
-    (or (get-buffer bufname)
-        (with-current-buffer (org-mem-org-mode-scratch bufname)
-          (push (current-buffer) org-node--work-buffers)
-          (insert-file-contents file)
-          ;; May be useful for `org-node-roam-accelerator-mode'.
-          ;; No idea why `org-roam-with-temp-buffer' sets default directory,
-          ;; but Chesterton's Fence.
-          (setq-local default-directory (file-name-directory file))
-          ;; Ensure that attempted edits trip an error, since the buffer may be
-          ;; reused any number of times, and should always reflect FILE.
-          (setq-local buffer-read-only t)
-          (current-buffer)))))
 
 
 ;;;; Org-roam accelerator
@@ -2791,15 +2806,6 @@ As a side effect, it can be used without the rest of org-roam."
 
 
 ;;;; API not used within this package
-
-(let (tipped)
-  (defun org-node-id-at-point ()
-    "Get the ID property in entry at point or some ancestor."
-    (declare (obsolete org-entry-get-with-inheritance "2024-11-18"))
-    (unless tipped
-      (setq tipped t)
-      (message "Use `org-entry-get-with-inheritance' rather than `org-node-id-at-point'"))
-    (org-entry-get-with-inheritance "ID")))
 
 (defun org-node-at-point ()
   "Return the ID-node near point.
