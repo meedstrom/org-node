@@ -520,12 +520,14 @@ STR, PRED and ACTION as in `org-node-collection-basic'."
                  (cl-loop for candidate in (cdr collection)
                           collect (list candidate "" ""))
                (cl-loop for title in (cdr collection)
-                        collect (gethash title org-node--title<>affixations))))
+                        collect (or (gethash title org-node--title<>affixations)
+                                    (list title "" "")))))
     (if org-node-alter-candidates
         (cl-loop for candidate in collection
                  collect (list candidate "" ""))
       (cl-loop for title in collection
-               collect (gethash title org-node--title<>affixations)))))
+               collect (or (gethash title org-node--title<>affixations)
+                           (list title "" ""))))))
 
 (defvar org-node-hist nil
   "Minibuffer history.")
