@@ -651,7 +651,8 @@ If REMOVE non-nil, remove it instead."
                   (newline)
                   (indent-to col)))
               ;; Membership is correct, now re-sort
-              (let ((sorted-lines (sort (split-string (buffer-string) "\n" t t)
+              (let ((sorted-lines (sort (split-string
+                                         (string-trim (buffer-string)) "\n" t)
                                         org-node-backlink-drawer-sorter)))
                 (when org-node-backlink-drawer-sort-in-reverse
                   (setq sorted-lines (nreverse sorted-lines)))
