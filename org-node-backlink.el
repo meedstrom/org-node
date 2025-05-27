@@ -490,7 +490,7 @@ To force an update at any time, use one of these commands:
 ;;     No-op for now
 (defun org-node-backlink--maybe-fix-proactively (_)
   "Designed for `org-mem-post-targeted-scan-functions'."
-  (unless nil ;; org-node-backlink-lazy
+  (unless t ;; org-node-backlink-lazy
     (let (affected-targets)
       (cl-loop
        for target being each hash-key of org-mem-updater--id-or-ref-target<>old-links
