@@ -673,75 +673,6 @@ something to change the facts on the ground just prior."
     (org-mem-await 'org-node 10)))
 
 
-;;;; Etc
-
-(defvar org-node--compile-timers nil)
-(defvar org-node--compiled-lambdas (make-hash-table :test 'equal))
-(defun org-node--try-ensure-compiled (fn)
-  "Try to return FN as a compiled function.
-
-- If FN is a symbol with uncompiled function definition, return
-  the same symbol, and arrange to natively compile it after some
-  idle time.  Or if native-comp missing, byte-compile right away.
-
-- If FN is an anonymous lambda, compile it, cache the resulting
-  bytecode, and return that bytecode.
-
-Normally Emacs already does this kind of thing for definitions in an
-installed library, but it can be handy for user-provided lambdas that
-must be called a lot."
-  (cond ((compiled-function-p fn) fn)
-        ((symbolp fn)
-         (if (compiled-function-p (symbol-function fn))
-             fn
-           (let (byte-compile-warnings)
-             (if (native-comp-available-p)
-                 (unless (alist-get fn org-node--compile-timers)
-                   (setf (alist-get fn org-node--compile-timers)
-                         (run-with-idle-timer
-                          (+ 5 (random 5)) nil (##native-compile fn))))
-               (byte-compile fn)))
-           ;; May remain uncompiled until native comp is done
-           fn))
-        ((gethash fn org-node--compiled-lambdas))
-        ((let (byte-compile-warnings)
-           (puthash fn (byte-compile fn) org-node--compiled-lambdas)))))
-
-(defvar org-node--new-unsaved-buffers nil
-  "List of file-visiting buffers that have never written to the file.")
-
-;; TODO: Could the :creator just check if the buffer is unmodified and empty?
-;;       But possible pitfall that the user may have important stuff in undo.
-(defun org-node--kill-blank-unsaved-buffers (&rest _)
-  "Kill buffers created by org-node that have always been blank.
-
-This exists to allow you to create a node, especially a journal note for
-today via package \"org-node-seq\", change your mind, do an `undo' to
-empty the buffer, then browse to the previous day\\='s note.  When later
-you want to create today\\='s note after all, the seq\\='s :creator
-function should be made to run again, but it will not do so if the
-buffer already exists, so the buffer stays blank.  Thus this hook."
-  (unless (minibufferp)
-    (dolist (buf org-node--new-unsaved-buffers)
-      (if (or (not (buffer-live-p buf))
-              (file-exists-p (buffer-file-name buf)))
-          ;; Stop checking the buffer
-          (setq org-node--new-unsaved-buffers
-                (delq buf org-node--new-unsaved-buffers))
-        (with-current-buffer buf
-          (when (and (not (get-buffer-window buf t))
-                     (not (buffer-modified-p))
-                     (string-blank-p (buffer-string)))
-            (when buffer-auto-save-file-name
-              ;; Hopefully throw away a stale autosave
-              ;; since its existence annoys the user on re-creating the file
-              (do-auto-save nil t))
-            (when-let* ((file (org-mem--truename-maybe buffer-file-name)))
-              (org-mem-updater--forget-file-contents file)
-              (org-node--forget-completions-in-files file))
-            (kill-buffer buf)))))))
-
-
 ;;;; Filename functions
 
 (defcustom org-node-file-directory-ask nil
@@ -2719,6 +2650,73 @@ Optional keyword argument ABOUT-TO-DO as in
                        (inhibit-message t))
                    (save-buffer)))
                (kill-buffer))))))))
+
+
+(defvar org-node--compile-timers nil)
+(defvar org-node--compiled-lambdas (make-hash-table :test 'equal))
+(defun org-node--try-ensure-compiled (fn)
+  "Try to return FN as a compiled function.
+
+- If FN is a symbol with uncompiled function definition, return
+  the same symbol, and arrange to natively compile it after some
+  idle time.  Or if native-comp missing, byte-compile right away.
+
+- If FN is an anonymous lambda, compile it, cache the resulting
+  bytecode, and return that bytecode.
+
+Normally Emacs already does this kind of thing for definitions in an
+installed library, but it can be handy for user-provided lambdas that
+must be called a lot."
+  (cond ((compiled-function-p fn) fn)
+        ((symbolp fn)
+         (if (compiled-function-p (symbol-function fn))
+             fn
+           (let (byte-compile-warnings)
+             (if (native-comp-available-p)
+                 (unless (alist-get fn org-node--compile-timers)
+                   (setf (alist-get fn org-node--compile-timers)
+                         (run-with-idle-timer
+                          (+ 5 (random 5)) nil (##native-compile fn))))
+               (byte-compile fn)))
+           ;; May remain uncompiled until native comp is done
+           fn))
+        ((gethash fn org-node--compiled-lambdas))
+        ((let (byte-compile-warnings)
+           (puthash fn (byte-compile fn) org-node--compiled-lambdas)))))
+
+(defvar org-node--new-unsaved-buffers nil
+  "List of file-visiting buffers that have never written to the file.")
+
+;; TODO: Could the :creator just check if the buffer is unmodified and empty?
+;;       But possible pitfall that the user may have important stuff in undo.
+(defun org-node--kill-blank-unsaved-buffers (&rest _)
+  "Kill buffers created by org-node that have always been blank.
+
+This exists to allow you to create a node, especially a journal note for
+today via package \"org-node-seq\", change your mind, do an `undo' to
+empty the buffer, then browse to the previous day\\='s note.  When later
+you want to create today\\='s note after all, the seq\\='s :creator
+function should be made to run again, but it will not do so if the
+buffer already exists, so the buffer stays blank.  Thus this hook."
+  (unless (minibufferp)
+    (dolist (buf org-node--new-unsaved-buffers)
+      (if (or (not (buffer-live-p buf))
+              (file-exists-p (buffer-file-name buf)))
+          ;; Stop checking the buffer
+          (setq org-node--new-unsaved-buffers
+                (delq buf org-node--new-unsaved-buffers))
+        (with-current-buffer buf
+          (when (and (not (get-buffer-window buf t))
+                     (not (buffer-modified-p))
+                     (string-blank-p (buffer-string)))
+            (when buffer-auto-save-file-name
+              ;; Hopefully throw away a stale autosave
+              ;; since its existence annoys the user on re-creating the file
+              (do-auto-save nil t))
+            (when-let* ((file (org-mem--truename-maybe buffer-file-name)))
+              (org-mem-updater--forget-file-contents file)
+              (org-node--forget-completions-in-files file))
+            (kill-buffer buf)))))))
 
 
 ;;;; Transclusion safety
