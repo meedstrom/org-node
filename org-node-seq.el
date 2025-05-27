@@ -150,7 +150,7 @@ YYYY-MM-DD format, e.g. \"2024-01-31.org\"."
     :version 2
     :capture ,capture
     :classifier (lambda (node)
-                  (when (string-prefix-p ,dir (org-mem-entry-file node))
+                  (when (string-prefix-p ,dir (org-mem-entry-file-truename node))
                     (let* ((path (org-mem-entry-file node))
                            (sortstr (file-name-base path)))
                       (cons sortstr path))))
