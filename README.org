@@ -28,7 +28,7 @@ Update initfiles when you can.  Direct renames:
 | Old user option                | New user option                  |
 |--------------------------------+----------------------------------|
 | org-node-extra-id-dirs         | org-mem-watch-dirs               |
-| org-node-extra-id-dirs-exclude | org-mem-watch-dirs-exclude       |
+| org-node-extra-id-dirs-exclude | org-mem-exclude                  |
 | org-node-link-types            | org-mem-seek-link-types          |
 | org-node-warn-title-collisions | org-mem-do-warn-title-collisions |
 
