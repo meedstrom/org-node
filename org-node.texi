@@ -60,8 +60,8 @@ Backlink solution 1: displayed in a separate window
 Backlink solution 2: Print inside the file
 
 * Option 2A Automatic @samp{BACKLINKS} property::
-* Option 2B Automatic @samp{BACKLINKS...END} drawer: Option 2B Automatic @samp{BACKLINKSEND} drawer.
-* Option 2C Semi-automatic @samp{BACKLINKS...END} drawer: Option 2C Semi-automatic @samp{BACKLINKSEND} drawer.
+* Option 2B Automatic @samp{BACKLINKS...END} drawer: Option 2B Automatic @samp{BACKLINKSEND} drawer. 
+* Option 2C Semi-automatic @samp{BACKLINKS...END} drawer: Option 2C Semi-automatic @samp{BACKLINKSEND} drawer. 
 
 Misc
 
@@ -404,8 +404,8 @@ It's the same you observe in the backlink buffers from earlier: @strong{not all 
 
 @menu
 * Option 2A Automatic @samp{BACKLINKS} property::
-* Option 2B Automatic @samp{BACKLINKS...END} drawer: Option 2B Automatic @samp{BACKLINKSEND} drawer.
-* Option 2C Semi-automatic @samp{BACKLINKS...END} drawer: Option 2C Semi-automatic @samp{BACKLINKSEND} drawer.
+* Option 2B Automatic @samp{BACKLINKS...END} drawer: Option 2B Automatic @samp{BACKLINKSEND} drawer. 
+* Option 2C Semi-automatic @samp{BACKLINKS...END} drawer: Option 2C Semi-automatic @samp{BACKLINKSEND} drawer. 
 @end menu
 
 @node Option 2A Automatic @samp{BACKLINKS} property
@@ -669,7 +669,7 @@ Anyway@dots{} there's a workaround.  Assuming you leave @samp{org-node-affixatio
 (setq org-node-alter-candidates t)
 @end lisp
 
-This lets you match against the node outline path and not only the title@comma{} which resolves most conflicts given that the most likely source of conflict is subheadings in disparate files@comma{} that happen to be named the same.  @uref{https://fosstodon.org/@@nickanderson/112249581810196258, Some people} make this trick part of their workflow.
+This lets you match against the node outline path and not only the title@comma{} which resolves most conflicts given that the most likely source of conflict is subheadings in disparate files@comma{} that happen to be named the same.
 
 NB: for users of @samp{org-node-complete-at-point-mode}@comma{} this workaround won't help those completions.  With some luck you'll rarely insert the wrong link@comma{} but it's worth being aware. (@uref{https://github.com/meedstrom/org-node/issues/62, #62})
 
@@ -890,7 +890,7 @@ API cheatsheet between org-roam and org-node.
 @tab @samp{(org-roam-node-read)}
 @tab @samp{(org-node-read)}
 @item Get node by ID
-@tab
+@tab 
 @tab @samp{(org-mem-entry-by-id ID)}
 @item Get list of files
 @tab @samp{(org-roam-list-files)}
@@ -908,7 +908,7 @@ API cheatsheet between org-roam and org-node.
 @tab @samp{(org-roam-node-file-title NODE)}
 @tab @samp{(org-mem-entry-file-title NODE)}
 @item Get title @emph{or} name of file where NODE is
-@tab
+@tab 
 @tab @samp{(org-mem-entry-file-title-or-basename NODE)}
 @item Get full path to file where NODE is
 @tab @samp{(org-roam-node-file NODE)}
@@ -920,10 +920,10 @@ API cheatsheet between org-roam and org-node.
 @tab @samp{(org-roam-node-tags NODE)}
 @tab @samp{(org-mem-entry-tags NODE)}
 @item Get tags (local only)
-@tab
+@tab 
 @tab @samp{(org-mem-entry-tags-local NODE)}
 @item Get tags (inherited only)
-@tab
+@tab 
 @tab @samp{(org-mem-entry-tags-inherited NODE)}
 @item Get outline level
 @tab @samp{(org-roam-node-level NODE)}
@@ -932,7 +932,7 @@ API cheatsheet between org-roam and org-node.
 @tab @samp{(org-roam-node-point NODE)}
 @tab @samp{(org-mem-entry-pos node)}
 @item Get line number
-@tab
+@tab 
 @tab @samp{(org-mem-entry-lnum NODE)}
 @item Get properties
 @tab @samp{(org-roam-node-properties NODE)}
@@ -959,7 +959,7 @@ API cheatsheet between org-roam and org-node.
 @tab @samp{(org-roam-node-aliases NODE)}
 @tab @samp{(org-mem-entry-roam-aliases NODE)}
 @item Get @samp{ROAM_EXCLUDE}
-@tab
+@tab 
 @tab @samp{(org-mem-entry-property "ROAM_EXCLUDE" NODE)}
 @item Ensure fresh data
 @tab @samp{(org-roam-db-sync)}

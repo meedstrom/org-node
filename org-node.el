@@ -448,11 +448,11 @@ Used in some commands when exiting minibuffer with a blank string."
            finally return title))
 
 (defun org-node-titlegen-today ()
-  "Get a node title for the day\\='s date."
+  "Make a node title for the day\\='s date."
   (format-time-string "Assorted for %A, %d %b %Y"))
 
 (defun org-node-titlegen-this-week ()
-  "Get a node title for the current ISO8601 week."
+  "Make a node title for the current ISO8601 week."
   (format-time-string "Assorted for Week %V, %G"))
 
 (defvar org-node--candidate<>entry (make-hash-table :test 'equal)

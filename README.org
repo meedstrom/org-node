@@ -9,6 +9,7 @@
 #+HTML: <a href="https://repology.org/project/emacs%3Aorg-node/versions"> <img src="https://repology.org/badge/vertical-allrepos/emacs%3Aorg-node.svg" alt="Packaging status" align="right"> </a>
 * News after v3 :noexport:
 
+- Fix strange glyphs & missing refs in the minibuffer completions
 - Fix some issues with backlink drawers ending up in the wrong place
 - New feature: create *untitled nodes* using the blank input
   - Related new user option: =org-node-blank-input-hint=
@@ -49,14 +50,14 @@ Node seqs, if you use them, now require turning on explicitly.
 
 For reference, check out the full list of obsoletions near the bottom of file [[https://github.com/meedstrom/org-node/blob/main/org-node-changes.el][org-node-changes.el]].
 
-A *silent* obsoletion: links are not plists anymore, but =plist-get= is unhelpfully polite and returns nil when given invalid input.  Talk about weak typing!  Anyway, use e.g. =(org-mem-link-pos LINK)= instead of =(plist-get LINK :pos)=.
+A *silent* obsoletion: links are not plists anymore, but =plist-get= is unhelpfully polite and returns nil when given any object not a plist.  Talk about a weak type system!  Anyway, use e.g. =(org-mem-link-pos LINK)= instead of =(plist-get LINK :pos)=.
 
 Another silent obsoletion: a link is a citation if =(org-mem-link-citation-p LINK)=.  Use that instead of =(null (org-mem-link-type LINK))=, which no longer carries that meaning.
 
 Other changes you may notice:
 
 - Command =org-node-reset= (now aliased to =org-mem-reset=) has become a bit slower, because it scans all subtrees in all files rather than only ID-nodes.  Org-node itself does not use that information, but org-mem aims to be useful in a wider domain.
-- Package [[https://github.com/meedstrom/org-node-fakeroam][org-node-fakeroam]] deprecated
+- Package [[https://github.com/meedstrom/org-node-fakeroam][org-node-fakeroam]] effectively deprecated
   - New built-in: =org-node-roam-accelerator-mode=
   - New built-in: =org-mem-roamy-db-mode=
 
@@ -424,7 +425,7 @@ Anyway... there's a workaround.  Assuming you leave =org-node-affixation-fn= at 
 (setq org-node-alter-candidates t)
 #+end_src
 
-This lets you match against the node outline path and not only the title, which resolves most conflicts given that the most likely source of conflict is subheadings in disparate files, that happen to be named the same.  [[https://fosstodon.org/@nickanderson/112249581810196258][Some people]] make this trick part of their workflow.
+This lets you match against the node outline path and not only the title, which resolves most conflicts given that the most likely source of conflict is subheadings in disparate files, that happen to be named the same.
 
 NB: for users of =org-node-complete-at-point-mode=, this workaround won't help those completions.  With some luck you'll rarely insert the wrong link, but it's worth being aware. ([[https://github.com/meedstrom/org-node/issues/62][#62]])
 
