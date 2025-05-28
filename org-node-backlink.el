@@ -641,10 +641,12 @@ If REMOVE non-nil, remove it instead."
                 (save-excursion
                   (search-forward id)
                   (back-to-indentation)
-                  (let ((line (buffer-substring (point) (pos-eol))))
-                    (atomic-change-group
-                      (delete-region (point) (pos-eol))
-                      (insert (org-node-backlink--reformat-line line))))))
+                  (let* ((line (buffer-substring-no-properties (point) (pos-eol)))
+                         (reformatted (org-node-backlink--reformat-line line)))
+                    (unless (equal line reformatted)
+                      (atomic-change-group
+                        (delete-region (point) (pos-eol))
+                        (insert reformatted))))))
               (dolist (id to-add)
                 (let ((title (org-mem-title-maybe (org-mem-entry-by-id id))))
                   (insert (funcall org-node-backlink-drawer-formatter id title))
@@ -656,9 +658,10 @@ If REMOVE non-nil, remove it instead."
                                         org-node-backlink-drawer-sorter)))
                 (when org-node-backlink-drawer-sort-in-reverse
                   (setq sorted-lines (nreverse sorted-lines)))
-                (atomic-change-group
-                  (delete-region (point-min) (point-max))
-                  (insert (string-join sorted-lines "\n")))))))))))
+                (unless (equal lines sorted-lines)
+                  (atomic-change-group
+                    (delete-region (point-min) (point-max))
+                    (insert (string-join sorted-lines "\n"))))))))))))
 
 
 ;;; Subroutine: "Add in target" (to advise real-time link insertion)
