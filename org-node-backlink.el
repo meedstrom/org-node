@@ -813,8 +813,9 @@ Designed for use by `org-node-backlink--add-in-target'."
           (unless (search-forward (concat "[[id:" id) nil t) ;; Already has it
             (let ((col (current-indentation)))
               (insert (funcall org-node-backlink-drawer-formatter id title))
-              (newline)
-              (indent-to col))
+              (unless (eolp)
+                (newline)
+                (indent-to col)))
             ;; Re-sort so just-inserted link is placed correct among them
             (let ((lines (sort (split-string (buffer-string) "\n" t)
                                org-node-backlink-drawer-sorter)))
