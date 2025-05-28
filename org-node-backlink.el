@@ -586,6 +586,7 @@ If REMOVE is non-nil, remove it instead."
                           (append (org-mem-id-links-to entry)
                                   (org-mem-roam-reflinks-to entry))
                           (mapcar #'org-mem-link-nearby-id)
+                          (delete id)
                           (delete-dups)
                           ;; Sort deterministically for less noisy diffs.
                           (seq-sort #'string<)
@@ -614,6 +615,7 @@ If REMOVE non-nil, remove it instead."
                            (append (org-mem-id-links-to-entry entry)
                                    (org-mem-roam-reflinks-to-entry entry))
                            (seq-keep #'org-mem-link-nearby-id)
+                           (delete id)
                            (delete-dups)
                            ;; Shouldn't be necessary if tables are correct, but
                            ;; don't assume `org-mem-updater-mode' is flawless
@@ -705,6 +707,10 @@ If REMOVE non-nil, remove it instead."
          target-id target-file)
     ;; In a link such as [[id:abc1234]], TYPE is "id" and PATH is "abc1234".
     (when (and type path)
+      ;; Ensure `org-mem--roam-ref<>id' has recent goods, and that
+      ;; `org-node-backlink--fix-flagged-parts-of-buffer' will not
+      ;; later remove the backlink we're adding
+      (org-mem-updater-ensure-id-node-at-point-known)
       (org-mem-updater-ensure-link-at-point-known)
       (if (equal "id" type)
           ;; A classic backlink
@@ -731,10 +737,7 @@ If REMOVE non-nil, remove it instead."
                              (goto-char org-entry-property-inherited-from)
                              (or (org-get-heading t t t t)
                                  (org-get-title))))))
-              ;; Ensure that
-              ;; `org-node-backlink--fix-flagged-parts-of-buffer' will not
-              ;; later remove the backlink we're adding
-              (org-mem-updater-ensure-id-node-at-point-known)
+
               (org-node--with-quick-file-buffer target-file
                 :about-to-do "Org-node going to add backlink in target of link you just inserted"
                 (org-node--assert-transclusion-safe)
