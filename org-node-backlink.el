@@ -609,17 +609,17 @@ If REMOVE non-nil, remove it instead."
       (org-node--delete-drawer "BACKLINKS")
     (let* ((id (org-entry-get nil "ID"))
            (entry (org-mem-entry-by-id id))
-           (origins (when entry
-                      (thread-last
-                        (append (org-mem-id-links-to-entry entry)
-                                (org-mem-roam-reflinks-to-entry entry))
-                        (mapcar #'org-mem-link-nearby-id)
-                        (delete-dups)
-                        ;; Shouldn't be necessary if tables are correct,
-                        ;; but don't assume `org-mem-updater-mode' is flawless
-                        (seq-filter #'org-mem-entry-by-id))))
+           (origin-ids (when entry
+                         (thread-last
+                           (append (org-mem-id-links-to-entry entry)
+                                   (org-mem-roam-reflinks-to-entry entry))
+                           (seq-keep #'org-mem-link-nearby-id)
+                           (delete-dups)
+                           ;; Shouldn't be necessary if tables are correct, but
+                           ;; don't assume `org-mem-updater-mode' is flawless
+                           (seq-filter #'org-mem-entry-by-id))))
            (org-node-backlink--inhibit-flagging t))
-      (if (null origins)
+      (if (null origin-ids)
           (org-node--delete-drawer "BACKLINKS")
         (save-excursion
           (save-restriction
@@ -629,9 +629,9 @@ If REMOVE non-nil, remove it instead."
                    (lines (split-string (buffer-string) "\n" t))
                    (already-present-ids
                     (seq-keep #'org-node-backlink--extract-id lines))
-                   (to-add      (seq-difference   origins already-present-ids))
-                   (to-remove   (seq-difference   already-present-ids origins))
-                   (to-reformat (seq-intersection already-present-ids origins)))
+                   (to-add      (seq-difference   origin-ids already-present-ids))
+                   (to-remove   (seq-difference   already-present-ids origin-ids))
+                   (to-reformat (seq-intersection already-present-ids origin-ids)))
               ;; Add new, remove stale, reformat the rest
               (dolist (id to-remove)
                 (save-excursion
