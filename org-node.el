@@ -1896,8 +1896,6 @@ user quits, do not apply any modifications."
         (1arg-funs '(org-mem-entry-active-timestamps
                      org-mem-entry-closed
                      org-mem-entry-deadline
-                     org-mem-entry-file
-                     org-mem-entry-file-truename
                      org-mem-entry-id
                      org-mem-entry-level
                      org-mem-entry-lnum
@@ -1908,6 +1906,8 @@ user quits, do not apply any modifications."
                      org-mem-entry-pos
                      org-mem-entry-priority
                      org-mem-entry-properties
+                     org-mem-entry-roam-aliases
+                     org-mem-entry-roam-refs
                      org-mem-entry-scheduled
                      org-mem-entry-subtree-p
                      org-mem-entry-tags
@@ -1915,7 +1915,9 @@ user quits, do not apply any modifications."
                      org-mem-entry-tags-local
                      org-mem-entry-title
                      org-mem-entry-title-maybe
+                     org-mem-file
                      org-mem-file-attributes
+                     org-mem-file-coding-system
                      org-mem-file-id-strict
                      org-mem-file-id-topmost
                      org-mem-file-line-count
@@ -1925,8 +1927,12 @@ user quits, do not apply any modifications."
                      org-mem-file-title-or-basename
                      org-mem-file-title-strict
                      org-mem-file-title-topmost
+                     org-mem-file-truename
+                     org-mem-id-links-to-entry
+                     org-mem-links-in-entry
                      org-mem-next-entry
-                     org-mem-previous-entry)))
+                     org-mem-previous-entry
+                     org-mem-roam-reflinks-to-entry)))
     (pop-to-buffer (get-buffer-create "*org-mem example*" t))
     (emacs-lisp-mode)
     (setq-local buffer-read-only t)
