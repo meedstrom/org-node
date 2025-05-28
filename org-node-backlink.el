@@ -213,9 +213,9 @@ ID and DESC are link id and description, TIME a Lisp time value."
 
 (defun org-node-backlink--extract-timestamp (text)
   "Get Org timestamp out of TEXT."
-  (let ((link-end (and (string-match org-link-bracket-re text)
-                       (match-end 0))))
-    (when (string-match (org-re-timestamp 'all) text link-end)
+  (let ((link-beg (and (string-match org-link-bracket-re text)
+                       (match-beginning 0))))
+    (when (string-match (org-re-timestamp 'all) (substring text 0 link-beg))
       (match-string 0 text))))
 
 (defun org-node-backlink--extract-id (text)
