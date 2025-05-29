@@ -1208,6 +1208,7 @@ Argument NOVISIT for use by `org-node-insert-link-novisit'."
       (insert (org-link-make-string (concat "id:" id) link-desc)))
     (run-hooks 'org-node-insert-link-hook)
     ;; TODO: Delete the link if a node was not created
+    ;;       See `org-node-insert-transclusion'
     (unless node
       (org-node-create input id))))
 
@@ -1287,18 +1288,25 @@ The result includes NODE\\='s current file name, unfortunately required."
   (unless (derived-mode-p 'org-mode)
     (user-error "Only works in org-mode buffers"))
   (org-node-cache-ensure)
-  (unless node
-    (setq node (org-node-read)))
-  (if (not node)
-      (message "Node not known, create it first")
-    (let ((id (org-mem-entry-id node))
-          (title (org-mem-entry-title node))
-          (level (or (org-current-level) 0)))
-      (insert (org-link-make-string (concat "id:" id) title))
-      (goto-char (pos-bol))
+  (let* ((input (org-node-read-candidate "Transclude node content: " t))
+         (_ (when (string-blank-p input)
+              (setq input (funcall org-node-blank-input-title-generator))))
+         (node (or node (gethash input org-node--candidate<>entry)))
+         (id (if node (org-mem-id node) (org-id-new)))
+         (title (if node (org-mem-title node) input))
+         (buf (current-buffer))
+         (here (progn (back-to-indentation) (point-marker))))
+    (unless node
+      (org-node-create input id))
+    (with-current-buffer buf
+      (goto-char here)
+      (set-marker here nil)
+      (unless (eolp) (goto-char (pos-eol)) (newline-and-indent))
       (insert "#+transclude: ")
-      (goto-char (pos-eol))
-      (insert " :level " (number-to-string (+ 1 level))))))
+      (save-excursion (insert " :level " (number-to-string
+                                          (+ 1 (or (org-current-level) 0)))))
+      (insert (org-link-make-string (concat "id:" id) title))
+      (run-hooks 'org-node-insert-link-hook))))
 
 ;; TODO: Consider whether to use `org-node-custom-link-format-fn' here.
 ;;;###autoload
