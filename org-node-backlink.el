@@ -354,19 +354,20 @@ Let user option `org-node-backlink-do-drawers' determine which.
 Or if KIND is symbol `update-drawers', `del-drawers', `update-props', or
 `del-props', do the corresponding thing."
   (interactive)
-  (unless (or (and (memq kind '(update-drawers update-props))
-                   (org-node-backlink--check-v2-misaligned-setting-p))
-              (and (eq kind 'update-drawers)
-                   (org-node-backlink--check-osl-user-p)))
-    ;; (message "Fixing file %s" buffer-file-name)
-    (goto-char (point-min))
-    (org-node--assert-transclusion-safe)
-    (let ((case-fold-search t))
-      ;; NOTE: If there is an entry that has :BACKLINKS:, but that has lost its
-      ;;       :ID:, it will never be touched again, but that's on the user.
-      (while (re-search-forward "^[ \t]*:id:[ \t]*[[:graph:]]" nil t)
-        (org-node-backlink--fix-nearby kind)
-        (outline-next-heading)))))
+  (save-excursion
+    (unless (or (and (memq kind '(update-drawers update-props))
+                     (org-node-backlink--check-v2-misaligned-setting-p))
+                (and (eq kind 'update-drawers)
+                     (org-node-backlink--check-osl-user-p)))
+      ;; (message "Fixing file %s" buffer-file-name)
+      (goto-char (point-min))
+      (org-node--assert-transclusion-safe)
+      (let ((case-fold-search t))
+        ;; NOTE: If there is an entry that has :BACKLINKS:, but that has lost its
+        ;;       :ID:, it will never be touched again, but that's on the user.
+        (while (re-search-forward "^[ \t]*:id:[ \t]*[[:graph:]]" nil t)
+          (org-node-backlink--fix-nearby kind)
+          (outline-next-heading))))))
 
 
 ;;; Save-hook to update only the changed parts of current buffer
@@ -655,8 +656,7 @@ If REMOVE non-nil, remove it instead."
                   (newline)
                   (indent-to col)))
               ;; Membership is correct, now re-sort
-              (let ((sorted-lines (sort (split-string
-                                         (string-trim (buffer-string)) "\n" t)
+              (let ((sorted-lines (sort (split-string (buffer-string) "\n" t)
                                         org-node-backlink-drawer-sorter)))
                 (when org-node-backlink-drawer-sort-in-reverse
                   (setq sorted-lines (nreverse sorted-lines)))
@@ -762,7 +762,8 @@ If REMOVE non-nil, remove it instead."
              prop-pos (buffer-name))))
   (let ((current-backlinks-value (org-entry-get nil "BACKLINKS"))
         (new-link (org-link-make-string (concat "id:" id) title))
-        new-value)
+        new-value
+        (org-node-backlink--inhibit-flagging t))
     (when (and current-backlinks-value
                (string-search "\f" current-backlinks-value))
       (error "Form-feed character in BACKLINKS property near %d in %s"
@@ -792,9 +793,7 @@ If REMOVE non-nil, remove it instead."
       ;; Only one link
       (setq new-value new-link))
     (unless (equal new-value current-backlinks-value)
-      (let ((user-is-editing (buffer-modified-p))
-            ;; Prevent reacting to this edit (would be redundant at best)
-            (org-node-backlink--inhibit-flagging t))
+      (let ((user-is-editing (buffer-modified-p)))
         (org-entry-put nil "BACKLINKS" new-value)
         (unless user-is-editing
           (let ((before-save-hook nil)
