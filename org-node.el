@@ -154,7 +154,7 @@ If you change your mind about this setting, you can
 transition the files you already have with the Org-roam commands
 `org-roam-promote-entire-buffer' and `org-roam-demote-entire-buffer'."
   :type 'boolean
-  :package-version '(org-node . "0"))
+  :package-version '(org-node . "0.4"))
 
 (defun org-node--set-and-remind-reset (sym val)
   "Set SYM to VAL.
@@ -218,7 +218,7 @@ Does not hide if it merely inherits that property from an ancestor."
 
 Called with point in the new link."
   :type 'hook
-  :package-version '(org-node . "0"))
+  :package-version '(org-node . "0.1pre"))
 
 (defcustom org-node-creation-hook nil
   "Hook run with point in the newly created file or entry.
@@ -226,7 +226,7 @@ Called with point in the new link."
 A good function for this hook is `org-node-ensure-crtime-property',
 since the default `org-node-file-timestamp-format' is empty."
   :type 'hook
-  :package-version '(org-node . "0"))
+  :package-version '(org-node . "0.1pre"))
 
 (defcustom org-node-relocation-hook nil
   "Hook run with point in the newly relocated file or entry.
@@ -278,7 +278,7 @@ long as their prefix or suffix differ in some way.
 After changing this setting, run \\[org-mem-reset]."
   :type 'boolean
   :set #'org-node--set-and-remind-reset
-  :package-version '(org-node . "0"))
+  :package-version '(org-node . "0.2"))
 
 (defcustom org-node-affixation-fn #'org-node-prepend-olp
   "Function to give prefix and suffix to minibuffer completions.
@@ -309,7 +309,7 @@ aliases."
           (function-item org-node-append-tags-use-frame-width)
           (function :tag "Custom function"
                     :value (lambda (node title) (list title "" ""))))
-  :package-version '(org-node . "0.9")
+  :package-version '(org-node . "0.2")
   :set #'org-node--set-and-remind-reset)
 
 (defun org-node-affix-bare (_node title)
@@ -684,7 +684,7 @@ something to change the facts on the ground just prior."
 - Value t: Ask every time
 - String: A directory path in which to put the file"
   :type '(choice boolean directory)
-  :package-version '(org-node . "0"))
+  :package-version '(org-node . "0.1pre"))
 
 ;; This setting needs care with `org-node-rename-file-by-title' after changing.
 ;; https://blog.ganssle.io/articles/2023/01/attractive-nuisances.html
@@ -700,7 +700,7 @@ For the rest of the filename, configure `org-node-file-slug-fn'."
           (const :tag "Like Org-roam: %Y%m%d%H%M%S-" :value "%Y%m%d%H%M%S-")
           (const :tag "Like Denote: %Y%m%dT%H%M%S--" :value "%Y%m%dT%H%M%S--")
           (string :tag "Custom"))
-  :package-version '(org-node . "0"))
+  :package-version '(org-node . "0.4"))
 
 (defcustom org-node-file-slug-fn #'org-node-slugify-for-web
   "Function taking a node title and returning a filename component.
@@ -713,7 +713,7 @@ that, configure `org-node-file-timestamp-format'."
           (function-item org-node-slugify-for-web)
           (function-item org-node-slugify-like-roam-default)
           (function :tag "Custom function" :value (lambda (title) title)))
-  :package-version '(org-node . "0"))
+  :package-version '(org-node . "0.4"))
 
 (defun org-node--root-dirs (file-list)
   "Infer root directories of FILE-LIST.
@@ -901,7 +901,7 @@ the function is called: `org-node-proposed-title' and
           (function-item org-node-new-via-roam-capture)
           (function-item org-capture)
           (function :tag "Custom function" :value (lambda ())))
-  :package-version '(org-node . "0"))
+  :package-version '(org-node . "0.1pre"))
 
 (defun org-node-create (title id &optional seq-key)
   "Call `org-node-creation-fn' with necessary variables set.
@@ -1564,7 +1564,8 @@ creation-date as more truthful or useful than today\\='s date.
 ;; org-cut-subtree and paste.
 ;;;###autoload
 (defun org-node-refile ()
-  "Experimental."
+  "Prompt for a node and refile subtree at point into it.
+No support yet for refiling a file."
   (interactive () org-mode)
   (unless (derived-mode-p 'org-mode)
     (user-error "This command expects an org-mode buffer"))
@@ -1644,7 +1645,7 @@ Used if you have the function `org-node-rename-file-by-title' on
 
 To add exceptions, see `org-node-renames-exclude'."
   :type '(repeat directory)
-  :package-version '(org-node . "0"))
+  :package-version '(org-node . "0.7"))
 
 (defcustom org-node-renames-exclude "\\(?:daily\\|dailies\\|journal\\)/"
   "Regexp matching paths of files not to auto-rename.
@@ -1653,7 +1654,7 @@ For use by `org-node-rename-file-by-title'.
 Only applied to files under `org-node-renames-allowed-dirs'.  If
 a file is not there, it is not considered in any case."
   :type 'string
-  :package-version '(org-node . "0"))
+  :package-version '(org-node . "0.7"))
 
 ;;;###autoload
 (defun org-node-rename-file-by-title (&optional interactive)
