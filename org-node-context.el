@@ -451,7 +451,7 @@ that buffer."
   (dolist (link (sort links #'org-node-context--origin-title-lessp))
     (let* ((node (or (org-mem-entry-by-id (org-mem-link-nearby-id link))
                      (error "Origin not found for link: %S" link)))
-           (breadcrumbs (if-let* ((olp (org-mem-entry-olpath-with-title node)))
+           (breadcrumbs (if-let* ((olp (org-mem-olpath-with-file-title node)))
                             (string-join olp " > ")
                           "Top")))
       (magit-insert-section (org-node-context link)

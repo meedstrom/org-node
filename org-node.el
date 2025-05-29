@@ -331,7 +331,7 @@ aliases."
   (list title
         (if-let* ((fontified-ancestors
                    (cl-loop
-                    for ancestor in (org-mem-entry-olpath-with-title node)
+                    for ancestor in (org-mem-olpath-with-file-title node)
                     collect
                     (propertize ancestor 'face 'completions-annotations))))
             (concat (string-join fontified-ancestors " > ") " > ")
@@ -344,7 +344,7 @@ aliases."
         (let ((tags (org-mem-entry-tags node))
               (fontified-ancestors
                (cl-loop
-                for ancestor in (org-mem-entry-olpath-with-title node)
+                for ancestor in (org-mem-olpath-with-file-title node)
                 collect (propertize ancestor 'face 'completions-annotations))))
           (concat
            ;; TODO: Fallback on other face before org init
@@ -359,7 +359,7 @@ aliases."
   "Prepend NODE's outline path to TITLE, and append NODE\\='s tags."
   (list title
         (if (org-mem-entry-subtree-p node)
-            (let ((ancestors (org-mem-entry-olpath-with-title node))
+            (let ((ancestors (org-mem-olpath-with-file-title node))
                   (result nil))
               (dolist (anc ancestors)
                 (push (propertize anc 'face 'completions-annotations) result)
@@ -395,7 +395,7 @@ aliases."
     (list title
           (concat
            (when (org-mem-entry-subtree-p node)
-             (let ((ancestors (org-mem-entry-olpath-with-title node)))
+             (let ((ancestors (org-mem-olpath-with-file-title node)))
                (dolist (anc ancestors)
                  (push (propertize anc 'face 'completions-annotations) olp)
                  (push " > " olp))
