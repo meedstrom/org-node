@@ -1086,10 +1086,10 @@ set `org-node-creation-fn' to `org-node-new-via-roam-capture'."
          (_ (when (string-blank-p input)
               (setq input (funcall org-node-blank-input-title-generator))))
          (node (gethash input org-node--candidate<>entry)))
+    (require 'org-id)
     (if node
         (org-node--goto node)
-      (let ((id (org-id-new)))
-        (org-node-create input id)))))
+      (org-node-create input (org-id-new)))))
 
 ;;;###autoload
 (defun org-node-insert-heading ()
