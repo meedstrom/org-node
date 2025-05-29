@@ -1893,28 +1893,28 @@ user quits, do not apply any modifications."
   "Print a random `org-mem-entry' object."
   (interactive)
   (let ((entry (seq-random-elt (hash-table-values org-mem--id<>entry)))
-        (1arg-funs '(org-mem-entry-active-timestamps
-                     org-mem-entry-closed
-                     org-mem-entry-deadline
-                     org-mem-entry-id
-                     org-mem-entry-level
-                     org-mem-entry-lnum
-                     org-mem-entry-olpath
-                     org-mem-entry-olpath-with-self
-                     org-mem-entry-olpath-with-self-with-title
-                     org-mem-entry-olpath-with-title
-                     org-mem-entry-pos
-                     org-mem-entry-priority
-                     org-mem-entry-properties
-                     org-mem-entry-roam-aliases
-                     org-mem-entry-roam-refs
-                     org-mem-entry-scheduled
-                     org-mem-entry-subtree-p
-                     org-mem-entry-tags
-                     org-mem-entry-tags-inherited
-                     org-mem-entry-tags-local
-                     org-mem-entry-title
-                     org-mem-entry-title-maybe
+        (1arg-funs '(org-mem-active-timestamps
+                     org-mem-closed
+                     org-mem-deadline
+                     org-mem-id
+                     org-mem-level
+                     org-mem-lnum
+                     org-mem-olpath
+                     org-mem-olpath-with-self
+                     org-mem-olpath-with-file-title-with-self
+                     org-mem-olpath-with-file-title
+                     org-mem-pos
+                     org-mem-priority
+                     org-mem-properties
+                     org-mem-roam-aliases
+                     org-mem-roam-refs
+                     org-mem-scheduled
+                     org-mem-subtree-p
+                     org-mem-tags
+                     org-mem-tags-inherited
+                     org-mem-tags-local
+                     org-mem-title
+                     org-mem-title-maybe
                      org-mem-file
                      org-mem-file-attributes
                      org-mem-file-coding-system
