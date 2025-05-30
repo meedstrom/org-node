@@ -1966,10 +1966,11 @@ user quits, do not apply any modifications."
       (insert "Example data taken from random node titled \""
               (org-mem-entry-title entry) "\"\n\n")
       (cl-loop for func in 1arg-funs
-               do (insert "(" (symbol-name func) " ENTRY) => "
+               do (insert "(" (symbol-name func) " NODE) => "
                           (prin1-to-string (funcall func entry))
                           "\n"))
-      (align-regexp (point-min) (point-max) "\\(\\s-*\\) => "))))
+      (align-regexp (point-min) (point-max) "\\(\\s-*\\) => "))
+    (goto-char (point-min))))
 
 (defun org-node-list-reflinks ()
   "List all reflinks and the ID-nodes in which they were found.
