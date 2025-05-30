@@ -37,7 +37,7 @@
   :group 'org-node)
 
 (defcustom org-node-backlink-do-drawers t
-  "Manage drawers instead of properties.
+  "Manage :BACKLINKS: drawers instead of properties.
 A :BACKLINKS: property is more compact, but can run off the edge of the
 visible window without `visual-line-mode' or similar."
   :type 'boolean

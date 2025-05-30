@@ -230,9 +230,7 @@ Does not hide if it merely inherits that property from an ancestor."
                  (mapcar #'file-truename org-mem-watch-dirs))))))
 
 (defcustom org-node-insert-link-hook nil
-  "Hook run after inserting a link to an Org-ID node.
-
-Called with point in the new link."
+  "Hook run after inserting a link, with point in the new link."
   :type 'hook
   :package-version '(org-node . "0.1pre"))
 
@@ -406,7 +404,7 @@ aliases."
                      tags))))))
 
 (defun org-node-prepend-olp-append-tags-use-frame-width (node title)
-  "Prepend NODE's outline path to TITLE, and append NODE\\='s tags."
+  "Prepend NODE outline path to TITLE, and put NODE tags at frame edge."
   (let (olp)
     (list title
           (concat
