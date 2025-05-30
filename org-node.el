@@ -223,7 +223,7 @@ Does not hide if it merely inherits that property from an ancestor."
 
 (defun org-node-filter-watched-dir-p (node)
   "Show NODE only if it is found inside `org-mem-watch-dirs'."
-  (let ((file (org-mem-file node)))
+  (let ((file (org-mem-file-truename node)))
     (cl-some (lambda (dir) (string-prefix-p dir file))
              (with-memoization (org-mem--table 0 'true-watch-dirs)
                (with-temp-buffer ;; No buffer-env
