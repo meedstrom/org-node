@@ -19,7 +19,7 @@
 ;; URL:      https://github.com/meedstrom/org-node
 ;; Created:  2024-04-13
 ;; Keywords: org, hypermedia
-;; Package-Requires: ((emacs "29.1") (llama "0.5.0") (org-mem "0.13.1") (magit-section "4.3.0"))
+;; Package-Requires: ((emacs "29.1") (llama "0.5.0") (org-mem "0.14.1") (magit-section "4.3.0"))
 
 ;; Looking for Package-Version?  Consult the Git tag.
 ;;       MELPA versions above 20250303 is v2.
@@ -1917,8 +1917,11 @@ user quits, do not apply any modifications."
 (defun org-node-peek (&optional _deprecated-arg)
   "Print a random `org-mem-entry' object."
   (interactive)
+  (org-node-cache-ensure)
   (let ((entry (seq-random-elt (hash-table-values org-mem--id<>entry)))
         (1arg-funs '(org-mem-active-timestamps
+                     org-mem-clocks
+                     org-mem-clocks-int
                      org-mem-closed
                      org-mem-deadline
                      org-mem-id
@@ -1947,6 +1950,7 @@ user quits, do not apply any modifications."
                      org-mem-file-id-topmost
                      org-mem-file-line-count
                      org-mem-file-mtime
+                     org-mem-file-mtime-floor
                      org-mem-file-ptmax
                      org-mem-file-size
                      org-mem-file-title-or-basename
