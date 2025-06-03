@@ -232,7 +232,7 @@ Does not hide if it merely inherits that property from an ancestor."
 (defcustom org-node-insert-link-hook nil
   "Hook run after inserting a link, with point in the new link."
   :type 'hook
-  :package-version '(org-node . "0.1pre"))
+  :package-version '(org-node . "0.1"))
 
 (defcustom org-node-creation-hook nil
   "Hook run with point in the newly created file or entry.
@@ -240,7 +240,7 @@ Does not hide if it merely inherits that property from an ancestor."
 A good function for this hook is `org-node-ensure-crtime-property',
 since the default `org-node-file-timestamp-format' is empty."
   :type 'hook
-  :package-version '(org-node . "0.1pre"))
+  :package-version '(org-node . "0.1"))
 
 (defcustom org-node-relocation-hook nil
   "Hook run with point in the newly relocated file or entry.
@@ -698,7 +698,7 @@ something to change the facts on the ground just prior."
 - Value t: Ask every time
 - String: A directory path in which to put the file"
   :type '(choice boolean directory)
-  :package-version '(org-node . "0.1pre"))
+  :package-version '(org-node . "0.1"))
 
 ;; This setting needs care with `org-node-rename-file-by-title' after changing.
 ;; https://blog.ganssle.io/articles/2023/01/attractive-nuisances.html
@@ -915,7 +915,7 @@ the function is called: `org-node-proposed-title' and
           (function-item org-node-new-via-roam-capture)
           (function-item org-capture)
           (function :tag "Custom function" :value (lambda ())))
-  :package-version '(org-node . "0.1pre"))
+  :package-version '(org-node . "0.1"))
 
 (defun org-node-create (title id &optional seq-key)
   "Call `org-node-creation-fn' with necessary variables set.
