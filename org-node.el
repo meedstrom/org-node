@@ -2542,8 +2542,8 @@ Otherwise do not narrow, and return nil.
 Narrow to the region between :NAME:\\n and \\n:END:, exclusive.
 Place point at the beginning of that region, after any indentation.
 If the drawer was empty, ensure one blank line.
-\(Put another way: if you delete all buffer contents, one blank line
-remains after un-narrowing.)
+\(Put another way, if you delete all visible buffer contents,
+one blank line remains after un-narrowing.)
 
 A way you might invoke this function:
 

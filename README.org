@@ -68,7 +68,7 @@ I like [[https://github.com/org-roam/org-roam][org-roam]] but found it too slow,
 
 - *If you were using org-roam*, there is nothing to migrate.  You can use both packages.  It's the same on-disk format: "notes" are identified by their org-id.
 
-  In pursuit of being "just org-id", this package has no equivalent setting to =org-roam-directory= -- it just looks up the =org-id-locations= table.
+  In pursuit of being "just org-id", this package has no equivalent setting to =org-roam-directory= -- it just looks up the =org-id-locations= table.  (UPDATE 2025-06-03: this is true if setting =org-mem-do-sync-with-org-id= to t.  Otherwise, you can configure =org-mem-watch-dirs=.)
 
 - *If you were not using org-roam*, maybe think of it as somewhat like [[https://github.com/alphapapa/org-recent-headings][org-recent-headings]] tooled-up to the extent that you won't need other methods of browsing, as long as you give IDs to all objects of interest.
 
@@ -94,41 +94,48 @@ Once a subtree has an ID you can link to, it's a "node" because it has joined th
 
 A comparison of three systems that all permit relying on org-id and don't lock you into the concept of "one-note-per-file".
 
-| Feature                        | org-roam | org-node         | [[https://github.com/toshism/org-super-links][org-super-links]]      |
-|--------------------------------+----------+------------------+----------------------|
-| Backlinks                      | yes      | yes              | yes                  |
-| Node search and insert         | yes      | yes              | -- (suggests [[https://github.com/alphapapa/org-ql][org-ql]]) |
-| Node aliases                   | yes      | yes              | --                   |
-| Node exclusion                 | yes      | limited          | not applicable       |
-| Refile                         | yes      | yes              | --                   |
-| Rich backlinks buffer          | yes      | yes              | --                   |
-| Customize how backlinks shown  | yes      | yes              | yes                  |
-| Reflinks                       | yes      | yes              | --                   |
-| Ref search                     | yes      | yes (as aliases) | not applicable       |
-| Org 9.5 @citations as refs     | yes      | yes              | not applicable       |
-| Support org-ref v3             | yes      | limited          | not applicable       |
-| Support org-ref v2             | yes      | --               | not applicable       |
-| Work thru org-roam-capture     | yes      | yes              | ?                    |
-| Work thru org-capture          | --       | yes              | ?                    |
-| Daily-nodes                    | yes      | yes              | --                   |
-| Node sequences                 | --       | yes              | --                   |
-| Show backlinks in same window  | --       | yes              | yes                  |
-| Cooperate with org-super-links | --       | yes              | not applicable       |
-| Fix link descriptions          | --       | yes              | --                   |
-| List dead links                | --       | yes              | --                   |
-| Rename file when title changes | --       | yes              | --                   |
-| Warn about duplicate titles    | --       | yes              | --                   |
-| Principled "related-section"   | --       | yes              | yes                  |
-| Untitled notes                 | --       | --               | --                   |
-| org-protocol extension         | yes      | --               | --                   |
+| Feature                          | org-roam | org-node         | [[https://github.com/toshism/org-super-links][org-super-links]]      |
+|----------------------------------+----------+------------------+----------------------|
+| Backlinks                        | yes      | yes              | yes                  |
+| Node search and insert           | yes      | yes              | -- (suggests [[https://github.com/alphapapa/org-ql][org-ql]]) |
+| Node aliases                     | yes      | yes              | --                   |
+| Node exclusion                   | yes      | yes              | not applicable       |
+| Refile                           | yes      | yes              | --                   |
+| Rich backlinks buffer            | yes      | yes              | --                   |
+| Customize how backlinks shown    | yes      | yes              | yes                  |
+| Reflinks                         | yes      | yes              | --                   |
+| Ref search                       | yes      | yes (as aliases) | not applicable       |
+| Org 9.5 @citations as refs       | yes      | yes              | not applicable       |
+| Support org-ref v3               | yes      | limited          | not applicable       |
+| Support org-ref v2               | yes      | --               | not applicable       |
+| Work thru org-roam-capture       | yes      | yes              | ?                    |
+| Work thru org-capture            | --       | yes              | ?                    |
+| Daily-nodes                      | yes      | yes              | --                   |
+| Node sequences                   | --       | yes              | --                   |
+| Show backlinks in same window    | --       | yes              | yes                  |
+| Cooperate with org-super-links   | --       | yes              | not applicable       |
+| Fix link descriptions            | --       | yes              | --                   |
+| List dead links                  | --       | yes              | --                   |
+| Rename file when title changes   | --       | yes              | --                   |
+| Warn about duplicate titles      | --       | yes              | --                   |
+| Principled "related-section"     | --       | yes              | yes                  |
+| Untitled notes                   | --       | limited          | --                   |
+| org-protocol extension           | yes      | --               | --                   |
 | Support =roam:= links            | yes      | -- (wontfix)     | --                   |
-| Can have separate note piles   | yes      | -- (wontfix)     | not applicable       |
-|--------------------------------+----------+------------------+----------------------|
-| Some query-able cache          | yes      | yes              | --                   |
-| Async cache rebuild            | --       | yes              | not applicable       |
-| *Time to cache my 3000 nodes*    | *2m 48s*   | *0m 02s*           | not applicable       |
-| *Time to save file w/ 400 nodes* | *5--10s*   | *instant*          | ?                    |
-| *Time to open minibuffer*        | *1--3s*    | *instant*          | not applicable       |
+| Can have separate note piles     | yes      | -- (wontfix)     | not applicable       |
+| Some query-able cache            | yes      | yes              | --                   |
+| Async cache rebuild              | --       | yes              | not applicable       |
+
+** Benchmarks on my machine
+
+The original reason that org-node exists.
+
+|                                  | org-roam | org-node  |
+|----------------------------------+----------+-----------|
+| *Time to cache my 3000 nodes*    | *2m 48s* | *0m 02s*  |
+| *Time to save file w/ 400 nodes* | *5--10s* | *instant* |
+| *Time to display 20 backlinks*   | *5--10s* | *instant* |
+| *Time to open minibuffer*        | *1--3s*  | *instant* |
 
 * Setup
 ** Install

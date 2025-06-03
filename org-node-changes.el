@@ -85,14 +85,16 @@ value."
       (message
        "%s" "Note: org-roam overrides ID-link behavior to prefer its own DB!
 As that DB is not being updated, links can send you to the wrong place.
-If `org-mem-do-sync-with-org-id', you can revert to default ID-link behavior.
-Add to initfiles:
+If `org-mem-do-sync-with-org-id' is t, you can safely revert to
+default ID-link behavior.  Add to initfiles:
 (with-eval-after-load 'org-roam-id
  (org-link-set-parameters
   \"id\" :follow #'org-id-open :store #'org-id-store-link-maybe))")))
   (unless org-node-changes--warned-about-titlegen
     (when (help-function-arglist org-node-blank-input-title-generator)
       (setq org-node-changes--warned-about-titlegen t)
+      ;; When first implemented, it took one argument, changed to zero a couple
+      ;; of days later.
       (display-warning
        'org-node "User option org-node-blank-input-title-generator should be a function of no argument"))))
 
