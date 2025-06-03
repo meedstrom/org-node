@@ -2856,7 +2856,6 @@ from many sources.  To deal with that:
   "Advise the \"*org-roam*\" buffer to be faster.
 As a side effect, it can be used without the rest of org-roam."
   :global t
-  (require 'org-roam)
   (require 'org-mem-roamy)
   (if org-node-roam-accelerator-mode
       (progn
