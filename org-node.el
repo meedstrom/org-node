@@ -1130,13 +1130,21 @@ be sufficient to key-bind that one."
                    (format-time-string (org-time-stamp-format t t)))))
 (defalias 'org-node-ensure-crtime-property 'org-node-put-created)
 
-;;;###autoload
-(defun org-node-visit-random ()
+(defun org-node-visit-random-1 ()
   "Visit a random node."
   (interactive)
   (org-node-cache-ensure)
-  (org-node--goto
-   (seq-random-elt (hash-table-values org-node--candidate<>entry))))
+  (org-node--goto (seq-random-elt
+                   (hash-table-values org-node--candidate<>entry))))
+
+;;;###autoload
+(defun org-node-visit-random nil
+  "Visit a random node, repeatable.
+Requires `repeat-on-final-keystroke' t in order to repeat."
+  (interactive)
+  (let ((repeat-message-function #'ignore))
+    (setq last-repeatable-command #'org-node-visit-random-1)
+    (repeat nil)))
 
 ;; TODO: Optionally obey `org-node-filter-fn'
 ;;;###autoload
