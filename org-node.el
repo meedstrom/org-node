@@ -2395,15 +2395,14 @@ end of buffer).  Since that newline may be the beginning of the next
 heading, you should probably verify that `org-at-heading-p' is nil,
 else do `backward-char' or `open-line' prior to inserting text."
   (if (org-before-first-heading-p)
-      (save-restriction
-        (widen)
+      (progn
         (org-node--after-drawers-before-keyword)
-        ;; Jump past #+keywords, comments and blank lines.
+        ;; Jump past #+keywords, comments and empty lines.
         (while (looking-at-p (rx (*? space) (or "#+" "# " "\n")))
           (forward-line))
-        ;; On a "final stretch" of blank lines, go back to the first.
-        (unless (= 0 (skip-chars-backward "\n"))
-          (forward-char 1)))
+        ;; On a "final stretch" of empty lines, go back to the first.
+        (when (not (= 0 (skip-chars-backward "\n")))
+          (forward-char)))
     ;; PERF: Override a bottleneck inside `org-end-of-meta-data'.
     (cl-letf (((symbol-function 'org-back-to-heading)
                #'org-node--back-to-heading-or-point-min))
@@ -2508,7 +2507,7 @@ If already visiting that node, then follow the link normally."
       (when (org-node-narrow-to-drawer-p name)
         (delete-region (point-min) (point-max))
         (widen)
-        (delete-blank-lines)
+        (delete-line) ;; There is always 1 empty line
         (org-remove-empty-drawer-at (point))))))
 
 ;; Org ships no general tool to find/create a drawer, so roll our own.
