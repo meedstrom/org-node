@@ -1438,8 +1438,6 @@ Works in non-Org buffers."
   :type 'string
   :package-version '(org-node . "3.3.3"))
 
-;; TODO: Actually prompt for a thing to insert first, so user does not see the
-;; temp narrowed buffer.
 (defun org-node-insert-into-related ()
   "Insert a link into a RELATED drawer near the end of current entry.
 Unlike the BACKLINKS drawer, this drawer is not \"smart\" and will never
@@ -1447,20 +1445,22 @@ be sorted, reformatted or erased, and the links count like any other
 forward-link.  The drawer can be moved, so long as it maintains the name
 set in `org-node-name-of-links-drawer'."
   (interactive "*" org-mode)
-  (save-excursion
-    (save-restriction
-      (org-node-narrow-to-drawer-create org-node-name-of-links-drawer
-                                        #'org-entry-end-position)
-      (atomic-change-group
-        (unless (eolp)
-          (let ((col (current-indentation)))
-            (newline)
-            (indent-to col))
-          (forward-line -1)
-          (back-to-indentation))
-        (insert (format-time-string (org-time-stamp-format t t)) " -> ")
-        ;; This can take user to another buffer, so it must be at the end.
-        (org-node-insert-link-novisit)))))
+  (when-let* ((input (org-node-read-candidate))
+              (node (gethash input org-node--candidate<>entry)))
+    (save-excursion
+      (save-restriction
+        (org-node-narrow-to-drawer-create org-node-name-of-links-drawer
+                                          #'org-entry-end-position)
+        (atomic-change-group
+          (unless (eolp)
+            (let ((col (current-indentation)))
+              (newline)
+              (indent-to col))
+            (forward-line -1)
+            (back-to-indentation))
+          (insert (format-time-string (org-time-stamp-format t t)) " -> "
+                  (org-make-link-string (org-mem-id node)
+                                        (org-mem-title node))))))))
 
 
 ;;;; Commands 3: Extract and refile
