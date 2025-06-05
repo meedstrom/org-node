@@ -2302,13 +2302,12 @@ To always operate on the current entry, use `org-node-add-tags-here'."
              (case-fold-search t))
         (save-excursion
           (without-restriction
-            (goto-char 1)
+            (goto-char (point-min))
             (if (search-forward "\n#+filetags:" nil t)
-                (progn
+                (atomic-change-group
                   (skip-chars-forward " ")
-                  (atomic-change-group
-                    (delete-region (point) (pos-eol))
-                    (insert ":" (string-join new-tags ":") ":")))
+                  (delete-region (point) (pos-eol))
+                  (insert ":" (string-join new-tags ":") ":"))
               (org-node-full-end-of-meta-data)
               (insert "#+filetags: :" (string-join new-tags ":") ":\n")))))
     (save-excursion
