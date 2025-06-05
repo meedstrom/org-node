@@ -2379,16 +2379,13 @@ if there is any such line before the text body begins.
 Else move to the first text line.  Note that in such a degenerate case,
 this cannot be a file-level node that qualifies for backlinks anyway."
   (goto-char (point-min))
-  ;; Jump past comments and blank lines.
-  (while (looking-at-p (rx (*? space) (or "# " "\n")))
-    (forward-line))
-  ;; Jump past any drawers.
   (let ((case-fold-search t)
         (bound (org-entry-end-position)))
-    (while (looking-at-p org-drawer-regexp)
-      (if (re-search-forward "^[ \t]*:END:[ \t]*$" bound t)
-          (forward-line)
-        (error "Missing :END: in %s" (buffer-name))))))
+    (while (or (looking-at-p (rx (*? space) (or "# " "\n")))
+               (and (looking-at-p org-drawer-regexp)
+                    (or (re-search-forward "^[ \t]*:END:[ \t]*$" bound t)
+                        (error "Missing :END: in %s" (buffer-name)))))
+      (forward-line))))
 
 (defun org-node-full-end-of-meta-data (&optional _deprecated-arg)
   "Skip properties and other drawers, and at the file-level, skip keywords.
