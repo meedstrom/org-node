@@ -2298,7 +2298,7 @@ To always operate on the current entry, use `org-node-add-tags-here'."
       (let* ((filetags (cl-loop
                         for raw in (cdar (org-collect-keywords '("FILETAGS")))
                         append (split-string raw ":" t)))
-             (new-tags (seq-uniq (append tags filetags)))
+             (new-tags (seq-uniq (append filetags tags)))
              (case-fold-search t))
         (save-excursion
           (without-restriction
@@ -2313,7 +2313,7 @@ To always operate on the current entry, use `org-node-add-tags-here'."
               (insert "#+filetags: :" (string-join new-tags ":") ":\n")))))
     (save-excursion
       (org-back-to-heading)
-      (org-set-tags (seq-uniq (append tags (org-get-tags nil t)))))))
+      (org-set-tags (seq-uniq (append (org-get-tags nil t) tags))))))
 
 (defun org-node--read-tags ()
   "Prompt for an Org tag or several.
