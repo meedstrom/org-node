@@ -630,9 +630,11 @@ BLANK-OK means to obey `org-node-blank-input-hint'."
 ;;;###autoload
 (define-minor-mode org-node-cache-mode
   "Cache completion candidates every time Org-mem updates its cache.
-You should also turn on `org-mem-updater-mode', ideally at nearly the
-same time in your init process, because then org-mem will tend to only
-scan files once rather than twice."
+
+Enabling this mode asks org-mem to reset its cache.
+You should enable `org-mem-updater-mode' at nearly the same time in your
+init process, because then org-mem will tend to only scan files once
+rather than twice."
   :global t
   (cond
    (org-node-cache-mode
@@ -2524,15 +2526,13 @@ If already visiting that node, then follow the link normally."
 
 (defun org-node-narrow-to-drawer-create (name &optional create-where)
   "Narrow to pre-existing drawer named NAME, creating it if necessary.
-
 Search current entry only, via subroutine `org-node-narrow-to-drawer-p'.
 
 When drawer is created, insert it near the beginning of the entry
 \(after any properties drawer\), unless CREATE-WHERE is a function, in
 which case call it and hope it moved `point' to some appropriate
-position.
-
-If CREATE-WHERE returns an integer or marker, go to that position."
+position.  If CREATE-WHERE returns an integer or marker, go to that
+position."
   (org-node-narrow-to-drawer-p name t create-where))
 
 (defun org-node-narrow-to-drawer-p (name &optional create-missing create-where)

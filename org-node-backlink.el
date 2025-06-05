@@ -816,6 +816,8 @@ Designed for use by `org-node-backlink--add-in-target'."
             (let ((col (current-indentation)))
               (insert (funcall org-node-backlink-drawer-formatter id title))
               (unless (eolp)
+                ;; NOTE: Don't use `newline-and-indent' because it may deepen
+                ;;       indentation of a list bullet.
                 (newline)
                 (indent-to col)))
             ;; Re-sort so just-inserted link is placed correct among them
