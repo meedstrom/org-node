@@ -333,13 +333,8 @@ properties.  Org-mode is enabled, but the org-element cache is not."
       (goto-char link-pos)
       (recenter))))
 
-;;;###autoload
-(defun org-node-context-raise ()
-  "Either display a context buffer or refresh an already visible one.
-
-To reiterate: if it was not visible, only bring it up for
-display, do NOT also refresh it.  Leave that for the second time
-the user invokes the command."
+(defun org-node-context-raise-1 ()
+  "Either display a context buffer or refresh an already visible one."
   (interactive)
   (let ((buf org-node-context-main-buffer))
     (cond
@@ -366,6 +361,22 @@ the user invokes the command."
 
      (t
       (message "Found no context buffer, visit an org-mode buffer first")))))
+
+;;;###autoload
+(defun org-node-context-raise ()
+  "Either display a context buffer or refresh an already visible one.
+
+To reiterate: if it was not visible, only bring it up for
+display, do NOT also refresh it.  Leave that for the second time
+the user invokes the command.  This can be useful when you
+do not enable `org-node-context-follow-mode'.
+
+Repeatable on the last key of a key sequence
+if `repeat-on-final-keystroke' is t."
+  (interactive)
+  (let ((repeat-message-function #'ignore))
+    (setq last-repeatable-command #'org-node-context-raise-1)
+    (repeat nil)))
 
 ;;;###autoload
 (defun org-node-context-toggle ()
