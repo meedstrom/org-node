@@ -387,7 +387,8 @@ if `repeat-on-final-keystroke' is t."
   (if-let* ((win (get-buffer-window org-node-context-main-buffer 'visible)))
       (quit-window nil win)
     (let ((buf (get-buffer-create org-node-context-main-buffer)))
-      (org-node-context--refresh buf (org-entry-get-with-inheritance "ID"))
+      (when (derived-mode-p 'org-mode)
+        (org-node-context--refresh buf (org-entry-get-with-inheritance "ID")))
       (display-buffer buf))))
 
 ;; TODO: Use any buffer that may be rendering the correct context
