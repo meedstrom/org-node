@@ -19,7 +19,7 @@
 ;; URL:      https://github.com/meedstrom/org-node
 ;; Created:  2024-04-13
 ;; Keywords: org, hypermedia
-;; Package-Requires: ((emacs "29.1") (llama "0.5.0") (org-mem "0.14.1") (magit-section "4.3.0"))
+;; Package-Requires: ((emacs "29.1") (llama "0.5.0") (org-mem "0.16.0") (magit-section "4.3.0"))
 
 ;; Looking for Package-Version?  Consult the Git tag.
 ;;       MELPA versions above 20250303 is v2.
@@ -1464,7 +1464,7 @@ set in `org-node-name-of-links-drawer'."
             (forward-line -1)
             (back-to-indentation))
           (insert (format-time-string (org-time-stamp-format t t)) " -> "
-                  (org-make-link-string (org-mem-id node)
+                  (org-link-make-string (org-mem-id node)
                                         (org-mem-title node))))))))
 
 
