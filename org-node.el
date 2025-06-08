@@ -2560,7 +2560,8 @@ A way you might invoke this function:
 Instead of passing the optional arguments, consider calling
 `org-node-narrow-to-drawer-create' instead, which is equivalent to
 CREATE-MISSING t.  Also see that function for meaning of CREATE-WHERE."
-  (let ((start (point))
+  (let ((start (window-start))
+        (point (window-point))
         (entry-end (org-entry-end-position))
         (case-fold-search t))
     (org-back-to-heading-or-point-min t)
@@ -2594,8 +2595,9 @@ CREATE-MISSING t.  Also see that function for meaning of CREATE-WHERE."
             (org-insert-drawer nil name)
             (narrow-to-region (point) (point))
             t)
-        ;; Do nothing
-        (goto-char start)
+        ;; Do nothing and restore scroll position
+        (set-window-start (selected-window) start t)
+        (set-window-point (selected-window) point)
         nil))))
 
 
