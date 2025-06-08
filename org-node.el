@@ -1013,7 +1013,7 @@ possible workflow:
 Additionally, with (setq org-node-creation-fn #\\='org-capture),
 commands like `org-node-find' will outsource to `org-capture' when you
 type the name of a node that does not exist.  That enables this
-\"inverted\" workflow:
+\"inverted\" workflow, familiar to Org-roam users:
 
 1. Run `org-node-find'
 2. Type name of an unknown node
@@ -1063,6 +1063,7 @@ type the name of a node that does not exist.  That enables this
               (file-name-concat dir (org-node-title-to-basename title))))
         (when (file-exists-p path-to-write)
           (error "File already exists: %s" path-to-write))
+        ;; TODO: Maybe just use the buffer, especially if it is blank.
         (when (find-buffer-visiting path-to-write)
           (error "A buffer already has the filename %s" path-to-write))
         (mkdir (file-name-directory path-to-write) t)
@@ -1134,9 +1135,9 @@ be sufficient to key-bind that one."
                    (hash-table-values org-node--candidate<>entry))))
 
 ;;;###autoload
-(defun org-node-visit-random nil
-  "Visit a random node, repeatable.
-Requires `repeat-on-final-keystroke' t in order to repeat."
+(defun org-node-visit-random ()
+  "Visit a random node.
+Repeatable when bound to a key and `repeat-on-final-keystroke' is t."
   (interactive)
   (let ((repeat-message-function #'ignore))
     (setq last-repeatable-command #'org-node-visit-random-1)
@@ -2330,10 +2331,53 @@ well as the members of `org-tag-persistent-alist' and `org-tag-alist'."
    nil nil nil 'org-tags-history))
 
 
+;;;; Keymap
+
+;; TODO: maybe context-raise and context-toggle can merge into a dwim, changing behavior whether follow-mode is on or off
+
+;; (defvar-keymap org-node-global-keymap
+;;   "f" #'org-node-find
+;;   "g" #'org-node-grep
+;;   "s" #'org-node-seq-dispatch
+;;   "c" #'org-node-context-raise
+;;   "b" #'org-node-context-toggle ;; b for "backlinks"
+;;   "r" #'org-node-visit-random
+;;   "l d" #'org-mem-list-dead-id-links
+;;   "l t" #'org-mem-list-title-collisions ; "list collisions"
+;;   "l c" #'org-mem-list-db-contents ; "list contents"
+;;   "l p" #'org-mem-list-problems
+;;   "l e" #'org-node-peek ; "list entry" / "list example entry"
+;;   "l f" #'org-node-list-files
+;;   "l r" #'org-node-list-reflinks
+;;   "l a" #'org-node-list-feedback-arcs) ; "list arcs"
+
+;; ;; TODO: Check if it inherits :repeat.
+;; ;; If not, then consider adding :repeat to the above keymap, since only have to add a couple of :continue.
+;; ;; If it does inherit so I have to add a lot of :continue specs...  ehhh.
+;; ;; Maybe look up if it is possible to have an "opt-in" repeat-map rather than opt out.
+;; ;; B/c users might add extra commands and not expect that they will also repeat.
+;; (defvar-keymap org-node-org-keymap
+;;   :parent org-node-global-keymap
+;;   "i" #'org-node-insert-link
+;;   "d" #'org-node-insert-into-related ;; d for "drawer"...
+;;   "t" #'org-node-insert-transclusion
+;;   "y" #'org-node-insert-transclusion-as-subtree
+;;   ;; "u" #'org-node-insert-include
+;;   ;; "h" #'org-node-insert-heading
+;;   "n" #'org-node-nodeify-entry
+;;   "w" #'org-node-refile ;; because C-c w is `org-refile'
+;;   "m" #'org-node-rename-file-by-title
+;;   "x a" #'org-node-rename-asset-and-rewrite-links
+;;   "x a" #'org-node-rename-asset-and-rewrite-links)
+
+;; (keymap-set global-map "M-o" org-node-global-keymap)
+;; (keymap-set org-mode-map "M-o" org-node-org-keymap)
+
+
 ;;;; Gotos
 
 (defun org-node--goto (node &optional exact)
-  "Visit NODE file, and move point unless already close.
+  "Visit NODE file, and move point to NODE unless already inside.
 EXACT means always move point."
   (when (numberp exact)
     (error "Function org-node--goto no longer takes a position argument"))
@@ -2347,13 +2391,16 @@ EXACT means always move point."
           (find-file file)
           (widen)
           (org-node--assert-transclusion-safe)
+          ;; Search for the ID rather than naively using
+          ;; (goto-char (org-mem-pos node)), so that it will find the
+          ;; correct place even in a buffer with unsaved modifications.
           (let* ((id (org-mem-id node))
                  (pos (and id (org-find-property "ID" id))))
             (unless pos
               (error "Could not find ID \"%s\" in buffer %s" id (current-buffer)))
-            ;; Now point may already be in a good place because a buffer was
-            ;; already visiting it, or because of save-place.
-            ;; No need to move point unnecessarily.
+            ;; Having visited FILE, point may already be at a desirable
+            ;; position because a buffer was already visiting it, or because of
+            ;; save-place.  Otherwise, move directly to the heading.
             (when (or exact
                       (not (equal id (org-entry-get-with-inheritance "ID")))
                       (not (pos-visible-in-window-p pos))
@@ -2521,6 +2568,7 @@ If already visiting that node, then follow the link normally."
 ;; There's a trick used by org-super-links: temporarily set
 ;; `org-log-into-drawer' to "BACKLINKS", and then call `org-log-beginning'.
 ;; Only works under a heading though.
+;; And our argument CREATE-WHERE turns out to be pretty handy.
 
 (defun org-node-narrow-to-drawer-create (name &optional create-where)
   "Narrow to pre-existing drawer named NAME, creating it if necessary.
