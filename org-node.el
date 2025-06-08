@@ -457,7 +457,7 @@ Used in some commands when exiting minibuffer with a blank string."
   "Combine `org-node-untitled-format' with a new integer on every call."
   (cl-loop for title = (format org-node-untitled-format org-node--untitled-ctr)
            while (or (gethash title org-node--title<>affixations)
-                     (file-exists-p (org-node-title-to-filename title)))
+                     (file-exists-p (org-node-title-to-filename-quiet title)))
            do (cl-incf org-node--untitled-ctr)
            finally return title))
 
@@ -782,8 +782,8 @@ substring \"/home/me\" referring to the same location."
                    return (cl-incf (cdr (assoc dir dir-counters))))
        finally return (mapcar #'car (cl-sort dir-counters #'> :key #'cdr))))))
 
-(defun org-node-title-to-filename (title)
-  "From TITLE, make a full file path."
+(defun org-node-title-to-filename-quiet (title)
+  "From TITLE, make a full file path, and never prompt."
   (file-name-concat (if (stringp org-node-file-directory-ask)
                         org-node-file-directory-ask
                       (org-node-guess-dir))
@@ -2909,6 +2909,7 @@ heading, else the file-level node, whichever has an ID first."
 (define-obsolete-function-alias 'org-node-list-file-coding-systems         #'org-node-list-files                "3.3.10 (May 2025)")
 (define-obsolete-function-alias 'org-node-collection                       #'org-node-collection-basic          "3.3.12 (May 2025)")
 (define-obsolete-function-alias 'org-node-mk-auto-title                    #'org-node-titlegen-untitled         "3.3.12 (May 2025)")
+(define-obsolete-function-alias 'org-node-title-to-filename                #'org-node-title-to-filename-quiet   "3.4.3 (June 2025)")
 
 (provide 'org-node)
 
