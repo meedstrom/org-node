@@ -1031,10 +1031,9 @@ type the name of a node that does not exist.  That enables this
         ;; by something that pre-set the title and id
         (progn
           (setq title org-node-proposed-title)
-          (setq id org-node-proposed-id)
-          ;; FIXME: Why not use id?  Review when the proposed-id might be pre-set
-          (setq node (org-node-guess-node-by-title title)))
-      (when org-node-proposed-id (error "Proposed title was nil"))
+          (setq id (or org-node-proposed-id (error "Proposed ID was nil")))
+          (setq node (org-mem-entry-by-id id)))
+      (when org-node-proposed-id (error "Proposed title was nil but not ID"))
       ;; Was called from `org-capture', which means the user has not yet typed
       ;; the title; let them type it now
       (let ((input (org-node-read-candidate nil t)))
@@ -1049,6 +1048,7 @@ type the name of a node that does not exist.  That enables this
           (setq title input))))
 
     (unless title (error "Given title was nil"))
+    (unless id (error "Given ID was nil"))
     (if node
         ;; Node exists; capture into it
         (progn
