@@ -1052,10 +1052,7 @@ type the name of a node that does not exist.  That enables this
     (if node
         ;; Node exists; capture into it
         (progn
-          (find-file (org-mem-entry-file node))
-          (widen)
-          (goto-char (org-mem-entry-pos node))
-          (org-fold-reveal)
+          (org-node--goto node t)
           ;; TODO: Figure out how to play well with :prepend vs not :prepend.
           ;; Now it's just like it always prepends, I think?
           (unless (and (= 1 (point)) (org-at-heading-p))
