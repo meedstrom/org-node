@@ -584,8 +584,8 @@ If REMOVE is non-nil, remove it instead."
       (if (not (and id entry))
           (org-entry-delete nil "BACKLINKS")
         (let* ((origins (thread-last
-                          (append (org-mem-id-links-to entry)
-                                  (org-mem-roam-reflinks-to entry))
+                          (append (org-mem-id-links-to-entry entry)
+                                  (org-mem-roam-reflinks-to-entry entry))
                           (mapcar #'org-mem-link-nearby-id)
                           (delete id)
                           (delete-dups)
