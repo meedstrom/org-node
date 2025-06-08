@@ -642,7 +642,7 @@ rather than twice."
     (add-hook 'org-mem-pre-targeted-scan-functions #'org-node--forget-completions-in-results)
     (add-hook 'org-mem-record-entry-functions #'org-node--record-completion-candidates)
     (add-hook 'org-mem-record-entry-functions #'org-node--let-refs-be-aliases)
-    (org-mem--scan-full))
+    (org-mem-reset))
    (t
     (remove-hook 'org-mem-pre-full-scan-functions #'org-node--wipe-completions)
     (remove-hook 'org-mem-pre-targeted-scan-functions #'org-node--forget-completions-in-results)
@@ -686,9 +686,9 @@ something to change the facts on the ground just prior."
     (setq block t)
     (setq force t))
   (when force
-    (org-mem--scan-full))
+    (org-mem-reset nil "Org-node waiting for org-mem..."))
   (when block
-    (org-mem-await 'org-node 10)))
+    (org-mem-await "Org-node waiting for org-mem..." 10)))
 
 
 ;;;; Filename functions
@@ -954,9 +954,10 @@ Designed for `org-node-creation-fn'."
          (path-to-write
           (file-name-concat dir (org-node-title-to-basename org-node-proposed-title))))
     (when (file-exists-p path-to-write)
-      (org-mem--scan-full t)
-      (user-error "org-node: Resetting cache because file already exists: %s"
-                  path-to-write))
+      (let ((msg (format "org-node: Resetting cache because file already exists: %s"
+                         path-to-write)))
+        (org-mem-reset t msg)
+        (user-error "%s" msg)))
     (when (find-buffer-visiting path-to-write)
       (error "A buffer already exists for filename %s" path-to-write))
     (mkdir dir t)
@@ -2369,8 +2370,7 @@ EXACT means always move point."
                 (org-fold-show-entry)
                 (org-fold-show-children)
                 (recenter 0)))))
-      (message "org-node: Didn't find file, resetting...")
-      (org-mem--scan-full t))))
+      (org-mem-reset t "org-node: Didn't find file, resetting..."))))
 
 (defun org-node-goto-new-drawer-site ()
   "Go to just after properties drawer.

@@ -288,9 +288,9 @@ Argument KIND controls how to update them."
                       (equal fileloop--operate-function
                              #'org-node-backlink--loop-operator))))
     (unless proceed
-      (org-mem--scan-full)
-      (unless (org-mem-await 'org-node-backlink 30)
-        (user-error "org-node-backlink: Waited weirdly long for org-mem"))
+      (org-mem-reset nil "org-node: Waiting for org-mem...")
+      (unless (org-mem-await "org-node: Waiting for org-mem..." 30)
+        (user-error "org-node: Waited weirdly long for org-mem"))
       (let* ((files (org-mem-all-files))
              (dirs (org-node--root-dirs files))
              (problematic (seq-filter (##and (boundp %) (symbol-value %))
