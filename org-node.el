@@ -2373,7 +2373,9 @@ EXACT means always move point."
       (org-mem--scan-full t))))
 
 (defun org-node-goto-new-drawer-site ()
-  "Go to just after properties drawer."
+  "Go to just after properties drawer.
+Actually, if before the first heading, also skip past any other drawer
+that follows the file properties drawer."
   (if (org-before-first-heading-p)
       (org-node--after-drawers-before-keyword)
     (org-end-of-meta-data)))
@@ -2381,20 +2383,23 @@ EXACT means always move point."
 ;; Keyword lines work as a natural barrier, because Org expects file-level
 ;; :PROPERTIES: to come before #+title and other keyword lines.
 (defun org-node--after-drawers-before-keyword ()
-  "Move point to after all consecutive drawers in the front matter.
-If there are no drawers, move point to the first #+keyword line,
-if there is any such line before the text body begins.
-
-Else move to the first text line.  Note that in such a degenerate case,
-this cannot be a file-level node that qualifies for backlinks anyway."
+  "Move point to after all drawers in the front matter."
   (goto-char (point-min))
   (let ((case-fold-search t)
-        (bound (org-entry-end-position)))
-    (while (or (looking-at-p (rx (*? space) (or "# " "\n")))
+        (bound (org-entry-end-position))
+        (junk (rx (*? space) (or "# " "\n"))))
+    ;; NOTE: We also skip any comments and blanklines in between
+    ;; these drawers.  This implementation detail allows
+    ;; `org-node-full-end-of-meta-data' to presume there are no more drawers.
+    (while (or (looking-at-p junk)
                (and (looking-at-p org-drawer-regexp)
                     (or (re-search-forward "^[ \t]*:END:[ \t]*$" bound t)
                         (error "Missing :END: in %s" (buffer-name)))))
-      (forward-line))))
+      (forward-line))
+    ;; On a "final stretch" of comments and blanklines, go back to the first.
+    (while (progn (forward-line -1)
+                  (looking-at-p junk)))
+    (forward-line)))
 
 (defun org-node-full-end-of-meta-data (&optional _deprecated-arg)
   "Skip properties and other drawers, and at the file-level, skip keywords.
@@ -2406,7 +2411,7 @@ else do `backward-char' or `open-line' prior to inserting text."
   (if (org-before-first-heading-p)
       (progn
         (org-node--after-drawers-before-keyword)
-        ;; Jump past #+keywords, comments and empty lines.
+        ;; Jump past #+keywords, comments and blank lines.
         (while (looking-at-p (rx (*? space) (or "#+" "# " "\n")))
           (forward-line))
         ;; On a "final stretch" of empty lines, go back to the first.
