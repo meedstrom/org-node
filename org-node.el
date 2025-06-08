@@ -994,10 +994,6 @@ Designed for `org-node-creation-fn'."
                               :id    org-node-proposed-id))
         (remove-hook 'org-roam-capture-new-node-hook creation-hook-runner)))))
 
-(defun org-node-guess-node-by-title (title)
-  (and (gethash title org-node--title<>affixations)
-       (org-mem-entry-by-id (gethash title org-mem--title<>id))))
-
 (defun org-node-capture-target ()
   "Can be used as target in a capture template.
 See `org-capture-templates' for more info about targets.
@@ -2901,6 +2897,10 @@ heading, else the file-level node, whichever has an ID first."
 (defun org-node-all-filtered-nodes ()
   "List currently cached org-nodes that satisfied `org-node-filter-fn'."
   (delete-dups (hash-table-values org-node--candidate<>entry)))
+
+(defun org-node-guess-node-by-title (title)
+  (and (gethash title org-node--title<>affixations)
+       (org-mem-entry-by-id (gethash title org-mem--title<>id))))
 
 
 (define-obsolete-function-alias 'org-node-prefix-with-olp                  #'org-node-prepend-olp               "3.3.0 (May 2025)")
