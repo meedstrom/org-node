@@ -2331,49 +2331,6 @@ well as the members of `org-tag-persistent-alist' and `org-tag-alist'."
    nil nil nil 'org-tags-history))
 
 
-;;;; Keymap
-
-;; TODO: maybe context-raise and context-toggle can merge into a dwim, changing behavior whether follow-mode is on or off
-
-;; (defvar-keymap org-node-global-keymap
-;;   "f" #'org-node-find
-;;   "g" #'org-node-grep
-;;   "s" #'org-node-seq-dispatch
-;;   "c" #'org-node-context-raise
-;;   "b" #'org-node-context-toggle ;; b for "backlinks"
-;;   "r" #'org-node-visit-random
-;;   "l d" #'org-mem-list-dead-id-links
-;;   "l t" #'org-mem-list-title-collisions ; "list collisions"
-;;   "l c" #'org-mem-list-db-contents ; "list contents"
-;;   "l p" #'org-mem-list-problems
-;;   "l e" #'org-node-peek ; "list entry" / "list example entry"
-;;   "l f" #'org-node-list-files
-;;   "l r" #'org-node-list-reflinks
-;;   "l a" #'org-node-list-feedback-arcs) ; "list arcs"
-
-;; ;; TODO: Check if it inherits :repeat.
-;; ;; If not, then consider adding :repeat to the above keymap, since only have to add a couple of :continue.
-;; ;; If it does inherit so I have to add a lot of :continue specs...  ehhh.
-;; ;; Maybe look up if it is possible to have an "opt-in" repeat-map rather than opt out.
-;; ;; B/c users might add extra commands and not expect that they will also repeat.
-;; (defvar-keymap org-node-org-keymap
-;;   :parent org-node-global-keymap
-;;   "i" #'org-node-insert-link
-;;   "d" #'org-node-insert-into-related ;; d for "drawer"...
-;;   "t" #'org-node-insert-transclusion
-;;   "y" #'org-node-insert-transclusion-as-subtree
-;;   ;; "u" #'org-node-insert-include
-;;   ;; "h" #'org-node-insert-heading
-;;   "n" #'org-node-nodeify-entry
-;;   "w" #'org-node-refile ;; because C-c w is `org-refile'
-;;   "m" #'org-node-rename-file-by-title
-;;   "x a" #'org-node-rename-asset-and-rewrite-links
-;;   "x a" #'org-node-rename-asset-and-rewrite-links)
-
-;; (keymap-set global-map "M-o" org-node-global-keymap)
-;; (keymap-set org-mode-map "M-o" org-node-org-keymap)
-
-
 ;;;; Gotos
 
 (defun org-node--goto (node &optional exact)
@@ -2737,7 +2694,6 @@ Optional keyword argument ABOUT-TO-DO as in
                        (inhibit-message t))
                    (save-buffer)))
                (kill-buffer))))))))
-
 
 (defvar org-node--compile-timers nil)
 (defvar org-node--compiled-lambdas (make-hash-table :test 'equal))
