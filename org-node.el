@@ -2375,7 +2375,8 @@ Actually, if before the first heading, also skip past any other drawer
 that follows the file properties drawer."
   (if (org-before-first-heading-p)
       (org-node--after-drawers-before-keyword)
-    (org-end-of-meta-data)))
+    (org-end-of-meta-data))
+  nil)
 
 ;; Keyword lines work as a natural barrier, because Org expects file-level
 ;; :PROPERTIES: to come before #+title and other keyword lines.
@@ -2396,7 +2397,8 @@ that follows the file properties drawer."
     ;; On a "final stretch" of comments and blanklines, go back to the first.
     (while (progn (forward-line -1)
                   (looking-at-p junk)))
-    (forward-line)))
+    (forward-line))
+  nil)
 
 (defun org-node-full-end-of-meta-data (&optional _deprecated-arg)
   "Skip properties and other drawers, and at the file-level, skip keywords.
