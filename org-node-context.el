@@ -370,11 +370,12 @@ To reiterate: if it was not visible, only bring it up for
 display, do NOT also refresh it.  Leave that for the second time
 the user invokes the command.
 
-This can be handy as a \"Do-What-I-Mean\" command,
-especially when not using `org-node-context-follow-mode'.
+This can be handy when not using `org-node-context-follow-mode',
+offering the possibility to keep the context buffer focused on some
+other note than the one at point.
 
-Repeatable on the last key of a key sequence
-if `repeat-on-final-keystroke' is t."
+Repeatable on the last key of a key sequence if
+`repeat-on-final-keystroke' is t."
   (interactive)
   (let ((repeat-message-function #'ignore))
     (setq last-repeatable-command #'org-node-context-raise-1)

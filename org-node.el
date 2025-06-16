@@ -205,10 +205,9 @@ In other words, returning nil means the user cannot autocomplete to the
 node, but Lisp code can still find it in the output of
 `org-mem-all-id-nodes', and backlinks are discovered normally.
 
-This function is applied once for every ID-node found, and
-receives the node data as a single argument: an object which form
-you can observe in examples from \\[org-node-peek] and specified
-in the type `org-mem-entry' (C-h o org-mem-entry RET)."
+This function is applied once for every ID-node found, and receives the
+node data as a single argument: an `org-mem-entry' object.  See examples
+by typing \\[org-node-list-example]."
   :type '(radio (function-item org-node-filter-no-roam-exclude-p)
                 (function-item org-node-filter-watched-dir-p)
                 (function :tag "Custom function"
@@ -306,9 +305,8 @@ The function receives two arguments: NODE and TITLE, and it must return
 a list of three strings: title, prefix and suffix.  Of those three, the
 title should be TITLE unmodified.
 
-NODE is an object which form you can observe in examples from
-\\[org-node-peek] and specified in type `org-mem-entry'
-\(for docs, type \\[describe-symbol] org-mem-entry RET).
+NODE is an `org-mem-entry' object.  See examples
+by typing \\[org-node-list-example].
 
 If a node has aliases, the same node is passed to this function
 again for every alias, in which case TITLE is actually one of the
@@ -451,6 +449,8 @@ Used in some commands when exiting minibuffer with a blank string."
                 (function :tag "Custom function" :value (lambda ())))
   :package-version '(org-node . "3.3.12"))
 
+;; TODO: If using org-capture as creation-fn, can we design a template to
+;;       capture into a child of another entry rather than a new file?
 (defvar org-node-untitled-format "untitled-%d")
 (defvar org-node--untitled-ctr 1)
 (defun org-node-titlegen-untitled ()
@@ -502,11 +502,10 @@ directly into `org-node--candidate<>entry', or into a secondary table
 simply reads candidates off the candidates table, or attaches the
 affixations in realtime.
 
-Regardless of which, all completions except the empty string are
-guaranteed to be keys of `org-node--candidate<>entry' \(which is the
-main reason for this design\), but remember that it is possible for
-`completing-read' to exit with user-entered input that didn\\='t match
-anything.
+Regardless of which, all completions are guaranteed to be keys of
+`org-node--candidate<>entry' \(which is the main reason for this dual
+code flow\), but remember that it is possible for `completing-read' to
+exit with user-entered input that didn\\='t match anything.
 
 Arguments STR, PRED and ACTION are handled behind the scenes,
 see Info node `(elisp)Programmed Completion'."
@@ -556,7 +555,8 @@ STR, PRED and ACTION as in `org-node-collection-basic'."
 ;; Boost completion hist to at least 1000 elements, unless user has nerfed
 ;; the default `history-length'.
 ;; Because you often narrow down the completions majorly, and still want to
-;; sort among what's left.
+;; sort among what's left; perhaps it's a general topic you have not touched
+;; since two months ago, but when you do, the recency order remains relevant.
 (when (and (>= history-length (car (get 'history-length 'standard-value)))
            (< history-length 1000))
   (put 'org-node-hist 'history-length 1000)
@@ -661,7 +661,7 @@ rather than twice."
 Ensure that modes `org-node-cache-mode' and `org-mem-updater-mode' are
 enabled.  If FORCE, trigger org-mem to rebuild cache.  If BLOCK and a
 cache build is underway \(perhaps started by FORCE), block Emacs until
-it finishes.
+it finishes \(or 10 seconds elapsed\).
 
 If cache has never been built, act as if both FORCE and BLOCK.
 
@@ -764,8 +764,8 @@ substring \"/home/me\" referring to the same location."
          root-dirs)
     ;; Example: if there is /home/roam/courses/Math1A/, but ancestor dir
     ;; /home/roam/ is also a member of the set, throw out the child dir.
+    ;; REVIEW: Maybe more elegant to use `nreverse' twice?
     (while-let ((dir (car (last dirs))))
-      ;; REVIEW: Maybe more elegant to use `nreverse' twice?
       (setq dirs (nbutlast dirs))
       (cl-loop for other-dir in dirs
                when (string-prefix-p other-dir dir)
