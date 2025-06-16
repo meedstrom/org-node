@@ -198,7 +198,6 @@ NAME, ARGLIST and BODY as in `defun'."
 
 (require 'org-mem)
 (require 'org-mem-updater)
-(require 'org-mem-list)
 
 (if (or (not (boundp 'org-mem--bump-int))
         (< org-mem--bump-int 7))
