@@ -582,22 +582,21 @@ BLANK-OK means to obey `org-node-blank-input-hint'."
              node
              org-node--candidate<>entry)))
 
-(defun org-node--record-completion-candidates (node)
-  "Cache fancy completion candidates for NODE and its aliases."
-  (when (and (org-mem-entry-id node)
-             (org-mem-entry-title node)
-             (funcall org-node-filter-fn node))
-    (dolist (title (cons (org-mem-entry-title node)
-                         (org-mem-entry-roam-aliases node)))
-      (let ((affx (funcall org-node-affixation-fn node title)))
+(defun org-node--record-completion-candidates (entry)
+  "Cache completions for ENTRY and its aliases, if it is an ID-node."
+  (when (and (org-mem-entry-id entry)
+             (funcall org-node-filter-fn entry))
+    (dolist (title (cons (org-mem-entry-title entry)
+                         (org-mem-entry-roam-aliases entry)))
+      (let ((affx (funcall org-node-affixation-fn entry title)))
         (puthash title affx org-node--title<>affixations)
         (if org-node-alter-candidates
             ;; Absorb the affixations into one candidate string
             (puthash (concat (nth 1 affx) (nth 0 affx) (nth 2 affx))
-                     node
+                     entry
                      org-node--candidate<>entry)
           ;; Bare title, to be affixated later
-          (puthash title node org-node--candidate<>entry))))))
+          (puthash title entry org-node--candidate<>entry))))))
 
 (defun org-node--wipe-completions (_parse-results)
   "Clear completions tables."
