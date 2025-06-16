@@ -784,7 +784,7 @@ substring \"/home/me\" referring to the same location."
 (defun org-node-title-to-basename (title)
   "From TITLE, make the non-directory component of a file name."
   (concat (format-time-string org-node-file-timestamp-format)
-          (funcall (org-node--try-ensure-compiled org-node-file-slug-fn) title)
+          (funcall (org-node--ensure-compiled org-node-file-slug-fn) title)
           ".org"))
 
 (defun org-node-guess-dir ()
@@ -2691,37 +2691,26 @@ Optional keyword argument ABOUT-TO-DO as in
                    (save-buffer)))
                (kill-buffer))))))))
 
-(defvar org-node--compile-timers nil)
 (defvar org-node--compiled-lambdas (make-hash-table :test 'equal))
-(defun org-node--try-ensure-compiled (fn)
-  "Try to return FN as a compiled function.
+(defun org-node--ensure-compiled (fn)
+  "Return FN as a compiled function.
 
-- If FN is a symbol with uncompiled function definition, return
-  the same symbol, and arrange to natively compile it after some
-  idle time.  Or if native-comp missing, byte-compile right away.
-
+- If FN is already compiled, return FN.
+- If FN is a symbol with uncompiled function definition, byte-compile it
+  and return the same symbol.
 - If FN is an anonymous lambda, compile it, cache the resulting
   bytecode, and return that bytecode.
 
-Normally Emacs already does this kind of thing for definitions in an
-installed library, but it can be handy for user-provided lambdas that
-must be called a lot."
+Can be handy for user-provided lambdas that must be called a lot."
   (cond ((compiled-function-p fn) fn)
         ((symbolp fn)
-         (if (compiled-function-p (symbol-function fn))
-             fn
+         (unless (compiled-function-p (symbol-function fn))
            (let (byte-compile-warnings)
-             (if (native-comp-available-p)
-                 (unless (alist-get fn org-node--compile-timers)
-                   (setf (alist-get fn org-node--compile-timers)
-                         (run-with-idle-timer
-                          (+ 5 (random 5)) nil (##native-compile fn))))
-               (byte-compile fn)))
-           ;; May remain uncompiled until native comp is done
-           fn))
-        ((gethash fn org-node--compiled-lambdas))
-        ((let (byte-compile-warnings)
-           (puthash fn (byte-compile fn) org-node--compiled-lambdas)))))
+             (byte-compile fn))
+           fn)
+         ((gethash fn org-node--compiled-lambdas))
+         ((let (byte-compile-warnings)
+            (puthash fn (byte-compile fn) org-node--compiled-lambdas))))))
 
 (defvar org-node--new-unsaved-buffers nil
   "List of file-visiting buffers that have never written to the file.")

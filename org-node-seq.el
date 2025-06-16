@@ -481,12 +481,12 @@ Unlike `org-node-proposed-seq', does not need to revert to nil.")
 DEF is a seq-def from `org-node-seq-defs'."
   (unless (plist-get (cdr def) :version)
     (user-error "Seq def :version must be 2 or higher"))
-  (let ((classifier (org-node--try-ensure-compiled
+  (let ((classifier (org-node--ensure-compiled
                      (plist-get (cdr def) :classifier))))
     (nconc
      (cl-loop for elt in (cdr def)
               if (functionp elt)
-              collect (org-node--try-ensure-compiled elt)
+              collect (org-node--ensure-compiled elt)
               else collect elt)
      (cl-loop for node in (org-mem-all-id-nodes)
               as result = (funcall classifier node)
