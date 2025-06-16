@@ -391,6 +391,16 @@ if `repeat-on-final-keystroke' is t."
         (org-node-context--refresh buf (org-entry-get-with-inheritance "ID")))
       (display-buffer buf))))
 
+;;;###autoload
+(defun org-node-context-dwim ()
+  "Call `org-node-context-toggle' or `org-node-context-raise'.
+Call the former if `org-node-context-follow-mode' is enabled,
+otherwise call the latter."
+  (interactive)
+  (if org-node-context-follow-mode
+      (org-node-context-toggle)
+    (org-node-context-raise)))
+
 ;; TODO: Use any buffer that may be rendering the correct context
 (defun org-node-context--try-refresh ()
   "For `post-command-hook' in an Org-mode buffer."
