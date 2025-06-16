@@ -516,9 +516,9 @@ see Info node `(elisp)Programmed Completion'."
 (defun org-node-collection--with-empty (str pred action)
   "A collection that includes an empty candidate at the front.
 STR, PRED and ACTION as in `org-node-collection-basic'."
-  (let ((blank (if (bound-and-true-p helm-mode) " " "")))
-    (if (eq action 'metadata)
-        (cons 'metadata (list (cons 'affixation-function #'org-node--affixate)))
+  (if (eq action 'metadata)
+      (cons 'metadata (list (cons 'affixation-function #'org-node--affixate)))
+    (let ((blank (if (bound-and-true-p helm-mode) " " "")))
       (complete-with-action
        action
        (cons blank (hash-table-keys org-node--candidate<>entry))
@@ -526,31 +526,24 @@ STR, PRED and ACTION as in `org-node-collection-basic'."
        pred))))
 
 (defun org-node--affixate (collection)
-  "From list COLLECTION, make an alist of ((TITLE PREFIX SUFFIX) ...)."
-  (if (and (car collection) (string-blank-p (car collection)))
-      (nconc (list (list (car collection) "" (or org-node-blank-input-hint "")))
-             (if org-node-alter-candidates
-                 (cl-loop for candidate in (cdr collection)
-                          collect (list candidate "" ""))
-               (cl-loop for title in (cdr collection)
-                        collect (or (gethash title org-node--title<>affixations)
-                                    (list title "" "")))))
-    (if org-node-alter-candidates
-        (cl-loop for candidate in collection
-                 collect (list candidate "" ""))
-      (cl-loop for title in collection
-               collect (or (gethash title org-node--title<>affixations)
-                           (list title "" ""))))))
+  "From flat list COLLECTION, make alist ((TITLE PREFIX SUFFIX) ...)."
+  (when (length= collection 0)
+    (error "No completions in collection"))
+  (nconc (and (string-blank-p (car collection))
+              (list (list (car collection) "" (or org-node-blank-input-hint ""))))
+         (if org-node-alter-candidates
+             (cl-loop for full-candidate in (cdr collection)
+                      collect (list full-candidate "" ""))
+           (cl-loop for title in (cdr collection)
+                    collect (or (gethash title org-node--title<>affixations)
+                                (list title "" ""))))))
 
 (defvar org-node-hist nil
   "Minibuffer history.")
 
-;; Second hist introduced in 3.3.16; transition by copying from first.
-(if (boundp 'org-node-hist-altered)
-    (defvar org-node-hist-altered nil
-      "Minibuffer history.")
-  (defvar org-node-hist-altered org-node-hist
-    "Minibuffer history."))
+;; New hist introduced in 3.3.16.  If never used, copy from `org-node-hist'.
+(defvar org-node-hist-altered org-node-hist
+  "Minibuffer history.")
 
 ;; Boost completion hist to at least 1000 elements, unless user has nerfed
 ;; the default `history-length'.
@@ -1137,11 +1130,13 @@ be sufficient to key-bind that one."
 ;;;###autoload
 (defun org-node-visit-random ()
   "Visit a random node.
-Repeatable when bound to a key and `repeat-on-final-keystroke' is t."
+Repeatable on the last key of a key sequence if
+`repeat-on-final-keystroke' is t."
   (interactive)
-  (let ((repeat-message-function #'ignore))
-    (setq last-repeatable-command #'org-node-visit-random-1)
-    (repeat nil)))
+  (setq last-repeatable-command #'org-node-visit-random-1)
+  (if repeat-on-final-keystroke
+      (repeat nil)
+    (org-node-visit-random-1)))
 
 ;; TODO: Optionally obey `org-node-filter-fn'
 ;;;###autoload
@@ -2920,6 +2915,7 @@ heading, else the file-level node, whichever has an ID first."
 (define-obsolete-function-alias 'org-node-collection                       #'org-node-collection-basic          "3.3.12 (May 2025)")
 (define-obsolete-function-alias 'org-node-mk-auto-title                    #'org-node-titlegen-untitled         "3.3.12 (May 2025)")
 (define-obsolete-function-alias 'org-node-title-to-filename                #'org-node-title-to-filename-quiet   "3.4.3 (June 2025)")
+(define-obsolete-function-alias 'org-node-peek                             #'org-node-list-example              "2025-06-16")
 
 (provide 'org-node)
 

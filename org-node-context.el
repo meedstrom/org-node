@@ -377,9 +377,10 @@ other note than the one at point.
 Repeatable on the last key of a key sequence if
 `repeat-on-final-keystroke' is t."
   (interactive)
-  (let ((repeat-message-function #'ignore))
-    (setq last-repeatable-command #'org-node-context-raise-1)
-    (repeat nil)))
+  (setq last-repeatable-command #'org-node-context-raise-1)
+  (if repeat-on-final-keystroke
+      (repeat nil)
+    (org-node-context-raise-1)))
 
 ;;;###autoload
 (defun org-node-context-toggle ()
