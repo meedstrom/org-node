@@ -1911,7 +1911,7 @@ user quits, do not apply any modifications."
 
 ;;;; Commands 5: Listing things
 
-(defun org-node-peek (&optional _deprecated-arg)
+(defun org-node-list-example (&optional _deprecated-arg)
   "Print a random `org-mem-entry' object."
   (interactive)
   (org-node-cache-ensure)
