@@ -2333,6 +2333,7 @@ well as the members of `org-tag-persistent-alist' and `org-tag-alist'."
 ;;;; Keymap
 ;; NOTE: Reserve "c" for a possible future capture key.
 
+;;;###autoload
 (defvar-keymap org-node-global-prefix-map
   "b" 'org-node-context-dwim ;; b for "backlinks"
   "f" #'org-node-find
@@ -2354,6 +2355,7 @@ well as the members of `org-tag-persistent-alist' and `org-tag-alist'."
   "x u" #'org-node-insert-raw-link ;; u for "URL"
   "x x" #'org-mem-reset)
 
+;;;###autoload
 (defvar-keymap org-node-org-prefix-map
   :parent org-node-global-prefix-map
   "d" #'org-node-insert-into-related  ;; d for "drawer".  Maybe rename command?
