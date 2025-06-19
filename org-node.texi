@@ -737,22 +737,20 @@ Basic commands:
 @item
 @samp{org-node-visit-random}
 @item
-@samp{org-node-refile}
-@item
 @samp{org-node-context-raise}
 @item
 @samp{org-node-context-toggle}
+@item
+@samp{org-node-refile}
+@itemize
+@item
+Does two technically different things: either move a subtree into  some node it prompts you for@comma{} or if you press RET with no input@comma{} extract the subtree into a new file (similarly to @samp{org-roam-extract-subtree})
+@end itemize
 @item
 @samp{org-node-seq-dispatch}
 @itemize
 @item
 Browse node series -- see README
-@end itemize
-@item
-@samp{org-node-extract-subtree}
-@itemize
-@item
-A bizarro counterpart to @samp{org-roam-extract-subtree}.  Export the subtree at point into a file-level node@comma{} @strong{leave a link in the outline parent of where the subtree was}@comma{} and show the new file as current buffer.
 @end itemize
 @item
 @samp{org-node-nodeify-entry}

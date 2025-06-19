@@ -2398,7 +2398,7 @@ well as the members of `org-tag-persistent-alist' and `org-tag-alist'."
 (defvar-keymap org-node-org-prefix-map
   :parent org-node-global-prefix-map
   "d" #'org-node-insert-into-related  ;; d for "drawer".  Maybe rename command?
-  "e" #'org-node-extract-subtree
+  ;; "e" #'org-node-extract-subtree ;; NOTE: `org-node-refile' does same now
   "i" #'org-node-insert-link
   "m" #'org-node-rename-file-by-title ;; m for "move"
   "n" #'org-node-nodeify-entry

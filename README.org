@@ -463,13 +463,12 @@ Basic commands:
 - =org-node-insert-transclusion=
 - =org-node-insert-transclusion-as-subtree=
 - =org-node-visit-random=
-- =org-node-refile=
 - =org-node-context-raise=
 - =org-node-context-toggle=
+- =org-node-refile=
+  - Does two technically different things: either move a subtree into  some node it prompts you for, or if you press RET with no input, extract the subtree into a new file (similarly to =org-roam-extract-subtree=)
 - =org-node-seq-dispatch=
   - Browse node series -- see README
-- =org-node-extract-subtree=
-  - A bizarro counterpart to =org-roam-extract-subtree=.  Export the subtree at point into a file-level node, *leave a link in the outline parent of where the subtree was*, and show the new file as current buffer.
 - =org-node-nodeify-entry=
   - (Trivial) Give an ID to the subtree at point, and run the hook =org-node-creation-hook=
 - =org-node-insert-heading=
