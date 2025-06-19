@@ -1606,32 +1606,44 @@ creation-date as more truthful or useful than today\\='s date.
 ;;;###autoload
 (defun org-node-refile ()
   "Prompt for a node and refile subtree at point into it.
-No support yet for refiling a file."
-  (interactive () org-mode)
+No support yet for refiling a file-level node.
+
+Exiting the prompt with a blank input means hand off to
+`org-node-extract-subtree'."
+  (interactive "*" org-mode)
   (unless (derived-mode-p 'org-mode)
     (user-error "This command expects an org-mode buffer"))
   (when (org-invisible-p)
     (user-error "Better not run this command in an invisible region"))
   (if (org-before-first-heading-p)
-      (user-error "`org-node-refile' only works on subtrees for now")
+      ;; TODO: Support refiling a file.  Just implement
+      ;; `org-roam-demote-entire-buffer', use it and then proceed as normal.
+      (message "`org-node-refile' only works on subtrees for now")
     (org-node-cache-ensure)
-    (let* ((input (org-node-read-candidate "Refile into ID-node: "))
-           (node (gethash input org-node--candidate<>entry))
-           (origin-buffer (current-buffer)))
-      (unless node
-        (error "Node not found %s" input))
-      (org-cut-subtree)
-      (condition-case err
-          (org-node--goto node t)
-        ((t error)
-         (switch-to-buffer origin-buffer)
-         (org-paste-subtree)
-         (signal (car err) (cdr err)))
-        (:success
-         (widen)
-         (forward-char)
-         (org-paste-subtree)
-         (run-hooks 'org-node-relocation-hook))))))
+    (let* ((org-node-blank-input-hint
+            (propertize "(extract to own file)"
+                        'face 'completions-annotations))
+           (input (org-node-read-candidate "Refile into ID-node: " t))
+           (origin-buffer (current-buffer))
+           node)
+      (if (string-blank-p input)
+          (org-node-extract-subtree)
+        (setq node (gethash input org-node--candidate<>entry))
+        (unless node
+          (error "Node not found: %s" input))
+        (org-cut-subtree)
+        (condition-case err
+            (org-node--goto node t)
+          ((t error)
+           ;; Try to undo the cut
+           (switch-to-buffer origin-buffer)
+           (org-paste-subtree)
+           (signal (car err) (cdr err)))
+          (:success
+           (widen)
+           (forward-char)
+           (org-paste-subtree)
+           (run-hooks 'org-node-relocation-hook)))))))
 
 
 ;;;; Commands 4: Renaming things
