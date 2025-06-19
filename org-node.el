@@ -529,8 +529,6 @@ STR, PRED and ACTION as in `org-node-collection-basic'."
 
 (defun org-node--affixate (collection)
   "From flat list COLLECTION, make alist ((TITLE PREFIX SUFFIX) ...)."
-  (when (length= collection 0)
-    (error "No completions in collection"))
   (nconc (and (string-blank-p (car collection))
               (list (list (car collection) "" (or org-node-blank-input-hint ""))))
          (if org-node-alter-candidates
