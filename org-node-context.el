@@ -23,6 +23,7 @@
 (require 'org-element)
 (require 'org-mem)
 (require 'magit-section)
+(require 'repeat)
 
 (unless (and (boundp 'org-mem--bump-int) (>= org-mem--bump-int 1))
     (display-warning 'org-node-context

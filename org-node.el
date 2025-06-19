@@ -86,6 +86,7 @@
 (require 'cl-lib)
 (require 'subr-x)
 (require 'fileloop)
+(require 'repeat)
 (require 'llama)
 (require 'org-node-changes)
 (require 'org-mem)
@@ -123,6 +124,7 @@
 (declare-function org-link-make-string "ol")
 (declare-function org-lint "org-lint")
 (declare-function org-map-region "org")
+(declare-function org-mem-list--pop-to-tabulated-buffer "org-mem-list")
 (declare-function org-mem-roamy-mk-backlinks "org-mem-roamy")
 (declare-function org-mem-roamy-mk-reflinks "org-mem-roamy")
 (declare-function org-mem-updater-ensure-id-node-at-point-known "org-mem-updater")
@@ -784,7 +786,7 @@ substring \"/home/me\" referring to the same location."
 (defun org-node-title-to-basename (title)
   "From TITLE, make the non-directory component of a file name."
   (concat (format-time-string org-node-file-timestamp-format)
-          (funcall (org-node--ensure-compiled org-node-file-slug-fn) title)
+          (funcall org-node-file-slug-fn title)
           ".org"))
 
 (defun org-node-guess-dir ()
