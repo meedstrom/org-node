@@ -454,13 +454,13 @@ Used in some commands when exiting minibuffer with a blank string."
 ;; TODO: If using org-capture as creation-fn, can we design a template to
 ;;       capture into a child of another entry rather than a new file?
 (defvar org-node-untitled-format "untitled-%d")
-(defvar org-node--untitled-ctr 1)
+(defvar org-node--untitled-ctr 0)
 (defun org-node-titlegen-untitled ()
   "Combine `org-node-untitled-format' with a new integer on every call."
-  (cl-loop for title = (format org-node-untitled-format org-node--untitled-ctr)
+  (cl-loop do (cl-incf org-node--untitled-ctr)
+           as title = (format org-node-untitled-format org-node--untitled-ctr)
            while (or (gethash title org-node--title<>affixations)
                      (file-exists-p (org-node-title-to-filename-quiet title)))
-           do (cl-incf org-node--untitled-ctr)
            finally return title))
 
 (defun org-node-titlegen-today ()
