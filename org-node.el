@@ -2403,7 +2403,7 @@ EXACT means always move point."
             ;; position because a buffer was already visiting it, or because of
             ;; save-place.  Otherwise, move directly to the heading.
             (when (or exact
-                      (not (equal id (org-entry-get-with-inheritance "ID")))
+                      (not (equal id (org-entry-get nil "ID")))
                       (not (pos-visible-in-window-p pos))
                       (org-invisible-p pos))
               (goto-char pos)
