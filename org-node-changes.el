@@ -247,7 +247,7 @@ NAME, ARGLIST and BODY as in `defun'."
 (define-obsolete-function-alias 'org-node-list-dead-links            'org-mem-list-dead-id-links           "3.0.0 (May 2025)")
 (define-obsolete-function-alias 'org-node-list-scan-problems         'org-mem-list-problems                "3.0.0 (May 2025)")
 (define-obsolete-function-alias 'org-node-p                          #'org-mem-entry-p                      "3.0.0 (May 2025)")
-(define-obsolete-function-alias 'org-node-subtree-p                  #'org-mem-subtree-p                    "3.0.0 (May 2025)")
+(define-obsolete-function-alias 'org-node-subtree-p                  #'org-mem-entry-subtree-p              "3.0.0 (May 2025)")
 (define-obsolete-function-alias 'org-nodes-in-file                   #'org-mem-id-nodes-in-files            "3.0.0 (May 2025)")
 
 (org-node-changes--def-whiny-alias 'org-node-get-file-path         #'org-mem-file                             "1.9.38 (February 2025)" "May")

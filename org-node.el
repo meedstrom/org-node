@@ -561,7 +561,8 @@ STR, PRED and ACTION as in `org-node-collection-basic'."
 (defun org-node-read-candidate (&optional prompt blank-ok)
   "PROMPT for a known node and return the input.
 If the input is not a key of `org-node--candidate<>entry',
-you can assume no such node exists.
+you can assume no such node exists,
+or it was recently created but its buffer never saved.
 
 BLANK-OK means to obey `org-node-blank-input-hint'."
   (completing-read (or prompt "Node: ")
@@ -2380,8 +2381,8 @@ well as the members of `org-tag-persistent-alist' and `org-tag-alist'."
 ;;;; Gotos
 
 (defun org-node--goto (node &optional exact)
-  "Visit NODE file, and move point to NODE unless already inside.
-EXACT means always move point."
+  "Visit NODE file, and ensure point is inside NODE.
+EXACT means always move point to NODE top."
   (when (numberp exact)
     (error "Function org-node--goto no longer takes a position argument"))
   (unless node
@@ -2487,7 +2488,7 @@ As bonus, do not land on an inlinetask, seek a real heading."
     (point)))
 
 
-;;;; CAPF (Completion-At-Point Function) aka. in-buffer completion
+;;;; CAPF (Completion-At-Point Function), aka. in-buffer completion
 
 (defun org-node-complete-at-point ()
   "Expand word at point to a known node title, and linkify.

@@ -37,6 +37,7 @@ Background
 * What's all this::
 * What's a "node"?::
 * Features::
+* Benchmarks on my machine::
 
 Setup
 
@@ -107,6 +108,7 @@ Appendix IV: What are @samp{ROAM_REFS}?
 * What's all this::
 * What's a "node"?::
 * Features::
+* Benchmarks on my machine::
 @end menu
 
 @node What's all this
@@ -118,7 +120,7 @@ I like @uref{https://github.com/org-roam/org-roam, org-roam} but found it too sl
 @item
 @strong{If you were using org-roam}@comma{} there is nothing to migrate.  You can use both packages.  It's the same on-disk format: "notes" are identified by their org-id.
 
-In pursuit of being "just org-id"@comma{} this package has no equivalent setting to @samp{org-roam-directory} -- it just looks up the @samp{org-id-locations} table.
+In pursuit of being "just org-id"@comma{} this package has no equivalent setting to @samp{org-roam-directory} -- it just looks up the @samp{org-id-locations} table.  (UPDATE 2025-06-03: this is true if setting @samp{org-mem-do-sync-with-org-id} to t.  Otherwise@comma{} you can configure @samp{org-mem-watch-dirs}.)
 
 @item
 @strong{If you were not using org-roam}@comma{} maybe think of it as somewhat like @uref{https://github.com/alphapapa/org-recent-headings, org-recent-headings} tooled-up to the extent that you won't need other methods of browsing@comma{} as long as you give IDs to all objects of interest.
@@ -148,7 +150,7 @@ Once a subtree has an ID you can link to@comma{} it's a "node" because it has jo
 
 A comparison of three systems that all permit relying on org-id and don't lock you into the concept of "one-note-per-file".
 
-@multitable {aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa} {aaaaaaaa} {aaaaaaaaaaaaaaaa} {aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}
+@multitable {aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa} {aaaaaaaa} {aaaaaaaaaaaaaaaa} {aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}
 @headitem Feature
 @tab org-roam
 @tab org-node
@@ -167,7 +169,7 @@ A comparison of three systems that all permit relying on org-id and don't lock y
 @tab --
 @item Node exclusion
 @tab yes
-@tab limited
+@tab yes
 @tab not applicable
 @item Refile
 @tab yes
@@ -247,7 +249,7 @@ A comparison of three systems that all permit relying on org-id and don't lock y
 @tab yes
 @item Untitled notes
 @tab --
-@tab --
+@tab limited
 @tab --
 @item org-protocol extension
 @tab yes
@@ -269,18 +271,29 @@ A comparison of three systems that all permit relying on org-id and don't lock y
 @tab --
 @tab yes
 @tab not applicable
+@end multitable
+
+@node Benchmarks on my machine
+@section Benchmarks on my machine
+
+The original reason that org-node exists.
+
+@multitable {aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa} {aaaaaaaa} {aaaaaaaaa}
+@headitem 
+@tab org-roam
+@tab org-node
 @item @strong{Time to cache my 3000 nodes}
 @tab @strong{2m 48s}
 @tab @strong{0m 02s}
-@tab not applicable
 @item @strong{Time to save file w/ 400 nodes}
 @tab @strong{5--10s}
 @tab @strong{instant}
-@tab ?
+@item @strong{Time to display 20 backlinks}
+@tab @strong{5--10s}
+@tab @strong{instant}
 @item @strong{Time to open minibuffer}
 @tab @strong{1--3s}
 @tab @strong{instant}
-@tab not applicable
 @end multitable
 
 @node Setup
@@ -298,9 +311,14 @@ Assuming your package manager knows about @uref{https://melpa.org/#/getting-star
 
 @lisp
 (use-package org-node
+  :init
+  ;; Optional; note that doing this on :init loads the package.
+  (keymap-set global-map "M-o n" org-node-global-prefix-map)
+  (with-eval-after-load 'org-keys
+    (keymap-set org-mode-map "M-o n" org-node-org-prefix-map))
   :config
   (setq org-mem-do-sync-with-org-id t) ; optional
-  (setq org-mem-watch-dirs (list "~/org")) ; optional
+  (setq org-mem-watch-dirs (list "~/org")) ; optional; configure me!
   (org-mem-updater-mode)
   (org-node-cache-mode))
 @end lisp
@@ -309,6 +327,10 @@ If you're coming here from @strong{org-roam}@comma{} try this instead:
 
 @lisp
 (use-package org-node
+  :init
+  (keymap-set global-map "M-o n" org-node-global-prefix-map)
+  (with-eval-after-load 'org-keys
+    (keymap-set org-mode-map "M-o n" org-node-org-prefix-map))
   :config
   (setq org-mem-do-sync-with-org-id t)
   (setq org-mem-watch-dirs
@@ -333,20 +355,24 @@ See @uref{https://github.com/meedstrom/org-node#appendix-ii-how-to-rollback, How
 @node Quick start
 @section Quick start
 
-If you're new to these concepts@comma{} fear not.  The main things for day-to-day operation are two verbs: "find" and "insert".
+If you're new to these concepts@comma{} fear not.  The main things for day-to-day operation are two commands:
 
-Pick some short keys and try them out.
+@itemize
+@item
+@samp{org-node-find} (@samp{M-o n f})
+@itemize
+@item
+Tip: Bind this one to an extra-short key such as @samp{M-o f} -- you'll use it that much!
+@end itemize
+@item
+@samp{org-node-insert-link} (@samp{M-o n i})
+@end itemize
 
-@lisp
-(keymap-set global-map "M-s M-f" #'org-node-find)
-(keymap-set org-mode-map "M-s M-i" #'org-node-insert-link)
-@end lisp
+Tip: There's @strong{no separate command} for creating a new node!  Reuse one of the commands above@comma{} and type the name of a node that doesn't exist.  Try it and see what happens!
 
-To browse config options@comma{} type @samp{M-x customize-group RET org-node}.
+To browse config options@comma{} type @samp{M-x customize-group RET org-node RET}.
 
-Final tip: there's @strong{no separate command} for creating a new node!  Reuse one of the commands above@comma{} and type the name of a node that doesn't exist.
-
-Try it and see what happens!
+To see a list of all commands@comma{} enter an Org buffer and type @samp{M-o n <f1>}.
 
 @node Backlinks
 @chapter Backlinks
@@ -616,9 +642,10 @@ A related option is @samp{org-node-alter-candidates}@comma{} which lets you matc
 
 If you have Ripgrep installed on the computer@comma{} and @uref{https://github.com/minad/consult, Consult} installed on Emacs@comma{} you can use this command to grep across all your Org files at any time.
 
-@lisp
-(keymap-set global-map "M-s M-g" #'org-node-grep)
-@end lisp
+@itemize
+@item
+@samp{org-node-grep} (@samp{M-o n g})
+@end itemize
 
 This can be a power-tool for mass edits.  Say you want to rename some Org tag @samp{:math:} to @samp{:Math:} absolutely everywhere.  Then you could follow a procedure such as:
 
@@ -837,14 +864,16 @@ Rarer commands for org-node-backlink-mode:
 @node Experimental Node sequences
 @section Experimental: Node sequences
 
-Do you already know about "daily-notes"?  Then get started with a keybinding such as:
+Do you already know about "daily-notes"?  Then get started as follows:
 
-@lisp
-(keymap-set global-map "M-s M-s" #'org-node-seq-dispatch)
-(org-node-seq-mode)
-@end lisp
-
-and configure @samp{org-node-seq-defs}.  See @uref{https://github.com/meedstrom/org-node/wiki/Configuring-node-sequences, wiki} for premade examples.
+@enumerate
+@item
+Configure variable @samp{org-node-seq-defs}; see @uref{https://github.com/meedstrom/org-node/wiki/Configuring-node-sequences, wiki} for premade examples
+@item
+Enable @samp{(org-node-seq-mode)}
+@item
+Try the command @samp{org-node-seq-dispatch} (@samp{M-o n s})
+@end enumerate
 
 @menu
 * What are node seqs?::

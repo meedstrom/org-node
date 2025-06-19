@@ -145,12 +145,13 @@ Assuming your package manager knows about [[https://melpa.org/#/getting-started]
 #+begin_src elisp
 (use-package org-node
   :init
+  ;; Optional; note that doing this on :init loads the package.
   (keymap-set global-map "M-o n" org-node-global-prefix-map)
   (with-eval-after-load 'org-keys
     (keymap-set org-mode-map "M-o n" org-node-org-prefix-map))
   :config
   (setq org-mem-do-sync-with-org-id t) ; optional
-  (setq org-mem-watch-dirs (list "~/org")) ; optional
+  (setq org-mem-watch-dirs (list "~/org")) ; optional; configure me!
   (org-mem-updater-mode)
   (org-node-cache-mode))
 #+end_src
@@ -396,9 +397,7 @@ A related option is =org-node-alter-candidates=, which lets you match against th
 
 If you have Ripgrep installed on the computer, and [[https://github.com/minad/consult][Consult]] installed on Emacs, you can use this command to grep across all your Org files at any time.
 
-#+begin_src elisp
-(keymap-set global-map "M-s M-g" #'org-node-grep)
-#+end_src
+- =org-node-grep= (=M-o n g=)
 
 This can be a power-tool for mass edits.  Say you want to rename some Org tag =:math:= to =:Math:= absolutely everywhere.  Then you could follow a procedure such as:
 
@@ -522,14 +521,11 @@ Rarer commands for org-node-backlink-mode:
 - =org-node-backlink-fix-buffer=
 
 ** Experimental: Node sequences
-Do you already know about "daily-notes"?  Then get started with a keybinding such as:
+Do you already know about "daily-notes"?  Then get started as follows:
 
-#+begin_src elisp
-(keymap-set global-map "M-s M-s" #'org-node-seq-dispatch)
-(org-node-seq-mode)
-#+end_src
-
-and configure =org-node-seq-defs=.  See [[https://github.com/meedstrom/org-node/wiki/Configuring-node-sequences][wiki]] for premade examples.
+1. Configure variable =org-node-seq-defs=; see [[https://github.com/meedstrom/org-node/wiki/Configuring-node-sequences][wiki]] for premade examples
+2. Enable =(org-node-seq-mode)=
+3. Try the command =org-node-seq-dispatch= (=M-o n s=)
 
 *** What are node seqs?
 It's easiest to explain node sequences if we use "daily-notes" (aka "dailies") as an example.
