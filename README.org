@@ -145,8 +145,7 @@ Assuming your package manager knows about [[https://melpa.org/#/getting-started]
 #+begin_src elisp
 (use-package org-node
   :init
-  ;; Optional; note that doing this on :init loads the package.
-  (keymap-set global-map "M-o n" org-node-global-prefix-map)
+  (keymap-global-set "M-o n" org-node-global-prefix-map)
   (with-eval-after-load 'org-keys
     (keymap-set org-mode-map "M-o n" org-node-org-prefix-map))
   :config
