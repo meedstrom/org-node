@@ -1925,29 +1925,13 @@ user quits, do not apply any modifications."
   (org-node-cache-ensure)
   (let ((entry (seq-random-elt (hash-table-values org-mem--id<>entry)))
         (1arg-funs '(org-mem-active-timestamps
+                     org-mem-active-timestamps-int
                      org-mem-clocks
                      org-mem-clocks-int
                      org-mem-closed
+                     org-mem-closed-int
                      org-mem-deadline
-                     org-mem-id
-                     org-mem-level
-                     org-mem-lnum
-                     org-mem-olpath
-                     org-mem-olpath-with-self
-                     org-mem-olpath-with-file-title-with-self
-                     org-mem-olpath-with-file-title
-                     org-mem-pos
-                     org-mem-priority
-                     org-mem-properties
-                     org-mem-roam-aliases
-                     org-mem-roam-refs
-                     org-mem-scheduled
-                     org-mem-subtree-p
-                     org-mem-tags
-                     org-mem-tags-inherited
-                     org-mem-tags-local
-                     org-mem-title
-                     org-mem-title-maybe
+                     org-mem-deadline-int
                      org-mem-file
                      org-mem-file-attributes
                      org-mem-file-coding-system
@@ -1962,12 +1946,32 @@ user quits, do not apply any modifications."
                      org-mem-file-title-strict
                      org-mem-file-title-topmost
                      org-mem-file-truename
+                     org-mem-id
                      org-mem-id-links-to-entry
+                     org-mem-level
                      org-mem-links-in-entry
+                     org-mem-lnum
                      org-mem-next-entry
+                     org-mem-olpath
+                     org-mem-olpath-with-file-title
+                     org-mem-olpath-with-file-title-with-self
+                     org-mem-olpath-with-self
+                     org-mem-pos
                      org-mem-previous-entry
-                     org-mem-roam-reflinks-to-entry)))
-    (pop-to-buffer (get-buffer-create "*org-mem example*" t))
+                     org-mem-priority
+                     org-mem-properties
+                     org-mem-roam-aliases
+                     org-mem-roam-reflinks-to-entry
+                     org-mem-roam-refs
+                     org-mem-scheduled
+                     org-mem-scheduled-int
+                     org-mem-subtree-p
+                     org-mem-tags
+                     org-mem-tags-inherited
+                     org-mem-tags-local
+                     org-mem-title
+                     org-mem-title-maybe)))
+    (pop-to-buffer (get-buffer-create "*org-node example*" t))
     (emacs-lisp-mode)
     (setq-local buffer-read-only t)
     (let ((buffer-read-only nil))
