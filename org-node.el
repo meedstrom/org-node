@@ -1308,120 +1308,136 @@ The result includes NODE\\='s current file name, unfortunately required."
 
 ;;;###autoload
 (defun org-node-insert-transclusion (&optional node)
-  "Insert a #+transclude: referring to NODE."
-  (interactive () org-mode)
-  (unless (derived-mode-p 'org-mode)
-    (user-error "Only works in org-mode buffers"))
-  (org-node-cache-ensure)
-  (let* ((input (org-node-read-candidate "Transclude node content: " t))
-         (_ (when (string-blank-p input)
-              (setq input (funcall org-node-blank-input-title-generator))))
-         (node (or node (gethash input org-node--candidate<>entry)))
-         (id (if node (org-mem-id node) (org-id-new)))
-         (title (if node (org-mem-title node) input))
-         (buf (current-buffer))
-         (here (progn (back-to-indentation) (point-marker))))
-    (unless node
-      (org-node-create input id))
-    (with-current-buffer buf
-      (goto-char here)
-      (set-marker here nil)
-      (unless (eolp) (goto-char (pos-eol)) (newline-and-indent))
-      (insert "#+transclude: ")
-      (save-excursion (insert " :level " (number-to-string
-                                          (+ 1 (or (org-current-level) 0)))))
-      (insert (org-link-make-string (concat "id:" id) title))
-      (run-hooks 'org-node-insert-link-hook))))
+  "Insert a #+transclude: referring to NODE.
 
-;; TODO: Consider whether to use `org-node-custom-link-format-fn' here.
+Tip: If you often transclude file-level nodes with no initial heading,
+consider configuring `org-transclusion-exclude-elements' to exclude
+keywords."
+  (interactive "*" org-mode)
+  (org-node-cache-ensure)
+  (let (input)
+    (unless node
+      (setq input (org-node-read-candidate "Transclude node content: " t))
+      (when (string-blank-p input)
+        (setq input (funcall org-node-blank-input-title-generator)))
+      (setq node (gethash input org-node--candidate<>entry)))
+    (let ((id (if node (org-mem-id node) (org-id-new)))
+          (title (if node (org-mem-title node) input))
+          (buf (current-buffer))
+          (pt (point-marker)))
+      (unless node
+        (org-node-create title id))
+      (with-current-buffer buf
+        (goto-char pt)
+        (set-marker pt nil)
+        (org-node--safe-ensure-blank-line)
+        (insert "#+transclude: "
+                (org-link-make-string
+                 (concat "id:" id)
+                 (or (and org-node-custom-link-format-fn
+                          node
+                          (funcall org-node-custom-link-format-fn node))
+                     title)))
+        (save-excursion
+          (insert " :level " (number-to-string
+                              (+ 1 (or (org-current-level) 0)))))
+        (run-hooks 'org-node-insert-link-hook)))))
+
 ;;;###autoload
 (defun org-node-insert-transclusion-as-subtree (&optional node)
-  "Insert a link and a transclusion.
+  "Insert a subheading, link, newline and transclusion.
 Prompt for NODE if needed.
-
 Result will basically look like:
 
 ** [[Note]]
 #+transclude: [[Note]] :level 3
 
 but adapt to the surrounding outline level.
-If you often transclude file-level nodes, consider adding keywords to
-`org-transclusion-exclude-elements':
-
-\(setq org-transclusion-exclude-elements
-      \\='(property-drawer comment keyword))"
-  (interactive () org-mode)
-  (unless (derived-mode-p 'org-mode)
-    (error "Only works in org-mode buffers"))
+Tip: If you often transclude file-level nodes with no initial heading,
+consider configuring `org-transclusion-exclude-elements' to exclude
+keywords."
+  (interactive "*" org-mode)
   (org-node-cache-ensure)
-  (unless node
-    (setq node (org-node-read)))
-  (if (not node)
-      (message "Node not known, create it first")
-    (let ((id (org-mem-entry-id node))
-          (title (org-mem-entry-title node))
-          (level (or (org-current-level) 0))
-          (m1 (make-marker)))
-      (insert (org-link-make-string (concat "id:" id) title))
-      (set-marker m1 (1- (point)))
-      (duplicate-line)
-      (goto-char (pos-bol))
-      (insert (make-string (+ 1 level) ?\*) " ")
-      (forward-line 1)
-      (insert "#+transclude: ")
-      (goto-char (pos-eol))
-      (insert " :level " (number-to-string (+ 2 level)))
-      (goto-char (marker-position m1))
-      (set-marker m1 nil)
-      (run-hooks 'org-node-insert-link-hook))))
+  (when org-odd-levels-only
+    (message "This command may not work as intended with `org-odd-levels-only'"))
+  (let (input)
+    (unless node
+      (setq input (org-node-read-candidate "Transclude node content: " t))
+      (when (string-blank-p input)
+        (setq input (funcall org-node-blank-input-title-generator)))
+      (setq node (gethash input org-node--candidate<>entry)))
+    (let ((id (if node (org-mem-id node) (org-id-new)))
+          (title (if node (org-mem-title node) input))
+          (buf (current-buffer))
+          (pt (point-marker)))
+      (unless node
+        (org-node-create title id))
+      (with-current-buffer buf
+        (goto-char pt)
+        (set-marker pt nil)
+        (org-node--safe-ensure-blank-line)
+        (delete-horizontal-space)
+        (let ((link (org-link-make-string
+                     (concat "id:" id)
+                     (or (and org-node-custom-link-format-fn
+                              node
+                              (funcall org-node-custom-link-format-fn node))
+                         title)))
+              (level (or (org-current-level) 0)))
+          (insert (make-string (+ 1 level) ?\*) " " link)
+          (save-excursion
+            (newline-and-indent)
+            (insert "#+transclude: " link
+                    " :level " (number-to-string (+ 2 level))))
+          (run-hooks 'org-node-insert-link-hook))))))
 
 ;; TODO: New default once this PR is merged:
 ;; https://github.com/nobiot/org-transclusion/pull/268
 (defun org-node-insert-transclusion-as-subtree-pull268 (&optional node)
-  "Insert a link and a transclusion.
+  "Requires https://github.com/nobiot/org-transclusion/pull/268.
+Insert a subheading, link, newline and transclusion.
 Prompt for NODE if needed.
-
 Result will basically look like:
 
 ** [[Note]]
 #+transclude: [[Note]] :level :no-first-heading
 
-but adapt to the surrounding outline level.
-Requires https://github.com/nobiot/org-transclusion/pull/268
-
-If you often transclude file-level nodes, consider adding keywords to
-`org-transclusion-exclude-elements':
-
-\(setq org-transclusion-exclude-elements
-      \\='(property-drawer comment keyword))"
-  (interactive () org-mode)
-  (unless (derived-mode-p 'org-mode)
-    (error "Only works in org-mode buffers"))
+Tip: If you often transclude file-level nodes with no initial heading,
+consider configuring `org-transclusion-exclude-elements' to exclude
+keywords."
+  (interactive "*" org-mode)
   (org-node-cache-ensure)
-  (unless node
-    (setq node (org-node-read)))
-  (if (not node)
-      (message "Node not known, create it first")
-    (let ((id (org-mem-entry-id node))
-          (title (org-mem-entry-title node))
-          (level (org-current-level))
-          (link-marker (make-marker)))
-      (goto-char (pos-eol))
-      (newline)
-      (insert (org-link-make-string (concat "id:" id) title))
-      (set-marker link-marker (1- (point)))
-      (duplicate-line)
-      (goto-char (pos-bol))
-      (if level
-          (insert (make-string (+ (if org-odd-levels-only 2 1) level) ?*) " ")
-        (insert "* "))
-      (forward-line 1)
-      (insert "#+transclude: ")
-      (goto-char (pos-eol))
-      (insert " :level :no-first-heading")
-      (goto-char (marker-position link-marker))
-      (set-marker link-marker nil)
-      (run-hooks 'org-node-insert-link-hook))))
+  (let (input)
+    (unless node
+      (setq input (org-node-read-candidate "Transclude node content: " t))
+      (when (string-blank-p input)
+        (setq input (funcall org-node-blank-input-title-generator)))
+      (setq node (gethash input org-node--candidate<>entry)))
+    (let ((id (if node (org-mem-id node) (org-id-new)))
+          (title (if node (org-mem-title node) input))
+          (buf (current-buffer))
+          (pt (point-marker)))
+      (unless node
+        (org-node-create title id))
+      (with-current-buffer buf
+        (goto-char pt)
+        (set-marker pt nil)
+        (org-node--safe-ensure-blank-line)
+        (delete-horizontal-space)
+        (if-let* ((level (org-current-level)))
+            (insert (make-string (+ (if org-odd-levels-only 2 1) level) ?*) " ")
+          (insert "* "))
+        (let ((link (org-link-make-string
+                     (concat "id:" id)
+                     (or (and org-node-custom-link-format-fn
+                              node
+                              (funcall org-node-custom-link-format-fn node))
+                         title))))
+          (insert link)
+          (save-excursion
+            (newline-and-indent)
+            (insert "#+transclude: " link " :level :no-first-heading"))
+          (run-hooks 'org-node-insert-link-hook))))))
 
 (defun org-node-insert-raw-link ()
   "Insert input at point, completing to any link ever seen.
@@ -2806,6 +2822,17 @@ buffer already exists, so the buffer stays blank.  Thus this hook."
               (org-mem-updater--forget-file-contents file)
               (org-node--forget-completions-in-files file))
             (kill-buffer buf)))))))
+
+(defun org-node--safe-ensure-blank-line ()
+  "Ensure point is in a blank line without messing up text around point.
+- On a line that is only whitespace, go to end of line.
+- On any other line, add a new line below, indent it the same as the
+  current line, and place point on the end of that new line.
+
+This exists because `newline-and-indent' can have surprising effects
+around an Org bullet list."
+  (let ((col (progn (back-to-indentation) (current-indentation))))
+    (unless (eolp) (goto-char (pos-eol)) (newline) (indent-to col))))
 
 
 ;;;; Transclusion safety
