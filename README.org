@@ -144,6 +144,10 @@ Assuming your package manager knows about [[https://melpa.org/#/getting-started]
 
 #+begin_src elisp
 (use-package org-node
+  :init
+  (keymap-set global-map "M-o n" org-node-global-prefix-map)
+  (with-eval-after-load 'org-keys
+    (keymap-set org-mode-map "M-o n" org-node-org-prefix-map))
   :config
   (setq org-mem-do-sync-with-org-id t) ; optional
   (setq org-mem-watch-dirs (list "~/org")) ; optional
@@ -155,6 +159,10 @@ If you're coming here from *org-roam*, try this instead:
 
 #+begin_src elisp
 (use-package org-node
+  :init
+  (keymap-set global-map "M-o n" org-node-global-prefix-map)
+  (with-eval-after-load 'org-keys
+    (keymap-set org-mode-map "M-o n" org-node-org-prefix-map))
   :config
   (setq org-mem-do-sync-with-org-id t)
   (setq org-mem-watch-dirs
@@ -172,20 +180,17 @@ See [[https://github.com/meedstrom/org-node#appendix-ii-how-to-rollback][How to 
 
 ** Quick start
 
-If you're new to these concepts, fear not.  The main things for day-to-day operation are two verbs: "find" and "insert".
+If you're new to these concepts, fear not.  The main things for day-to-day operation are two commands:
 
-Pick some short keys and try them out.
+- =org-node-find= (=M-o n f=)
+  - Tip: Bind this one to an extra-short key such as =M-o f= -- you'll use it that much!
+- =org-node-insert-link= (=M-o n i=)
 
-#+begin_src elisp
-(keymap-set global-map "M-s M-f" #'org-node-find)
-(keymap-set org-mode-map "M-s M-i" #'org-node-insert-link)
-#+end_src
+Tip: There's *no separate command* for creating a new node!  Reuse one of the commands above, and type the name of a node that doesn't exist.  Try it and see what happens!
 
-To browse config options, type =M-x customize-group RET org-node=.
+To browse config options, type =M-x customize-group RET org-node RET=.
 
-Final tip: there's *no separate command* for creating a new node!  Reuse one of the commands above, and type the name of a node that doesn't exist.
-
-Try it and see what happens!
+To see a list of all commands, enter an Org buffer and type =M-o n <f1>=.
 
 * Backlinks
 Backlinks are the butter on the bread that is your notes.  If you've ever seen a "What links here" section on some webpage, that's exactly what it is.  Imagine seeing that, all the time.  The following sections outline two general ways to do so.

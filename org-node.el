@@ -1163,6 +1163,11 @@ Repeatable on the last key of a key sequence if
                        (org-mem-all-files)
                        nil)))))
 
+(defun org-node-customize ()
+  "Display the `org-node' customization group."
+  (interactive)
+  (customize-group 'org-node))
+
 
 ;;;; Commands 2: Inserting things
 
@@ -2323,6 +2328,49 @@ well as the members of `org-tag-persistent-alist' and `org-tag-alist'."
            (cl-loop for entry in (org-mem-all-entries)
                     append (org-mem-entry-tags entry))))
    nil nil nil 'org-tags-history))
+
+
+;;;; Keymap
+;; NOTE: Reserve "c" for a possible future capture key.
+
+(defvar-keymap org-node-global-prefix-map
+  "b" 'org-node-context-dwim ;; b for "backlinks"
+  "f" #'org-node-find
+  "g" #'org-node-grep
+  "s" 'org-node-seq-dispatch
+  "l a" #'org-node-list-feedback-arcs ; l a for "list arcs"
+  "l c" 'org-mem-list-db-contents ; l c for "list contents"
+  "l d" 'org-mem-list-dead-id-links
+  "l e" #'org-node-list-example
+  "l f" #'org-node-list-files
+  "l l" #'org-node-lint-all-files
+  "l p" 'org-mem-list-problems
+  "l r" #'org-node-list-reflinks
+  "l t" 'org-mem-list-title-collisions ; l t for "list title..."
+  "x a" #'org-node-rename-asset-and-rewrite-links
+  "x l" #'org-node-rewrite-links-ask
+  "x r" #'org-node-visit-random
+  "x o" #'org-node-customize
+  "x u" #'org-node-insert-raw-link ;; u for "URL"
+  "x x" #'org-mem-reset)
+
+(defvar-keymap org-node-org-prefix-map
+  :parent org-node-global-prefix-map
+  "d" #'org-node-insert-into-related  ;; d for "drawer".  Maybe rename command?
+  "Se" #'org-node-extract-subtree
+  "i" #'org-node-insert-link
+  "m" #'org-node-rename-file-by-title ;; m for "move"
+  "n" #'org-node-nodeify-entry
+  "w" #'org-node-refile ;; because C-c w is `org-refile'
+  "a a" #'org-node-add-alias
+  "a h" #'org-node-add-tags-here
+  "a r" #'org-node-add-refs
+  "a t" #'org-node-add-tags
+  "x b" 'org-node-backlink-fix-buffer
+  "x p" #'org-node-complete-at-point-local-mode
+  ;; "x i" #'org-node-insert-include ;; TODO. Not yet a good command.
+  "x t" #'org-node-insert-transclusion
+  "x y" #'org-node-insert-transclusion-as-subtree)
 
 
 ;;;; Gotos
