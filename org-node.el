@@ -2004,17 +2004,23 @@ user quits, do not apply any modifications."
                      org-mem-title
                      org-mem-title-maybe)))
     (pop-to-buffer (get-buffer-create "*org-node example*" t))
-    (emacs-lisp-mode)
     (setq-local buffer-read-only t)
+    (setq-local revert-buffer-function (##org-node-list-example _&*))
+    (keymap-local-set "g" #'revert-buffer-quick)
+    (keymap-local-set "q" #'quit-window)
     (let ((buffer-read-only nil))
       (erase-buffer)
-      (insert "Example data taken from random node titled \""
-              (org-mem-entry-title entry) "\"\n\n")
-      (cl-loop for func in 1arg-funs
-               do (insert "(" (symbol-name func) " NODE) => "
-                          (prin1-to-string (funcall func entry))
-                          "\n"))
-      (align-regexp (point-min) (point-max) "\\(\\s-*\\) => "))
+      (insert (with-temp-buffer
+                (delay-mode-hooks (emacs-lisp-mode))
+                (insert "Example data taken from random node titled \""
+                        (org-mem-entry-title entry) "\"\n\n")
+                (cl-loop for func in 1arg-funs
+                         do (insert "(" (symbol-name func) " NODE) => "
+                                    (prin1-to-string (funcall func entry))
+                                    "\n"))
+                (align-regexp (point-min) (point-max) "\\(\\s-*\\) => ")
+                (font-lock-ensure)
+                (buffer-string))))
     (goto-char (point-min))))
 
 (defun org-node-list-reflinks ()
