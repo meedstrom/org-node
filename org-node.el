@@ -1544,12 +1544,8 @@ creation-date as more truthful or useful than today\\='s date.
                   (remove-hook \\='org-node-relocation-hook creation-putter)))))"
   (interactive "*" org-mode)
   (org-node-cache-ensure)
-  (when (org-invisible-p)
-    (user-error "Better not run this command in an invisible region"))
   (org-back-to-heading t)
   (save-buffer)
-  (when (org-invisible-p)
-    (user-error "Better not run this command in an invisible region"))
   (let* ((tags (org-get-tags))
          (title (org-get-heading t t t t))
          (dir (org-node-guess-or-ask-dir "Extract to new file in directory: "))
@@ -1610,14 +1606,12 @@ creation-date as more truthful or useful than today\\='s date.
             (save-excursion
               (goto-char source-parent)
               (goto-char (org-entry-end-position))
-              (if (org-invisible-p)
-                  (message "Invisible area, opting not to link extracted subtree")
-                (open-line 1)
-                (insert "\n"
-                        (format-time-string
-                         (format "%s Created " (org-time-stamp-format t t)))
-                        (org-link-make-string (concat "id:" id) title)
-                        "\n")))))))
+              (open-line 1)
+              (insert "\n"
+                      (format-time-string
+                       (format "%s Created " (org-time-stamp-format t t)))
+                      (org-link-make-string (concat "id:" id) title)
+                      "\n"))))))
     (when org-node-extract-stay-in-source-buffer
       (switch-to-buffer (marker-buffer source)))
     (set-marker source-parent nil)
@@ -1635,8 +1629,6 @@ No support yet for refiling a whole file.
 
 Exiting the prompt with a blank input calls `org-node-extract-subtree'."
   (interactive "*" org-mode)
-  (when (org-invisible-p)
-    (user-error "Better not run this command in an invisible region"))
   (when (org-before-first-heading-p)
     ;; TODO: Support refiling a file.  Just implement
     ;; `org-roam-demote-entire-buffer', call it and then proceed as normal.
