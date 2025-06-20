@@ -66,7 +66,7 @@ set `org-node-backlink-protect-org-super-links' to nil.")))
   "Warn if `org-node-backlink-do-drawers' is t but properties exist.
 If a warning was not needed, return nil."
   (and org-node-backlink-do-drawers
-       (cl-some (##org-mem-entry-property "BACKLINKS" %) (org-mem-all-entries))
+       (cl-some (##org-mem-entry-property "BACKLINKS" %) (org-mem-all-id-nodes))
        (display-warning 'org-node-backlink "User option `org-node-backlink-do-drawers' is t,
 but found :BACKLINKS: lines in some property drawers, so doing nothing.
 This is a new default in v2, you probably just need to toggle it.
@@ -290,7 +290,7 @@ Argument KIND controls how to update them."
     (unless proceed
       (org-mem-reset nil "org-node: Waiting for org-mem...")
       (unless (org-mem-await "org-node: Waiting for org-mem..." 30)
-        (user-error "org-node: Waited weirdly long for org-mem"))
+        (error "org-node: Waited weirdly long for org-mem"))
       (let* ((files (org-mem-all-files))
              (dirs (org-node--root-dirs files))
              (problematic (seq-filter (##and (boundp %) (symbol-value %))
@@ -322,10 +322,9 @@ Argument KIND controls how to update them."
       (let ((find-file-hook nil)
             (buffer-list-update-hook nil)
             (enable-local-variables :safe)
-            (delay-mode-hooks t)
             (org-agenda-files nil) ;; Stop `org-mode' calling `org-agenda-files'
             (org-inhibit-startup t) ;; Don't apply startup #+options
-            (org-element-cache-persistent nil))
+            (delay-mode-hooks t))
         (fileloop-continue)))))
 
 (defun org-node-backlink--loop-operator ()
@@ -605,7 +604,6 @@ If REMOVE is non-nil, remove it instead."
 
 (defun org-node-backlink--fix-nearby-drawer (&optional remove)
   "Update nearby backlinks drawer so it reflects current reality.
-Designed for use by `org-node-backlink--fix-nearby'.
 If REMOVE non-nil, remove it instead."
   (if remove
       (org-node--delete-drawer "BACKLINKS")

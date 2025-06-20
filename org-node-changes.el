@@ -161,9 +161,10 @@ NAME, ARGLIST and BODY as in `defun'."
            (seq-find #'file-exists-p
                      (list (file-name-concat org-roam-directory "daily/")
                            (file-name-concat org-roam-directory "dailies/"))))
-      (seq-find #'file-exists-p
-                (list (file-name-concat org-directory "daily/")
-                      (file-name-concat org-directory "dailies/")))))
+      (and (require 'org)
+           (seq-find #'file-exists-p
+                     (list (file-name-concat org-directory "daily/")
+                           (file-name-concat org-directory "dailies/"))))))
 
 (org-node-changes--def-whiny-fn org-node-id-at-point ()
   "1.9.0 (November 2024)" "June 2025" "use `org-entry-get-with-inheritance' instead."
@@ -186,7 +187,7 @@ NAME, ARGLIST and BODY as in `defun'."
 (define-obsolete-variable-alias 'org-node--title<>id                   'org-mem--title<>id                 "3.0.0 (May 2025)")
 (define-obsolete-variable-alias 'org-node-before-update-tables-hook    'org-mem-pre-full-scan-functions    "3.0.0 (May 2025)")
 (define-obsolete-variable-alias 'org-node-extra-id-dirs                'org-mem-watch-dirs                 "3.0.0 (May 2025)")
-(define-obsolete-variable-alias 'org-node-extra-id-dirs-exclude        'org-mem-watch-dirs-exclude         "3.0.0 (May 2025)")
+(define-obsolete-variable-alias 'org-node-extra-id-dirs-exclude        'org-mem-exclude                    "3.0.0 (May 2025)")
 (define-obsolete-variable-alias 'org-node-link-types                   'org-mem-seek-link-types            "3.0.0 (May 2025)")
 (define-obsolete-variable-alias 'org-node-warn-title-collisions        'org-mem-do-warn-title-collisions   "3.0.0 (May 2025)")
 
@@ -230,7 +231,6 @@ NAME, ARGLIST and BODY as in `defun'."
 (define-obsolete-function-alias 'org-node-get-reflinks-to            #'org-mem-roam-reflinks-to-entry       "3.0.0 (May 2025)")
 (define-obsolete-function-alias 'org-node-get-refs                   #'org-mem-roam-refs                    "3.0.0 (May 2025)")
 (define-obsolete-function-alias 'org-node-get-scheduled              #'org-mem-scheduled                    "3.0.0 (May 2025)")
-(define-obsolete-function-alias 'org-node-get-tags                   #'org-mem-tags                         "3.0.0 (May 2025)")
 (define-obsolete-function-alias 'org-node-get-tags                   #'org-mem-tags                         "3.0.0 (May 2025)")
 (define-obsolete-function-alias 'org-node-get-tags-inherited         #'org-mem-tags-inherited               "3.0.0 (May 2025)")
 (define-obsolete-function-alias 'org-node-get-tags-local             #'org-mem-tags-local                   "3.0.0 (May 2025)")

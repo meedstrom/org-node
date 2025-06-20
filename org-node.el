@@ -1462,7 +1462,9 @@ Works in non-Org buffers."
 
 (defcustom org-node-name-of-links-drawer "RELATED"
   "Name of drawer created by command `org-node-insert-into-related'."
-  :type 'string
+  :type '(radio (const :value "RELATED")
+                (const :value "SEE-ALSO") ;; Would put as default, but too late
+                string)
   :package-version '(org-node . "3.3.3"))
 
 (defun org-node-insert-into-related ()
@@ -1681,7 +1683,8 @@ out, with any year, month or day."
                      (let ((example (format-time-string format)))
                        (if (string-match-p (rx (any "^*+([\\")) example)
                            ;; TODO: Improve error message, now it presumes caller
-                           (error "org-node: Unable to safely rename with current `org-node-file-timestamp-format'.  This is not inherent in your choice of format, I am just not smart enough")
+                           (error "org-node: Unable to safely rename with current `org-node-file-timestamp-format'.
+This is not inherent in your choice of format, I am just not smart enough")
                          (concat "^"
                                  (string-replace
                                   "." "\\."
@@ -1997,6 +2000,7 @@ user quits, do not apply any modifications."
                      org-mem-roam-refs
                      org-mem-scheduled
                      org-mem-scheduled-int
+                     ;; org-mem-stats-cookies ;; org-mem 0.17.0
                      org-mem-subtree-p
                      org-mem-tags
                      org-mem-tags-inherited
@@ -2098,8 +2102,9 @@ cut (though sometimes it suffices to reverse the direction rather
 than cut them), the remaining links in the network will
 constitute a DAG (directed acyclic graph).
 
-You may consider this as merely one of many ways to view your
-network to quality-control it."
+This is not to say that your notes /should/ constitute a DAG,
+but you may consider this as one of many ways to explore them
+for quality-control issues that can reveal themselves."
   (interactive)
   (require 'org-mem-list)
   (unless (executable-find "Rscript")
@@ -2171,6 +2176,10 @@ from ID links found in `org-mem--target<>links'."
                        collect (concat target "\t" (org-mem-link-nearby-id link)))))
     "\n")))
 
+;; TODO: Speed it up by using only the fileloop SCAN-FUNCTION, which runs
+;; in a temp buffer.  Just enable org-mode, run org-lint, then return nil so
+;; OPERATE-FUNCTION is never called.  Just remember to kill the " *next-file*"
+;; buffer as cleanup at the end of the loop.
 (defvar org-node--unlinted nil)
 (defvar org-node--lint-current nil)
 (defvar org-node--lint-operator nil)
@@ -2202,8 +2211,7 @@ from ID links found in `org-mem--target<>links'."
                   (enable-local-variables :safe)
                   (delay-mode-hooks t)
                   (org-agenda-files nil)
-                  (org-inhibit-startup t)
-                  (org-element-cache-persistent nil))
+                  (org-inhibit-startup t))
               (fileloop-continue))))
       (quit)))
 
