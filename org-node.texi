@@ -278,22 +278,22 @@ A comparison of three systems that all permit relying on org-id and don't lock y
 
 The original reason that org-node exists.
 
-@multitable {aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa} {aaaaaaaa} {aaaaaaaaa}
+@multitable {aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa} {aaaaaaaa} {aaaaaaaa}
 @headitem 
 @tab org-roam
 @tab org-node
-@item @strong{Time to cache my 3000 nodes}
-@tab @strong{2m 48s}
-@tab @strong{0m 02s}
-@item @strong{Time to save file w/ 400 nodes}
-@tab @strong{5--10s}
-@tab @strong{instant}
-@item @strong{Time to display 20 backlinks}
-@tab @strong{5--10s}
-@tab @strong{instant}
-@item @strong{Time to open minibuffer}
-@tab @strong{1--3s}
-@tab @strong{instant}
+@item Time to cache my 3000 nodes
+@tab 2m 48s
+@tab 0m 02s
+@item Time to save file w/ 400 nodes
+@tab 5--10s
+@tab instant
+@item Time to display 20 backlinks
+@tab 5--10s
+@tab instant
+@item Time to open minibuffer
+@tab 1--3s
+@tab instant
 @end multitable
 
 @node Setup
@@ -405,15 +405,12 @@ You can use the org-roam buffer without the rest of org-roam.  Enable:
 
 Org-node ships a complete rewrite of the org-roam buffer.
 
-Add to initfiles:
+Try the command @samp{org-node-context-dwim} (@samp{M-o n b}).
+
+If you'd like it to keep itself updated@comma{} reflecting where point is at all times@comma{} add to initfiles:
 
 @lisp
-(org-node-context-follow-mode) ;; optional behavior
-
-;; Example keybindings
-(keymap-set org-mode-map "M-s M-t" #'org-node-context-toggle)
-;; if your window mgmt style is constantly lose all windows
-(keymap-set global-map "M-s M-r" #'org-node-context-raise)
+(org-node-context-follow-mode)
 @end lisp
 
 @node Backlink solution 2 Print inside the file
@@ -423,9 +420,7 @@ I rarely have the screen space to display a backlink buffer.  Because it needs m
 
 A complementary solution@comma{} which can also stand alone@comma{} is to have the backlinks @emph{written into} the file@comma{} on an Org property line or in a drawer.
 
-NOTE: To be clear@comma{} this mode never generates new IDs.  That's your own business.  This only adds/edits @samp{:BACKLINKS:} properties.
-
-It's the same you observe in the backlink buffers from earlier: @strong{not all links create a backlink@comma{}} only links located in an entry that has or inherits an ID@.  After all@comma{} there must be something to link back to.
+NOTE: To be clear@comma{} this mode never generates new IDs.  That's your own business.  This only adds/edits @samp{:BACKLINKS:} properties -- and only if the origin has or inherits an ID@.
 
 @menu
 * Option 2A Automatic @samp{BACKLINKS} property::

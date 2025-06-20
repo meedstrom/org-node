@@ -130,12 +130,12 @@ A comparison of three systems that all permit relying on org-id and don't lock y
 
 The original reason that org-node exists.
 
-|                                  | org-roam | org-node  |
-|----------------------------------+----------+-----------|
-| *Time to cache my 3000 nodes*    | *2m 48s* | *0m 02s*  |
-| *Time to save file w/ 400 nodes* | *5--10s* | *instant* |
-| *Time to display 20 backlinks*   | *5--10s* | *instant* |
-| *Time to open minibuffer*        | *1--3s*  | *instant* |
+|                                 | org-roam | org-node |
+|---------------------------------+----------+----------|
+| Time to cache my 3000 nodes     | 2m 48s   | 0m 02s   |
+| Time to save file w/ 400 nodes  | 5--10s   | instant  |
+| Time to display 20 backlinks    | 5--10s   | instant  |
+| Time to open minibuffer         | 1--3s    | instant  |
 
 * Setup
 ** Install
@@ -208,15 +208,12 @@ You can use the org-roam buffer without the rest of org-roam.  Enable:
 
 Org-node ships a complete rewrite of the org-roam buffer.
 
-Add to initfiles:
+Try the command =org-node-context-dwim= (=M-o n b=).
+
+If you'd like it to keep itself updated, reflecting where point is at all times, add to initfiles:
 
 #+begin_src elisp
-(org-node-context-follow-mode) ;; optional behavior
-
-;; Example keybindings
-(keymap-set org-mode-map "M-s M-t" #'org-node-context-toggle)
-;; if your window mgmt style is constantly lose all windows
-(keymap-set global-map "M-s M-r" #'org-node-context-raise)
+(org-node-context-follow-mode)
 #+end_src
 
 ** Backlink solution 2: Print inside the file
@@ -224,9 +221,7 @@ I rarely have the screen space to display a backlink buffer.  Because it needs m
 
 A complementary solution, which can also stand alone, is to have the backlinks /written into/ the file, on an Org property line or in a drawer.
 
-NOTE: To be clear, this mode never generates new IDs.  That's your own business.  This only adds/edits =:BACKLINKS:= properties.
-
-It's the same you observe in the backlink buffers from earlier: *not all links create a backlink,* only links located in an entry that has or inherits an ID.  After all, there must be something to link back to.
+NOTE: To be clear, this mode never generates new IDs.  That's your own business.  This only adds/edits =:BACKLINKS:= properties -- and only if the origin has or inherits an ID.
 
 *** Option 2A: Automatic =:BACKLINKS:= property
 
