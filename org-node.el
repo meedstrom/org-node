@@ -530,19 +530,19 @@ STR, PRED and ACTION as in `org-node-collection-basic'."
 (defun org-node--affixate (collection)
   "From flat list COLLECTION, make alist ((TITLE PREFIX SUFFIX) ...)."
   (and collection
-       (nconc
-        (if (string-blank-p (car collection))
-            (list (list (car collection) "" (or org-node-blank-input-hint "")))
-          (if org-node-alter-candidates
-              (list (list (car collection) "" ""))
-            (list (or (gethash (car collection) org-node--title<>affixations)
-                      (list (car collection) "" "")))))
-        (if org-node-alter-candidates
-            (cl-loop for full-candidate in (cdr collection)
-                     collect (list full-candidate "" ""))
-          (cl-loop for title in (cdr collection)
-                   collect (or (gethash title org-node--title<>affixations)
-                               (list title "" "")))))))
+       (if (string-blank-p (car collection))
+           (cons
+            (list (car collection) "" (or org-node-blank-input-hint ""))
+            (if org-node-alter-candidates
+                (cl-loop for altered-candidate in (cdr collection)
+                         collect (list altered-candidate "" ""))
+              (cl-loop for title in (cdr collection)
+                       collect (gethash title org-node--title<>affixations))))
+         (if org-node-alter-candidates
+             (cl-loop for altered-candidate in collection
+                      collect (list altered-candidate "" ""))
+           (cl-loop for title in collection
+                    collect (gethash title org-node--title<>affixations))))))
 
 (defvar org-node-hist nil
   "Minibuffer history.")
