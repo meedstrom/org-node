@@ -1608,44 +1608,35 @@ creation-date as more truthful or useful than today\\='s date.
 ;;;###autoload
 (defun org-node-refile ()
   "Prompt for a node and refile subtree at point into it.
-No support yet for refiling a file-level node.
+No support yet for refiling a whole file.
 
-Exiting the prompt with a blank input means hand off to
-`org-node-extract-subtree'."
+Exiting the prompt with a blank input calls `org-node-extract-subtree'."
   (interactive "*" org-mode)
-  (unless (derived-mode-p 'org-mode)
-    (user-error "This command expects an org-mode buffer"))
   (when (org-invisible-p)
     (user-error "Better not run this command in an invisible region"))
-  (if (org-before-first-heading-p)
-      ;; TODO: Support refiling a file.  Just implement
-      ;; `org-roam-demote-entire-buffer', use it and then proceed as normal.
-      (message "`org-node-refile' only works on subtrees for now")
-    (org-node-cache-ensure)
-    (let* ((org-node-blank-input-hint
-            (propertize "(extract to own file)"
-                        'face 'completions-annotations))
-           (input (org-node-read-candidate "Refile into ID-node: " t))
-           (origin-buffer (current-buffer))
-           node)
-      (if (string-blank-p input)
-          (org-node-extract-subtree)
-        (setq node (gethash input org-node--candidate<>entry))
-        (unless node
-          (error "Node not found: %s" input))
-        (org-cut-subtree)
-        (condition-case err
-            (org-node--goto node t)
-          ((t error)
-           ;; Try to undo the cut
-           (switch-to-buffer origin-buffer)
-           (org-paste-subtree)
-           (signal (car err) (cdr err)))
-          (:success
-           (widen)
-           (forward-char)
-           (org-paste-subtree)
-           (run-hooks 'org-node-relocation-hook)))))))
+  (when (org-before-first-heading-p)
+    ;; TODO: Support refiling a file.  Just implement
+    ;; `org-roam-demote-entire-buffer', call it and then proceed as normal.
+    ;; Then prompt to delete empty file left behind.
+    (user-error "`org-node-refile' only works on subtrees for now"))
+  (org-node-cache-ensure)
+  (let* ((org-node-blank-input-hint
+          (propertize "(extract to own file)" 'face 'completions-annotations))
+         (input (org-node-read-candidate "Refile into ID-node: " t)))
+    (if (string-blank-p input)
+        (org-node-extract-subtree)
+      (let ((node (or (gethash input org-node--candidate<>entry)
+                      (error "Node not found: %s" input)))
+            (source (point-marker)))
+        (org-node--goto node t) ;; NOTE: May or may not change current buffer
+        (forward-char)
+        (save-excursion
+          (with-current-buffer (marker-buffer source)
+            (goto-char source)
+            (set-marker source nil)
+            (org-cut-subtree)))
+        (org-paste-subtree)
+        (run-hooks 'org-node-relocation-hook)))))
 
 
 ;;;; Commands 4: Renaming things
