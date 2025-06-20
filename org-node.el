@@ -622,8 +622,9 @@ BLANK-OK means to obey `org-node-blank-input-hint'."
   "Remove the minibuffer completions for all nodes in FILES."
   (when files
     (maphash (lambda (candidate entry)
-               (when (member (org-mem-entry-file-truename entry) files)
-                 (remhash candidate org-node--candidate<>entry)))
+               (when (member (org-mem-file-truename entry) files)
+                 (remhash candidate org-node--candidate<>entry)
+                 (remhash (org-mem-title entry) org-node--title<>affixations)))
              org-node--candidate<>entry)))
 
 ;;;###autoload
