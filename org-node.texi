@@ -549,7 +549,7 @@ With that done@comma{} you can optionally configure the everyday commands @samp{
 (setq org-node-creation-fn #'org-capture)
 @end lisp
 
-That last optional functionality may be confusing if I describe it -- better you give it a spin and see if you like.
+That last optional functionality may only confuse you more if I try to describe it in words -- better you give it a spin and see if you like.
 
 @node Exclude uninteresting nodes
 @section Exclude uninteresting nodes
@@ -562,8 +562,8 @@ This could work by---for example---excluding anything tagged "project" or perhap
 (setq org-node-filter-fn
       (lambda (node)
         (not
-         (or (org-mem-entry-todo-state node)
-             (member "project" (org-mem-entry-tags node))))))
+         (or (org-mem-todo-state node)
+             (member "project" (org-mem-tags node))))))
 @end lisp
 
 Or you could go with a whitelist approach@comma{} to show only nodes from a certain directory we'll call "my-personal-wiki":
@@ -571,7 +571,7 @@ Or you could go with a whitelist approach@comma{} to show only nodes from a cert
 @lisp
 (setq org-node-filter-fn
       (lambda (node)
-        (string-search "/my-personal-wiki/" (org-mem-entry-file node))))
+        (string-search "/my-personal-wiki/" (org-mem-file node))))
 @end lisp
 
 @menu
@@ -581,12 +581,13 @@ Or you could go with a whitelist approach@comma{} to show only nodes from a cert
 @node Limitation @samp{ROAM_EXCLUDE}
 @subsection Limitation: @samp{ROAM_EXCLUDE}
 
-Let's say you have a big archive file@comma{} fulla IDs@comma{} and you want all the nodes within out of sight.
+The default value of @samp{org-node-filter-fn} is @samp{org-node-filter-no-roam-exclude-p}.
 
-Putting a @samp{:ROAM_EXCLUDE: t} at the top won't do it@comma{} because unlike in org-roam@comma{} @strong{child ID nodes of an excluded node are not excluded!}  The default value of org-node-filter-fn is @samp{org-node-filter-no-roam-exclude-p}@comma{}
-but it applies to each node in isolation.
+But let's say you have a big archive file@comma{} fulla IDs@comma{} and you want all the nodes within out of sight.
 
-However@comma{} nodes in isolation do still have inherited tags.  So you can exploit that@comma{} or the outline path or file name.
+Putting a @samp{:ROAM_EXCLUDE: t} property at the top of that file won't do it@comma{} because unlike in org-roam@comma{} @strong{child ID nodes of an excluded node are not excluded!}
+
+However@comma{} nodes in isolation do still have information about inherited tags.  So you can exploit that@comma{} or the outline path or even the file name.
 
 It works well for me to filter out any file or directory that happens to contain "archive" in the name:
 
@@ -596,7 +597,7 @@ It works well for me to filter out any file or directory that happens to contain
         (not (string-search "archive" (org-mem-file node)))))
 @end lisp
 
-Or put something like @samp{#+filetags: :hide_node:} at the top of each file@comma{} and set:
+Or put something like @samp{#+filetags: :hide_node:} at the top of each file you want to exclude@comma{} and set:
 
 @lisp
 (setq org-node-filter-fn
@@ -692,7 +693,7 @@ Anyway@dots{} there's a workaround.  Assuming you leave @samp{org-node-affixatio
 
 This lets you match against the node outline path and not only the title@comma{} which resolves most conflicts given that the most likely source of conflict is subheadings in disparate files@comma{} that happen to be named the same.
 
-NB: for users of @samp{org-node-complete-at-point-mode}@comma{} this workaround won't help those completions.  With some luck you'll rarely insert the wrong link@comma{} but it's worth being aware. (@uref{https://github.com/meedstrom/org-node/issues/62, #62})
+NB: for users of @samp{org-node-complete-at-point-mode}@comma{} this workaround won't help those completions.  With some luck you'll link to the wrong one of two homonymous nodes@comma{} but it's worth being aware. (@uref{https://github.com/meedstrom/org-node/issues/62, #62})
 
 @node Limitation Org-ref
 @section Limitation: Org-ref
@@ -716,6 +717,8 @@ Contribute to @uref{https://github.com/meedstrom/org-mem, org-mem}@comma{} see f
 @node Toolbox
 @section Toolbox
 
+(Note that you can view this same list of commands in Emacs.  Assuming that @samp{M-o n} was where you bound @samp{org-node-org-prefix-map}@comma{} type @samp{M-o n <f1>}.)
+
 Basic commands:
 
 @itemize
@@ -732,14 +735,12 @@ Basic commands:
 @item
 @samp{org-node-visit-random}
 @item
-@samp{org-node-context-raise}
-@item
-@samp{org-node-context-toggle}
+@samp{org-node-context-dwim}
 @item
 @samp{org-node-refile}
 @itemize
 @item
-Does two technically different things: either move a subtree into  some node it prompts you for@comma{} or if you press RET with no input@comma{} extract the subtree into a new file (similarly to @samp{org-roam-extract-subtree})
+Does two technically different things: either move a subtree into some node it prompts you for@comma{} or if you press RET with no input@comma{} extract the subtree into a new file (similarly to @samp{org-roam-extract-subtree})
 @end itemize
 @item
 @samp{org-node-seq-dispatch}
@@ -751,13 +752,7 @@ Browse node series -- see README
 @samp{org-node-nodeify-entry}
 @itemize
 @item
-(Trivial) Give an ID to the subtree at point@comma{} and run the hook @samp{org-node-creation-hook}
-@end itemize
-@item
-@samp{org-node-insert-heading}
-@itemize
-@item
-(Trivial) Shortcut for @samp{org-insert-heading} + @samp{org-node-nodeify-entry}
+Give an ID to the entry at point@comma{} and run the hook @samp{org-node-creation-hook}
 @end itemize
 @item
 @samp{org-node-grep}
@@ -1002,31 +997,31 @@ With @uref{https://github.com/quelpa/quelpa, Quelpa}:
 With @uref{https://github.com/slotThe/vc-use-package, vc-use-package} on Emacs 29:
 @lisp
 (use-package org-node
-  :vc (:fetcher github :repo "meedstrom/org-node"
-       :branch "v1.6"))
+  :vc ( :fetcher github :repo "meedstrom/org-node"
+        :branch "v1.6"))
 @end lisp
 
 With built-in @samp{:vc} on Emacs 30+ (but note default value of @samp{use-package-vc-prefer-newest} means you never update@comma{} since it is not aware of Git tags):
 @lisp
 (use-package org-node
-  :vc (:url "https://github.com/meedstrom/org-node"
-       :branch "v1.6"))
+  :vc ( :url "https://github.com/meedstrom/org-node"
+        :branch "v1.6"))
 @end lisp
 
 With @uref{https://github.com/progfolio/elpaca, Elpaca} as follows.  Note that recipe changes only take effect after you do @samp{M-x elpaca-delete} and it re-clones -- the idea is that Elpaca users will prefer to do it manually.
 
 @lisp
 (use-package org-node
-  :ensure (:fetcher github :repo "meedstrom/org-node"
-           :branch "v1.6"))
+  :ensure ( :fetcher github :repo "meedstrom/org-node"
+            :branch "v1.6"))
 @end lisp
 
 @dots{}Elpaca can also target an exact version tag.  Package manager of the future@comma{} it is:
 
 @lisp
 (use-package org-node
-  :ensure (:fetcher github :repo "meedstrom/org-node"
-           :tag "1.6.2"))
+  :ensure ( :fetcher github :repo "meedstrom/org-node"
+            :tag "1.6.2"))
 @end lisp
 
 With @uref{https://github.com/radian-software/straight.el, Straight}:

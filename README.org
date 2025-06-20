@@ -316,7 +316,7 @@ With that done, you can optionally configure the everyday commands =org-node-fin
 (setq org-node-creation-fn #'org-capture)
 #+end_src
 
-That last optional functionality may be confusing if I describe it -- better you give it a spin and see if you like.
+That last optional functionality may only confuse you more if I try to describe it in words -- better you give it a spin and see if you like.
 
 ** Exclude uninteresting nodes
 
@@ -328,8 +328,8 @@ This could work by---for example---excluding anything tagged "project" or perhap
 (setq org-node-filter-fn
       (lambda (node)
         (not
-         (or (org-mem-entry-todo-state node)
-             (member "project" (org-mem-entry-tags node))))))
+         (or (org-mem-todo-state node)
+             (member "project" (org-mem-tags node))))))
 #+end_src
 
 Or you could go with a whitelist approach, to show only nodes from a certain directory we'll call "my-personal-wiki":
@@ -337,17 +337,18 @@ Or you could go with a whitelist approach, to show only nodes from a certain dir
 #+begin_src elisp
 (setq org-node-filter-fn
       (lambda (node)
-        (string-search "/my-personal-wiki/" (org-mem-entry-file node))))
+        (string-search "/my-personal-wiki/" (org-mem-file node))))
 #+end_src
 
 *** Limitation: =ROAM_EXCLUDE=
 
-Let's say you have a big archive file, fulla IDs, and you want all the nodes within out of sight.
+The default value of =org-node-filter-fn= is =org-node-filter-no-roam-exclude-p=.
 
-Putting a =:ROAM_EXCLUDE: t= at the top won't do it, because unlike in org-roam, *child ID nodes of an excluded node are not excluded!*  The default value of org-node-filter-fn is =org-node-filter-no-roam-exclude-p=,
-but it applies to each node in isolation.
+But let's say you have a big archive file, fulla IDs, and you want all the nodes within out of sight.
 
-However, nodes in isolation do still have inherited tags.  So you can exploit that, or the outline path or file name.
+Putting a =:ROAM_EXCLUDE: t= property at the top of that file won't do it, because unlike in org-roam, *child ID nodes of an excluded node are not excluded!*
+
+However, nodes in isolation do still have information about inherited tags.  So you can exploit that, or the outline path or even the file name.
 
 It works well for me to filter out any file or directory that happens to contain "archive" in the name:
 
@@ -357,7 +358,7 @@ It works well for me to filter out any file or directory that happens to contain
         (not (string-search "archive" (org-mem-file node)))))
 #+end_src
 
-Or put something like =#+filetags: :hide_node:= at the top of each file, and set:
+Or put something like =#+filetags: :hide_node:= at the top of each file you want to exclude, and set:
 
 #+begin_src elisp
 (setq org-node-filter-fn
@@ -432,7 +433,7 @@ Anyway... there's a workaround.  Assuming you leave =org-node-affixation-fn= at 
 
 This lets you match against the node outline path and not only the title, which resolves most conflicts given that the most likely source of conflict is subheadings in disparate files, that happen to be named the same.
 
-NB: for users of =org-node-complete-at-point-mode=, this workaround won't help those completions.  With some luck you'll rarely insert the wrong link, but it's worth being aware. ([[https://github.com/meedstrom/org-node/issues/62][#62]])
+NB: for users of =org-node-complete-at-point-mode=, this workaround won't help those completions.  With some luck you'll link to the wrong one of two homonymous nodes, but it's worth being aware. ([[https://github.com/meedstrom/org-node/issues/62][#62]])
 
 ** Limitation: Org-ref
 
@@ -450,6 +451,8 @@ If you need more of Org-ref, you have at least two options:
 
 ** Toolbox
 
+(Note that you can view this same list of commands in Emacs.  Assuming that =M-o n= was where you bound =org-node-org-prefix-map=, type =M-o n <f1>=.)
+
 Basic commands:
 
 - =org-node-find=
@@ -458,16 +461,13 @@ Basic commands:
 - =org-node-insert-transclusion=
 - =org-node-insert-transclusion-as-subtree=
 - =org-node-visit-random=
-- =org-node-context-raise=
-- =org-node-context-toggle=
+- =org-node-context-dwim=
 - =org-node-refile=
-  - Does two technically different things: either move a subtree into  some node it prompts you for, or if you press RET with no input, extract the subtree into a new file (similarly to =org-roam-extract-subtree=)
+  - Does two technically different things: either move a subtree into some node it prompts you for, or if you press RET with no input, extract the subtree into a new file (similarly to =org-roam-extract-subtree=)
 - =org-node-seq-dispatch=
   - Browse node series -- see README
 - =org-node-nodeify-entry=
-  - (Trivial) Give an ID to the subtree at point, and run the hook =org-node-creation-hook=
-- =org-node-insert-heading=
-  - (Trivial) Shortcut for =org-insert-heading= + =org-node-nodeify-entry=
+  - Give an ID to the entry at point, and run the hook =org-node-creation-hook=
 - =org-node-grep=
   - (Requires [[https://github.com/minad/consult][consult]]) Grep across all known Org files.
 
@@ -579,31 +579,31 @@ With [[https://github.com/quelpa/quelpa][Quelpa]]:
 With [[https://github.com/slotThe/vc-use-package][vc-use-package]] on Emacs 29:
 #+begin_src elisp
 (use-package org-node
-  :vc (:fetcher github :repo "meedstrom/org-node"
-       :branch "v1.6"))
+  :vc ( :fetcher github :repo "meedstrom/org-node"
+        :branch "v1.6"))
 #+end_src
 
 With built-in =:vc= on Emacs 30+ (but note default value of =use-package-vc-prefer-newest= means you never update, since it is not aware of Git tags):
 #+begin_src elisp
 (use-package org-node
-  :vc (:url "https://github.com/meedstrom/org-node"
-       :branch "v1.6"))
+  :vc ( :url "https://github.com/meedstrom/org-node"
+        :branch "v1.6"))
 #+end_src
 
 With [[https://github.com/progfolio/elpaca][Elpaca]] as follows.  Note that recipe changes only take effect after you do =M-x elpaca-delete= and it re-clones -- the idea is that Elpaca users will prefer to do it manually.
 
 #+begin_src elisp
 (use-package org-node
-  :ensure (:fetcher github :repo "meedstrom/org-node"
-           :branch "v1.6"))
+  :ensure ( :fetcher github :repo "meedstrom/org-node"
+            :branch "v1.6"))
 #+end_src
 
 ...Elpaca can also target an exact version tag.  Package manager of the future, it is:
 
 #+begin_src elisp
 (use-package org-node
-  :ensure (:fetcher github :repo "meedstrom/org-node"
-           :tag "1.6.2"))
+  :ensure ( :fetcher github :repo "meedstrom/org-node"
+            :tag "1.6.2"))
 #+end_src
 
 With [[https://github.com/radian-software/straight.el][Straight]]:
