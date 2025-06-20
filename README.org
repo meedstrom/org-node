@@ -447,7 +447,7 @@ If you need more of Org-ref, you have at least two options:
 
 - Use org-roam - see discussions on boosting its performance [[https://org-roam.discourse.group/t/rewriting-org-roam-node-list-for-speed-it-is-not-sqlite/3475/92][here]] and [[https://org-roam.discourse.group/t/improving-performance-of-node-find-et-al/3326/33][here]]
 
-- Contribute to [[https://github.com/meedstrom/org-mem][org-mem]], see function =org-mem-parser--collect-links-until=.
+- Contribute to [[https://github.com/meedstrom/org-mem][org-mem]], see function =org-mem-parser--scan-text-until=.
 
 ** Toolbox
 

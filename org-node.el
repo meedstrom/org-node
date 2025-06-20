@@ -1440,8 +1440,14 @@ keywords."
             (insert "#+transclude: " link " :level :no-first-heading"))
           (run-hooks 'org-node-insert-link-hook))))))
 
+(defun org-node--safe-ensure-blank-line ()
+  "Ensure point is in a blank line or a new blank line below current.
+Place point after any indentation."
+  (let ((col (progn (back-to-indentation) (current-indentation))))
+    (unless (eolp) (goto-char (pos-eol)) (newline) (indent-to col))))
+
 (defun org-node-insert-raw-link ()
-  "Insert input at point, completing to any link ever seen.
+  "Insert input at point, completing to any link ever seen in Org.
 Works in non-Org buffers."
   (interactive)
   (insert (completing-read "Insert raw link: "
@@ -2854,17 +2860,6 @@ buffer already exists, so the buffer stays blank.  Thus this hook."
               (org-mem-updater--forget-file-contents file)
               (org-node--forget-completions-in-files file))
             (kill-buffer buf)))))))
-
-(defun org-node--safe-ensure-blank-line ()
-  "Ensure point is in a blank line without messing up text around point.
-- On a line that is only whitespace, go to end of line.
-- On any other line, add a new line below, indent it the same as the
-  current line, and place point on the end of that new line.
-
-This exists because `newline-and-indent' can have surprising effects
-around an Org bullet list."
-  (let ((col (progn (back-to-indentation) (current-indentation))))
-    (unless (eolp) (goto-char (pos-eol)) (newline) (indent-to col))))
 
 
 ;;;; Transclusion safety
