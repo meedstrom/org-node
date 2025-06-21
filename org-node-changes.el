@@ -201,7 +201,7 @@ NAME, ARGLIST and BODY as in `defun'."
 (require 'org-mem-updater)
 
 (if (or (not (boundp 'org-mem--bump-int))
-        (< org-mem--bump-int 7))
+        (< org-mem--bump-int 9))
     (display-warning 'org-node "Update org-mem to use this version of org-node"))
 
 (define-obsolete-function-alias 'org-node--dir-files-recursively     #'org-mem--dir-files-recursive         "3.0.0 (May 2025)")
