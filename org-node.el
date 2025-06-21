@@ -2468,37 +2468,36 @@ EXACT means always move point to NODE top."
   (unless node
     (error "Function org-node--goto received a nil argument"))
   (let ((file (org-mem-file-truename node)))
-    (if (file-exists-p file)
-        (progn
-          (when (not (file-readable-p file))
-            (error "org-node: Couldn't visit unreadable file %s" file))
-          (find-file file)
-          (widen)
-          (org-node--assert-transclusion-safe)
-          ;; Search for the ID rather than naively using
-          ;; (goto-char (org-mem-pos node)), so that it will find the
-          ;; correct place even in a buffer with unsaved modifications.
-          (let* ((id (org-mem-id node))
-                 (pos (and id (org-find-property "ID" id))))
-            (unless pos
-              (error "Could not find ID \"%s\" in buffer %s" id (current-buffer)))
-            (when (eq pos (point))
-              (org-node-full-end-of-meta-data))
-            ;; Point may already be at a desirable position due to any of:
-            ;; - the above
-            ;; - save-place
-            ;; - a buffer was already visiting the file
-            ;; Leave it there if sensible, otherwise move to exact position.
-            (when (or exact
-                      (not (equal id (org-entry-get nil "ID")))
-                      (not (pos-visible-in-window-p pos))
-                      (org-invisible-p pos))
-              (goto-char pos)
-              (when (org-mem-subtree-p node)
-                (org-fold-show-entry)
-                (org-fold-show-children)
-                (recenter 0)))))
-      (org-mem-reset t "org-node: Didn't find file, resetting..."))))
+    (if (not (file-exists-p file))
+        (org-mem-reset t "org-node: Didn't find file, resetting...")
+      (when (not (file-readable-p file))
+        (error "org-node: Couldn't visit unreadable file %s" file))
+      (find-file file)
+      (widen)
+      (org-node--assert-transclusion-safe)
+      ;; Search for the ID rather than naively using
+      ;; (goto-char (org-mem-pos node)), so that it will find the
+      ;; correct place even in a buffer with unsaved modifications.
+      (let* ((id (org-mem-id node))
+             (pos (and id (org-find-property "ID" id))))
+        (unless pos
+          (error "Could not find ID \"%s\" in buffer %s" id (current-buffer)))
+        (when (eq pos (point))
+          (org-node-full-end-of-meta-data))
+        ;; Point may already be at a desirable position due to any of:
+        ;; - the above
+        ;; - save-place
+        ;; - a buffer was already visiting the file
+        ;; Leave it there if sensible, otherwise move to exact position.
+        (when (or exact
+                  (not (equal id (org-entry-get nil "ID")))
+                  (not (pos-visible-in-window-p pos))
+                  (org-invisible-p pos))
+          (goto-char pos)
+          (when (org-mem-subtree-p node)
+            (org-fold-show-entry)
+            (org-fold-show-children)
+            (recenter 0)))))))
 
 (defun org-node-goto-new-drawer-site ()
   "Go to just after properties drawer.
