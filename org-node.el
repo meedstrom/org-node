@@ -171,6 +171,49 @@ Then remind the user to run \\[org-mem-reset]."
        "Remember to run M-x org-mem-reset after configuring %S" sym)))
   (custom-set-default sym val))
 
+(defcustom org-node-blank-input-hint
+  (propertize "(untitled node)" 'face 'completions-annotations)
+  "Whether to add an empty completion candidate to some commands.
+It helps indicate that a blank input can be used there to
+create an untitled node.
+
+If non-nil, the value is actually the annotation added to it, a
+propertized string."
+  :type '(choice string (const nil))
+  :package-version '(org-node . "3.3.0"))
+
+;; Perhaps it would be handy if the blank input could do smart things like
+;; create a daily-note, but it was not obvious how to shoehorn that into the
+;; system we already have.  This was what we could easily do.
+(defcustom org-node-blank-input-title-generator #'org-node-titlegen-untitled
+  "Function to generate a title, given no user input.
+Used in some commands when exiting minibuffer with a blank string."
+  :type '(radio (function-item org-node-titlegen-untitled)
+                (function-item org-node-titlegen-today)
+                (function-item org-node-titlegen-this-week)
+                (function :tag "Custom function" :value (lambda ())))
+  :package-version '(org-node . "3.3.12"))
+
+;; TODO: If using org-capture as creation-fn, can we design a template to
+;;       capture into a child of another entry rather than a new file?
+(defvar org-node-untitled-format "untitled-%d")
+(defvar org-node--untitled-ctr 0)
+(defun org-node-titlegen-untitled ()
+  "Combine `org-node-untitled-format' with a new integer on every call."
+  (cl-loop do (cl-incf org-node--untitled-ctr)
+           as title = (format org-node-untitled-format org-node--untitled-ctr)
+           while (or (gethash title org-node--title<>affixations)
+                     (file-exists-p (org-node-title-to-filename-quiet title)))
+           finally return title))
+
+(defun org-node-titlegen-today ()
+  "Make a node title for the day\\='s date."
+  (format-time-string "Assorted for %A, %d %b %Y"))
+
+(defun org-node-titlegen-this-week ()
+  "Make a node title for the current ISO8601 week."
+  (format-time-string "Assorted for Week %V, %G"))
+
 
 ;;;; Filter
 
@@ -369,49 +412,6 @@ aliases."
                                               (fringe-columns 'left)))
                                     ?\s)
                        tags)))))))
-
-(defcustom org-node-blank-input-hint
-  (propertize "(untitled node)" 'face 'completions-annotations)
-  "Whether to add an empty completion candidate to some commands.
-It helps indicate that a blank input can be used there to
-create an untitled node.
-
-If non-nil, the value is actually the annotation added to it, a
-propertized string."
-  :type '(choice string (const nil))
-  :package-version '(org-node . "3.3.0"))
-
-;; Perhaps it would be handy if the blank input could do smart things like
-;; create a daily-note, but it was not obvious how to shoehorn that into the
-;; system we already have.  This was what we could easily do.
-(defcustom org-node-blank-input-title-generator #'org-node-titlegen-untitled
-  "Function to generate a title, given no user input.
-Used in some commands when exiting minibuffer with a blank string."
-  :type '(radio (function-item org-node-titlegen-untitled)
-                (function-item org-node-titlegen-today)
-                (function-item org-node-titlegen-this-week)
-                (function :tag "Custom function" :value (lambda ())))
-  :package-version '(org-node . "3.3.12"))
-
-;; TODO: If using org-capture as creation-fn, can we design a template to
-;;       capture into a child of another entry rather than a new file?
-(defvar org-node-untitled-format "untitled-%d")
-(defvar org-node--untitled-ctr 0)
-(defun org-node-titlegen-untitled ()
-  "Combine `org-node-untitled-format' with a new integer on every call."
-  (cl-loop do (cl-incf org-node--untitled-ctr)
-           as title = (format org-node-untitled-format org-node--untitled-ctr)
-           while (or (gethash title org-node--title<>affixations)
-                     (file-exists-p (org-node-title-to-filename-quiet title)))
-           finally return title))
-
-(defun org-node-titlegen-today ()
-  "Make a node title for the day\\='s date."
-  (format-time-string "Assorted for %A, %d %b %Y"))
-
-(defun org-node-titlegen-this-week ()
-  "Make a node title for the current ISO8601 week."
-  (format-time-string "Assorted for Week %V, %G"))
 
 (defvar org-node--candidate<>entry (make-hash-table :test 'equal)
   "1:1 table mapping minibuffer completion candidates to ID-nodes.
@@ -1680,50 +1680,6 @@ Exiting the prompt with a blank input calls `org-node-extract-subtree'."
 
 ;;;; Commands 4: Renaming things
 
-(defun org-node-extract-file-name-datestamp (path)
-  "From filename PATH, get the datestamp prefix if it has one.
-Do so by comparing with `org-node-file-timestamp-format'.
-
-High risk of false positives if you have been changing formats over
-time without renaming existing files."
-  (when (and org-node-file-timestamp-format
-             (not (string-blank-p org-node-file-timestamp-format)))
-    (let ((name (file-name-nondirectory path)))
-      (when (string-match
-             (org-node--make-regexp-for-time-format org-node-file-timestamp-format)
-             name)
-        (match-string 0 name)))))
-
-;; "Some people, when confronted with a problem, think
-;; 'I know, I'll use regular expressions.'
-;; Now they have two problems." —Jamie Zawinski
-(defvar org-node--make-regexp-for-time-format nil)
-(defun org-node--make-regexp-for-time-format (format)
-  "Make regexp to match a result of (format-time-string FORMAT).
-
-In other words, if e.g. FORMAT is %Y-%m-%d, which can be
-instantiated in many ways such as 2024-08-10, then this should
-return a regexp that can match any of those ways it might turn
-out, with any year, month or day."
-  (if (equal format (car org-node--make-regexp-for-time-format))
-      ;; Reuse memoized value on consecutive calls with same input
-      (cdr org-node--make-regexp-for-time-format)
-    (cdr (setq org-node--make-regexp-for-time-format
-               (cons format
-                     (let ((example (format-time-string format)))
-                       (if (string-match-p (rx (any "^*+([\\")) example)
-                           ;; TODO: Improve error message, now it presumes caller
-                           (error "org-node: Unable to safely rename with current `org-node-file-timestamp-format'.
-This is not inherent in your choice of format, I am just not smart enough")
-                         (concat "^"
-                                 (string-replace
-                                  "." "\\."
-                                  (replace-regexp-in-string
-                                   "[[:digit:]]+" "[[:digit:]]+"
-                                   (replace-regexp-in-string
-                                    "[[:alpha:]]+" "[[:alpha:]]+"
-                                    example t)))))))))))
-
 (defcustom org-node-renames-allowed-dirs nil
   "Dirs in which files may be auto-renamed.
 Used if you have the function `org-node-rename-file-by-title' on
@@ -1828,19 +1784,49 @@ Argument INTERACTIVE automatically set."
               (set-visited-file-name new-path t t))
             (message "File '%s' renamed to '%s'" name new-name)))))))))
 
-(defun org-node--consent-to-bothersome-modes-for-mass-edit ()
-  "Confirm about certain modes being enabled.
-These are modes such as `auto-save-visited-mode' that can
-interfere with user experience during or after mass-editing operation."
-  ;; TODO: Expand the list, there are probably other annoying modes
-  (cl-loop for mode in '(auto-save-visited-mode
-                         git-auto-commit-mode)
-           when (and (boundp mode)
-                     (symbol-value mode)
-                     (not (y-or-n-p
-                           (format "%S is active - proceed anyway?" mode))))
-           return nil
-           finally return t))
+(defun org-node-extract-file-name-datestamp (path)
+  "From filename PATH, get the datestamp prefix if it has one.
+Do so by comparing with `org-node-file-timestamp-format'.
+
+High risk of false positives if you have been changing formats over
+time without renaming existing files."
+  (when (and org-node-file-timestamp-format
+             (not (string-blank-p org-node-file-timestamp-format)))
+    (let ((name (file-name-nondirectory path)))
+      (when (string-match
+             (org-node--make-regexp-for-time-format org-node-file-timestamp-format)
+             name)
+        (match-string 0 name)))))
+
+;; "Some people, when confronted with a problem, think
+;; 'I know, I'll use regular expressions.'
+;; Now they have two problems." —Jamie Zawinski
+(defvar org-node--make-regexp-for-time-format nil)
+(defun org-node--make-regexp-for-time-format (format)
+  "Make regexp to match a result of (format-time-string FORMAT).
+
+In other words, if e.g. FORMAT is %Y-%m-%d, which can be
+instantiated in many ways such as 2024-08-10, then this should
+return a regexp that can match any of those ways it might turn
+out, with any year, month or day."
+  (if (equal format (car org-node--make-regexp-for-time-format))
+      ;; Reuse memoized value on consecutive calls with same input
+      (cdr org-node--make-regexp-for-time-format)
+    (cdr (setq org-node--make-regexp-for-time-format
+               (cons format
+                     (let ((example (format-time-string format)))
+                       (if (string-match-p (rx (any "^*+([\\")) example)
+                           ;; TODO: Improve error message, now it presumes caller
+                           (error "org-node: Unable to safely rename with current `org-node-file-timestamp-format'.
+This is not inherent in your choice of format, I am just not smart enough")
+                         (concat "^"
+                                 (string-replace
+                                  "." "\\."
+                                  (replace-regexp-in-string
+                                   "[[:digit:]]+" "[[:digit:]]+"
+                                   (replace-regexp-in-string
+                                    "[[:alpha:]]+" "[[:alpha:]]+"
+                                    example t)))))))))))
 
 ;; TODO: Kill opened buffers that were not edited.
 ;;       But first make sure it can pick up where it left off if canceled
@@ -1929,6 +1915,20 @@ so it matches the destination\\='s current title."
                       (redisplay)
                       (sleep-for .12))
                     (goto-char end)))))))))))
+
+(defun org-node--consent-to-bothersome-modes-for-mass-edit ()
+  "Confirm about certain modes being enabled.
+These are modes such as `auto-save-visited-mode' that can
+interfere with user experience during or after mass-editing operation."
+  ;; TODO: Expand the list, there are probably other annoying modes
+  (cl-loop for mode in '(auto-save-visited-mode
+                         git-auto-commit-mode)
+           when (and (boundp mode)
+                     (symbol-value mode)
+                     (not (y-or-n-p
+                           (format "%S is active - proceed anyway?" mode))))
+           return nil
+           finally return t))
 
 ;;;###autoload
 (defun org-node-rename-asset-and-rewrite-links ()
