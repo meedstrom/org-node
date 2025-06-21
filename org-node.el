@@ -510,17 +510,19 @@ STR, PRED and ACTION as in `org-node-collection-basic'."
   (put 'org-node-hist-altered 'history-length 1000))
 
 ;; Finally, tying it all together
-(defun org-node-read-candidate (&optional prompt blank-ok)
-  "PROMPT for a known node and return the input.
+(defun org-node-read-candidate (&optional prompt blank-ok initial-input)
+  "PROMPT for a known node and return the user input.
 If the input is not a key of `org-node--candidate<>entry',
 you can assume no such node exists,
 or it was recently created but its buffer never saved.
 
-BLANK-OK means to obey `org-node-blank-input-hint'."
+BLANK-OK means to obey `org-node-blank-input-hint'.
+INITIAL-INPUT as in `completing-read.'"
   (completing-read (or prompt "Node: ")
                    (if blank-ok #'org-node-collection-main
                      #'org-node-collection-basic)
-                   () () ()
+                   () ()
+                   initial-input
                    (if org-node-alter-candidates 'org-node-hist-altered
                      'org-node-hist)))
 
@@ -1212,7 +1214,7 @@ Argument NOVISIT for use by `org-node-insert-link-novisit'."
                     nil))
          (input (if (and novisit initial)
                     initial
-                  (org-node-read-candidate nil t)))
+                  (org-node-read-candidate nil t initial)))
          (_ (when (string-blank-p input)
               (setq input (funcall org-node-blank-input-title-generator))))
          (node (gethash input org-node--candidate<>entry))
