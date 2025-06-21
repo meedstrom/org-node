@@ -1511,10 +1511,11 @@ modify itself other than through this command."
 
 ;;;; Commands 3: Extract and refile
 
-(defcustom org-node-extract-stay-in-source-buffer nil
-  "Keep the source buffer current after `org-node-extract-subtree'."
+(defcustom org-node-stay-in-source-buffer nil
+  "Keep the source buffer current after extract or refile.
+Used by `org-node-extract-subtree' and `org-node-refile'."
   :type 'boolean
-  :package-version '(org-node . "3.6.0"))
+  :package-version '(org-node . "3.6.4"))
 
 (defcustom org-node-extract-leave-link-in-source t
   "Whether to insert a link to the just-extracted subtree.
@@ -1539,7 +1540,7 @@ Note that this command can be indirectly called from another command
 \\[org-node-refile], so you may not need to key-bind this one.
 
 Some behaviors are configurable in user options:
-- `org-node-extract-stay-in-source-buffer'
+- `org-node-stay-in-source-buffer'
 - `org-node-extract-leave-link-in-source'
 - `org-node-extract-add-inherited-tags'
 - `org-node-prefer-with-heading'
@@ -1637,7 +1638,7 @@ creation-date as more truthful or useful than today\\='s date.
                        (format "%s Created " (org-time-stamp-format t t)))
                       (org-link-make-string (concat "id:" id) title)
                       "\n"))))))
-    (when org-node-extract-stay-in-source-buffer
+    (when org-node-stay-in-source-buffer
       (switch-to-buffer (marker-buffer source)))
     (set-marker source-parent nil)
     (set-marker source nil)))
@@ -1674,10 +1675,12 @@ Exiting the prompt with a blank input calls `org-node-extract-subtree'."
         (save-excursion
           (with-current-buffer (marker-buffer source)
             (goto-char source)
-            (set-marker source nil)
             (org-cut-subtree)))
         (org-paste-subtree)
-        (run-hooks 'org-node-relocation-hook)))))
+        (run-hooks 'org-node-relocation-hook)
+        (when org-node-stay-in-source-buffer
+          (switch-to-buffer (marker-buffer source)))
+        (set-marker source nil)))))
 
 
 ;;;; Commands 4: Renaming things
