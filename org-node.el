@@ -3012,9 +3012,12 @@ heading, else the file-level node, whichever has an ID first."
   (gethash (org-node-read-candidate prompt)
            org-node--candidate<>entry))
 
+;; Debatable name
 (defun org-node-p (entry)
-  "Return non-nil if ENTRY satisfies `org-node-filter-fn'."
-  (funcall org-node-filter-fn entry))
+  "Non-nil if ENTRY has an ID and satisfies `org-node-filter-fn'.
+ENTRY should be an `org-mem-entry' object."
+  (and (org-mem-entry-id entry)
+       (funcall org-node-filter-fn entry)))
 
 (defun org-node-all-filtered-nodes ()
   "List currently cached org-nodes that satisfied `org-node-filter-fn'."
