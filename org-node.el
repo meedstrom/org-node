@@ -865,17 +865,9 @@ since the default `org-node-file-timestamp-format' is empty."
   :type 'hook
   :package-version '(org-node . "0.1"))
 
-(defun org-node--hack-record-candidate ()
-  "Ensure you can spam-create nodes with `org-node-titlegen-untitled'."
-  (when-let* ((title (or (org-get-heading t t t t)
-                         (org-get-title))))
-    (puthash title (list title "" "") org-node--title<>affixations)
-    (puthash title (org-mem-updater-mk-entry-atpt) org-node--candidate<>entry)))
-
 (unless (featurep 'org-node)
   (add-hook 'org-node-insert-link-hook #'org-mem-updater-ensure-link-at-point-known -50)
   (add-hook 'org-node-creation-hook    #'org-id-get-create -90)
-  (add-hook 'org-node-creation-hook    #'org-node--hack-record-candidate -80)
   (add-hook 'org-node-creation-hook    #'org-mem-updater-ensure-id-node-at-point-known -70)
   (add-hook 'org-node-creation-hook    #'org-node-ensure-crtime-property)
   (add-hook 'org-node-relocation-hook  #'org-mem-updater-ensure-id-node-at-point-known -70))
