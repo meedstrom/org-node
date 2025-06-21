@@ -313,7 +313,7 @@ Assuming your package manager knows about @uref{https://melpa.org/#/getting-star
 (use-package org-node
   :init
   (keymap-global-set "M-o n" org-node-global-prefix-map)
-  (with-eval-after-load 'org-keys
+  (with-eval-after-load 'org
     (keymap-set org-mode-map "M-o n" org-node-org-prefix-map))
   :config
   (setq org-mem-do-sync-with-org-id t) ; optional
@@ -328,7 +328,7 @@ If you're coming here from @strong{org-roam}@comma{} try this instead:
 (use-package org-node
   :init
   (keymap-set global-map "M-o n" org-node-global-prefix-map)
-  (with-eval-after-load 'org-keys
+  (with-eval-after-load 'org
     (keymap-set org-mode-map "M-o n" org-node-org-prefix-map))
   :config
   (setq org-mem-do-sync-with-org-id t)
@@ -711,7 +711,7 @@ If you need more of Org-ref@comma{} you have at least two options:
 Use org-roam - see discussions on boosting its performance @uref{https://org-roam.discourse.group/t/rewriting-org-roam-node-list-for-speed-it-is-not-sqlite/3475/92, here} and @uref{https://org-roam.discourse.group/t/improving-performance-of-node-find-et-al/3326/33, here}
 
 @item
-Contribute to @uref{https://github.com/meedstrom/org-mem, org-mem}@comma{} see function @samp{org-mem-parser--collect-links-until}.
+Contribute to @uref{https://github.com/meedstrom/org-mem, org-mem}@comma{} see function @samp{org-mem-parser--scan-text-until}.
 @end itemize
 
 @node Toolbox

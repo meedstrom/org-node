@@ -2771,9 +2771,7 @@ skips the overhead of creation.  To clean up, call
 (defmacro org-node--with-quick-file-buffer (file &rest body)
   "Like `org-with-file-buffer' and `org-with-wide-buffer'.
 Tries to execute minimal hooks in order to open and close FILE as
-quickly as possible.
-
-In detail:
+quickly as possible. In detail:
 
 1. If a buffer was visiting FILE, reuse that buffer, else visit
    FILE in a new buffer, in which case ignore most of the Org
@@ -2788,12 +2786,7 @@ In detail:
     skip any save hooks and kill hooks.
 
 3b. If a buffer had been open: leave it open and leave it
-    unsaved.
-
-Optional keyword argument ABOUT-TO-DO as in
-`org-node--in-files-do'.
-
-\(fn FILE [:about-to-do ABOUT-TO-DO] &rest BODY)"
+    unsaved."
   (declare (indent 1) (debug t))
   `(let ((enable-local-variables :safe)
          (org-inhibit-startup t) ;; Don't apply startup #+options

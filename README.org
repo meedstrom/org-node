@@ -136,7 +136,7 @@ Assuming your package manager knows about [[https://melpa.org/#/getting-started]
 (use-package org-node
   :init
   (keymap-global-set "M-o n" org-node-global-prefix-map)
-  (with-eval-after-load 'org-keys
+  (with-eval-after-load 'org
     (keymap-set org-mode-map "M-o n" org-node-org-prefix-map))
   :config
   (setq org-mem-do-sync-with-org-id t) ; optional
@@ -151,7 +151,7 @@ If you're coming here from *org-roam*, try this instead:
 (use-package org-node
   :init
   (keymap-set global-map "M-o n" org-node-global-prefix-map)
-  (with-eval-after-load 'org-keys
+  (with-eval-after-load 'org
     (keymap-set org-mode-map "M-o n" org-node-org-prefix-map))
   :config
   (setq org-mem-do-sync-with-org-id t)
