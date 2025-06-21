@@ -537,12 +537,18 @@ STR, PRED and ACTION as in `org-node-collection-basic'."
                 (cl-loop for altered-candidate in (cdr collection)
                          collect (list altered-candidate "" ""))
               (cl-loop for title in (cdr collection)
-                       collect (gethash title org-node--title<>affixations))))
+                       collect (or (gethash title org-node--title<>affixations)
+                                   ;; REVIEW: Sometimes above gethash returns
+                                   ;; nil, don't remember why.  That results in
+                                   ;; odd glyphs in the completions.  Can we
+                                   ;; guarantee it would never return nil?
+                                   (list title "" "")))))
          (if org-node-alter-candidates
              (cl-loop for altered-candidate in collection
                       collect (list altered-candidate "" ""))
            (cl-loop for title in collection
-                    collect (gethash title org-node--title<>affixations))))))
+                    collect (or (gethash title org-node--title<>affixations)
+                                (list title "" "")))))))
 
 (defvar org-node-hist nil
   "Minibuffer history.")
