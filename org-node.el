@@ -1477,15 +1477,19 @@ Works in non-Org buffers."
   "Name of drawer created by command `org-node-insert-into-related'."
   :type '(radio (const :value "RELATED")
                 (const :value "SEE-ALSO") ;; Would put as default, but too late
+                (const :value "LINKS")
                 string)
   :package-version '(org-node . "3.3.3"))
 
+;; TODO: Option to insert at end of drawer instead of beginning
+;; TODO: Option to control how to format each new insertion
 (defun org-node-insert-into-related ()
-  "Insert a link into a RELATED drawer near the end of current entry.
+  "Insert a link into a drawer named by `org-node-name-of-links-drawer'.
+If such a drawer is not found in the current entry, create one at the
+end of the entry.
+
 Unlike the BACKLINKS drawer, this drawer is not \"smart\" and will never
-be sorted, reformatted or erased, and the links count like any other
-forward-link.  The drawer can be moved, so long as it maintains the name
-set in `org-node-name-of-links-drawer'."
+modify itself other than through this command."
   (interactive "*" org-mode)
   (when-let* ((input (org-node-read-candidate))
               (node (gethash input org-node--candidate<>entry)))
