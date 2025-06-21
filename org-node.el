@@ -1527,9 +1527,8 @@ Used by `org-node-extract-subtree'."
 ;;;###autoload
 (defun org-node-extract-subtree ()
   "Extract subtree at point into a file of its own.
-Assign an ID if it had none, and run `org-node-relocation-hook'.
-Also add all tags that had been inherited in the original context,
-making the tags explicit.
+If it had an ID, run `org-node-relocation-hook', else run
+`org-node-creation-hook'.
 
 Note that this command can be indirectly called from another command
 \\[org-node-refile], so you may not need to key-bind this one.
@@ -1567,6 +1566,7 @@ creation-date as more truthful or useful than today\\='s date.
          (dir (org-node-guess-or-ask-dir "Extract to new file in directory: "))
          (path-to-write
           (file-name-concat dir (org-node-title-to-basename title)))
+         (already-a-node (org-id-get))
          (id (progn
                (when (file-exists-p path-to-write)
                  (user-error "A file already exists named %s" path-to-write))
@@ -1614,7 +1614,9 @@ creation-date as more truthful or useful than today\\='s date.
        "\n#+title: " title
        "\n"))
     (push (current-buffer) org-node--new-unsaved-buffers)
-    (run-hooks 'org-node-relocation-hook)
+    (if already-a-node
+        (run-hooks 'org-node-relocation-hook)
+      (run-hooks 'org-node-creation-hook))
     (when org-node-extract-leave-link-in-source
       (save-excursion
         (with-current-buffer (marker-buffer source-parent)
