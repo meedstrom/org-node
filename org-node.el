@@ -156,24 +156,6 @@
                  directory)
   :package-version '(org-node . "2.0.0"))
 
-(defcustom org-node-prefer-with-heading nil
-  "Make a heading even when creating isolated file nodes.
-If nil, write a #+TITLE and a file-level property-drawer instead.
-
-In other words:
-
-- if nil, make file with no heading (outline level 0)
-- if t, make file with heading (outline level 1)
-
-This affects the behavior of `org-node-new-file',
-`org-node-extract-subtree', and `org-node-capture-target'.
-
-If you change your mind about this setting, you can
-transition the files you already have with the Org-roam commands
-`org-roam-promote-entire-buffer' and `org-roam-demote-entire-buffer'."
-  :type 'boolean
-  :package-version '(org-node . "0.4"))
-
 (defun org-node--set-and-remind-reset (sym val)
   "Set SYM to VAL.
 Then remind the user to run \\[org-mem-reset]."
@@ -189,11 +171,8 @@ Then remind the user to run \\[org-mem-reset]."
        "Remember to run M-x org-mem-reset after configuring %S" sym)))
   (custom-set-default sym val))
 
-(defcustom org-node-custom-link-format-fn nil
-  "Function to format inserted links specially.
-Takes a node as argument, should return a string."
-  :type '(choice (const nil) function)
-  :package-version '(org-node . "2.3.3"))
+
+;;;; Filter
 
 ;; TODO: Compose a list of functions?
 (defcustom org-node-filter-fn #'org-node-filter-no-roam-exclude-p
@@ -229,43 +208,6 @@ Does not hide if it merely inherits that property from an ancestor."
              (with-memoization (org-mem--table 0 'true-watch-dirs)
                (with-temp-buffer ;; No buffer-env
                  (mapcar #'file-truename org-mem-watch-dirs))))))
-
-(defcustom org-node-insert-link-hook nil
-  "Hook run after inserting a link, with point in the new link."
-  :type 'hook
-  :package-version '(org-node . "0.1"))
-
-(defcustom org-node-creation-hook nil
-  "Hook run with point in the newly created file or entry.
-
-A good function for this hook is `org-node-ensure-crtime-property',
-since the default `org-node-file-timestamp-format' is empty."
-  :type 'hook
-  :package-version '(org-node . "0.1"))
-
-(defcustom org-node-relocation-hook nil
-  "Hook run with point in the newly relocated file or entry.
-
-A relocation is an operation like `org-node-refile' or
-`org-node-extract-subtree', such that some of the node\\='s data was
-already known."
-  :type 'hook
-  :package-version '(org-node . "3.2.0"))
-
-(defun org-node--hack-record-candidate ()
-  "Ensure you can spam-create nodes with `org-node-titlegen-untitled'."
-  (when-let* ((title (or (org-get-heading t t t t)
-                         (org-get-title))))
-    (puthash title (list title "" "") org-node--title<>affixations)
-    (puthash title (org-mem-updater-mk-entry-atpt) org-node--candidate<>entry)))
-
-(unless (featurep 'org-node)
-  (add-hook 'org-node-insert-link-hook #'org-mem-updater-ensure-link-at-point-known -50)
-  (add-hook 'org-node-creation-hook    #'org-id-get-create -90)
-  (add-hook 'org-node-creation-hook    #'org-node--hack-record-candidate -80)
-  (add-hook 'org-node-creation-hook    #'org-mem-updater-ensure-id-node-at-point-known -70)
-  (add-hook 'org-node-creation-hook    #'org-node-ensure-crtime-property)
-  (add-hook 'org-node-relocation-hook  #'org-mem-updater-ensure-id-node-at-point-known -70))
 
 
 ;;;; Pretty completion
@@ -888,17 +830,55 @@ belonging to an alphabet or number system."
 
 ;;;; Creation functions
 
-(defvar org-node-proposed-title nil
-  "For use by `org-node-creation-fn'.
-Automatically set, should be nil most of the time.")
+(defcustom org-node-prefer-with-heading nil
+  "Make a heading even when creating isolated file nodes.
+If nil, write a #+TITLE and a file-level property-drawer instead.
 
-(defvar org-node-proposed-id nil
-  "For use by `org-node-creation-fn'.
-Automatically set, should be nil most of the time.")
+In other words:
 
-(defvar org-node-proposed-seq nil
-  "Key that identifies a node sequence about to be added-to.
-Automatically set, should be nil most of the time.")
+- if nil, make file with no heading (outline level 0)
+- if t, make file with heading (outline level 1)
+
+This affects the behavior of `org-node-new-file',
+`org-node-extract-subtree', and `org-node-capture-target'.
+
+If you change your mind about this setting, you can
+transition the files you already have with the Org-roam commands
+`org-roam-promote-entire-buffer' and `org-roam-demote-entire-buffer'."
+  :type 'boolean
+  :package-version '(org-node . "0.4"))
+
+(defcustom org-node-relocation-hook nil
+  "Hook run with point in the newly relocated file or entry.
+
+A relocation is an operation like `org-node-refile' or
+`org-node-extract-subtree', such that some of the node\\='s data was
+already known."
+  :type 'hook
+  :package-version '(org-node . "3.2.0"))
+
+(defcustom org-node-creation-hook nil
+  "Hook run with point in the newly created file or entry.
+
+A good function for this hook is `org-node-ensure-crtime-property',
+since the default `org-node-file-timestamp-format' is empty."
+  :type 'hook
+  :package-version '(org-node . "0.1"))
+
+(defun org-node--hack-record-candidate ()
+  "Ensure you can spam-create nodes with `org-node-titlegen-untitled'."
+  (when-let* ((title (or (org-get-heading t t t t)
+                         (org-get-title))))
+    (puthash title (list title "" "") org-node--title<>affixations)
+    (puthash title (org-mem-updater-mk-entry-atpt) org-node--candidate<>entry)))
+
+(unless (featurep 'org-node)
+  (add-hook 'org-node-insert-link-hook #'org-mem-updater-ensure-link-at-point-known -50)
+  (add-hook 'org-node-creation-hook    #'org-id-get-create -90)
+  (add-hook 'org-node-creation-hook    #'org-node--hack-record-candidate -80)
+  (add-hook 'org-node-creation-hook    #'org-mem-updater-ensure-id-node-at-point-known -70)
+  (add-hook 'org-node-creation-hook    #'org-node-ensure-crtime-property)
+  (add-hook 'org-node-relocation-hook  #'org-mem-updater-ensure-id-node-at-point-known -70))
 
 (defcustom org-node-creation-fn #'org-node-new-file
   "Function called to create a node that does not yet exist.
@@ -924,6 +904,18 @@ the function is called: `org-node-proposed-title' and
           (function-item org-capture)
           (function :tag "Custom function" :value (lambda ())))
   :package-version '(org-node . "0.1"))
+
+(defvar org-node-proposed-title nil
+  "For use by `org-node-creation-fn'.
+Automatically set, should be nil most of the time.")
+
+(defvar org-node-proposed-id nil
+  "For use by `org-node-creation-fn'.
+Automatically set, should be nil most of the time.")
+
+(defvar org-node-proposed-seq nil
+  "Key that identifies a node sequence about to be added-to.
+Automatically set, should be nil most of the time.")
 
 (defun org-node-create (title id &optional seq-key)
   "Call `org-node-creation-fn' with necessary variables set.
@@ -1184,6 +1176,17 @@ Repeatable on the last key of a key sequence if
 
 
 ;;;; Commands 2: Inserting things
+
+(defcustom org-node-insert-link-hook nil
+  "Hook run after inserting a link, with point in the new link."
+  :type 'hook
+  :package-version '(org-node . "0.1"))
+
+(defcustom org-node-custom-link-format-fn nil
+  "Function to format inserted links specially.
+Takes a node as argument, should return a string."
+  :type '(choice (const nil) function)
+  :package-version '(org-node . "2.3.3"))
 
 ;;;###autoload
 (defun org-node-insert-link (&optional region-as-initial-input novisit)
