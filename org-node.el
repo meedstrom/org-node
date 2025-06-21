@@ -2482,9 +2482,13 @@ EXACT means always move point to NODE top."
                  (pos (and id (org-find-property "ID" id))))
             (unless pos
               (error "Could not find ID \"%s\" in buffer %s" id (current-buffer)))
-            ;; Having visited FILE, point may already be at a desirable
-            ;; position because a buffer was already visiting it, or because of
-            ;; save-place.  Otherwise, move directly to the heading.
+            (when (eq pos (point))
+              (org-node-full-end-of-meta-data))
+            ;; Point may already be at a desirable position due to any of:
+            ;; - the above
+            ;; - save-place
+            ;; - a buffer was already visiting the file
+            ;; Leave it there if sensible, otherwise move to exact position.
             (when (or exact
                       (not (equal id (org-entry-get nil "ID")))
                       (not (pos-visible-in-window-p pos))
