@@ -1524,6 +1524,12 @@ Used by `org-node-extract-subtree'."
   :type 'boolean
   :package-version '(org-node . "3.6.0"))
 
+(defcustom org-node-extract-add-inherited-tags t
+  "Also add all tags that had been inherited in the original context,
+making those tags explicit."
+  :type 'boolean
+  :package-version '(org-node . "3.6.3"))
+
 ;;;###autoload
 (defun org-node-extract-subtree ()
   "Extract subtree at point into a file of its own.
@@ -1536,6 +1542,7 @@ Note that this command can be indirectly called from another command
 Some behaviors are configurable in user options:
 - `org-node-extract-stay-in-source-buffer'
 - `org-node-extract-leave-link-in-source'
+- `org-node-extract-add-inherited-tags'
 - `org-node-prefer-with-heading'
 
 Adding to that, see below for an example advice that copies any
@@ -1561,7 +1568,8 @@ creation-date as more truthful or useful than today\\='s date.
   (org-node-cache-ensure)
   (org-back-to-heading t)
   (save-buffer)
-  (let* ((tags (org-get-tags))
+  (let* ((tags (if org-node-extract-add-inherited-tags (org-get-tags)
+                 (org-get-tags nil t)))
          (title (org-get-heading t t t t))
          (dir (org-node-guess-or-ask-dir "Extract to new file in directory: "))
          (path-to-write
