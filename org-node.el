@@ -1512,21 +1512,20 @@ modify itself other than through this command."
 ;;;; Commands 3: Extract and refile
 
 (defcustom org-node-extract-stay-in-source-buffer nil
-  "Stay in the source buffer after `org-node-extract-subtree'."
+  "Keep the source buffer current after `org-node-extract-subtree'."
   :type 'boolean
   :package-version '(org-node . "3.6.0"))
 
 (defcustom org-node-extract-leave-link-in-source t
   "Whether to insert a link to the just-extracted subtree.
 The link would be placed at the end of the parent entry.
-
 Used by `org-node-extract-subtree'."
   :type 'boolean
   :package-version '(org-node . "3.6.0"))
 
 (defcustom org-node-extract-add-inherited-tags t
-  "Also add all tags that had been inherited in the original context,
-making those tags explicit."
+  "Add all tags that had been inherited in the original context.
+Used by `org-node-extract-subtree'."
   :type 'boolean
   :package-version '(org-node . "3.6.3"))
 
@@ -1643,11 +1642,12 @@ creation-date as more truthful or useful than today\\='s date.
     (set-marker source-parent nil)
     (set-marker source nil)))
 
-;; TODO: Allow refile from some capture templates.  (During a capture,
-;; `org-refile' is rebound to `org-capture-refile', which see).  It seems we
-;; can just temp override definition of `org-refile' with this one, if I am
-;; correct that that long function basically does the equivalent of
-;; org-cut-subtree and paste.
+;; TODO: Allow refile from inside a capture buffer, at least for some capture
+;; templates.  (During a capture, `org-refile' is rebound to
+;; `org-capture-refile', which see).  It seems we can just temp override
+;; definition of `org-refile' with this one, if I am correct that that long
+;; function basically does the equivalent of org-cut-subtree and paste.
+
 ;;;###autoload
 (defun org-node-refile ()
   "Prompt for a node and refile subtree at point into it.

@@ -365,6 +365,7 @@ current value of `org-node-proposed-seq'.  If that is also nil, do
 nothing."
   (when (bound-and-true-p org-node-proposed-sequence)
     ;; Old name existed 1.9.0 -> 2.0.0
+    ;; but this warning added later
     (display-warning
      'org-node "Variable org-node-proposed-sequence should be org-node-proposed-seq, check initfiles"))
   (when (or key org-node-proposed-seq)
