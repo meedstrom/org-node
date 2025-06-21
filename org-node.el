@@ -262,9 +262,9 @@ already known."
 (unless (featurep 'org-node)
   (add-hook 'org-node-insert-link-hook #'org-mem-updater-ensure-link-at-point-known -50)
   (add-hook 'org-node-creation-hook    #'org-id-get-create -90)
-  (add-hook 'org-node-creation-hook    #'org-node-ensure-crtime-property -85)
   (add-hook 'org-node-creation-hook    #'org-node--hack-record-candidate -80)
   (add-hook 'org-node-creation-hook    #'org-mem-updater-ensure-id-node-at-point-known -70)
+  (add-hook 'org-node-creation-hook    #'org-node-ensure-crtime-property)
   (add-hook 'org-node-relocation-hook  #'org-mem-updater-ensure-id-node-at-point-known -70))
 
 
@@ -1547,16 +1547,16 @@ creation-date as more truthful or useful than today\\='s date.
 
 \(advice-add \\='org-node-extract-subtree :around
             (defun my-inherit-creation-date (orig-fn &rest args)
-              (let* ((parent-creation (org-entry-get nil \"CREATED\" t))
-                     (creation-putter
+              (let* ((ancestor-crtime (org-entry-get nil \"CREATED\" t))
+                     (crtime-putter
                       (lambda ()
                         (org-entry-put nil \"CREATED\"
-                                       (or parent-creation
+                                       (or ancestor-crtime
                                            (format-time-string
                                             (org-time-stamp-format t t)))))))
-                (add-hook \\='org-node-relocation-hook creation-putter)
+                (add-hook \\='org-node-creation-hook crtime-putter)
                 (unwind-protect (apply orig-fn args)
-                  (remove-hook \\='org-node-relocation-hook creation-putter)))))"
+                  (remove-hook \\='org-node-creation-hook crtime-putter)))))"
   (interactive "*" org-mode)
   (org-node-cache-ensure)
   (org-back-to-heading t)
