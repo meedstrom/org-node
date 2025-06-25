@@ -1397,7 +1397,7 @@ keywords."
 
 ;; TODO: New default once this PR is merged:
 ;; https://github.com/nobiot/org-transclusion/pull/268
-(defun org-node-insert-transclusion-as-subtree-pull268 (&optional node)
+(defun org-node-insert-transclusion-as-subtree-pull268 (&optional node arg)
   "Requires https://github.com/nobiot/org-transclusion/pull/268.
 Insert a subheading, link, newline and transclusion.
 Prompt for NODE if needed.
@@ -1408,8 +1408,10 @@ Result will basically look like:
 
 Tip: If you often transclude file-level nodes with no initial heading,
 consider configuring `org-transclusion-exclude-elements' to exclude
-keywords."
-  (interactive "*" org-mode)
+keywords.
+
+Prefix argument ARG as in `org-insert-heading'."
+  (interactive "*i\nP" org-mode)
   (org-node-cache-ensure)
   (let (input)
     (unless node
@@ -1426,17 +1428,14 @@ keywords."
       (with-current-buffer buf
         (goto-char pt)
         (set-marker pt nil)
+        ;; Never bring along any text from the current line.
         (org-node--safe-ensure-blank-line)
-        (delete-horizontal-space)
-        (if-let* ((level (org-current-level)))
-            (insert (make-string (+ (if org-odd-levels-only 2 1) level) ?*) " ")
-          (insert "* "))
-        (let ((link (org-link-make-string
-                     (concat "id:" id)
-                     (or (and org-node-custom-link-format-fn
+        (org-insert-subheading arg)
+        (let* ((desc (or (and org-node-custom-link-format-fn
                               node
                               (funcall org-node-custom-link-format-fn node))
-                         title))))
+                         title))
+               (link (org-link-make-string (concat "id:" id) desc)))
           (insert link)
           (save-excursion
             (newline-and-indent)
