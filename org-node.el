@@ -1111,13 +1111,13 @@ be sufficient to key-bind that one."
   (run-hooks 'org-node-creation-hook))
 
 ;;;###autoload
-(defun org-node-put-created ()
+(defun org-node-ensure-crtime-property ()
   "Add a CREATED property to entry at point, if none already."
   (interactive "*" org-mode)
-  (unless (org-entry-get nil "CREATED")
-    (org-entry-put nil "CREATED"
+  (unless (org-entry-get nil org-node-property-crtime)
+    (org-entry-put nil
+                   org-node-property-crtime
                    (format-time-string (org-time-stamp-format t t)))))
-(defalias 'org-node-ensure-crtime-property 'org-node-put-created)
 
 (defun org-node-visit-random-1 ()
   "Visit a random node."
@@ -3037,6 +3037,9 @@ ENTRY should be an `org-mem-entry' object."
 (define-obsolete-function-alias 'org-node-mk-auto-title                    #'org-node-titlegen-untitled         "3.3.12 (May 2025)")
 (define-obsolete-function-alias 'org-node-title-to-filename                #'org-node-title-to-filename-quiet   "3.4.3 (June 2025)")
 (define-obsolete-function-alias 'org-node-peek                             #'org-node-list-example              "2025-06-16")
+
+;;;###autoload
+(define-obsolete-function-alias 'org-node-put-created #'org-node-ensure-crtime-property "2025-06-21")
 
 (provide 'org-node)
 
