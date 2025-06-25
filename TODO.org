@@ -26,7 +26,7 @@
 
 - Let user preview the filename that will be created.  (Currently, when option =org-node-file-directory-ask= is t, it just asks you for a directory, which is weirdly restrictive.)
 
-- Make a command akin to =org-node-lint-all-files=, but that just =runs org-element-parse-buffer= with =org-element--cache-diagnostics= on, then prints any issues.
+- Make a command akin to =org-node-lint-all-files=, but that just runs =org-element-parse-buffer= with =org-element--cache-diagnostics= on, then prints any issues.
 
   - Or rewrite org-mem so it uses =org-element-parse-buffer= from the start.
 
@@ -41,8 +41,6 @@
 - Implement a =:MODIFIED:= property
 
   - Easy to build on the =org-node-backlink--flag-buffer-modification= we already have.
-
-- Get https://github.com/nobiot/org-transclusion/pull/268 into upstream and update command =org-node-insert-transclusion-as-subtree= to use it.
 
 - Make =org-node-rename-asset-and-rewrite-links= easier to use
 

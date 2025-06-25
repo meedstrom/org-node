@@ -3032,7 +3032,7 @@ ENTRY should be an `org-mem-entry' object."
 (define-obsolete-function-alias 'org-node-collection                       #'org-node-collection-basic          "3.3.12 (May 2025)")
 (define-obsolete-function-alias 'org-node-mk-auto-title                    #'org-node-titlegen-untitled         "3.3.12 (May 2025)")
 (define-obsolete-function-alias 'org-node-title-to-filename                #'org-node-title-to-filename-quiet   "3.4.3 (June 2025)")
-(define-obsolete-function-alias 'org-node-peek                             #'org-node-list-example              "2025-06-16")
+(define-obsolete-function-alias 'org-node-peek                             #'org-node-list-example              "3.5.0 (June 2025)")
 
 ;;;###autoload
 (define-obsolete-function-alias 'org-node-put-created #'org-node-ensure-crtime-property "2025-06-21")
