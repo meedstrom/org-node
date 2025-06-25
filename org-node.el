@@ -1238,6 +1238,7 @@ Argument NOVISIT for use by `org-node-insert-link-novisit'."
     (run-hooks 'org-node-insert-link-hook)
     ;; TODO: Delete the link if a node was not created
     ;;       See `org-node-insert-transclusion'
+    ;; TODO: Respect `org-node-stay-in-source-buffer'
     (unless node
       (org-node-create input id))))
 
@@ -2031,7 +2032,6 @@ user quits, do not apply any modifications."
                      org-mem-roam-refs
                      org-mem-scheduled
                      org-mem-scheduled-int
-                     ;; org-mem-stats-cookies ;; org-mem 0.17.0
                      org-mem-subtree-p
                      org-mem-tags
                      org-mem-tags-inherited
@@ -2230,6 +2230,7 @@ from ID links found in `org-mem--target<>links'."
          files
          (lambda ()
            (let ((file (pop org-node--unlinted)))
+             ;; REVIEW: unnecessary?
              (when (string-prefix-p "org" (file-name-extension file))
                (setq org-node--lint-current file))))
          #'org-node--lint-operator)
