@@ -1803,7 +1803,6 @@ time without renaming existing files."
 ;; "Some people, when confronted with a problem, think
 ;; 'I know, I'll use regular expressions.'
 ;; Now they have two problems." —Jamie Zawinski
-(defvar org-node--make-regexp-for-time-format nil)
 (defun org-node--make-regexp-for-time-format (format)
   "Make regexp to match a result of (format-time-string FORMAT).
 
@@ -1811,24 +1810,20 @@ In other words, if e.g. FORMAT is %Y-%m-%d, which can be
 instantiated in many ways such as 2024-08-10, then this should
 return a regexp that can match any of those ways it might turn
 out, with any year, month or day."
-  (if (equal format (car org-node--make-regexp-for-time-format))
-      ;; Reuse memoized value on consecutive calls with same input
-      (cdr org-node--make-regexp-for-time-format)
-    (cdr (setq org-node--make-regexp-for-time-format
-               (cons format
-                     (let ((example (format-time-string format)))
-                       (if (string-match-p (rx (any "^*+([\\")) example)
-                           ;; TODO: Improve error message, now it presumes caller
-                           (error "org-node: Unable to safely rename with current `org-node-file-timestamp-format'.
+  (with-memoization (org-mem--table 'org-node--make-regexp-for-time-format format)
+    (let ((example (format-time-string format)))
+      (if (string-match-p (rx (any "^*+([\\")) example)
+          ;; TODO: Improve error message, now it presumes caller
+          (error "org-node: Unable to safely rename with current `org-node-file-timestamp-format'.
 This is not inherent in your choice of format, I am just not smart enough")
-                         (concat "^"
-                                 (string-replace
-                                  "." "\\."
-                                  (replace-regexp-in-string
-                                   "[[:digit:]]+" "[[:digit:]]+"
-                                   (replace-regexp-in-string
-                                    "[[:alpha:]]+" "[[:alpha:]]+"
-                                    example t)))))))))))
+        (concat "^"
+                (string-replace
+                 "." "\\."
+                 (replace-regexp-in-string
+                  "[[:digit:]]+" "[[:digit:]]+"
+                  (replace-regexp-in-string
+                   "[[:alpha:]]+" "[[:alpha:]]+"
+                   example t))))))))
 
 ;; TODO: Kill opened buffers that were not edited.
 ;;       But first make sure it can pick up where it left off if canceled
