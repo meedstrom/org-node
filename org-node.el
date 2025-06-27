@@ -1700,6 +1700,13 @@ a file is not there, it is not considered in any case."
   :type 'string
   :package-version '(org-node . "0.7"))
 
+(defcustom org-node-property-crtime "CREATED"
+  "Name of a property for holding a creation-time timestamp.
+Used by:
+- `org-node-ensure-crtime-property'"
+  :type 'string
+  :package-version '(org-node . "3.7.1"))
+
 ;;;###autoload
 (defun org-node-rename-file-by-title (&optional interactive)
   "Rename the current file according to `org-node-file-slug-fn'.
