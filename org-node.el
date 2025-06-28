@@ -1707,13 +1707,18 @@ Used by:
   :type 'string
   :package-version '(org-node . "3.7.1"))
 
+(defcustom org-node-renames-use-time-from-property t
+  "Whether to use timestamp found in `org-node-property-crtime'.
+See `org-node-rename-file-by-title'."
+  :type 'boolean)
+
 ;;;###autoload
 (defun org-node-rename-file-by-title (&optional interactive)
   "Rename the current file according to `org-node-file-slug-fn'.
 
-Also attempt to check for a prefix in the style of
+Also attempt to check for a prefix in the style of current
 `org-node-file-timestamp-format', and preserve such a prefix.
-Otherwise, add one.
+Otherwise, add one, obeying `org-node-renames-use-time-from-property'.
 
 Suitable at the end of `after-save-hook'.  If called from a hook
 \(or from Lisp in general), only operate on files in
@@ -1725,7 +1730,8 @@ Argument INTERACTIVE automatically set."
   ;; Apparently the variable `buffer-file-truename' returns an abbreviated path
   (let ((path (file-truename buffer-file-name))
         (buf (current-buffer))
-        (title nil))
+        (title nil)
+        (time-from-property nil))
     (cond
      ((or (not (derived-mode-p 'org-mode))
           (not (equal "org" (file-name-extension path))))
@@ -1742,28 +1748,32 @@ Argument INTERACTIVE automatically set."
            else if (and (string-prefix-p dir path)
                         (not (string-match-p org-node-renames-exclude path)))
            return t))
-      (setq title
-            (or (org-get-title)
-                ;; No #+TITLE keyword, so treat first heading as title
-                (save-excursion
-                  (without-restriction
-                    (goto-char 1)
-                    (if (org-at-heading-p)
-                        (org-get-heading t t t t)
-                      (if (org-entry-properties 1 "ID")
-                          ;; In the special case when content before the first
-                          ;; heading has a property drawer with :ID: (despite
-                          ;; absence of #+TITLE), do nothing.
-                          nil
-                        (outline-next-heading)
-                        (org-get-heading t t t t)))))))
+      (save-excursion
+        (without-restriction
+          (goto-char (point-min))
+          (setq title (or (org-get-title)
+                          ;; No #+TITLE keyword.  If also no file-level :ID:,
+                          ;; let the first heading stand for title.
+                          (unless (and (org-before-first-heading-p)
+                                       (org-entry-get nil "ID"))
+                            (and (or (org-at-heading-p)
+                                     (outline-next-heading))
+                                 (org-get-heading t t t t)))))
+          (when org-node-renames-use-time-from-property
+            (let ((x (org-entry-get nil org-node-property-crtime)))
+              (when (and x (seq-some #'natnump (parse-time-string x)))
+                (setq time-from-property
+                      (encode-time (org-parse-time-string x))))))))
       (if (not title)
           (message "org-node-rename-file-by-title: No title in file %s" path)
-
         (let* ((name (file-name-nondirectory path))
-               (date-prefix (or (org-node-extract-file-name-datestamp path)
-                                ;; Couldn't find date prefix, give a new one
-                                (format-time-string org-node-file-timestamp-format)))
+               (date-prefix
+                (or (org-node-extract-file-name-datestamp path)
+                    ;; Couldn't find date prefix, add a new one.
+                    ;; Base it on the :CREATED: property if it was
+                    ;; present, else generate one for today.
+                    (format-time-string org-node-file-timestamp-format
+                                        time-from-property)))
                (slug (funcall org-node-file-slug-fn title))
                (new-name (concat date-prefix slug ".org"))
                (new-path
