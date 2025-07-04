@@ -307,34 +307,47 @@ The original reason that org-node exists.
 @node Install
 @section Install
 
-Assuming your package manager knows about @uref{https://melpa.org/#/getting-started, MELPA}@comma{} add this initfile snippet:
+Assuming your package manager knows about @uref{https://melpa.org/#/getting-started, MELPA}@comma{} add the following initfile snippet.
+
+Note that the prefix maps are new@comma{} so @uref{https://github.com/meedstrom/org-node/issues/123, you may need to upgrade or re-build the package}@comma{} or just remove the optional @samp{:init} clause.
 
 @lisp
+(use-package org-mem
+  :defer
+  :config
+  ;; At least one of these two is needed
+  (setq org-mem-do-sync-with-org-id t)
+  (setq org-mem-watch-dirs (list "~/org")) ;; Configure me
+  (org-mem-updater-mode))
+
 (use-package org-node
   :init
+  ;; Optional key bindings
   (keymap-global-set "M-o n" org-node-global-prefix-map)
   (with-eval-after-load 'org
     (keymap-set org-mode-map "M-o n" org-node-org-prefix-map))
   :config
-  (setq org-mem-do-sync-with-org-id t) ; optional
-  (setq org-mem-watch-dirs (list "~/org")) ; optional; configure me!
-  (org-mem-updater-mode)
   (org-node-cache-mode))
 @end lisp
 
 If you're coming here from @strong{org-roam}@comma{} try this instead:
 
 @lisp
+(use-package org-mem
+  :defer
+  :config
+  (setq org-mem-do-sync-with-org-id t) ;; Optional
+  (setq org-mem-watch-dirs
+        (list "~/org-roam/")) ;; Your org-roam-directory here
+  (org-mem-updater-mode))
+
 (use-package org-node
   :init
+  ;; Optional key bindings
   (keymap-set global-map "M-o n" org-node-global-prefix-map)
   (with-eval-after-load 'org
     (keymap-set org-mode-map "M-o n" org-node-org-prefix-map))
   :config
-  (setq org-mem-do-sync-with-org-id t)
-  (setq org-mem-watch-dirs
-        (list "~/org-roam/")) ;; Your org-roam-directory here
-  (org-mem-updater-mode)
   (org-node-cache-mode)
   (org-node-roam-accelerator-mode)
   (setq org-node-creation-fn #'org-node-new-via-roam-capture)

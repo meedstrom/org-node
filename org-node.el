@@ -215,7 +215,8 @@ Used in some commands when exiting minibuffer with a blank string."
 (defcustom org-node-property-crtime "CREATED"
   "Name of a property for holding a creation-time timestamp.
 Used by:
-- `org-node-ensure-crtime-property'"
+- `org-node-ensure-crtime-property'
+- `org-node-rename-file-by-title'"
   :type 'string
   :package-version '(org-node . "3.7.1"))
 
@@ -269,8 +270,7 @@ the minibuffer can match against the prefix and suffix as well as
 against the node title.
 
 In other words: you can match against the node's outline path, if
-as `org-node-affixation-fn' is set to `org-node-prepend-olp'
-\(default).
+`org-node-affixation-fn' is set to `org-node-prepend-olp' \(default).
 
 \(Tip: users of the \"orderless\" library do not need this
 setting, they can always match against the prefix and suffix via
