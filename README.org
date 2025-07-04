@@ -132,7 +132,7 @@ The original reason that org-node exists.
 
 Assuming your package manager knows about [[https://melpa.org/#/getting-started][MELPA]], add the following initfile snippet.
 
-Note that the prefix maps are new, so [[https://github.com/meedstrom/org-node/issues/123][binding them may not work]] until upgrading or re-building the package.
+Note that the prefix maps are new, so [[https://github.com/meedstrom/org-node/issues/123][you may need to upgrade or re-build the package]], or just remove the optional =:init= clause.
 
 #+begin_src elisp
 (use-package org-mem
@@ -140,7 +140,7 @@ Note that the prefix maps are new, so [[https://github.com/meedstrom/org-node/is
   :config
   ;; At least one of these two is needed
   (setq org-mem-do-sync-with-org-id t)
-  (setq org-mem-watch-dirs (list "~/org"))
+  (setq org-mem-watch-dirs (list "~/org")) ;; Configure me
   (org-mem-updater-mode))
 
 (use-package org-node
