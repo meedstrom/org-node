@@ -214,6 +214,13 @@ Used in some commands when exiting minibuffer with a blank string."
   "Make a node title for the current ISO8601 week."
   (format-time-string "Assorted for Week %V, %G"))
 
+(defcustom org-node-property-crtime "CREATED"
+  "Name of a property for holding a creation-time timestamp.
+Used by:
+- `org-node-ensure-crtime-property'"
+  :type 'string
+  :package-version '(org-node . "3.7.1"))
+
 
 ;;;; Filter
 
@@ -681,6 +688,75 @@ that, configure `org-node-file-timestamp-format'."
           (function :tag "Custom function" :value (lambda (title) title)))
   :package-version '(org-node . "0.4"))
 
+(defun org-node-slugify-like-roam-default (title)
+  "From TITLE, make a filename slug in default org-roam style.
+Does not require org-roam installed.
+
+A title like \"Löb\\='s Theorem\" becomes \"lob_s_theorem\".
+
+Diacritical marks U+0300 to U+0331 are stripped \(mostly used with Latin
+alphabets).  Also stripped are all glyphs not categorized in Unicode as
+belonging to an alphabet or number system.
+
+If you seek to emulate org-roam filenames, you may also want to
+configure `org-node-file-timestamp-format'."
+  (thread-last title
+               (string-glyph-decompose)
+               (seq-remove (lambda (char) (<= #x300 char #x331)))
+               (concat)
+               (string-glyph-compose)
+               (downcase)
+               (string-trim)
+               (replace-regexp-in-string "[^[:alnum:]]" "_")
+               (replace-regexp-in-string "__*" "_")
+               (replace-regexp-in-string "^_" "")
+               (replace-regexp-in-string "_$" "")))
+
+(defun org-node-slugify-for-web (title)
+  "From TITLE, make a filename slug meant to look nice as URL component.
+
+A title like \"Löb\\='s Theorem\" becomes \"lobs-theorem\".
+
+Diacritical marks U+0300 to U+0331 are stripped \(mostly used with Latin
+alphabets).  Also stripped are all glyphs not categorized in Unicode as
+belonging to an alphabet or number system."
+  (thread-last title
+               (string-glyph-decompose)
+               (seq-remove (lambda (char) (<= #x300 char #x331)))
+               (concat)
+               (string-glyph-compose)
+               (downcase)
+               (string-trim)
+               (replace-regexp-in-string "[[:space:]]+" "-")
+               (replace-regexp-in-string "[^[:alnum:]\\/-]" "")
+               (replace-regexp-in-string "\\/" "-")
+               (replace-regexp-in-string "--*" "-")
+               (replace-regexp-in-string "^-" "")
+               (replace-regexp-in-string "-$" "")))
+
+;; Hacking on the above?  Some useful test cases!
+
+;; (org-node-slugify-for-web "A/B testing")
+;; (org-node-slugify-for-web "\"But there's still a chance, right?\"")
+;; (org-node-slugify-for-web "Löb's Theorem")
+;; (org-node-slugify-for-web "Mañana Çedilla")
+;; (org-node-slugify-for-web "How to convince me that 2 + 2 = 3")
+;; (org-node-slugify-for-web "E. T. Jaynes")
+;; (org-node-slugify-for-web "Amnesic recentf? Solution: Run kill-emacs-hook every 2 minutes.")
+;; (org-node-slugify-for-web "Slimline/\"pizza box\" computer chassis")
+;; (org-node-slugify-for-web "#emacs")
+;; (org-node-slugify-for-web "칹え🐛")
+
+;; TODO: For Denote users, you get valid filename with just the default slug fn,
+;;       and a datestamp "%Y%m%dT%H%M%S--".  However, the full format including
+;;       optional parts looks like:
+;;       DATE==SIGNATURE--TITLE__KEYWORDS.EXT
+;;
+;;       So either the user adds SIGNATURE and KEYWORDS themselves, and never
+;;       uses `org-node-rename-file-by-title'.  Or we could pass more arguments
+;;       into the slug fn, that it can use to systematically add these parts
+;;       based on some rule, like perhaps the content of an Org property.
+
 (defun org-node--root-dirs (file-list)
   "Infer root directories of FILE-LIST.
 
@@ -759,75 +835,6 @@ Behavior depends on user option `org-node-file-directory-ask'."
   (if (eq t org-node-file-directory-ask) (read-directory-name prompt)
     (if (stringp org-node-file-directory-ask) org-node-file-directory-ask
       (org-node-guess-dir))))
-
-(defun org-node-slugify-like-roam-default (title)
-  "From TITLE, make a filename slug in default org-roam style.
-Does not require org-roam installed.
-
-A title like \"Löb\\='s Theorem\" becomes \"lob_s_theorem\".
-
-Diacritical marks U+0300 to U+0331 are stripped \(mostly used with Latin
-alphabets).  Also stripped are all glyphs not categorized in Unicode as
-belonging to an alphabet or number system.
-
-If you seek to emulate org-roam filenames, you may also want to
-configure `org-node-file-timestamp-format'."
-  (thread-last title
-               (string-glyph-decompose)
-               (seq-remove (lambda (char) (<= #x300 char #x331)))
-               (concat)
-               (string-glyph-compose)
-               (downcase)
-               (string-trim)
-               (replace-regexp-in-string "[^[:alnum:]]" "_")
-               (replace-regexp-in-string "__*" "_")
-               (replace-regexp-in-string "^_" "")
-               (replace-regexp-in-string "_$" "")))
-
-(defun org-node-slugify-for-web (title)
-  "From TITLE, make a filename slug meant to look nice as URL component.
-
-A title like \"Löb\\='s Theorem\" becomes \"lobs-theorem\".
-
-Diacritical marks U+0300 to U+0331 are stripped \(mostly used with Latin
-alphabets).  Also stripped are all glyphs not categorized in Unicode as
-belonging to an alphabet or number system."
-  (thread-last title
-               (string-glyph-decompose)
-               (seq-remove (lambda (char) (<= #x300 char #x331)))
-               (concat)
-               (string-glyph-compose)
-               (downcase)
-               (string-trim)
-               (replace-regexp-in-string "[[:space:]]+" "-")
-               (replace-regexp-in-string "[^[:alnum:]\\/-]" "")
-               (replace-regexp-in-string "\\/" "-")
-               (replace-regexp-in-string "--*" "-")
-               (replace-regexp-in-string "^-" "")
-               (replace-regexp-in-string "-$" "")))
-
-;; Hacking on the above?  Some useful test cases!
-
-;; (org-node-slugify-for-web "A/B testing")
-;; (org-node-slugify-for-web "\"But there's still a chance, right?\"")
-;; (org-node-slugify-for-web "Löb's Theorem")
-;; (org-node-slugify-for-web "Mañana Çedilla")
-;; (org-node-slugify-for-web "How to convince me that 2 + 2 = 3")
-;; (org-node-slugify-for-web "E. T. Jaynes")
-;; (org-node-slugify-for-web "Amnesic recentf? Solution: Run kill-emacs-hook every 2 minutes.")
-;; (org-node-slugify-for-web "Slimline/\"pizza box\" computer chassis")
-;; (org-node-slugify-for-web "#emacs")
-;; (org-node-slugify-for-web "칹え🐛")
-
-;; TODO: For Denote users, you get valid filename with just the default slug fn,
-;;       and a datestamp "%Y%m%dT%H%M%S--".  However, the full format including
-;;       optional parts looks like:
-;;       DATE==SIGNATURE--TITLE__KEYWORDS.EXT
-;;
-;;       So either the user adds SIGNATURE and KEYWORDS themselves, and never
-;;       uses `org-node-rename-file-by-title'.  Or we could pass more arguments
-;;       into the slug fn, that it can use to systematically add these parts
-;;       based on some rule, like perhaps the content of an Org property.
 
 
 ;;;; Creation functions
@@ -1699,13 +1706,6 @@ Only applied to files under `org-node-renames-allowed-dirs'.  If
 a file is not there, it is not considered in any case."
   :type 'string
   :package-version '(org-node . "0.7"))
-
-(defcustom org-node-property-crtime "CREATED"
-  "Name of a property for holding a creation-time timestamp.
-Used by:
-- `org-node-ensure-crtime-property'"
-  :type 'string
-  :package-version '(org-node . "3.7.1"))
 
 (defcustom org-node-renames-use-time-from-property t
   "Whether to use timestamp found in `org-node-property-crtime'.
