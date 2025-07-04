@@ -701,6 +701,7 @@ belonging to an alphabet or number system.
 If you seek to emulate org-roam filenames, you may also want to
 configure `org-node-file-timestamp-format'."
   (thread-last title
+               (org-link-display-format)
                (string-glyph-decompose)
                (seq-remove (lambda (char) (<= #x300 char #x331)))
                (concat)
@@ -721,6 +722,7 @@ Diacritical marks U+0300 to U+0331 are stripped \(mostly used with Latin
 alphabets).  Also stripped are all glyphs not categorized in Unicode as
 belonging to an alphabet or number system."
   (thread-last title
+               (org-link-display-format)
                (string-glyph-decompose)
                (seq-remove (lambda (char) (<= #x300 char #x331)))
                (concat)
