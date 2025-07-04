@@ -1748,6 +1748,7 @@ Argument INTERACTIVE automatically set."
            else if (and (string-prefix-p dir path)
                         (not (string-match-p org-node-renames-exclude path)))
            return t))
+      (org-node--assert-transclusion-safe)
       (save-excursion
         (without-restriction
           (goto-char (point-min))
