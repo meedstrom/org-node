@@ -25,10 +25,6 @@
 (require 'magit-section)
 (require 'repeat)
 
-(unless (and (boundp 'org-mem--bump-int) (>= org-mem--bump-int 1))
-    (display-warning 'org-node-context
-                     "Upgrade org-mem to fix bug in org-node-context"))
-
 (defgroup org-node-context nil "Preview backlink contexts in separate buffer."
   :group 'org-node)
 

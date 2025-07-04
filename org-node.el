@@ -255,7 +255,7 @@ Does not hide if it merely inherits that property from an ancestor."
     (cl-some (lambda (dir) (string-prefix-p dir file))
              (with-memoization (org-mem--table 0 'true-watch-dirs)
                (with-temp-buffer ;; No buffer-env
-                 (mapcar #'file-truename org-mem-watch-dirs))))))
+                 (delete-dups (mapcar #'file-truename org-mem-watch-dirs)))))))
 
 
 ;;;; Pretty completion
@@ -939,6 +939,7 @@ To operate on a node after creating it, hook onto
       (add-hook \\='org-node-creation-hook fix-up)
       (unwind-protect (org-node-create TITLE ID)
         (remove-hook \\='org-node-creation-hook fix-up))"
+  (require 'org)
   (let ((org-node-proposed-title title)
         (org-node-proposed-id id)
         (org-node-proposed-seq seq-key))
@@ -1707,8 +1708,11 @@ a file is not there, it is not considered in any case."
   :type 'string
   :package-version '(org-node . "0.7"))
 
+;; Answers the question: how do you experiment with changing datestamp formats?
+;; All the user needs to do is use wdired to delete pre-existing stamps, then
+;; run `org-node-rename-file-by-title' on all files.
 (defcustom org-node-renames-use-time-from-property t
-  "Whether to use timestamp found in `org-node-property-crtime'.
+  "Whether to fall back on timestamp in `org-node-property-crtime'.
 See `org-node-rename-file-by-title'."
   :type 'boolean)
 
@@ -1727,8 +1731,7 @@ command, always prompt for confirmation.
 
 Argument INTERACTIVE automatically set."
   (interactive "p" org-mode)
-  ;; Apparently the variable `buffer-file-truename' returns an abbreviated path
-  (let ((path (file-truename buffer-file-name))
+  (let ((path (file-truename buffer-file-truename))
         (buf (current-buffer))
         (title nil)
         (time-from-property nil))
@@ -1761,10 +1764,10 @@ Argument INTERACTIVE automatically set."
                                      (outline-next-heading))
                                  (org-get-heading t t t t)))))
           (when org-node-renames-use-time-from-property
-            (let ((x (org-entry-get nil org-node-property-crtime)))
-              (when (and x (seq-some #'natnump (parse-time-string x)))
+            (let ((xx (org-entry-get nil org-node-property-crtime)))
+              (when (and xx (seq-some #'natnump (parse-time-string xx)))
                 (setq time-from-property
-                      (encode-time (org-parse-time-string x))))))))
+                      (encode-time (org-parse-time-string xx))))))))
       (if (not title)
           (message "org-node-rename-file-by-title: No title in file %s" path)
         (let* ((name (file-name-nondirectory path))
