@@ -150,11 +150,9 @@
   "Support a zettelkasten of org-id files and subtrees."
   :group 'org)
 
-(defcustom org-node-data-dir user-emacs-directory
-  "Directory in which to persist data between sessions."
-  :type `(choice (const :value ,user-emacs-directory)
-                 directory)
-  :package-version '(org-node . "2.0.0"))
+(defvar org-node-data-dir user-emacs-directory
+  "Directory in which to persist data between sessions.
+As of 3.7.1, only used when `org-node-context-persist-on-disk' is t.")
 
 (defun org-node--set-and-remind-reset (sym val)
   "Set SYM to VAL.
