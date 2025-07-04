@@ -130,7 +130,9 @@ The original reason that org-node exists.
 * Setup
 ** Install
 
-Assuming your package manager knows about [[https://melpa.org/#/getting-started][MELPA]], add this initfile snippet:
+Assuming your package manager knows about [[https://melpa.org/#/getting-started][MELPA]], add the following initfile snippet.
+
+Note that the prefix maps are new, so [[https://github.com/meedstrom/org-node/issues/123][binding them may not work]] until upgrading or re-building the package.
 
 #+begin_src elisp
 (use-package org-mem
@@ -151,21 +153,20 @@ Assuming your package manager knows about [[https://melpa.org/#/getting-started]
   (org-node-cache-mode))
 #+end_src
 
-Note that the prefix maps are new, so [[https://github.com/meedstrom/org-node/issues/123][binding them may not work]] until upgrading or re-building the package.
-
 If you're coming here from *org-roam*, try this instead:
 
 #+begin_src elisp
 (use-package org-mem
   :defer
   :config
-  (setq org-mem-do-sync-with-org-id t)
+  (setq org-mem-do-sync-with-org-id t) ;; Optional
   (setq org-mem-watch-dirs
         (list "~/org-roam/")) ;; Your org-roam-directory here
   (org-mem-updater-mode))
 
 (use-package org-node
   :init
+  ;; Optional key bindings
   (keymap-set global-map "M-o n" org-node-global-prefix-map)
   (with-eval-after-load 'org
     (keymap-set org-mode-map "M-o n" org-node-org-prefix-map))
