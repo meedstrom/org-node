@@ -121,7 +121,7 @@ For KEY, NAME and CAPTURE, see `org-node-seq-defs'."
                (let ((adder (lambda ()
                               (org-entry-put nil ,prop sortstr)
                               (org-node-add-tags (split-string ,tags ":" t)))))
-                 (add-hook 'org-node-creation-hook dadder)
+                 (add-hook 'org-node-creation-hook adder)
                  (unwind-protect (org-node-create sortstr (org-id-new) key)
                    (remove-hook 'org-node-creation-hook adder))))))
 
