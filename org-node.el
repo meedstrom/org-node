@@ -313,8 +313,8 @@ aliases."
           (function-item org-node-append-tags-use-frame-width)
           (function :tag "Custom function"
                     :value (lambda (node title) (list title "" ""))))
-  :package-version '(org-node . "0.2")
-  :set #'org-node--set-and-remind-reset)
+  :set #'org-node--set-and-remind-reset
+  :package-version '(org-node . "0.2"))
 
 (defun org-node-affix-bare (_node title)
   "Use TITLE as-is."
