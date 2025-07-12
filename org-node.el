@@ -1714,7 +1714,8 @@ a file is not there, it is not considered in any case."
 (defcustom org-node-renames-use-time-from-property t
   "Whether to fall back on timestamp in `org-node-property-crtime'.
 See `org-node-rename-file-by-title'."
-  :type 'boolean)
+  :type 'boolean
+  :package-version '(org-node . "3.7.2"))
 
 ;;;###autoload
 (defun org-node-rename-file-by-title (&optional interactive)
