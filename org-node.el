@@ -278,9 +278,7 @@ setting, they can always match against the prefix and suffix via
 
 Another consequence: this setting can lift the uniqueness constraint on
 note titles: you\\='ll be able to have two nodes with the same name, so
-long as their prefix or suffix differ in some way.
-
-After changing this setting, run \\[org-mem-reset]."
+long as their prefix or suffix differ in some way."
   :type 'boolean
   :set #'org-node--set-and-remind-reset
   :package-version '(org-node . "0.2"))
@@ -1270,6 +1268,7 @@ The commands are the same, just differing in initial input."
   (interactive "*" org-mode)
   (org-node-insert-link t))
 
+;; TODO: Get rid of it
 ;;;###autoload
 (defun org-node-insert-link-novisit ()
   "(Unimplemented) Only supported with `org-node-new-via-roam-capture'.
