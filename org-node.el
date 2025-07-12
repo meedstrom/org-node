@@ -2003,7 +2003,17 @@ user quits, do not apply any modifications."
 ;;;; Commands 5: Listing things
 
 (defun org-node-list-example (&optional _deprecated-arg)
-  "Print a random `org-mem-entry' object."
+  "Display data from a randomly selected `org-mem-entry' object.
+Repeatable on the last key of a key sequence if
+`repeat-on-final-keystroke' is t."
+  (interactive)
+  (if repeat-on-final-keystroke
+      (progn (setq last-repeatable-command #'org-node-list-example-1)
+             (repeat nil))
+    (org-node-list-example-1)))
+
+(defun org-node-list-example-1 (&optional _deprecated-arg)
+  "Display data from a randomly selected `org-mem-entry' object."
   (interactive)
   (org-node-cache-ensure)
   (let ((entry (seq-random-elt (hash-table-values org-mem--id<>entry)))
