@@ -3085,23 +3085,6 @@ ENTRY should be an `org-mem-entry' object."
   (and (gethash title org-node--title<>affixations)
        (org-mem-entry-by-id (gethash title org-mem--title<>id))))
 
-
-(define-obsolete-function-alias 'org-node-prefix-with-olp                  #'org-node-prepend-olp               "3.3.0 (May 2025)")
-(define-obsolete-function-alias 'org-node-prefix-with-tags-tags            #'org-node-prepend-tags              "3.3.0 (May 2025)")
-(define-obsolete-function-alias 'org-node-prefix-with-tags-and-olp         #'org-node-prepend-tags-and-olp      "3.3.0 (May 2025)")
-(define-obsolete-function-alias 'org-node-affix-with-olp-and-tags          #'org-node-prepend-olp-append-tags   "3.3.0 (May 2025)")
-(define-obsolete-function-alias 'org-node-affix-with-olp-and-tags-legacy   #'org-node-prepend-olp-append-tags   "3.3.0 (May 2025)")
-(define-obsolete-function-alias 'org-node-insert-link-into-drawer          #'org-node-insert-into-related       "3.3.3 (May 2025)")
-(define-obsolete-function-alias 'org-node--end-of-meta-data                #'org-node-full-end-of-meta-data     "3.3.10 (May 2025)")
-(define-obsolete-function-alias 'org-node-list-file-coding-systems         #'org-node-list-files                "3.3.10 (May 2025)")
-(define-obsolete-function-alias 'org-node-collection                       #'org-node-collection-basic          "3.3.12 (May 2025)")
-(define-obsolete-function-alias 'org-node-mk-auto-title                    #'org-node-titlegen-untitled         "3.3.12 (May 2025)")
-(define-obsolete-function-alias 'org-node-title-to-filename                #'org-node-title-to-filename-quiet   "3.4.3 (June 2025)")
-(define-obsolete-function-alias 'org-node-peek                             #'org-node-list-example              "3.5.0 (June 2025)")
-
-;;;###autoload
-(define-obsolete-function-alias 'org-node-put-created #'org-node-ensure-crtime-property "2025-06-21")
-
 (provide 'org-node)
 
 ;;; org-node.el ends here
