@@ -945,37 +945,44 @@ To operate on a node after creating it, hook onto
         (org-node-proposed-seq seq-key))
     (funcall org-node-creation-fn)))
 
-(defun org-node-new-file ()
+(defun org-node-new-file (&optional title id)
   "Create a new file with a new node.
 Designed for `org-node-creation-fn'."
-  (unless org-node-proposed-title (error "Proposed title was nil"))
-  (unless org-node-proposed-id (error "Proposed ID was nil"))
-  (let* ((dir (org-node-guess-or-ask-dir "New file in which directory? "))
-         (path-to-write
-          (file-name-concat dir (org-node-title-to-basename org-node-proposed-title))))
-    (when (file-exists-p path-to-write)
-      (let ((msg (format "org-node: Resetting cache because file already exists: %s"
-                         path-to-write)))
-        (org-mem-reset t msg)
-        (user-error "%s" msg)))
-    (when (find-buffer-visiting path-to-write)
-      (error "A buffer already exists for filename %s" path-to-write))
-    (mkdir dir t)
-    (find-file path-to-write)
-    (if org-node-prefer-with-heading
-        (insert "* " org-node-proposed-title
-                "\n:PROPERTIES:"
-                "\n:ID:       " org-node-proposed-id
-                "\n:END:"
-                "\n")
-      (insert ":PROPERTIES:"
-              "\n:ID:       " org-node-proposed-id
+  (or (and title (setq org-node-proposed-title title))
+      (setq title org-node-proposed-title)
+      (error "Proposed title was nil"))
+  (or (and id (setq org-node-proposed-id id))
+      (setq id org-node-proposed-id)
+      (error "Proposed ID was nil"))
+  (org-node--pop-to-fresh-file-buffer title)
+  (if org-node-prefer-with-heading
+      (insert "* " title
+              "\n:PROPERTIES:"
+              "\n:ID:       " id
               "\n:END:"
-              "\n#+title: " org-node-proposed-title
-              "\n"))
-    (goto-char (point-max))
-    (push (current-buffer) org-node--new-unsaved-buffers)
-    (run-hooks 'org-node-creation-hook)))
+              "\n")
+    (insert ":PROPERTIES:"
+            "\n:ID:       " id
+            "\n:END:"
+            "\n#+title: " title
+            "\n"))
+  (goto-char (point-max))
+  (push (current-buffer) org-node--new-unsaved-buffers)
+  (run-hooks 'org-node-creation-hook))
+
+(defun org-node--pop-to-fresh-file-buffer (title)
+  (let* ((dir (org-node-guess-or-ask-dir "New file in which directory? "))
+         (file (file-name-concat dir (org-node-title-to-basename title)))
+         (buf (progn (mkdir dir t)
+                     (or (find-buffer-visiting file)
+                         (find-file-noselect file)))))
+    (pop-to-buffer-same-window buf)
+    (cl-assert (eq (current-buffer) buf))
+    (when (not (length= (buffer-string) 0))
+      (let ((msg (format "Resetting cache because file seems to already have contents: %s"
+                         file)))
+        (org-mem-reset t msg)
+        (user-error "%s" msg)))))
 
 (defun org-node-new-via-roam-capture ()
   "Call `org-roam-capture-' with predetermined arguments.
