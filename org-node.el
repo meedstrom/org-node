@@ -1047,9 +1047,10 @@ type the name of a node that does not exist.  That enables this
   ;; expansions %(org-capture-get :title) and %(org-capture-get :id) in the
   ;; template string.
   (apply #'org-capture-put (org-node--infer-title-etc))
-  (org-node--goto-maybe-create (org-capture-get :title)
-                               (org-capture-get :id)
-                               (org-capture-get :existing-node))
+  (if-let* ((node (org-capture-get :existing-node)))
+      (org-node--goto node t)
+    (org-node-new-file (org-capture-get :title)
+                       (org-capture-get :id)))
   (when (eq (org-capture-get :type) 'plain)
     ;; Emulate part of `org-capture-place-plain-text'.  We cannot just put the
     ;; capture property :target-entry-p t, because this may be a file-level
@@ -1092,36 +1093,6 @@ that \(an `org-mem-entry' object\), otherwise leave it at nil."
     (cl-assert title)
     (cl-assert id)
     (list :title title :id id :existing-node node)))
-
-(defun org-node--goto-maybe-create (title id node)
-  "Go to NODE and place point at a suitable location for capture.
-If NODE is nil, first create a node with TITLE and ID in a new file.
-
-Does not save the buffer, so the file may not yet be written to disk."
-  (if node
-      ;; Node exists; go there.
-      (org-node--goto node t)
-    ;; Node does not exist; create new node in an empty file.
-    (let* ((dir (org-node-guess-or-ask-dir "New file in which directory? "))
-           (file (file-name-concat dir (org-node-title-to-basename title))))
-      (mkdir dir t)
-      (pop-to-buffer-same-window (or (find-buffer-visiting file)
-                                     (find-file-noselect file)))
-      (when (not (length= (buffer-string) 0))
-        (error "File seems to already have contents: %s" file))
-      (if org-node-prefer-with-heading
-          (insert "* " title
-                  "\n:PROPERTIES:"
-                  "\n:ID:       " id
-                  "\n:END:"
-                  "\n")
-        (insert ":PROPERTIES:"
-                "\n:ID:       " id
-                "\n:END:"
-                "\n#+title: " title
-                "\n"))
-      (push (current-buffer) org-node--new-unsaved-buffers)
-      (run-hooks 'org-node-creation-hook))))
 
 
 ;;;; Commands 1: Cute little commands
