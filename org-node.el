@@ -108,6 +108,8 @@
 (declare-function org-entry-properties "org")
 (declare-function org-entry-put "org")
 (declare-function org-find-property "org")
+(declare-function org-capture-get "org-capture")
+(declare-function org-capture-put "org-capture")
 (declare-function org-fold-reveal "org-fold")
 (declare-function org-fold-show-children "org-fold")
 (declare-function org-fold-show-context "org-fold")
@@ -992,6 +994,22 @@ Designed for `org-node-creation-fn'."
                               :id    org-node-proposed-id))
         (remove-hook 'org-roam-capture-new-node-hook creation-hook-runner)))))
 
+(defcustom org-node-capture-legacy-behavior nil
+  "Whether to enable a legacy behavior in `org-node-capture-target'.
+
+This matters for templates using the `plain' type \(see
+`org-capture-templates'\).  The `entry' type should be unaffected.
+
+The new behavior places point like Org normally does, at the end of an
+entry, even if that is the beginning of the next entry.  The legacy
+behavior backs point up to the end of the previous line.  In addition,
+the legacy behavior did not support :prepend.
+
+This will be removed in the future."
+  :type 'boolean
+  :package-version '(org-node . "3.8.0"))
+
+;;;###autoload
 (defun org-node-capture-target ()
   "Can be used as target in a capture template.
 See `org-capture-templates' for more info about targets.
@@ -1018,67 +1036,85 @@ type the name of a node that does not exist.  That enables this
 3. Select your template
 4. Same as 4b earlier."
   (org-node-cache-ensure)
-  (let (title node id)
+  ;; Store the title and ID in such a way that the user gets access to
+  ;; expansions %(org-capture-get :title) and %(org-capture-get :id) in the
+  ;; template string.
+  (apply #'org-capture-put (org-node--infer-title-etc))
+  (org-node--goto-maybe-create (org-capture-get :title)
+                               (org-capture-get :id)
+                               (org-capture-get :existing-node))
+  (when (eq (org-capture-get :type) 'plain)
+    ;; Emulate part of `org-capture-place-plain-text'.  We cannot just put the
+    ;; capture property :target-entry-p t, because this may be a file-level
+    ;; node which is not an entry, and then some Org code falls apart.
+    (if (and (org-capture-get :prepend)
+             (not org-node-capture-legacy-behavior))
+	(org-node-full-end-of-meta-data)
+      (outline-next-heading)
+      (when org-node-capture-legacy-behavior
+        (when (org-at-heading-p)
+          (backward-char))))))
+
+(defun org-node--infer-title-etc ()
+  "Return a plist with values for :title, :id, :existing-node.
+
+If possible, determine :title and :id from current values of
+`org-node-proposed-title' and `org-node-proposed-id'.
+Otherwise, prompt the user for a title.
+Finally, if the title matches an existing node, set :existing-node to
+that \(an `org-mem-entry' object\), otherwise leave it at nil."
+  (org-node-cache-ensure)
+  (let (title id node)
     (if org-node-proposed-title
-        ;; Was called from `org-node-create', so the user had typed the
-        ;; title and no such node exists yet, or was invoked externally
-        ;; by something that pre-set the title and id
-        (progn
-          (setq title org-node-proposed-title)
-          (setq id (or org-node-proposed-id (error "Proposed ID was nil")))
-          (setq node (org-mem-entry-by-id id)))
-      (when org-node-proposed-id (error "Proposed title was nil but not ID"))
-      ;; Was called from `org-capture', which means the user has not yet typed
-      ;; the title; let them type it now
+        ;; Was presumably called from wrapper `org-node-create', so the user
+        ;; had typed the title and no such node exists yet.
+        (setq title org-node-proposed-title
+              id org-node-proposed-id
+              node (org-mem-entry-by-id id))
+      ;; Was presumably called from bare `org-capture', which means the user
+      ;; has not yet typed the title; let her type it now.
       (let ((input (org-node-read-candidate nil t)))
         (when (string-blank-p input)
           (setq input (funcall org-node-blank-input-title-generator)))
         (setq node (gethash input org-node--candidate<>entry))
         (if node
-            (progn
-              (setq id (org-mem-entry-id node))
-              (setq title (org-mem-entry-title node)))
-          (setq id (org-id-new))
-          (setq title input))))
+            (setq title (org-mem-entry-title node)
+                  id (org-mem-entry-id node))
+          (setq title input
+                id (org-id-new)))))
+    (cl-assert title)
+    (cl-assert id)
+    (list :title title :id id :existing-node node)))
 
-    (unless title (error "Given title was nil"))
-    (unless id (error "Given ID was nil"))
-    (if node
-        ;; Node exists; capture into it
-        (progn
-          (org-node--goto node t)
-          ;; TODO: Figure out how to play well with :prepend vs not :prepend.
-          ;; Now it's just like it always prepends, I think?
-          (unless (and (= 1 (point)) (org-at-heading-p))
-            ;; Go to just before next heading, or end of buffer if there are no
-            ;; more headings.  This allows the template to insert subtrees
-            ;; without swallowing content that was already there.
-            (when (outline-next-heading)
-              (backward-char 1))))
-      ;; Node does not exist; capture into new file
-      (let* ((dir (org-node-guess-or-ask-dir "New file in which directory? "))
-             (path-to-write
-              (file-name-concat dir (org-node-title-to-basename title))))
-        (when (file-exists-p path-to-write)
-          (error "File already exists: %s" path-to-write))
-        ;; TODO: Maybe just use the buffer, especially if it is blank.
-        (when (find-buffer-visiting path-to-write)
-          (error "A buffer already has the filename %s" path-to-write))
-        (mkdir (file-name-directory path-to-write) t)
-        (find-file path-to-write)
-        (if org-node-prefer-with-heading
-            (insert "* " title
-                    "\n:PROPERTIES:"
-                    "\n:ID:       " id
-                    "\n:END:"
-                    "\n")
-          (insert ":PROPERTIES:"
+(defun org-node--goto-maybe-create (title id node)
+  "Go to NODE and place point at a suitable location for capture.
+If NODE is nil, first create a node with TITLE and ID in a new file.
+
+Does not save the buffer, so the file may not yet be written to disk."
+  (if node
+      ;; Node exists; go there.
+      (org-node--goto node t)
+    ;; Node does not exist; create new node in an empty file.
+    (let* ((dir (org-node-guess-or-ask-dir "New file in which directory? "))
+           (file (file-name-concat dir (org-node-title-to-basename title))))
+      (mkdir dir t)
+      (pop-to-buffer-same-window (or (find-buffer-visiting file)
+                                     (find-file-noselect file)))
+      (when (not (length= (buffer-string) 0))
+        (error "File seems to already have contents: %s" file))
+      (if org-node-prefer-with-heading
+          (insert "* " title
+                  "\n:PROPERTIES:"
                   "\n:ID:       " id
                   "\n:END:"
-                  "\n#+title: " title
-                  "\n"))
-        (push (current-buffer) org-node--new-unsaved-buffers)
-        (run-hooks 'org-node-creation-hook)))))
+                  "\n")
+        (insert ":PROPERTIES:"
+                "\n:ID:       " id
+                "\n:END:"
+                "\n#+title: " title
+                "\n"))
+      (push (current-buffer) org-node--new-unsaved-buffers)
+      (run-hooks 'org-node-creation-hook))))
 
 
 ;;;; Commands 1: Cute little commands
