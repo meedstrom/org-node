@@ -2525,7 +2525,7 @@ well as the members of `org-tag-persistent-alist' and `org-tag-alist'."
 ;;;; Gotos
 
 (defun org-node--goto (node &optional exact)
-  "Visit NODE file, and ensure point is inside NODE.
+  "Visit file containing NODE, and ensure point is inside NODE.
 EXACT means always move point to NODE top."
   (when (numberp exact)
     (error "Function org-node--goto no longer takes a position argument"))
@@ -2536,32 +2536,52 @@ EXACT means always move point to NODE top."
         (org-mem-reset t "org-node: Didn't find file, resetting...")
       (when (not (file-readable-p file))
         (error "org-node: Couldn't visit unreadable file %s" file))
-      (find-file file)
-      (widen)
+      (org-node--goto-id (org-mem-id node) exact (or (find-buffer-visiting file)
+                                                     (find-file-noselect file))))))
+
+;; Upstream `org-id-goto' involves a check for `file-exists-p', very bad
+;; because as org-node tries to avoid saving buffers.
+(defun org-node--goto-id (id &optional exact buffer)
+  "Go to ID in some buffer, without needing the file to exist yet.
+That is, if `org-id-locations' has an entry for ID pointing to a
+file-name that may not yet have been written to disk, but a buffer
+visits it, switch to that unsaved buffer and look for ID there.
+
+If optional argument BUFFER non-nil, look in that specific buffer,
+in which case it needs not be a file-visiting buffer at all.
+
+Optional argument EXACT as in `org-node--goto'."
+  (cl-assert (stringp id))
+  (unless buffer
+    (let ((file (or (gethash id org-id-locations)
+                    (org-mem-entry-file-truename (org-mem-entry-by-id id)))))
+      (setq buffer (or (find-buffer-visiting file)
+                       (find-file-noselect file)))))
+  (let (pos)
+    (with-current-buffer buffer
       (org-node--assert-transclusion-safe)
-      ;; Search for the ID rather than naively using
-      ;; (goto-char (org-mem-pos node)), so that it will find the
-      ;; correct place even in a buffer with unsaved modifications.
-      (let* ((id (org-mem-id node))
-             (pos (and id (org-find-property "ID" id))))
-        (unless pos
-          (error "Could not find ID \"%s\" in buffer %s" id (current-buffer)))
-        (when (eq pos (point))
-          (org-node-full-end-of-meta-data))
-        ;; Point may already be at a desirable position due to any of:
-        ;; - the above
-        ;; - save-place
-        ;; - a buffer was already visiting the file
-        ;; Leave it there if sensible, otherwise move to exact position.
-        (when (or exact
-                  (not (equal id (org-entry-get nil "ID")))
-                  (not (pos-visible-in-window-p pos))
-                  (org-invisible-p pos))
-          (goto-char pos)
-          (when (org-mem-subtree-p node)
-            (org-fold-show-entry)
-            (org-fold-show-children)
-            (recenter 0)))))))
+      (setq pos (or (org-find-property "ID" id)
+                    (error "Could not find ID \"%s\" in buffer %s" id buffer))))
+    (pop-to-buffer-same-window buffer)
+    (cl-assert (eq (current-buffer) buffer)) ; does pop-to-buffer guarantee it?
+    (widen)
+    ;; Mainly comes true on first visit to a file node, so that point=1.
+    (when (eq (point) pos)
+      (org-node-full-end-of-meta-data))
+    ;; Point may already be at a desirable position due to any of:
+    ;; - the above
+    ;; - save-place
+    ;; - a buffer was already visiting the file
+    ;; Leave it there if sensible, otherwise move to exact position.
+    (when (or exact
+              (not (equal id (org-entry-get nil "ID")))
+              (not (pos-visible-in-window-p pos))
+              (org-invisible-p pos))
+      (goto-char pos)
+      (unless (org-before-first-heading-p)
+        (org-fold-show-entry)
+        (org-fold-show-children)
+        (recenter 0)))))
 
 (defun org-node-goto-new-drawer-site ()
   "Go to just after properties drawer.
