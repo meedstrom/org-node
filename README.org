@@ -6,53 +6,9 @@
 #+TEXINFO_DIR_CATEGORY: Emacs
 #+TEXINFO_DIR_TITLE: Org-node: (org-node).
 #+TEXINFO_DIR_DESC: Link org-id entries into a network.
-* News for v3 :noexport:
-#+HTML: <a href="https://repology.org/project/emacs%3Aorg-node/versions"> <img src="https://repology.org/badge/vertical-allrepos/emacs%3Aorg-node.svg" alt="Packaging status" align="right"> </a>
-
-A lot of code has been spun into a new library https://github.com/meedstrom/org-mem, now a dependency.  Reduces codebase by 30%.
-
-Not much new features -- mainly a change of plumbing.
-
-Update initfiles when you can.  Direct renames:
-
-| Old user option                | New user option                  |
-|--------------------------------+----------------------------------|
-| org-node-extra-id-dirs         | org-mem-watch-dirs               |
-| org-node-extra-id-dirs-exclude | org-mem-exclude                  |
-| org-node-link-types            | org-mem-seek-link-types          |
-| org-node-warn-title-collisions | org-mem-do-warn-title-collisions |
-
-Also enable =org-mem-updater-mode=.  Here's a new basic-install snippet:
-
-#+begin_src elisp
-(use-package org-node
-  :config
-  (setq org-mem-do-sync-with-org-id t)
-  (org-mem-updater-mode)
-  (org-node-cache-mode))
-#+end_src
-
-Node seqs, if you use them, now require turning on explicitly.
-
-#+begin_src elisp
-(org-node-seq-mode)
-#+end_src
-
-For reference, check out the full list of obsoletions near the bottom of file [[https://github.com/meedstrom/org-node/blob/main/org-node-changes.el][org-node-changes.el]].
-
-A *silent* obsoletion: links are not plists anymore, but =plist-get= is unhelpfully polite and returns nil when given any object not a plist.  Talk about a weak type system!  Anyway, use e.g. =(org-mem-link-pos LINK)= instead of =(plist-get LINK :pos)=.
-
-Another silent obsoletion: a link is a citation if =(org-mem-link-citation-p LINK)=.  Use that instead of =(null (org-mem-link-type LINK))=, which no longer carries that meaning.
-
-Other changes you may notice:
-
-- Command =org-node-reset= (now aliased to =org-mem-reset=) has become a bit slower, because it scans all subtrees in all files rather than only ID-nodes.  Org-node itself does not use that information, but org-mem aims to be useful in a wider domain.
-- Package [[https://github.com/meedstrom/org-node-fakeroam][org-node-fakeroam]] effectively deprecated
-  - New built-in: =org-node-roam-accelerator-mode=
-  - New built-in: =org-mem-roamy-db-mode=
-
 * Background
 ** What's all this
+#+HTML: <a href="https://repology.org/project/emacs%3Aorg-node/versions"> <img src="https://repology.org/badge/vertical-allrepos/emacs%3Aorg-node.svg" alt="Packaging status" align="right"> </a>
 
 I like [[https://github.com/org-roam/org-roam][org-roam]] but found it too slow, so I made [[https://github.com/meedstrom/quickroam][quickroam]].  And that idea spun off into this package, a standalone thing.  It may also be easier to pick up than org-roam.
 
