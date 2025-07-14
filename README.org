@@ -191,9 +191,9 @@ If you're new to these concepts, fear not.  The main things for day-to-day opera
 
 Tip: There's *no separate command* for creating a new node!  Reuse one of the commands above, and type the name of a node that doesn't exist.  Try it and see what happens!
 
-To browse config options, type =M-x customize-group RET org-node RET=.
-
 To see a list of all commands, enter an Org buffer and type =M-o n <f1>=.
+
+To browse config options, type =M-x customize-group RET org-node RET=.
 
 * Backlinks
 Backlinks are the butter on the bread that is your notes.  If you've ever seen a "What links here" section on some webpage, that's exactly what it is.  Imagine seeing that, all the time.  The following sections outline two general ways to do so.
@@ -201,7 +201,7 @@ Backlinks are the butter on the bread that is your notes.  If you've ever seen a
 ** Backlink solution 1: displayed in a separate window
 *** Option 1A: Reuse the org-roam buffer
 
-You can use the org-roam buffer without the rest of org-roam.  Enable:
+You can use the org-roam buffer without the rest of org-roam.  Enable the following mode, then see [[https://www.orgroam.com/manual.html#The-Org_002droam-Buffer][org-roam's documentation]].
 
 #+begin_src elisp
 (org-node-roam-accelerator-mode)
@@ -209,11 +209,11 @@ You can use the org-roam buffer without the rest of org-roam.  Enable:
 
 *** Option 2A: Use the org-node-context buffer
 
-Org-node ships a complete rewrite of the org-roam buffer.
+Org-node ships a rewrite of the org-roam buffer.
 
 Try the command =org-node-context-dwim= (=M-o n b=).
 
-If you'd like it to keep itself updated, reflecting where point is at all times, add to initfiles:
+If you like it, consider binding it to a particularly short key, such as =M-o M-b=.  Or you can let it keep itself updated, reflecting where point is at all times, by enabling this mode:
 
 #+begin_src elisp
 (org-node-context-follow-mode)
@@ -224,7 +224,7 @@ I rarely have the screen space to display a backlink buffer.  Because it needs m
 
 A complementary solution, which can also stand alone, is to have the backlinks /written into/ the file, on an Org property line or in a drawer.
 
-NOTE: To be clear, this mode never generates new IDs.  That's your own business.  This only adds/edits =:BACKLINKS:= properties -- and only if the origin has or inherits an ID.
+NOTE: To be clear, this mode never generates new IDs.  That's your own business.  This only adds/edits =:BACKLINKS:= properties or drawers, and only gives it backlinks corresponding to links where the original site has or inherits some ID.
 
 *** Option 2A: Automatic =:BACKLINKS:= property
 
@@ -292,23 +292,28 @@ People who understand the magic of capture templates, they may take this in stri
 
 Can we just use vanilla org-capture?  That'd be less scary.  The answer is yes!
 
-The secret sauce is =(function org-node-capture-target)=:
+The secret sauce is =(function org-node-capture-target)=.  Examples:
 
 #+begin_src elisp
 (setq org-capture-templates
-      '(("i" "Capture into ID node"
+      '(("e" "Capture entry into ID node"
+         entry (function org-node-capture-target) "* %?")
+
+        ("p" "Capture plain text into ID node"
          plain (function org-node-capture-target) nil
          :empty-lines-after 1)
 
         ("j" "Jump to ID node"
          plain (function org-node-capture-target) nil
-         :jump-to-captured t
-         :immediate-finish t)
+         :prepend t
+         :no-save t
+         :immediate-finish t
+         :jump-to-captured t)
 
         ;; Sometimes handy after `org-node-insert-link', to
         ;; make a stub you plan to fill in later, without
         ;; leaving the current buffer for now
-        ("s" "Make quick stub ID node"
+        ("q" "Make quick stub ID node"
          plain (function org-node-capture-target) nil
          :immediate-finish t)))
 #+end_src
@@ -325,14 +330,13 @@ That last optional functionality may only confuse you more if I try to describe 
 
 One user had over a thousand project-nodes, but only just began to do a knowledge base, and wished to avoid seeing the project nodes.
 
-This could work by---for example---excluding anything tagged "project" or perhaps anything that has a TODO state.  Here's a way to exclude both:
+This could work by---for example---excluding anything with the Org tag =:project:= or perhaps anything that has a TODO state.  Here's a way to exclude both:
 
 #+begin_src elisp
 (setq org-node-filter-fn
       (lambda (node)
-        (not
-         (or (org-mem-todo-state node)
-             (member "project" (org-mem-tags node))))))
+        (not (or (member "project" (org-mem-tags node))
+                 (org-mem-todo-state node)))))
 #+end_src
 
 Or you could go with a whitelist approach, to show only nodes from a certain directory we'll call "my-personal-wiki":
@@ -351,7 +355,7 @@ But let's say you have a big archive file, fulla IDs, and you want all the nodes
 
 Putting a =:ROAM_EXCLUDE: t= property at the top of that file won't do it, because unlike in org-roam, *child ID nodes of an excluded node are not excluded!*
 
-However, nodes in isolation do still have information about inherited tags.  So you can exploit that, or the outline path or even the file name.
+However, nodes in isolation do still have information about inherited tags.  So you can exploit that, or the outline path or even the file name.  Alas, the org-mem library does not include information about inherited /properties/, which is why this workaround.
 
 It works well for me to filter out any file or directory that happens to contain "archive" in the name:
 

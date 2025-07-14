@@ -1010,9 +1010,9 @@ This matters for templates using the `plain' type \(see
 The new behavior places point like Org normally does, at the end of an
 entry, even if that is the beginning of the next entry.  The legacy
 behavior backs point up to the end of the previous line.  In addition,
-the legacy behavior did not support :prepend.
+the legacy behavior ignores :prepend.
 
-This will be removed in the future."
+This option will be removed in the future."
   :type 'boolean
   :package-version '(org-node . "3.8.0"))
 
@@ -1054,7 +1054,7 @@ type the name of a node that does not exist.  That enables this
   (when (eq (org-capture-get :type) 'plain)
     ;; Emulate part of `org-capture-place-plain-text'.  We cannot just put the
     ;; capture property :target-entry-p t, because this may be a file-level
-    ;; node which is not an entry, and then some Org code falls apart.
+    ;; node which is not an entry, and some of Org cannot handle that.
     (if (and (org-capture-get :prepend)
              (not org-node-capture-legacy-behavior))
 	(org-node-full-end-of-meta-data)
@@ -1064,7 +1064,7 @@ type the name of a node that does not exist.  That enables this
           (backward-char))))))
 
 (defun org-node--infer-title-etc ()
-  "Return a plist with values for :title, :id, :existing-node.
+  "Return a plist with values for :title, :id and :existing-node.
 
 If possible, determine :title and :id from current values of
 `org-node-proposed-title' and `org-node-proposed-id'.
@@ -1080,7 +1080,7 @@ that \(an `org-mem-entry' object\), otherwise leave it at nil."
               id org-node-proposed-id
               node (org-mem-entry-by-id id))
       ;; Was presumably called from bare `org-capture', which means the user
-      ;; has not yet typed the title; let her type it now.
+      ;; has not yet typed the title; let them type it now.
       (let ((input (org-node-read-candidate nil t)))
         (when (string-blank-p input)
           (setq input (funcall org-node-blank-input-title-generator)))
@@ -2564,7 +2564,7 @@ Optional argument EXACT as in `org-node--goto'."
 (defun org-node-goto-new-drawer-site ()
   "Go to just after properties drawer.
 Actually, if before the first heading, also skip past any other drawer
-that follows the file properties drawer."
+that follows the file-level properties drawer."
   (if (org-before-first-heading-p)
       (org-node--after-drawers-before-keyword)
     (org-end-of-meta-data))

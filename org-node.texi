@@ -382,9 +382,9 @@ Tip: Bind this one to an extra-short key such as @samp{M-o f} -- you'll use it t
 
 Tip: There's @strong{no separate command} for creating a new node!  Reuse one of the commands above@comma{} and type the name of a node that doesn't exist.  Try it and see what happens!
 
-To browse config options@comma{} type @samp{M-x customize-group RET org-node RET}.
-
 To see a list of all commands@comma{} enter an Org buffer and type @samp{M-o n <f1>}.
+
+To browse config options@comma{} type @samp{M-x customize-group RET org-node RET}.
 
 @node Backlinks
 @chapter Backlinks
@@ -407,7 +407,7 @@ Backlinks are the butter on the bread that is your notes.  If you've ever seen a
 @node Option 1A Reuse the org-roam buffer
 @subsection Option 1A: Reuse the org-roam buffer
 
-You can use the org-roam buffer without the rest of org-roam.  Enable:
+You can use the org-roam buffer without the rest of org-roam.  Enable the following mode@comma{} then see @uref{https://www.orgroam.com/manual.html#The-Org_002droam-Buffer, org-roam's documentation}.
 
 @lisp
 (org-node-roam-accelerator-mode)
@@ -416,11 +416,11 @@ You can use the org-roam buffer without the rest of org-roam.  Enable:
 @node Option 2A Use the org-node-context buffer
 @subsection Option 2A: Use the org-node-context buffer
 
-Org-node ships a complete rewrite of the org-roam buffer.
+Org-node ships a rewrite of the org-roam buffer.
 
 Try the command @samp{org-node-context-dwim} (@samp{M-o n b}).
 
-If you'd like it to keep itself updated@comma{} reflecting where point is at all times@comma{} add to initfiles:
+If you like it@comma{} consider binding it to a particularly short key@comma{} such as @samp{M-o M-b}.  Or you can let it keep itself updated@comma{} reflecting where point is at all times@comma{} by enabling this mode:
 
 @lisp
 (org-node-context-follow-mode)
@@ -433,7 +433,7 @@ I rarely have the screen space to display a backlink buffer.  Because it needs m
 
 A complementary solution@comma{} which can also stand alone@comma{} is to have the backlinks @emph{written into} the file@comma{} on an Org property line or in a drawer.
 
-NOTE: To be clear@comma{} this mode never generates new IDs.  That's your own business.  This only adds/edits @samp{:BACKLINKS:} properties -- and only if the origin has or inherits an ID@.
+NOTE: To be clear@comma{} this mode never generates new IDs.  That's your own business.  This only adds/edits @samp{:BACKLINKS:} properties or drawers@comma{} and only gives it backlinks corresponding to links where the original site has or inherits some ID@.
 
 @menu
 * Option 2A Automatic @samp{BACKLINKS} property::
@@ -535,23 +535,28 @@ People who understand the magic of capture templates@comma{} they may take this 
 
 Can we just use vanilla org-capture?  That'd be less scary.  The answer is yes!
 
-The secret sauce is @samp{(function org-node-capture-target)}:
+The secret sauce is @samp{(function org-node-capture-target)}.  Examples:
 
 @lisp
 (setq org-capture-templates
-      '(("i" "Capture into ID node"
+      '(("e" "Capture entry into ID node"
+         entry (function org-node-capture-target) "* %?")
+
+        ("p" "Capture plain text into ID node"
          plain (function org-node-capture-target) nil
          :empty-lines-after 1)
 
         ("j" "Jump to ID node"
          plain (function org-node-capture-target) nil
-         :jump-to-captured t
-         :immediate-finish t)
+         :prepend t
+         :no-save t
+         :immediate-finish t
+         :jump-to-captured t)
 
         ;; Sometimes handy after `org-node-insert-link'@comma{} to
         ;; make a stub you plan to fill in later@comma{} without
         ;; leaving the current buffer for now
-        ("s" "Make quick stub ID node"
+        ("q" "Make quick stub ID node"
          plain (function org-node-capture-target) nil
          :immediate-finish t)))
 @end lisp
@@ -569,14 +574,13 @@ That last optional functionality may only confuse you more if I try to describe 
 
 One user had over a thousand project-nodes@comma{} but only just began to do a knowledge base@comma{} and wished to avoid seeing the project nodes.
 
-This could work by---for example---excluding anything tagged "project" or perhaps anything that has a TODO state.  Here's a way to exclude both:
+This could work by---for example---excluding anything with the Org tag @samp{:project:} or perhaps anything that has a TODO state.  Here's a way to exclude both:
 
 @lisp
 (setq org-node-filter-fn
       (lambda (node)
-        (not
-         (or (org-mem-todo-state node)
-             (member "project" (org-mem-tags node))))))
+        (not (or (member "project" (org-mem-tags node))
+                 (org-mem-todo-state node)))))
 @end lisp
 
 Or you could go with a whitelist approach@comma{} to show only nodes from a certain directory we'll call "my-personal-wiki":
@@ -600,7 +604,7 @@ But let's say you have a big archive file@comma{} fulla IDs@comma{} and you want
 
 Putting a @samp{:ROAM_EXCLUDE: t} property at the top of that file won't do it@comma{} because unlike in org-roam@comma{} @strong{child ID nodes of an excluded node are not excluded!}
 
-However@comma{} nodes in isolation do still have information about inherited tags.  So you can exploit that@comma{} or the outline path or even the file name.
+However@comma{} nodes in isolation do still have information about inherited tags.  So you can exploit that@comma{} or the outline path or even the file name.  Alas@comma{} the org-mem library does not include information about inherited @emph{properties}@comma{} which is why this workaround.
 
 It works well for me to filter out any file or directory that happens to contain "archive" in the name:
 
