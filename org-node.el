@@ -2503,21 +2503,22 @@ well as the members of `org-tag-persistent-alist' and `org-tag-alist'."
 
 (defun org-node-goto (node &optional exact)
   "Visit file containing NODE, and ensure point is inside NODE.
-EXACT means always move point to NODE top."
+EXACT means always move point to NODE top.
+See also `org-node-goto-id'."
+  (cl-assert (org-mem-entry-p node))
   (when (numberp exact)
-    (error "Function org-node--goto no longer takes a position argument"))
-  (unless node
-    (error "Function org-node--goto received a nil argument"))
-  (let ((file (org-mem-file-truename node)))
-    (if (not (file-exists-p file))
-        (org-mem-reset t "org-node: Didn't find file, resetting...")
-      (when (not (file-readable-p file))
-        (error "org-node: Couldn't visit unreadable file %s" file))
-      (org-node--goto-id (org-mem-id node) exact (or (find-buffer-visiting file)
-                                                     (find-file-noselect file))))))
+    (error "Function org-node-goto no longer takes a position argument"))
+  (let* ((file (org-mem-file-truename node))
+         ;; NOTE: We always behave as if `find-file-existing-other-name' is t,
+         ;;       which I think makes sense for us, but I haven't thought too
+         ;;       hard about it.
+         (buf (find-buffer-visiting file)))
+    (if (or buf (file-exists-p file))
+        (org-node-goto-id (org-mem-id node)
+                          exact
+                          (or buf (find-file-noselect file)))
+      (org-mem-reset t "org-node: Didn't find file, resetting..."))))
 
-;; Upstream `org-id-goto' involves a check for `file-exists-p', very bad
-;; because as org-node tries to avoid saving buffers.
 (defun org-node-goto-id (id &optional exact buffer)
   "Go to ID in some buffer, without needing the file to exist yet.
 That is, if `org-id-locations' has an entry for ID pointing to a
