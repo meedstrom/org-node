@@ -2259,6 +2259,7 @@ from ID links found in `org-mem--target<>links'."
   "Run `org-lint' on all known Org files, and report results."
   (interactive)
   (require 'org-lint)
+  (require 'org-mem-list)
   (let ((proceed (and org-node--unlinted
                       (equal fileloop--operate-function
                              #'org-node--lint-operator)))
