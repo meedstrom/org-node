@@ -2247,79 +2247,64 @@ from ID links found in `org-mem--target<>links'."
                        collect (concat target "\t" (org-mem-link-nearby-id link)))))
     "\n")))
 
-;; TODO: Speed it up by using only the fileloop SCAN-FUNCTION, which runs
-;; in a temp buffer.  Just enable org-mode, run org-lint, then return nil so
-;; OPERATE-FUNCTION is never called.  Just remember to kill the " *next-file*"
-;; buffer as cleanup at the end of the loop.
-(defvar org-node--unlinted nil)
-(defvar org-node--lint-current nil)
-(defvar org-node--lint-operator nil)
+(defvar org-node--lint-remaining-files nil)
 (defvar org-node--lint-warnings nil)
 (defun org-node-lint-all-files ()
   "Run `org-lint' on all known Org files, and report results."
   (interactive)
   (require 'org-lint)
   (require 'org-mem-list)
-  (let ((proceed (and org-node--unlinted
-                      (equal fileloop--operate-function
-                             #'org-node--lint-operator)))
+  (let ((proceed (and org-node--lint-remaining-files
+                      (equal fileloop--scan-function #'org-node--lint-scanner)))
         (files (org-mem-all-files)))
     (unless proceed
       (when (y-or-n-p (format "Lint %d files?" (length files)))
-        (setq org-node--unlinted files)
-        (fileloop-initialize
-         files
-         (lambda ()
-           (let ((file (pop org-node--unlinted)))
-             ;; REVIEW: unnecessary?
-             (when (string-prefix-p "org" (file-name-extension file))
-               (setq org-node--lint-current file))))
-         #'org-node--lint-operator)
+        (setq org-node--lint-remaining-files files)
+        (fileloop-initialize files #'org-node--lint-scanner #'ignore)
         (setq org-node--lint-warnings nil)
         (setq proceed t)))
     (condition-case _
         (when proceed
-          (cl-letf (((symbol-function 'recentf-add-file) #'ignore))
-            (let ((find-file-hook nil)
-                  (enable-local-variables :safe)
-                  (delay-mode-hooks t)
-                  (org-agenda-files nil)
-                  (org-inhibit-startup t))
+          (let ((enable-local-variables :safe)
+                ;; PERF: Speed-up enabling `org-mode' in each buffer
+                (delay-mode-hooks t)
+                (org-agenda-files nil)
+                (org-inhibit-startup t))
+            ;; PERF: Prevent re-running `org-id-update-id-locations' in every
+            ;;       file; 85% of runtime according to the CPU profiler!
+            (cl-letf (((symbol-function #'org-id-update-id-locations) #'ignore))
               (fileloop-continue))))
       (quit)))
-
   (when org-node--lint-warnings
-      (org-mem-list--pop-to-tabulated-buffer
-       :buffer "*org lint results*"
-       :format [("File" 30 t) ("Line" 5 t) ("Trust" 5 t) ("Explanation" 0 t)]
-       :reverter #'org-node-lint-all-files
-       :entries (cl-loop
-                 for (file . warning) in org-node--lint-warnings
-                 collect (let ((array (cadr warning)))
-                           (list (sxhash warning)
-                                 (vector
-                                  (buttonize (file-name-nondirectory file)
-                                             `(lambda (_button)
-                                                (find-file ,file)
-                                                (goto-line ,(string-to-number
-                                                             (elt array 0)))))
-                                  (elt array 0)
-                                  (elt array 1)
-                                  (elt array 2))))))))
+    (org-mem-list--pop-to-tabulated-buffer
+     :buffer "*org lint results*"
+     :format [("File" 30 t) ("Line" 5 t) ("Trust" 5 t) ("Explanation" 0 t)]
+     :reverter #'org-node-lint-all-files
+     :entries (cl-loop
+               for (file . warning) in org-node--lint-warnings
+               collect (let ((array (cadr warning)))
+                         (list (sxhash warning)
+                               (vector
+                                (buttonize (file-name-nondirectory file)
+                                           `(lambda (_button)
+                                              (find-file ,file)
+                                              (goto-line ,(string-to-number
+                                                           (elt array 0)))))
+                                (elt array 0)
+                                (elt array 1)
+                                (elt array 2))))))))
 
-;; FIXME: ...Just one lint warning per file?
-(defun org-node--lint-operator ()
-  "An OPERATE-FUNCTION for `fileloop-initialize'."
-  (let ((buffer-seems-new (and (not (buffer-modified-p))
-                               (not buffer-undo-list))))
-    (unless (derived-mode-p 'org-mode) (org-mode))
-    (let ((inhibit-message t)) ; Muffle spam from `org-lint-invalid-id-link'
-      (when-let* ((warning (org-lint)))
-        (push (cons org-node--lint-current (car warning))
-              org-node--lint-warnings)))
-    (when buffer-seems-new
-      (kill-buffer))
-    t))
+(defun org-node--lint-scanner ()
+  "A SCAN-FUNCTION for `fileloop-initialize'."
+  (redisplay)
+  (unless (derived-mode-p 'org-mode)
+    (org-mode))
+  (let* ((file (pop org-node--lint-remaining-files))
+         (inhibit-message t) ;; Muffle spam from `org-lint-invalid-id-link'
+         (warnings (org-lint)))
+    (while warnings
+      (push (cons file (pop warnings)) org-node--lint-warnings)))
+  nil)
 
 
 ;;;; Commands 6: Editing tags / refs / aliases
