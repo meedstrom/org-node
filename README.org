@@ -6,7 +6,6 @@
 #+TEXINFO_DIR_CATEGORY: Emacs
 #+TEXINFO_DIR_TITLE: Org-node: (org-node).
 #+TEXINFO_DIR_DESC: Link org-id entries into a network.
-* Background
 ** What's all this
 #+HTML: <a href="https://repology.org/project/emacs%3Aorg-node/versions"> <img src="https://repology.org/badge/vertical-allrepos/emacs%3Aorg-node.svg" alt="Packaging status" align="right"> </a>
 
@@ -262,7 +261,6 @@ The secret sauce is =(function org-node-capture-target)=.  Examples:
         ("j" "Jump to ID node"
          plain (function org-node-capture-target) nil
          :prepend t
-         :no-save t
          :immediate-finish t
          :jump-to-captured t)
 
@@ -281,6 +279,8 @@ With that done, you can optionally configure the everyday commands =org-node-fin
 #+end_src
 
 That last optional functionality may only confuse you more if I try to describe it in words -- better you give it a spin and see if you like.
+
+For deeper hacking, see [[https://github.com/meedstrom/org-node/wiki/Capture][wiki]].
 
 ** Exclude uninteresting nodes
 

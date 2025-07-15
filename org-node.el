@@ -194,8 +194,10 @@ Used in some commands when exiting minibuffer with a blank string."
                 (function :tag "Custom function" :value (lambda ())))
   :package-version '(org-node . "3.3.12"))
 
-;; TODO: If using org-capture as creation-fn, can we design a template to
-;;       capture into a child of another entry rather than a new file?
+;; TODO: If setting `org-node-creation-fn' to `org-capture', can we design a
+;;       capture template that makes new subtree in a pre-existing entry,
+;;       rather than always making a new file?
+;;       Would be handy for some kind of "inbox.org" datetree.
 (defvar org-node-untitled-format "untitled-%d")
 (defvar org-node--untitled-ctr 0)
 (defun org-node-titlegen-untitled ()
@@ -1084,7 +1086,6 @@ If possible, determine :title and :id from current values of
 Otherwise, prompt the user for a title.
 Finally, if the title matches an existing node, set :existing-node to
 that \(an `org-mem-entry' object\), otherwise leave it at nil."
-  (org-node-cache-ensure)
   (let (title id node)
     (if org-node-proposed-title
         ;; Was presumably called from wrapper `org-node-create', so the user
@@ -2521,18 +2522,21 @@ See also `org-node-goto-id'."
 
 (defun org-node-goto-id (id &optional exact buffer)
   "Go to ID in some buffer, without needing the file to exist yet.
-That is, if `org-id-locations' has an entry for ID pointing to a
+that is, if `org-id-locations' has an entry for ID pointing to a
 file-name that may not yet have been written to disk, but a buffer
 visits it, switch to that unsaved buffer and look for ID there.
+This differs from `org-id-goto', which would throw an error.
 
-If optional argument BUFFER non-nil, look in that specific buffer,
-in which case it needs not be a file-visiting buffer at all.
+Optional argument BUFFER is a specific buffer in which to look,
+in which case ID needs not be registered in `org-id-locations' at all.
 
 Optional argument EXACT as in `org-node-goto'."
   (cl-assert (stringp id))
   (unless buffer
     (let ((file (or (gethash id org-id-locations)
-                    (org-mem-entry-file-truename (org-mem-entry-by-id id)))))
+                    (let ((entry (org-mem-entry-by-id id)))
+                      (if entry (org-mem-entry-file-truename entry)
+                        (error "Unknown ID: %s" id))))))
       (setq buffer (or (find-buffer-visiting file)
                        (find-file-noselect file)))))
   (let (pos)
@@ -2541,7 +2545,8 @@ Optional argument EXACT as in `org-node-goto'."
       (setq pos (or (org-find-property "ID" id)
                     (error "Could not find ID \"%s\" in buffer %s" id buffer))))
     (pop-to-buffer-same-window buffer)
-    (cl-assert (eq (current-buffer) buffer)) ; does pop-to-buffer guarantee it?
+    ;; Q: Does pop-to-buffer guarantee this?
+    (cl-assert (eq (current-buffer) buffer))
     (widen)
     ;; Mainly comes true on first visit to a file node, so that point=1.
     (when (eq (point) pos)

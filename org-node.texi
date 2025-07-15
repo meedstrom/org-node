@@ -23,7 +23,6 @@
 @end ifnottex
 
 @menu
-* Background::
 * Setup::
 * Backlinks::
 * Misc::
@@ -31,13 +30,6 @@
 
 @detailmenu
 --- The Detailed Node Listing ---
-
-Background
-
-* What's all this::
-* What's a "node"?::
-* Features::
-* Benchmarks on my machine::
 
 Setup
 
@@ -99,16 +91,6 @@ Appendix IV: What are @samp{ROAM_REFS}?
 * Citations::
 
 @end detailmenu
-@end menu
-
-@node Background
-@chapter Background
-
-@menu
-* What's all this::
-* What's a "node"?::
-* Features::
-* Benchmarks on my machine::
 @end menu
 
 @node What's all this
@@ -549,7 +531,6 @@ The secret sauce is @samp{(function org-node-capture-target)}.  Examples:
         ("j" "Jump to ID node"
          plain (function org-node-capture-target) nil
          :prepend t
-         :no-save t
          :immediate-finish t
          :jump-to-captured t)
 
@@ -568,6 +549,8 @@ With that done@comma{} you can optionally configure the everyday commands @samp{
 @end lisp
 
 That last optional functionality may only confuse you more if I try to describe it in words -- better you give it a spin and see if you like.
+
+For deeper hacking@comma{} see @uref{https://github.com/meedstrom/org-node/wiki/Capture, wiki}.
 
 @node Exclude uninteresting nodes
 @section Exclude uninteresting nodes
