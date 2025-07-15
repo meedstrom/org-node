@@ -971,6 +971,14 @@ Designed for `org-node-creation-fn'."
   (run-hooks 'org-node-creation-hook))
 
 (defun org-node-pop-to-fresh-file-buffer (title)
+  "Open a buffer that visits a file for a node to be named TITLE.
+
+May open a pre-existing buffer even if it was not yet written to disk,
+but throws an error if that buffer already has content, since this
+function is meant as a subroutine for creating a new file-level node.
+To merely visit an existing node, see `org-node-goto-id'.
+
+If the file already exists, this also attempts a `revert-buffer'."
   (let* ((dir (org-node-guess-or-ask-dir "New file in which directory? "))
          (file (file-name-concat dir (org-node-title-to-basename title)))
          (buf (progn (mkdir dir t)
@@ -978,11 +986,16 @@ Designed for `org-node-creation-fn'."
                          (find-file-noselect file)))))
     (pop-to-buffer-same-window buf)
     (cl-assert (eq (current-buffer) buf))
-    (when (not (length= (buffer-string) 0))
-      (let ((msg (format "Resetting cache because file seems to already have contents: %s"
-                         file)))
-        (org-mem-reset t msg)
-        (user-error "%s" msg)))))
+    (cl-flet ((assert-empty ()
+                (when (not (length= (buffer-string) 0))
+                  (let ((msg (format "Resetting cache because file seems to already have contents: %s"
+                                     file)))
+                    (org-mem-reset t msg)
+                    (user-error "%s" msg)))))
+      (assert-empty)
+      (when (file-exists-p file)
+        (revert-buffer)
+        (assert-empty)))))
 
 (defun org-node-new-via-roam-capture ()
   "Call `org-roam-capture-' with predetermined arguments.
