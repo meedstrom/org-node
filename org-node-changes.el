@@ -252,7 +252,6 @@ NAME, ARGLIST and BODY as in `defun'."
 (org-node-changes--def-whiny-alias 'org-node-list-collisions                'org-mem-list-title-collisions              "3.0.0 (May 2025)" "September" t)
 (org-node-changes--def-whiny-alias 'org-node-list-dead-links                'org-mem-list-dead-id-links                 "3.0.0 (May 2025)" "September" t)
 (org-node-changes--def-whiny-alias 'org-node-list-scan-problems             'org-mem-list-problems                      "3.0.0 (May 2025)" "September" t)
-(org-node-changes--def-whiny-alias 'org-node-p                              #'org-mem-entry-p                           "3.0.0 (May 2025)" "September")
 (org-node-changes--def-whiny-alias 'org-nodes-in-file                       #'org-mem-id-nodes-in-files                 "3.0.0 (May 2025)" "September")
 (org-node-changes--def-whiny-alias 'org-node--general-org-work-buffer       #'org-mem-org-mode-scratch                  "3.1.1 (May 2025)" "September")
 (org-node-changes--def-whiny-alias 'org-node-forget-dir                     #'org-mem-forget-id-locations-recursively   "3.2.0 (May 2025)" "September" t)
