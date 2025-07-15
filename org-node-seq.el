@@ -180,7 +180,7 @@ YYYY-MM-DD format, e.g. \"2024-01-31.org\"."
   "Try to visit org-id ID and return non-nil, else return nil."
   (let ((node (org-mem-entry-by-id id)))
     (when node
-      (org-node--goto node)
+      (org-node-goto node)
       t)))
 
 ;;;###autoload

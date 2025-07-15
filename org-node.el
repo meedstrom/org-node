@@ -954,7 +954,7 @@ Designed for `org-node-creation-fn'."
   (or (and id (setq org-node-proposed-id id))
       (setq id org-node-proposed-id)
       (error "Proposed ID was nil"))
-  (org-node--pop-to-fresh-file-buffer title)
+  (org-node-pop-to-fresh-file-buffer title)
   (if org-node-prefer-with-heading
       (insert "* " title
               "\n:PROPERTIES:"
@@ -970,7 +970,7 @@ Designed for `org-node-creation-fn'."
   (push (current-buffer) org-node--new-unsaved-buffers)
   (run-hooks 'org-node-creation-hook))
 
-(defun org-node--pop-to-fresh-file-buffer (title)
+(defun org-node-pop-to-fresh-file-buffer (title)
   (let* ((dir (org-node-guess-or-ask-dir "New file in which directory? "))
          (file (file-name-concat dir (org-node-title-to-basename title)))
          (buf (progn (mkdir dir t)
@@ -1046,9 +1046,9 @@ type the name of a node that does not exist.  That enables this
   ;; Store the title and ID in such a way that the user gets access to
   ;; expansions %(org-capture-get :title) and %(org-capture-get :id) in the
   ;; template string.
-  (apply #'org-capture-put (org-node--infer-title-etc))
+  (apply #'org-capture-put (org-node-capture-infer-title-etc))
   (if-let* ((node (org-capture-get :existing-node)))
-      (org-node--goto node t)
+      (org-node-goto node t)
     (org-node-new-file (org-capture-get :title)
                        (org-capture-get :id)))
   (when (eq (org-capture-get :type) 'plain)
@@ -1063,7 +1063,7 @@ type the name of a node that does not exist.  That enables this
         (when (org-at-heading-p)
           (backward-char))))))
 
-(defun org-node--infer-title-etc ()
+(defun org-node-capture-infer-title-etc ()
   "Return a plist with values for :title, :id and :existing-node.
 
 If possible, determine :title and :id from current values of
@@ -1111,7 +1111,7 @@ set `org-node-creation-fn' to `org-node-new-via-roam-capture'."
          (node (gethash input org-node--candidate<>entry)))
     (require 'org-id)
     (if node
-        (org-node--goto node)
+        (org-node-goto node)
       (org-node-create input (org-id-new)))))
 
 ;;;###autoload
@@ -1143,8 +1143,8 @@ be sufficient to key-bind that one."
   "Visit a random node."
   (interactive)
   (org-node-cache-ensure)
-  (org-node--goto (seq-random-elt
-                   (hash-table-values org-node--candidate<>entry))))
+  (org-node-goto (seq-random-elt
+                  (hash-table-values org-node--candidate<>entry))))
 
 ;;;###autoload
 (defun org-node-visit-random ()
@@ -1688,7 +1688,7 @@ Exiting the prompt with a blank input calls `org-node-extract-subtree'."
       (let ((node (or (gethash input org-node--candidate<>entry)
                       (error "Node not found: %s" input)))
             (source (point-marker)))
-        (org-node--goto node t) ;; NOTE: May or may not change current buffer
+        (org-node-goto node t) ;; NOTE: May or may not change current buffer
         (forward-char)
         (save-excursion
           (with-current-buffer (marker-buffer source)
@@ -2223,10 +2223,10 @@ for quality-control issues that can reveal themselves."
                  collect
                  (list (+ (sxhash origin) (sxhash target))
                        (vector (buttonize (org-mem-title origin-node)
-                                          #'org-node--goto
+                                          #'org-node-goto
                                           origin-node)
                                (buttonize (org-mem-title target-node)
-                                          #'org-node--goto
+                                          #'org-node-goto
                                           target-node))))))))
 
 ;; TODO: Temp merge all refs into corresponding ID
@@ -2503,7 +2503,7 @@ well as the members of `org-tag-persistent-alist' and `org-tag-alist'."
 
 ;;;; Gotos
 
-(defun org-node--goto (node &optional exact)
+(defun org-node-goto (node &optional exact)
   "Visit file containing NODE, and ensure point is inside NODE.
 EXACT means always move point to NODE top."
   (when (numberp exact)
@@ -2520,7 +2520,7 @@ EXACT means always move point to NODE top."
 
 ;; Upstream `org-id-goto' involves a check for `file-exists-p', very bad
 ;; because as org-node tries to avoid saving buffers.
-(defun org-node--goto-id (id &optional exact buffer)
+(defun org-node-goto-id (id &optional exact buffer)
   "Go to ID in some buffer, without needing the file to exist yet.
 That is, if `org-id-locations' has an entry for ID pointing to a
 file-name that may not yet have been written to disk, but a buffer
@@ -2529,7 +2529,7 @@ visits it, switch to that unsaved buffer and look for ID there.
 If optional argument BUFFER non-nil, look in that specific buffer,
 in which case it needs not be a file-visiting buffer at all.
 
-Optional argument EXACT as in `org-node--goto'."
+Optional argument EXACT as in `org-node-goto'."
   (cl-assert (stringp id))
   (unless buffer
     (let ((file (or (gethash id org-id-locations)
@@ -2699,7 +2699,7 @@ If already visiting that node, then follow the link normally."
                (not (and (derived-mode-p 'org-mode)
                          (equal (org-entry-get-with-inheritance "ID")
                                 (org-mem-entry-id found)))))
-          (progn (org-node--goto found t)
+          (progn (org-node-goto found t)
                  t)
         nil))))
 

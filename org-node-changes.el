@@ -235,6 +235,10 @@ NAME, ARGLIST and BODY as in `defun'."
 (define-obsolete-function-alias 'org-node-is-subtree                 #'org-mem-subtree-p                    "3.0.0 (May 2025)")
 (define-obsolete-function-alias 'org-node-subtree-p                  #'org-mem-entry-subtree-p              "3.0.0 (May 2025)")
 (define-obsolete-function-alias 'org-node-insert-link-into-drawer    'org-node-insert-into-related          "3.3.3 (May 2025)")
+(define-obsolete-function-alias 'org-node--goto                      'org-node-goto                         "3.8.0 (July 2025)")
+(define-obsolete-function-alias 'org-node--goto-id                   'org-node-goto-id                      "3.8.0 (July 2025)")
+(define-obsolete-function-alias 'org-node--infer-title-etc           'org-node-capture-infer-title-etc      "3.8.0 (July 2025)")
+(define-obsolete-function-alias 'org-node--pop-to-fresh-file-buffer  'org-node-pop-to-fresh-file-buffer     "3.8.0 (July 2025)")
 
 (org-node-changes--def-whiny-alias 'org-node--dir-files-recursively         #'org-mem--dir-files-recursive              "3.0.0 (May 2025)" "August")
 (org-node-changes--def-whiny-alias 'org-node--maybe-adjust-idle-timer       #'org-mem-updater--adjust-timer             "3.0.0 (May 2025)" "September")
