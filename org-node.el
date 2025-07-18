@@ -1537,7 +1537,7 @@ modify itself other than through this command."
             (forward-line -1)
             (back-to-indentation))
           (insert (format-time-string (org-time-stamp-format t t)) " -> "
-                  (org-link-make-string (org-mem-id node)
+                  (org-link-make-string (concat "id:" (org-mem-id node))
                                         (org-mem-title node))))))))
 
 
