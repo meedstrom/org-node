@@ -272,6 +272,13 @@ The secret sauce is =(function org-node-capture-target)=.  Examples:
          :immediate-finish t)))
 #+end_src
 
+The behavior of =org-node-capture-target= can be influenced via parameters passed in a plist. In order
+to do so, the result has to be wrapped in a nullary lambda function in the capture template, e.g.,
+=(function (lambda () (org-node-capture-target '(:path "~/org/articles"))))=. The following parameters exist:
+
+- =:path=: Provide the path of the directory in which the new file will be created
+- =:ask_path=: Always ask for the path, even if ~org-node-file-directory-ask~ is configured otherwise
+
 With that done, you can optionally configure the everyday commands =org-node-find= & =org-node-insert-link= to outsource to org-capture when they try to create new nodes:
 
 #+begin_src elisp

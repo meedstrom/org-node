@@ -831,10 +831,11 @@ substring \"/home/me\" referring to the same location."
 ;;       change the basename.  So, conditionally call `org-node-file-slug-fn'
 ;;       here, then use `read-file-name' rather than `read-directory-name'.
 ;;       But first we need some refactoring elsewhere.
-(defun org-node-guess-or-ask-dir (prompt)
+(defun org-node-guess-or-ask-dir (prompt &optional ask_always)
   "Maybe prompt for a directory, and if so, use string PROMPT.
-Behavior depends on user option `org-node-file-directory-ask'."
-  (if (eq t org-node-file-directory-ask) (read-directory-name prompt)
+Behavior depends on user option `org-node-file-directory-ask'
+(the latter can be overridden with the optional ALWAYS_ASK.)"
+  (if (or (eq t ask_always) (eq t org-node-file-directory-ask)) (read-directory-name prompt)
     (if (stringp org-node-file-directory-ask) org-node-file-directory-ask
       (org-node-guess-dir))))
 
@@ -949,14 +950,43 @@ To operate on a node after creating it, hook onto
 
 (defun org-node-new-file (&optional title id)
   "Create a new file with a new node.
-Designed for `org-node-creation-fn'."
+ Designed for `org-node-creation-fn'. This
+ is a wrapper around `org-node-new-file-parameterized'
+ in order to provide the required signature for
+ `org-node-creation-fn'."
   (or (and title (setq org-node-proposed-title title))
       (setq title org-node-proposed-title)
       (error "Proposed title was nil"))
   (or (and id (setq org-node-proposed-id id))
       (setq id org-node-proposed-id)
       (error "Proposed ID was nil"))
-  (org-node-pop-to-fresh-file-buffer title)
+  (org-node-new-file-parameterized `(:title ,title :id ,id)))
+
+(defun org-node-new-file-parameterized (plist)
+  "Create a new file with a new node according
+   to the specification in the PLIST, allowing
+   us to provide a `:path' for the directory in which
+   the file is to be created or stipulate that
+   the user should always be asked via `:ask_path'
+   (thus overriding `org-node-file-directory-ask`.)"
+  (let ((title (plist-get plist :title))
+        (id    (plist-get plist :id))
+        (path   (plist-get plist :path))
+	(ask_path   (plist-get plist :ask_path))
+        )
+      ;; get title
+      (unless title
+        (setq title org-node-proposed-title))
+      (unless title
+        (error "Proposed title was nil"))
+      (setq org-node-proposed-title title)
+      ;; get ID
+      (unless id
+        (setq id org-node-proposed-id))
+      (unless id
+        (error "Proposed ID was nil"))
+      (setq org-node-proposed-id id)
+  (org-node-pop-to-fresh-file-buffer title plist)
   (if org-node-prefer-with-heading
       (insert "* " title
               "\n:PROPERTIES:"
@@ -970,9 +1000,9 @@ Designed for `org-node-creation-fn'."
             "\n"))
   (goto-char (point-max))
   (push (current-buffer) org-node--new-unsaved-buffers)
-  (run-hooks 'org-node-creation-hook))
+  (run-hooks 'org-node-creation-hook)))
 
-(defun org-node-pop-to-fresh-file-buffer (title)
+(defun org-node-pop-to-fresh-file-buffer (title &optional plist)
   "Open a buffer that visits a file for a node to be named TITLE.
 
 May open a pre-existing buffer even if it was not yet written to disk,
@@ -980,8 +1010,17 @@ but throws an error if that buffer already has content, since this
 function is meant as a subroutine for creating a new file-level node.
 To merely visit an existing node, see `org-node-goto-id'.
 
-If the file already exists, this also attempts a `revert-buffer'."
-  (let* ((dir (org-node-guess-or-ask-dir "New file in which directory? "))
+If the file already exists, this also attempts a `revert-buffer'.
+
+File creation can be influenced via the PLIST, allowing
+us to provide a `:path' for the directory in which
+the file is to be created or stipulate that
+the user should always be asked via `:ask_path'
+(thus overriding `org-node-file-directory-ask`.)
+"
+  (let* ((path (plist-get plist :path))
+	 (ask_path (plist-get plist :ask_path))
+	 (dir (or path (org-node-guess-or-ask-dir "New file in which directory? " ask_path)))
          (file (file-name-concat dir (org-node-title-to-basename title)))
          (buf (progn (mkdir dir t)
                      (or (find-buffer-visiting file)
@@ -1032,7 +1071,7 @@ This option will be removed in the future."
   :package-version '(org-node . "3.8.0"))
 
 ;;;###autoload
-(defun org-node-capture-target ()
+(defun org-node-capture-target (&rest args)
   "Can be used as target in a capture template.
 See `org-capture-templates' for more info about targets.
 
@@ -1056,16 +1095,34 @@ type the name of a node that does not exist.  That enables this
 1. Run `org-node-find'
 2. Type name of an unknown node
 3. Select your template
-4. Same as 4b earlier."
+4. Same as 4b earlier.
+
+Behavior of `org-node-capture-target' can be modified by
+passing a plist as single ARG and wrapping the result as a nullary
+lambda function:
+
+1. A default `:path' for the directory in which the new file
+   is to be created can be set
+2. Alternatively, by setting `:ask_path' to `t', the
+   customization of `org-node-file-directory-ask' can be overridden.
+"
   (org-node-cache-ensure)
   ;; Store the title and ID in such a way that the user gets access to
   ;; expansions %(org-capture-get :title) and %(org-capture-get :id) in the
   ;; template string.
   (apply #'org-capture-put (org-node-capture-infer-title-etc))
-  (if-let* ((node (org-capture-get :existing-node)))
+  (let* ((plist (cond
+               ((null args) '())
+               ((and (= (length args) 1) (listp (car args))) (car args))
+               (t args)))
+	 (path (plist-get plist :path))
+	 (ask_path (plist-get plist :ask_path))
+         (title (org-capture-get :title))
+         (id (org-capture-get :id))
+         (node (org-capture-get :existing-node)))
+  (if node
       (org-node-goto node t)
-    (org-node-new-file (org-capture-get :title)
-                       (org-capture-get :id)))
+    (org-node-new-file-parameterized `(:title ,title :id ,id :path ,path :ask_path ,ask_path))))
   (when (eq (org-capture-get :type) 'plain)
     ;; Emulate part of `org-capture-place-plain-text'.  We cannot just put the
     ;; capture property :target-entry-p t, because this may be a file-level
