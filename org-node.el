@@ -2435,6 +2435,42 @@ To always operate on the current entry, use `org-node-add-tags-here'."
       (org-back-to-heading)
       (org-set-tags (seq-uniq (append (org-get-tags nil t) tags))))))
 
+(defun org-node-remove-tags (tags)
+  "Add TAGS to the node at point or nearest ancestor that is a node.
+
+To always operate on the current entry, use `org-node-remove-tags-here'."
+  (interactive (list (org-node--read-tags)) org-mode)
+  (org-node--call-at-nearest-node #'org-node-remove-tags-here tags))
+
+(defun org-node-remove-tags-here (tags)
+  "Add TAGS to the entry at point."
+  (interactive (list (org-node--read-tags)) org-mode)
+  (setq tags (ensure-list tags))
+  (if (org-before-first-heading-p)
+      ;; There's no Org builtin to set filetags yet
+      ;; so we have to do it ourselves.
+      (let* ((filetags (cl-loop
+                        for raw in (cdar (org-collect-keywords '("FILETAGS")))
+                        append (split-string raw ":" t)))
+             (new-tags (seq-difference filetags tags))
+             (case-fold-search t))
+        (save-excursion
+          (without-restriction
+            (goto-char (point-min))
+            (if (search-forward "\n#+filetags:" nil t)
+                (atomic-change-group
+                  (skip-chars-forward " ")
+                  (delete-region (point) (pos-eol))
+		  (when new-tags
+		    (insert ":" (string-join new-tags ":") ":"))
+		  )
+              (org-node-full-end-of-meta-data)
+	      (when new-tags
+                (insert "#+filetags: :" (string-join new-tags ":") ":\n"))))))
+    (save-excursion
+      (org-back-to-heading)
+      (org-set-tags (seq-uniq (append (org-get-tags nil t) tags))))))
+
 (defun org-node--read-tags ()
   "Prompt for an Org tag or several.
 Pre-fill completions by collecting tags from all known Org files, as
@@ -2493,6 +2529,8 @@ well as the members of `org-tag-persistent-alist' and `org-tag-alist'."
   "a h" #'org-node-add-tags-here
   "a r" #'org-node-add-refs
   "a t" #'org-node-add-tags
+  "r h" #'org-node-remove-tags-here
+  "r t" #'org-node-remove-tags
   "x b" 'org-node-backlink-fix-buffer
   "x p" #'org-node-complete-at-point-local-mode
   ;; "x i" #'org-node-insert-include ;; TODO. Not yet a good command.
