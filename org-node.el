@@ -439,6 +439,10 @@ The collections are trivial variants of `org-node-collection-basic'."
       (apply #'org-node-collection--with-empty args)
     (apply #'org-node-collection-basic args)))
 
+
+(defun org-node--completion-metadata ()
+  (list (cons 'affixation-function #'org-node--affixate)))
+
 ;; TODO: Assign a category `org-node', then add an embark action to embark?
 ;; TODO: Bind a custom exporter to `embark-export'
 ;; TODO: Add user options to set 'group-function, 'display-sort-function etc?
@@ -462,14 +466,14 @@ exit with user-entered input that didn\\='t match anything.
 Arguments STR, PRED and ACTION are handled behind the scenes,
 see Info node `(elisp)Programmed Completion'."
   (if (eq action 'metadata)
-      (cons 'metadata (list (cons 'affixation-function #'org-node--affixate)))
+      (cons 'metadata (org-node--completion-metadata))
     (complete-with-action action org-node--candidate<>entry str pred)))
 
 (defun org-node-collection--with-empty (str pred action)
   "A collection that includes an empty candidate at the front.
 STR, PRED and ACTION as in `org-node-collection-basic'."
   (if (eq action 'metadata)
-      (cons 'metadata (list (cons 'affixation-function #'org-node--affixate)))
+      (cons 'metadata (org-node--completion-metadata))
     (let ((blank (if (bound-and-true-p helm-mode) " " "")))
       (complete-with-action
        action
@@ -478,7 +482,8 @@ STR, PRED and ACTION as in `org-node-collection-basic'."
        pred))))
 
 (defun org-node--affixate (collection)
-  "From flat list COLLECTION, make alist ((TITLE PREFIX SUFFIX) ...)."
+  "From flat list COLLECTION, make alist ((TITLE PREFIX SUFFIX) ...).
+Presumes that COLLECTION is the keys of `org-node--candidate<>entry'."
   (and collection
        (if (string-blank-p (car collection))
            (cons
