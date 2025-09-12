@@ -264,7 +264,7 @@ The original reason that org-node exists.
 @headitem 
 @tab org-roam
 @tab org-node
-@item Time to cache my 3000 nodes
+@item Time to index my 3000 nodes
 @tab 2m 48s
 @tab 0m 02s
 @item Time to save file w/ 400 nodes
@@ -290,8 +290,6 @@ The original reason that org-node exists.
 @section Install
 
 Assuming your package manager knows about @uref{https://melpa.org/#/getting-started, MELPA}@comma{} add the following initfile snippet.
-
-Note that the prefix maps are new@comma{} so @uref{https://github.com/meedstrom/org-node/issues/123, you may need to upgrade or re-build the package}@comma{} or just remove the optional @samp{:init} clause.
 
 @lisp
 (use-package org-mem

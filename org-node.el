@@ -920,6 +920,12 @@ Automatically set, should be nil most of the time.")
   "Key that identifies a node sequence about to be added-to.
 Automatically set, should be nil most of the time.")
 
+;; TODO: Return the node it created...?  Handy for programming.  We'd have to
+;;       mandate saving the buffer after creation, and refactor org-mem so it
+;;       can update synchronously instead of async, but that risks slowness in
+;;       the use-case where you call this rapid-fire in an already huge file.
+;;       Maybe this function can just accept a lambda that it temporarily adds
+;;       to `org-mem-post-targeted-scan-functions'?
 (defun org-node-create (title id &optional seq-key)
   "Call `org-node-creation-fn' with necessary variables set.
 
@@ -1085,7 +1091,7 @@ If possible, determine :title and :id from current values of
 `org-node-proposed-title' and `org-node-proposed-id'.
 Otherwise, prompt the user for a title.
 Finally, if the title matches an existing node, set :existing-node to
-that \(an `org-mem-entry' object\), otherwise leave it at nil."
+that node \(an `org-mem-entry' object\), otherwise leave it at nil."
   (let (title id node)
     (if org-node-proposed-title
         ;; Was presumably called from wrapper `org-node-create', so the user
@@ -1375,6 +1381,12 @@ keywords."
                 (org-link-make-string
                  (concat "id:" id)
                  (or (and org-node-custom-link-format-fn
+                          ;; FIXME: if it had to create new node, its data
+                          ;; doesnt yet exist so we cant funcall this.  maybe
+                          ;; mandate that a node creator saves the buffer, make
+                          ;; org-mem-updater actually just operate
+                          ;; synchronously, (not using el-job), and node
+                          ;; creator can return the node object thus created
                           node
                           (funcall org-node-custom-link-format-fn node))
                      title)))
@@ -1530,6 +1542,10 @@ modify itself other than through this command."
         (org-node-narrow-to-drawer-create org-node-name-of-links-drawer
                                           #'org-entry-end-position)
         (atomic-change-group
+          ;; TODO: Go to end of drawer.
+          ;;       This should probably be controlled by user option.
+          ;; (goto-char (point-max))
+          ;; (org-node--safe-ensure-blank-line t)
           (unless (eolp)
             (let ((col (current-indentation)))
               (newline)
@@ -1730,8 +1746,8 @@ To add exceptions, see `org-node-renames-exclude'."
   "Regexp matching paths of files not to auto-rename.
 For use by `org-node-rename-file-by-title'.
 
-Only applied to files under `org-node-renames-allowed-dirs'.  If
-a file is not there, it is not considered in any case."
+Only applied to files under `org-node-renames-allowed-dirs'.
+If a file is not there, it is not considered in any case."
   :type 'string
   :package-version '(org-node . "0.7"))
 

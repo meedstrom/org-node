@@ -75,19 +75,17 @@ A comparison of three systems that all permit relying on org-id and don't lock y
 
 The original reason that org-node exists.
 
-|                                 | org-roam | org-node |
-|---------------------------------+----------+----------|
-| Time to cache my 3000 nodes     | 2m 48s   | 0m 02s   |
-| Time to save file w/ 400 nodes  | 5--10s   | instant  |
-| Time to display 20 backlinks    | 5--10s   | instant  |
-| Time to open minibuffer         | 1--3s    | instant  |
+|                                | org-roam | org-node |
+|--------------------------------+----------+----------|
+| Time to index my 3000 nodes    | 2m 48s   | 0m 02s   |
+| Time to save file w/ 400 nodes | 5--10s   | instant  |
+| Time to display 20 backlinks   | 5--10s   | instant  |
+| Time to open minibuffer        | 1--3s    | instant  |
 
 * Setup
 ** Install
 
 Assuming your package manager knows about [[https://melpa.org/#/getting-started][MELPA]], add the following initfile snippet.
-
-Note that the prefix maps are new, so [[https://github.com/meedstrom/org-node/issues/123][you may need to upgrade or re-build the package]], or just remove the optional =:init= clause.
 
 #+begin_src elisp
 (use-package org-mem
