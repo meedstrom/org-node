@@ -2593,10 +2593,10 @@ To always operate on the current entry, use `org-node-add-tags-here'."
           (without-restriction
             (goto-char (point-min))
             (if (null tags)
-                (when (re-search-forward "^#+filetags: " nil t)
+                (when (re-search-forward "^#\\+filetags: " nil t)
                   (delete-region (pos-bol) (pos-eol)))
               (atomic-change-group
-                (unless (re-search-forward "^#+filetags: " nil t)
+                (unless (re-search-forward "^#\\+filetags: " nil t)
                   (org-node-full-end-of-meta-data)
                   (unless (and (bolp) (eolp))
                     (open-line 1))
