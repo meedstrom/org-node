@@ -2238,8 +2238,8 @@ one of them is associated with a ROAM_REFS property."
   (let ((entries
          (cl-loop
           for link in (org-mem-all-links)
-          unless (equal "id" (org-mem-link-type link))
           as node = (org-mem-entry-by-id (org-mem-link-nearby-id link))
+          unless (equal "id" (org-mem-link-type link))
           when node
           collect
           (let ((type (org-mem-link-type link))
