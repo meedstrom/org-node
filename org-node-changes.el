@@ -235,7 +235,6 @@ NAME, ARGLIST and BODY as in `defun'."
 (define-obsolete-function-alias 'org-node--pop-to-fresh-file-buffer  'org-node-pop-to-fresh-file-buffer     "3.8.0 (July 2025)")
 
 (org-node-changes--def-whiny-alias 'org-node--dir-files-recursively         #'org-mem--dir-files-recursive              "3.0.0 (May 2025)" "August")
-(org-node-changes--def-whiny-alias 'org-node--maybe-adjust-idle-timer       #'org-mem-updater--adjust-timer             "3.0.0 (May 2025)" "September")
 (org-node-changes--def-whiny-alias 'org-node-abbrev-file-names              #'org-mem--fast-abbrev                      "3.0.0 (May 2025)" "September")
 (org-node-changes--def-whiny-alias 'org-node-by-id                          #'org-mem-entry-by-id                       "3.0.0 (May 2025)" "September")
 (org-node-changes--def-whiny-alias 'org-node-link-dest                      #'org-mem-link-target                       "3.0.0 (May 2025)" "September")

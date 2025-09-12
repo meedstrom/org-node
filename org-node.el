@@ -144,6 +144,7 @@
 (defvar org-roam-capture-templates)
 (defvar org-roam-preview-function)
 (defvar org-roam-preview-postprocess-functions)
+(defvar crm-separator)
 
 
 ;;;; Some options
