@@ -107,7 +107,6 @@ string WHEN says when it was deprecated and REMOVED-BY when it
 may be removed.  When these strings are omitted, fall back on
 hardcoded strings."
   `(let (warned-once)
-     (add-to-list 'org-node-changes--new-names '(,(cadr old) ,(cadr new) ,removed-by))
      (defun ,(cadr old) (&rest args)
        (declare (obsolete ,(cadr new) ,when))
        ,@(if interactive '((interactive)))
