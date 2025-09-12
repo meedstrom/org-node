@@ -2598,7 +2598,8 @@ To always operate on the current entry, use `org-node-add-tags-here'."
               (atomic-change-group
                 (unless (re-search-forward "^#+filetags: " nil t)
                   (org-node-full-end-of-meta-data)
-                  (org-node--safe-ensure-blank-line)
+                  (unless (and (bolp) (eolp))
+                    (open-line 1))
                   (insert "#+filetags: "))
                 (delete-region (point) (pos-eol))
                 (insert ":" (string-join tags ":") ":")))))
