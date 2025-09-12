@@ -2403,7 +2403,9 @@ from ID links found in `org-mem--target<>links'."
             ;;       file; 85% of runtime according to the CPU profiler!
             (cl-letf (((symbol-function #'org-id-update-id-locations) #'ignore))
               (fileloop-continue))))
-      (quit)))
+      ;; When fileloop finishes, it signals an `user-error'.  Let that or a
+      ;; `quit' proceed to the display of results.
+      ((quit user-error))))
   (when org-node--lint-warnings
     (org-mem-list--pop-to-tabulated-buffer
      :buffer "*org lint results*"
