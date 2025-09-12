@@ -1125,7 +1125,8 @@ To behave like Org-roam when creating new nodes,
 set `org-node-creation-fn' to `org-node-new-via-roam-capture'."
   (interactive)
   (org-node-cache-ensure)
-  (let* ((input (org-node-read-candidate "Visit or create node: " t))
+  (let* ((input (org-node-read-candidate "Visit or create node: " t
+                                         (thing-at-point 'symbol)))
          (_ (when (string-blank-p input)
               (setq input (funcall org-node-blank-input-title-generator))))
          (node (gethash input org-node--candidate<>entry)))
