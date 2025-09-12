@@ -489,15 +489,18 @@ The collections are trivial variants of `org-node-collection-basic'."
       (apply #'org-node-collection--with-empty args)
     (apply #'org-node-collection-basic args)))
 
-(defun org-node--completion-metadata ()
-  (append (and org-node-display-sort-fn
-               (list (cons 'display-sort-function org-node-display-sort-fn)))
-          (list (cons 'affixation-function #'org-node--affixate))))
+(defun org-node-collection--with-empty (str pred action)
+  "A collection that includes an empty candidate at the front.
+STR, PRED and ACTION as in `org-node-collection-basic'."
+  (if (eq action 'metadata)
+      (cons 'metadata (org-node--completion-metadata))
+    (let ((blank (if (bound-and-true-p helm-mode) " " "")))
+      (complete-with-action
+       action
+       (cons blank (hash-table-keys org-node--candidate<>entry))
+       str
+       pred))))
 
-;; TODO: Assign a category `org-node', then add an embark action to embark?
-;; TODO: Bind a custom exporter to `embark-export'
-;; TODO: Add user option to set 'group-function
-;; TODO: See consult-org-roam.
 (defun org-node-collection-basic (str pred action)
   "Custom COLLECTION for `completing-read'.
 
@@ -520,17 +523,15 @@ see Info node `(elisp)Programmed Completion'."
       (cons 'metadata (org-node--completion-metadata))
     (complete-with-action action org-node--candidate<>entry str pred)))
 
-(defun org-node-collection--with-empty (str pred action)
-  "A collection that includes an empty candidate at the front.
-STR, PRED and ACTION as in `org-node-collection-basic'."
-  (if (eq action 'metadata)
-      (cons 'metadata (org-node--completion-metadata))
-    (let ((blank (if (bound-and-true-p helm-mode) " " "")))
-      (complete-with-action
-       action
-       (cons blank (hash-table-keys org-node--candidate<>entry))
-       str
-       pred))))
+;; TODO: Assign a completion category `org-node'/`org-roam-node'/other clever
+;;       name, then add an embark action to embark that can operate on it?
+;; TODO: Bind a custom exporter to `embark-export'
+;; TODO: Add user option to set 'group-function
+;; TODO: See consult-org-roam.
+(defun org-node--completion-metadata ()
+  (append (and org-node-display-sort-fn
+               (list (cons 'display-sort-function org-node-display-sort-fn)))
+          (list (cons 'affixation-function #'org-node--affixate))))
 
 (defun org-node--affixate (collection)
   "From flat list COLLECTION, make alist ((TITLE PREFIX SUFFIX) ...).
