@@ -1277,6 +1277,10 @@ Argument NOVISIT for use by `org-node-insert-link-novisit'."
                                                org-node--title<>affixations)))
                       region-text
                     nil))
+         (_ (when (eq t initial)
+              ;; Guard against `try-completion' returning t instead of a string
+              ;; (who knew?!)
+              (setq initial nil)))
          (input (if (and novisit initial)
                     initial
                   (org-node-read-candidate nil t initial)))
