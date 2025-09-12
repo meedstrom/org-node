@@ -1125,8 +1125,21 @@ To behave like Org-roam when creating new nodes,
 set `org-node-creation-fn' to `org-node-new-via-roam-capture'."
   (interactive)
   (org-node-cache-ensure)
-  (let* ((input (org-node-read-candidate "Visit or create node: " t
-                                         (thing-at-point 'symbol)))
+  (let* ((partial-known-title-at-pt
+          (save-excursion
+            (let* ((sym (thing-at-point 'symbol))
+                   (word (thing-at-point 'word))
+                   ;; Handle note title like "#statistics", with the #
+                   (beg (+ (point) (skip-chars-backward "^[:space:]\n[]")))
+                   (end (+ (point) (skip-chars-forward "^[:space:]\n[]")))
+                   (real-thing-at-pt (and (not (= beg end))
+                                          (buffer-substring beg end)))
+                   (titles (hash-table-keys org-node--title<>affixations)))
+              (org-node--try-completions (list sym word real-thing-at-pt)
+                                         (append titles (mapcar #'downcase titles))))))
+         (input (org-node-read-candidate "Visit or create node: "
+                                         t
+                                         partial-known-title-at-pt))
          (_ (when (string-blank-p input)
               (setq input (funcall org-node-blank-input-title-generator))))
          (node (gethash input org-node--candidate<>entry)))
@@ -1134,6 +1147,17 @@ set `org-node-creation-fn' to `org-node-new-via-roam-capture'."
     (if node
         (org-node-goto node)
       (org-node-create input (org-id-new)))))
+
+(defun org-node--try-completions (tests collection)
+  "Like `try-completion' but easier to use.
+
+Tries each string in TESTS against COLLECTION until one matches.
+TESTS may include nils, which are skipped.
+On match, the return value is always a string."
+  (cl-loop for test in tests
+           as result = (and test (try-completion test collection))
+           if (eq t result) return test
+           else if (stringp result) return result))
 
 ;;;###autoload
 (defun org-node-insert-heading ()
