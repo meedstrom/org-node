@@ -380,7 +380,8 @@ aliases."
             ""))))
 
 (defun org-node-append-tags-use-frame-width (node title)
-  "Append NODE tags after TITLE and justify them to `frame-width'."
+  "Append NODE tags after TITLE and justify them to `frame-width'.
+Looks bad when you resize the frame, until you call `org-mem-reset'."
   (list title
         ""
         (concat
@@ -397,7 +398,8 @@ aliases."
                      tags))))))
 
 (defun org-node-prepend-olp-append-tags-use-frame-width (node title)
-  "Prepend NODE outline path to TITLE, and put NODE tags at frame edge."
+  "Prepend NODE outline path to TITLE, and put NODE tags at frame edge.
+Looks bad when you resize the frame, until you call `org-mem-reset'."
   (let (olp)
     (list title
           (concat
@@ -423,7 +425,8 @@ aliases."
 
 (defcustom org-node-display-sort-fn nil
   "How to sort completions.
-Used as `display-sort-function' in `completion-metadata'."
+Used as `display-sort-function' in `completion-metadata'.
+See Info node `(elisp) Completion Variables'."
   :type '(radio
           (const :tag "Do not override `completions-sort'" :value nil)
           (function-item org-node-sort-by-file-mtime)
@@ -493,7 +496,7 @@ The collections are trivial variants of `org-node-collection-basic'."
 
 ;; TODO: Assign a category `org-node', then add an embark action to embark?
 ;; TODO: Bind a custom exporter to `embark-export'
-;; TODO: Add user options to set 'group-function, 'display-sort-function etc?
+;; TODO: Add user option to set 'group-function
 ;; TODO: See consult-org-roam.
 (defun org-node-collection-basic (str pred action)
   "Custom COLLECTION for `completing-read'.
