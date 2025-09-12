@@ -421,6 +421,53 @@ aliases."
                                     ?\s)
                        tags)))))))
 
+(defcustom org-node-display-sort-fn nil
+  "How to sort completions.
+Used as `display-sort-function' in `completion-metadata'."
+  :type '(radio
+          (const :tag "Do not override `completions-sort'" :value nil)
+          (function-item org-node-sort-by-file-mtime)
+          (function-item org-node-sort-by-crtime)
+          (function :tag "Custom function" :value (lambda (completions))))
+  :package-version '(org-node . "3.9.0"))
+
+(defun org-node-sort-by-file-mtime (completions)
+  "Sort COMPLETIONS by file modification time."
+  (sort completions
+        (lambda (c1 c2)
+          (let* ((node1 (gethash c1 org-node--candidate<>entry))
+                 (node2 (gethash c2 org-node--candidate<>entry))
+                 ;; mtime could be nil if the file does not exist yet
+                 (mtime1 (and node1 (org-mem-file-mtime-floor node1)))
+                 (mtime2 (and node2 (org-mem-file-mtime-floor node2))))
+            ;; REVIEW: Actually should all of these four cases return t?
+            (cond ((null node1) t)
+                  ((null node2) nil)
+                  ((null mtime1) t)
+                  ((null mtime2) nil)
+                  (t (< mtime2 mtime1)))))))
+
+(defun org-node-sort-by-crtime (completions)
+  "Sort COMPLETIONS by timestamp in `org-node-property-crtime'.
+Nodes with no such property come after all the rest that do have the
+property - in other words, nodes without may as well be dated to 1970."
+  (sort completions
+        (lambda (c1 c2)
+          (let* ((node1 (gethash c1 org-node--candidate<>entry))
+                 (node2 (gethash c2 org-node--candidate<>entry))
+                 (crtime1 (and node1 (org-mem-property org-node-property-crtime node1)))
+                 (crtime2 (and node2 (org-mem-property org-node-property-crtime node2))))
+            (cond ((null node1) t)
+                  ((null node2) nil)
+                  ((null crtime1) nil)
+                  ((null crtime2) t)
+                  ;; NOTE: Using `string>' is efficient but not exact beyond
+                  ;; the day because Org timestamps look like
+                  ;; [2025-09-12 Thu 01:36], where "Thu" is not sortable.
+                  ;; Alas, using `org-parse-time-string' here seems to result
+                  ;; in noticeable latency, but I haven't tried it compiled.
+                  (t (string< crtime2 crtime1)))))))
+
 (defvar org-node--candidate<>entry (make-hash-table :test 'equal)
   "1:1 table mapping minibuffer completion candidates to ID-nodes.
 These candidates may or may not be pre-affixated, depending on
@@ -439,9 +486,10 @@ The collections are trivial variants of `org-node-collection-basic'."
       (apply #'org-node-collection--with-empty args)
     (apply #'org-node-collection-basic args)))
 
-
 (defun org-node--completion-metadata ()
-  (list (cons 'affixation-function #'org-node--affixate)))
+  (append (and org-node-display-sort-fn
+               (list (cons 'display-sort-function org-node-display-sort-fn)))
+          (list (cons 'affixation-function #'org-node--affixate))))
 
 ;; TODO: Assign a category `org-node', then add an embark action to embark?
 ;; TODO: Bind a custom exporter to `embark-export'
