@@ -2451,24 +2451,77 @@ To always operate on the current entry, use `org-node-add-tags-here'."
       (org-back-to-heading)
       (org-set-tags (seq-uniq (append (org-get-tags nil t) tags))))))
 
+;; TODO: Deprecate.
 (defun org-node--read-tags ()
   "Prompt for an Org tag or several.
 Pre-fill completions by collecting tags from all known Org files, as
 well as the members of `org-tag-persistent-alist' and `org-tag-alist'."
-  (completing-read-multiple
-   "Tags: "
-   (delete-dups
-    (nconc (thread-last (append org-tag-persistent-alist
-                                org-tag-alist
-                                (and org-element-use-cache
-                                     (derived-mode-p 'org-mode)
-                                     (org-get-buffer-tags)))
-                        (mapcar #'car)
-                        (cl-remove-if #'keywordp)
-                        (mapcar #'substring-no-properties))
-           (cl-loop for entry in (org-mem-all-entries)
-                    append (org-mem-entry-tags entry))))
-   nil nil nil 'org-tags-history))
+  (completing-read-multiple "Tags: "
+                            (org-node--get-all-known-tags)
+                            nil nil nil
+                            'org-tags-history))
+
+;; New 2025-09-12, removing the need for a "remove-tags" command.
+;; Still keeping `org-node-add-tags' to suit running theme with
+;; `org-node-add-refs' and `org-node-add-alias'.
+(defun org-node-set-tags ()
+  "Add TAGS to the node at point or nearest ancestor that is a node.
+
+To always operate on the current entry, use `org-node-add-tags-here'."
+  (interactive "*" org-mode)
+  (org-node--call-at-nearest-node #'org-node-set-tags-here))
+
+(defun org-node-set-tags-here ()
+  "Set the tags of the current entry to TAGS."
+  (interactive "*" org-mode)
+  (let ((tags (let ((crm-separator "[ \t]*:[ \t]*")
+                    (present-tags (string-join (if (org-before-first-heading-p)
+                                                   (org-node--get-filetags)
+                                                 (org-get-tags nil t))
+                                               ":")))
+                (completing-read-multiple "Tags: "
+                                          (org-node--get-all-known-tags)
+                                          nil nil
+                                          (if (string-empty-p present-tags)
+                                              nil
+                                            (concat ":" present-tags ":"))))))
+    (if (org-before-first-heading-p)
+        ;; There's no Org builtin to set filetags yet,
+        ;; so we have to in-house the code.
+        (save-excursion
+          (without-restriction
+            (goto-char (point-min))
+            (if (null tags)
+                (when (re-search-forward "^#+filetags: " nil t)
+                  (delete-region (pos-bol) (pos-eol)))
+              (atomic-change-group
+                (unless (re-search-forward "^#+filetags: " nil t)
+                  (org-node-full-end-of-meta-data)
+                  (org-node--safe-ensure-blank-line)
+                  (insert "#+filetags: "))
+                (delete-region (point) (pos-eol))
+                (insert ":" (string-join tags ":") ":")))))
+      (save-excursion
+        (org-back-to-heading)
+        (org-set-tags tags)))))
+
+(defun org-node--get-all-known-tags ()
+  (delete-dups
+   (nconc (thread-last (append org-tag-persistent-alist
+                               org-tag-alist
+                               (and org-element-use-cache
+                                    (derived-mode-p 'org-mode)
+                                    (org-get-buffer-tags)))
+                       (mapcar #'car)
+                       (cl-remove-if #'keywordp)
+                       (mapcar #'substring-no-properties))
+          (cl-loop for entry in (org-mem-all-entries)
+                   append (org-mem-entry-tags entry)))))
+
+(defun org-node--get-filetags ()
+  "Get the filetags in current buffer."
+  (cl-loop for raw in (cdar (org-collect-keywords '("FILETAGS")))
+           append (split-string raw ":" t)))
 
 
 ;;;; Keymap
@@ -2505,6 +2558,7 @@ well as the members of `org-tag-persistent-alist' and `org-tag-alist'."
   "m" #'org-node-rename-file-by-title ;; m for "move"
   "n" #'org-node-nodeify-entry
   "w" #'org-node-refile ;; because C-c w is `org-refile'
+  "q" #'org-node-set-tags ;; because C-c C-q is `org-set-tags-command'
   "a a" #'org-node-add-alias
   "a h" #'org-node-add-tags-here
   "a r" #'org-node-add-refs
