@@ -23,6 +23,7 @@
 @end ifnottex
 
 @menu
+* Intro::
 * Setup::
 * Backlinks::
 * Misc::
@@ -30,6 +31,13 @@
 
 @detailmenu
 --- The Detailed Node Listing ---
+
+Intro
+
+* What's all this::
+* What's a "node"?::
+* Features::
+* Benchmarks on my machine::
 
 Setup
 
@@ -91,6 +99,16 @@ Appendix IV: What are @samp{ROAM_REFS}?
 * Citations::
 
 @end detailmenu
+@end menu
+
+@node Intro
+@chapter Intro
+
+@menu
+* What's all this::
+* What's a "node"?::
+* Features::
+* Benchmarks on my machine::
 @end menu
 
 @node What's all this
