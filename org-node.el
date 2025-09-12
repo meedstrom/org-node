@@ -1136,7 +1136,9 @@ set `org-node-creation-fn' to `org-node-new-via-roam-capture'."
                    (real-thing-at-pt (and (not (= beg end))
                                           (buffer-substring beg end)))
                    (titles (hash-table-keys org-node--title<>affixations)))
-              (org-node--try-completions (list sym word real-thing-at-pt)
+              ;; Discussion about the preference order:
+              ;; https://github.com/meedstrom/org-node/pull/134
+              (org-node--try-completions (list real-thing-at-pt sym word)
                                          (append titles (mapcar #'downcase titles))))))
          (input (org-node-read-candidate "Visit or create node: "
                                          t
