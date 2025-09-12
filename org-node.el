@@ -1118,6 +1118,15 @@ that node \(an `org-mem-entry' object\), otherwise leave it at nil."
 
 ;;;; Commands 1: Cute little commands
 
+(defcustom org-node-find-use-thing-at-point t
+  "Whether to `org-node-find' should try to have smart initial input.
+
+This means it checks the text around point for a partial or full match
+to an existing node title, and in that case fills the minibuffer with
+the text that matched."
+  :type 'boolean
+  :package-version '(org-node . "3.9.0"))
+
 ;;;###autoload
 (defun org-node-find ()
   "Select and visit one of your ID nodes.
@@ -1127,19 +1136,20 @@ set `org-node-creation-fn' to `org-node-new-via-roam-capture'."
   (interactive)
   (org-node-cache-ensure)
   (let* ((partial-known-title-at-pt
-          (save-excursion
-            (let* ((sym (thing-at-point 'symbol))
-                   (word (thing-at-point 'word))
-                   ;; Handle note title like "#statistics", with the #
-                   (beg (+ (point) (skip-chars-backward "^[:space:]\n[]")))
-                   (end (+ (point) (skip-chars-forward "^[:space:]\n[]")))
-                   (real-thing-at-pt (and (not (= beg end))
-                                          (buffer-substring beg end)))
-                   (titles (hash-table-keys org-node--title<>affixations)))
-              ;; Discussion about the preference order:
-              ;; https://github.com/meedstrom/org-node/pull/134
-              (org-node--try-completions (list real-thing-at-pt sym word)
-                                         (append titles (mapcar #'downcase titles))))))
+          (and org-node-find-use-thing-at-point
+               (save-excursion
+                 (let* ((titles (hash-table-keys org-node--title<>affixations))
+                        (sym (thing-at-point 'symbol))
+                        (word (thing-at-point 'word))
+                        ;; Handle note title like "#statistics", with the #
+                        (beg (+ (point) (skip-chars-backward "^[:space:]\n[]")))
+                        (end (+ (point) (skip-chars-forward "^[:space:]\n[]")))
+                        (real-thing-at-pt (and (not (= beg end))
+                                               (buffer-substring beg end))))
+                   ;; Discussion about the preference order:
+                   ;; https://github.com/meedstrom/org-node/pull/134
+                   (org-node--try-completions (list real-thing-at-pt sym word)
+                                              (append titles (mapcar #'downcase titles)))))))
          (input (org-node-read-candidate "Visit or create node: "
                                          t
                                          partial-known-title-at-pt))
