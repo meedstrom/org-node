@@ -1123,7 +1123,7 @@ type the name of a node that does not exist.  That enables this
       ;; being on a single-star asterisk, moving it further downwards with
       ;; `org-end-of-meta-data'. Prevent that.
       (when (and file-level-node (org-at-heading-p))
-        (if (looking-back "\n\n")
+        (if (looking-back "\n\n" nil)
             (backward-char)
           ;; Unfortunately, we must modify the buffer
           (open-line 1))))))
