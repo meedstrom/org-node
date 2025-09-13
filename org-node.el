@@ -1014,12 +1014,10 @@ To operate on a node after creating it, hook onto
 (defun org-node-new-file (&optional title id)
   "Create a new file with a new node.
 Designed for `org-node-creation-fn'."
-  (or (and title (setq org-node-proposed-title title))
-      (setq title org-node-proposed-title)
-      (error "Proposed title was nil"))
-  (or (and id (setq org-node-proposed-id id))
-      (setq id org-node-proposed-id)
-      (error "Proposed ID was nil"))
+  (unless title (or (setq title org-node-proposed-title)
+                    (error "Proposed title was nil")))
+  (unless id (or (setq id org-node-proposed-id)
+                 (error "Proposed ID was nil")))
   (org-node-pop-to-fresh-file-buffer title)
   (if org-node-prefer-with-heading
       (insert "* " title
