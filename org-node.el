@@ -1078,21 +1078,6 @@ Designed for `org-node-creation-fn'."
                               :id    org-node-proposed-id))
         (remove-hook 'org-roam-capture-new-node-hook creation-hook-runner)))))
 
-(defcustom org-node-capture-legacy-behavior nil
-  "Whether to enable a legacy behavior in `org-node-capture-target'.
-
-This matters for templates using the `plain' type \(see
-`org-capture-templates'\).  The `entry' type should be unaffected.
-
-The new behavior places point like Org normally does, at the end of an
-entry, even if that is the beginning of the next entry.  The legacy
-behavior backs point up to the end of the previous line.  In addition,
-the legacy behavior ignores :prepend.
-
-This option will be removed in the future."
-  :type 'boolean
-  :package-version '(org-node . "3.8.0"))
-
 ;;;###autoload
 (defun org-node-capture-target ()
   "Can be used as target in a capture template.
