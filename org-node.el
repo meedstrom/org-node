@@ -3068,15 +3068,14 @@ quickly as possible. In detail:
   bytecode, and return that bytecode.
 
 Can be handy for user-provided lambdas that must be called a lot."
-  (cond ((compiled-function-p fn) fn)
-        ((symbolp fn)
-         (unless (compiled-function-p (symbol-function fn))
-           (let (byte-compile-warnings)
-             (byte-compile fn)))
-         fn)
-         ((gethash fn org-node--compiled-lambdas))
-         ((let (byte-compile-warnings)
-            (puthash fn (byte-compile fn) org-node--compiled-lambdas)))))
+  (let (byte-compile-warnings)
+    (cond ((compiled-function-p fn) fn)
+          ((symbolp fn)
+           (unless (compiled-function-p (symbol-function fn))
+             (byte-compile fn))
+           fn)
+          ((gethash fn org-node--compiled-lambdas))
+          ((puthash fn (byte-compile fn) org-node--compiled-lambdas)))))
 
 (defvar org-node--new-unsaved-buffers nil
   "List of file-visiting buffers that have never written to the file.")
