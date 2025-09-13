@@ -275,7 +275,6 @@ That means the second part of a [[id][description]]."
 (defun org-node-backlink--fix-all-files (kind)
   "Update :BACKLINKS: in all known nodes.
 Argument KIND controls how to update them."
-  (interactive)
   (unless (boundp 'fileloop--operate-function)
     (error "Probably org-node-backlink.el is not up to date with fileloop.el"))
   (when (or (and (memq kind '(update-drawers update-props))

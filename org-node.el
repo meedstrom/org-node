@@ -733,6 +733,16 @@ For the rest of the filename, configure `org-node-file-slug-fn'."
           (string :tag "Custom"))
   :package-version '(org-node . "0.4"))
 
+;; TODO: For Denote users, you get valid filename with just the default slug fn,
+;;       and a datestamp "%Y%m%dT%H%M%S--".  However, Denote's full format
+;;       including optional parts looks like:
+;;
+;;       DATE==SIGNATURE--TITLE__KEYWORDS.EXT
+;;
+;;       So either the user adds SIGNATURE and KEYWORDS themselves, and never
+;;       uses `org-node-rename-file-by-title'.  Or we could pass more arguments
+;;       into the slug fn, that it can use to systematically add these parts
+;;       based on some rule, like perhaps the content of an Org property.
 (defcustom org-node-file-slug-fn #'org-node-slugify-for-web
   "Function taking a node title and returning a filename component.
 Receives one argument: the value of an Org #+TITLE keyword, or
@@ -806,16 +816,6 @@ belonging to an alphabet or number system."
 ;; (org-node-slugify-for-web "Slimline/\"pizza box\" computer chassis")
 ;; (org-node-slugify-for-web "#emacs")
 ;; (org-node-slugify-for-web "칹え🐛")
-
-;; TODO: For Denote users, you get valid filename with just the default slug fn,
-;;       and a datestamp "%Y%m%dT%H%M%S--".  However, the full format including
-;;       optional parts looks like:
-;;       DATE==SIGNATURE--TITLE__KEYWORDS.EXT
-;;
-;;       So either the user adds SIGNATURE and KEYWORDS themselves, and never
-;;       uses `org-node-rename-file-by-title'.  Or we could pass more arguments
-;;       into the slug fn, that it can use to systematically add these parts
-;;       based on some rule, like perhaps the content of an Org property.
 
 (defun org-node--root-dirs (file-list)
   "Infer root directories of FILE-LIST.
@@ -2276,7 +2276,7 @@ one of them is associated with a ROAM_REFS property."
   (require 'org-mem-list)
   (org-mem-list--pop-to-tabulated-buffer
    :buffer "*org-node files list*"
-   :format [("Modified" 11 t) ("Size" 7 t) ("File" 70 t) ("Title" 40 t) ("Coding system" 15 t) ("Properties" 10 t)]
+   :format [("Modified" 11 t) ("Size" 7 t) ("File" 70 t) ("Coding system" 15 t) ("Title" 40 t) ("Properties" 10 t)]
    :entries
    (cl-loop
     for file in (org-mem-all-files)
@@ -2287,8 +2287,8 @@ one of them is associated with a ROAM_REFS property."
           (vector (format-time-string "%F" (org-mem-file-mtime file))
                   (format (if (< kb 1) "" "%d kB") kb)
                   (buttonize file #'find-file file)
-                  (or (org-mem-file-title-topmost file) "")
                   (prin1-to-string (org-mem-file-coding-system file))
+                  (or (org-mem-file-title-topmost file) "")
                   (if props (prin1-to-string props) ""))))
    :reverter #'org-node-list-files))
 
@@ -2875,8 +2875,7 @@ If already visiting that node, then follow the link normally."
                (not (and (derived-mode-p 'org-mode)
                          (equal (org-entry-get-with-inheritance "ID")
                                 (org-mem-entry-id found)))))
-          (progn (org-node-goto found t)
-                 t)
+          (progn (org-node-goto found) t)
         nil))))
 
 
@@ -2911,7 +2910,6 @@ position."
 
 (defun org-node-narrow-to-drawer-p (name &optional create-missing create-where)
   "Seek a drawer named NAME in the current entry, then narrow to it.
-This also works at the file top level, before the first entry.
 
 If a drawer was found, return t.
 Otherwise do not narrow, and return nil.
