@@ -1129,16 +1129,17 @@ type the name of a node that does not exist.  That enables this
     (org-node-new-file (org-capture-get :title)
                        (org-capture-get :id)))
   (when (eq (org-capture-get :type) 'plain)
-    ;; Emulate part of `org-capture-place-plain-text'.  We cannot just put the
-    ;; capture property :target-entry-p t, because this may be a file-level
-    ;; node which is not an entry, and some of Org cannot handle that.
-    (if (and (org-capture-get :prepend)
-             (not org-node-capture-legacy-behavior))
-	(org-node-full-end-of-meta-data)
-      (outline-next-heading)
-      (when org-node-capture-legacy-behavior
-        (when (org-at-heading-p)
-          (backward-char))))))
+    ;; Emulate part of `org-capture-place-plain-text'.
+    ;; A neat trick would've been (org-capture-put :target-entry-p t) and leave
+    ;; the rest to Org, since org-nodes are always "entries"... except
+    ;; file-level nodes aren't yet supported by all code that handles "entries".
+    (if org-node-capture-legacy-behavior
+        (progn (outline-next-heading)
+               (when (org-at-heading-p)
+                 (backward-char)))
+      (if (org-capture-get :prepend)
+          (org-node-full-end-of-meta-data)
+        (outline-next-heading)))))
 
 (defun org-node-capture-infer-title-etc ()
   "Return a plist with values for :title, :id and :existing-node.
