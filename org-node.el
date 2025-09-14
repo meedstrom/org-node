@@ -1051,7 +1051,11 @@ function is meant as a subroutine for creating a new file-level node.
 To merely visit an existing node, see `org-node-goto-id'.
 
 If the file already exists, this also attempts a `revert-buffer'."
-  (let* ((dir (or (plist-get plist :path)
+  (let* (
+	 (dir (or (and (plist-get plist :path)
+		       (functionp (plist-get plist :path))
+		       (funcall (plist-get plist :path)))
+	          (plist-get plist :path)
                   (org-node-guess-or-ask-dir "New file in which directory? "
                                              (plist-get plist :ask-path))))
          (file (file-name-concat dir (org-node-title-to-basename title)))
@@ -1135,8 +1139,17 @@ type the name of a node that does not exist.  That enables this
   ;; template string.
   (apply #'org-capture-put (org-node-capture-infer-title-etc))
   (if-let* ((node (org-capture-get :existing-node)))
-      (org-node-goto node t)
-    (org-node-new-file-parameterized org-capture-plist))
+    (org-node-goto node t)
+    (let ((parent-id (plist-get org-capture-plist :parent-id-if-new)))
+      (if parent-id
+          (if-let ((parent-node (org-mem-entry-by-id parent-id)))
+              (org-node-goto parent-node)
+            (user-error "No node found with ID: %s" parent-id))
+	(org-node-new-file-parameterized org-capture-plist))))
+
+  ;;(if-let* ((node (org-capture-get :existing-node)))
+  ;;    (org-node-goto node t)
+  ;;  (org-node-new-file-parameterized org-capture-plist))
   (when (eq (org-capture-get :type) 'plain)
     ;; Emulate part of `org-capture-place-plain-text'.  We cannot just put the
     ;; capture property :target-entry-p t, because this may be a file-level
