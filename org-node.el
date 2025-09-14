@@ -1161,7 +1161,7 @@ that node \(an `org-mem-entry' object\), otherwise leave it at nil."
 
 ;;;; Commands 1: Cute little commands
 
-(defcustom org-node-find-use-thing-at-point t
+(defcustom org-node-find-use-thing-at-point nil
   "Whether to `org-node-find' should try to have smart initial input.
 
 This means it checks the text around point for a partial or full match
