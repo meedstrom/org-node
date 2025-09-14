@@ -1146,10 +1146,6 @@ type the name of a node that does not exist.  That enables this
               (org-node-goto parent-node)
             (user-error "No node found with ID: %s" parent-id))
 	(org-node-new-file-parameterized org-capture-plist))))
-
-  ;;(if-let* ((node (org-capture-get :existing-node)))
-  ;;    (org-node-goto node t)
-  ;;  (org-node-new-file-parameterized org-capture-plist))
   (when (eq (org-capture-get :type) 'plain)
     ;; Emulate part of `org-capture-place-plain-text'.  We cannot just put the
     ;; capture property :target-entry-p t, because this may be a file-level
