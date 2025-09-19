@@ -722,8 +722,8 @@ If REMOVE non-nil, remove it instead."
         (setq target-file (ignore-errors
                             (org-mem-entry-file
                              (org-mem-entry-by-id target-id)))))
-      (when (null target-file)
-        (message "`org-node-backlink--add-in-target' could not resolve ID: %s" target-id))
+      ;; (when (null target-file)
+      ;;   (message "`org-node-backlink--add-in-target' could not resolve ID: %s" target-id))
       (when (and target-id target-file)
         (org-node--assert-transclusion-safe)
         (let ((origin-id (org-entry-get-with-inheritance "ID")))
