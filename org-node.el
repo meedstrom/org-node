@@ -19,7 +19,7 @@
 ;; URL:      https://github.com/meedstrom/org-node
 ;; Created:  2024-04-13
 ;; Keywords: org, hypermedia
-;; Package-Requires: ((emacs "29.1") (llama "0.5.0") (org-mem "0.17.2") (magit-section "4.3.0"))
+;; Package-Requires: ((emacs "29.1") (llama "0.5.0") (org-mem "0.20.0") (magit-section "4.3.0"))
 
 ;; Looking for Package-Version?  Consult the Git tag.
 ;;       MELPA versions above 20250303 is v2.
@@ -244,6 +244,7 @@ This function is applied once for every ID-node found, and receives the
 node data as a single argument: an `org-mem-entry' object.  See examples
 by typing \\[org-node-list-example]."
   :type '(radio (function-item org-node-filter-no-roam-exclude-p)
+                (function-item org-node-filter-no-local-roam-exclude-p)
                 (function-item org-node-filter-watched-dir-p)
                 (function :tag "Custom function"
                           :value (lambda (node) t)))
@@ -251,8 +252,11 @@ by typing \\[org-node-list-example]."
   :package-version '(org-node . "3.3.0"))
 
 (defun org-node-filter-no-roam-exclude-p (node)
-  "Hide NODE if it has a :ROAM_EXCLUDE: property.
-Does not hide if it merely inherits that property from an ancestor."
+  "Hide NODE if it has or inherits a :ROAM_EXCLUDE: property."
+  (not (org-mem-property-with-inheritance "ROAM_EXCLUDE" node)))
+
+(defun org-node-filter-no-local-roam-exclude-p (node)
+  "(Legacy) Hide NODE if it has a :ROAM_EXCLUDE: property."
   (not (org-mem-property "ROAM_EXCLUDE" node)))
 
 (defun org-node-filter-watched-dir-p (node)
@@ -2181,6 +2185,7 @@ Repeatable on the last key of a key sequence if
                      org-mem-pos
                      org-mem-previous-entry
                      org-mem-priority
+                     org-mem-properties-inherited
                      org-mem-properties
                      org-mem-roam-aliases
                      org-mem-roam-reflinks-to-entry

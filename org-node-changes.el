@@ -194,7 +194,7 @@ NAME, ARGLIST and BODY as in `defun'."
 (require 'org-mem-updater)
 
 (if (or (not (boundp 'org-mem--bump-int))
-        (< org-mem--bump-int 9))
+        (< org-mem--bump-int 10))
     (display-warning 'org-node "Update org-mem to use this version of org-node"))
 
 (define-obsolete-function-alias 'org-node-get-aliases                #'org-mem-roam-aliases                 "3.0.0 (May 2025)")
