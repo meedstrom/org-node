@@ -2198,7 +2198,9 @@ Repeatable on the last key of a key sequence if
     (setq-local revert-buffer-function (##org-node-list-example _&*))
     (keymap-local-set "g" #'revert-buffer-quick)
     (keymap-local-set "q" #'quit-window)
-    (let ((buffer-read-only nil))
+    (let ((buffer-read-only nil)
+          (win-start-line (line-number-at-pos (window-start)))
+          (win-line (line-number-at-pos)))
       (erase-buffer)
       (insert (with-temp-buffer
                 (delay-mode-hooks (emacs-lisp-mode))
@@ -2210,8 +2212,12 @@ Repeatable on the last key of a key sequence if
                                     "\n"))
                 (align-regexp (point-min) (point-max) "\\(\\s-*\\) => ")
                 (font-lock-ensure)
-                (buffer-string))))
-    (goto-char (point-min))))
+                (buffer-string)))
+      (goto-char (point-min))
+      ;; Restore scroll position
+      (forward-line (- win-start-line 1))
+      (set-window-start (selected-window) (point))
+      (forward-line (- win-line win-start-line)))))
 
 (defun org-node-list-reflinks ()
   "List all reflinks and the ID-nodes in which they were found.
