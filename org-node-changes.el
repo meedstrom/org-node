@@ -31,6 +31,8 @@
 
 (require 'subr-x)
 (require 'cl-lib)
+(defvar org-node-blank-input-title-generator)
+
 
 (defvar org-node-major-version 3
   "Number incremented for breaking changes that require reading README.")
