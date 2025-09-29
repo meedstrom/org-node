@@ -137,7 +137,8 @@ but when this finds one of them stale, it removes that whole entry."
   "Major mode for the context buffer."
   (when (or (member #'visual-line-mode org-mode-hook)
             (member #'visual-line-mode text-mode-hook))
-    (visual-line-mode)))
+    (visual-line-mode))
+  (setq-local font-lock-defaults nil))
 
 (defclass org-node-context (magit-section)
   ((value :initform nil)))
