@@ -60,7 +60,7 @@ Backlink solution 1: displayed in a separate window
 
 Backlink solution 2: Print inside the file
 
-* Option 2A Automatic @samp{BACKLINKS} property::
+* Option 2A Automatic @samp{BACKLINKS} property line::
 * Option 2B Automatic @samp{BACKLINKS...END} drawer: Option 2B Automatic @samp{BACKLINKSEND} drawer. 
 * Option 2C Semi-automatic @samp{BACKLINKS...END} drawer: Option 2C Semi-automatic @samp{BACKLINKSEND} drawer. 
 
@@ -315,7 +315,8 @@ Assuming your package manager knows about @uref{https://melpa.org/#/getting-star
   :config
   ;; At least one of these two is needed
   (setq org-mem-do-sync-with-org-id t)
-  (setq org-mem-watch-dirs (list "~/org")) ;; Configure me
+  (setq org-mem-watch-dirs
+        (list "~/org")) ;; Configure me
   (org-mem-updater-mode))
 
 (use-package org-node
@@ -372,7 +373,7 @@ If you're new to these concepts@comma{} fear not.  The main things for day-to-da
 @samp{org-node-find} (@samp{M-o n f})
 @itemize
 @item
-Tip: Bind this one to an extra-short key such as @samp{M-o f} -- you'll use it that much!
+Tip: Bind this one globally to a shorter key such as @samp{M-o f} -- you'll use it that much!
 @end itemize
 @item
 @samp{org-node-insert-link} (@samp{M-o n i})
@@ -434,13 +435,13 @@ A complementary solution@comma{} which can also stand alone@comma{} is to have t
 NOTE: To be clear@comma{} this mode never generates new IDs.  That's your own business.  This only adds/edits @samp{:BACKLINKS:} properties or drawers@comma{} and only gives it backlinks corresponding to links where the original site has or inherits some ID@.
 
 @menu
-* Option 2A Automatic @samp{BACKLINKS} property::
+* Option 2A Automatic @samp{BACKLINKS} property line::
 * Option 2B Automatic @samp{BACKLINKS...END} drawer: Option 2B Automatic @samp{BACKLINKSEND} drawer. 
 * Option 2C Semi-automatic @samp{BACKLINKS...END} drawer: Option 2C Semi-automatic @samp{BACKLINKSEND} drawer. 
 @end menu
 
-@node Option 2A Automatic @samp{BACKLINKS} property
-@subsection Option 2A: Automatic @samp{:BACKLINKS:} property
+@node Option 2A Automatic @samp{BACKLINKS} property line
+@subsection Option 2A: Automatic @samp{:BACKLINKS:} property line
 
 Add to initfiles:
 
@@ -456,13 +457,14 @@ For a first-time run@comma{} type @samp{M-x org-node-backlink-mass-update-props}
 
 Same as Option 2A@comma{} but uses a multiline drawer.
 
-For a first-time run@comma{} type @samp{M-x org-node-backlink-mass-update-drawers}.  (Don't worry if you change your mind; undo with @samp{M-x org-node-mass-delete-drawers}.)
-
-Then add to initfiles:
+Add to initfiles:
 
 @lisp
+(setq org-node-backlink-do-drawers t)
 (org-node-backlink-mode)
 @end lisp
+
+For a first-time run@comma{} type @samp{M-x org-node-backlink-mass-update-drawers}.  (Don't worry if you change your mind; undo with @samp{M-x org-node-mass-delete-drawers}.)
 
 @node Option 2C Semi-automatic @samp{BACKLINKSEND} drawer
 @subsection Option 2C: Semi-automatic @samp{:BACKLINKS:...:END:} drawer
@@ -752,6 +754,12 @@ Basic commands:
 @samp{org-node-visit-random}
 @item
 @samp{org-node-context-dwim}
+@item
+@samp{org-node-set-tags}
+@item
+@samp{org-node-add-alias}
+@item
+@samp{org-node-add-refs}
 @item
 @samp{org-node-refile}
 @itemize

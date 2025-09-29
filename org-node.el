@@ -221,7 +221,8 @@ Used in some commands when exiting minibuffer with a blank string."
   "Name of a property for holding a creation-time timestamp.
 Used by:
 - `org-node-ensure-crtime-property'
-- `org-node-rename-file-by-title'"
+- `org-node-rename-file-by-title'
+- `org-node-sort-by-crtime'"
   :type 'string
   :package-version '(org-node . "3.7.1"))
 
@@ -280,10 +281,6 @@ against the node title.
 
 In other words: you can match against the node's outline path, if
 `org-node-affixation-fn' is set to `org-node-prepend-olp' \(default).
-
-\(Tip: users of the \"orderless\" library do not need this
-setting, they can always match against the prefix and suffix via
-`orderless-annotation', bound to the character \& by default.\)
 
 Another consequence: this setting can lift the uniqueness constraint on
 note titles: you\\='ll be able to have two nodes with the same name, so
@@ -1467,6 +1464,7 @@ create it and then visit it.  This will not visit it."
                        '(:immediate-finish t)))))
     (org-node-insert-link t t)))
 
+;; https://old.reddit.com/r/orgmode/comments/1khtt9k/release_orgincludeinline/msn9p50/
 (defun org-node-insert-include (&optional node)
   "Insert an #+include referring to NODE.
 Tip: It can be previewed with package \"org-include-inline\".
@@ -1837,7 +1835,7 @@ creation-date as more truthful or useful than today\\='s date.
 
 ;;;###autoload
 (defun org-node-refile ()
-  "Prompt for a node and refile subtree at point into it.
+  "Prompt for a node and refile the tree at point into it.
 No support yet for refiling a whole file.
 
 Exiting the prompt with a blank input calls `org-node-extract-subtree'."
@@ -2674,10 +2672,11 @@ To always operate on the current entry, use `org-node-add-tags-here'."
 
 
 ;;;; Keymap
-;; NOTE: Reserve "c" for a possible future capture key.
+;; NOTE: Reserve "c" for a possible future capture-related key.
 
 ;;;###autoload
 (defvar-keymap org-node-global-prefix-map
+  :doc "Org-node commands that work in any buffer."
   "b" 'org-node-context-dwim ;; b for "backlinks"
   "f" #'org-node-find
   "g" #'org-node-grep
@@ -2701,9 +2700,11 @@ To always operate on the current entry, use `org-node-add-tags-here'."
 
 ;;;###autoload
 (defvar-keymap org-node-org-prefix-map
+  :doc "Superset of `org-node-global-prefix-map', with
+extra commands that work only in Org mode."
   :parent org-node-global-prefix-map
-  "d" #'org-node-insert-into-related  ;; d for "drawer".  Maybe rename command?
-  ;; "e" #'org-node-extract-subtree ;; NOTE: `org-node-refile' does same now
+  "d" #'org-node-insert-into-related  ;; d for "drawer".  TODO: Maybe rename?
+  ;; "e" #'org-node-extract-subtree ;; NOTE: `org-node-refile' does same now.
   "i" #'org-node-insert-link
   "m" #'org-node-rename-file-by-title ;; m for "move"
   "n" #'org-node-nodeify-entry
@@ -2912,7 +2913,7 @@ following the link normally.
 
 If already visiting that node, then follow the link normally."
   (when-let* ((url (thing-at-point 'url)))
-    ;; Rarely more than one car
+    ;; Rarely more than one valid target
     (let* ((target (car (org-mem--split-roam-refs-field url)))
            (found (cl-loop for node in (org-mem-all-id-nodes)
                            when (member target (org-mem-entry-roam-refs node))

@@ -94,7 +94,8 @@ Assuming your package manager knows about [[https://melpa.org/#/getting-started]
   :config
   ;; At least one of these two is needed
   (setq org-mem-do-sync-with-org-id t)
-  (setq org-mem-watch-dirs (list "~/org")) ;; Configure me
+  (setq org-mem-watch-dirs
+        (list "~/org")) ;; Configure me
   (org-mem-updater-mode))
 
 (use-package org-node
@@ -140,7 +141,7 @@ See [[https://github.com/meedstrom/org-node#appendix-ii-how-to-rollback][How to 
 If you're new to these concepts, fear not.  The main things for day-to-day operation are two commands:
 
 - =org-node-find= (=M-o n f=)
-  - Tip: Bind this one to an extra-short key such as =M-o f= -- you'll use it that much!
+  - Tip: Bind this one globally to a shorter key such as =M-o f= -- you'll use it that much!
 - =org-node-insert-link= (=M-o n i=)
 
 Tip: There's *no separate command* for creating a new node!  Reuse one of the commands above, and type the name of a node that doesn't exist.  Try it and see what happens!
@@ -180,7 +181,7 @@ A complementary solution, which can also stand alone, is to have the backlinks /
 
 NOTE: To be clear, this mode never generates new IDs.  That's your own business.  This only adds/edits =:BACKLINKS:= properties or drawers, and only gives it backlinks corresponding to links where the original site has or inherits some ID.
 
-*** Option 2A: Automatic =:BACKLINKS:= property
+*** Option 2A: Automatic =:BACKLINKS:= property line
 
 Add to initfiles:
 
@@ -195,13 +196,15 @@ For a first-time run, type =M-x org-node-backlink-mass-update-props=.  (Don't wo
 
 Same as Option 2A, but uses a multiline drawer.
 
-For a first-time run, type =M-x org-node-backlink-mass-update-drawers=.  (Don't worry if you change your mind; undo with =M-x org-node-mass-delete-drawers=.)
-
-Then add to initfiles:
+Add to initfiles:
 
 #+begin_src elisp
+(setq org-node-backlink-do-drawers t)
 (org-node-backlink-mode)
 #+end_src
+
+For a first-time run, type =M-x org-node-backlink-mass-update-drawers=.  (Don't worry if you change your mind; undo with =M-x org-node-mass-delete-drawers=.)
+
 
 *** Option 2C: Semi-automatic =:BACKLINKS:...:END:= drawer
 
@@ -424,6 +427,9 @@ Basic commands:
 - =org-node-insert-transclusion-as-subtree=
 - =org-node-visit-random=
 - =org-node-context-dwim=
+- =org-node-set-tags=
+- =org-node-add-alias=
+- =org-node-add-refs=
 - =org-node-refile=
   - Does two technically different things: either move a subtree into some node it prompts you for, or if you press RET with no input, extract the subtree into a new file (similarly to =org-roam-extract-subtree=)
 - =org-node-seq-dispatch=
