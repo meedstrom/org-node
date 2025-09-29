@@ -3106,7 +3106,7 @@ quickly as possible. In detail:
                    (save-buffer)))
                (kill-buffer))))))))
 
-(defvar org-node--compiled-lambdas (make-hash-table :test 'equal))
+(defvar org-node--compiled-fn-tbl (make-hash-table :test 'equal))
 (defun org-node--ensure-compiled (fn)
   "Return FN as a compiled function.
 
@@ -3117,14 +3117,14 @@ quickly as possible. In detail:
   bytecode, and return that bytecode.
 
 Can be handy for user-provided lambdas that must be called a lot."
-  (let (byte-compile-warnings)
-    (cond ((compiled-function-p fn) fn)
-          ((symbolp fn)
-           (unless (compiled-function-p (symbol-function fn))
-             (byte-compile fn))
-           fn)
-          ((gethash fn org-node--compiled-lambdas))
-          ((puthash fn (byte-compile fn) org-node--compiled-lambdas)))))
+  (with-memoization (gethash fn org-node--compiled-fn-tbl)
+    (let (byte-compile-warnings)
+      (cond ((compiled-function-p fn) fn)
+            ((symbolp fn)
+             (unless (compiled-function-p (symbol-function fn))
+               (byte-compile fn))
+             fn)
+            (t (byte-compile fn))))))
 
 (defvar org-node--new-unsaved-buffers nil
   "List of file-visiting buffers that have never written to the file.")
