@@ -493,17 +493,21 @@ The collections are trivial variants of `org-node-collection-basic'."
       (apply #'org-node-collection--with-empty args)
     (apply #'org-node-collection-basic args)))
 
+;; HACK: Can't just let-bind a table, so it needs a defvar.
+(defvar org-node--tbl-with-empty nil)
 (defun org-node-collection--with-empty (str pred action)
   "A collection that includes an empty candidate at the front.
 STR, PRED and ACTION as in `org-node-collection-basic'."
   (if (eq action 'metadata)
       (cons 'metadata (org-node--completion-metadata))
     (let ((blank (if (bound-and-true-p helm-mode) " " "")))
-      (complete-with-action
-       action
-       (cons blank (hash-table-keys org-node--candidate<>entry))
-       str
-       pred))))
+      (setq org-node--tbl-with-empty (copy-hash-table org-node--candidate<>entry))
+      (puthash blank
+               ;; HACK: Temporary.  With future org-mem version, call
+               ;;       `make-org-mem-entry' instead.
+               (eval `(record 'org-mem-entry ,@(make-list 20 nil)))
+               org-node--tbl-with-empty))
+    (complete-with-action action org-node--tbl-with-empty str pred)))
 
 (defun org-node-collection-basic (str pred action)
   "Custom COLLECTION for `completing-read'.
