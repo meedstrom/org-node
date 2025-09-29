@@ -579,21 +579,33 @@ Presumes that COLLECTION is the keys of `org-node--candidate<>entry'."
   (put 'org-node-hist-altered 'history-length 1000))
 
 ;; Finally, tying it all together
-(defun org-node-read-candidate (&optional prompt blank-ok initial-input)
+(defun org-node-read-candidate (&optional prompt blank-ok &rest args)
   "PROMPT for a known node and return the user input.
 If the input is not a key of `org-node--candidate<>entry',
-you can assume no such node exists,
+you can assume that no such node exists,
 or it was recently created but its buffer never saved.
 
-BLANK-OK means to obey `org-node-blank-input-hint'.
-INITIAL-INPUT as in `completing-read.'"
-  (completing-read (or prompt "Node: ")
-                   (if blank-ok #'org-node-collection-main
-                     #'org-node-collection-basic)
-                   () ()
-                   initial-input
-                   (if org-node-alter-candidates 'org-node-hist-altered
-                     'org-node-hist)))
+BLANK-OK means to use `org-node-blank-input-hint' if it is non-nil.
+ARGS are all the optional arguments to `completing-read'.
+
+An obsolete calling convention allows ARGS to be a string, used as
+INITIAL-INPUT in `completing-read'."
+  (when (stringp (car args))
+    ;; 2025-09-29: Convert from old calling convention that had just
+    ;; INITIAL-INPUT in place of ARGS.
+    (setq args (list nil nil (car args))))
+  (seq-let (predicate require-match initial-input hist def inherit-input-method) args
+    (completing-read (or prompt "Node: ")
+                     (if blank-ok #'org-node-collection-main
+                       #'org-node-collection-basic)
+                     predicate
+                     require-match
+                     initial-input
+                     (or hist (if org-node-alter-candidates
+                                  'org-node-hist-altered
+                                'org-node-hist))
+                     def
+                     inherit-input-method)))
 
 
 ;;;; The cache mode
