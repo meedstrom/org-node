@@ -1337,6 +1337,11 @@ Repeatable on the last key of a key sequence if
   (interactive)
   (customize-group 'org-node))
 
+(defun org-node-help ()
+  "Display the Info manual for \"(org-node)\"."
+  (interactive)
+  (info "(org-node)"))
+
 
 ;;;; Commands 2: Inserting things
 
@@ -2687,6 +2692,7 @@ To always operate on the current entry, use `org-node-add-tags-here'."
   "l r" #'org-node-list-reflinks
   "l t" 'org-mem-list-title-collisions ; l t for "list title..."
   "x a" #'org-node-rename-asset-and-rewrite-links
+  "x h" #'org-node-help
   "x l" #'org-node-rewrite-links-ask
   "x r" #'org-node-visit-random
   "x o" #'org-node-customize
