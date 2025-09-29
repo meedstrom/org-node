@@ -662,6 +662,32 @@ INITIAL-INPUT in `completing-read'."
                  (remhash (org-mem-title entry) org-node--title<>affixations)))
              org-node--candidate<>entry)))
 
+;; TODO: Submit patch upstream to print a message when `org-id-find'
+;;       fails to find ID and calls update-id-locations.
+;; TODO: While we're at it... patch `org-id-find-id-in-file' so it allows the
+;;       file not to exist if a buffer exists with that file name.
+;; TODO: While we're at it... patch `org-id-find-id-file' not to fallback on
+;;       the current buffer, that is so inviting to bugs!  Probably it
+;;       shouldn't have been a separate function at all.
+(defun org-node--ad-org-id-find (fn &rest args)
+  "Print a message if car of ARGS is not an ID in `org-id-locations'.
+Then call FN, passing it ARGS.
+Designed as around-advice for `org-id-find'.
+
+This is merely an informative helper, because often the attempt to open
+an unknown ID-link results in Emacs appearing to freeze as org-id
+updates its database without telling the user that it is doing so.
+With a lot of files, this takes a long time."
+  (let ((id (car args)))
+    ;; Same as `org-id-find' (org-id.el is full of this sort of dynamic typing)
+    (cond
+     ((symbolp id) (setq id (symbol-name id)))
+     ((numberp id) (setq id (number-to-string id))))
+    (when (and (org-mem--try-ensure-org-id-table-p)
+               (not (gethash id org-id-locations)))
+      (message "No cached location for ID \"%s\"..." id))
+    (apply fn args)))
+
 ;;;###autoload
 (define-minor-mode org-node-cache-mode
   "Cache completion candidates every time Org-mem updates its cache.
@@ -673,12 +699,14 @@ rather than twice."
   :global t
   (cond
    (org-node-cache-mode
+    (advice-add #'org-id-find :around #'org-node--ad-org-id-find)
     (add-hook 'org-mem-pre-full-scan-functions #'org-node--wipe-completions)
     (add-hook 'org-mem-pre-targeted-scan-functions #'org-node--forget-completions-in-results)
     (add-hook 'org-mem-record-entry-functions #'org-node--record-completion-candidates)
     (add-hook 'org-mem-record-entry-functions #'org-node--let-refs-be-aliases)
     (org-mem-reset))
    (t
+    (advice-remove #'org-id-find #'org-node--ad-org-id-find)
     (remove-hook 'org-mem-pre-full-scan-functions #'org-node--wipe-completions)
     (remove-hook 'org-mem-pre-targeted-scan-functions #'org-node--forget-completions-in-results)
     (remove-hook 'org-mem-record-entry-functions #'org-node--record-completion-candidates)
