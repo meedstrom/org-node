@@ -2277,7 +2277,8 @@ Repeatable on the last key of a key sequence if
                      org-mem-tags-inherited
                      org-mem-tags-local
                      org-mem-title
-                     org-mem-title-maybe)))
+                     org-mem-title-maybe
+                     org-mem-text)))
     (pop-to-buffer (get-buffer-create "*org-node example*" t))
     (setq-local buffer-read-only t)
     (setq-local revert-buffer-function (lambda (&rest _)
