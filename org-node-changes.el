@@ -196,7 +196,7 @@ NAME, ARGLIST and BODY as in `defun'."
 (require 'org-mem-updater)
 
 (if (or (not (boundp 'org-mem--bump-int))
-        (< org-mem--bump-int 10))
+        (< org-mem--bump-int 12))
     (display-warning 'org-node "Update org-mem to use this version of org-node"))
 
 (define-obsolete-function-alias 'org-node-get-aliases                #'org-mem-roam-aliases                 "3.0.0 (May 2025)")
@@ -257,7 +257,6 @@ NAME, ARGLIST and BODY as in `defun'."
 (org-node-changes--def-whiny-alias 'org-node-affix-with-olp-and-tags-legacy 'org-node-prepend-olp-append-tags           "3.3.0 (May 2025)" "September")
 (org-node-changes--def-whiny-alias 'org-node--end-of-meta-data              'org-node-full-end-of-meta-data             "3.3.10 (May 2025)" "September")
 (org-node-changes--def-whiny-alias 'org-node-list-file-coding-systems       'org-node-list-files                        "3.3.10 (May 2025)" "September")
-(org-node-changes--def-whiny-alias 'org-node-collection                     'org-node-collection-basic                  "3.3.12 (May 2025)" "September")
 (org-node-changes--def-whiny-alias 'org-node-mk-auto-title                  'org-node-titlegen-untitled                 "3.3.12 (May 2025)" "August")
 (org-node-changes--def-whiny-alias 'org-node-title-to-filename              'org-node-title-to-filename-quiet           "3.4.3 (June 2025)" "October")
 (org-node-changes--def-whiny-alias 'org-node-peek                           'org-node-list-example                      "3.5.0 (June 2025)" "October" t)

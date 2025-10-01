@@ -19,7 +19,7 @@
 ;; URL:      https://github.com/meedstrom/org-node
 ;; Created:  2024-04-13
 ;; Keywords: org, hypermedia
-;; Package-Requires: ((emacs "29.1") (llama "0.5.0") (org-mem "0.20.0") (magit-section "4.3.0"))
+;; Package-Requires: ((emacs "29.1") (llama "0.5.0") (org-mem "0.21.0") (magit-section "4.3.0"))
 
 ;; Looking for Package-Version?  Consult the Git tag.
 ;;       MELPA versions above 20250303 is v2.
@@ -523,30 +523,12 @@ Even when the triplets are not used, this table serves double-duty such
 that its keys constitute the subset of `org-mem--title<>id' that
 passed `org-node-filter-fn'.")
 
-(defun org-node-collection-main (&rest args)
-  "Pass ARGS to the right collection depending on user settings.
-The collections are trivial variants of `org-node-collection-basic'."
-  (if org-node-blank-input-hint
-      (apply #'org-node-collection--with-empty args)
-    (apply #'org-node-collection-basic args)))
-
-;; HACK: Can't just let-bind a table, so it needs a defvar.
-(defvar org-node--tbl-with-empty nil)
-(defun org-node-collection--with-empty (str pred action)
-  "A collection that includes an empty candidate at the front.
-STR, PRED and ACTION as in `org-node-collection-basic'."
-  (if (eq action 'metadata)
-      (cons 'metadata (org-node--completion-metadata))
-    (let ((blank (if (bound-and-true-p helm-mode) " " "")))
-      (setq org-node--tbl-with-empty (copy-hash-table org-node--candidate<>entry))
-      (puthash blank
-               ;; HACK: Temporary.  With future org-mem version, call
-               ;;       `make-org-mem-entry' instead.
-               (eval `(record 'org-mem-entry ,@(make-list 20 nil)))
-               org-node--tbl-with-empty))
-    (complete-with-action action org-node--tbl-with-empty str pred)))
-
-(defun org-node-collection-basic (str pred action)
+;; TODO: Assign a completion category `org-node'/`org-roam-node'/other clever
+;;       name, then add an embark action to embark that can operate on it?
+;; TODO: Bind a custom exporter to `embark-export'
+;; TODO: Add user option to set 'group-function
+;; TODO: See consult-org-roam.
+(defun org-node-collection (str pred action)
   "Custom COLLECTION for `completing-read'.
 
 Ahead of time, org-node takes titles and aliases from all nodes, runs
@@ -564,19 +546,21 @@ exit with user-entered input that didn\\='t match anything.
 
 Arguments STR, PRED and ACTION are handled behind the scenes,
 see Info node `(elisp)Programmed Completion'."
+  (if org-node-blank-input-hint
+      ;; HACK
+      (puthash (if (bound-and-true-p helm-mode) " " "")
+               (make-org-mem-entry)
+               org-node--candidate<>entry)
+    (remhash "" org-node--candidate<>entry)
+    (remhash " " org-node--candidate<>entry))
   (if (eq action 'metadata)
-      (cons 'metadata (org-node--completion-metadata))
+      (cons 'metadata (append (and org-node-display-sort-fn
+                                   `((display-sort-function . ,org-node-display-sort-fn)))
+                              `((affixation-function . org-node--affixate))))
     (complete-with-action action org-node--candidate<>entry str pred)))
 
-;; TODO: Assign a completion category `org-node'/`org-roam-node'/other clever
-;;       name, then add an embark action to embark that can operate on it?
-;; TODO: Bind a custom exporter to `embark-export'
-;; TODO: Add user option to set 'group-function
-;; TODO: See consult-org-roam.
-(defun org-node--completion-metadata ()
-  (append (and org-node-display-sort-fn
-               (list (cons 'display-sort-function org-node-display-sort-fn)))
-          (list (cons 'affixation-function #'org-node--affixate))))
+(define-obsolete-function-alias 'org-node-collection-main 'org-node-collection "2025-09-30")
+(define-obsolete-function-alias 'org-node-collection-basic 'org-node-collection "2025-09-30")
 
 (defun org-node--affixate (collection)
   "From flat list COLLECTION, make alist ((TITLE PREFIX SUFFIX) ...).
@@ -636,17 +620,17 @@ INITIAL-INPUT in `completing-read'."
     ;; (PROMPT BLANK-OK &optional INITIAL-INPUT).
     (setq args (list nil nil (car args))))
   (seq-let (predicate require-match initial-input hist def inherit-input-method) args
-    (completing-read (or prompt "Node: ")
-                     (if blank-ok #'org-node-collection-main
-                       #'org-node-collection-basic)
-                     predicate
-                     require-match
-                     initial-input
-                     (or hist (if org-node-alter-candidates
-                                  'org-node-hist-altered
-                                'org-node-hist))
-                     def
-                     inherit-input-method)))
+    (let ((org-node-blank-input-hint (if blank-ok org-node-blank-input-hint nil)))
+      (completing-read (or prompt "Node: ")
+                       #'org-node-collection
+                       predicate
+                       require-match
+                       initial-input
+                       (or hist (if org-node-alter-candidates
+                                    'org-node-hist-altered
+                                  'org-node-hist))
+                       def
+                       inherit-input-method))))
 
 
 ;;;; The cache mode
