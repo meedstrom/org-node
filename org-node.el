@@ -546,13 +546,6 @@ exit with user-entered input that didn\\='t match anything.
 
 Arguments STR, PRED and ACTION are handled behind the scenes,
 see Info node `(elisp)Programmed Completion'."
-  (if org-node-blank-input-hint
-      ;; HACK
-      (puthash (if (bound-and-true-p helm-mode) " " "")
-               (make-org-mem-entry)
-               org-node--candidate<>entry)
-    (remhash "" org-node--candidate<>entry)
-    (remhash " " org-node--candidate<>entry))
   (if (eq action 'metadata)
       (cons 'metadata (append (and org-node-display-sort-fn
                                    `((display-sort-function . ,org-node-display-sort-fn)))
@@ -604,33 +597,44 @@ Presumes that COLLECTION is the keys of `org-node--candidate<>entry'."
   (put 'org-node-hist-altered 'history-length 1000))
 
 ;; Finally, tying it all together
-(defun org-node-read-candidate (&optional prompt blank-ok &rest args)
+(defun org-node-read-candidate
+    (&optional prompt blank-ok predicate require-match initial-input hist def inherit-input-method)
   "PROMPT for a known node and return the user input.
-If the input is not a key of `org-node--candidate<>entry',
+
+If the user input is not a key of `org-node--candidate<>entry',
 you can assume that no such node exists,
 or it was recently created but its buffer never saved.
 
-BLANK-OK means to use `org-node-blank-input-hint' if both are non-nil.
-ARGS are all the optional arguments to `completing-read'.
+BLANK-OK non-nil means to use `org-node-blank-input-hint' if non-nil.
+This can affect PREDICATE and REQUIRE-MATCH, because a fake entry is
+added to `org-node--candidate<>entry' during completion.
 
-An obsolete calling convention allows ARGS to be a string, used as
-INITIAL-INPUT in `completing-read'."
-  (when (stringp (car args))
-    ;; 2025-09-29: Convert from old calling convention
-    ;; (PROMPT BLANK-OK &optional INITIAL-INPUT).
-    (setq args (list nil nil (car args))))
-  (seq-let (predicate require-match initial-input hist def inherit-input-method) args
-    (let ((org-node-blank-input-hint (if blank-ok org-node-blank-input-hint nil)))
-      (completing-read (or prompt "Node: ")
-                       #'org-node-collection
-                       predicate
-                       require-match
-                       initial-input
-                       (or hist (if org-node-alter-candidates
-                                    'org-node-hist-altered
-                                  'org-node-hist))
-                       def
-                       inherit-input-method))))
+The rest of the arguments \(PREDICATE, REQUIRE-MATCH, INITIAL-INPUT,
+HIST, DEF, INHERIT-INPUT-METHOD) same as in `completing-read'.
+
+An obsolete calling convention allows the third argument to be a string,
+used as INITIAL-INPUT in `completing-read'."
+  (when (stringp predicate)
+    ;; Convert from obsolete calling convention.
+    (cl-assert (cl-every #'null (list require-match initial-input hist def inherit-input-method)))
+    (setq initial-input predicate)
+    (setq predicate nil))
+  (when (and blank-ok org-node-blank-input-hint)
+    (puthash (if (bound-and-true-p helm-mode) " " "")
+             (make-org-mem-entry)
+             org-node--candidate<>entry))
+  (unwind-protect (completing-read (or prompt "Node: ")
+                                   #'org-node-collection
+                                   predicate
+                                   require-match
+                                   initial-input
+                                   (or hist (if org-node-alter-candidates
+                                                'org-node-hist-altered
+                                              'org-node-hist))
+                                   def
+                                   inherit-input-method)
+    (remhash "" org-node--candidate<>entry)
+    (remhash " " org-node--candidate<>entry)))
 
 
 ;;;; The cache mode
