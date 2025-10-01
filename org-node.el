@@ -19,7 +19,7 @@
 ;; URL:      https://github.com/meedstrom/org-node
 ;; Created:  2024-04-13
 ;; Keywords: org, hypermedia
-;; Package-Requires: ((emacs "29.1") (llama "0.5.0") (org-mem "0.21.0") (magit-section "4.3.0"))
+;; Package-Requires: ((emacs "29.1") (llama "0.5.0") (org-mem "0.22.0") (magit-section "4.3.0"))
 
 ;; Looking for Package-Version?  Consult the Git tag.
 ;;       MELPA versions above 20250303 is v2.
@@ -772,7 +772,8 @@ something to change the facts on the ground just prior."
   (when force
     (org-mem-reset nil "Org-node waiting for org-mem..."))
   (when block
-    (org-mem-await "Org-node waiting for org-mem..." 10)))
+    (org-mem-await "Org-node waiting for org-mem..." 10))
+  (org-mem-tip-if-empty))
 
 
 ;;;; Filename functions
@@ -2246,9 +2247,11 @@ Repeatable on the last key of a key sequence if
                      org-mem-lnum
                      org-mem-next-entry
                      org-mem-olpath
-                     org-mem-olpath-with-file-title
-                     org-mem-olpath-with-file-title-with-self
                      org-mem-olpath-with-self
+                     org-mem-olpath-with-file-title
+                     org-mem-olpath-with-file-title-or-basename
+                     org-mem-olpath-with-self-with-file-title
+                     org-mem-olpath-with-self-with-file-title-or-basename
                      org-mem-pos
                      org-mem-previous-entry
                      org-mem-priority
