@@ -756,7 +756,7 @@ rather than twice."
 Ensure that modes `org-node-cache-mode' and `org-mem-updater-mode' are
 enabled.  If FORCE, trigger org-mem to rebuild cache.  If BLOCK and a
 cache build is underway \(perhaps started by FORCE), block Emacs until
-it finishes \(or 10 seconds elapsed\).
+it finishes \(or 10 seconds elapse\).
 
 If cache has never been built, act as if both FORCE and BLOCK.
 
@@ -2231,7 +2231,8 @@ Repeatable on the last key of a key sequence if
 Or from ENTRY if provided."
   (interactive)
   (org-node-cache-ensure)
-  (let ((entry (or entry (seq-random-elt (hash-table-values org-mem--id<>entry))))
+  (let ((entry (or entry
+                   (seq-random-elt (hash-table-values org-mem--id<>entry))))
         (1arg-funs '(org-mem-active-timestamps
                      org-mem-active-timestamps-int
                      org-mem-clocks
@@ -2304,7 +2305,8 @@ Or from ENTRY if provided."
       (insert (with-temp-buffer
                 (delay-mode-hooks (emacs-lisp-mode))
                 (insert "Example data taken from random node titled \""
-                        (org-mem-entry-title entry) "\"\n\n")
+                        (org-mem-entry-title entry) "\"\n"
+                        "(Type g for a new example)\n\n")
                 (cl-loop for func in 1arg-funs
                          do (insert "(" (symbol-name func) " NODE) => "
                                     (prin1-to-string (funcall func entry))
