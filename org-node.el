@@ -2226,11 +2226,12 @@ Repeatable on the last key of a key sequence if
              (repeat nil))
     (org-node-list-example-1)))
 
-(defun org-node-list-example-1 (&optional _deprecated-arg)
-  "Display data from a randomly selected `org-mem-entry' object."
+(defun org-node-list-example-1 (&optional entry)
+  "Display data from a randomly selected `org-mem-entry' object.
+Or from ENTRY if provided."
   (interactive)
   (org-node-cache-ensure)
-  (let ((entry (seq-random-elt (hash-table-values org-mem--id<>entry)))
+  (let ((entry (or entry (seq-random-elt (hash-table-values org-mem--id<>entry))))
         (1arg-funs '(org-mem-active-timestamps
                      org-mem-active-timestamps-int
                      org-mem-clocks
@@ -2288,6 +2289,14 @@ Repeatable on the last key of a key sequence if
                                          (org-node-list-example)))
     (keymap-local-set "g" #'revert-buffer-quick)
     (keymap-local-set "q" #'quit-window)
+    (keymap-local-set "n" (lambda ()
+                            (interactive)
+                            (when (org-mem-next-entry entry)
+                              (org-node-list-example-1 (org-mem-next-entry entry)))))
+    (keymap-local-set "p" (lambda ()
+                            (interactive)
+                            (when (org-mem-previous-entry entry)
+                              (org-node-list-example-1 (org-mem-previous-entry entry)))))
     (let ((buffer-read-only nil)
           (win-start-line (line-number-at-pos (window-start)))
           (win-line (line-number-at-pos)))
