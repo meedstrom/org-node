@@ -849,6 +849,7 @@ belonging to an alphabet or number system.
 
 If you seek to emulate org-roam filenames, you may also want to
 configure `org-node-file-timestamp-format'."
+  (require 'ol)
   (thread-last title
                (org-link-display-format)
                (string-glyph-decompose)
@@ -870,6 +871,7 @@ A title like \"Löb\\='s Theorem\" becomes \"lobs-theorem\".
 Diacritical marks U+0300 to U+0331 are stripped \(mostly used with Latin
 alphabets).  Also stripped are all glyphs not categorized in Unicode as
 belonging to an alphabet or number system."
+  (require 'ol)
   (thread-last title
                (org-link-display-format)
                (string-glyph-decompose)
