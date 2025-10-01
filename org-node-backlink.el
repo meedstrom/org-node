@@ -467,7 +467,9 @@ headings but you have only done work under one of them."
 ;;; Proactive updating (broken & disabled for now)
 
 (defcustom org-node-backlink-lazy nil
-  "Inhibit cleaning up backlinks until user edits affected entry.
+  "NO EFFECT: Broken since org-node v3.
+
+Inhibit cleaning up backlinks until user edits affected entry.
 
 Background: Regardless of this value, links inserted via most commands
 will insert a backlink in real time, so long as

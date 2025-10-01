@@ -142,6 +142,10 @@ but when this finds one of them stale, it removes that whole entry."
   (when (or (member #'visual-line-mode org-mode-hook)
             (member #'visual-line-mode text-mode-hook))
     (visual-line-mode))
+  ;; Ensure that Emacs will indeed render the font-locking done by
+  ;; `org-node-context--get-preview'.
+  ;; Magit-section normally disables it because:
+  ;; https://github.com/magit/magit/commit/7de0f1335f8c4954d6d07413c5ec19fc8200078c
   (setq-local font-lock-defaults nil))
 
 (defclass org-node-context (magit-section)
@@ -518,9 +522,9 @@ else briefly visit the file at LINK-POS and call
              ;; entire source file.
              ;;
              ;; It would be nice to do this before the postprocess hook instead
-             ;; of after, to offer the possibility for users to override colors
-             ;; or something, but the hook also could be used to add text and
-             ;; not just text properties, so we have to re-fontify in any case.
+             ;; of after, to offer the possibility to override colors
+             ;; or something, but the hook also could be used to add text,
+             ;; so we have to re-fontify in any case.
              (font-lock-ensure)
              (buffer-string)))))))
 

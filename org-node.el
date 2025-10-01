@@ -189,7 +189,9 @@
 
 (defgroup org-node nil
   "Support a zettelkasten of org-id files and subtrees."
-  :group 'org)
+  :group 'org
+  :link '(url-link :tag "GitHub source" "https://github.com/meedstrom/org-node")
+  :link '(custom-manual "(org-node)"))
 
 (defvar org-node-data-dir user-emacs-directory
   "Directory in which to persist data between sessions.
@@ -624,14 +626,14 @@ If the input is not a key of `org-node--candidate<>entry',
 you can assume that no such node exists,
 or it was recently created but its buffer never saved.
 
-BLANK-OK means to use `org-node-blank-input-hint' if it is non-nil.
+BLANK-OK means to use `org-node-blank-input-hint' if both are non-nil.
 ARGS are all the optional arguments to `completing-read'.
 
 An obsolete calling convention allows ARGS to be a string, used as
 INITIAL-INPUT in `completing-read'."
   (when (stringp (car args))
-    ;; 2025-09-29: Convert from old calling convention that had just
-    ;; INITIAL-INPUT in place of ARGS.
+    ;; 2025-09-29: Convert from old calling convention
+    ;; (PROMPT BLANK-OK &optional INITIAL-INPUT).
     (setq args (list nil nil (car args))))
   (seq-let (predicate require-match initial-input hist def inherit-input-method) args
     (completing-read (or prompt "Node: ")
@@ -1351,6 +1353,7 @@ Repeatable on the last key of a key sequence if
   (org-node-cache-ensure)
   ;; Prevent consult from turning the names relative, with such enlightening
   ;; directory paths as ../../../../../../.
+  ;; https://github.com/minad/consult/discussions/1073
   (cl-letf (((symbol-function #'file-relative-name)
              (lambda (name &optional _dir) name)))
     (let ((consult-ripgrep-args (concat consult-ripgrep-args " --type=org")))
