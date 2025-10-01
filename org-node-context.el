@@ -18,12 +18,16 @@
 
 ;;; Code:
 
-(require 'org)
-(require 'org-node)
-(require 'org-element)
+(declare-function org-entry-get-with-inheritance "org")
+(declare-function org-at-comment-p "org")
+(declare-function org-back-to-heading-or-point-min "org")
 (require 'org-mem)
 (require 'magit-section)
 (require 'repeat)
+(eval-when-compile
+  (require 'org)
+  (require 'org-node)
+  (require 'org-element))
 
 (defgroup org-node-context nil "Preview backlink contexts in separate buffer."
   :group 'org-node)

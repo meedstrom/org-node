@@ -23,15 +23,25 @@
 
 ;;; Code:
 
+(declare-function org-entry-end-position "org")
+(declare-function org-entry-get "org")
+(declare-function org-entry-get-with-inheritance "org")
+(declare-function org-entry-put "org")
+(declare-function org-find-property "org")
+(declare-function org-get-property-block "org")
+(declare-function org-get-title "org")
+(declare-function org-link-make-string "ol")
+(defvar org-entry-property-inherited-from)
 (require 'cl-lib)
 (require 'fileloop)
-(require 'org)
-(require 'org-element)
-(require 'ol)
 (require 'llama)
 (require 'org-mem)
 (require 'org-mem-updater)
 (require 'org-node)
+(eval-when-compile
+  (require 'org)
+  (require 'org-element)
+  (require 'ol))
 
 (defgroup org-node-backlink nil "In-file backlinks."
   :group 'org-node)
@@ -275,6 +285,7 @@ That means the second part of a [[id][description]]."
 (defun org-node-backlink--fix-all-files (kind)
   "Update :BACKLINKS: in all known nodes.
 Argument KIND controls how to update them."
+  (require 'org)
   (unless (boundp 'fileloop--operate-function)
     (error "Probably org-node-backlink.el is not up to date with fileloop.el"))
   (when (or (and (memq kind '(update-drawers update-props))
