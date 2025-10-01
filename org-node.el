@@ -693,12 +693,12 @@ used as INITIAL-INPUT in `completing-read'."
 (defun org-node--ad-org-id-find (fn &rest args)
   "Print a message if car of ARGS is not an ID in `org-id-locations'.
 Then call FN, passing it ARGS.
-Designed as around-advice for `org-id-find'.
 
-This is merely an informative helper, because often the attempt to open
-an unknown ID-link results in Emacs appearing to freeze as org-id
-updates its database without telling the user that it is doing so.
-With a lot of files, this takes a long time."
+Designed as around-advice for `org-id-find'.  This is merely an
+informative helper, because often the attempt to open an unknown ID-link
+results in Emacs appearing to freeze as org-id updates its database
+without telling the user that it is doing so.  With a lot of files, this
+takes a long time."
   (let ((id (car args)))
     ;; Same as `org-id-find' (org-id.el is full of this sort of dynamic typing)
     (cond
@@ -1268,7 +1268,7 @@ set `org-node-creation-fn' to `org-node-new-via-roam-capture'."
          (_ (when (string-blank-p input)
               (setq input (funcall org-node-blank-input-title-generator))))
          (node (gethash input org-node--candidate<>entry)))
-    (require 'org-id)
+    (require 'org-id) ;; REVIEW
     (if node
         (org-node-goto node)
       (org-node-create input (org-id-new)))))

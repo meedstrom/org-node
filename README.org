@@ -101,6 +101,7 @@ Assuming your package manager knows about [[https://melpa.org/#/getting-started]
 (use-package org-node
   :init
   ;; Optional key bindings
+  ;; Tip: Try changing these to just "M-o"!
   (keymap-global-set "M-o n" org-node-global-prefix-map)
   (with-eval-after-load 'org
     (keymap-set org-mode-map "M-o n" org-node-org-prefix-map))
@@ -122,6 +123,7 @@ If you're coming here from *org-roam*, try this instead:
 (use-package org-node
   :init
   ;; Optional key bindings
+  ;; Tip: Try changing these to just "M-o"!
   (keymap-set global-map "M-o n" org-node-global-prefix-map)
   (with-eval-after-load 'org
     (keymap-set org-mode-map "M-o n" org-node-org-prefix-map))
@@ -141,7 +143,6 @@ See [[https://github.com/meedstrom/org-node#appendix-ii-how-to-rollback][How to 
 If you're new to these concepts, fear not.  The main things for day-to-day operation are two commands:
 
 - =org-node-find= (=M-o n f=)
-  - Tip: Bind this one globally to a shorter key such as =M-o f= -- you'll use it that much!
 - =org-node-insert-link= (=M-o n i=)
 
 Tip: There's *no separate command* for creating a new node!  Reuse one of the commands above, and type the name of a node that doesn't exist.  Try it and see what happens!

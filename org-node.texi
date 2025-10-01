@@ -322,6 +322,7 @@ Assuming your package manager knows about @uref{https://melpa.org/#/getting-star
 (use-package org-node
   :init
   ;; Optional key bindings
+  ;; Tip: Try changing these to just "M-o"!
   (keymap-global-set "M-o n" org-node-global-prefix-map)
   (with-eval-after-load 'org
     (keymap-set org-mode-map "M-o n" org-node-org-prefix-map))
@@ -343,6 +344,7 @@ If you're coming here from @strong{org-roam}@comma{} try this instead:
 (use-package org-node
   :init
   ;; Optional key bindings
+  ;; Tip: Try changing these to just "M-o"!
   (keymap-set global-map "M-o n" org-node-global-prefix-map)
   (with-eval-after-load 'org
     (keymap-set org-mode-map "M-o n" org-node-org-prefix-map))
@@ -371,10 +373,6 @@ If you're new to these concepts@comma{} fear not.  The main things for day-to-da
 @itemize
 @item
 @samp{org-node-find} (@samp{M-o n f})
-@itemize
-@item
-Tip: Bind this one globally to a shorter key such as @samp{M-o f} -- you'll use it that much!
-@end itemize
 @item
 @samp{org-node-insert-link} (@samp{M-o n i})
 @end itemize
