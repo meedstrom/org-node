@@ -552,9 +552,6 @@ see Info node `(elisp)Programmed Completion'."
                               `((affixation-function . org-node--affixate))))
     (complete-with-action action org-node--candidate<>entry str pred)))
 
-(define-obsolete-function-alias 'org-node-collection-main 'org-node-collection "2025-09-30")
-(define-obsolete-function-alias 'org-node-collection-basic 'org-node-collection "2025-09-30")
-
 (defun org-node--affixate (collection)
   "From flat list COLLECTION, make alist ((TITLE PREFIX SUFFIX) ...).
 Presumes that COLLECTION is the keys of `org-node--candidate<>entry'."
@@ -578,23 +575,6 @@ Presumes that COLLECTION is the keys of `org-node--candidate<>entry'."
            (cl-loop for title in collection
                     collect (or (gethash title org-node--title<>affixations)
                                 (list title "" "")))))))
-
-(defvar org-node-hist nil
-  "Minibuffer history.")
-
-;; New hist introduced in 3.3.16.  If never used, copy from `org-node-hist'.
-(defvar org-node-hist-altered org-node-hist
-  "Minibuffer history.")
-
-;; Boost completion hist to at least 1000 elements, unless user has nerfed
-;; the default `history-length'.
-;; Because you often narrow down the completions majorly, and still want to
-;; sort among what's left; perhaps it's a general topic you have not touched
-;; since two months ago, but when you do, the recency order remains relevant.
-(when (and (>= history-length (car (get 'history-length 'standard-value)))
-           (< history-length 1000))
-  (put 'org-node-hist 'history-length 1000)
-  (put 'org-node-hist-altered 'history-length 1000))
 
 ;; Finally, tying it all together
 (defun org-node-read-candidate
@@ -635,6 +615,22 @@ used as INITIAL-INPUT in `completing-read'."
                                    inherit-input-method)
     (remhash "" org-node--candidate<>entry)
     (remhash " " org-node--candidate<>entry)))
+
+(defvar org-node-hist nil
+  "Minibuffer history.")
+
+(defvar org-node-hist-altered nil
+  "Minibuffer history while `org-node-alter-candidates' was t.")
+
+;; Boost completion hist to at least 1000 elements, unless user has nerfed
+;; the default `history-length'.
+;; Because you often narrow down the completions majorly, and still want to
+;; sort among what's left; perhaps it's a general topic you have not touched
+;; since two months ago, but when you do, the recency order remains relevant.
+(when (and (>= history-length (car (get 'history-length 'standard-value)))
+           (< history-length 1000))
+  (put 'org-node-hist 'history-length 1000)
+  (put 'org-node-hist-altered 'history-length 1000))
 
 
 ;;;; The cache mode
