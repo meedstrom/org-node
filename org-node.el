@@ -725,7 +725,17 @@ rather than twice."
     (add-hook 'org-mem-pre-targeted-scan-functions #'org-node--forget-completions-in-results)
     (add-hook 'org-mem-record-entry-functions #'org-node--record-completion-candidates)
     (add-hook 'org-mem-record-entry-functions #'org-node--let-refs-be-aliases)
-    (org-mem-reset))
+    (when (and org-mem-do-sync-with-org-id (not (featurep 'org-id)))
+      (if org-mem-watch-dirs
+          ;; Re-cache including files known to org-id, as soon as that loads
+          (with-eval-after-load 'org-id
+            (when org-node-cache-mode
+              (org-mem-reset t)))
+        ;; User depends solely on `org-mem-do-sync-with-org-id', so load Org
+        ;; now to get completions instead of nothing.
+        (require 'org-id)))
+    (org-mem-reset)
+    (org-mem-tip-if-empty))
    (t
     (advice-remove #'org-id-find #'org-node--ad-org-id-find)
     (remove-hook 'org-mem-pre-full-scan-functions #'org-node--wipe-completions)
