@@ -727,10 +727,11 @@ rather than twice."
     (add-hook 'org-mem-record-entry-functions #'org-node--let-refs-be-aliases)
     (when (and org-mem-do-sync-with-org-id (not (featurep 'org-id)))
       (if org-mem-watch-dirs
-          ;; Re-cache including files known to org-id, as soon as that loads
-          (with-eval-after-load 'org-id
-            (when org-node-cache-mode
-              (org-mem-reset t)))
+          (eval-after-load 'org-id
+            (defun org-node--reset-once ()
+              (when org-node-cache-mode
+                (org-mem-reset t "Re-caching to include org-id locations...")
+                (fset 'org-node--reset-once #'ignore))))
         ;; User depends solely on `org-mem-do-sync-with-org-id', so load Org
         ;; now to get completions instead of nothing.
         (require 'org-id)))
