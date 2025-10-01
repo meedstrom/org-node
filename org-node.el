@@ -191,7 +191,7 @@
   "Support a zettelkasten of org-id files and subtrees."
   :group 'org
   :link '(url-link :tag "GitHub source" "https://github.com/meedstrom/org-node")
-  :link '(custom-manual "(org-node)"))
+  :link '(info-link :tag "Info manual" "(org-node)"))
 
 (defvar org-node-data-dir user-emacs-directory
   "Directory in which to persist data between sessions.
@@ -2243,6 +2243,7 @@ Or from ENTRY if provided."
                      org-mem-deadline-int
                      org-mem-file
                      org-mem-file-attributes
+                     org-mem-file-char-count
                      org-mem-file-coding-system
                      org-mem-file-id-strict
                      org-mem-file-id-topmost
