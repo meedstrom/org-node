@@ -482,8 +482,8 @@ See Info node `(elisp) Completion Variables'."
           (let* ((node1 (gethash c1 org-node--candidate<>entry))
                  (node2 (gethash c2 org-node--candidate<>entry))
                  ;; mtime could be nil if the file does not exist yet
-                 (mtime1 (and node1 (org-mem-file-mtime-floor node1)))
-                 (mtime2 (and node2 (org-mem-file-mtime-floor node2))))
+                 (mtime1 (and node1 (ignore-errors (org-mem-file-mtime-floor node1))))
+                 (mtime2 (and node2 (ignore-errors (org-mem-file-mtime-floor node2)))))
             ;; REVIEW: Actually should all of these four cases return t?
             (cond ((null node1) t)
                   ((null node2) nil)
