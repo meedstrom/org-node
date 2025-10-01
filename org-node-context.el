@@ -277,18 +277,6 @@ properties.  Org-mode is enabled, but the org-element cache is not."
   :type 'hook
   :package-version '(org-node . "2.0.0"))
 
-(defface org-node-context-origin-title
-  '((((type nil)) ;; On a terminal.
-     :extend t
-     :inherit org-document-title)
-    (t ;; On GUI.
-     :extend t
-     :height 1.5
-     ;; :inherit variable-pitch ;; Too controversial
-     :weight bold))
-  "Face for backlink node titles in the context buffer."
-  :package-version '(org-node . "2.0.0"))
-
 (defcustom org-node-context-main-buffer "*Backlinks*"
   "Name of the main context buffer."
   :type 'string
@@ -484,7 +472,7 @@ that buffer."
                   (propertize (org-mem-entry-title node)
                               'face
                               'org-node-context-origin-title)
-                  (propertize breadcrumbs 'face 'completions-annotations)))
+                  (propertize breadcrumbs 'face 'org-node-parent)))
         (insert (org-node-context--get-preview node link))
         (insert "\n")))))
 

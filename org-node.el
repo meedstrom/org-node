@@ -88,6 +88,7 @@
 (require 'fileloop)
 (require 'repeat)
 (require 'llama)
+(require 'org-faces)
 (require 'org-node-changes)
 (require 'org-mem)
 (require 'org-mem-updater)
@@ -145,6 +146,43 @@
 (defvar org-roam-preview-function)
 (defvar org-roam-preview-postprocess-functions)
 (defvar crm-separator)
+
+
+;;; Faces
+
+(defgroup org-node-faces nil
+  "Faces used by Org-node."
+  :group 'faces
+  :group 'org-node)
+
+(defface org-node-cite
+  '((t :inherit org-cite))
+  "Face for @citations in Org-node commands.")
+
+(defface org-node-tag
+  '((t :inherit org-tag))
+  "Face for :tags: in Org-node commands.")
+
+(defface org-node-parent
+  '((t :inherit completions-annotations))
+  "Face for parent headings in Org-node commands.")
+
+(defface org-node-rewrite-link
+  '((t :inherit org-link
+       :inverse-video t))
+  "Face for use in `org-node-rewrite-links-ask'.")
+
+(defface org-node-context-origin-title
+  '((((type nil)) ;; On a terminal.
+     :extend t
+     :inherit org-document-title)
+    (t ;; On GUI.
+     :extend t
+     :height 1.5
+     ;; :inherit variable-pitch ;; Too controversial
+     :weight bold))
+  "Face for backlink node titles in the context buffer."
+  :package-version '(org-node . "2.0.0"))
 
 
 ;;;; Some options
@@ -330,7 +368,7 @@ aliases."
         (let ((tags (org-mem-entry-tags node)))
           (if tags
               (propertize (concat "(" (string-join tags ", ") ") ")
-                          'face 'org-tag)
+                          'face 'org-node-tag)
             ""))
         ""))
 
@@ -341,7 +379,7 @@ aliases."
                    (cl-loop
                     for ancestor in (org-mem-olpath-with-file-title node)
                     collect
-                    (propertize ancestor 'face 'completions-annotations))))
+                    (propertize ancestor 'face 'org-node-parent))))
             (concat (string-join fontified-ancestors " > ") " > ")
           "")
         ""))
@@ -353,11 +391,11 @@ aliases."
               (fontified-ancestors
                (cl-loop
                 for ancestor in (org-mem-olpath-with-file-title node)
-                collect (propertize ancestor 'face 'completions-annotations))))
+                collect (propertize ancestor 'face 'org-node-parent))))
           (concat
            ;; TODO: Fallback on other face before org init
            (and tags (propertize (concat "(" (string-join tags ", ") ") ")
-                                 'face 'org-tag))
+                                 'face 'org-node-tag))
            (and fontified-ancestors
                 (concat (and tags " ")
                         (string-join fontified-ancestors " > ") " > "))))
@@ -370,14 +408,14 @@ aliases."
             (let ((ancestors (org-mem-olpath-with-file-title node))
                   (result nil))
               (dolist (anc ancestors)
-                (push (propertize anc 'face 'completions-annotations) result)
+                (push (propertize anc 'face 'org-node-parent) result)
                 (push " > " result))
               (setq result (apply #'concat (nreverse result)))
               result)
           "")
         (let ((tags (org-mem-entry-tags node)))
           (if tags (propertize (concat "   :" (string-join tags ":") ":")
-                               'face 'org-tag)
+                               'face 'org-node-tag)
             ""))))
 
 (defun org-node-append-tags-use-frame-width (node title)
@@ -389,7 +427,7 @@ Looks bad when you resize the frame, until you call `org-mem-reset'."
          (let ((tags (org-mem-entry-tags node)))
            (when tags
              (setq tags (propertize (concat ":" (string-join tags ":") ":")
-                                    'face 'org-tag))
+                                    'face 'org-node-tag))
              (concat (make-string (max 2 (- (frame-width)
                                             (string-width title)
                                             (string-width tags)
@@ -407,14 +445,14 @@ Looks bad when you resize the frame, until you call `org-mem-reset'."
            (when (org-mem-entry-subtree-p node)
              (let ((ancestors (org-mem-olpath-with-file-title node)))
                (dolist (anc ancestors)
-                 (push (propertize anc 'face 'completions-annotations) olp)
+                 (push (propertize anc 'face 'org-node-parent) olp)
                  (push " > " olp))
                (setq olp (apply #'concat (nreverse olp))))))
           (concat
            (let ((tags (org-mem-entry-tags node)))
              (when tags
                (setq tags (propertize (concat ":" (string-join tags ":") ":")
-                                      'face 'org-tag))
+                                      'face 'org-node-tag))
                (concat (make-string (max 2 (- (frame-width)
                                               (string-width title)
                                               (if olp (string-width olp) 0)
@@ -617,7 +655,7 @@ INITIAL-INPUT in `completing-read'."
     (puthash (concat (when-let* ((type (gethash ref org-mem--roam-ref<>type)))
                        (propertize (concat type ":")
                                    'face 'completions-annotations))
-                     (propertize ref 'face 'org-cite))
+                     (propertize ref 'face 'org-node-cite))
              node
              org-node--candidate<>entry)))
 
@@ -2042,11 +2080,6 @@ At each link, prompt for user consent, then auto-update the link
 so it matches the destination\\='s current title."
   (interactive)
   (require 'ol)
-  (require 'org-faces)
-  (defface org-node--rewrite-face
-    `((t :inherit 'org-link
-         :inverse-video ,(not (face-inverse-video-p 'org-link))))
-    "Face for use in `org-node-rewrite-links-ask'.")
   (org-node-cache-ensure)
   (when (org-node--consent-to-bothersome-modes-for-mass-edit)
     (let ((n-links 0)
@@ -2094,7 +2127,7 @@ so it matches the destination\\='s current title."
                         (org-fold-show-entry)
                       (org-fold-show-context))
                     (recenter)
-                    (highlight-regexp exact-link 'org-node--rewrite-face)
+                    (highlight-regexp exact-link 'org-node-rewrite-link)
                     (unwind-protect
                         (setq answered-yes
                               (y-or-n-p
