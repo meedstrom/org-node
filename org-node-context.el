@@ -299,7 +299,7 @@ properties.  Org-mode is enabled, but the org-element cache is not."
   (cond
    ((not org-node-context-follow-local-mode)
     (remove-hook 'post-command-hook #'org-node-context--try-refresh t))
-   ((not (and (derived-mode-p 'org-mode) buffer-file-name))
+   ((not (derived-mode-p 'org-mode))
     (org-node-context-follow-local-mode 0))
    (t
     (add-hook 'post-command-hook #'org-node-context--try-refresh nil t))))
@@ -469,15 +469,14 @@ that buffer."
 (defun org-node-context--insert-backlink-sections (links)
   "Insert a section displaying a preview of LINK."
   (dolist (link (sort links #'org-node-context--origin-title-lessp))
-    (let* ((node (or (org-mem-entry-by-id (org-mem-link-nearby-id link))
-                     (error "Origin not found for link: %S" link)))
+    (let* ((node (org-mem-entry-by-id (org-mem-link-nearby-id link)))
            (breadcrumbs (if-let* ((olp (org-mem-olpath-with-file-title node)))
                             (string-join olp " > ")
                           "Top")))
       (magit-insert-section (org-node-context link)
         (magit-insert-heading
           (format "%s (%s)"
-                  (propertize (org-mem-entry-title node)
+                  (propertize (org-mem-title node)
                               'face
                               'org-node-context-origin-title)
                   (propertize breadcrumbs 'face 'org-node-parent)))
@@ -506,10 +505,8 @@ else briefly visit the file at LINK-POS and call
     (or (alist-get pos-diff (gethash id org-node-context--previews))
         (setf
          (alist-get pos-diff (gethash id org-node-context--previews))
-         (let ((org-element-cache-persistent nil)
-               snippet)
-           (with-current-buffer (org-node--work-buffer-for
-                                 (org-mem-entry-file node))
+         (let (snippet)
+           (with-current-buffer (org-node--work-buffer-for (org-mem-file node))
              (goto-char link-pos)
              (setq snippet (org-node-context--extract-entry-at-point)))
            (with-current-buffer (org-mem-org-mode-scratch)
