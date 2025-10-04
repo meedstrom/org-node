@@ -2711,7 +2711,7 @@ To always operate on the current entry, use `org-node-add-tags-here'."
                        (mapcar #'car)
                        (cl-remove-if #'keywordp)
                        (mapcar #'substring-no-properties))
-          (cl-loop for entry in (org-node-all-filtered-nodes)
+          (cl-loop for entry in (org-mem-all-entries)
                    append (org-mem-entry-tags entry)))))
 
 (defun org-node--get-filetags ()
