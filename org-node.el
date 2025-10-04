@@ -2701,6 +2701,10 @@ To always operate on the current entry, use `org-node-add-tags-here'."
         (org-back-to-heading)
         (org-set-tags tags)))))
 
+(defcustom org-node-do-filter-tags nil
+  "Whether `org-node-set-tags' etc should limit completions."
+  :type 'boolean)
+
 (defun org-node--get-all-known-tags ()
   (delete-dups
    (nconc (thread-last (append org-tag-persistent-alist
@@ -2711,7 +2715,9 @@ To always operate on the current entry, use `org-node-add-tags-here'."
                        (mapcar #'car)
                        (cl-remove-if #'keywordp)
                        (mapcar #'substring-no-properties))
-          (cl-loop for entry in (org-mem-all-entries)
+          (cl-loop for entry in (if org-node-do-filter-tags
+                                    (org-node-all-filtered-nodes)
+                                  (org-mem-all-entries))
                    append (org-mem-entry-tags entry)))))
 
 (defun org-node--get-filetags ()
