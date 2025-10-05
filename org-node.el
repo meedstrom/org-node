@@ -126,6 +126,7 @@
 (declare-function org-link-display-format "ol")
 (declare-function org-link-make-string "ol")
 (declare-function org-lint "org-lint")
+(declare-function org-make-tag-string "org")
 (declare-function org-map-region "org")
 (declare-function org-mem-list--pop-to-tabulated-buffer "org-mem-list")
 (declare-function org-mem-roamy-mk-backlinks "org-mem-roamy")
@@ -148,7 +149,7 @@
 (defvar crm-separator)
 
 
-;;; Faces
+;;;; Faces
 
 (defgroup org-node-faces nil
   "Faces used by Org-node."
@@ -311,6 +312,10 @@ by typing \\[org-node-list-example]."
              (with-memoization (org-mem--table 0 'true-watch-dirs)
                (with-temp-buffer ;; No buffer-env
                  (delete-dups (mapcar #'file-truename org-mem-watch-dirs)))))))
+
+(defun org-node-all-filtered-nodes ()
+  "All currently cached org-nodes that satisfied `org-node-filter-fn'."
+  (delete-dups (hash-table-values org-node--candidate<>entry)))
 
 
 ;;;; Pretty completion
@@ -486,14 +491,14 @@ See Info node `(elisp) Completion Variables'."
           (let* ((node1 (gethash c1 org-node--candidate<>entry))
                  (node2 (gethash c2 org-node--candidate<>entry))
                  ;; mtime could be nil if the file does not exist yet
-                 (mtime1 (and node1 (ignore-errors (org-mem-file-mtime-floor node1))))
-                 (mtime2 (and node2 (ignore-errors (org-mem-file-mtime-floor node2)))))
+                 (mtime1 (and node1 (ignore-errors (org-mem-file-mtime node1))))
+                 (mtime2 (and node2 (ignore-errors (org-mem-file-mtime node2)))))
             ;; REVIEW: Actually should all of these four cases return t?
             (cond ((null node1) t)
                   ((null node2) nil)
                   ((null mtime1) t)
                   ((null mtime2) nil)
-                  (t (< mtime2 mtime1)))))))
+                  (t (time-less-p mtime2 mtime1)))))))
 
 (defun org-node-sort-by-crtime (completions)
   "Sort COMPLETIONS by timestamp in `org-node-property-crtime'.
@@ -734,7 +739,7 @@ rather than twice."
           (eval-after-load 'org-id
             (defun org-node--reset-once ()
               (when org-node-cache-mode
-                (org-mem-reset t "Re-caching to include org-id locations...")
+                (org-mem-reset t "org-node: Re-caching to include org-id locations...")
                 (fset 'org-node--reset-once #'ignore))))
         ;; User depends solely on `org-mem-do-sync-with-org-id', so load Org
         ;; now to get completions instead of nothing.
@@ -828,6 +833,7 @@ For the rest of the filename, configure `org-node-file-slug-fn'."
 ;;       uses `org-node-rename-file-by-title'.  Or we could pass more arguments
 ;;       into the slug fn, that it can use to systematically add these parts
 ;;       based on some rule, like perhaps the content of an Org property.
+
 (defcustom org-node-file-slug-fn #'org-node-slugify-for-web
   "Function taking a node title and returning a filename component.
 Receives one argument: the value of an Org #+TITLE keyword, or
@@ -2785,29 +2791,26 @@ extra commands that work only in Org mode."
 (defun org-node-goto (node &optional exact)
   "Visit file containing NODE, and ensure point is inside NODE.
 EXACT means always move point to NODE top.
-See also `org-node-goto-id'."
+See also the subroutine `org-node-goto-id'."
   (cl-assert (org-mem-entry-p node))
   (when (numberp exact)
     (error "Function org-node-goto no longer takes a position argument"))
-  (let* ((file (org-mem-file-truename node))
-         ;; NOTE: We always behave as if `find-file-existing-other-name' is t,
-         ;;       which I think makes sense for us, but I haven't thought too
-         ;;       hard about it.
-         (buf (find-buffer-visiting file)))
-    (if (or buf (file-exists-p file))
-        (org-node-goto-id (org-mem-id node)
-                          exact
-                          (or buf (find-file-noselect file)))
-      (org-mem-reset t "org-node: Didn't find file, resetting..."))))
+  (if-let* ((file (org-mem-file-truename node))
+            (buf (or (find-buffer-visiting file)
+                     (and (file-exists-p file)
+                          (find-file-noselect file)))))
+      (org-node-goto-id (org-mem-id node) exact buf)
+    (org-mem-reset t "org-node: Didn't find file, resetting...")))
 
 (defun org-node-goto-id (id &optional exact buffer)
   "Go to ID in some buffer, without needing the file to exist yet.
-that is, if `org-id-locations' has an entry for ID pointing to a
-file-name that may not yet have been written to disk, but a buffer
-visits it, switch to that unsaved buffer and look for ID there.
-This differs from `org-id-goto', which would throw an error.
 
-Optional argument BUFFER is a specific buffer in which to look,
+This differs from `org-id-goto', which would throw an error.
+That is, if `org-id-locations' has an entry for ID pointing to a
+file-name that may not yet have been written to disk, but a buffer
+visits it, switch to that unsaved buffer and move point to said entry.
+
+Optional argument BUFFER is a specific buffer in which to look for ID,
 in which case ID needs not be registered in `org-id-locations' at all.
 
 Optional argument EXACT as in `org-node-goto'."
@@ -2815,10 +2818,13 @@ Optional argument EXACT as in `org-node-goto'."
   (unless buffer
     (let ((file (or (gethash id org-id-locations)
                     (let ((entry (org-mem-entry-by-id id)))
-                      (if entry (org-mem-entry-file-truename entry)
-                        (error "Unknown ID: %s" id))))))
-      (setq buffer (or (find-buffer-visiting file)
-                       (find-file-noselect file)))))
+                      (and entry (org-mem-entry-file-truename entry)))
+                    (error "Unknown ID: %s" id))))
+      (setq buffer
+            (or (find-buffer-visiting file)
+                (and (file-exists-p file)
+                     (find-file-noselect file))
+                (error "File not on disk nor visited by any buffer: %s" file)))))
   (let (pos)
     (with-current-buffer buffer
       (org-node--assert-transclusion-safe)
@@ -2828,7 +2834,7 @@ Optional argument EXACT as in `org-node-goto'."
     ;; Q: Does pop-to-buffer guarantee this?
     (cl-assert (eq (current-buffer) buffer))
     (widen)
-    ;; Mainly comes true on first visit to a file node, so that point=1.
+    ;; Mainly comes true on first visit to a file node, so that point==pos==1.
     (when (eq (point) pos)
       (org-node-full-end-of-meta-data))
     ;; Point may already be at a desirable position due to any of:
@@ -2858,7 +2864,7 @@ that follows the file-level properties drawer."
 ;; Keyword lines work as a natural barrier, because Org expects file-level
 ;; :PROPERTIES: to come before #+title and other keyword lines.
 (defun org-node--after-drawers-before-keyword ()
-  "Move point to after all drawers in the front matter."
+  "Move point to after all drawers in the file top level."
   (goto-char (point-min))
   (let ((case-fold-search t)
         (bound (org-entry-end-position))
@@ -2942,23 +2948,19 @@ Designed for `completion-at-point-functions'."
   "Let completion at point insert links to nodes.
 
 -----"
-  :require 'org-node
+  :require 'org-node ;; ?
   (if org-node-complete-at-point-local-mode
-      (add-hook 'completion-at-point-functions
-                #'org-node-complete-at-point nil t)
+      (if (not (derived-mode-p 'org-mode))
+          (org-node-complete-at-point-local-mode 0)
+        (add-hook 'completion-at-point-functions
+                  #'org-node-complete-at-point nil t))
     (remove-hook 'completion-at-point-functions
                  #'org-node-complete-at-point t)))
-
-(defun org-node-complete-at-point--try-enable ()
-  "Enable `org-node-complete-at-point-local-mode' if in Org file."
-  (and (derived-mode-p 'org-mode)
-       buffer-file-name
-       (org-node-complete-at-point-local-mode)))
 
 ;;;###autoload
 (define-globalized-minor-mode org-node-complete-at-point-mode
   org-node-complete-at-point-local-mode
-  org-node-complete-at-point--try-enable)
+  org-node-complete-at-point-local-mode)
 
 
 ;;;; Misc features
@@ -3096,7 +3098,7 @@ Also enable `org-mode', but ignore `org-mode-hook' and startup options.
 A buffer persists for each FILE, so calling again with the same FILE
 skips the overhead of creation.  To clean up, call
 `org-node--kill-work-buffers' explicitly."
-  (let ((bufname (format " *org-node-work-%d*" (sxhash file))))
+  (let ((bufname (format " *org-node-work-%d*" (abs (sxhash file)))))
     (or (get-buffer bufname)
         (with-current-buffer (org-mem-org-mode-scratch bufname)
           (push (current-buffer) org-node--work-buffers)
@@ -3358,10 +3360,6 @@ heading, else the file-level node, whichever has an ID first."
 ENTRY should be an `org-mem-entry' object."
   (and (org-mem-entry-id entry)
        (funcall org-node-filter-fn entry)))
-
-(defun org-node-all-filtered-nodes ()
-  "List currently cached org-nodes that satisfied `org-node-filter-fn'."
-  (delete-dups (hash-table-values org-node--candidate<>entry)))
 
 (defun org-node-guess-node-by-title (title)
   (and (gethash title org-node--title<>affixations)
