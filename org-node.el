@@ -159,6 +159,10 @@
   '((t :inherit org-cite))
   "Face for @citations in Org-node commands.")
 
+(defface org-node-cite-type
+  '((t :inherit completions-annotations))
+  "Face for \"http:\" part of an URL citation in Org-node commands.")
+
 (defface org-node-tag
   '((t :inherit org-tag))
   "Face for :tags: in Org-node commands.")
@@ -640,7 +644,7 @@ used as INITIAL-INPUT in `completing-read'."
   (dolist (ref (org-mem-entry-roam-refs node))
     (puthash (concat (when-let* ((type (gethash ref org-mem--roam-ref<>type)))
                        (propertize (concat type ":")
-                                   'face 'completions-annotations))
+                                   'face 'org-node-cite-type))
                      (propertize ref 'face 'org-node-cite))
              node
              org-node--candidate<>entry)))
