@@ -544,10 +544,9 @@ Meant to sit on these hooks:
       (dolist (date sortstrs)
         ;; Use `parse-time-string' rather than `iso8601-parse' to fail quietly
         (let ((decoded-time (parse-time-string date)))
-          ;; Basic check that it could be parsed
-          (when (seq-some #'natnump decoded-time)
-            (setq mdy (seq-let (_ _ _ d m y) decoded-time
-                        (list m d y)))
+          (setq mdy (seq-let (_ _ _ d m y) decoded-time
+                      (list m d y)))
+          (when (seq-every-p #'natnump mdy)
             (when (calendar-date-is-visible-p mdy)
               (calendar-mark-visible-date mdy))))))))
 
