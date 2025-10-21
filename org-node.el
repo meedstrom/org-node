@@ -146,6 +146,7 @@
 (defvar org-roam-capture-templates)
 (defvar org-roam-preview-function)
 (defvar org-roam-preview-postprocess-functions)
+(defvar org-attach-id-dir)
 (defvar crm-separator)
 
 
@@ -2536,6 +2537,9 @@ from ID links found in `org-mem--target<>links'."
     (org-mode))
   (let* ((file (pop org-node--lint-remaining-files))
          (inhibit-message t) ;; Muffle spam from `org-lint-invalid-id-link'
+         ;; Prevent an error in `org-attach-check-absolute-path'
+         (org-attach-id-dir (expand-file-name org-attach-id-dir
+                                              (file-name-nondirectory file)))
          (warnings (org-lint)))
     (while warnings
       (push (cons file (pop warnings)) org-node--lint-warnings)))
