@@ -2061,9 +2061,14 @@ instantiated in many ways such as 2024-08-10, then this should
 return a regexp that can match any of those ways it might turn
 out, with any year, month or day."
   (with-memoization (org-mem--table 'org-node--make-regexp-for-time-format format)
+    ;; TODO: Improve error messages, now they presume caller
+    ;;       (or do the checks in the caller, rather than here).
+    (when (string-empty-p format)
+      (error "Called with empty FORMAT"))
+    (when (string-match-p "[[:alnum:]]" (substring format 0 -1))
+      (error "Cannot safely rename if `org-node-file-timestamp-format' does not end in a separator such as a dash"))
     (let ((example (format-time-string format)))
       (if (string-match-p (rx (any "^*+([\\")) example)
-          ;; TODO: Improve error message, now it presumes caller
           (error "org-node: Unable to safely rename with current `org-node-file-timestamp-format'.
 This is not inherent in your choice of format, I am just not smart enough")
         (concat "^"
