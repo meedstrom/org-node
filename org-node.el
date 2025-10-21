@@ -1961,10 +1961,10 @@ command, always prompt for confirmation.
 
 Argument INTERACTIVE automatically set."
   (interactive "p" org-mode)
-  (let ((path (file-truename buffer-file-truename))
-        (buf (current-buffer))
-        (title nil)
-        (time-from-property nil))
+  (let* ((buf (or (buffer-base-buffer) (current-buffer)))
+         (path (file-truename (buffer-file-name buf)))
+         (title nil)
+         (time-from-property nil))
     (cond
      ((or (not (derived-mode-p 'org-mode))
           (not (equal "org" (file-name-extension path))))
@@ -2019,8 +2019,7 @@ Argument INTERACTIVE automatically set."
            ((string-empty-p slug)
             (when interactive
               (message "Filename would become blank: %s" path)))
-           ((or (buffer-modified-p buf)
-                (buffer-modified-p (buffer-base-buffer buf)))
+           ((buffer-modified-p buf)
             (when interactive
               (message "Unsaved file, letting it be: %s" path)))
            ((find-buffer-visiting new-path)
