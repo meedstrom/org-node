@@ -77,22 +77,6 @@
 
 ;;; Code:
 
-(eval-when-compile
-  (require 'org)
-  (require 'org-id)
-  (require 'org-macs)
-  (require 'org-fold)
-  (require 'org-element))
-(require 'cl-lib)
-(require 'subr-x)
-(require 'fileloop)
-(require 'repeat)
-(require 'llama)
-(require 'org-faces)
-(require 'org-node-changes)
-(require 'org-mem)
-(require 'org-mem-updater)
-
 (declare-function consult--grep "ext:consult")
 (declare-function consult--grep-make-builder "ext:consult")
 (declare-function consult--ripgrep-make-builder "ext:consult")
@@ -148,6 +132,22 @@
 (defvar org-roam-preview-postprocess-functions)
 (defvar org-attach-id-dir)
 (defvar crm-separator)
+(require 'cl-lib)
+(require 'subr-x)
+(require 'fileloop)
+(require 'repeat)
+(require 'llama)
+(require 'org-faces)
+(require 'org-node-changes)
+(require 'org-mem)
+(require 'org-mem-updater)
+
+(eval-when-compile
+  (require 'org)
+  (require 'org-id)
+  (require 'org-macs)
+  (require 'org-fold)
+  (require 'org-element))
 
 
 ;;;; Faces
@@ -187,8 +187,7 @@
      :height 1.5
      ;; :inherit variable-pitch ;; Too controversial
      :weight bold))
-  "Face for backlink node titles in the context buffer."
-  :package-version '(org-node . "2.0.0"))
+  "Face for backlink node titles in the context buffer.")
 
 
 ;;;; Some options
@@ -700,24 +699,20 @@ used as INITIAL-INPUT in `completing-read'."
 ;; TODO: While we're at it... patch `org-id-find-id-file' not to fallback on
 ;;       the current buffer, that is so inviting to bugs!  Probably it
 ;;       shouldn't have been a separate function at all.
-(defun org-node--ad-org-id-find (fn &rest args)
-  "Print a message if car of ARGS is not an ID in `org-id-locations'.
-Then call FN, passing it ARGS.
+(defun org-node--ad-org-id-find (id &rest _)
+  "Print a message if ID is not in `org-id-locations'.
 
-Designed as around-advice for `org-id-find'.  This is merely an
+Designed as before-advice for `org-id-find'.  This is merely an
 informative helper, because often the attempt to open an unknown ID-link
 results in Emacs appearing to freeze as org-id updates its database
 without telling the user that it is doing so.  With a lot of files, this
 takes a long time."
-  (let ((id (car args)))
-    ;; Same as `org-id-find' (org-id.el is full of this sort of dynamic typing)
-    (cond
-     ((symbolp id) (setq id (symbol-name id)))
-     ((numberp id) (setq id (number-to-string id))))
-    (when (and (org-mem--try-ensure-org-id-table-p)
-               (not (gethash id org-id-locations)))
-      (message "No cached location for ID \"%s\"..." id))
-    (apply fn args)))
+  (cond
+   ((symbolp id) (setq id (symbol-name id)))
+   ((numberp id) (setq id (number-to-string id))))
+  (when (and (org-mem--try-ensure-org-id-table-p)
+             (not (gethash id org-id-locations)))
+    (message "No cached location for ID \"%s\"..." id)))
 
 ;;;###autoload
 (define-minor-mode org-node-cache-mode
@@ -730,7 +725,7 @@ rather than twice."
   :global t
   (cond
    (org-node-cache-mode
-    (advice-add #'org-id-find :around #'org-node--ad-org-id-find)
+    (advice-add #'org-id-find :before #'org-node--ad-org-id-find)
     (add-hook 'org-mem-pre-full-scan-functions #'org-node--wipe-completions)
     (add-hook 'org-mem-pre-targeted-scan-functions #'org-node--forget-completions-in-results)
     (add-hook 'org-mem-record-entry-functions #'org-node--record-completion-candidates)
@@ -2497,9 +2492,9 @@ from ID links found in `org-mem--target<>links'."
         (files (org-mem-all-files)))
     (unless proceed
       (when (y-or-n-p (format "Lint %d files?" (length files)))
+        (setq org-node--lint-warnings nil)
         (setq org-node--lint-remaining-files files)
         (fileloop-initialize files #'org-node--lint-scanner #'ignore)
-        (setq org-node--lint-warnings nil)
         (setq proceed t)))
     (condition-case _
         (when proceed
@@ -2515,6 +2510,8 @@ from ID links found in `org-mem--target<>links'."
       ;; When fileloop finishes, it signals an `user-error'.  Let that or a
       ;; `quit' proceed to the display of results.
       ((quit user-error))))
+  ;; We're here in three cases: linting finished, linting was quit midway thru,
+  ;; or user said no at the `y-or-n-p' and just wants to see results from last time.
   (when org-node--lint-warnings
     (org-mem-list--pop-to-tabulated-buffer
      :buffer "*org lint results*"
