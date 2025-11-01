@@ -56,7 +56,7 @@ Backlinks
 Backlink solution 1: displayed in a separate window
 
 * Option 1A Reuse the org-roam buffer::
-* Option 2A Use the org-node-context buffer::
+* Option 1B Use the org-node-context buffer::
 
 Backlink solution 2: Print inside the file
 
@@ -398,7 +398,7 @@ Backlinks are the butter on the bread that is your notes.  If you've ever seen a
 
 @menu
 * Option 1A Reuse the org-roam buffer::
-* Option 2A Use the org-node-context buffer::
+* Option 1B Use the org-node-context buffer::
 @end menu
 
 @node Option 1A Reuse the org-roam buffer
@@ -410,8 +410,8 @@ You can use the org-roam buffer without the rest of org-roam.  Enable the follow
 (org-node-roam-accelerator-mode)
 @end lisp
 
-@node Option 2A Use the org-node-context buffer
-@subsection Option 2A: Use the org-node-context buffer
+@node Option 1B Use the org-node-context buffer
+@subsection Option 1B: Use the org-node-context buffer
 
 Org-node ships a rewrite of the org-roam buffer.
 

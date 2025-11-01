@@ -163,7 +163,7 @@ You can use the org-roam buffer without the rest of org-roam.  Enable the follow
 (org-node-roam-accelerator-mode)
 #+end_src
 
-*** Option 2A: Use the org-node-context buffer
+*** Option 1B: Use the org-node-context buffer
 
 Org-node ships a rewrite of the org-roam buffer.
 
@@ -180,7 +180,7 @@ I rarely have the screen space to display a backlink buffer.  Because it needs m
 
 A complementary solution, which can also stand alone, is to have the backlinks /written into/ the file, on an Org property line or in a drawer.
 
-NOTE: To be clear, this mode never generates new IDs.  That's your own business.  This only adds/edits =:BACKLINKS:= properties or drawers, and only gives it backlinks corresponding to links where the original site has or inherits some ID.
+NOTE: To be clear, this mode never generates new IDs (and neither would Option 1).  That's your own business.  This only adds/edits =:BACKLINKS:= properties or drawers, and only gives it backlinks corresponding to links where the original site already has or inherits some ID.
 
 *** Option 2A: Automatic =:BACKLINKS:= property line
 
