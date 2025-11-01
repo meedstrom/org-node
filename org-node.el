@@ -2540,6 +2540,7 @@ from ID links found in `org-mem--target<>links'."
   (unless (derived-mode-p 'org-mode)
     (org-mode))
   (let* ((file (pop org-node--lint-remaining-files))
+         (default-directory (file-name-directory file))
          (inhibit-message t) ;; Muffle spam from `org-lint-invalid-id-link'
          ;; Prevent an error in `org-attach-check-absolute-path'
          (org-attach-id-dir (expand-file-name org-attach-id-dir
