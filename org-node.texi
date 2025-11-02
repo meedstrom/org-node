@@ -23,7 +23,7 @@
 @end ifnottex
 
 @menu
-* Intro::
+* What's all this::
 * Setup::
 * Backlinks::
 * Misc::
@@ -32,12 +32,11 @@
 @detailmenu
 --- The Detailed Node Listing ---
 
-Intro
+What's all this
 
-* What's all this::
 * What's a "node"?::
-* Features::
 * Benchmarks on my machine::
+* Features::
 
 Setup
 
@@ -97,18 +96,8 @@ Appendix IV: What are @samp{ROAM_REFS}?
 @end detailmenu
 @end menu
 
-@node Intro
-@chapter Intro
-
-@menu
-* What's all this::
-* What's a "node"?::
-* Features::
-* Benchmarks on my machine::
-@end menu
-
 @node What's all this
-@section What's all this
+@chapter What's all this
 
 I like @uref{https://github.com/org-roam/org-roam, org-roam} but found it too slow@comma{} so I made @uref{https://github.com/meedstrom/quickroam, quickroam}.  And that idea spun off into this package@comma{} a standalone thing.  It may also be easier to pick up than org-roam.
 
@@ -123,6 +112,12 @@ In pursuit of being "just org-id"@comma{} this package has no equivalent setting
 
 If you were the sort of person to prefer ID-links over file links or any other type of link@comma{} you're in the right place!  Now you can rely on IDs@comma{} and---if you want---stop worrying about filenames@comma{} directories and subtree hierarchies.  As long as you've assigned an ID to a heading or file@comma{} you can find it later.
 @end itemize
+
+@menu
+* What's a "node"?::
+* Benchmarks on my machine::
+* Features::
+@end menu
 
 @node What's a "node"?
 @section What's a "node"?
@@ -140,6 +135,29 @@ Just searching for Org files is too coarse.  Just searching for any subtree anyw
 @strong{Here's what org-roam invented.}  It turns out that if you limit the search-hits to just those files and subtrees you've deigned to assign an org-id -- which roughly maps to @emph{everything you've ever thought it was worth linking to} -- it filters out the noise excellently.
 
 Once a subtree has an ID you can link to@comma{} it's a "node" because it has joined the wider graph@comma{} the network of linked nodes.  I wish the English language had more distinct sounds for the words "node" and "note"@comma{} but to clarify@comma{} I'll say "ID-node" when the distinction matters.
+
+@node Benchmarks on my machine
+@section Benchmarks on my machine
+
+The original reason that org-node exists.
+
+@multitable {aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa} {aaaaaaaa} {aaaaaaaa}
+@headitem 
+@tab org-roam
+@tab org-node
+@item Time to index my 3000 nodes
+@tab 2m 48s
+@tab 0m 02s
+@item Time to save file w/ 400 nodes
+@tab 5--10s
+@tab instant
+@item Time to display 20 backlinks
+@tab 5--10s
+@tab instant
+@item Time to open minibuffer
+@tab 1--3s
+@tab instant
+@end multitable
 
 @node Features
 @section Features
@@ -267,29 +285,6 @@ A comparison of three systems that all permit relying on org-id and don't lock y
 @tab --
 @tab yes
 @tab not applicable
-@end multitable
-
-@node Benchmarks on my machine
-@section Benchmarks on my machine
-
-The original reason that org-node exists.
-
-@multitable {aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa} {aaaaaaaa} {aaaaaaaa}
-@headitem 
-@tab org-roam
-@tab org-node
-@item Time to index my 3000 nodes
-@tab 2m 48s
-@tab 0m 02s
-@item Time to save file w/ 400 nodes
-@tab 5--10s
-@tab instant
-@item Time to display 20 backlinks
-@tab 5--10s
-@tab instant
-@item Time to open minibuffer
-@tab 1--3s
-@tab instant
 @end multitable
 
 @node Setup

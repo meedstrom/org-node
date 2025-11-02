@@ -6,8 +6,7 @@
 #+TEXINFO_DIR_CATEGORY: Emacs
 #+TEXINFO_DIR_TITLE: Org-node: (org-node).
 #+TEXINFO_DIR_DESC: Link org-id entries into a network.
-* Intro
-** What's all this
+* What's all this
 #+HTML: <a href="https://repology.org/project/emacs%3Aorg-node/versions"> <img src="https://repology.org/badge/vertical-allrepos/emacs%3Aorg-node.svg" alt="Packaging status" align="right"> </a>
 
 I like [[https://github.com/org-roam/org-roam][org-roam]] but found it too slow, so I made [[https://github.com/meedstrom/quickroam][quickroam]].  And that idea spun off into this package, a standalone thing.  It may also be easier to pick up than org-roam.
@@ -35,6 +34,17 @@ Just searching for Org files is too coarse.  Just searching for any subtree anyw
 *Here's what org-roam invented.*  It turns out that if you limit the search-hits to just those files and subtrees you've deigned to assign an org-id -- which roughly maps to /everything you've ever thought it was worth linking to/ -- it filters out the noise excellently.
 
 Once a subtree has an ID you can link to, it's a "node" because it has joined the wider graph, the network of linked nodes.  I wish the English language had more distinct sounds for the words "node" and "note", but to clarify, I'll say "ID-node" when the distinction matters.
+
+** Benchmarks on my machine
+
+The original reason that org-node exists.
+
+|                                | org-roam | org-node |
+|--------------------------------+----------+----------|
+| Time to index my 3000 nodes    | 2m 48s   | 0m 02s   |
+| Time to save file w/ 400 nodes | 5--10s   | instant  |
+| Time to display 20 backlinks   | 5--10s   | instant  |
+| Time to open minibuffer        | 1--3s    | instant  |
 
 ** Features
 
@@ -71,17 +81,6 @@ A comparison of three systems that all permit relying on org-id and don't lock y
 | Can have separate note piles     | yes      | -- (wontfix)     | not applicable       |
 | Some query-able cache            | yes      | yes              | --                   |
 | Async cache rebuild              | --       | yes              | not applicable       |
-
-** Benchmarks on my machine
-
-The original reason that org-node exists.
-
-|                                | org-roam | org-node |
-|--------------------------------+----------+----------|
-| Time to index my 3000 nodes    | 2m 48s   | 0m 02s   |
-| Time to save file w/ 400 nodes | 5--10s   | instant  |
-| Time to display 20 backlinks   | 5--10s   | instant  |
-| Time to open minibuffer        | 1--3s    | instant  |
 
 * Setup
 ** Install
