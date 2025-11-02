@@ -1257,10 +1257,46 @@ that node \(an `org-mem-entry' object\), otherwise leave it at nil."
     (list :title title :id id :existing-node node)))
 
 
+;;;; Subroutines for some commands
+
+(defun org-node--try-complete-title-at-pt ()
+  "See user option `org-node-find-use-thing-at-point'."
+  (save-excursion
+    (let* ((titles (hash-table-keys org-node--title<>affixations))
+           (sym (thing-at-point 'symbol))
+           (word (thing-at-point 'word))
+           ;; Handle note title like "#statistics", with the #
+           (beg (+ (point) (skip-chars-backward "^[:space:]\n[]")))
+           (end (+ (point) (skip-chars-forward "^[:space:]\n[]")))
+           (real-thing-at-pt (and (not (= beg end))
+                                  (buffer-substring beg end))))
+      ;; Discussion about the preference order:
+      ;; https://github.com/meedstrom/org-node/pull/134
+      (org-node--try-completions (list real-thing-at-pt sym word)
+                                 (append titles (mapcar #'downcase titles))))))
+
+(defun org-node--try-completions (tests collection)
+  "Like `try-completion' but easier to use in general-purpose code.
+
+Tries each string in TESTS against COLLECTION until one matches.
+TESTS may include nils, which are skipped.
+On match, the return value is always a string."
+  (cl-loop for test in tests
+           as result = (and test (try-completion test collection))
+           if (eq t result) return test
+           else if (stringp result) return result))
+
+(defun org-node--safe-ensure-blank-line ()
+  "Ensure point is in a blank line or a new blank line below current.
+Place point after any indentation."
+  (let ((col (progn (back-to-indentation) (current-indentation))))
+    (unless (eolp) (goto-char (pos-eol)) (newline) (indent-to col))))
+
+
 ;;;; Commands 1: Cute little commands
 
 (defcustom org-node-find-use-thing-at-point nil
-  "Whether to `org-node-find' should try to have smart initial input.
+  "Whether `org-node-find' should try to have smart initial input.
 
 This means it checks the text around point for a partial or full match
 to an existing node title, and in that case fills the minibuffer with
@@ -1270,30 +1306,13 @@ the text that matched."
 
 ;;;###autoload
 (defun org-node-find ()
-  "Select and visit one of your ID nodes.
-
-To behave like Org-roam when creating new nodes,
-set `org-node-creation-fn' to `org-node-new-via-roam-capture'."
+  "Select and visit one of your ID nodes."
   (interactive)
   (org-node-cache-ensure)
-  (let* ((partial-known-title-at-pt
-          (and org-node-find-use-thing-at-point
-               (save-excursion
-                 (let* ((titles (hash-table-keys org-node--title<>affixations))
-                        (sym (thing-at-point 'symbol))
-                        (word (thing-at-point 'word))
-                        ;; Handle note title like "#statistics", with the #
-                        (beg (+ (point) (skip-chars-backward "^[:space:]\n[]")))
-                        (end (+ (point) (skip-chars-forward "^[:space:]\n[]")))
-                        (real-thing-at-pt (and (not (= beg end))
-                                               (buffer-substring beg end))))
-                   ;; Discussion about the preference order:
-                   ;; https://github.com/meedstrom/org-node/pull/134
-                   (org-node--try-completions (list real-thing-at-pt sym word)
-                                              (append titles (mapcar #'downcase titles)))))))
-         (input (org-node-read-candidate "Visit or create node: "
+  (let* ((input (org-node-read-candidate "Visit or create node: "
                                          t
-                                         partial-known-title-at-pt))
+                                         (and org-node-find-use-thing-at-point
+                                              (org-node--try-complete-title-at-pt))))
          (_ (when (string-blank-p input)
               (setq input (funcall org-node-blank-input-title-generator))))
          (node (gethash input org-node--candidate<>entry)))
@@ -1301,17 +1320,6 @@ set `org-node-creation-fn' to `org-node-new-via-roam-capture'."
     (if node
         (org-node-goto node)
       (org-node-create input (org-id-new)))))
-
-(defun org-node--try-completions (tests collection)
-  "Like `try-completion' but easier to use.
-
-Tries each string in TESTS against COLLECTION until one matches.
-TESTS may include nils, which are skipped.
-On match, the return value is always a string."
-  (cl-loop for test in tests
-           as result = (and test (try-completion test collection))
-           if (eq t result) return test
-           else if (stringp result) return result))
 
 ;;;###autoload
 (defun org-node-insert-heading ()
@@ -1679,12 +1687,6 @@ Prefix argument ARG as in `org-insert-heading'."
             (newline-and-indent)
             (insert "#+transclude: " link " :level :no-first-heading"))
           (run-hooks 'org-node-insert-link-hook))))))
-
-(defun org-node--safe-ensure-blank-line ()
-  "Ensure point is in a blank line or a new blank line below current.
-Place point after any indentation."
-  (let ((col (progn (back-to-indentation) (current-indentation))))
-    (unless (eolp) (goto-char (pos-eol)) (newline) (indent-to col))))
 
 (defun org-node-insert-raw-link ()
   "Insert input at point, completing to any link ever seen in Org.
