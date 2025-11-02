@@ -2084,9 +2084,12 @@ This is not inherent in your choice of format, I am just not smart enough")
                    "[[:alpha:]]+" "[[:alpha:]]+"
                    example t))))))))
 
+(defconst org-node-rewrite-link-overlay (make-overlay 1 1))
+(overlay-put org-node-rewrite-link-overlay 'face 'org-node-rewrite-link)
+
 ;; TODO: Kill opened buffers that were not edited.
 ;;       But first make sure it can pick up where it left off if canceled
-;;       midway.  Maybe use `org-node--in-files-do'.
+;;       midway. Maybe use fileloop, like `org-node-lint-all-files'.
 ;; REVIEW: Verify `org-node-filter-fn' is used correctly.
 ;;;###autoload
 (defun org-node-rewrite-links-ask (&optional files)
@@ -2096,41 +2099,39 @@ Search all files, or just FILES if non-nil, for ID-links where
 the link description has gotten out of sync from the
 destination\\='s current title.
 
-At each link, prompt for user consent, then auto-update the link
+At each link, prompt for user consent to update the link
 so it matches the destination\\='s current title."
   (interactive)
   (require 'ol)
   (org-node-cache-ensure)
   (when (org-node--consent-to-bothersome-modes-for-mass-edit)
-    (let ((n-links 0)
+    (let ((org-agenda-files nil) ;; perf
+          (inhibit-message t)
+          (n-links 0)
           (n-files 0))
-      (dolist (file (or files (sort (org-mem-all-files)
-                                    (lambda (_ _) (natnump (random))))))
-        (cl-incf n-files)
+      (dolist (file (or files (cl-sort (org-mem-all-files)
+                                       (lambda (_ _) (natnump (random))))))
         (with-current-buffer (delay-mode-hooks (find-file-noselect file))
           (save-excursion
             (without-restriction
               (goto-char (point-min))
+              (cl-incf n-files)
               (while-let ((end (re-search-forward org-link-bracket-re nil t)))
-                (message "Checking... link %d (file #%d)"
-                         (cl-incf n-links) n-files)
                 (let* ((beg (match-beginning 0))
-                       (link (substring-no-properties (match-string 0)))
-                       (exact-link (rx (literal link)))
-                       (parts (split-string link "]\\["))
-                       (target (substring (car parts) 2))
-                       (desc (when (cadr parts)
-                               (substring (cadr parts) 0 -2)))
-                       (id (when (string-prefix-p "id:" target)
-                             (substring target 3)))
+                       (uri (match-string 1))
+                       (desc (match-string 2))
+                       (id (when (string-match (rx bos "id:" (group (* (not ":")))) uri)
+                             (match-string 1 uri)))
                        (node (org-mem-entry-by-id id))
-                       (true-title (when node
-                                     (org-mem-entry-title node)))
+                       (true-title (and node (org-mem-entry-title node)))
                        (custom-desc
                         (and org-node-custom-link-format-fn
                              node
                              (funcall org-node-custom-link-format-fn node)))
-                       (answered-yes nil))
+                       (inhibit-message nil))
+                  (message "Checking... link %d (file #%d)"
+                           (cl-incf n-links) n-files)
+                  (redisplay t)
                   (when (and id node desc
                              (funcall org-node-filter-fn node)
                              (if custom-desc
@@ -2147,25 +2148,27 @@ so it matches the destination\\='s current title."
                         (org-fold-show-entry)
                       (org-fold-show-context))
                     (recenter)
-                    (highlight-regexp exact-link 'org-node-rewrite-link)
+                    (move-overlay org-node-rewrite-link-overlay beg end (current-buffer))
                     (unwind-protect
-                        (setq answered-yes
-                              (y-or-n-p
-                               (format "Rewrite link? Will become:  \"%s\""
-                                       (or custom-desc true-title))))
-                      (unhighlight-regexp exact-link))
-                    (when answered-yes
-                      (goto-char beg)
-                      (atomic-change-group
-                        (delete-region beg end)
-                        (insert (org-link-make-string
-                                 target (or custom-desc true-title))))
-                      ;; Give user a moment to glimpse the result before
-                      ;; hopping to the next link, in case of a replacement
-                      ;; gone wrong
-                      (redisplay)
-                      (sleep-for .12))
-                    (goto-char end)))))))))))
+                        (let* ((new-desc (or custom-desc true-title))
+                               (answer (read-multiple-choice
+                                        (format "Rewrite link? Will become:  \"%s\""
+                                                new-desc)
+                                        '((?y "yes")
+                                          (?n "no")
+                                          (?e "edit")))))
+                          (when (memq (car answer) '(?y ?e))
+                            (when (eq (car answer) ?e)
+                              (setq new-desc (read-string "Rewrite to: " new-desc)))
+                            (atomic-change-group
+                              (delete-region beg end)
+                              (insert (org-link-make-string uri new-desc)))
+                            ;; Give user a moment to glimpse the result before
+                            ;; hopping to the next link, in case something goes
+                            ;; very wrong
+                            (redisplay t)
+                            (sleep-for .12)))
+                      (delete-overlay org-node-rewrite-link-overlay))))))))))))
 
 (defun org-node--consent-to-bothersome-modes-for-mass-edit ()
   "Confirm about certain modes being enabled.
