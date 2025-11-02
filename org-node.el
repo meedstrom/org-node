@@ -1797,8 +1797,10 @@ creation-date as more truthful or useful than today\\='s date.
                                        (or ancestor-crtime
                                            (format-time-string
                                             (org-time-stamp-format t t)))))))
+                (add-hook \\='org-node-relocation-hook crtime-putter)
                 (add-hook \\='org-node-creation-hook crtime-putter)
                 (unwind-protect (apply orig-fn args)
+                  (remove-hook \\='org-node-relocation-hook crtime-putter)
                   (remove-hook \\='org-node-creation-hook crtime-putter)))))"
   (interactive "*" org-mode)
   (org-node-cache-ensure)
