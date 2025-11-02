@@ -78,10 +78,6 @@ Misc
 * Toolbox::
 * Experimental Node sequences::
 
-Exclude uninteresting nodes
-
-* Limitation @samp{ROAM_EXCLUDE}::
-
 Experimental: Node sequences
 
 * What are node seqs?::
@@ -430,7 +426,7 @@ I rarely have the screen space to display a backlink buffer.  Because it needs m
 
 A complementary solution@comma{} which can also stand alone@comma{} is to have the backlinks @emph{written into} the file@comma{} on an Org property line or in a drawer.
 
-NOTE: To be clear@comma{} this mode never generates new IDs.  That's your own business.  This only adds/edits @samp{:BACKLINKS:} properties or drawers@comma{} and only gives it backlinks corresponding to links where the original site has or inherits some ID@.
+NOTE: To be clear@comma{} this mode never generates new IDs (and neither would Option 1).  That's your own business.  This only adds/edits @samp{:BACKLINKS:} properties or drawers@comma{} and only gives it backlinks corresponding to links where the original site already has or inherits some ID@.
 
 @menu
 * Option 2A Automatic @samp{BACKLINKS} property line::
@@ -469,7 +465,7 @@ For a first-time run@comma{} type @samp{M-x org-node-backlink-mass-update-drawer
 
 If you were previously using @uref{https://github.com/toshism/org-super-links, org-super-links}@comma{} you can continue letting it manage its drawers@comma{} and leave org-node out of the matter.
 
-Just add to initfiles:
+Do not enable `org-node-backlink-mode` at all@comma{} just add to initfiles:
 
 @lisp
 (add-hook 'org-node-insert-link-hook
@@ -588,37 +584,6 @@ Or you could go with a whitelist approach@comma{} to show only nodes from a cert
 (setq org-node-filter-fn
       (lambda (node)
         (string-search "/my-personal-wiki/" (org-mem-file node))))
-@end lisp
-
-@menu
-* Limitation @samp{ROAM_EXCLUDE}::
-@end menu
-
-@node Limitation @samp{ROAM_EXCLUDE}
-@subsection Limitation: @samp{ROAM_EXCLUDE}
-
-The default value of @samp{org-node-filter-fn} is @samp{org-node-filter-no-roam-exclude-p}.
-
-But let's say you have a big archive file@comma{} fulla IDs@comma{} and you want all the nodes within out of sight.
-
-Putting a @samp{:ROAM_EXCLUDE: t} property at the top of that file won't do it@comma{} because unlike in org-roam@comma{} @strong{child ID nodes of an excluded node are not excluded!}
-
-However@comma{} nodes in isolation do still have information about inherited tags.  So you can exploit that@comma{} or the outline path or even the file name.  Alas@comma{} the org-mem library does not include information about inherited @emph{properties}@comma{} which is why this workaround.
-
-It works well for me to filter out any file or directory that happens to contain "archive" in the name:
-
-@lisp
-(setq org-node-filter-fn
-      (lambda (node)
-        (not (string-search "archive" (org-mem-file node)))))
-@end lisp
-
-Or put something like @samp{#+filetags: :hide_node:} at the top of each file you want to exclude@comma{} and set:
-
-@lisp
-(setq org-node-filter-fn
-      (lambda (node)
-        (not (member "hide_node" (org-mem-tags node)))))
 @end lisp
 
 @node Completion-at-point

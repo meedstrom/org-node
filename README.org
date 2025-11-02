@@ -211,7 +211,7 @@ For a first-time run, type =M-x org-node-backlink-mass-update-drawers=.  (Don't 
 
 If you were previously using [[https://github.com/toshism/org-super-links][org-super-links]], you can continue letting it manage its drawers, and leave org-node out of the matter.
 
-Just add to initfiles:
+Do not enable `org-node-backlink-mode` at all, just add to initfiles:
 
 #+begin_src elisp
 (add-hook 'org-node-insert-link-hook
@@ -304,32 +304,6 @@ Or you could go with a whitelist approach, to show only nodes from a certain dir
 (setq org-node-filter-fn
       (lambda (node)
         (string-search "/my-personal-wiki/" (org-mem-file node))))
-#+end_src
-
-*** Limitation: =ROAM_EXCLUDE=
-
-The default value of =org-node-filter-fn= is =org-node-filter-no-roam-exclude-p=.
-
-But let's say you have a big archive file, fulla IDs, and you want all the nodes within out of sight.
-
-Putting a =:ROAM_EXCLUDE: t= property at the top of that file won't do it, because unlike in org-roam, *child ID nodes of an excluded node are not excluded!*
-
-However, nodes in isolation do still have information about inherited tags.  So you can exploit that, or the outline path or even the file name.  Alas, the org-mem library does not include information about inherited /properties/, which is why this workaround.
-
-It works well for me to filter out any file or directory that happens to contain "archive" in the name:
-
-#+begin_src elisp
-(setq org-node-filter-fn
-      (lambda (node)
-        (not (string-search "archive" (org-mem-file node)))))
-#+end_src
-
-Or put something like =#+filetags: :hide_node:= at the top of each file you want to exclude, and set:
-
-#+begin_src elisp
-(setq org-node-filter-fn
-      (lambda (node)
-        (not (member "hide_node" (org-mem-tags node)))))
 #+end_src
 
 ** Completion-at-point
