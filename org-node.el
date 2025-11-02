@@ -565,6 +565,7 @@ see Info node `(elisp)Programmed Completion'."
   "From flat list COLLECTION, make alist ((TITLE PREFIX SUFFIX) ...).
 Presumes that COLLECTION is the keys of `org-node--candidate<>entry'."
   (and collection
+       ;; REVIEW: We probably shouldn't assume it is always the `car'.
        (if (string-blank-p (car collection))
            (cons
             (list (car collection) "" (or org-node-blank-input-hint ""))
@@ -644,15 +645,16 @@ used as INITIAL-INPUT in `completing-read'."
 
 ;;;; The cache mode
 
-(defun org-node--let-refs-be-aliases (node)
-  "Add ROAM_REFS of NODE as extra minibuffer completions."
-  (dolist (ref (org-mem-entry-roam-refs node))
-    (puthash (concat (when-let* ((type (gethash ref org-mem--roam-ref<>type)))
-                       (propertize (concat type ":")
-                                   'face 'org-node-cite-type))
-                     (propertize ref 'face 'org-node-cite))
-             node
-             org-node--candidate<>entry)))
+(defun org-node--let-refs-be-aliases (entry)
+  "Add ROAM_REFS of ENTRY as extra minibuffer completions."
+  (when (and (org-mem-entry-id entry)
+             (funcall org-node-filter-fn entry))
+    (dolist (ref (org-mem-entry-roam-refs entry))
+      (puthash (concat (when-let* ((type (gethash ref org-mem--roam-ref<>type)))
+                         (propertize (concat type ":") 'face 'org-node-cite-type))
+                       (propertize ref 'face 'org-node-cite))
+               entry
+               org-node--candidate<>entry))))
 
 (defun org-node--record-completion-candidates (entry)
   "Cache completions for ENTRY and its aliases, if it is an ID-node."
@@ -2184,6 +2186,7 @@ interfere with user experience during or after mass-editing operation."
            return nil
            finally return t))
 
+;; Quick and dirty.  It works but don't like it.
 ;;;###autoload
 (defun org-node-rename-asset-and-rewrite-links ()
   "Helper for renaming images and all links that point to them.
@@ -2499,7 +2502,8 @@ from ID links found in `org-mem--target<>links'."
   (interactive)
   (require 'org-lint)
   (require 'org-mem-list)
-  (let ((proceed (and org-node--lint-remaining-files
+  (let ((proceed (and (not current-prefix-arg) ;; Let C-u reset the file list.
+                      org-node--lint-remaining-files
                       (equal fileloop--scan-function #'org-node--lint-scanner)))
         (files (org-mem-all-files)))
     (unless proceed
@@ -2552,8 +2556,7 @@ from ID links found in `org-mem--target<>links'."
          (default-directory (file-name-directory file))
          (inhibit-message t) ;; Muffle spam from `org-lint-invalid-id-link'
          ;; Prevent an error in `org-attach-check-absolute-path'
-         (org-attach-id-dir (expand-file-name org-attach-id-dir
-                                              (file-name-nondirectory file)))
+         (org-attach-id-dir (expand-file-name org-attach-id-dir))
          (warnings (org-lint)))
     (while warnings
       (push (cons file (pop warnings)) org-node--lint-warnings)))
@@ -2731,7 +2734,8 @@ To always operate on the current entry, use `org-node-add-tags-here'."
 
 (defcustom org-node-do-filter-tags nil
   "Whether `org-node-set-tags' etc should limit completions."
-  :type 'boolean)
+  :type 'boolean
+  :package-version '(org-node . "3.9.2"))
 
 (defun org-node--get-all-known-tags ()
   (delete-dups

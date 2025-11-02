@@ -289,7 +289,7 @@ Jump/Next/Previous/Capture actions.
 
 NAME describes the sequence, in one or a few words.
 
-CLASSIFIER is a single-argument function taking an `org-node' object
+CLASSIFIER is a single-argument function taking an `org-mem-entry' object
 and should return a list or cons cell if a sequence-item was found,
 otherwise nil.
 

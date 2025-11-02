@@ -135,7 +135,8 @@ but when this finds one of them stale, it removes that whole entry."
   "C-m"                     'org-node-context-visit-thing
   "l"                       'org-node-context-history-go-back
   "r"                       'org-node-context-history-go-forward
-  "<remap> <revert-buffer>" 'org-node-context-refresh-this-buffer)
+  "<remap> <revert-buffer-quick>" 'org-node-context-refresh-this-buffer
+  "<remap> <revert-buffer>"       'org-node-context-refresh-this-buffer)
 
 (define-derived-mode org-node-context-mode magit-section-mode "Org-Node-Context"
   "Major mode for the context buffer."
