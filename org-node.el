@@ -714,6 +714,12 @@ takes a long time."
              (not (gethash id org-id-locations)))
     (message "No cached location for ID \"%s\"..." id)))
 
+(defcustom org-node-reset-on-org-load t
+  "Whether to allow resetting org-mem after Org loads.
+This is the delay you can observe if `org-mem-do-sync-with-org-id' is t
+and you jump into an Org file for the first time."
+  :type 'boolean)
+
 ;;;###autoload
 (define-minor-mode org-node-cache-mode
   "Cache completion candidates every time Org-mem updates its cache.
@@ -735,7 +741,8 @@ rather than twice."
           (eval-after-load 'org-id
             (defun org-node--reset-once ()
               (when org-node-cache-mode
-                (org-mem-reset t "org-node: Re-caching to include org-id locations...")
+                (when org-node-reset-on-org-load
+                  (org-mem-reset t "org-node: Re-caching to include org-id locations..."))
                 (fset 'org-node--reset-once #'ignore))))
         ;; User depends solely on `org-mem-do-sync-with-org-id', so load Org
         ;; now to get completions instead of nothing.
