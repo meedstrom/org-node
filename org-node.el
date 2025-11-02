@@ -990,9 +990,11 @@ substring \"/home/me\" referring to the same location."
 (defun org-node-guess-or-ask-dir (prompt)
   "Maybe prompt for a directory, and if so, use string PROMPT.
 Behavior depends on user option `org-node-file-directory-ask'."
-  (if (eq t org-node-file-directory-ask) (read-directory-name prompt)
-    (if (stringp org-node-file-directory-ask) org-node-file-directory-ask
-      (org-node-guess-dir))))
+  (or (and (null org-node-file-directory-ask)
+           (org-node-guess-dir))
+      (if (stringp org-node-file-directory-ask)
+          org-node-file-directory-ask
+        (read-directory-name prompt))))
 
 
 ;;;; Creation functions
