@@ -1035,11 +1035,12 @@ since the default `org-node-file-timestamp-format' is empty."
   :package-version '(org-node . "0.1"))
 
 (unless (featurep 'org-node)
-  (add-hook 'org-node-insert-link-hook #'org-mem-updater-ensure-link-at-point-known -50)
+  ;; REVIEW 2025-11-08: Testing with this commented-out.
+  ;; (add-hook 'org-node-insert-link-hook #'org-mem-updater-ensure-link-at-point-known -50)
+  ;; (add-hook 'org-node-relocation-hook  #'org-mem-updater-ensure-id-node-at-point-known -70)
+  ;; (add-hook 'org-node-creation-hook    #'org-mem-updater-ensure-id-node-at-point-known -70)
   (add-hook 'org-node-creation-hook    #'org-id-get-create -90)
-  (add-hook 'org-node-creation-hook    #'org-mem-updater-ensure-id-node-at-point-known -70)
-  (add-hook 'org-node-creation-hook    #'org-node-ensure-crtime-property)
-  (add-hook 'org-node-relocation-hook  #'org-mem-updater-ensure-id-node-at-point-known -70))
+  (add-hook 'org-node-creation-hook    #'org-node-ensure-crtime-property))
 
 (defcustom org-node-creation-fn #'org-node-new-file
   "Function called to create a node that does not yet exist.
