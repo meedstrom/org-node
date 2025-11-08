@@ -43,7 +43,6 @@
 Names here will cause complaints if bound.")
 
 (defvar org-node-changes--warned-about-titlegen nil)
-(defvar org-node-changes--warned-about-roam-id nil)
 (defvar org-node-changes--warned-about-fakeroam-v2 nil)
 (defun org-node-changes--onetime-warn-and-copy ()
   "Maybe print one-shot warnings.
@@ -75,22 +74,6 @@ value."
       (setq org-node-changes--warned-about-fakeroam-v2 t)
       (display-warning
        'org-node "Package org-node-fakeroam still v2, upgrade or remove")))
-  (unless org-node-changes--warned-about-roam-id
-    (when (and (fboundp 'org-link-get-parameter)
-               (not (or (and (bound-and-true-p org-roam-autosync-mode)
-                             (bound-and-true-p org-roam-db-update-on-save))
-                        (and (bound-and-true-p org-mem-roamy-db-mode)
-                             (bound-and-true-p org-mem-roamy-do-overwrite-real-db))))
-               (eq (org-link-get-parameter "id" :follow) 'org-roam-id-open))
-      (setq org-node-changes--warned-about-roam-id t)
-      (message
-       "%s" "Note: org-roam overrides ID-link behavior to prefer its own DB!
-As that DB is not being updated, links can send you to the wrong place.
-If `org-mem-do-sync-with-org-id' is t, you can safely revert to
-default ID-link behavior.  Add to initfiles:
-(with-eval-after-load 'org-roam-id
- (org-link-set-parameters
-  \"id\" :follow #'org-id-open :store #'org-id-store-link-maybe))")))
   (unless org-node-changes--warned-about-titlegen
     (when (help-function-arglist org-node-blank-input-title-generator)
       (setq org-node-changes--warned-about-titlegen t)
