@@ -2906,7 +2906,7 @@ that follows the file-level properties drawer."
       (forward-line))
     ;; On a "final stretch" of comments and blanklines, go back to the first.
     (while (progn (forward-line -1)
-                  (looking-at-p junk)))
+                  (and (looking-at-p junk) (not (bobp)))))
     (forward-line))
   nil)
 
