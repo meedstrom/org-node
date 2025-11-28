@@ -638,6 +638,7 @@ used as INITIAL-INPUT in `completing-read'."
 ;; sort among what's left; perhaps it's a general topic you have not touched
 ;; since two months ago, but when you do, the recency order remains relevant.
 (when (and (numberp history-length)
+           (not (get 'org-node-hist 'history-length))
            (>= history-length (car (get 'history-length 'standard-value)))
            (< history-length 1000))
   (put 'org-node-hist 'history-length 1000)
