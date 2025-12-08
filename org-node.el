@@ -131,6 +131,7 @@
 (defvar org-roam-preview-function)
 (defvar org-roam-preview-postprocess-functions)
 (defvar org-attach-id-dir)
+(defvar org-time-stamp-formats)
 (defvar crm-separator)
 (require 'cl-lib)
 (require 'subr-x)
@@ -262,6 +263,9 @@ Used in some commands when exiting minibuffer with a blank string."
   "Make a node title for the current ISO8601 week."
   (format-time-string "Assorted for Week %V, %G"))
 
+
+;;;; Time
+
 (defcustom org-node-property-crtime "CREATED"
   "Name of a property for holding a creation-time timestamp.
 Used by:
@@ -273,9 +277,41 @@ Used by:
 
 (defcustom org-node-property-mtime "TIME_MODIFIED"
   "Name of a property for holding a last-modification-time timestamp.
-Used by `org-node-update-mtime'."
+Used by `org-node-update-mtime-property'."
   :type 'string
   :package-version '(org-node . "3.10.0"))
+
+(defcustom org-node-time-stamp-formats nil
+  "Temporary override for `org-time-stamp-formats', if non-nil.
+
+This exists as a way to omit the \"%a\" construct in the default value,
+allowing `org-node-display-sort-fn' to be designed with a cheaper
+algorithm."
+  :type '(choice (const :tag "Current value of `org-time-stamp-formats'"
+                        :value nil)
+                 (const :tag "Default:  (\"%Y-%m-%d %a\" . \"%Y-%m-%d %a %H:%M\")"
+                        :value ("%Y-%m-%d %a" . "%Y-%m-%d %a %H:%M"))
+                 (const :tag "Omit %a:  (\"%Y-%m-%d\" . \"%Y-%m-%d %H:%M\")"
+                        :value ("%Y-%m-%d" . "%Y-%m-%d %H:%M"))
+                 (cons string string))
+  :package-version '(org-node . "3.11.0"))
+
+(defun org-node-time-stamp (with-time inactive &optional time zone)
+  "Make a timestamp passing WITH-TIME, INACTIVE to `org-time-stamp-format'.
+Pass TIME, ZONE to `format-time-string'.
+
+Also respect `org-node-time-stamp-formats' if non-nil."
+  (let ((org-time-stamp-formats (or org-node-time-stamp-formats
+                                    org-time-stamp-formats)))
+    (format-time-string (org-time-stamp-format with-time inactive)
+                        time zone)))
+
+(defun org-node-update-mtime-property ()
+  "Update property `org-node-property-mtime' in entry at point.
+Suitable on `org-node-modification-hook'."
+  (org-entry-put nil
+                 org-node-property-mtime
+                 (org-node-time-stamp t t)))
 
 
 ;;;; Filter
@@ -1357,7 +1393,7 @@ be sufficient to key-bind that one."
   (unless (org-entry-get nil org-node-property-crtime)
     (org-entry-put nil
                    org-node-property-crtime
-                   (format-time-string (org-time-stamp-format t t)))))
+                   (org-node-time-stamp t t))))
 
 (defun org-node-visit-random-1 ()
   "Visit a random node."
@@ -1757,7 +1793,7 @@ modify itself other than through this command."
               (indent-to col))
             (forward-line -1)
             (back-to-indentation))
-          (insert (format-time-string (org-time-stamp-format t t)) " -> "
+          (insert (org-node-time-stamp t t) " -> "
                   (org-link-make-string (concat "id:" (org-mem-id node))
                                         (org-mem-title node))))))))
 
@@ -1812,8 +1848,7 @@ creation-date as more truthful or useful than today\\='s date.
                       (lambda ()
                         (org-entry-put nil \"CREATED\"
                                        (or ancestor-crtime
-                                           (format-time-string
-                                            (org-time-stamp-format t t)))))))
+                                           (org-node-time-stamp t t))))))
                 (add-hook \\='org-node-relocation-hook crtime-putter)
                 (add-hook \\='org-node-creation-hook crtime-putter)
                 (unwind-protect (apply orig-fn args)
@@ -1890,7 +1925,7 @@ creation-date as more truthful or useful than today\\='s date.
               (open-line 1)
               (insert "\n"
                       (format-time-string
-                       (format "%s Created " (org-time-stamp-format t t)))
+                       (format "%s Created " (org-node-time-stamp t t time)))
                       (org-link-make-string (concat "id:" id) title)
                       "\n"))))))
     (when org-node-stay-in-source-buffer
@@ -3034,13 +3069,6 @@ If already visiting that node, then follow the link normally."
   :options '((function-item org-node-update-mtime-property)
              (function-item org-node-backlink--fix-nearby))
   :package-version '(org-node . "3.10.0"))
-
-(defun org-node-update-mtime ()
-  "Update property `org-node-property-mtime' in entry at point.
-Suitable on `org-node-modification-hook'."
-  (org-entry-put nil
-                 org-node-property-mtime
-                 (format-time-string (org-time-stamp-format t t))))
 
 (defvar org-node--inhibit-flagging nil)
 (defun org-node--flag-change (beg end _n-deleted-chars)

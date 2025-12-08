@@ -194,8 +194,7 @@ It should return a string, with constraints:
     (id desc &optional time)
   "Example: \"[2025-02-21 Fri 14:39] <- [[id:ID][Node title]]\".
 ID and DESC are link id and description, TIME a Lisp time value."
-  (concat (format-time-string (org-time-stamp-format t t)
-                              (or time (current-time)))
+  (concat (org-node-time-stamp t t time)
           " <- "
           (org-link-make-string (concat "id:" id) desc)))
 
@@ -203,8 +202,7 @@ ID and DESC are link id and description, TIME a Lisp time value."
   "Example: \"- [2025-02-21 Fri 14:39] [[id:ID][Node title]]\".
 ID and DESC are link id and description, TIME a Lisp time value."
   (concat "- "
-          (format-time-string (org-time-stamp-format t t)
-                              (or time (current-time)))
+          (org-node-time-stamp t t time)
           " "
           (org-link-make-string (concat "id:" id) desc)))
 

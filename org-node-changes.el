@@ -220,6 +220,7 @@ NAME, ARGLIST and BODY as in `defun'."
 (define-obsolete-function-alias 'org-node--pop-to-fresh-file-buffer  'org-node-pop-to-fresh-file-buffer     "3.8.0 (July 2025)")
 (define-obsolete-function-alias 'org-node-collection-main            'org-node-collection                   "3.9.0 (October 2025)")
 (define-obsolete-function-alias 'org-node-collection-basic           'org-node-collection                   "3.9.0 (October 2025)")
+(define-obsolete-function-alias 'org-node-update-mtime               'org-node-update-mtime-property        "3.11.0 (December 2025)")
 
 (org-node-changes--def-whiny-alias 'org-node-abbrev-file-names              #'org-mem--fast-abbrev                      "3.0.0 (May 2025)" "September")
 (org-node-changes--def-whiny-alias 'org-node-by-id                          #'org-mem-entry-by-id                       "3.0.0 (May 2025)" "September")
