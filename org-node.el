@@ -3088,61 +3088,60 @@ purely deleted, this flags the preceding or succeeding char or both."
 (defun org-node--eat-flags ()
   "Run `org-node-modification-hook' at each modified node.
 Then undo the flags marking them as modified."
-  (when (derived-mode-p 'org-mode)
-    ;; Catch any error, because this runs at `before-save-hook' which MUST
-    ;; fail gracefully and let the user save anyway
-    (condition-case err
-        (save-excursion
-          (without-restriction
-            ;; Iterate over each change-region.  Algorithm borrowed from
-            ;; `ws-butler-map-changes', odd but elegant.  Worth knowing
-            ;; that if you tell Emacs to search for text that has a given
-            ;; text-property with a nil value, that's the same as searching
-            ;; for text without that property at all.
-            (let ((start (point-min-marker))
-                  (end (make-marker))
-                  (case-fold-search t)
-                  prop)
-              (while (< start (point-max))
-                (setq prop (get-text-property start 'org-node-flag))
-                (set-marker end (or (text-property-not-all
-                                     start (point-max) 'org-node-flag prop)
-                                    (point-max)))
-                (cl-assert (not (= start end)))
-                (when prop
-                  (goto-char start)
-                  ;; START and END delineate an area where changes were
-                  ;; flagged, but the area rarely envelops the current
-                  ;; tree's property drawer, likely placed long before
-                  ;; START, so search back for it
-                  (save-excursion
-                    (when (org-entry-get-with-inheritance "ID")
-                      (goto-char org-entry-property-inherited-from)
-                      (unless (org-node--in-transclusion-p)
-                        (condition-case err
-                            (run-hooks 'org-node-modification-hook)
-                          (( error )
-                           (signal 'org-node-modification-hook-failed err))))))
-                  ;; ...and if the change-area is massive, spanning multiple
-                  ;; subtrees (like after a big yank), handle each subtree
-                  ;; within
-                  (while (and (< (point) end)
-                              (re-search-forward "^[\t\s]*:ID: +" end t))
+  ;; Catch any error, because this runs at `before-save-hook' which MUST
+  ;; fail gracefully and let the user save anyway
+  (condition-case err
+      (save-excursion
+        (without-restriction
+          ;; Iterate over each change-region.  Algorithm borrowed from
+          ;; `ws-butler-map-changes', odd but elegant.  Worth knowing
+          ;; that if you tell Emacs to search for text that has a given
+          ;; text-property with a nil value, that's the same as searching
+          ;; for text without that property at all.
+          (let ((start (point-min-marker))
+                (end (make-marker))
+                (case-fold-search t)
+                prop)
+            (while (< start (point-max))
+              (setq prop (get-text-property start 'org-node-flag))
+              (set-marker end (or (text-property-not-all
+                                   start (point-max) 'org-node-flag prop)
+                                  (point-max)))
+              (cl-assert (not (= start end)))
+              (when prop
+                (goto-char start)
+                ;; START and END delineate an area where changes were
+                ;; flagged, but the area rarely envelops the current
+                ;; tree's property drawer, likely placed long before
+                ;; START, so search back for it
+                (save-excursion
+                  (when (org-entry-get-with-inheritance "ID")
+                    (goto-char org-entry-property-inherited-from)
                     (unless (org-node--in-transclusion-p)
                       (condition-case err
                           (run-hooks 'org-node-modification-hook)
                         (( error )
-                         (signal 'org-node-modification-hook-failed err)))))
-                  (remove-text-properties start end 'org-node-flag))
-                ;; This change-area dealt with, move on
-                (set-marker start (marker-position end)))
-              (set-marker start nil)
-              (set-marker end nil))))
-      (( error )
-       (remove-text-properties (point-min) (point-max) 'org-node-flag)
-       ;; Because `display-warning' does not work on `before-save-hook'.
-       (push (list 'org-node--eat-flags (error-message-string err))
-             delayed-warnings-list)))))
+                         (signal 'org-node-modification-hook-failed err))))))
+                ;; ...and if the change-area is massive, spanning multiple
+                ;; subtrees (like after a big yank), handle each subtree
+                ;; within
+                (while (and (< (point) end)
+                            (re-search-forward "^[\t\s]*:ID: +" end t))
+                  (unless (org-node--in-transclusion-p)
+                    (condition-case err
+                        (run-hooks 'org-node-modification-hook)
+                      (( error )
+                       (signal 'org-node-modification-hook-failed err)))))
+                (remove-text-properties start end 'org-node-flag))
+              ;; This change-area dealt with, move on
+              (set-marker start (marker-position end)))
+            (set-marker start nil)
+            (set-marker end nil))))
+    (( error )
+     (remove-text-properties (point-min) (point-max) 'org-node-flag)
+     ;; Because `display-warning' does not work on `before-save-hook'.
+     (push (list 'org-node--eat-flags (error-message-string err))
+           delayed-warnings-list))))
 
 (define-minor-mode org-node--track-modifications-local-mode
   "Make available `org-node-modification-hook'."
