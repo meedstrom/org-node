@@ -379,92 +379,7 @@ Or if KIND is symbol `update-drawers', `del-drawers', `update-props', or
           (outline-next-heading))))))
 
 
-;;; Save-hook to update only the changed parts of current buffer
-
-(defvar org-node-backlink--inhibit-flagging nil)
-(defun org-node-backlink--flag-buffer-modification (beg end _n-deleted-chars)
-  "Add text property `org-node-flag' to region between BEG and END.
-
-Designed for `after-change-functions', where this effectively flags
-all areas where text is added/changed/deleted.  Where text was
-purely deleted, this flags the preceding and succeeding char."
-  (unless org-node-backlink--inhibit-flagging
-    (with-silent-modifications
-      (if (= beg end)
-          (put-text-property (max (1- beg) (point-min))
-                             (min (1+ end) (point-max))
-                             'org-node-flag t)
-        (put-text-property beg end 'org-node-flag t)))))
-
-(defun org-node-backlink--fix-flagged-parts-of-buffer ()
-  "Fix backlinks around parts of buffer that have been modified.
-
-Look for areas flagged by
-`org-node-backlink--flag-buffer-modification' and run
-`org-node-backlink--fix-nearby' at each affected heading.
-
-For a huge file, this is much faster than using
-`org-node-backlink-fix-buffer' -- imagine a thousand
-headings but you have only done work under one of them."
-  (when (derived-mode-p 'org-mode)
-    (if (or (org-node-backlink--check-v2-misaligned-setting-p)
-            (org-node-backlink--check-osl-user-p))
-        (org-node-backlink-mode 0)
-      ;; Catch any error, because this runs at `before-save-hook' which MUST
-      ;; fail gracefully and let the user save anyway
-      (condition-case err
-          (save-excursion
-            (without-restriction
-              ;; Iterate over each change-region.  Algorithm borrowed from
-              ;; `ws-butler-map-changes', odd but elegant.  Worth knowing
-              ;; that if you tell Emacs to search for text that has a given
-              ;; text-property with a nil value, that's the same as searching
-              ;; for text without that property at all.  So if position START
-              ;; is in some unmodified area -- property `org-node-flag' is
-              ;; effectively valued at nil -- this way of calling
-              ;; `text-property-not-all' means search forward until it is t.
-              ;; Then calling it again has the opposite effect, searching
-              ;; until it is nil again.
-              (let ((start (point-min-marker))
-                    (end (make-marker))
-                    (case-fold-search t)
-                    prop)
-                (while (< start (point-max))
-                  (setq prop (get-text-property start 'org-node-flag))
-                  (set-marker end (or (text-property-not-all
-                                       start (point-max) 'org-node-flag prop)
-                                      (point-max)))
-                  (cl-assert (not (= start end)))
-                  (when prop
-                    (goto-char start)
-                    ;; START and END delineate an area where changes were
-                    ;; detected, but the area rarely envelops the current
-                    ;; tree's property drawer, likely placed long before
-                    ;; START, so search back for it
-                    (save-excursion
-                      (and (org-entry-get-with-inheritance "ID")
-                           (goto-char org-entry-property-inherited-from)
-                           (not (org-node--in-transclusion-p))
-                           (org-node-backlink--fix-nearby)))
-                    ;; ...and if the change-area is massive, spanning multiple
-                    ;; subtrees (like after a big yank), update each subtree
-                    ;; within
-                    (while (and (< (point) end)
-                                (re-search-forward "^[\t\s]*:id: +" end t))
-                      (unless (org-node--in-transclusion-p)
-                        (org-node-backlink--fix-nearby)))
-                    (remove-text-properties start end 'org-node-flag))
-                  ;; This change-area dealt with, move on
-                  (set-marker start (marker-position end)))
-                (set-marker start nil)
-                (set-marker end nil))))
-        (( error )
-         (unless (remove-text-properties 1 (point-max) 'org-node-flag)
-           (message "org-node: Did not remove org-node-flag text property"))
-         (message "org-node: Updating backlinks ran into an issue: %S" err))))))
-
-
-;;; Proactive updating (broken & disabled for now)
+;;; Proactive updating
 
 (defcustom org-node-backlink-lazy t
   "Inhibit cleaning up backlinks until user edits affected entry.
@@ -627,7 +542,7 @@ If REMOVE non-nil, remove it instead."
                            ;; Shouldn't be necessary if tables are correct, but
                            ;; don't assume `org-mem-updater-mode' is flawless
                            (seq-filter #'org-mem-entry-by-id))))
-           (org-node-backlink--inhibit-flagging t))
+           (org-node--inhibit-flagging t))
       (if (null origin-ids)
           (org-node--delete-drawer "BACKLINKS")
         (save-excursion
@@ -716,7 +631,7 @@ If REMOVE non-nil, remove it instead."
       ;; REVIEW 2025-11-08: Testing with this commented-out.
       ;;
       ;; Ensure `org-mem--roam-ref<>id' has recent goods, and that
-      ;; `org-node-backlink--fix-flagged-parts-of-buffer' will not
+      ;; `org-node-backlink--fix-nearby' will not
       ;; later remove the backlink we're adding
       ;; (org-mem-updater-ensure-id-node-at-point-known)
       ;; (org-mem-updater-ensure-link-at-point-known)
@@ -771,7 +686,7 @@ If REMOVE non-nil, remove it instead."
   (let ((current-backlinks-value (org-entry-get nil "BACKLINKS"))
         (new-link (org-link-make-string (concat "id:" id) title))
         new-value
-        (org-node-backlink--inhibit-flagging t))
+        (org-node--inhibit-flagging t))
     (when (and current-backlinks-value
                (string-search "\f" current-backlinks-value))
       (error "Form-feed character in BACKLINKS property near %d in %s"
@@ -817,7 +732,7 @@ Designed for use by `org-node-backlink--add-in-target'."
       (org-node-backlink-mode 0)
     (save-excursion
       (save-restriction
-        (let ((org-node-backlink--inhibit-flagging t))
+        (let ((org-node--inhibit-flagging t))
           (org-node-narrow-to-drawer-create
            "BACKLINKS" org-node-backlink-drawer-positioner)
           (unless (search-forward (concat "[[id:" id) nil t) ;; Already has it
@@ -848,36 +763,18 @@ See Info node `(org-node)'."
   :global t
   (if org-node-backlink-mode
       (progn
-        (add-hook 'org-mode-hook                        #'org-node-backlink--local-mode)
         (add-hook 'org-mem-post-targeted-scan-functions #'org-node-backlink--maybe-fix-proactively)
         (add-hook 'org-node-relocation-hook             #'org-node-backlink--fix-nearby)
+        (add-hook 'org-node-modification-hook           #'org-node-backlink--fix-nearby)
         (add-hook 'org-roam-post-node-insert-hook       #'org-node-backlink--add-in-target)
         (add-hook 'org-node-insert-link-hook            #'org-node-backlink--add-in-target)
-        (advice-add 'org-insert-link :after             #'org-node-backlink--add-in-target)
-        (dolist (buf (buffer-list))
-          (with-current-buffer buf
-            (when (derived-mode-p 'org-mode)
-              (org-node-backlink--local-mode)))))
-    (remove-hook 'org-mode-hook                        #'org-node-backlink--local-mode)
+        (advice-add 'org-insert-link :after             #'org-node-backlink--add-in-target))
     (remove-hook 'org-mem-post-targeted-scan-functions #'org-node-backlink--maybe-fix-proactively)
     (remove-hook 'org-node-relocation-hook             #'org-node-backlink--fix-nearby)
+    (remove-hook 'org-node-modification-hook           #'org-node-backlink--fix-nearby)
     (remove-hook 'org-roam-post-node-insert-hook       #'org-node-backlink--add-in-target)
     (remove-hook 'org-node-insert-link-hook            #'org-node-backlink--add-in-target)
-    (advice-remove 'org-insert-link                    #'org-node-backlink--add-in-target)
-    (dolist (buf (buffer-list))
-      (with-current-buffer buf
-        (org-node-backlink--local-mode 0)))))
-
-(define-minor-mode org-node-backlink--local-mode
-  "Buffer-local part of `org-node-backlink-mode'.
-Not meant to be toggled on its own."
-  :interactive nil
-  (if org-node-backlink--local-mode
-      (progn
-        (add-hook 'after-change-functions #'org-node-backlink--flag-buffer-modification nil t)
-        (add-hook 'before-save-hook       #'org-node-backlink--fix-flagged-parts-of-buffer nil t))
-    (remove-hook 'after-change-functions  #'org-node-backlink--flag-buffer-modification t)
-    (remove-hook 'before-save-hook        #'org-node-backlink--fix-flagged-parts-of-buffer t)))
+    (advice-remove 'org-insert-link                    #'org-node-backlink--add-in-target)))
 
 (let (warned-once)
   (defun org-node-backlinks-mode (&rest args)

@@ -271,6 +271,12 @@ Used by:
   :type 'string
   :package-version '(org-node . "3.7.1"))
 
+(defcustom org-node-property-mtime "TIME_MODIFIED"
+  "Name of a property for holding a last-modification-time timestamp.
+Used by `org-node-update-mtime'."
+  :type 'string
+  :package-version '(org-node . "3.10.0"))
+
 
 ;;;; Filter
 
@@ -752,13 +758,15 @@ rather than twice."
         ;; now to get completions instead of nothing.
         (require 'org-id)))
     (org-mem-reset)
-    (org-mem-tip-if-empty))
+    (org-mem-tip-if-empty)
+    (org-node--track-modifications-mode))
    (t
     (advice-remove #'org-id-find #'org-node--ad-org-id-find)
     (remove-hook 'org-mem-pre-full-scan-functions #'org-node--wipe-completions)
     (remove-hook 'org-mem-pre-targeted-scan-functions #'org-node--forget-completions-in-results)
     (remove-hook 'org-mem-record-entry-functions #'org-node--record-completion-candidates)
-    (remove-hook 'org-mem-record-entry-functions #'org-node--let-refs-be-aliases))))
+    (remove-hook 'org-mem-record-entry-functions #'org-node--let-refs-be-aliases)
+    (org-node--track-modifications-mode 0))))
 
 ;;;###autoload
 (define-obsolete-function-alias 'org-node-reset #'org-mem-reset "3.0.0 (May 2025)")
@@ -3016,6 +3024,109 @@ If already visiting that node, then follow the link normally."
                                 (org-mem-entry-id found)))))
           (progn (org-node-goto found) t)
         nil))))
+
+
+;;;; Detect modification
+
+(defcustom org-node-modification-hook nil
+  ""
+  :type 'hook
+  :options '((function-item org-node-update-mtime)
+             ;; (function-item org-node-backlink--fix-nearby)
+             )
+  :package-version '(org-node . "3.10.0"))
+
+(defun org-node-update-mtime ()
+  "Update property `org-node-property-mtime' in entry at point.
+Suitable on `org-node-modification-hook'."
+  (org-entry-put nil
+                 org-node-property-mtime
+                 (format-time-string (org-time-stamp-format t t))))
+
+(defvar org-node--inhibit-flagging nil)
+(defun org-node--flag-change (beg end _n-deleted-chars)
+  "Add text property `org-node-flag' to region between BEG and END.
+
+Designed for `after-change-functions', to this effectively flag
+all areas where text is added/changed/deleted.  Where text was
+purely deleted, this flags the preceding or succeeding char or both."
+  (unless org-node--inhibit-flagging
+    (with-silent-modifications
+      (if (= beg end)
+          (put-text-property (max (1- beg) (point-min))
+                             (min (1+ end) (point-max))
+                             'org-node-flag t)
+        (put-text-property beg end 'org-node-flag t)))))
+
+(defun org-node--eat-flags ()
+  "Run `org-node-modification-hook' at each modified node.
+Then undo the flags marking them as modified."
+  (when (derived-mode-p 'org-mode)
+    ;; Catch any error, because this runs at `before-save-hook' which MUST
+    ;; fail gracefully and let the user save anyway
+    (condition-case err
+        (save-excursion
+          (without-restriction
+            ;; Iterate over each change-region.  Algorithm borrowed from
+            ;; `ws-butler-map-changes', odd but elegant.  Worth knowing
+            ;; that if you tell Emacs to search for text that has a given
+            ;; text-property with a nil value, that's the same as searching
+            ;; for text without that property at all.
+            (let ((start (point-min-marker))
+                  (end (make-marker))
+                  (case-fold-search t)
+                  prop)
+              (while (< start (point-max))
+                (setq prop (get-text-property start 'org-node-flag))
+                (set-marker end (or (text-property-not-all
+                                     start (point-max) 'org-node-flag prop)
+                                    (point-max)))
+                (cl-assert (not (= start end)))
+                (when prop
+                  (goto-char start)
+                  ;; START and END delineate an area where changes were
+                  ;; flagged, but the area rarely envelops the current
+                  ;; tree's property drawer, likely placed long before
+                  ;; START, so search back for it
+                  (save-excursion
+                    (when (org-entry-get-with-inheritance "ID")
+                      (goto-char org-entry-property-inherited-from)
+                      (unless (org-node--in-transclusion-p)
+                        (run-hooks 'org-node-modification-hook))))
+                  ;; ...and if the change-area is massive, spanning multiple
+                  ;; subtrees (like after a big yank), handle each subtree
+                  ;; within
+                  (while (and (< (point) end)
+                              (re-search-forward "^[\t\s]*:ID: +" end t))
+                    (unless (org-node--in-transclusion-p)
+                      (run-hooks 'org-node-modification-hook)))
+                  (remove-text-properties start end 'org-node-flag))
+                ;; This change-area dealt with, move on
+                (set-marker start (marker-position end)))
+              (set-marker start nil)
+              (set-marker end nil))))
+      (( error )
+       (remove-text-properties (point-min) (point-max) 'org-node-flag)
+       (message "org-node--eat-flags signaled: %S" err)))))
+
+(define-minor-mode org-node--track-modifications-local-mode
+  "Make available `org-node-modification-hook'."
+  :interactive nil
+  (if org-node--track-modifications-local-mode
+      (progn
+        (add-hook 'after-change-functions #'org-node--flag-change nil t)
+        (add-hook 'before-save-hook       #'org-node--eat-flags nil t))
+    (remove-hook 'after-change-functions  #'org-node--flag-change t)
+    (remove-hook 'before-save-hook        #'org-node--eat-flags t)))
+
+(defun org-node--track-modifications-local-turn-on ()
+  (when (derived-mode-p 'org-mode)
+    (org-node--track-modifications-local-mode)))
+
+(define-globalized-minor-mode org-node--track-modifications-mode
+  org-node--track-modifications-local-mode
+  org-node--track-modifications-local-turn-on
+  :interactive nil)
 
 
 ;;;; Drawer subroutines
