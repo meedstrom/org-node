@@ -655,7 +655,7 @@ So I re-sort the entire properties drawer on save:
                          (point)))
                   (end (progn
                          (search-forward ":END:")
-                         (forward-line -1)
+                         (forward-line 0)
                          (point))))
               (sort-lines nil beg end)))
           50)
