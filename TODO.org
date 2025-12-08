@@ -30,17 +30,11 @@
 
   - Or rewrite org-mem so it uses =org-element-parse-buffer= from the start.
 
-- Make =org-node-capture-target= a bit more robust and not need =:empty-lines after 1=.
-
 - Help Embark and Marginalia integrate more deeply with =org-node-read-candidate=
 
   - Not sure I understand "completion categories", but IIUC, we don't really have a completion-category representing "an Org entry somewhere /which is not necessarily in the current buffer"/.
 
     Might need agreement with upstream Org for the shape of a data object representing that?  Something like [[https://github.com/meedstrom/org-mem/blob/main/indexed.el][org-mem.el]]'s struct =org-mem-entry=?  Once that's in, then embark and such packages could easily build in handlers for that, then org-roam and such packages can automatically benefit if they translate from their internal data objects.
-
-- Implement a =:MODIFIED:= property
-
-  - Easy to build on the =org-node-backlink--flag-buffer-modification= we already have.
 
 - Make =org-node-rename-asset-and-rewrite-links= easier to use
 
