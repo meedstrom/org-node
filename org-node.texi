@@ -69,6 +69,7 @@ Misc
 * Exclude uninteresting nodes::
 * Completion-at-point::
 * Customize appearance::
+* Sort completions::
 * Grep::
 * Let org-open-at-point detect refs::
 * Limitation TRAMP::
@@ -76,6 +77,10 @@ Misc
 * Limitation Org-ref::
 * Toolbox::
 * Experimental Node sequences::
+
+Sort completions
+
+* Lining up properties::
 
 Experimental: Node sequences
 
@@ -506,6 +511,7 @@ Finally@comma{} lines that contain no Org link such as @samp{[[id:1234][Title]]}
 * Exclude uninteresting nodes::
 * Completion-at-point::
 * Customize appearance::
+* Sort completions::
 * Grep::
 * Let org-open-at-point detect refs::
 * Limitation TRAMP::
@@ -606,6 +612,56 @@ A related option is @samp{org-node-alter-candidates}@comma{} which lets you matc
 
 @lisp
 (setq org-node-alter-candidates t)
+@end lisp
+
+@node Sort completions
+@section Sort completions
+
+A useful way to sort completions is to base it on a @samp{:TIME_MODIFIED:} property under each of your ID-nodes.
+
+First@comma{} of course@comma{} a few nodes must have such a property.  Start generating them by adding this hook:
+
+@lisp
+(setq org-node-property-mtime "TIME_MODIFIED")
+(add-hook 'org-node-modification-hook
+          #'org-node-update-mtime-property)
+@end lisp
+
+Then to sort the completions:
+
+@lisp
+(setq org-node-display-sort-fn
+      #'org-node-sort-by-mtime-property)
+@end lisp
+
+@menu
+* Lining up properties::
+@end menu
+
+@node Lining up properties
+@subsection Lining up properties
+
+I want to see @samp{:TIME_CREATED:} right above @samp{:TIME_MODIFIED:}.
+
+So I re-sort the entire properties drawer on save:
+
+@lisp
+(add-hook 'org-node-modification-hook
+          (defun my-sort-properties ()
+            (org-back-to-heading-or-point-min)
+            (let ((beg (progn
+                         (search-forward ":PROPERTIES:")
+                         (forward-line 1)
+                         (point)))
+                  (end (progn
+                         (search-forward ":END:")
+                         (forward-line -1)
+                         (point))))
+              (sort-lines nil beg end)))
+          50)
+;; The above is so the following properties will come in predictable order.
+(setq org-node-property-crtime "TIME_CREATED")
+(setq org-node-property-mtime "TIME_MODIFIED")
 @end lisp
 
 @node Grep

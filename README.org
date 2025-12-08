@@ -328,6 +328,50 @@ A related option is =org-node-alter-candidates=, which lets you match against th
 (setq org-node-alter-candidates t)
 #+end_src
 
+** Sort completions
+
+A useful way to sort completions is to base it on a =:TIME_MODIFIED:= property under each of your ID-nodes.
+
+First, of course, a few nodes must have such a property.  Start generating them by adding this hook:
+
+#+begin_src elisp
+(setq org-node-property-mtime "TIME_MODIFIED")
+(add-hook 'org-node-modification-hook
+          #'org-node-update-mtime-property)
+#+end_src
+
+Then to sort the completions:
+
+#+begin_src elisp
+(setq org-node-display-sort-fn
+      #'org-node-sort-by-mtime-property)
+#+end_src
+
+*** Lining up properties
+
+I want to see =:TIME_CREATED:= right above =:TIME_MODIFIED:=.
+
+So I re-sort the entire properties drawer on save:
+
+#+begin_src elisp
+(add-hook 'org-node-modification-hook
+          (defun my-sort-properties ()
+            (org-back-to-heading-or-point-min)
+            (let ((beg (progn
+                         (search-forward ":PROPERTIES:")
+                         (forward-line 1)
+                         (point)))
+                  (end (progn
+                         (search-forward ":END:")
+                         (forward-line -1)
+                         (point))))
+              (sort-lines nil beg end)))
+          50)
+;; The above is so the following properties will come in predictable order.
+(setq org-node-property-crtime "TIME_CREATED")
+(setq org-node-property-mtime "TIME_MODIFIED")
+#+end_src
+
 ** Grep
 
 If you have Ripgrep installed on the computer, and [[https://github.com/minad/consult][Consult]] installed on Emacs, you can use this command to grep across all your Org files at any time.
