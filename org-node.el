@@ -596,6 +596,7 @@ see Info node `(elisp)Programmed Completion'."
   (if (eq action 'metadata)
       (cons 'metadata (append (and org-node-display-sort-fn
                                    `((display-sort-function . ,org-node-display-sort-fn)))
+                              `((category . org-node))
                               `((affixation-function . org-node--affixate))))
     (complete-with-action action org-node--candidate<>entry str pred)))
 
