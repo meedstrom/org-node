@@ -3081,6 +3081,9 @@ purely deleted, this flags the preceding or succeeding char or both."
                              'org-node-flag t)
         (put-text-property beg end 'org-node-flag t)))))
 
+(define-error 'org-node-modification-hook-failed
+              "A member of org-node-modification-hook signaled")
+
 (defun org-node--eat-flags ()
   "Run `org-node-modification-hook' at each modified node.
 Then undo the flags marking them as modified."
@@ -3115,14 +3118,20 @@ Then undo the flags marking them as modified."
                     (when (org-entry-get-with-inheritance "ID")
                       (goto-char org-entry-property-inherited-from)
                       (unless (org-node--in-transclusion-p)
-                        (run-hooks 'org-node-modification-hook))))
+                        (condition-case err
+                            (run-hooks 'org-node-modification-hook)
+                          (( error )
+                           (signal 'org-node-modification-hook-failed err))))))
                   ;; ...and if the change-area is massive, spanning multiple
                   ;; subtrees (like after a big yank), handle each subtree
                   ;; within
                   (while (and (< (point) end)
                               (re-search-forward "^[\t\s]*:ID: +" end t))
                     (unless (org-node--in-transclusion-p)
-                      (run-hooks 'org-node-modification-hook)))
+                      (condition-case err
+                          (run-hooks 'org-node-modification-hook)
+                        (( error )
+                         (signal 'org-node-modification-hook-failed err)))))
                   (remove-text-properties start end 'org-node-flag))
                 ;; This change-area dealt with, move on
                 (set-marker start (marker-position end)))
@@ -3130,7 +3139,9 @@ Then undo the flags marking them as modified."
               (set-marker end nil))))
       (( error )
        (remove-text-properties (point-min) (point-max) 'org-node-flag)
-       (message "org-node--eat-flags signaled: %S" err)))))
+       ;; Because `display-warning' does not work on `before-save-hook'.
+       (push (list 'org-node--eat-flags (error-message-string err))
+             delayed-warnings-list)))))
 
 (define-minor-mode org-node--track-modifications-local-mode
   "Make available `org-node-modification-hook'."
