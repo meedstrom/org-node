@@ -271,7 +271,7 @@ Used in some commands when exiting minibuffer with a blank string."
 Used by:
 - `org-node-ensure-crtime-property'
 - `org-node-rename-file-by-title'
-- `org-node-sort-by-crtime-cheap'"
+- `org-node-sort-by-crtime-property'"
   :type 'string
   :package-version '(org-node . "3.7.1"))
 
@@ -279,34 +279,15 @@ Used by:
   "Name of a property for holding a last-modification-time timestamp.
 Used by:
 - `org-node-update-mtime-property'
-- `org-node-sort-by-mtime-cheap'"
+- `org-node-sort-by-mtime-property'"
   :type 'string
   :package-version '(org-node . "3.10.0"))
 
-(defcustom org-node-time-stamp-formats nil
-  "Temporary override for `org-time-stamp-formats', if non-nil.
-
-This exists as a way to omit the \"%a\" construct in the default value,
-allowing `org-node-display-sort-fn' to be designed with a cheaper
-algorithm."
-  :type '(radio (const :tag "Current value of `org-time-stamp-formats'"
-                       :value nil)
-                (const :tag "Default:  (\"%Y-%m-%d %a\" . \"%Y-%m-%d %a %H:%M\")"
-                       :value ("%Y-%m-%d %a" . "%Y-%m-%d %a %H:%M"))
-                (const :tag "Omit %a:  (\"%Y-%m-%d\" . \"%Y-%m-%d %H:%M\")"
-                       :value ("%Y-%m-%d" . "%Y-%m-%d %H:%M"))
-                (cons string string))
-  :package-version '(org-node . "3.11.0"))
-
 (defun org-node-time-stamp (with-time inactive &optional time zone)
   "Make a timestamp passing WITH-TIME, INACTIVE to `org-time-stamp-format'.
-Pass TIME, ZONE to `format-time-string'.
-
-Also respect `org-node-time-stamp-formats' if non-nil."
-  (let ((org-time-stamp-formats (or org-node-time-stamp-formats
-                                    org-time-stamp-formats)))
-    (format-time-string (org-time-stamp-format with-time inactive)
-                        time zone)))
+Pass TIME, ZONE to `format-time-string'."
+  (format-time-string (org-time-stamp-format with-time inactive)
+                      time zone))
 
 (defun org-node-update-mtime-property ()
   "Update property `org-node-property-mtime' in entry at point.
@@ -371,8 +352,8 @@ See Info node `(elisp) Completion Variables'."
   :type '(radio
           (const :tag "Do not override `completions-sort'" :value nil)
           (function-item org-node-sort-by-file-mtime)
-          (function-item org-node-sort-by-crtime-cheap)
-          (function-item org-node-sort-by-mtime-cheap)
+          (function-item org-node-sort-by-crtime-property)
+          (function-item org-node-sort-by-mtime-property)
           (function :tag "Custom function" :value (lambda (completions))))
   :package-version '(org-node . "3.9.0"))
 
@@ -392,12 +373,10 @@ See Info node `(elisp) Completion Variables'."
                   ((null mtime2) nil)
                   (t (time-less-p mtime2 mtime1)))))))
 
-(defun org-node-sort-by-crtime-cheap (completions)
+(defun org-node-sort-by-crtime-property (completions)
   "Sort COMPLETIONS by timestamp in `org-node-property-crtime'.
 Nodes with no such property come after all the rest that do have the
-property - in other words, nodes without may as well be dated to 1970.
-
-Uses cheap algorithm, see `org-node-time-stamp-formats'."
+property - in other words, nodes without may as well be dated to 1970."
   (sort completions
         (lambda (c1 c2)
           (let* ((node1 (gethash c1 org-node--candidate<>entry))
@@ -408,16 +387,10 @@ Uses cheap algorithm, see `org-node-time-stamp-formats'."
                   ((null node2) nil)
                   ((null crtime1) nil)
                   ((null crtime2) t)
-                  ;; NOTE: Using `string>' is efficient but not exact beyond
-                  ;; the day because Org timestamps look like
-                  ;; [2025-09-12 Thu 01:36], where "Thu" is not sortable.
-                  ;; Alas, using `org-parse-time-string' here seems to result
-                  ;; in noticeable latency, but I haven't tried it compiled.
                   (t (string< crtime2 crtime1)))))))
 
-(defun org-node-sort-by-mtime-cheap (completions)
-  "Sort COMPLETIONS by timestamp in `org-node-property-mtime'.
-Uses cheap algorithm, see `org-node-time-stamp-formats'."
+(defun org-node-sort-by-mtime-property (completions)
+  "Sort COMPLETIONS by timestamp in `org-node-property-mtime'."
   (sort completions
         (lambda (c1 c2)
           (let* ((node1 (gethash c1 org-node--candidate<>entry))
