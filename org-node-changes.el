@@ -221,6 +221,7 @@ NAME, ARGLIST and BODY as in `defun'."
 (define-obsolete-function-alias 'org-node-collection-main            'org-node-collection                   "3.9.0 (October 2025)")
 (define-obsolete-function-alias 'org-node-collection-basic           'org-node-collection                   "3.9.0 (October 2025)")
 (define-obsolete-function-alias 'org-node-update-mtime               'org-node-update-mtime-property        "3.11.0 (December 2025)")
+(define-obsolete-function-alias 'org-node-sort-by-crtime             'org-node-sort-by-crtime-cheap         "3.11.0 (December 2025)")
 
 (provide 'org-node-changes)
 

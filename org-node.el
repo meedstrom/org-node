@@ -271,7 +271,7 @@ Used in some commands when exiting minibuffer with a blank string."
 Used by:
 - `org-node-ensure-crtime-property'
 - `org-node-rename-file-by-title'
-- `org-node-sort-by-crtime'"
+- `org-node-sort-by-crtime-cheap'"
   :type 'string
   :package-version '(org-node . "3.7.1"))
 
@@ -524,7 +524,7 @@ See Info node `(elisp) Completion Variables'."
   :type '(radio
           (const :tag "Do not override `completions-sort'" :value nil)
           (function-item org-node-sort-by-file-mtime)
-          (function-item org-node-sort-by-crtime)
+          (function-item org-node-sort-by-crtime-cheap)
           (function-item org-node-sort-by-mtime-cheap)
           (function :tag "Custom function" :value (lambda (completions))))
   :package-version '(org-node . "3.9.0"))
@@ -545,10 +545,12 @@ See Info node `(elisp) Completion Variables'."
                   ((null mtime2) nil)
                   (t (time-less-p mtime2 mtime1)))))))
 
-(defun org-node-sort-by-crtime (completions)
+(defun org-node-sort-by-crtime-cheap (completions)
   "Sort COMPLETIONS by timestamp in `org-node-property-crtime'.
 Nodes with no such property come after all the rest that do have the
-property - in other words, nodes without may as well be dated to 1970."
+property - in other words, nodes without may as well be dated to 1970.
+
+Uses cheap algorithm, see `org-node-time-stamp-formats'."
   (sort completions
         (lambda (c1 c2)
           (let* ((node1 (gethash c1 org-node--candidate<>entry))
