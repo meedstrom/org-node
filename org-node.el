@@ -277,7 +277,9 @@ Used by:
 
 (defcustom org-node-property-mtime "TIME_MODIFIED"
   "Name of a property for holding a last-modification-time timestamp.
-Used by `org-node-update-mtime-property'."
+Used by:
+- `org-node-update-mtime-property'
+- `org-node-sort-by-mtime-cheap'"
   :type 'string
   :package-version '(org-node . "3.10.0"))
 
@@ -523,6 +525,7 @@ See Info node `(elisp) Completion Variables'."
           (const :tag "Do not override `completions-sort'" :value nil)
           (function-item org-node-sort-by-file-mtime)
           (function-item org-node-sort-by-crtime)
+          (function-item org-node-sort-by-mtime-cheap)
           (function :tag "Custom function" :value (lambda (completions))))
   :package-version '(org-node . "3.9.0"))
 
@@ -562,6 +565,21 @@ property - in other words, nodes without may as well be dated to 1970."
                   ;; Alas, using `org-parse-time-string' here seems to result
                   ;; in noticeable latency, but I haven't tried it compiled.
                   (t (string< crtime2 crtime1)))))))
+
+(defun org-node-sort-by-mtime-cheap (completions)
+  "Sort COMPLETIONS by timestamp in `org-node-property-mtime'.
+Uses cheap algorithm, see `org-node-time-stamp-formats'."
+  (sort completions
+        (lambda (c1 c2)
+          (let* ((node1 (gethash c1 org-node--candidate<>entry))
+                 (node2 (gethash c2 org-node--candidate<>entry))
+                 (time1 (and node1 (org-mem-property org-node-property-mtime node1)))
+                 (time2 (and node2 (org-mem-property org-node-property-mtime node2))))
+            (cond ((null node1) t)
+                  ((null node2) nil)
+                  ((null time1) nil)
+                  ((null time2) t)
+                  (t (string< time2 time1)))))))
 
 (defvar org-node--candidate<>entry (make-hash-table :test 'equal)
   "1:1 table mapping minibuffer completion candidates to ID-nodes.
