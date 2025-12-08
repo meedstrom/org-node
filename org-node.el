@@ -3029,11 +3029,10 @@ If already visiting that node, then follow the link normally."
 ;;;; Detect modification
 
 (defcustom org-node-modification-hook nil
-  ""
+  "Hook run with point at each modified ID-node before save."
   :type 'hook
-  :options '((function-item org-node-update-mtime)
-             ;; (function-item org-node-backlink--fix-nearby)
-             )
+  :options '((function-item org-node-update-mtime-property)
+             (function-item org-node-backlink--fix-nearby))
   :package-version '(org-node . "3.10.0"))
 
 (defun org-node-update-mtime ()
