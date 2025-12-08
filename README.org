@@ -2,7 +2,8 @@
 #+AUTHOR: Martin Edström
 #+EMAIL: meedstrom91@gmail.com
 #+STARTUP: content
-#+EXPORT_FILE_NAME: org-node
+#+EXPORT_FILE_NAME: org-node.texi
+#+TEXINFO_FILENAME: org-node.info
 #+TEXINFO_DIR_CATEGORY: Emacs
 #+TEXINFO_DIR_TITLE: Org-node: (org-node).
 #+TEXINFO_DIR_DESC: Link org-id entries into a network.

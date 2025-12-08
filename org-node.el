@@ -2741,7 +2741,7 @@ well as the members of `org-tag-persistent-alist' and `org-tag-alist'."
 ;; Still keeping `org-node-add-tags' to suit running theme with
 ;; `org-node-add-refs' and `org-node-add-alias'.
 (defun org-node-set-tags ()
-  "Add TAGS to the node at point or nearest ancestor that is a node.
+  "Set TAGS in the node at point or nearest ancestor that is a node.
 
 To always operate on the current entry, use `org-node-add-tags-here'."
   (interactive "*" org-mode)
@@ -3165,7 +3165,8 @@ Then undo the flags marking them as modified."
       (when (org-node-narrow-to-drawer-p name)
         (delete-region (point-min) (point-max))
         (widen)
-        (delete-line) ;; There is always 1 empty line
+        (cl-assert (and (bolp) (eolp)))
+        (delete-line)
         (org-remove-empty-drawer-at (point))))))
 
 ;; Org ships no general tool to find/create a drawer, so roll our own.
