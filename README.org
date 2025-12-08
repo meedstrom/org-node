@@ -360,11 +360,11 @@ So I re-sort the entire properties drawer on save:
             (let ((beg (progn
                          (search-forward ":PROPERTIES:")
                          (forward-line 1)
-                         (point)))
+                         (pos-bol)))
                   (end (progn
                          (search-forward ":END:")
                          (forward-line -1)
-                         (point))))
+                         (pos-eol))))
               (sort-lines nil beg end)))
           50)
 ;; The above is so the following properties will come in predictable order.
