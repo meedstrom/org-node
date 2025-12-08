@@ -3128,10 +3128,12 @@ Then undo the flags marking them as modified."
                 (while (and (< (point) end)
                             (re-search-forward "^[\t\s]*:ID: +" end t))
                   (unless (org-node--in-transclusion-p)
-                    (condition-case err
-                        (run-hooks 'org-node-modification-hook)
-                      (( error )
-                       (signal 'org-node-modification-hook-failed err)))))
+                    (save-excursion
+                      (org-back-to-heading-or-point-min t)
+                      (condition-case err
+                          (run-hooks 'org-node-modification-hook)
+                        (( error )
+                         (signal 'org-node-modification-hook-failed err))))))
                 (remove-text-properties start end 'org-node-flag))
               ;; This change-area dealt with, move on
               (set-marker start (marker-position end)))
