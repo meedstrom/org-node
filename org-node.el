@@ -289,13 +289,13 @@ Used by:
 This exists as a way to omit the \"%a\" construct in the default value,
 allowing `org-node-display-sort-fn' to be designed with a cheaper
 algorithm."
-  :type '(choice (const :tag "Current value of `org-time-stamp-formats'"
-                        :value nil)
-                 (const :tag "Default:  (\"%Y-%m-%d %a\" . \"%Y-%m-%d %a %H:%M\")"
-                        :value ("%Y-%m-%d %a" . "%Y-%m-%d %a %H:%M"))
-                 (const :tag "Omit %a:  (\"%Y-%m-%d\" . \"%Y-%m-%d %H:%M\")"
-                        :value ("%Y-%m-%d" . "%Y-%m-%d %H:%M"))
-                 (cons string string))
+  :type '(radio (const :tag "Current value of `org-time-stamp-formats'"
+                       :value nil)
+                (const :tag "Default:  (\"%Y-%m-%d %a\" . \"%Y-%m-%d %a %H:%M\")"
+                       :value ("%Y-%m-%d %a" . "%Y-%m-%d %a %H:%M"))
+                (const :tag "Omit %a:  (\"%Y-%m-%d\" . \"%Y-%m-%d %H:%M\")"
+                       :value ("%Y-%m-%d" . "%Y-%m-%d %H:%M"))
+                (cons string string))
   :package-version '(org-node . "3.11.0"))
 
 (defun org-node-time-stamp (with-time inactive &optional time zone)
