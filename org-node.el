@@ -791,14 +791,14 @@ rather than twice."
         (require 'org-id)))
     (org-mem-reset)
     (org-mem-tip-if-empty)
-    (org-node--track-modifications-mode))
+    (org-node-track-modifications-mode))
    (t
     (advice-remove #'org-id-find #'org-node--ad-org-id-find)
     (remove-hook 'org-mem-pre-full-scan-functions #'org-node--wipe-completions)
     (remove-hook 'org-mem-pre-targeted-scan-functions #'org-node--forget-completions-in-results)
     (remove-hook 'org-mem-record-entry-functions #'org-node--record-completion-candidates)
     (remove-hook 'org-mem-record-entry-functions #'org-node--let-refs-be-aliases)
-    (org-node--track-modifications-mode 0))))
+    (org-node-track-modifications-mode 0))))
 
 ;;;###autoload
 (define-obsolete-function-alias 'org-node-reset #'org-mem-reset "3.0.0 (May 2025)")
@@ -3157,10 +3157,9 @@ Then undo the flags marking them as modified."
   (when (derived-mode-p 'org-mode)
     (org-node--track-modifications-local-mode)))
 
-(define-globalized-minor-mode org-node--track-modifications-mode
+(define-globalized-minor-mode org-node-track-modifications-mode
   org-node--track-modifications-local-mode
-  org-node--track-modifications-local-turn-on
-  :interactive nil)
+  org-node--track-modifications-local-turn-on)
 
 
 ;;;; Drawer subroutines
