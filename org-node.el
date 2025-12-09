@@ -2691,48 +2691,42 @@ Wrap the link in double-brackets if necessary."
         (message "Spaces in ref, not sure how to format correctly: %s" ref)))
     (org-node--add-to-property-keep-space "ROAM_REFS" ref)))
 
-(defun org-node-add-tags (tags)
+(defun org-node-add-tags (&optional tags)
   "Add TAGS to the node at point or nearest ancestor that is a node.
 
 To always operate on the current entry, use `org-node-add-tags-here'."
-  (interactive (list (org-node--read-tags)) org-mode)
+  (interactive "*" org-mode)
   (org-node--call-at-nearest-node #'org-node-add-tags-here tags))
 
-(defun org-node-add-tags-here (tags)
+(defun org-node-add-tags-here (&optional tags)
   "Add TAGS to the entry at point."
-  (interactive (list (org-node--read-tags)) org-mode)
-  (setq tags (ensure-list tags))
-  (if (org-before-first-heading-p)
-      ;; There's no Org builtin to set filetags yet
-      ;; so we have to do it ourselves.
-      (let* ((filetags (cl-loop
-                        for raw in (cdar (org-collect-keywords '("FILETAGS")))
-                        append (split-string raw ":" t)))
-             (new-tags (seq-uniq (append filetags tags)))
-             (case-fold-search t))
-        (save-excursion
-          (without-restriction
-            (goto-char (point-min))
-            (if (search-forward "\n#+filetags:" nil t)
-                (atomic-change-group
-                  (skip-chars-forward " ")
-                  (delete-region (point) (pos-eol))
-                  (insert ":" (string-join new-tags ":") ":"))
-              (org-node-full-end-of-meta-data)
-              (insert "#+filetags: :" (string-join new-tags ":") ":\n")))))
-    (save-excursion
-      (org-back-to-heading)
-      (org-set-tags (seq-uniq (append (org-get-tags nil t) tags))))))
-
-;; TODO: Deprecate.
-(defun org-node--read-tags ()
-  "Prompt for an Org tag or several.
-Pre-fill completions by collecting tags from all known Org files, as
-well as the members of `org-tag-persistent-alist' and `org-tag-alist'."
-  (completing-read-multiple "Tags: "
-                            (org-node--get-all-known-tags)
-                            nil nil nil
-                            'org-tags-history))
+  (interactive "*" org-mode)
+  (let* ((tags (or (ensure-list tags)
+                   (completing-read-multiple "Tags: "
+                                             (org-node--get-all-known-tags)
+                                             nil nil nil
+                                             'org-tags-history))))
+    (if (org-before-first-heading-p)
+        ;; There's no Org builtin to set filetags yet
+        ;; so we have to do it ourselves.
+        (let* ((filetags (cl-loop
+                          for raw in (cdar (org-collect-keywords '("FILETAGS")))
+                          append (split-string raw ":" t)))
+               (new-tags (seq-uniq (append filetags tags)))
+               (case-fold-search t))
+          (save-excursion
+            (without-restriction
+              (goto-char (point-min))
+              (if (search-forward "\n#+filetags:" nil t)
+                  (atomic-change-group
+                    (skip-chars-forward " ")
+                    (delete-region (point) (pos-eol))
+                    (insert ":" (string-join new-tags ":") ":"))
+                (org-node-full-end-of-meta-data)
+                (insert "#+filetags: :" (string-join new-tags ":") ":\n")))))
+      (save-excursion
+        (org-back-to-heading)
+        (org-set-tags (seq-uniq (append (org-get-tags nil t) tags)))))))
 
 ;; New 2025-09-12, removing the need for a "remove-tags" command.
 ;; Still keeping `org-node-add-tags' to suit running theme with
