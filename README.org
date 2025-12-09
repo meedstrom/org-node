@@ -358,11 +358,12 @@ So I re-sort the entire properties drawer on save:
           (defun my-sort-properties ()
             (org-back-to-heading-or-point-min)
             (let ((beg (progn
-                         (search-forward ":PROPERTIES:")
+                         (re-search-forward org-property-start-re)
                          (forward-line 1)
                          (point)))
                   (end (progn
-                         (search-forward ":END:")
+                         (re-search-forward org-property-end-re
+                                            (org-entry-end-position))
                          (forward-line 0)
                          (point))))
               (sort-lines nil beg end)))
