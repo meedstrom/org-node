@@ -3089,58 +3089,37 @@ purely deleted, this flags the preceding or succeeding char or both."
 
 (defun org-node--eat-flags ()
   "Run `org-node-modification-hook' at each modified node.
-Then undo the flags marking them as modified."
+Then undo the flags that marked them as modified."
   ;; Catch any error, because this runs at `before-save-hook' which MUST
-  ;; fail gracefully and let the user save anyway
+  ;; fail gracefully and let the user save anyway.
   (condition-case err
       (save-excursion
         (without-restriction
-          (let ((start (point-min-marker))
-                (end (make-marker))
-                (case-fold-search t)
-                prop)
-            (while (< start (point-max))
-              (setq prop (get-text-property start 'org-node-flag))
-              (set-marker end (or (text-property-any start
-                                                     (point-max)
-                                                     'org-node-flag
-                                                     (not prop))
-                                  (point-max)))
-              (cl-assert (not (= start end)))
-              (when prop
-                (goto-char start)
-                ;; START and END delineate an area where changes were
-                ;; flagged, but the area rarely envelops the current
-                ;; tree's property drawer, likely placed long before
-                ;; START, so search back for it
-                (save-excursion
-                  (when (org-entry-get-with-inheritance "ID")
+          (with-undo-amalgamate
+            (let ((end (make-marker))
+                  handled-ids)
+              (goto-char (point-min))
+              (while-let ((flag (text-property-any (point) (point-max) 'org-node-flag t)))
+                (goto-char flag)
+                (set-marker end (org-entry-end-position))
+                (let ((id (org-entry-get-with-inheritance "ID"))
+                      (org-node--inhibit-flagging t))
+                  (unless (member id handled-ids)
+                    (push id handled-ids)
                     (goto-char org-entry-property-inherited-from)
                     (unless (org-node--in-transclusion-p)
                       (condition-case err
                           (run-hooks 'org-node-modification-hook)
                         (( error )
                          (signal 'org-node-modification-hook-failed err))))))
-                ;; ...and if the change-area is massive, spanning multiple
-                ;; subtrees (like after a big yank), handle each subtree
-                ;; within
-                (while (and (< (point) end)
-                            (re-search-forward "^[\t\s]*:ID: +" end t))
-                  (unless (org-node--in-transclusion-p)
-                    (save-excursion
-                      (org-back-to-heading-or-point-min t)
-                      (condition-case err
-                          (run-hooks 'org-node-modification-hook)
-                        (( error )
-                         (signal 'org-node-modification-hook-failed err))))))
-                (remove-text-properties start end 'org-node-flag))
-              ;; This change-area dealt with, move on
-              (set-marker start (marker-position end)))
-            (set-marker start nil)
-            (set-marker end nil))))
+                (goto-char end))
+              (set-marker end nil)))
+          (with-silent-modifications
+            (remove-text-properties (point-min) (point-max) '(org-node-flag)))))
     (( error )
-     (remove-text-properties (point-min) (point-max) 'org-node-flag)
-     ;; Because `display-warning' does not work on `before-save-hook'.
+     (with-silent-modifications
+       (remove-text-properties (point-min) (point-max) '(org-node-flag)))
+     ;; Delay because `display-warning' in `before-save-hook' does not display.
      (push (list 'org-node--eat-flags (error-message-string err))
            delayed-warnings-list))))
 
