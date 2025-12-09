@@ -2702,6 +2702,7 @@ To always operate on the current entry, use `org-node-add-tags-here'."
   "Add TAGS to the entry at point."
   (interactive "*" org-mode)
   (let* ((crm-separator "[ \t]*:[ \t]*")
+         (completion-extra-properties '(:category org-tag))
          (tags (or (ensure-list tags)
                    (completing-read-multiple "Tags: "
                                              (org-node--get-all-known-tags)
@@ -2747,6 +2748,7 @@ Similar to `org-set-tags-command', but:
 - supplies more completion candidates"
   (interactive "*" org-mode)
   (let ((tags (let ((crm-separator "[ \t]*:[ \t]*")
+                    (completion-extra-properties '(:category org-tag))
                     (present-tags (string-join (if (org-before-first-heading-p)
                                                    (org-node--get-filetags)
                                                  (org-get-tags nil t))
