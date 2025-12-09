@@ -2701,7 +2701,8 @@ To always operate on the current entry, use `org-node-add-tags-here'."
 (defun org-node-add-tags-here (&optional tags)
   "Add TAGS to the entry at point."
   (interactive "*" org-mode)
-  (let* ((tags (or (ensure-list tags)
+  (let* ((crm-separator "[ \t]*:[ \t]*")
+         (tags (or (ensure-list tags)
                    (completing-read-multiple "Tags: "
                                              (org-node--get-all-known-tags)
                                              nil nil nil
