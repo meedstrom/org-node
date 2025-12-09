@@ -2733,14 +2733,18 @@ To always operate on the current entry, use `org-node-add-tags-here'."
 ;; Still keeping `org-node-add-tags' to suit running theme with
 ;; `org-node-add-refs' and `org-node-add-alias'.
 (defun org-node-set-tags ()
-  "Set TAGS in the node at point or nearest ancestor that is a node.
+  "Set tags in the ID-node at point or nearest ancestor that has an ID.
 
 To always operate on the current entry, use `org-node-add-tags-here'."
   (interactive "*" org-mode)
   (org-node--call-at-nearest-node #'org-node-set-tags-here))
 
 (defun org-node-set-tags-here ()
-  "Set the tags of the current entry to TAGS."
+  "Set the tags of the current entry.
+
+Similar to `org-set-tags-command', but:
+- supports filetags
+- supplies more completion candidates"
   (interactive "*" org-mode)
   (let ((tags (let ((crm-separator "[ \t]*:[ \t]*")
                     (present-tags (string-join (if (org-before-first-heading-p)
@@ -2775,7 +2779,9 @@ To always operate on the current entry, use `org-node-add-tags-here'."
         (org-set-tags tags)))))
 
 (defcustom org-node-do-filter-tags nil
-  "Whether `org-node-set-tags' etc should limit completions."
+  "Whether `org-node-set-tags' etc should limit completions.
+Normally it supplies every tag org-mem has seen.
+When t, only supply tags from nodes that passed `org-node-filter-fn'."
   :type 'boolean
   :package-version '(org-node . "3.9.2"))
 
@@ -3058,8 +3064,7 @@ If already visiting that node, then follow the link normally."
 (defcustom org-node-modification-hook nil
   "Hook run with point at each modified ID-node before save."
   :type 'hook
-  :options '((function-item org-node-update-mtime-property)
-             (function-item org-node-backlink--fix-nearby))
+  :options '((function-item org-node-update-mtime-property))
   :package-version '(org-node . "3.10.0"))
 
 (defvar org-node--inhibit-flagging nil)
@@ -3088,19 +3093,16 @@ Then undo the flags marking them as modified."
   (condition-case err
       (save-excursion
         (without-restriction
-          ;; Iterate over each change-region.  Algorithm borrowed from
-          ;; `ws-butler-map-changes', odd but elegant.  Worth knowing
-          ;; that if you tell Emacs to search for text that has a given
-          ;; text-property with a nil value, that's the same as searching
-          ;; for text without that property at all.
           (let ((start (point-min-marker))
                 (end (make-marker))
                 (case-fold-search t)
                 prop)
             (while (< start (point-max))
               (setq prop (get-text-property start 'org-node-flag))
-              (set-marker end (or (text-property-not-all
-                                   start (point-max) 'org-node-flag prop)
+              (set-marker end (or (text-property-any start
+                                                     (point-max)
+                                                     'org-node-flag
+                                                     (not prop))
                                   (point-max)))
               (cl-assert (not (= start end)))
               (when prop
