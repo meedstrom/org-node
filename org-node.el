@@ -3107,7 +3107,7 @@ Then undo the flags that marked them as modified."
                 (set-marker end (org-entry-end-position))
                 (let ((id (org-entry-get-with-inheritance "ID"))
                       (org-node--inhibit-flagging t))
-                  (unless (member id handled-ids)
+                  (when (and id (not (member id handled-ids)))
                     (push id handled-ids)
                     (goto-char org-entry-property-inherited-from)
                     (unless (org-node--in-transclusion-p)
