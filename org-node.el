@@ -327,7 +327,7 @@ by typing \\[org-node-list-example]."
   (not (org-mem-property-with-inheritance "ROAM_EXCLUDE" node)))
 
 (defun org-node-filter-no-local-roam-exclude-p (node)
-  "(Legacy) Hide NODE if it has a :ROAM_EXCLUDE: property."
+  "Hide NODE if it has a :ROAM_EXCLUDE: property."
   (not (org-mem-property "ROAM_EXCLUDE" node)))
 
 (defun org-node-filter-watched-dir-p (node)
@@ -2702,7 +2702,8 @@ To always operate on the current entry, use `org-node-add-tags-here'."
   "Add TAGS to the entry at point."
   (interactive "*" org-mode)
   (let* ((crm-separator "[ \t]*:[ \t]*")
-         (completion-extra-properties '(:category org-tag))
+         (completion-extra-properties (append completion-extra-properties
+                                              '(:category org-tag)))
          (tags (or (ensure-list tags)
                    (completing-read-multiple "Tags: "
                                              (org-node--get-all-known-tags)
@@ -2747,18 +2748,19 @@ Similar to `org-set-tags-command', but:
 - supports filetags
 - supplies more completion candidates"
   (interactive "*" org-mode)
-  (let ((tags (let ((crm-separator "[ \t]*:[ \t]*")
-                    (completion-extra-properties '(:category org-tag))
-                    (present-tags (string-join (if (org-before-first-heading-p)
-                                                   (org-node--get-filetags)
-                                                 (org-get-tags nil t))
-                                               ":")))
-                (completing-read-multiple "Tags: "
-                                          (org-node--get-all-known-tags)
-                                          nil nil
-                                          (if (string-empty-p present-tags)
-                                              nil
-                                            (concat ":" present-tags ":"))))))
+  (let* ((crm-separator "[ \t]*:[ \t]*")
+         (completion-extra-properties (append completion-extra-properties
+                                              '(:category org-tag)))
+         (present-tags (string-join (if (org-before-first-heading-p)
+                                        (org-node--get-filetags)
+                                      (org-get-tags nil t))
+                                    ":"))
+         (tags (completing-read-multiple "Tags: "
+                                         (org-node--get-all-known-tags)
+                                         nil nil
+                                         (if (string-empty-p present-tags)
+                                             nil
+                                           (concat ":" present-tags ":")))))
     (if (org-before-first-heading-p)
         ;; There's no Org builtin to set filetags yet,
         ;; so we have to in-house the code.
@@ -3099,7 +3101,8 @@ Then undo the flags that marked them as modified."
             (let ((end (make-marker))
                   handled-ids)
               (goto-char (point-min))
-              (while-let ((flag (text-property-any (point) (point-max) 'org-node-flag t)))
+              (while-let ((flag (text-property-any
+                                 (point) (point-max) 'org-node-flag t)))
                 (goto-char flag)
                 (set-marker end (org-entry-end-position))
                 (let ((id (org-entry-get-with-inheritance "ID"))
