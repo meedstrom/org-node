@@ -3123,9 +3123,10 @@ Then undo the flags that marked them as modified."
     (( debug error )
      (with-silent-modifications
        (remove-text-properties (point-min) (point-max) '(org-node-flag)))
-     ;; Delay because `display-warning' in `before-save-hook' does not display.
-     (push (list 'org-node--eat-flags (error-message-string err))
-           delayed-warnings-list))))
+     (unless debug-on-error
+       ;; Delay because `display-warning' in `before-save-hook' does not display.
+       (push (list 'org-node--eat-flags (error-message-string err))
+             delayed-warnings-list)))))
 
 (define-minor-mode org-node--track-modifications-local-mode
   "Make available `org-node-modification-hook'."
