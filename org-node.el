@@ -3119,7 +3119,7 @@ Then undo the flags that marked them as modified."
               (set-marker end nil)))
           (with-silent-modifications
             (remove-text-properties (point-min) (point-max) '(org-node-flag)))))
-    (( error )
+    (( debug error )
      (with-silent-modifications
        (remove-text-properties (point-min) (point-max) '(org-node-flag)))
      ;; Delay because `display-warning' in `before-save-hook' does not display.
