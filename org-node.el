@@ -266,11 +266,12 @@ Used in some commands when exiting minibuffer with a blank string."
 
 ;;;; Time
 
+;; Should have been TIME_CREATED but too late to change the default.
 (defcustom org-node-property-crtime "CREATED"
   "Name of a property for holding a creation-time timestamp.
 Used by:
-- `org-node-ensure-crtime-property'
 - `org-node-rename-file-by-title'
+- `org-node-ensure-crtime-property'
 - `org-node-sort-by-crtime-property'"
   :type 'string
   :package-version '(org-node . "3.7.1"))
@@ -1469,7 +1470,7 @@ To behave exactly like org-roam\\='s `org-roam-node-insert',
 see `org-node-insert-link*', or pass REGION-AS-INITIAL-INPUT t.
 
 Argument NOVISIT for use by `org-node-insert-link-novisit'."
-  (interactive "*" org-mode)
+  (interactive "@*" org-mode)
   (unless (derived-mode-p 'org-mode)
     (user-error "Only works in org-mode buffers"))
   (org-node-cache-ensure)
@@ -1758,7 +1759,7 @@ Works in non-Org buffers."
 (defcustom org-node-name-of-links-drawer "RELATED"
   "Name of drawer created by command `org-node-insert-into-related'."
   :type '(radio (const :value "RELATED")
-                (const :value "SEE-ALSO") ;; Would put as default, but too late
+                (const :value "SEE-ALSO")
                 (const :value "LINKS")
                 string)
   :package-version '(org-node . "3.3.3"))
@@ -3105,14 +3106,14 @@ Then undo the flags that marked them as modified."
                                  (point) (point-max) 'org-node-flag t)))
                 (goto-char flag)
                 (set-marker end (org-entry-end-position))
-                (let ((id (org-entry-get-with-inheritance "ID"))
-                      (org-node--inhibit-flagging t))
+                (let ((id (org-entry-get-with-inheritance "ID")))
                   (when (and id (not (member id handled-ids)))
-                    (push id handled-ids)
                     (goto-char org-entry-property-inherited-from)
                     (unless (org-node--in-transclusion-p)
+                      (push id handled-ids)
                       (condition-case err
-                          (run-hooks 'org-node-modification-hook)
+                          (let ((org-node--inhibit-flagging t))
+                            (run-hooks 'org-node-modification-hook))
                         (( error )
                          (signal 'org-node-modification-hook-failed err))))))
                 (goto-char end))

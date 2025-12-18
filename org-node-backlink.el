@@ -304,7 +304,8 @@ Argument KIND controls how to update them."
              (problematic (seq-filter (##and (boundp %) (symbol-value %))
                                       '(org-node-backlink-mode
                                         auto-save-visited-mode
-                                        git-auto-commit-mode))))
+                                        git-auto-commit-mode
+                                        auto-revert-mode))))
         (and
          (y-or-n-p
           (format "Edit %d Org files in these %d directories?\n%S"
