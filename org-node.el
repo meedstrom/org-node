@@ -2569,11 +2569,11 @@ from ID links found in `org-mem--target<>links'."
             (cl-letf (((symbol-function #'org-id-update-id-locations) #'ignore))
               (with-temp-buffer ;; HACK: Help prevent loss of font-lock
                 (fileloop-continue)))))
-      ;; When fileloop finishes, it signals an `user-error'.  Let that or a
-      ;; `quit' proceed to the display of results.
+      ;; When fileloop finishes, it signals `user-error' as a hack to stop
+      ;; looping.  Let that or a `quit' proceed to the display of results.
       ((quit user-error))))
   ;; We're here in three cases: linting finished, linting was quit midway thru,
-  ;; or user said no at the `y-or-n-p' and just wants to see results from last time.
+  ;; or user said no at `y-or-n-p' and just wants to see results of last time.
   (when org-node--lint-warnings
     (org-mem-list--pop-to-tabulated-buffer
      :buffer "*org lint results*"
