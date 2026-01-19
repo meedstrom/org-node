@@ -2567,7 +2567,8 @@ from ID links found in `org-mem--target<>links'."
             ;; PERF: Prevent re-running `org-id-update-id-locations' in every
             ;;       file; 85% of runtime according to the CPU profiler!
             (cl-letf (((symbol-function #'org-id-update-id-locations) #'ignore))
-              (fileloop-continue))))
+              (with-temp-buffer ;; HACK: Help prevent loss of font-lock
+                (fileloop-continue)))))
       ;; When fileloop finishes, it signals an `user-error'.  Let that or a
       ;; `quit' proceed to the display of results.
       ((quit user-error))))
