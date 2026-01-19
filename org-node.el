@@ -2563,10 +2563,7 @@ from ID links found in `org-mem--target<>links'."
     (condition-case _
         (when proceed
           (let ((enable-local-variables :safe)
-                ;; PERF: Speed-up enabling `org-mode' in each buffer
-                (delay-mode-hooks t)
-                (org-agenda-files nil)
-                (org-inhibit-startup t))
+                (non-essential t))
             ;; PERF: Prevent re-running `org-id-update-id-locations' in every
             ;;       file; 85% of runtime according to the CPU profiler!
             (cl-letf (((symbol-function #'org-id-update-id-locations) #'ignore))
@@ -2599,7 +2596,10 @@ from ID links found in `org-mem--target<>links'."
   "A SCAN-FUNCTION for `fileloop-initialize'."
   (redisplay)
   (unless (derived-mode-p 'org-mode)
-    (org-mode))
+    (let ((org-agenda-files nil)
+          (org-inhibit-startup t))
+      (delay-mode-hooks
+        (org-mode))))
   (let* ((file (pop org-node--lint-remaining-files))
          (default-directory (file-name-directory file))
          (inhibit-message t) ;; Muffle spam from `org-lint-invalid-id-link'
