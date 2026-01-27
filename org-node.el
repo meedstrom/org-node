@@ -719,13 +719,16 @@ used as INITIAL-INPUT in `completing-read'."
   (clrhash org-node--title<>affixations)
   (clrhash org-node--candidate<>entry))
 
-;; Could have used `org-mem-forget-file-functions', but more efficient to loop
-;; over the whole parse-results.
 (defun org-node--forget-completions-in-results (parse-results)
   "Remove old completions where PARSE-RESULTS has new data."
-  (seq-let (bad-paths file-data) parse-results
-    (org-node--forget-completions-in-files
-     (append bad-paths (mapcar #'car file-data)))))
+  (if (>= org-mem--bump-int 21) ;; org-mem 0.27.0+
+      (org-node--forget-completions-in-files
+       (cl-loop for (bad-path _ file-data) in parse-results
+                collect bad-path
+                collect (car file-data)))
+    (seq-let (bad-paths file-data) parse-results
+      (org-node--forget-completions-in-files
+       (append bad-paths (mapcar #'car file-data))))))
 
 (defun org-node--forget-completions-in-files (files)
   "Remove the minibuffer completions for all nodes in FILES."
