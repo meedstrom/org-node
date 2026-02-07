@@ -6,11 +6,9 @@
 
   - =org-node-narrow-to-drawer-p=
 
-  - Patch =org-end-of-meta-data= to support file level (without FULL like =org-node-goto-new-drawer-site=, with FULL like =org-node-full-end-of-meta-data=)
+  - Patch =org-end-of-meta-data= to support file level (without FULL then like =org-node-goto-new-drawer-site=, with FULL then like =org-node-full-end-of-meta-data=)
 
 - Upstream applicable parts of =org-node-roam-accelerator-mode= to Org-roam
-
-- Get https://github.com/nobiot/org-transclusion/pull/268 merged
 
 * Other
 
@@ -19,8 +17,10 @@
   - [X] Create node without needing to type a title
   - [X] =org-node-grep=
   - [ ] Let =org-node-grep= create new nodes
-  - [ ] Rewrite =org-node-grep= so it does not need Consult
-  - [ ] Subroutine for *identifying a node by a grep result*, which could be used to insert/extract/capture/refile while only ever looking at grep lines
+  - [ ] (Rewrite =org-node-grep= so it does not need Consult)
+  - [ ] Subroutine for *identifying a node by a grep result*, which could be used to insert/extract/capture/refile while only ever completing against grep results
+  - [ ] See that issue about untitled notes https://github.com/meedstrom/org-node/issues XXX
+    Figure out the helper commands you'd want for embedding human-generated IDs in headings/titles.
 
 - Let =org-node-grep= obey =org-node-filter-fn=
 
@@ -29,16 +29,13 @@
 - Make a command akin to =org-node-lint-all-files=, but that just runs =org-element-parse-buffer= with =org-element--cache-diagnostics= on, then prints any issues.
 
   - Or rewrite org-mem so it uses =org-element-parse-buffer= from the start.
+    See https://github.com/meedstrom/org-mem/issues/ XXX
 
-- Help Embark and Marginalia integrate more deeply with =org-node-read-candidate=
+- Help Embark and Marginalia integrate more deeply with =org-node-read-candidate=.  See package consult-org-roam.
 
-  - Not sure I understand "completion categories", but IIUC, we don't really have a completion-category representing "an Org entry somewhere /which is not necessarily in the current buffer"/.
+- Refactor =org-node-rename-asset-and-rewrite-links= for easier use, it's sub-par
 
-    Might need agreement with upstream Org for the shape of a data object representing that?  Something like [[https://github.com/meedstrom/org-mem/blob/main/indexed.el][org-mem.el]]'s struct =org-mem-entry=?  Once that's in, then embark and such packages could easily build in handlers for that, then org-roam and such packages can automatically benefit if they translate from their internal data objects.
-
-- Make =org-node-rename-asset-and-rewrite-links= easier to use
-
-- Write a glossary, to clarify e.g. what is a "ref" vs "reflink"
+- Write a glossary, to define precise jargon e.g. what is a "ref" vs "reflink"
 
 - =org-node-seq-dispatch=: Free up keys "j", "n", "p", "c"
 
