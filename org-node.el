@@ -844,7 +844,7 @@ something to change the facts on the ground just prior."
   (when force
     (org-mem-reset nil "Org-node waiting for org-mem..."))
   (when block
-    (org-mem-await "Org-node waiting for org-mem..." 10))
+    (org-mem-await "Org-node waiting for org-mem..." 60))
   (org-mem-tip-if-empty))
 
 
