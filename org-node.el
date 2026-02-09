@@ -269,7 +269,10 @@ Used by:
 - `org-node-rename-file-by-title'
 - `org-node-ensure-crtime-property'
 - `org-node-sort-by-crtime-property'"
-  :type 'string
+  :type '(radio (const "CREATED")
+                (const :tag "TIME_CREATED (good for alphabetic sort near TIME_MODIFIED)"
+                       "TIME_CREATED")
+                string)
   :package-version '(org-node . "3.7.1"))
 
 (defcustom org-node-property-mtime "TIME_MODIFIED"
@@ -850,14 +853,19 @@ something to change the facts on the ground just prior."
 
 - Value nil: Let `org-node-guess-dir' decide
 - Value t: Ask every time
-- String: A directory path in which to put the file"
-  :type '(choice boolean directory)
+- String: A directory in which to put the file"
+  :type '(radio (const :tag "Let `org-node-guess-dir' decide" nil)
+                (const :tag "Ask every time" t)
+                directory)
   :package-version '(org-node . "0.1"))
 
-;; This setting needs care with `org-node-rename-file-by-title' after changing.
-;; https://blog.ganssle.io/articles/2023/01/attractive-nuisances.html
 (defcustom org-node-file-timestamp-format ""
   "Passed to `format-time-string' to prepend to filenames.
+
+Beware that this setting is an ''attractive nuisance''.
+Changing it leads to lots of possibly unwanted renames if you have
+`org-node-rename-file-by-title' on a hook, and in any case requires
+manual intervention for pre-existing files.
 
 Example from Org-roam: %Y%m%d%H%M%S-
 Example from Denote: %Y%m%dT%H%M%S--
@@ -902,7 +910,7 @@ A title like \"Löb\\='s Theorem\" becomes \"lob_s_theorem\".
 
 Diacritical marks U+0300 to U+0331 are stripped \(mostly used with Latin
 alphabets).  Also stripped are all glyphs not categorized in Unicode as
-belonging to an alphabet or number system.
+\"alphanumeric\", such as punctuation and emoji.
 
 If you seek to emulate org-roam filenames, you may also want to
 configure `org-node-file-timestamp-format'."
@@ -927,7 +935,7 @@ A title like \"Löb\\='s Theorem\" becomes \"lobs-theorem\".
 
 Diacritical marks U+0300 to U+0331 are stripped \(mostly used with Latin
 alphabets).  Also stripped are all glyphs not categorized in Unicode as
-belonging to an alphabet or number system."
+\"alphanumeric\", such as punctuation and emoji."
   (require 'ol)
   (thread-last title
                (org-link-display-format)
@@ -1385,7 +1393,9 @@ be sufficient to key-bind that one."
 
 ;;;###autoload
 (defun org-node-ensure-crtime-property ()
-  "Add a CREATED property to entry at point, if none already."
+  "Add a CREATED property to entry at point, if none already.
+Actually, it can be named something other than CREATED -- configure
+`org-node-property-crtime'."
   (interactive "*" org-mode)
   (unless (org-entry-get nil org-node-property-crtime)
     (org-entry-put nil
@@ -1774,6 +1784,7 @@ Used by `org-node-extract-subtree' and `org-node-refile'."
 (defcustom org-node-extract-leave-link-in-source t
   "Whether to insert a link to the just-extracted subtree.
 The link would be placed at the end of the parent entry.
+
 Used by `org-node-extract-subtree'."
   :type 'boolean
   :package-version '(org-node . "3.6.0"))
