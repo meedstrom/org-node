@@ -178,8 +178,8 @@ NAME, ARGLIST and BODY as in `defun'."
 (require 'org-mem)
 (require 'org-mem-updater)
 
-(if (or (not (boundp 'org-mem--bump-int))
-        (< org-mem--bump-int 13))
+(if (or (not (boundp 'org-mem-internal-version))
+        (< org-mem-internal-version 27))
     (display-warning 'org-node "Update org-mem to use this version of org-node"))
 
 (org-node-changes--def-whiny-alias 'org-node-get-aliases                #'org-mem-roam-aliases                      "3.0.0 (May 2025)" "February 2026")

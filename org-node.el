@@ -19,11 +19,7 @@
 ;; URL:      https://github.com/meedstrom/org-node
 ;; Created:  2024-04-13
 ;; Keywords: org, hypermedia
-;; Package-Requires: ((emacs "29.1") (llama "0.5.0") (org-mem "0.22.0") (magit-section "4.3.0"))
-
-;; Looking for Package-Version?  Consult the Git tag.
-;;       MELPA versions above 20250303 is v2.
-;;       MELPA versions above 20250515 is v3.
+;; Package-Requires: ((emacs "29.1") (llama "0.5.0") (org-mem "0.28.0") (magit-section "4.3.0"))
 
 ;;; Commentary:
 
@@ -721,14 +717,10 @@ used as INITIAL-INPUT in `completing-read'."
 
 (defun org-node--forget-completions-in-results (parse-results)
   "Remove old completions where PARSE-RESULTS has new data."
-  (if (>= org-mem--bump-int 21) ;; org-mem 0.27.0+
-      (org-node--forget-completions-in-files
-       (cl-loop for (bad-path _ file-data) in parse-results
-                collect bad-path
-                collect (car file-data)))
-    (seq-let (bad-paths file-data) parse-results
-      (org-node--forget-completions-in-files
-       (append bad-paths (mapcar #'car file-data))))))
+  (org-node--forget-completions-in-files
+   (cl-loop for (bad-path _ file-data) in parse-results
+            collect bad-path
+            collect (car file-data))))
 
 (defun org-node--forget-completions-in-files (files)
   "Remove the minibuffer completions for all nodes in FILES."
