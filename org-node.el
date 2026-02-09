@@ -835,8 +835,9 @@ something to change the facts on the ground just prior."
   (when (hash-table-empty-p org-node--candidate<>entry)
     (setq block t)
     (setq force t))
-  (when force
-    (org-mem-reset nil "Org-node waiting for org-mem..."))
+  (if force
+      (org-mem-reset nil "Org-node waiting for org-mem...")
+    (org-mem-updater-update))
   (when block
     (org-mem-await "Org-node waiting for org-mem..." 60))
   (org-mem-tip-if-empty))
