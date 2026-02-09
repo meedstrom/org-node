@@ -1596,6 +1596,21 @@ The result includes NODE\\='s current file name, unfortunately required."
     (backward-char)
     (run-hooks 'org-node-insert-link-hook)))
 
+;; New 2026-02-09.  Polish later and make public.
+(defun org-node--create-sync (title id)
+  "Create node, sync, and return the newly created node.
+May return nil."
+  (let ((saver (lambda () (save-buffer)))
+        (updater (lambda () (org-mem-updater-update))))
+    (add-hook 'org-node-creation-hook saver)
+    (add-hook 'after-save-hook updater -95)
+    (unwind-protect (org-node-create title id)
+      (remove-hook 'org-node-creation-hook saver)
+      (remove-hook 'after-save-hook updater)))
+  (org-mem-await "Org-node syncing..." 60)
+  ;; FIXME: Can return nil, why?
+  (org-mem-entry-by-id id))
+
 ;;;###autoload
 (defun org-node-insert-transclusion (&optional node)
   "Insert a #+transclude: referring to NODE.
@@ -1616,7 +1631,7 @@ keywords."
           (buf (current-buffer))
           (pt (point-marker)))
       (unless node
-        (org-node-create title id))
+        (setq node (org-node--create-sync title id)))
       (with-current-buffer buf
         (goto-char pt)
         (set-marker pt nil)
@@ -1625,78 +1640,23 @@ keywords."
                 (org-link-make-string
                  (concat "id:" id)
                  (or (and org-node-custom-link-format-fn
-                          ;; FIXME: if it had to create new node, its data
-                          ;; doesnt yet exist so we cant funcall this.  maybe
-                          ;; mandate that a node creator saves the buffer, make
-                          ;; org-mem-updater actually just operate
-                          ;; synchronously, (not using el-job), and node
-                          ;; creator can return the node object thus created
                           node
                           (funcall org-node-custom-link-format-fn node))
                      title)))
-        (save-excursion
-          (insert " :level " (number-to-string
-                              (+ 1 (or (org-current-level) 0)))))
-        (run-hooks 'org-node-insert-link-hook)))))
+        ;; Condition on a recent version of org-transclusion
+        (if (fboundp 'org-transclusion-keyword-value-no-first-heading)
+            (insert " :level auto")
+          (insert " :level "
+                  (number-to-string
+                   (org-get-valid-level (or (org-current-level) 0) +1))))))))
 
-;;;###autoload
-(defun org-node-insert-transclusion-as-subtree (&optional node)
+(defun org-node-insert-transclusion-as-subtree (&optional node arg)
   "Insert a subheading, link, newline and transclusion.
 Prompt for NODE if needed.
 Result will basically look like:
 
 ** [[Note]]
-#+transclude: [[Note]] :level 3
-
-but adapt to the surrounding outline level.
-Tip: If you often transclude file-level nodes with no initial heading,
-consider configuring `org-transclusion-exclude-elements' to exclude
-keywords."
-  (interactive "*" org-mode)
-  (org-node-cache-ensure)
-  (when org-odd-levels-only
-    (message "This command may not work as intended with `org-odd-levels-only'"))
-  (let (input)
-    (unless node
-      (setq input (org-node-read-candidate "Transclude node content: " t))
-      (when (string-blank-p input)
-        (setq input (funcall org-node-blank-input-title-generator)))
-      (setq node (gethash input org-node--candidate<>entry)))
-    (let ((id (if node (org-mem-id node) (org-id-new)))
-          (title (if node (org-mem-title node) input))
-          (buf (current-buffer))
-          (pt (point-marker)))
-      (unless node
-        (org-node-create title id))
-      (with-current-buffer buf
-        (goto-char pt)
-        (set-marker pt nil)
-        (org-node--safe-ensure-blank-line)
-        (delete-horizontal-space)
-        (let ((link (org-link-make-string
-                     (concat "id:" id)
-                     (or (and org-node-custom-link-format-fn
-                              node
-                              (funcall org-node-custom-link-format-fn node))
-                         title)))
-              (level (or (org-current-level) 0)))
-          (insert (make-string (+ 1 level) ?\*) " " link)
-          (save-excursion
-            (newline-and-indent)
-            (insert "#+transclude: " link
-                    " :level " (number-to-string (+ 2 level))))
-          (run-hooks 'org-node-insert-link-hook))))))
-
-;; TODO: New default once this PR is merged:
-;; https://github.com/nobiot/org-transclusion/pull/268
-(defun org-node-insert-transclusion-as-subtree-pull268 (&optional node arg)
-  "Requires https://github.com/nobiot/org-transclusion/pull/268.
-Insert a subheading, link, newline and transclusion.
-Prompt for NODE if needed.
-Result will basically look like:
-
-** [[Note]]
-#+transclude: [[Note]] :level :no-first-heading
+#+transclude: [[Note]] :level auto :no-first-heading
 
 Tip: If you often transclude file-level nodes with no initial heading,
 consider configuring `org-transclusion-exclude-elements' to exclude
@@ -1716,7 +1676,9 @@ Prefix argument ARG as in `org-insert-subheading'."
           (buf (current-buffer))
           (pt (point-marker)))
       (unless node
-        (org-node-create title id))
+        ;; Try new `org-node--create-sync' so that
+        ;; `org-node-custom-link-format-fn' can be used further below.
+        (setq node (org-node--create-sync title id)))
       (with-current-buffer buf
         (goto-char pt)
         (set-marker pt nil)
@@ -1731,7 +1693,13 @@ Prefix argument ARG as in `org-insert-subheading'."
           (insert link)
           (save-excursion
             (newline-and-indent)
-            (insert "#+transclude: " link " :level :no-first-heading"))
+            (insert "#+transclude: " link)
+            ;; Condition on a recent version of org-transclusion
+            (if (fboundp 'org-transclusion-keyword-value-no-first-heading)
+                (insert " :level auto :no-first-heading")
+              (insert " :level "
+                      (number-to-string
+                       (org-get-valid-level (or (org-current-level) 0) +1)))))
           (run-hooks 'org-node-insert-link-hook))))))
 
 (defun org-node-insert-raw-link ()
