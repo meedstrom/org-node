@@ -612,8 +612,9 @@ Presumes that COLLECTION is the keys of `org-node--candidate<>entry'."
                        collect (or (gethash title org-node--title<>affixations)
                                    ;; REVIEW: Sometimes above gethash returns
                                    ;; nil, don't remember why.  That results in
-                                   ;; odd glyphs in the completions.  Can we
-                                   ;; guarantee it would never return nil?
+                                   ;; odd glyphs in the completions, hence this
+                                   ;; workaround. Can we guarantee it would
+                                   ;; never return nil?
                                    (list title "" "")))))
          (if org-node-alter-candidates
              (cl-loop for altered-candidate in collection
@@ -627,9 +628,11 @@ Presumes that COLLECTION is the keys of `org-node--candidate<>entry'."
     (&optional prompt blank-ok predicate require-match initial-input hist def inherit-input-method)
   "PROMPT for a known node and return the user input.
 
-If the user input is not a key of `org-node--candidate<>entry',
-you can assume that no such node exists,
-or it was recently created but its buffer never saved.
+If the node exists, the user input is a key of table
+`org-node--candidate<>entry', and the node is the value.
+
+Otherwise, it does not exist and the user input can be taken as the
+desired title for a new node.
 
 BLANK-OK non-nil means to use `org-node-blank-input-hint' if non-nil.
 This can affect PREDICATE and REQUIRE-MATCH, because a fake entry is
@@ -1330,6 +1333,7 @@ On match, the return value is always a string."
 (defun org-node--safe-ensure-blank-line ()
   "Ensure point is in a blank line or a new blank line below current.
 Place point after any indentation."
+  ;; Don't `newline-and-indent', it runs amok near a list.
   (let ((col (progn (back-to-indentation) (current-indentation))))
     (unless (eolp) (goto-char (pos-eol)) (newline) (indent-to col))))
 
@@ -1697,7 +1701,7 @@ Tip: If you often transclude file-level nodes with no initial heading,
 consider configuring `org-transclusion-exclude-elements' to exclude
 keywords.
 
-Prefix argument ARG as in `org-insert-heading'."
+Prefix argument ARG as in `org-insert-subheading'."
   (interactive "*i\nP" org-mode)
   (org-node-cache-ensure)
   (let (input)
