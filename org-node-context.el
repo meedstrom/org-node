@@ -454,12 +454,14 @@ that buffer."
         (setq header-line-format
               (concat "Context for \"" (org-mem-entry-title node) "\""))
         (magit-insert-section (org-node-context node)
-          (when-let* ((links (org-mem-id-links-to-entry node)))
+          (when-let* ((links (seq-filter #'org-mem-link-nearby-id
+                                         (org-mem-id-links-to-entry node))))
             (magit-insert-section (org-node-context 'id-links)
               (magit-insert-heading "ID backlinks:")
               (org-node-context--insert-backlink-sections links)
               (insert "\n")))
-          (when-let* ((links (org-mem-roam-reflinks-to-entry node)))
+          (when-let* ((links (seq-filter #'org-mem-link-nearby-id
+                                         (org-mem-roam-reflinks-to-entry node))))
             (magit-insert-section (org-node-context 'reflinks)
               (magit-insert-heading "Ref backlinks:")
               (org-node-context--insert-backlink-sections links)
