@@ -820,7 +820,6 @@ These cache builds are normally async, so without BLOCK, this returns
 immediately and can mean that the data you will next query from org-mem
 is still out of date.  That usually only matters if you had done
 something to change the facts on the ground just prior."
-  (org-node-changes--onetime-warn-and-copy)
   (setq org-node--first-init nil)
   (unless org-node-cache-mode
     (when (y-or-n-p "Org-node needs `org-node-cache-mode', enable? ")
