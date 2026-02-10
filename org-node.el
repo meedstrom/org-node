@@ -716,13 +716,20 @@ used as INITIAL-INPUT in `completing-read'."
           ;; Bare title, to be affixated later
           (puthash title entry org-node--candidate<>entry))))))
 
+(defun org-node--record-completion-candidates-all (parse-results)
+  "Cache completions for all entries in PARSE-RESULTS."
+  (cl-loop for (_ _ _ entries) in parse-results
+           do (dolist (entry entries)
+                (org-node--record-completion-candidates entry)
+                (org-node--let-refs-be-aliases entry))))
+
 (defun org-node--wipe-completions (_parse-results)
   "Clear completions tables."
   (clrhash org-node--title<>affixations)
   (clrhash org-node--candidate<>entry))
 
 (defun org-node--forget-completions-in-results (parse-results)
-  "Remove old completions where PARSE-RESULTS has new data."
+  "Remove old completions where PARSE-RESULTS indicates they are stale."
   (org-node--forget-completions-in-files
    (cl-loop for (bad-path _ file-data) in parse-results
             collect bad-path
@@ -779,8 +786,8 @@ rather than twice."
     (advice-add #'org-id-find :before #'org-node--ad-org-id-find)
     (add-hook 'org-mem-pre-full-scan-functions #'org-node--wipe-completions)
     (add-hook 'org-mem-pre-targeted-scan-functions #'org-node--forget-completions-in-results)
-    (add-hook 'org-mem-record-entry-functions #'org-node--record-completion-candidates)
-    (add-hook 'org-mem-record-entry-functions #'org-node--let-refs-be-aliases)
+    (add-hook 'org-mem-post-full-scan-functions #'org-node--record-completion-candidates-all)
+    (add-hook 'org-mem-post-targeted-scan-functions #'org-node--record-completion-candidates-all)
     (when (and org-mem-do-sync-with-org-id (not (featurep 'org-id)))
       (if org-mem-watch-dirs
           (eval-after-load 'org-id
@@ -799,8 +806,8 @@ rather than twice."
     (advice-remove #'org-id-find #'org-node--ad-org-id-find)
     (remove-hook 'org-mem-pre-full-scan-functions #'org-node--wipe-completions)
     (remove-hook 'org-mem-pre-targeted-scan-functions #'org-node--forget-completions-in-results)
-    (remove-hook 'org-mem-record-entry-functions #'org-node--record-completion-candidates)
-    (remove-hook 'org-mem-record-entry-functions #'org-node--let-refs-be-aliases)
+    (remove-hook 'org-mem-post-full-scan-functions #'org-node--record-completion-candidates-all)
+    (remove-hook 'org-mem-post-targeted-scan-functions #'org-node--record-completion-candidates-all)
     (org-node-track-modifications-mode 0))))
 
 ;;;###autoload
