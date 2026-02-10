@@ -2874,9 +2874,37 @@ See also the subroutine `org-node-goto-id'."
             (buf (or (find-buffer-visiting file)
                      (and (file-exists-p file)
                           (find-file-noselect file)))))
-      (org-node-goto-id (org-mem-id node) exact buf)
+      (let* ((id (org-mem-id node))
+             (pos (or (and id
+                           (with-current-buffer buf
+                             (without-restriction
+                               (org-node--assert-transclusion-safe)
+                               (org-find-property "ID" id))))
+                      (org-mem-pos node))))
+        (pop-to-buffer-same-window buf)
+        ;; Q: Does pop-to-buffer guarantee this?
+        (cl-assert (eq (current-buffer) buf))
+        (widen)
+        ;; Mainly comes true on first visit to a file node, so that point==pos==1.
+        (when (eq (point) pos)
+          (org-node-full-end-of-meta-data))
+        ;; Point may already be at a desirable position due to any of:
+        ;; - the above
+        ;; - save-place
+        ;; - a buffer was already visiting the file
+        ;; Leave it there if sensible, otherwise move to exact position.
+        (when (or exact
+                  (and id (not (equal id (org-entry-get nil "ID"))))
+                  (not (pos-visible-in-window-p pos))
+                  (org-invisible-p pos))
+          (goto-char pos)
+          (unless (org-before-first-heading-p)
+            (org-fold-show-entry)
+            (org-fold-show-children)
+            (recenter 0))))
     (org-mem-reset t "org-node: Didn't find file, resetting...")))
 
+;; TODO: Deprecate or refactor
 (defun org-node-goto-id (id &optional exact buffer)
   "Go to ID in some buffer, without needing the file to exist yet.
 
