@@ -454,14 +454,12 @@ that buffer."
         (setq header-line-format
               (concat "Context for \"" (org-mem-entry-title node) "\""))
         (magit-insert-section (org-node-context node)
-          (when-let* ((links (seq-filter #'org-mem-link-nearby-id
-                                         (org-mem-id-links-to-entry node))))
+          (when-let* ((links (org-mem-id-links-to-entry node)))
             (magit-insert-section (org-node-context 'id-links)
               (magit-insert-heading "ID backlinks:")
               (org-node-context--insert-backlink-sections links)
               (insert "\n")))
-          (when-let* ((links (seq-filter #'org-mem-link-nearby-id
-                                         (org-mem-roam-reflinks-to-entry node))))
+          (when-let* ((links (org-mem-roam-reflinks-to-entry node)))
             (magit-insert-section (org-node-context 'reflinks)
               (magit-insert-heading "Ref backlinks:")
               (org-node-context--insert-backlink-sections links)
@@ -472,7 +470,7 @@ that buffer."
 (defun org-node-context--insert-backlink-sections (links)
   "Insert a section displaying a preview of LINK."
   (dolist (link (sort links #'org-node-context--origin-title-lessp))
-    (let* ((node (org-mem-entry-by-id (org-mem-link-nearby-id link)))
+    (let* ((node (org-node-context--get-link-origin link))
            (breadcrumbs (if-let* ((olp (org-mem-olpath-with-file-title node)))
                             (string-join olp " > ")
                           "Top")))
@@ -493,8 +491,7 @@ that buffer."
 Actually, if a snippet was previously cached, return the cached version,
 else briefly visit the file at LINK-POS and call
 `org-node-context--extract-entry-at-point'."
-  (let* ((id (org-mem-entry-id node))
-         (link-pos (org-mem-link-pos link))
+  (let* ((link-pos (org-mem-link-pos link))
          ;; NOTE: `pos-diff' is not necessary in a simple implementation, but
          ;; this level of granularity lets us avoid wiping all cached previews
          ;; in a large file every time it is saved -- doing so would make the
@@ -505,9 +502,9 @@ else briefly visit the file at LINK-POS and call
          ;; thumb: when the text between a link and its heading get edited,
          ;; that will almost always result in a new unique `pos-diff'.
          (pos-diff (- link-pos (org-mem-entry-pos node))))
-    (or (alist-get pos-diff (gethash id org-node-context--previews))
+    (or (alist-get pos-diff (gethash node org-node-context--previews))
         (setf
-         (alist-get pos-diff (gethash id org-node-context--previews))
+         (alist-get pos-diff (gethash node org-node-context--previews))
          (let (snippet)
            (with-current-buffer (org-node--work-buffer-for (org-mem-file node))
              (goto-char link-pos)
@@ -542,8 +539,14 @@ Decide this by getting the titles of the nodes wherein the links were
 found, and checking if the first title would come lexicographically
 before the second title."
   (string<
-   (org-mem-entry-title (org-mem-entry-by-id (org-mem-link-nearby-id link-1)))
-   (org-mem-entry-title (org-mem-entry-by-id (org-mem-link-nearby-id link-2)))))
+   (org-mem-entry-title (org-node-context--get-link-origin link-1))
+   (org-mem-entry-title (org-node-context--get-link-origin link-2))))
+
+;; Same as upcoming `org-mem-link-entry'
+(defun org-node-context--get-link-origin (link)
+  "Return the entry that contains LINK."
+  (org-mem-entry-at-pos-in-file (org-mem-link-pos link)
+                                (org-mem-link-file link)))
 
 (provide 'org-node-context)
 
