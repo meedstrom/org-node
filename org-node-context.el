@@ -324,7 +324,7 @@ properties.  Org-mode is enabled, but the org-element cache is not."
                    ;; node as the "value" at that section.
                    value-atpt
                  (setq link-pos (org-mem-link-pos value-atpt))
-                 (org-mem-entry-by-id (org-mem-link-nearby-id value-atpt)))))
+                 (org-node-context--get-link-origin value-atpt))))
     (org-node-goto node)
     (when link-pos
       (goto-char link-pos)
@@ -544,11 +544,15 @@ before the second title."
    (org-mem-entry-title (org-node-context--get-link-origin link-1))
    (org-mem-entry-title (org-node-context--get-link-origin link-2))))
 
-;; Same as upcoming `org-mem-link-entry'
 (defun org-node-context--get-link-origin (link)
-  "Return the entry that contains LINK."
-  (org-mem-entry-at-pos-in-file (org-mem-link-pos link)
-                                (org-mem-link-file link)))
+  "Return the entry that contains LINK.
+Actually return the ancestor ID-node, if there is one and the direct
+entry has no ID."
+  (let ((id (org-mem-link-nearby-id link)))
+    (or (and id (org-mem-entry-by-id id))
+        ;; TODO: Change to upcoming `org-mem-link-entry'
+        (org-mem-entry-at-pos-in-file (org-mem-link-pos link)
+                                      (org-mem-link-file link)))))
 
 (provide 'org-node-context)
 
