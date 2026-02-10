@@ -472,28 +472,31 @@ that buffer."
 (defun org-node-context--insert-backlink-sections (links)
   "Insert a section displaying a preview of LINK."
   (dolist (link (sort links #'org-node-context--origin-title-lessp))
-    (let* ((node (org-node-context--get-link-origin link))
-           (breadcrumbs (if-let* ((olp (org-mem-olpath-with-file-title node)))
+    (let* ((entry (org-node-context--get-link-origin link))
+           (breadcrumbs (if-let* ((olp (org-mem-olpath-with-file-title entry)))
                             (string-join olp " > ")
                           "Top")))
       (magit-insert-section (org-node-context link)
         (magit-insert-heading
           (format "%s (%s)"
-                  (propertize (org-mem-title node)
+                  (propertize (org-mem-title entry)
                               'face
                               'org-node-context-origin-title)
                   (propertize breadcrumbs 'face 'org-node-parent)))
-        (insert (org-node-context--get-preview node link))
+        (insert (org-node-context--get-preview link))
         (insert "\n")))))
 
 (defvar org-node-context--snippet-link)
-(defun org-node-context--get-preview (node link)
-  "Get a preview snippet out of NODE file, where LINK is.
+(defun org-node-context--get-preview (link)
+  "Get a preview snippet from around LINK in its containing file.
 
 Actually, if a snippet was previously cached, return the cached version,
-else briefly visit the file at LINK-POS and call
+else briefly visit the file, go to the link and call
 `org-node-context--extract-entry-at-point'."
-  (let* ((link-pos (org-mem-link-pos link))
+  (let* ((entry (org-node-context--get-link-origin link))
+         ;; TODO: Change to upcoming `org-mem-entry-pseudo-id'
+         (eid (or (org-mem-entry-id entry) entry))
+         (link-pos (org-mem-link-pos link))
          ;; NOTE: `pos-diff' is not necessary in a simple implementation, but
          ;; this level of granularity lets us avoid wiping all cached previews
          ;; in a large file every time it is saved -- doing so would make the
@@ -503,12 +506,12 @@ else briefly visit the file at LINK-POS and call
          ;; Instead, we just don't wipe anything, and trust in a sloppy rule of
          ;; thumb: when the text between a link and its heading get edited,
          ;; that will almost always result in a new unique `pos-diff'.
-         (pos-diff (- link-pos (org-mem-entry-pos node))))
-    (or (alist-get pos-diff (gethash node org-node-context--previews))
+         (pos-diff (- link-pos (org-mem-entry-pos entry))))
+    (or (alist-get pos-diff (gethash eid org-node-context--previews))
         (setf
-         (alist-get pos-diff (gethash node org-node-context--previews))
+         (alist-get pos-diff (gethash eid org-node-context--previews))
          (let (snippet)
-           (with-current-buffer (org-node--work-buffer-for (org-mem-file node))
+           (with-current-buffer (org-node--work-buffer-for (org-mem-file entry))
              (goto-char link-pos)
              (setq snippet (org-node-context--extract-entry-at-point)))
            (with-current-buffer (org-mem-org-mode-scratch)
