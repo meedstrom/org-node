@@ -33,102 +33,6 @@
   :group 'org-node)
 
 
-;;; Persistence
-
-(defcustom org-node-context-persist-on-disk nil
-  "Whether to sync cached backlink previews to disk.
-The disk location is `org-node-data-dir'.
-
-This allows the context buffer created by \\[org-node-context-raise] to
-show up more instantly, even the first time it renders a given set of
-backlinks.
-
-Here\\='s how you test whether this is noticeable on your system:
-1. Open a file with many subtree nodes
-2. Collapse them all (i.e. S-TAB until you see only the headings)
-3. Have a context buffer open with `org-node-context-follow-mode'
-4. Hold the C-n or <down> key."
-  :type 'boolean
-  :package-version '(org-node . "2.0.0"))
-
-(defvar org-node-context--previews (make-hash-table :test 'equal)
-  "1:N table mapping IDs to seen previews of backlink contexts.
-
-Each preview is a cons cell \(POS-DIFF . TEXT) where POS-DIFF
-corresponds to a link\\='s buffer position relative to that of
-the heading that has said ID, and TEXT is an output of
-`org-node-context--get-preview'.")
-
-(defvar org-node-context--persist-timer (timer-create))
-(defvar org-node-context--last-tbl-state 0)
-(defvar org-node-context--did-init-persist nil)
-
-(defun org-node-context--maybe-init-persistence (&rest _)
-  "Try to restore `org-node-context--previews' from disk.
-Then start occasionally syncing back to disk.
-No-op if user option `org-node-context-persist-on-disk' is nil."
-  (when org-node-context-persist-on-disk
-    (unless org-node-context--did-init-persist
-      (setq org-node-context--did-init-persist t)
-      (cancel-timer org-node-context--persist-timer)
-      (setq org-node-context--persist-timer
-            (run-with-idle-timer 50 t #'org-node-context--persist))
-      ;; Load from disk.
-      (when (file-readable-p (org-node-context--persist-file))
-        (with-temp-buffer
-          (insert-file-contents (org-node-context--persist-file))
-          (let ((data (read (current-buffer))))
-            (when (hash-table-p data)
-              (setq org-node-context--last-tbl-state (hash-table-count data))
-              (setq org-node-context--previews data))))))))
-
-(defun org-node-context--persist-file ()
-  "Return path to file that caches previews between sessions."
-  (mkdir org-node-data-dir t)
-  (file-name-concat org-node-data-dir "org-node-backlink-previews.eld"))
-
-(defun org-node-context--persist ()
-  "Sync all cached previews to disk."
-  (if org-node-context-persist-on-disk
-      ;; Only proceed if table has gained new entries.
-      ;; NOTE: Does not proceed if there are merely new previews in existing
-      ;;       entries, but it's good enough this way.
-      (when (not (eq org-node-context--last-tbl-state
-                     (hash-table-count org-node-context--previews)))
-        (org-node-context--clean-stale-previews)
-        (setq org-node-context--last-tbl-state
-              (hash-table-count org-node-context--previews))
-        (with-temp-file (org-node-context--persist-file)
-          (let ((print-length nil))
-            (prin1 org-node-context--previews (current-buffer)))))
-    (cancel-timer org-node-context--persist-timer)
-    (setq org-node-context--did-init-persist nil)))
-
-(defun org-node-context--clean-stale-previews ()
-  "Clean stale members in table `org-node-context--previews'.
-
-Note that each entry in that table has potentially many previews,
-but when this finds one of them stale, it removes that whole entry."
-  (let ((valid-positions (make-hash-table :test 'equal)))
-    (maphash
-     (lambda (_ links)
-       (dolist (link links)
-         (push (org-mem-link-pos link)
-               (gethash (org-mem-link-nearby-id link) valid-positions))))
-     org-mem--target<>links)
-
-    (maphash
-     (lambda (id previews)
-       (let ((node (org-mem-entry-by-id id))
-             (valid (gethash id valid-positions)))
-         (or (and node
-                  (cl-loop
-                   for (pos-diff . _text) in previews
-                   always (memq (+ pos-diff (org-mem-entry-pos node)) valid)))
-             (remhash id org-node-context--previews))))
-     org-node-context--previews)))
-
-
 ;;; Early defs
 
 (defvar-keymap org-node-context-mode-map
@@ -432,7 +336,6 @@ otherwise call the latter."
 If argument BUF not supplied, use `org-node-context-main-buffer'.
 If argument ID not supplied, just refresh the context already shown in
 that buffer."
-  (org-node-context--maybe-init-persistence)
   (with-current-buffer (get-buffer-create (or buf org-node-context-main-buffer))
     (unless (derived-mode-p 'org-node-context-mode)
       (org-node-context-mode))

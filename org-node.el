@@ -195,10 +195,6 @@
   :link '(url-link :tag "GitHub source" "https://github.com/meedstrom/org-node")
   :link '(info-link :tag "Info manual" "(org-node)"))
 
-(defvar org-node-data-dir user-emacs-directory
-  "Directory in which to persist data between sessions.
-As of 3.7.1, only used when `org-node-context-persist-on-disk' is t.")
-
 (defun org-node--set-and-remind-reset (sym val)
   "Set SYM to VAL.
 Then remind the user to run \\[org-mem-reset]."
