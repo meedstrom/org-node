@@ -286,10 +286,10 @@ properties.  Org-mode is enabled, but the org-element cache is not."
   :type 'hook
   :package-version '(org-node . "2.0.0"))
 
-(defcustom org-node-context-main-buffer "*Backlinks*"
+(defcustom org-node-context-main-buffer "*org-node context*"
   "Name of the main context buffer."
   :type 'string
-  :package-version '(org-node . "2.0.0"))
+  :package-version '(org-node . "3.13.0"))
 
 ;;;###autoload
 (define-minor-mode org-node-context-follow-local-mode
