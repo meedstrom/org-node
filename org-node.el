@@ -1968,7 +1968,7 @@ To add exceptions, see `org-node-renames-exclude'."
   :package-version '(org-node . "0.7"))
 
 (defcustom org-node-renames-exclude "\\(?:daily\\|dailies\\|journal\\)/"
-  "Regexp matching paths of files not to auto-rename.
+  "Regexp matching file names not to auto-rename.
 For use by `org-node-rename-file-by-title'.
 
 Only applied to files under `org-node-renames-allowed-dirs'.
@@ -2802,7 +2802,14 @@ When t, only supply tags from nodes that passed `org-node-filter-fn'."
 
 ;;;###autoload
 (defvar-keymap org-node-global-prefix-map
-  :doc "Org-node commands that work in any buffer."
+  :doc "Org-node commands that work in any buffer.
+
+The author meedstrom recommends that unless this map is bound to a
+single key chord, that you bind some commands to shallower key
+sequences of your choice, in order of importance:
+1. `org-node-find'
+2. `org-node-insert-link' (in org-mode)
+3. `org-node-context-dwim'"
   "b" 'org-node-context-dwim ;; b for "backlinks"
   "f" #'org-node-find
   "g" #'org-node-grep
@@ -2826,8 +2833,15 @@ When t, only supply tags from nodes that passed `org-node-filter-fn'."
 
 ;;;###autoload
 (defvar-keymap org-node-org-prefix-map
-  :doc "Superset of `org-node-global-prefix-map', with
-extra commands that work only in Org mode."
+  :doc "Superset of `org-node-global-prefix-map'.
+Includes extra commands that work only in Org mode.
+
+The author meedstrom recommends that unless this map is bound to a
+single key chord, that you bind some commands to shallower key
+sequences of your choice, in order of importance:
+1. `org-node-find'
+2. `org-node-insert-link' (in org-mode)
+3. `org-node-context-dwim'"
   :parent org-node-global-prefix-map
   "d" #'org-node-insert-into-related  ;; d for "drawer".  TODO: Maybe rename?
   ;; "e" #'org-node-extract-subtree ;; NOTE: `org-node-refile' does same now.
