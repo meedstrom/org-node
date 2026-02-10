@@ -37,15 +37,17 @@
 
 (defcustom org-node-context-persist-on-disk nil
   "Whether to sync cached backlink previews to disk.
+The disk location is `org-node-data-dir'.
 
 This allows the context buffer created by \\[org-node-context-raise] to
 show up more instantly, even the first time it renders a given set of
 backlinks.
 
-Noticeable mainly if you are a connoisseur of low input latency,
-have a bad computer, and often re-start Emacs.
-
-For the cache location, see `org-node-data-dir'."
+Here\\='s how you test whether this is noticeable on your system:
+1. Open a file with many subtree nodes
+2. Collapse them all (i.e. S-TAB until you see only the headings)
+3. Have a context buffer open with `org-node-context-follow-mode'
+4. Hold the C-n or <down> key."
   :type 'boolean
   :package-version '(org-node . "2.0.0"))
 
