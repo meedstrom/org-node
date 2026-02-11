@@ -19,7 +19,7 @@
 ;; URL:      https://github.com/meedstrom/org-node
 ;; Created:  2024-04-13
 ;; Keywords: org, hypermedia
-;; Package-Requires: ((emacs "29.1") (llama "0.5.0") (org-mem "0.28.0") (magit-section "4.3.0"))
+;; Package-Requires: ((emacs "29.1") (llama "0.5.0") (org-mem "0.29.1") (magit-section "4.3.0"))
 
 ;;; Commentary:
 
@@ -146,7 +146,7 @@
   (require 'org-fold)
   (require 'org-element))
 
-(defconst org-node-internal-version 1)
+(defconst org-node-internal-version 2)
 
 
 ;;;; Faces
@@ -2867,8 +2867,7 @@ sequences of your choice, in order of importance:
 
 (defun org-node-goto (node &optional exact)
   "Visit file containing NODE, and ensure point is inside NODE.
-EXACT means always move point to NODE top.
-See also the subroutine `org-node-goto-id'."
+EXACT means always move point to NODE top."
   (cl-assert (org-mem-entry-p node))
   (when (numberp exact)
     (error "Function org-node-goto no longer takes a position argument"))

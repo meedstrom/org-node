@@ -33,28 +33,27 @@
   :group 'org-node)
 
 (defun org-node-context--clean-stale-previews ()
-  "Clean stale members in table `org-node-context--previews'.
-
-Note that each entry in that table has potentially many previews,
-but when this finds one of them stale, it removes that whole entry."
+  "Clean stale members in table `org-node-context--previews'."
   (let ((valid-positions (make-hash-table :test 'equal)))
-    (maphash
-     (lambda (_ links)
-       (dolist (link links)
-         (push (org-mem-link-pos link)
-               (gethash (org-mem-link-nearby-id link) valid-positions))))
-     org-mem--target<>links)
 
-    (maphash
-     (lambda (id previews)
-       (let ((node (org-mem-entry-by-id id))
-             (valid (gethash id valid-positions)))
-         (or (and node
-                  (cl-loop
-                   for (pos-diff . _text) in previews
-                   always (memq (+ pos-diff (org-mem-entry-pos node)) valid)))
-             (remhash id org-node-context--previews))))
-     org-node-context--previews)))
+    (maphash (lambda (pseudo-id links)
+               (dolist (link links)
+                 (push (org-mem-link-pos link)
+                       (gethash (or (org-mem-link-nearby-id link) pseudo-id)
+                                valid-positions))))
+             org-mem--pseudo-id<>links)
+
+    (maphash (lambda (key previews)
+               (let ((entry (or (org-mem-entry-by-id key)
+                                (org-mem-entry-by-pseudo-id key)))
+                     (valid (gethash key valid-positions)))
+                 (unless (and entry
+                              (cl-loop
+                               for (pos-diff . _text) in previews
+                               always (memq (+ pos-diff (org-mem-entry-pos entry))
+                                            valid)))
+                   (remhash key org-node-context--previews))))
+             org-node-context--previews)))
 
 
 ;;; Early defs
@@ -433,8 +432,7 @@ Actually, if a snippet was previously cached, return the cached version,
 else briefly visit the file, go to the link and call
 `org-node-context--extract-entry-at-point'."
   (let* ((entry (org-node-context--get-link-origin link))
-         ;; TODO: Change to upcoming `org-mem-entry-pseudo-id'
-         (eid (or (org-mem-entry-id entry) entry))
+         (eid (or (org-mem-entry-id entry) (org-mem-entry-pseudo-id entry)))
          (link-pos (org-mem-link-pos link))
          ;; NOTE: `pos-diff' is not necessary in a simple implementation, but
          ;; this level of granularity lets us avoid wiping all cached previews
@@ -492,10 +490,7 @@ Actually return the ancestor ID-node, if there is one and the direct
 entry has no ID."
   (let ((id (org-mem-link-nearby-id link)))
     (or (and id (org-mem-entry-by-id id))
-        ;; TODO: Change to upcoming `org-mem-link-entry'
-        (org-mem-entry-at-pos-in-file (org-mem-link-pos link)
-                                      (org-mem-link-file link)))))
-
+        (org-mem-link-entry link))))
 
 
 ;;; Persistence
