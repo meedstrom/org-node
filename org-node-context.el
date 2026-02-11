@@ -51,14 +51,6 @@ Here\\='s how you test whether this is noticeable on your system:
   :type 'boolean
   :package-version '(org-node . "2.0.0"))
 
-(defvar org-node-context--previews (make-hash-table :test 'equal)
-  "1:N table mapping IDs to seen previews of backlink contexts.
-
-Each preview is a cons cell \(POS-DIFF . TEXT) where POS-DIFF
-corresponds to a link\\='s buffer position relative to that of
-the heading that has said ID, and TEXT is an output of
-`org-node-context--get-preview'.")
-
 (defvar org-node-context--persist-timer (timer-create))
 (defvar org-node-context--last-tbl-state 0)
 (defvar org-node-context--did-init-persist nil)
@@ -429,6 +421,13 @@ otherwise call the latter."
 
 
 ;;; Plumbing
+
+(defvar org-node-context--previews (make-hash-table :test 'equal)
+  "Table of preview snippets of backlink contexts.
+
+Each table value is an alist of \((POS-DIFF . TEXT) ...) where POS-DIFF
+corresponds to a link\\='s buffer position relative to that of its
+heading, and TEXT is an output of `org-node-context--get-preview'.")
 
 (defun org-node-context--refresh (&optional buf id from-history-nav)
   "Refresh buffer BUF to show context for node known by ID.
