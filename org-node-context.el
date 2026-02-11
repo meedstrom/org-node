@@ -32,70 +32,6 @@
 (defgroup org-node-context nil "Preview backlink contexts in separate buffer."
   :group 'org-node)
 
-
-;;; Persistence
-
-(defcustom org-node-context-persist-on-disk nil
-  "Whether to sync cached backlink previews to disk.
-The disk location is `org-node-data-dir'.
-
-This allows the context buffer created by \\[org-node-context-raise] to
-show up more instantly, even the first time it renders a given set of
-backlinks.
-
-Here\\='s how you test whether this is noticeable on your system:
-1. Open a file with many subtree nodes
-2. Collapse them all (i.e. S-TAB until you see only the headings)
-3. Have a context buffer open with `org-node-context-follow-mode'
-4. Hold the C-n or <down> key."
-  :type 'boolean
-  :package-version '(org-node . "2.0.0"))
-
-(defvar org-node-context--persist-timer (timer-create))
-(defvar org-node-context--last-tbl-state 0)
-(defvar org-node-context--did-init-persist nil)
-
-(defun org-node-context--maybe-init-persistence (&rest _)
-  "Try to restore `org-node-context--previews' from disk.
-Then start occasionally syncing back to disk.
-No-op if user option `org-node-context-persist-on-disk' is nil."
-  (when org-node-context-persist-on-disk
-    (unless org-node-context--did-init-persist
-      (setq org-node-context--did-init-persist t)
-      (cancel-timer org-node-context--persist-timer)
-      (setq org-node-context--persist-timer
-            (run-with-idle-timer 50 t #'org-node-context--persist))
-      ;; Load from disk.
-      (when (file-readable-p (org-node-context--persist-file))
-        (with-temp-buffer
-          (insert-file-contents (org-node-context--persist-file))
-          (let ((data (read (current-buffer))))
-            (when (hash-table-p data)
-              (setq org-node-context--last-tbl-state (hash-table-count data))
-              (setq org-node-context--previews data))))))))
-
-(defun org-node-context--persist-file ()
-  "Return path to file that caches previews between sessions."
-  (mkdir org-node-data-dir t)
-  (file-name-concat org-node-data-dir "org-node-backlink-previews.eld"))
-
-(defun org-node-context--persist ()
-  "Sync all cached previews to disk."
-  (if org-node-context-persist-on-disk
-      ;; Only proceed if table has gained new entries.
-      ;; NOTE: Does not proceed if there are merely new previews in existing
-      ;;       entries, but it's good enough this way.
-      (when (not (eq org-node-context--last-tbl-state
-                     (hash-table-count org-node-context--previews)))
-        (org-node-context--clean-stale-previews)
-        (setq org-node-context--last-tbl-state
-              (hash-table-count org-node-context--previews))
-        (with-temp-file (org-node-context--persist-file)
-          (let ((print-length nil))
-            (prin1 org-node-context--previews (current-buffer)))))
-    (cancel-timer org-node-context--persist-timer)
-    (setq org-node-context--did-init-persist nil)))
-
 (defun org-node-context--clean-stale-previews ()
   "Clean stale members in table `org-node-context--previews'.
 
@@ -559,6 +495,71 @@ entry has no ID."
         ;; TODO: Change to upcoming `org-mem-link-entry'
         (org-mem-entry-at-pos-in-file (org-mem-link-pos link)
                                       (org-mem-link-file link)))))
+
+
+
+;;; Persistence
+
+(defcustom org-node-context-persist-on-disk nil
+  "Whether to sync cached backlink previews to disk.
+The disk location is `org-node-data-dir'.
+
+This allows the context buffer created by \\[org-node-context-raise] to
+show up more instantly, even the first time it renders a given set of
+backlinks.
+
+Here\\='s how you test whether this is noticeable on your system:
+1. Open a file with many subtree nodes
+2. Collapse them all (i.e. S-TAB until you see only the headings)
+3. Have a context buffer open with `org-node-context-follow-mode'
+4. Hold the C-n or <down> key."
+  :type 'boolean
+  :package-version '(org-node . "2.0.0"))
+
+(defvar org-node-context--persist-timer (timer-create))
+(defvar org-node-context--last-tbl-state 0)
+(defvar org-node-context--did-init-persist nil)
+
+(defun org-node-context--maybe-init-persistence (&rest _)
+  "Try to restore `org-node-context--previews' from disk.
+Then start occasionally syncing back to disk.
+No-op if user option `org-node-context-persist-on-disk' is nil."
+  (when org-node-context-persist-on-disk
+    (unless org-node-context--did-init-persist
+      (setq org-node-context--did-init-persist t)
+      (cancel-timer org-node-context--persist-timer)
+      (setq org-node-context--persist-timer
+            (run-with-idle-timer 50 t #'org-node-context--persist))
+      ;; Load from disk.
+      (when (file-readable-p (org-node-context--persist-file))
+        (with-temp-buffer
+          (insert-file-contents (org-node-context--persist-file))
+          (let ((data (read (current-buffer))))
+            (when (hash-table-p data)
+              (setq org-node-context--last-tbl-state (hash-table-count data))
+              (setq org-node-context--previews data))))))))
+
+(defun org-node-context--persist-file ()
+  "Return path to file that caches previews between sessions."
+  (mkdir org-node-data-dir t)
+  (file-name-concat org-node-data-dir "org-node-backlink-previews.eld"))
+
+(defun org-node-context--persist ()
+  "Sync all cached previews to disk."
+  (if org-node-context-persist-on-disk
+      ;; Only proceed if table has gained new entries.
+      ;; NOTE: Does not proceed if there are merely new previews in existing
+      ;;       entries, but it's good enough this way.
+      (when (not (eq org-node-context--last-tbl-state
+                     (hash-table-count org-node-context--previews)))
+        (org-node-context--clean-stale-previews)
+        (setq org-node-context--last-tbl-state
+              (hash-table-count org-node-context--previews))
+        (with-temp-file (org-node-context--persist-file)
+          (let ((print-length nil))
+            (prin1 org-node-context--previews (current-buffer)))))
+    (cancel-timer org-node-context--persist-timer)
+    (setq org-node-context--did-init-persist nil)))
 
 (provide 'org-node-context)
 
