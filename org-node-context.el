@@ -317,18 +317,22 @@ properties.  Org-mode is enabled, but the org-element cache is not."
   (interactive () org-node-context-mode)
   (unless (derived-mode-p 'org-node-context-mode)
     (error "`org-node-context-visit-thing' called outside context buffer"))
+  ;; Bit magical, but `magit-insert-section' can store a
+  ;; link as the "value" at that section.
   (let* ((value-atpt (oref (magit-current-section) value))
          link-pos
-         (node (if (org-mem-entry-p value-atpt)
-                   ;; Bit magical, but `magit-insert-section' could store the
-                   ;; node as the "value" at that section.
-                   value-atpt
-                 (setq link-pos (org-mem-link-pos value-atpt))
-                 (org-node-context--get-link-origin value-atpt))))
-    (org-node-goto node)
-    (when link-pos
-      (goto-char link-pos)
-      (recenter))))
+         (origin (pcase value-atpt
+                   ((pred org-mem-entry-p) nil)
+                   ((pred org-mem-link-p)
+                    (setq link-pos (org-mem-link-pos value-atpt))
+                    (org-node-context--get-link-origin value-atpt))
+                   ((pred listp) nil))))
+    (if origin
+        (progn
+          (org-node-goto origin)
+          (goto-char link-pos)
+          (recenter))
+      (message "Point not on a backlink snippet"))))
 
 (defun org-node-context-raise-1 ()
   "Either display a context buffer or refresh an already visible one."
@@ -455,14 +459,14 @@ that buffer."
         (erase-buffer)
         (setq header-line-format
               (concat "Context for \"" (org-mem-entry-title node) "\""))
-        (magit-insert-section (org-node-context node)
+        (magit-insert-section (org-node-context :root)
           (when-let* ((links (org-mem-id-links-to-entry node)))
-            (magit-insert-section (org-node-context 'id-links)
+            (magit-insert-section (org-node-context :id-links)
               (magit-insert-heading "ID backlinks:")
               (org-node-context--insert-backlink-sections links)
               (insert "\n")))
           (when-let* ((links (org-mem-roam-reflinks-to-entry node)))
-            (magit-insert-section (org-node-context 'reflinks)
+            (magit-insert-section (org-node-context :reflinks)
               (magit-insert-heading "Ref backlinks:")
               (org-node-context--insert-backlink-sections links)
               (insert "\n"))))
