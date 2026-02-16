@@ -327,6 +327,7 @@ Repeatable on the last key of a key sequence if
 Call the former if `org-node-context-follow-mode' is enabled,
 otherwise call the latter."
   (interactive)
+  (org-node-context--clean-stale-previews)
   (if org-node-context-follow-mode
       (org-node-context-toggle)
     (org-node-context-raise)))
