@@ -24,6 +24,7 @@
 (require 'org-mem)
 (require 'magit-section)
 (require 'repeat)
+(require 'map)
 (eval-when-compile
   (require 'org)
   (require 'org-node)
@@ -507,13 +508,7 @@ No-op if user option `org-node-context-persist-on-disk' is nil."
     (cancel-timer org-node-context--persist-timer)
     (setq org-node-context--persist-timer
           (run-with-idle-timer 30 t #'org-node-context--persist))
-    ;; Load from disk.
-    (when (file-readable-p (org-node-context--persistence-file))
-      (with-temp-buffer
-        (insert-file-contents (org-node-context--persistence-file))
-        (let ((data (read (current-buffer))))
-          (when (hash-table-p data)
-            (setq org-node-context--previews data)))))))
+    (org-node-context--persist)))
 
 (defun org-node-context--persistence-file ()
   "Return path to file that caches previews between sessions."
@@ -521,13 +516,20 @@ No-op if user option `org-node-context-persist-on-disk' is nil."
   (expand-file-name "org-node-backlink-previews.eld" org-node-data-dir))
 
 (defun org-node-context--persist ()
-  "Sync all cached previews to disk."
+  "Sync all cached previews with those on disk."
   (org-node-context--clean-stale-previews)
-  (if org-node-context-persist-on-disk
-      (with-temp-file (org-node-context--persistence-file)
-        (let ((print-length nil))
-          (prin1 org-node-context--previews (current-buffer))))
-    (cancel-timer org-node-context--persist-timer)))
+  (when (file-readable-p (org-node-context--persistence-file))
+    (with-temp-file (org-node-context--persistence-file)
+      (insert-file-contents (org-node-context--persistence-file))
+      (let ((data (read (current-buffer))))
+        (when (hash-table-p data)
+          (setq org-node-context--previews
+                (map-merge 'hash-table data org-node-context--previews))
+          (org-node-context--clean-stale-previews)))
+      (erase-buffer)
+      (let ((print-length nil))
+        (prin1 org-node-context--previews (current-buffer)))))
+  nil)
 
 (provide 'org-node-context)
 
