@@ -1850,6 +1850,7 @@ creation-date as more truthful or useful than today\\='s date.
          (path-to-write
           (file-name-concat dir (org-node-title-to-basename title)))
          (already-a-node (org-id-get))
+         (crtime (org-entry-get nil org-node-property-crtime))
          (id (progn
                (when (file-exists-p path-to-write)
                  (user-error "A file already exists named %s" path-to-write))
@@ -1910,7 +1911,7 @@ creation-date as more truthful or useful than today\\='s date.
               (open-line 1)
               (insert "\n"
                       (format-time-string
-                       (format "%s Created " (org-node-time-stamp t t)))
+                       (format "%s Created " (or crtime (org-node-time-stamp t t))))
                       (org-link-make-string (concat "id:" id) title)
                       "\n"))))))
     (when org-node-stay-in-source-buffer
