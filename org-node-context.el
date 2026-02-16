@@ -432,40 +432,28 @@ Actually, if a snippet was previously cached, return the cached version,
 else briefly visit the file, go to the link and call
 `org-node-context--extract-entry-at-point'."
   (let* ((entry (org-node-context--get-link-origin link))
-         (eid (or (org-mem-entry-id entry) (org-mem-entry-pseudo-id entry)))
+         (key (or (org-mem-entry-id entry) (org-mem-entry-pseudo-id entry)))
          (link-pos (org-mem-link-pos link))
-         ;; NOTE: `pos-diff' is not necessary in a simple implementation, but
-         ;; this level of granularity lets us avoid wiping all cached previews
+         ;; Tracking `pos-diff' lets us avoid wiping all cached previews
          ;; in a large file every time it is saved -- doing so would make the
          ;; cache useless, when you are working in a large file with links
          ;; between parts of itself.
-         ;;
-         ;; Instead, we just don't wipe anything, and trust in a sloppy rule of
-         ;; thumb: when the text between a link and its heading get edited,
-         ;; that will almost always result in a new unique `pos-diff'.
          (pos-diff (- link-pos (org-mem-entry-pos entry))))
-    (or (alist-get pos-diff (gethash eid org-node-context--previews))
-        (setf
-         (alist-get pos-diff (gethash eid org-node-context--previews))
-         (let (snippet)
-           (with-current-buffer (org-node--work-buffer-for (org-mem-file entry))
-             (goto-char link-pos)
-             (setq snippet (org-node-context--extract-entry-at-point)))
-           (with-current-buffer (org-mem-org-mode-scratch)
-             (erase-buffer)
-             (insert snippet)
-             (goto-char pos-diff)
-             (run-hooks 'org-node-context-postprocess-hook)
-             ;; Finally font-lock now that we are in a tiny buffer that
-             ;; contains only the snippet that needs to be font-locked, not the
-             ;; entire source file.
-             ;;
-             ;; It would be nice to do this before the postprocess hook instead
-             ;; of after, to offer the possibility to override colors
-             ;; or something, but the hook also could be used to add text,
-             ;; so we have to re-fontify in any case.
-             (font-lock-ensure)
-             (buffer-string)))))))
+    (with-memoization (alist-get pos-diff (gethash key org-node-context--previews))
+      (let (snippet)
+        (with-current-buffer (org-node--work-buffer-for (org-mem-file entry))
+          (goto-char link-pos)
+          (setq snippet (org-node-context--extract-entry-at-point)))
+        (with-current-buffer (org-mem-org-mode-scratch)
+          (erase-buffer)
+          (insert snippet)
+          (goto-char pos-diff)
+          (run-hooks 'org-node-context-postprocess-hook)
+          ;; Finally font-lock now that we are in a tiny buffer that
+          ;; contains only the snippet that needs to be font-locked, not the
+          ;; entire source file.
+          (font-lock-ensure)
+          (buffer-string))))))
 
 (defun org-node-context--extract-entry-at-point ()
   "Return whole entry at point as a string, including heading if any."
@@ -499,15 +487,12 @@ entry has no ID."
   "Whether to sync cached backlink previews to disk.
 The disk location is `org-node-data-dir'.
 
-This allows the context buffer created by \\[org-node-context-raise] to
-show up more instantly, even the first time it renders a given set of
-backlinks.
-
 Here\\='s how you test whether this is noticeable on your system:
-1. Open a file with many subtree nodes
-2. Collapse them all (i.e. S-TAB until you see only the headings)
-3. Have a context buffer open with `org-node-context-follow-mode'
-4. Hold the C-n or <down> key."
+1. Restart Emacs
+2. Open a file with many subtree nodes
+3. Collapse them all (i.e. S-TAB until you see only the headings)
+4. Have a context buffer open with `org-node-context-follow-mode'
+5. Hold the \\[next-line] key."
   :type 'boolean
   :package-version '(org-node . "2.0.0"))
 
