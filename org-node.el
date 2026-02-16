@@ -824,7 +824,7 @@ rather than twice."
 Ensure that modes `org-node-cache-mode' and `org-mem-updater-mode' are
 enabled.  If FORCE, trigger org-mem to rebuild cache.  If BLOCK and a
 cache build is underway \(perhaps started by FORCE), block Emacs until
-it finishes \(or 10 seconds elapse\).
+it finishes \(or 60 seconds elapse\).
 
 If cache has never been built, act as if both FORCE and BLOCK.
 
@@ -871,7 +871,7 @@ something to change the facts on the ground just prior."
 (defcustom org-node-file-timestamp-format ""
   "Passed to `format-time-string' to prepend to filenames.
 
-Beware that this setting is an ''attractive nuisance''.
+Beware that this setting is an ``attractive nuisance''.
 Changing it leads to lots of possibly unwanted renames if you have
 `org-node-rename-file-by-title' on a hook, and in any case requires
 manual intervention for pre-existing files.
@@ -1351,7 +1351,7 @@ On match, the return value is always a string."
 (defun org-node--safe-ensure-blank-line ()
   "Ensure point is in a blank line or a new blank line below current.
 Place point after any indentation."
-  ;; Don't `newline-and-indent', it runs amok near a list.
+  ;; Don't `newline-and-indent', it runs amok near an Org list.
   (let ((col (progn (back-to-indentation) (current-indentation))))
     (unless (eolp) (goto-char (pos-eol)) (newline) (indent-to col))))
 
