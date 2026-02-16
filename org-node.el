@@ -19,7 +19,7 @@
 ;; URL:      https://github.com/meedstrom/org-node
 ;; Created:  2024-04-13
 ;; Keywords: org, hypermedia
-;; Package-Requires: ((emacs "29.1") (llama "0.5.0") (org-mem "0.29.1") (magit-section "4.3.0"))
+;; Package-Requires: ((emacs "29.1") (llama "0.5.0") (org-mem "0.29.2") (magit-section "4.3.0"))
 
 ;;; Commentary:
 

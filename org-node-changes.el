@@ -75,7 +75,7 @@ hardcoded strings."
 (require 'org-mem-updater)
 
 (if (or (not (boundp 'org-mem-internal-version))
-        (< org-mem-internal-version 30))
+        (< org-mem-internal-version 31))
     (display-warning 'org-node "Update org-mem to use this version of org-node"))
 
 (org-node-changes--def-whiny-alias 'org-node--goto                      'org-node-goto                         "3.8.0 (July 2025)" "May 2026")
