@@ -425,7 +425,6 @@ that buffer."
         (insert (org-node-context--get-preview link))
         (insert "\n")))))
 
-(defvar org-node-context--snippet-link)
 (defun org-node-context--get-preview (link)
   "Get a preview snippet from around LINK in its containing file.
 
@@ -498,49 +497,37 @@ Here\\='s how you test whether this is noticeable on your system:
   :package-version '(org-node . "2.0.0"))
 
 (defvar org-node-context--persist-timer (timer-create))
-(defvar org-node-context--last-tbl-state 0)
-(defvar org-node-context--did-init-persist nil)
 
 (defun org-node-context--maybe-init-persistence (&rest _)
   "Try to restore `org-node-context--previews' from disk.
 Then start occasionally syncing back to disk.
 No-op if user option `org-node-context-persist-on-disk' is nil."
-  (when org-node-context-persist-on-disk
-    (unless org-node-context--did-init-persist
-      (setq org-node-context--did-init-persist t)
-      (cancel-timer org-node-context--persist-timer)
-      (setq org-node-context--persist-timer
-            (run-with-idle-timer 50 t #'org-node-context--persist))
-      ;; Load from disk.
-      (when (file-readable-p (org-node-context--persist-file))
-        (with-temp-buffer
-          (insert-file-contents (org-node-context--persist-file))
-          (let ((data (read (current-buffer))))
-            (when (hash-table-p data)
-              (setq org-node-context--last-tbl-state (hash-table-count data))
-              (setq org-node-context--previews data))))))))
+  (when (and org-node-context-persist-on-disk
+             (hash-table-empty-p org-node-context--previews))
+    (cancel-timer org-node-context--persist-timer)
+    (setq org-node-context--persist-timer
+          (run-with-idle-timer 30 t #'org-node-context--persist))
+    ;; Load from disk.
+    (when (file-readable-p (org-node-context--persistence-file))
+      (with-temp-buffer
+        (insert-file-contents (org-node-context--persistence-file))
+        (let ((data (read (current-buffer))))
+          (when (hash-table-p data)
+            (setq org-node-context--previews data)))))))
 
-(defun org-node-context--persist-file ()
+(defun org-node-context--persistence-file ()
   "Return path to file that caches previews between sessions."
   (mkdir org-node-data-dir t)
-  (file-name-concat org-node-data-dir "org-node-backlink-previews.eld"))
+  (expand-file-name "org-node-backlink-previews.eld" org-node-data-dir))
 
 (defun org-node-context--persist ()
   "Sync all cached previews to disk."
+  (org-node-context--clean-stale-previews)
   (if org-node-context-persist-on-disk
-      ;; Only proceed if table has gained new entries.
-      ;; NOTE: Does not proceed if there are merely new previews in existing
-      ;;       entries, but it's good enough this way.
-      (when (not (eq org-node-context--last-tbl-state
-                     (hash-table-count org-node-context--previews)))
-        (org-node-context--clean-stale-previews)
-        (setq org-node-context--last-tbl-state
-              (hash-table-count org-node-context--previews))
-        (with-temp-file (org-node-context--persist-file)
-          (let ((print-length nil))
-            (prin1 org-node-context--previews (current-buffer)))))
-    (cancel-timer org-node-context--persist-timer)
-    (setq org-node-context--did-init-persist nil)))
+      (with-temp-file (org-node-context--persistence-file)
+        (let ((print-length nil))
+          (prin1 org-node-context--previews (current-buffer))))
+    (cancel-timer org-node-context--persist-timer)))
 
 (provide 'org-node-context)
 
