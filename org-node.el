@@ -7,7 +7,7 @@
 ;; URL:      https://github.com/meedstrom/org-node
 ;; Created:  2024-04-13
 ;; Keywords: org, hypermedia
-;; Package-Requires: ((emacs "29.1") (llama "1.0") (magit-section "4.3.0") (org-mem "0.32.0"))
+;; Package-Requires: ((emacs "29.1") (cond-let "0.2") (llama "1.0") (magit-section "4.3.0") (org-mem "0.32.0"))
 
 ;;; Commentary:
 
@@ -130,6 +130,7 @@
 (require 'cl-lib)
 (require 'fileloop)
 (require 'llama)
+(require 'cond-let)
 (require 'org-faces)
 (require 'org-mem)
 (require 'org-mem-updater)
@@ -486,11 +487,11 @@ aliases."
 (defun org-node-prepend-olp (node title)
   "Prepend NODE\\='s outline path to TITLE."
   (list title
-        (if-let* ((fontified-ancestors
-                   (cl-loop
-                    for ancestor in (org-mem-olpath-with-file-title node)
-                    collect
-                    (propertize ancestor 'face 'org-node-parent))))
+        (if-let ((fontified-ancestors
+                  (cl-loop
+                   for ancestor in (org-mem-olpath-with-file-title node)
+                   collect
+                   (propertize ancestor 'face 'org-node-parent))))
             (concat (string-join fontified-ancestors " > ") " > ")
           "")
         ""))
@@ -697,7 +698,7 @@ used as INITIAL-INPUT in `completing-read'."
   (when (and (org-mem-entry-id entry)
              (funcall org-node-filter-fn entry))
     (dolist (ref (org-mem-entry-roam-refs entry))
-      (puthash (concat (when-let* ((type (gethash ref org-mem--roam-ref<>type)))
+      (puthash (concat (when-let ((type (gethash ref org-mem--roam-ref<>type)))
                          (propertize (concat type ":") 'face 'org-node-cite-type))
                        (propertize ref 'face 'org-node-cite))
                entry
@@ -1275,7 +1276,7 @@ type the name of a node that does not exist.  That enables this
   ;; expansions %(org-capture-get :title) and %(org-capture-get :id) in the
   ;; template string.
   (apply #'org-capture-put (org-node-capture-infer-title-etc))
-  (if-let* ((node (org-capture-get :existing-node)))
+  (if-let ((node (org-capture-get :existing-node)))
       (org-node-goto node t)
     (org-node-new-file (org-capture-get :title)
                        (org-capture-get :id))
@@ -2245,8 +2246,8 @@ user quits, do not apply any modifications."
             (setq default-directory
                   (read-directory-name
                    "Directory with Org notes to operate on: "))))
-      (when-let* ((bufs (seq-filter (##string-search "*grep*" (buffer-name %))
-                                    (buffer-list))))
+      (when-let ((bufs (seq-filter (##string-search "*grep*" (buffer-name %))
+                                   (buffer-list))))
         (when (yes-or-no-p "Kill other *grep* buffers to be sure this works?")
           (mapc #'kill-buffer bufs)))
       (let* ((filename (file-relative-name (read-file-name "File to rename: ")))
@@ -2917,7 +2918,7 @@ As bonus, do not land on an inlinetask, seek a real heading."
 (defun org-node-complete-at-point ()
   "Expand word at point to a known node title, and linkify.
 Designed for `completion-at-point-functions'."
-  (when-let* ((bounds (bounds-of-thing-at-point 'word)))
+  (when-let ((bounds (bounds-of-thing-at-point 'word)))
     (and (not (org-in-src-block-p))
          (not (save-match-data (org-in-regexp org-link-any-re)))
          (list (car bounds)
@@ -2926,7 +2927,7 @@ Designed for `completion-at-point-functions'."
                :exclusive 'no
                :exit-function
                (lambda (text _)
-                 (when-let* ((id (gethash text org-mem--title<>id)))
+                 (when-let ((id (gethash text org-mem--title<>id)))
                    (atomic-change-group
                      (delete-char (- (length text)))
                      (insert (org-link-make-string (concat "id:" id) text)))
@@ -2961,7 +2962,7 @@ the same link in its ROAM_REFS property, visit that node rather than
 following the link normally.
 
 If already visiting that node, then follow the link normally."
-  (when-let* ((url (thing-at-point 'url)))
+  (when-let ((url (thing-at-point 'url)))
     ;; Rarely more than one valid target
     (let* ((target (car (org-mem--split-roam-refs-field url)))
            (found (cl-loop for node in (org-mem-all-id-nodes)
@@ -3450,3 +3451,15 @@ ENTRY should be an `org-mem-entry' object."
 (provide 'org-node)
 
 ;;; org-node.el ends here
+
+;; Local Variables:
+;; checkdoc-spellcheck-documentation-flag: nil
+;; checkdoc-verb-check-experimental-flag: nil
+;; emacs-lisp-docstring-fill-column: 72
+;; read-symbol-shorthands: (("and$"      . "cond-let--and$")
+;;                          ("and>"      . "cond-let--and>")
+;;                          ("and-let"   . "cond-let--and-let")
+;;                          ("if-let"    . "cond-let--if-let")
+;;                          ("when-let"  . "cond-let--when-let")
+;;                          ("while-let" . "cond-let--while-let"))
+;; End:
