@@ -560,9 +560,6 @@ This permits \\[org-node-seq-dispatch] to work."
       (progn
         (org-node-cache-ensure t)
         (org-node-seq--reset)
-        ;; FIXME: A new node (cached w `org-mem-updater-ensure-id-node-at-point-known')
-        ;;        eventually disappears from cache if its buffer is never
-        ;;        saved, and then the node seq stops working
         (add-hook 'org-node-creation-hook        #'org-node-seq--add-item)
         (add-hook 'org-mem-post-full-scan-functions #'org-node-seq--reset 50)
         ;; Put ourselves in front of org-roam-dailies unhygienic hook.

@@ -111,7 +111,6 @@
 (declare-function org-mem-list--pop-to-tabulated-buffer "org-mem-list")
 (declare-function org-mem-roamy-mk-backlinks "org-mem-roamy")
 (declare-function org-mem-roamy-mk-reflinks "org-mem-roamy")
-(declare-function org-mem-updater-ensure-id-node-at-point-known "org-mem-updater")
 (declare-function org-paste-subtree "org")
 (declare-function org-promote "org")
 (declare-function org-remove-empty-drawer-at "org")
@@ -1094,10 +1093,6 @@ since the default `org-node-file-timestamp-format' is empty."
   :package-version '(org-node . "0.1"))
 
 (unless (featurep 'org-node)
-  ;; REVIEW 2025-11-08: Testing with this commented-out.
-  ;; (add-hook 'org-node-insert-link-hook #'org-mem-updater-ensure-link-at-point-known -50)
-  ;; (add-hook 'org-node-relocation-hook  #'org-mem-updater-ensure-id-node-at-point-known -70)
-  ;; (add-hook 'org-node-creation-hook    #'org-mem-updater-ensure-id-node-at-point-known -70)
   (add-hook 'org-node-creation-hook    #'org-id-get-create -90)
   (add-hook 'org-node-creation-hook    #'org-node-ensure-crtime-property))
 

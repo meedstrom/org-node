@@ -612,10 +612,6 @@ If REMOVE non-nil, remove it instead."
 ;; links with zero Emacs lag, if we instead use something like
 ;; `org-node-backlink--maybe-fix-proactively' after some idle...
 
-;; In fact, it might let us reason more easily about
-;; `org-node-backlink--maybe-fix-proactively' if we stop doing
-;; `org-mem-updater-ensure-link-at-point-known'.
-
 (defun org-node-backlink--add-in-target (&rest _)
   "For known link at point, leave a backlink in the target node."
   (unless (derived-mode-p 'org-mode)
@@ -627,13 +623,6 @@ If REMOVE non-nil, remove it instead."
          target-id target-file)
     ;; In a link such as [[id:abc1234]], TYPE is "id" and PATH is "abc1234".
     (when (and type path)
-      ;; REVIEW 2025-11-08: Testing with this commented-out.
-      ;;
-      ;; Ensure `org-mem--roam-ref<>id' has recent goods, and that
-      ;; `org-node-backlink--fix-nearby' will not
-      ;; later remove the backlink we're adding
-      ;; (org-mem-updater-ensure-id-node-at-point-known)
-      ;; (org-mem-updater-ensure-link-at-point-known)
       (if (equal "id" type)
           ;; A classic backlink
           (progn
