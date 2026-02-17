@@ -41,6 +41,8 @@
 (require 'transient)
 (require 'org-node)
 (require 'org-mem)
+(require 'llama)
+(require 'cond-let)
 (defvar org-node-proposed-seq)
 (defvar org-mem--next-message)
 (declare-function org-entry-get-with-inheritance "org")
@@ -65,7 +67,7 @@ For KEY, NAME and CAPTURE, see `org-node-seq-defs'."
                       (cons (concat sortstr " " (org-mem-entry-title node))
                             (org-mem-entry-id node)))))
     :whereami (lambda ()
-                (when-let* ((sortstr (org-entry-get nil ,prop t))
+                (when-let ((sortstr (org-entry-get nil ,prop t))
                             (node (org-node-at-point)))
                   (concat sortstr " " (org-mem-entry-title node))))
     :prompter (lambda (key)
@@ -210,7 +212,7 @@ The latter uses a sloppy algorithm so not all formats work, see
           (match-string 0 clipped-name)
         ;; Even in a non-daily file, pretend it is a daily if possible,
         ;; to allow entering the sequence at a more relevant date
-        (when-let* ((stamp (org-node-extract-file-name-datestamp path)))
+        (when-let ((stamp (org-node-extract-file-name-datestamp path)))
           (org-node-seq-extract-ymd stamp org-node-file-timestamp-format))))))
 
 ;; TODO: Handle %s, %V, %y...  is there a library?
@@ -702,3 +704,15 @@ not exist."
 (provide 'org-node-seq)
 
 ;;; org-node-seq.el ends here
+
+;; Local Variables:
+;; checkdoc-spellcheck-documentation-flag: nil
+;; checkdoc-verb-check-experimental-flag: nil
+;; emacs-lisp-docstring-fill-column: 72
+;; read-symbol-shorthands: (("and$"      . "cond-let--and$")
+;;                          ("and>"      . "cond-let--and>")
+;;                          ("and-let"   . "cond-let--and-let")
+;;                          ("if-let"    . "cond-let--if-let")
+;;                          ("when-let"  . "cond-let--when-let")
+;;                          ("while-let" . "cond-let--while-let"))
+;; End:

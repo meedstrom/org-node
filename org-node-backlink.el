@@ -35,6 +35,7 @@
 (require 'cl-lib)
 (require 'fileloop)
 (require 'llama)
+(require 'cond-let)
 (require 'org-mem)
 (require 'org-mem-updater)
 (require 'org-node)
@@ -458,7 +459,7 @@ To force an update at any time, use one of these commands:
               (org-node--assert-transclusion-safe)
               (let ((user-is-editing (buffer-modified-p)))
                 (dolist (id (delete-dups ids))
-                  (if-let* ((pos (and id (org-find-property "ID" id))))
+                  (if-let ((pos (and id (org-find-property "ID" id))))
                       (progn (goto-char pos)
                              (org-node-backlink--fix-nearby))
                     (error "Could not find ID %s in file %s" id file)))
@@ -493,7 +494,7 @@ Or if KIND is symbol `update-drawers', `del-drawers', `update-props', or
 (defun org-node-backlink--fix-nearby-property (&optional remove)
   "Update the :BACKLINKS: property in the current entry.
 If REMOVE is non-nil, remove it instead."
-  (when-let* ((prop-pos (car (org-get-property-block))))
+  (when-let ((prop-pos (car (org-get-property-block))))
     (when (get-text-property prop-pos 'read-only)
       ;; Because `org-entry-put' is so unsafe that it inhibits read-only
       (error "org-node-backlink: Area seems to be read-only at %d in %s"
@@ -642,17 +643,17 @@ If REMOVE non-nil, remove it instead."
         (org-node--assert-transclusion-safe)
         (let ((origin-id (org-entry-get-with-inheritance "ID")))
           (when (and origin-id (not (equal origin-id target-id)))
-            (when-let* ((origin-title
-                         (save-excursion
-                           (without-restriction
-                             (goto-char org-entry-property-inherited-from)
-                             (or (org-get-heading t t t t)
-                                 (org-get-title))))))
+            (when-let ((origin-title
+                        (save-excursion
+                          (without-restriction
+                            (goto-char org-entry-property-inherited-from)
+                            (or (org-get-heading t t t t)
+                                (org-get-title))))))
 
               (org-node--with-quick-file-buffer target-file
                 :about-to-do "Org-node going to add backlink in target of link you just inserted"
                 (org-node--assert-transclusion-safe)
-                (if-let* ((pos (org-find-property "ID" target-id)))
+                (if-let ((pos (org-find-property "ID" target-id)))
                     (progn (goto-char pos)
                            (org-node-backlink--add-nearby origin-id origin-title))
                   (message "`org-node-backlink--add-in-target' could not find ID %s in file %s"
@@ -666,7 +667,7 @@ If REMOVE non-nil, remove it instead."
 
 (defun org-node-backlink--add-to-property (id title)
   "Insert a link with ID and TITLE into nearby :BACKLINKS: property."
-  (when-let* ((prop-pos (car (org-get-property-block))))
+  (when-let ((prop-pos (car (org-get-property-block))))
     (when (get-text-property prop-pos 'read-only)
       ;; Because `org-entry-put' is so unsafe that it inhibits read-only
       (error "org-node-backlink: Area seems to be read-only at %d in %s"
@@ -779,3 +780,15 @@ See Info node `(org-node)'."
 (provide 'org-node-backlink)
 
 ;;; org-node-backlink.el ends here
+
+;; Local Variables:
+;; checkdoc-spellcheck-documentation-flag: nil
+;; checkdoc-verb-check-experimental-flag: nil
+;; emacs-lisp-docstring-fill-column: 72
+;; read-symbol-shorthands: (("and$"      . "cond-let--and$")
+;;                          ("and>"      . "cond-let--and>")
+;;                          ("and-let"   . "cond-let--and-let")
+;;                          ("if-let"    . "cond-let--if-let")
+;;                          ("when-let"  . "cond-let--when-let")
+;;                          ("while-let" . "cond-let--while-let"))
+;; End:
