@@ -25,6 +25,8 @@
 (require 'magit-section)
 (require 'repeat)
 (require 'map)
+(require 'cond-let)
+(require 'llama)
 (eval-when-compile
   (require 'org)
   (require 'org-node)
@@ -105,7 +107,7 @@ time that context was shown in a visible window.  Including:
 (defun org-node-context-history-go-back ()
   "Show the last context."
   (interactive () org-node-context-mode)
-  (when-let* ((last (pop org-node-context--past)))
+  (when-let ((last (pop org-node-context--past)))
     (push org-node-context--current
           org-node-context--future)
     (org-node-context--refresh nil last t)))
@@ -113,7 +115,7 @@ time that context was shown in a visible window.  Including:
 (defun org-node-context-history-go-forward ()
   "Show the next context."
   (interactive () org-node-context-mode)
-  (when-let* ((next (pop org-node-context--future)))
+  (when-let ((next (pop org-node-context--future)))
     (push org-node-context--current
           org-node-context--past)
     (org-node-context--refresh nil next t)))
@@ -138,7 +140,7 @@ time that context was shown in a visible window.  Including:
 ;; TODO: Solve problem if truncating away a :END: or #+END_... but not #+BEGIN,
 ;; or vice versa.
 ;; (defun org-node-context--truncate-buffer ()
-;;   (when-let* ((cutoff org-node-context-truncate-to-lines))
+;;   (when-let ((cutoff org-node-context-truncate-to-lines))
 ;;     (when (> (line-number-at-pos) cutoff)
 ;;       (forward-line (- cutoff))
 ;;       (delete-region (point-min) (point)))
@@ -315,7 +317,7 @@ Repeatable on the last key of a key sequence if
 (defun org-node-context-toggle ()
   "Show the main context buffer, or hide it if already showing."
   (interactive)
-  (if-let* ((win (get-buffer-window org-node-context-main-buffer 'visible)))
+  (if-let ((win (get-buffer-window org-node-context-main-buffer 'visible)))
       (quit-window nil win)
     (let ((buf (get-buffer-create org-node-context-main-buffer)))
       (when (derived-mode-p 'org-mode)
@@ -347,7 +349,7 @@ otherwise call the latter."
 
 (defun org-node-context--displaying-p (buf id)
   "Is BUF displaying context for ID?"
-  (when-let* ((buf (get-buffer (or buf org-node-context-main-buffer))))
+  (when-let ((buf (get-buffer (or buf org-node-context-main-buffer))))
     (equal id (buffer-local-value 'org-node-context--current buf))))
 
 (defun org-node-context-refresh-this-buffer (&rest _)
@@ -396,12 +398,12 @@ that buffer."
         (setq header-line-format
               (concat "Context for \"" (org-mem-entry-title node) "\""))
         (magit-insert-section (org-node-context :root)
-          (when-let* ((links (org-mem-id-links-to-entry node)))
+          (when-let ((links (org-mem-id-links-to-entry node)))
             (magit-insert-section (org-node-context :id-links)
               (magit-insert-heading "ID backlinks:")
               (org-node-context--insert-backlink-sections links)
               (insert "\n")))
-          (when-let* ((links (org-mem-roam-reflinks-to-entry node)))
+          (when-let ((links (org-mem-roam-reflinks-to-entry node)))
             (magit-insert-section (org-node-context :reflinks)
               (magit-insert-heading "Ref backlinks:")
               (org-node-context--insert-backlink-sections links)
@@ -413,7 +415,7 @@ that buffer."
   "Insert a section displaying a preview of LINK."
   (dolist (link (sort links #'org-node-context--origin-title-lessp))
     (let* ((entry (org-node-context--get-link-origin link))
-           (breadcrumbs (if-let* ((olp (org-mem-olpath-with-file-title entry)))
+           (breadcrumbs (if-let ((olp (org-mem-olpath-with-file-title entry)))
                             (string-join olp " > ")
                           "Top")))
       (magit-insert-section (org-node-context link)
@@ -534,3 +536,15 @@ No-op if user option `org-node-context-persist-on-disk' is nil."
 (provide 'org-node-context)
 
 ;;; org-node-context.el ends here
+
+;; Local Variables:
+;; checkdoc-spellcheck-documentation-flag: nil
+;; checkdoc-verb-check-experimental-flag: nil
+;; emacs-lisp-docstring-fill-column: 72
+;; read-symbol-shorthands: (("and$"      . "cond-let--and$")
+;;                          ("and>"      . "cond-let--and>")
+;;                          ("and-let"   . "cond-let--and-let")
+;;                          ("if-let"    . "cond-let--if-let")
+;;                          ("when-let"  . "cond-let--when-let")
+;;                          ("while-let" . "cond-let--while-let"))
+;; End:
