@@ -1045,14 +1045,17 @@ substring \"/home/me\" referring to the same location."
 ;;       change the basename.  So, conditionally call `org-node-file-slug-fn'
 ;;       here, then use `read-file-name' rather than `read-directory-name'.
 ;;       But first we need some refactoring elsewhere.
-(defun org-node-guess-or-ask-dir (prompt)
+(defun org-node-guess-or-ask-dir (prompt &optional ask-always)
   "Maybe prompt for a directory, and if so, use string PROMPT.
 Behavior depends on user option `org-node-file-directory-ask'."
-  (or (and (null org-node-file-directory-ask)
-           (org-node-guess-dir))
-      (if (stringp org-node-file-directory-ask)
-          org-node-file-directory-ask
-        (read-directory-name prompt))))
+  (if ask-always (read-directory-name prompt)
+    ;; The `or' clause allows starting out with zero ID-nodes
+    ;; https://github.com/meedstrom/org-node/issues/154
+    (or (and (null org-node-file-directory-ask)
+             (org-node-guess-dir))
+        (if (stringp org-node-file-directory-ask)
+            org-node-file-directory-ask
+          (read-directory-name prompt)))))
 
 
 ;;;; Creation functions
@@ -1169,27 +1172,33 @@ To operate on a node after creating it, hook onto
 (defun org-node-new-file (&optional title id)
   "Create a new file with a new node.
 Designed for `org-node-creation-fn'."
-  (unless title (or (setq title org-node-proposed-title)
-                    (error "Proposed title was nil")))
-  (unless id (or (setq id org-node-proposed-id)
-                 (error "Proposed ID was nil")))
-  (org-node-pop-to-fresh-file-buffer title)
-  (if org-node-prefer-with-heading
-      (insert "* " title
-              "\n:PROPERTIES:"
+  (or (and title (setq org-node-proposed-title title))
+      (setq title org-node-proposed-title)
+      (error "Proposed title was nil"))
+  (or (and id (setq org-node-proposed-id id))
+      (setq id org-node-proposed-id)
+      (error "Proposed ID was nil"))
+  (org-node-new-file-parameterized (list :title title :id id)))
+
+(defun org-node-new-file-parameterized (plist)
+  (pcase-let (((map :title :id :path :ask-path) plist))
+    (org-node-pop-to-fresh-file-buffer title plist)
+    (if org-node-prefer-with-heading
+        (insert "* " title
+                "\n:PROPERTIES:"
+                "\n:ID:       " id
+                "\n:END:"
+                "\n")
+      (insert ":PROPERTIES:"
               "\n:ID:       " id
               "\n:END:"
-              "\n")
-    (insert ":PROPERTIES:"
-            "\n:ID:       " id
-            "\n:END:"
-            "\n#+title: " title
-            "\n"))
-  (goto-char (point-max))
-  (push (current-buffer) org-node--new-unsaved-buffers)
-  (run-hooks 'org-node-creation-hook))
+              "\n#+title: " title
+              "\n"))
+    (goto-char (point-max))
+    (push (current-buffer) org-node--new-unsaved-buffers)
+    (run-hooks 'org-node-creation-hook)))
 
-(defun org-node-pop-to-fresh-file-buffer (title)
+(defun org-node-pop-to-fresh-file-buffer (title &optional plist)
   "Open a buffer that visits a file for a node to be named TITLE.
 
 May open a pre-existing buffer even if it was not yet written to disk,
@@ -1198,23 +1207,29 @@ function is meant as a subroutine for creating a new file-level node.
 To merely visit an existing node, see `org-node-goto-id'.
 
 If the file already exists, this also attempts a `revert-buffer'."
-  (let* ((dir (org-node-guess-or-ask-dir "New file in which directory? "))
-         (file (file-name-concat dir (org-node-title-to-basename title)))
-         (buf (progn (mkdir dir t)
-                     (or (find-buffer-visiting file)
-                         (find-file-noselect file)))))
-    (pop-to-buffer-same-window buf)
-    (cl-assert (eq (current-buffer) buf))
-    (cl-flet ((assert-empty ()
-                (when (not (length= (buffer-string) 0))
-                  (let ((msg (format "Resetting cache because file seems to already have contents: %s"
-                                     file)))
-                    (org-mem-reset t msg)
-                    (user-error "%s" msg)))))
-      (assert-empty)
-      (when (file-exists-p file)
-        (revert-buffer)
-        (assert-empty)))))
+  (pcase-let (((map :path :ask-path) plist))
+    (let* ((dir (or (and path
+		         (functionp path)
+		         (funcall path))
+                    path
+                    (org-node-guess-or-ask-dir "New file in which directory? "
+                                               ask-path)))
+           (file (file-name-concat dir (org-node-title-to-basename title)))
+           (buf (progn (mkdir dir t)
+                       (or (find-buffer-visiting file)
+                           (find-file-noselect file)))))
+      (pop-to-buffer-same-window buf)
+      (cl-assert (eq (current-buffer) buf))
+      (cl-flet ((assert-empty ()
+                  (when (not (length= (buffer-string) 0))
+                    (let ((msg (format "Resetting cache because file seems to already have contents: %s"
+                                       file)))
+                      (org-mem-reset t msg)
+                      (user-error "%s" msg)))))
+        (assert-empty)
+        (when (file-exists-p file)
+          (revert-buffer)
+          (assert-empty))))))
 
 (defun org-node-new-via-roam-capture ()
   "Call `org-roam-capture-' with predetermined arguments.
@@ -1266,9 +1281,12 @@ type the name of a node that does not exist.  That enables this
   (apply #'org-capture-put (org-node-capture-infer-title-etc))
   (if-let* ((node (org-capture-get :existing-node)))
       (org-node-goto node t)
-    (org-node-new-file (org-capture-get :title)
-                       (org-capture-get :id))
-    (goto-char (point-min)))
+    (let ((parent-id (plist-get org-capture-plist :parent-id-if-new)))
+      (if parent-id
+          (if-let ((parent-node (org-mem-entry-by-id parent-id)))
+              (org-node-goto parent-node)
+            (user-error "No node found with ID: %s" parent-id))
+	(org-node-new-file-parameterized org-capture-plist))))
   (when (eq (org-capture-get :type) 'plain)
     (let ((file-level-node (org-before-first-heading-p)))
       (if (org-capture-get :prepend)
@@ -1288,27 +1306,42 @@ type the name of a node that does not exist.  That enables this
 
 If possible, determine :title and :id from current values of
 `org-node-proposed-title' and `org-node-proposed-id'.
+Otherwise, try to get them from the capture template\\'s plist.
 Otherwise, prompt the user for a title.
+
 Finally, if the title matches an existing node, set :existing-node to
 that node \(an `org-mem-entry' object\), otherwise leave it at nil."
   (let (title id node)
     (if org-node-proposed-title
         ;; Was presumably called from wrapper `org-node-create', so the user
-        ;; had typed the title and no such node exists yet.
+        ;; had typed a title.
         (setq title org-node-proposed-title
               id org-node-proposed-id
               node (org-mem-entry-by-id id))
-      ;; Was presumably called from bare `org-capture', which means the user
-      ;; has not yet typed the title; let them type it now.
-      (let ((input (org-node-read-candidate nil t)))
-        (when (string-blank-p input)
-          (setq input (funcall org-node-blank-input-title-generator)))
-        (setq node (gethash input org-node--candidate<>entry))
-        (if node
-            (setq title (org-mem-entry-title node)
-                  id (org-mem-entry-id node))
-          (setq title input
-                id (org-id-new)))))
+      ;; Was presumably called from bare `org-capture'.
+      (when-let* ((pre-specified-title (org-capture-get :title)))
+        (setq title (if (functionp pre-specified-title)
+                        (funcall pre-specified-title)
+                      pre-specified-title))
+        (setq node (org-node-guess-node-by-title title)))
+      (when-let* ((pre-specified-id (org-capture-get :id)))
+        (setq id (if (functionp pre-specified-id)
+                     (funcall pre-specified-id)
+                   pre-specified-id))
+        (setq node (org-mem-entry-by-id id)))
+      (unless title
+        ;; User has not yet typed the title and there was no :title lambda to
+        ;; generate one; let them type it now.
+        (let ((input (org-node-read-candidate nil t)))
+          (when (string-blank-p input)
+            (setq input (funcall org-node-blank-input-title-generator)))
+          (setq node (gethash input org-node--candidate<>entry))
+          (setq title (if node
+                          (org-mem-entry-title node)
+                        input))))
+      (setq id (if node
+                   (org-mem-entry-id node)
+                 (or id (org-id-new)))))
     (cl-assert title)
     (cl-assert id)
     (list :title title :id id :existing-node node)))
