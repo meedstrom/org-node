@@ -1051,29 +1051,29 @@ function is meant as a subroutine for creating a new file-level node.
 To merely visit an existing node, see `org-node-goto-id'.
 
 If the file already exists, this also attempts a `revert-buffer'."
-  (let* (
-	 (dir (or (and (plist-get plist :path)
-		       (functionp (plist-get plist :path))
-		       (funcall (plist-get plist :path)))
-	          (plist-get plist :path)
-                  (org-node-guess-or-ask-dir "New file in which directory? "
-                                             (plist-get plist :ask-path))))
-         (file (file-name-concat dir (org-node-title-to-basename title)))
-         (buf (progn (mkdir dir t)
-                     (or (find-buffer-visiting file)
-                         (find-file-noselect file)))))
-    (pop-to-buffer-same-window buf)
-    (cl-assert (eq (current-buffer) buf))
-    (cl-flet ((assert-empty ()
-                (when (not (length= (buffer-string) 0))
-                  (let ((msg (format "Resetting cache because file seems to already have contents: %s"
-                                     file)))
-                    (org-mem-reset t msg)
-                    (user-error "%s" msg)))))
-      (assert-empty)
-      (when (file-exists-p file)
-        (revert-buffer)
-        (assert-empty)))))
+  (pcase-let (((map :path :ask-path) plist))
+    (let* ((dir (or (and path
+		         (functionp path)
+		         (funcall path))
+                    path
+                    (org-node-guess-or-ask-dir "New file in which directory? "
+                                               ask-path)))
+           (file (file-name-concat dir (org-node-title-to-basename title)))
+           (buf (progn (mkdir dir t)
+                       (or (find-buffer-visiting file)
+                           (find-file-noselect file)))))
+      (pop-to-buffer-same-window buf)
+      (cl-assert (eq (current-buffer) buf))
+      (cl-flet ((assert-empty ()
+                  (when (not (length= (buffer-string) 0))
+                    (let ((msg (format "Resetting cache because file seems to already have contents: %s"
+                                       file)))
+                      (org-mem-reset t msg)
+                      (user-error "%s" msg)))))
+        (assert-empty)
+        (when (file-exists-p file)
+          (revert-buffer)
+          (assert-empty))))))
 
 (defun org-node-new-via-roam-capture ()
   "Call `org-roam-capture-' with predetermined arguments.
@@ -1139,7 +1139,7 @@ type the name of a node that does not exist.  That enables this
   ;; template string.
   (apply #'org-capture-put (org-node-capture-infer-title-etc))
   (if-let* ((node (org-capture-get :existing-node)))
-    (org-node-goto node t)
+      (org-node-goto node t)
     (let ((parent-id (plist-get org-capture-plist :parent-id-if-new)))
       (if parent-id
           (if-let ((parent-node (org-mem-entry-by-id parent-id)))
@@ -1176,12 +1176,12 @@ that node \(an `org-mem-entry' object\), otherwise leave it at nil."
               id org-node-proposed-id
               node (org-mem-entry-by-id id))
       ;; Was presumably called from bare `org-capture'.
-      (when-let* ((pre-specified-title (org-capture-get :title)))
+      (when-let ((pre-specified-title (org-capture-get :title)))
         (setq title (if (functionp pre-specified-title)
                         (funcall pre-specified-title)
                       pre-specified-title))
         (setq node (org-node-guess-node-by-title title)))
-      (when-let* ((pre-specified-id (org-capture-get :id)))
+      (when-let ((pre-specified-id (org-capture-get :id)))
         (setq id (if (functionp pre-specified-id)
                      (funcall pre-specified-id)
                    pre-specified-id))
