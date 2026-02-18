@@ -2863,7 +2863,10 @@ sequences of your choice, in order of importance:
 
 (defun org-node-goto (node &optional exact)
   "Visit file containing NODE, and ensure point is inside NODE.
-EXACT means always move point to NODE top."
+EXACT means always move point to NODE top.
+
+If NODE lacks an ID, this may not go to the correct buffer position,
+especially if the buffer is unsaved."
   (cl-assert (org-mem-entry-p node))
   (when (numberp exact)
     (error "Function org-node-goto no longer takes a position argument"))
@@ -2871,6 +2874,7 @@ EXACT means always move point to NODE top."
             (buf (or (find-buffer-visiting file)
                      (and (file-exists-p file)
                           (find-file-noselect file)))))
+      ;; Prefer ID in case pos has changed
       (let* ((id (org-mem-id node))
              (pos (or (and id
                            (with-current-buffer buf
