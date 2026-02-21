@@ -1664,6 +1664,7 @@ keywords."
                   (number-to-string
                    (org-get-valid-level (or (org-current-level) 0) +1))))))))
 
+;;;###autoload
 (defun org-node-insert-transclusion-as-subtree (&optional node arg)
   "Insert a subheading, link, newline and transclusion.
 Prompt for NODE if needed.
