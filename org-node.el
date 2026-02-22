@@ -1451,11 +1451,13 @@ Repeatable on the last key of a key sequence if
                        (org-mem-all-files)
                        nil)))))
 
+;;;###autoload
 (defun org-node-customize ()
   "Display the `org-node' customization group."
   (interactive)
   (customize-group 'org-node))
 
+;;;###autoload
 (defun org-node-help ()
   "Display the Info manual for \"(org-node)\"."
   (interactive)
@@ -1706,6 +1708,7 @@ Prefix argument ARG as in `org-insert-subheading'."
             (insert "#+transclude: " link " :level auto :no-first-heading"))
           (run-hooks 'org-node-insert-link-hook))))))
 
+;;;###autoload
 (defun org-node-insert-raw-link ()
   "Insert input at point, completing to any link ever seen in Org.
 Works in non-Org buffers."
@@ -2262,6 +2265,7 @@ user quits, do not apply any modifications."
 
 ;;;; Commands 5: Listing things
 
+;;;###autoload
 (defun org-node-list-example (&optional _deprecated-arg)
   "Display data from a randomly selected `org-mem-entry' object.
 Repeatable on the last key of a key sequence if
@@ -2367,6 +2371,7 @@ Or from ENTRY if provided."
       (set-window-start (selected-window) (point))
       (forward-line (- win-line win-start-line)))))
 
+;;;###autoload
 (defun org-node-list-reflinks ()
   "List all reflinks and the ID-nodes in which they were found.
 
@@ -2410,6 +2415,7 @@ one of them is associated with a ROAM_REFS property."
       (message "No links found"))))
 
 ;; TODO: Make something like a find-dired buffer, handy!
+;;;###autoload
 (defun org-node-list-files ()
   "List files and associated information."
   (interactive)
@@ -2432,6 +2438,7 @@ one of them is associated with a ROAM_REFS property."
                   (if props (prin1-to-string props) ""))))
    :reverter #'org-node-list-files))
 
+;;;###autoload
 (defun org-node-list-feedback-arcs ()
   "Show a feedback-arc-set of forward id-links.
 
@@ -2518,6 +2525,8 @@ from ID links found in `org-mem--target<>links'."
 
 (defvar org-node--lint-remaining-files nil)
 (defvar org-node--lint-warnings nil)
+
+;;;###autoload
 (defun org-node-lint-all-files ()
   "Run `org-lint' on all known Org files, and report results."
   (interactive)

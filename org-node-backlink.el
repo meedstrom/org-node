@@ -252,6 +252,7 @@ That means the second part of a [[id][description]]."
 
 ;;; Commands
 
+;;;###autoload
 (defun org-node-backlink-mass-update-drawers ()
   "Add or update backlinks drawers in all files."
   (interactive)
@@ -259,6 +260,7 @@ That means the second part of a [[id][description]]."
     (user-error "Asked to update :BACKLINKS: drawers, but `org-node-backlink-do-drawers' is nil"))
   (org-node-backlink--fix-all-files 'update-drawers))
 
+;;;###autoload
 (defun org-node-backlink-mass-update-props ()
   "Add or update backlinks properties in all files."
   (interactive)
@@ -266,11 +268,13 @@ That means the second part of a [[id][description]]."
     (user-error "Asked to update :BACKLINKS: properties, but `org-node-backlink-do-drawers' is t"))
   (org-node-backlink--fix-all-files 'update-props))
 
+;;;###autoload
 (defun org-node-backlink-mass-delete-drawers ()
   "Delete all backlinks drawers in all files."
   (interactive)
   (org-node-backlink--fix-all-files 'del-drawers))
 
+;;;###autoload
 (defun org-node-backlink-mass-delete-props ()
   "Delete all backlinks properties in all files."
   (interactive)
@@ -355,6 +359,8 @@ Do `org-node-backlink-fix-buffer', then maybe save, maybe kill buffer."
     t))
 
 (defvar org-node-backlink--checked nil)
+
+;;;###autoload
 (defun org-node-backlink-fix-buffer (&optional kind)
   "Update :BACKLINKS: properties or drawers in all nodes in buffer.
 Let user option `org-node-backlink-do-drawers' determine which.
