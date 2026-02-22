@@ -1656,13 +1656,8 @@ keywords."
                  (or (and org-node-custom-link-format-fn
                           node
                           (funcall org-node-custom-link-format-fn node))
-                     title)))
-        ;; Condition on a recent version of org-transclusion
-        (if (fboundp 'org-transclusion-keyword-value-no-first-heading)
-            (insert " :level auto")
-          (insert " :level "
-                  (number-to-string
-                   (org-get-valid-level (or (org-current-level) 0) +1))))))))
+                     title))
+                " :level auto")))))
 
 ;;;###autoload
 (defun org-node-insert-transclusion-as-subtree (&optional node arg)
@@ -1708,13 +1703,7 @@ Prefix argument ARG as in `org-insert-subheading'."
           (insert link)
           (save-excursion
             (newline-and-indent)
-            (insert "#+transclude: " link)
-            ;; Condition on a recent version of org-transclusion
-            (if (fboundp 'org-transclusion-keyword-value-no-first-heading)
-                (insert " :level auto :no-first-heading")
-              (insert " :level "
-                      (number-to-string
-                       (org-get-valid-level (or (org-current-level) 0) +1)))))
+            (insert "#+transclude: " link " :level auto :no-first-heading"))
           (run-hooks 'org-node-insert-link-hook))))))
 
 (defun org-node-insert-raw-link ()
