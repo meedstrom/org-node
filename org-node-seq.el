@@ -370,9 +370,37 @@ nothing."
                 (lambda (item1 item2)
                   (string> (car item1) (car item2)))))))))
 
+;; TODO: Could the :creator just check if the buffer is unmodified and empty?
+;;       But possible pitfall that the user may have important stuff in undo.
+(defun org-node-seq--kill-blank-unsaved-buffers (&rest _)
+  "Kill buffers created by org-node that have always been blank.
+
+This exists to allow you to create a node, especially a journal note for
+today via package \"org-node-seq\", change your mind, do an `undo' to
+empty the buffer, then browse to the previous day\\='s note.  When later
+you want to create today\\='s note after all, the seq\\='s :creator
+function should be made to run again, but it will not do so if the
+buffer already exists, so the buffer stays blank.  Thus this hook."
+  (unless (minibufferp)
+    (dolist (buf org-node--new-unsaved-buffers)
+      (if (or (not (buffer-live-p buf))
+              (file-exists-p (buffer-file-name buf)))
+          ;; Stop checking the buffer
+          (setq org-node--new-unsaved-buffers
+                (delq buf org-node--new-unsaved-buffers))
+        (with-current-buffer buf
+          (when (and (not (get-buffer-window buf t))
+                     (not (buffer-modified-p))
+                     (string-blank-p (buffer-string)))
+            (when buffer-auto-save-file-name
+              ;; Hopefully throw away a stale autosave
+              ;; since its existence annoys the user on re-creating the file
+              (do-auto-save nil t))
+            (kill-buffer buf)))))))
+
 (defun org-node-seq--jump (key)
   "Prompt for and jump to an entry in node seq identified by KEY."
-  (org-node--kill-blank-unsaved-buffers)
+  (org-node-seq--kill-blank-unsaved-buffers)
   (require 'org)
   (let* ((seq (cdr (assoc key org-node-seqs)))
          (sortstr (funcall (plist-get seq :prompter) key))
@@ -439,7 +467,7 @@ Unlike `org-node-proposed-seq', does not need to revert to nil.")
 (defun org-node-seq-capture-target ()
   "Experimental."
   (org-node-cache-ensure)
-  (org-node--kill-blank-unsaved-buffers)
+  (org-node-seq--kill-blank-unsaved-buffers)
   (let ((key (or org-node-seq--current-key
                  (let* ((valid-keys (mapcar #'car org-node-seq-defs))
                         (elaborations

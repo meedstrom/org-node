@@ -3389,34 +3389,6 @@ Can be handy for user-provided lambdas that must be called a lot."
              fn)
             (t (byte-compile fn))))))
 
-;; TODO: Could the :creator just check if the buffer is unmodified and empty?
-;;       But possible pitfall that the user may have important stuff in undo.
-(defun org-node--kill-blank-unsaved-buffers (&rest _)
-  "Kill buffers created by org-node that have always been blank.
-
-This exists to allow you to create a node, especially a journal note for
-today via package \"org-node-seq\", change your mind, do an `undo' to
-empty the buffer, then browse to the previous day\\='s note.  When later
-you want to create today\\='s note after all, the seq\\='s :creator
-function should be made to run again, but it will not do so if the
-buffer already exists, so the buffer stays blank.  Thus this hook."
-  (unless (minibufferp)
-    (dolist (buf org-node--new-unsaved-buffers)
-      (if (or (not (buffer-live-p buf))
-              (file-exists-p (buffer-file-name buf)))
-          ;; Stop checking the buffer
-          (setq org-node--new-unsaved-buffers
-                (delq buf org-node--new-unsaved-buffers))
-        (with-current-buffer buf
-          (when (and (not (get-buffer-window buf t))
-                     (not (buffer-modified-p))
-                     (string-blank-p (buffer-string)))
-            (when buffer-auto-save-file-name
-              ;; Hopefully throw away a stale autosave
-              ;; since its existence annoys the user on re-creating the file
-              (do-auto-save nil t))
-            (kill-buffer buf)))))))
-
 
 ;;;; Transclusion safety
 
