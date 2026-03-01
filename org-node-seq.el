@@ -34,7 +34,7 @@
 (declare-function org-entry-get-with-inheritance "org")
 (declare-function org-up-heading-or-point-min "org")
 
-;;; Easy wrappers to define a sequence
+;;;; Easy wrappers to define a sequence
 
 ;;;###autoload
 (defun org-node-seq-def-on-any-sort-by-property
@@ -161,7 +161,7 @@ YYYY-MM-DD format, e.g. \"2024-01-31.org\"."
                  (org-node-create sortstr (org-id-new) key)))))
 
 
-;;; Helpers to use in a seq definition
+;;;; Helpers to use in a seq definition
 
 ;;;###autoload
 (defun org-node-seq-try-goto-id (id)
@@ -638,6 +638,9 @@ not exist."
             (concat org-mem--next-message
                     (format " + %.2fs caching org-node-seqs"
                             (float-time (time-since T))))))))
+
+
+;;;; Transient menu
 
 (defun org-node-seq--add-to-dispatch (key name)
   "Use KEY and NAME to add a sequence to the Transient menu."

@@ -23,22 +23,17 @@
 (defvar org-node-major-version 3
   "Number incremented for breaking changes that require reading README.")
 
-(defmacro org-node-changes--def-whiny-alias
-    (old new when removed-by &optional interactive)
+(defmacro org-node-changes--def-whiny-alias (old new when removed-by)
   "Define function OLD as effectively an alias for NEW.
-Also, running OLD will emit a deprecation warning the first time.
-
-If INTERACTIVE, define it as an interactive function.  Optional
-string WHEN says when it was deprecated and REMOVED-BY when it
-may be removed.  When these strings are omitted, fall back on
-hardcoded strings."
+Also, calling OLD will emit a deprecation warning the first time.
+String WHEN says when it was deprecated and REMOVED-BY when it
+may be removed from the package."
   `(let (warned-once)
      (defun ,(cadr old) (&rest args)
        (declare (obsolete ,(cadr new) ,when))
-       ,@(if interactive '((interactive)))
        (unless warned-once
          (setq warned-once t)
-         (lwarn ,old :warning "Obsolete as of %s, will be removed by %s; use `%s' instead. (Check your initfiles)"
+         (lwarn ,old :warning "Obsolete as of %s, will be removed by %s; use `%s' instead. "
                 ,when ,removed-by ,new))
        (apply ,new args))))
 

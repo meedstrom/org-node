@@ -2647,7 +2647,7 @@ That is, if the current entry has no ID but can inherit it from an
 ancestor entry, return the position of that ancestor.
 
 Per org-mem convention, if that ancestor is a so-called file-level node,
-it counts as a level-0 entry with position 1."
+it counts as a level-0 entry with position 1, and this will return 1."
   (or (and (org-entry-get-with-inheritance "ID")
            (marker-position org-entry-property-inherited-from))
       ;; Ignore narrow bc `org-entry-get-with-inheritance' does too.
@@ -2676,6 +2676,8 @@ affected heading into view of the current window."
       (when (pos-visible-in-window-p where-i-was)
         (forward-char (- where-i-was (point)))))
     (set-marker where-i-was nil)))
+
+;;;;; Refs & aliases
 
 (defun org-node--add-to-property-keep-space (property value)
   "Add VALUE to PROPERTY in entry at `org-node-nearest-relevant'.
@@ -2763,7 +2765,7 @@ When t, only supply tags from nodes that passed `org-node-filter-fn'."
 
 (defun org-node--get-all-known-tags ()
   "Return a list of tags for use in completions.
-Sourced from `org-tag-alist' etc and from looking in many files."
+Sourced from `org-tag-alist' and from looking in many files."
   (delete-dups
    (nconc (thread-last (append org-tag-persistent-alist
                                org-tag-alist
@@ -3436,6 +3438,7 @@ To keep using them safely:"
 
 
 ;;;; Org-roam accelerator
+;; TODO: Once Roam perf is fixed upstream, remove this section.
 
 (defvar org-node--ad-roam-src-node nil)
 (defun org-node--ad-roam-node-insert-section (orig-fn &rest args)
@@ -3527,9 +3530,7 @@ As a side effect, it can be used without the rest of org-roam."
 
 ;; DEPRECATED 2026-03-01
 (defun org-node-add-tags (&optional tags)
-  "Add TAGS to the entry at `org-node-nearest-relevant'.
-
-To always operate on the current entry, use `org-node-add-tags-here'."
+  "Add TAGS to the entry at `org-node-nearest-relevant'."
   (interactive "*" org-mode)
   (org-node--call-at-nearest-node #'org-node-add-tags-here tags))
 
