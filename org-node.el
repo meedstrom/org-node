@@ -2621,39 +2621,40 @@ from ID links found in `org-mem--target<>links'."
 
 ;;;; Commands 6: Editing tags / refs / aliases
 
+(defun org-node-nearest-relevant ()
+  "Like `org-entry-beginning-position' but prefer an ID-node.
+That is, if the current entry has no ID but can inherit it from an
+ancestor entry, return the position of that ancestor.
+
+Per org-mem convention, if that ancestor is a so-called file-level node,
+it counts as a level-0 entry with position 1."
+  (or (and (org-entry-get-with-inheritance "ID")
+           (marker-position org-entry-property-inherited-from))
+      ;; Ignore narrow bc `org-entry-get-with-inheritance' does too.
+      (without-restriction
+        (if (org-before-first-heading-p)
+            (point-min)
+          (org-entry-beginning-position)))))
+
 (defun org-node--call-at-nearest-node (function &rest args)
-  "With point at the relevant heading, call FUNCTION with ARGS.
+  "With point at `org-node-nearest-relevant', call FUNCTION with ARGS.
 
-Prefer the closest ancestor heading that has an ID property, else go to
-the file-level property drawer if that has an ID, else fall back on
-the heading for the current entry.
-
-Afterwards, maybe restore point to where it had been previously, so long
-as the heading where FUNCTION was called would still be visible in the
-window."
-  (let* ((where-i-was (point-marker))
-         (id (org-entry-get-with-inheritance "ID"))
-         (heading-pos
-          (save-excursion
-            (without-restriction
-              (when id
-                (goto-char (point-min))
-                (re-search-forward
-                 (rx bol (* space) ":ID:" (+ space) (literal id))))
-              (org-back-to-heading-or-point-min)
-              (point)))))
-    (when (and heading-pos (< heading-pos (point-min)))
+If the affected heading is outside current narrow region, this calls
+`widen'.  Afterwards, point may move if that is necessary to bring the
+affected heading into view of the current window."
+  (let ((where-i-was (point-marker))
+        (pos (org-node-nearest-relevant)))
+    (when (< pos (point-min))
       (widen))
     (save-excursion
-      (when heading-pos
-        (goto-char heading-pos))
+      (goto-char pos)
       (apply function args))
-    (when heading-pos
-      (unless (pos-visible-in-window-p heading-pos)
-        (goto-char heading-pos)
-        (recenter 0)
-        (when (pos-visible-in-window-p where-i-was)
-          (forward-char (- where-i-was (point))))))
+    (cl-assert (eq (current-buffer) (marker-buffer where-i-was)))
+    (unless (pos-visible-in-window-p pos)
+      (goto-char pos)
+      (recenter 0)
+      (when (pos-visible-in-window-p where-i-was)
+        (forward-char (- where-i-was (point)))))
     (set-marker where-i-was nil)))
 
 (defun org-node--add-to-property-keep-space (property value)
