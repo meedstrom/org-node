@@ -765,7 +765,7 @@ takes a long time."
   (cond
    ((symbolp id) (setq id (symbol-name id)))
    ((numberp id) (setq id (number-to-string id))))
-  (when (and (org-mem--try-ensure-org-id-table-p)
+  (when (and (hash-table-p org-id-locations)
              (not (gethash id org-id-locations)))
     (message "No cached location for ID \"%s\"..." id)))
 
@@ -791,7 +791,7 @@ rather than twice."
     (add-hook 'org-mem-pre-targeted-scan-functions #'org-node--forget-completions-in-results)
     (add-hook 'org-mem-post-full-scan-functions #'org-node--record-completion-candidates-all)
     (add-hook 'org-mem-post-targeted-scan-functions #'org-node--record-completion-candidates-all)
-    (when (and org-mem-do-sync-with-org-id (not (featurep 'org-id)))
+    (when (and org-mem-do-look-everywhere (not (featurep 'org-id)))
       (if org-mem-watch-dirs
           (eval-after-load 'org-id
             (defun org-node--reset-once ()
