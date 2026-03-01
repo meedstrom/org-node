@@ -2814,10 +2814,13 @@ When t, only supply tags from nodes that passed `org-node-filter-fn'."
                                   (org-mem-all-entries))
                    append (org-mem-entry-tags entry)))))
 
-(defun org-node--get-filetags ()
-  "Get the filetags in current buffer."
-  (cl-loop for raw in (cdar (org-collect-keywords '("FILETAGS")))
-           append (split-string raw ":" t)))
+;; TODO: Patch upstream `org-get-tags'.
+(defun org-node-get-tags-here ()
+  "Get tags of current entry, or filetags if before first heading."
+  (if (without-restriction (org-before-first-heading-p))
+      (cl-loop for raw in (cdar (org-collect-keywords '("FILETAGS")))
+               append (split-string raw ":" t))
+    (org-get-tags nil t)))
 
 
 ;;;; Keymap

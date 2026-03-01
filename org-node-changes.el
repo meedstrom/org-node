@@ -88,6 +88,7 @@ hardcoded strings."
 (org-node-changes--def-whiny-alias 'org-node-sort-by-crtime             'org-node-sort-by-crtime-property      "3.11.1 (December 2025)" "July 2026")
 (org-node-changes--def-whiny-alias 'org-node-sort-by-crtime-cheap       'org-node-sort-by-crtime-property      "3.11.1 (December 2025)" "July 2026")
 (org-node-changes--def-whiny-alias 'org-node-sort-by-mtime-cheap        'org-node-sort-by-mtime-property       "3.11.1 (December 2025)" "July 2026")
+(org-node-changes--def-whiny-alias 'org-node--get-filetags              'org-node-get-tags-here                "2026-03-01" "August 2026")
 
 (provide 'org-node-changes)
 
