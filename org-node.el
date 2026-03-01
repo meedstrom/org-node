@@ -3523,7 +3523,7 @@ from many sources.  To deal with that:
               (setq snippet (funcall fn snippet)))))
         (with-current-buffer (org-mem-scratch)
           (erase-buffer)
-          (insert string)
+          (insert snippet)
           (font-lock-ensure)
           (buffer-string))))))
 
