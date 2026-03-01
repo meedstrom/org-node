@@ -2786,17 +2786,25 @@ Sourced from `org-tag-alist' and from looking in many files."
       ;; There's no Org builtin to set filetags yet, we have to in-house it.
       (save-excursion
         (goto-char (point-min))
-        (if (null tags)
-            (when (re-search-forward "^#\\+filetags: " nil t)
-              (delete-region (pos-bol) (pos-eol)))
-          (atomic-change-group
-            (unless (re-search-forward "^#\\+filetags: " nil t)
-              (org-node-full-end-of-meta-data)
-              (unless (and (bolp) (eolp))
-                (open-line 1))
-              (insert "#+filetags: "))
-            (delete-region (point) (pos-eol))
-            (insert ":" (string-join tags ":") ":"))))
+        (let* ((filetags-lines
+                (cl-loop while (re-search-forward "^#\\+filetags: " nil t)
+                         collect (point)))
+               (pos (if (> (length filetags-lines) 1)
+                        (error "Not supported having more than one #+filetags: line.")
+                      (car filetags-lines))))
+          (if (null tags)
+              (when pos
+                (goto-char pos)
+                (delete-region (pos-bol) (pos-eol)))
+            (atomic-change-group
+              (if pos
+                  (goto-char pos)
+                (org-node-full-end-of-meta-data)
+                (unless (and (bolp) (eolp))
+                  (open-line 1))
+                (insert "#+filetags: "))
+              (delete-region (point) (pos-eol))
+              (insert ":" (string-join tags ":") ":")))))
     (save-excursion
       (org-back-to-heading)
       (org-set-tags tags))))
