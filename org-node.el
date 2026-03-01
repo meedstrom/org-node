@@ -89,6 +89,10 @@
 (declare-function org-get-tags "org")
 (declare-function org-get-title "org")
 (declare-function org-id-add-location "org-id")
+(declare-function org-id-find "org-id")
+(declare-function org-id-get-create "org-id")
+(declare-function org-id-new "org-id")
+(declare-function org-id-update-id-locations "org-id")
 (declare-function org-in-block-p "org")
 (declare-function org-in-regexp "org-macs")
 (declare-function org-in-src-block-p "org")
@@ -181,6 +185,20 @@
      ;; :inherit variable-pitch ;; Too controversial
      :weight bold))
   "Face for backlink node titles in the context buffer.")
+
+
+;;;; Early defs
+
+(defvar org-node--candidate<>entry (make-hash-table :test 'equal)
+  "1:1 table mapping minibuffer completion candidates to ID-nodes.
+These candidates may or may not be pre-affixated, depending on
+user option `org-node-alter-candidates'.")
+
+(defvar org-node--title<>affixations (make-hash-table :test 'equal)
+  "1:1 table mapping titles or aliases to affixation triplets.
+Even when the triplets are not used, this table serves double-duty such
+that its keys constitute the subset of `org-mem--title<>id' that
+passed `org-node-filter-fn'.")
 
 
 ;;;; Some options
@@ -554,17 +572,6 @@ Looks bad when you resize the frame, until you call `org-mem-reset'."
                                               (fringe-columns 'left)))
                                     ?\s)
                        tags)))))))
-
-(defvar org-node--candidate<>entry (make-hash-table :test 'equal)
-  "1:1 table mapping minibuffer completion candidates to ID-nodes.
-These candidates may or may not be pre-affixated, depending on
-user option `org-node-alter-candidates'.")
-
-(defvar org-node--title<>affixations (make-hash-table :test 'equal)
-  "1:1 table mapping titles or aliases to affixation triplets.
-Even when the triplets are not used, this table serves double-duty such
-that its keys constitute the subset of `org-mem--title<>id' that
-passed `org-node-filter-fn'.")
 
 ;; TODO: Assign a completion category `org-node'/`org-roam-node'/other clever
 ;;       name, then add an embark action to embark that can operate on it?
@@ -1126,6 +1133,9 @@ Automatically set, should be nil most of the time.")
 (defvar org-node-proposed-seq nil
   "Key that identifies a node sequence about to be added-to.
 Automatically set, should be nil most of the time.")
+
+(defvar org-node--new-unsaved-buffers nil
+  "List of file-visiting buffers that have never written to the file.")
 
 ;; TODO: Return the node it created...?  Handy for programming.  We'd have to
 ;;       mandate saving the buffer after creation, and refactor org-mem so it
@@ -1831,7 +1841,7 @@ creation-date as more truthful or useful than today\\='s date.
          (dir (org-node-guess-or-ask-dir "Extract to new file in directory: "))
          (path-to-write
           (file-name-concat dir (org-node-title-to-basename title)))
-         (already-a-node (org-id-get))
+         (already-a-node (org-entry-get nil "ID"))
          (crtime (org-entry-get nil org-node-property-crtime))
          (id (progn
                (when (file-exists-p path-to-write)
@@ -3176,7 +3186,8 @@ Then undo the flags that marked them as modified."
 
 (define-globalized-minor-mode org-node-track-modifications-mode
   org-node--track-modifications-local-mode
-  org-node--track-modifications-local-turn-on)
+  org-node--track-modifications-local-turn-on
+  :require 'org-node) ;; See package-lint
 
 
 ;;;; Drawer subroutines
@@ -3377,9 +3388,6 @@ Can be handy for user-provided lambdas that must be called a lot."
                (byte-compile fn))
              fn)
             (t (byte-compile fn))))))
-
-(defvar org-node--new-unsaved-buffers nil
-  "List of file-visiting buffers that have never written to the file.")
 
 ;; TODO: Could the :creator just check if the buffer is unmodified and empty?
 ;;       But possible pitfall that the user may have important stuff in undo.
