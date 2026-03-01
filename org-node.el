@@ -3421,9 +3421,6 @@ buffer already exists, so the buffer stays blank.  Thus this hook."
               ;; Hopefully throw away a stale autosave
               ;; since its existence annoys the user on re-creating the file
               (do-auto-save nil t))
-            (when-let* ((file (org-mem--truename-maybe buffer-file-name)))
-              (org-mem-updater--forget-file-contents file)
-              (org-node--forget-completions-in-files file))
             (kill-buffer buf)))))))
 
 

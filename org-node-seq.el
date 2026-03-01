@@ -156,7 +156,7 @@ YYYY-MM-DD format, e.g. \"2024-01-31.org\"."
                            (sortstr (file-name-base path)))
                       (cons sortstr path))))
     :whereami (lambda ()
-                (let ((file-name (org-mem--truename-maybe buffer-file-name)))
+                (let ((file-name (org-mem-file-known-p buffer-file-name)))
                   (when (string-prefix-p ,dir file-name)
                     (file-name-base file-name))))
     :prompter (lambda (key)
