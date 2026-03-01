@@ -2259,12 +2259,22 @@ user quits, do not apply any modifications."
 
 ;;;; Commands 5: Listing things
 
+(defvar org-node--elisp-scratch nil)
+(defun org-node--prin1-to-fontified (value &optional raw)
+  (cl-assert (eq (current-buffer) org-node--elisp-scratch))
+  (erase-buffer)
+  (if raw (insert value)
+    (prin1 value (current-buffer) '((length . 50) (level . 2))))
+  (font-lock-fontify-region (point-min) (point-max))
+  (buffer-string))
+
 ;;;###autoload
 (defun org-node-list-example (&optional _deprecated-arg)
   "Display data from a randomly selected `org-mem-entry' object.
 Repeatable on the last key of a key sequence if
 `repeat-on-final-keystroke' is t."
   (interactive)
+  (org-node-cache-ensure)
   (if repeat-on-final-keystroke
       (progn (setq last-repeatable-command #'org-node-list-example-1)
              (repeat nil))
@@ -2274,9 +2284,7 @@ Repeatable on the last key of a key sequence if
   "Display data from a randomly selected `org-mem-entry' object.
 Or from ENTRY if provided."
   (interactive)
-  (org-node-cache-ensure)
-  (let ((entry (or entry
-                   (seq-random-elt (hash-table-values org-mem--id<>entry))))
+  (let ((entry (or entry (seq-random-elt (org-node-all-filtered-nodes))))
         (entry-funs '(org-mem-entry-active-timestamps
                       org-mem-entry-active-timestamps-int
                       org-mem-entry-children
@@ -2342,7 +2350,7 @@ Or from ENTRY if provided."
     (pop-to-buffer (get-buffer-create "*org-node example*" t))
     (setq-local buffer-read-only t)
     (setq-local revert-buffer-function (lambda (&rest _)
-                                         (org-node-list-example)))
+                                         (org-node-list-example-1)))
     (keymap-local-set "g" #'revert-buffer-quick)
     (keymap-local-set "q" #'quit-window)
     (keymap-local-set "n" (lambda ()
@@ -2359,27 +2367,41 @@ Or from ENTRY if provided."
       (erase-buffer)
       (insert "Example data taken from entry titled \""
               (org-mem-entry-title entry) "\"\n"
-              "(Type g for a random ID-node)\n"
-              "(Type n or p for next/previous entry in same file)\n\n")
-      (insert (with-temp-buffer
-                (delay-mode-hooks (emacs-lisp-mode))
-                (cl-loop for func in entry-funs
-                         do (insert "(" (symbol-name func) " ENTRY) => "
-                                    (prin1-to-string (funcall func entry))
-                                    "\n"))
-                (align-regexp (point-min) (point-max) "\\(\\s-*\\) => ")
-                (newline)
-                (save-excursion
-                  (cl-loop with file = (org-mem-entry-file entry)
-                           for func in file-funs
-                           do (insert "(" (symbol-name func) " (org-mem-entry-file ENTRY)) => "
-                                      (prin1-to-string (funcall func file))
-                                      "\n")))
-                (align-regexp (point) (point-max) "\\(\\s-*\\) => ")
-                (font-lock-ensure)
-                (buffer-string)))
-      (goto-char (point-min))
+              "Type g for a random ID-node.\n"
+              "Type n or p for next/previous entry in same file.\n\n")
+      ;; PERF: Use persistent temp buffer so we can really spam this command
+      (unless (buffer-live-p org-node--elisp-scratch)
+        (setq org-node--elisp-scratch (get-buffer-create " *org-node-elisp-scratch*" t))
+        (with-current-buffer org-node--elisp-scratch
+          (emacs-lisp-mode)))
+      (mapc #'insert
+            (with-current-buffer org-node--elisp-scratch
+              (cl-loop
+               for func in entry-funs
+               nconc (list (string-pad (concat "(" (propertize (symbol-name func)
+                                                               'face 'font-lock-function-call-face)
+                                               " ENTRY)")
+                                       67)
+                           " => "
+                           (org-node--prin1-to-fontified (funcall func entry))
+                           "\n"))))
+      (newline)
+      (save-excursion
+        (mapc #'insert
+              (with-current-buffer org-node--elisp-scratch
+                (cl-loop
+                 with file = (org-mem-entry-file entry)
+                 for func in file-funs
+                 nconc (list (string-pad (concat
+                                          "(" (propertize (symbol-name func) 'face 'font-lock-function-call-face)
+                                          " (" (propertize "org-mem-entry-file" 'face 'font-lock-function-call-face)
+                                          " ENTRY))")
+                                         60)
+                             " => "
+                             (org-node--prin1-to-fontified (funcall func file))
+                             "\n")))))
       ;; Restore scroll position
+      (goto-char (point-min))
       (forward-line (- win-start-line 1))
       (set-window-start (selected-window) (point))
       (forward-line (- win-line win-start-line)))))
