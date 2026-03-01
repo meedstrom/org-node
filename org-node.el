@@ -2863,7 +2863,7 @@ sequences of your choice, in order of importance:
   "q" #'org-node-set-tags ;; because C-c C-q is `org-set-tags-command'
   "a a" #'org-node-add-alias
   "a h" #'org-node-add-tags-here
-  "a r" #'org-node-add-refs
+  "a r" #'org-node-add-ref
   "a t" #'org-node-add-tags
   "x b" 'org-node-backlink-fix-buffer
   "x p" #'org-node-complete-at-point-local-mode

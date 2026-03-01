@@ -445,7 +445,7 @@ Basic commands:
 - =org-node-context-dwim=
 - =org-node-set-tags=
 - =org-node-add-alias=
-- =org-node-add-refs=
+- =org-node-add-ref=
 - =org-node-refile=
   - Does two technically different things: either move a subtree into some node it prompts you for, or if you press RET with no input, extract the subtree into a new file (similarly to =org-roam-extract-subtree=)
 - =org-node-seq-dispatch=
