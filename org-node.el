@@ -2658,148 +2658,92 @@ affected heading into view of the current window."
     (set-marker where-i-was nil)))
 
 (defun org-node--add-to-property-keep-space (property value)
-  "Add VALUE to PROPERTY for node at point.
+  "Add VALUE to PROPERTY in entry at `org-node-nearest-relevant'.
 
-If the current entry has no ID, but an ancestor entry has an ID, then
-operate on that entry instead.
-
-Then behave like `org-entry-add-to-multivalued-property' but
+Behave like `org-entry-add-to-multivalued-property' but
 preserve spaces: instead of percent-escaping each space character
 as \"%20\", wrap VALUE in quotes if it has spaces."
   (org-node--call-at-nearest-node
    (lambda ()
      (let ((old (org-entry-get nil property)))
-       (when old
-         (setq old (split-string-and-unquote old)))
+       (when old (setq old (split-string-and-unquote old)))
        (unless (member value old)
          (org-entry-put nil property (combine-and-quote-strings
                                       (cons value old))))))))
 
-(defun org-node-add-alias ()
-  "Add alias to ROAM_ALIASES in nearest relevant property drawer."
-  (interactive () org-mode)
-  (org-node--add-to-property-keep-space
-   "ROAM_ALIASES" (string-trim (read-string "Alias: "))))
+;;;###autoload
+(defun org-node-add-alias (alias &optional interactive)
+  "Add ALIAS to ROAM_ALIASES in entry at `org-node-nearest-relevant'.
+If INTERACTIVE, and ALIAS exists somewhere, prompt for confirmation."
+  (interactive "sAlias: \np" org-mode)
+  (setq alias (string-trim alias))
+  (let ((existing-id (org-mem-id-by-title alias)))
+    (when (or (not interactive)
+              (not existing-id)
+              (y-or-n-p (format "Alias \"%s\" exists on ID \"%s\", really add here too? "
+                                alias existing-id)))
+      (org-node--add-to-property-keep-space "ROAM_ALIASES" alias))))
 
-;; FIXME: What if user yanks a [cite:... @key1 ... @key2 ...]?
-(defun org-node-add-refs ()
-  "Add a link to ROAM_REFS in nearest relevant property drawer.
-Wrap the link in double-brackets if necessary."
-  (interactive () org-mode)
-  (dolist (ref (mapcar #'string-trim
-                       (completing-read-multiple
-                        "Add ref(s): "
-                        (org-node--list-known-raw-links)
-                        nil
-                        nil
-                        nil
-                        'org-node-link-hist)))
-    (when (string-search " " ref)
-      (if (string-match-p org-link-plain-re ref)
-          ;; If it is a link, ensure it is enclosed in brackets
-          (setq ref (concat "[[" (string-trim ref (rx "[[") (rx "]]")) "]]"))
-        (message "Spaces in ref, not sure how to format correctly: %s" ref)))
-    (org-node--add-to-property-keep-space "ROAM_REFS" ref)))
+;;;###autoload
+(defun org-node-add-ref (ref)
+  "Add REF to ROAM_REFS in entry at `org-node-nearest-relevant'."
+  (interactive
+   (list (completing-read "Add ref: " (org-node--list-known-raw-links)
+                          nil nil nil 'org-node-link-hist))
+   org-mode)
+  (setq ref (string-trim ref))
+  (when (and (string-search " " ref)
+             (string-match-p org-link-plain-re ref)
+             (not (string-match-p org-element-citation-prefix-re ref)))
+    ;; If it is a link, ensure it is enclosed in brackets
+    (setq ref (concat "[[" (string-trim ref (rx "[[") (rx "]]")) "]]")))
+  (org-node--add-to-property-keep-space "ROAM_REFS" ref))
 
-(defun org-node-add-tags (&optional tags)
-  "Add TAGS to the node at point or nearest ancestor that is a node.
+;;;;; Tags
 
-To always operate on the current entry, use `org-node-add-tags-here'."
-  (interactive "*" org-mode)
-  (org-node--call-at-nearest-node #'org-node-add-tags-here tags))
-
-(defun org-node-add-tags-here (&optional tags)
-  "Add TAGS to the entry at point."
-  (interactive "*" org-mode)
-  (let* ((crm-separator "[ \t]*:[ \t]*")
-         (completion-extra-properties (append completion-extra-properties
-                                              '(:category org-tag)))
-         (tags (or (ensure-list tags)
-                   (completing-read-multiple "Tags: "
-                                             (org-node--get-all-known-tags)
-                                             nil nil nil
-                                             'org-tags-history))))
-    (if (org-before-first-heading-p)
-        ;; There's no Org builtin to set filetags yet
-        ;; so we have to do it ourselves.
-        (let* ((filetags (cl-loop
-                          for raw in (cdar (org-collect-keywords '("FILETAGS")))
-                          append (split-string raw ":" t)))
-               (new-tags (seq-uniq (append filetags tags)))
-               (case-fold-search t))
-          (save-excursion
-            (without-restriction
-              (goto-char (point-min))
-              (if (search-forward "\n#+filetags:" nil t)
-                  (atomic-change-group
-                    (skip-chars-forward " ")
-                    (delete-region (point) (pos-eol))
-                    (insert ":" (string-join new-tags ":") ":"))
-                (org-node-full-end-of-meta-data)
-                (insert "#+filetags: :" (string-join new-tags ":") ":\n")))))
-      (save-excursion
-        (org-back-to-heading)
-        (org-set-tags (seq-uniq (append (org-get-tags nil t) tags)))))))
-
-;; New 2025-09-12, removing the need for a "remove-tags" command.
-;; Still keeping `org-node-add-tags' to suit running theme with
-;; `org-node-add-refs' and `org-node-add-alias'.
+;;;###autoload
 (defun org-node-set-tags ()
-  "Set tags in the ID-node at point or nearest ancestor that has an ID.
+  "Set tags in the entry at `org-node-nearest-relevant'.
 
-To always operate on the current entry, use `org-node-add-tags-here'."
+To always operate on the current entry, use `org-node-set-tags-here'."
+  (declare (interactive-only t))
   (interactive "*" org-mode)
-  (org-node--call-at-nearest-node #'org-node-set-tags-here))
+  (org-node--call-at-nearest-node #'org-node-set-tags-here nil t))
 
-(defun org-node-set-tags-here ()
-  "Set the tags of the current entry.
+;;;###autoload
+(defun org-node-set-tags-here (tags &optional interactive)
+  "Set the tags of the current entry to TAGS.
+Prompt if INTERACTIVE.
 
 Similar to `org-set-tags-command', but:
 - supports filetags
-- supplies more completion candidates"
-  (interactive "*" org-mode)
-  (let* ((crm-separator "[ \t]*:[ \t]*")
-         (completion-extra-properties (append completion-extra-properties
-                                              '(:category org-tag)))
-         (present-tags (string-join (if (org-before-first-heading-p)
-                                        (org-node--get-filetags)
-                                      (org-get-tags nil t))
-                                    ":"))
-         (tags (completing-read-multiple "Tags: "
-                                         (org-node--get-all-known-tags)
-                                         nil nil
-                                         (if (string-empty-p present-tags)
-                                             nil
-                                           (concat ":" present-tags ":")))))
-    (if (org-before-first-heading-p)
-        ;; There's no Org builtin to set filetags yet,
-        ;; so we have to in-house the code.
-        (save-excursion
-          (without-restriction
-            (goto-char (point-min))
-            (if (null tags)
-                (when (re-search-forward "^#\\+filetags: " nil t)
-                  (delete-region (pos-bol) (pos-eol)))
-              (atomic-change-group
-                (unless (re-search-forward "^#\\+filetags: " nil t)
-                  (org-node-full-end-of-meta-data)
-                  (unless (and (bolp) (eolp))
-                    (open-line 1))
-                  (insert "#+filetags: "))
-                (delete-region (point) (pos-eol))
-                (insert ":" (string-join tags ":") ":")))))
-      (save-excursion
-        (org-back-to-heading)
-        (org-set-tags tags)))))
+- supplies more completion candidates (see `org-node-do-filter-tags')
+- is missing some of its advanced features"
+  (interactive "i\np" org-mode)
+  (when interactive
+    (let ((current-tags (string-join (org-node-get-tags-here) ":"))
+          (crm-separator "[ \t]*:[ \t]*")
+          (completion-extra-properties (append completion-extra-properties
+                                               '(:category org-tag))))
+      (setq tags (completing-read-multiple
+                  "Tags: "
+                  (org-node--get-all-known-tags)
+                  nil nil
+                  (if (string-empty-p current-tags)
+                      nil
+                    (concat ":" current-tags ":"))))))
+  (org-node--ersatz-set-tags (seq-uniq tags)))
 
 (defcustom org-node-do-filter-tags nil
-  "Whether `org-node-set-tags' etc should limit completions.
+  "Whether `org-node-set-tags' should limit completions.
 Normally it supplies every tag org-mem has seen.
 When t, only supply tags from nodes that passed `org-node-filter-fn'."
   :type 'boolean
   :package-version '(org-node . "3.9.2"))
 
 (defun org-node--get-all-known-tags ()
+  "Return a list of tags for use in completions.
+Sourced from `org-tag-alist' etc and from looking in many files."
   (delete-dups
    (nconc (thread-last (append org-tag-persistent-alist
                                org-tag-alist
@@ -2813,6 +2757,27 @@ When t, only supply tags from nodes that passed `org-node-filter-fn'."
                                     (org-node-all-filtered-nodes)
                                   (org-mem-all-entries))
                    append (org-mem-entry-tags entry)))))
+
+;; TODO: Patch upstream `org-set-tags'.
+(defun org-node--ersatz-set-tags (tags)
+  (if (org-before-first-heading-p)
+      ;; There's no Org builtin to set filetags yet, we have to in-house it.
+      (save-excursion
+        (goto-char (point-min))
+        (if (null tags)
+            (when (re-search-forward "^#\\+filetags: " nil t)
+              (delete-region (pos-bol) (pos-eol)))
+          (atomic-change-group
+            (unless (re-search-forward "^#\\+filetags: " nil t)
+              (org-node-full-end-of-meta-data)
+              (unless (and (bolp) (eolp))
+                (open-line 1))
+              (insert "#+filetags: "))
+            (delete-region (point) (pos-eol))
+            (insert ":" (string-join tags ":") ":"))))
+    (save-excursion
+      (org-back-to-heading)
+      (org-set-tags tags))))
 
 ;; TODO: Patch upstream `org-get-tags'.
 (defun org-node-get-tags-here ()
@@ -3553,6 +3518,46 @@ As a side effect, it can be used without the rest of org-roam."
     (advice-remove 'org-roam-buffer-render-contents #'org-node--kill-work-buffers)
     (advice-remove 'org-roam-backlinks-get          #'org-mem-roamy-mk-backlinks)
     (advice-remove 'org-roam-reflinks-get           #'org-mem-roamy-mk-reflinks)))
+
+
+;;;; Deprecated commands
+
+;; Subtly broken & unfixable.  Hard to pick a `crm-separator' since user may
+;; wish to yank something like [cite:... @key1 ... @key2 ...].
+;; DEPRECATED 2026-03-01
+(defun org-node-add-refs ()
+  "Add link(s) to ROAM_REFS in in entry at `org-node-nearest-relevant'."
+  (interactive () org-mode)
+  (let* ((links (org-node--list-known-raw-links))
+         (refs (completing-read-multiple
+                "Add ref(s): " links nil nil nil 'org-node-link-hist)))
+    (dolist (ref (mapcar #'string-trim refs))
+      (org-node-add-ref ref)))
+  (message "org-node-add-refs: This command will be removed in 2027, use org-node-add-ref"))
+
+;; DEPRECATED 2026-03-01
+(defun org-node-add-tags (&optional tags)
+  "Add TAGS to the entry at `org-node-nearest-relevant'.
+
+To always operate on the current entry, use `org-node-add-tags-here'."
+  (interactive "*" org-mode)
+  (org-node--call-at-nearest-node #'org-node-add-tags-here tags))
+
+;; DEPRECATED 2026-03-01
+(defun org-node-add-tags-here (&optional tags)
+  "Add TAGS to the entry at point."
+  (interactive "*" org-mode)
+  (let* ((crm-separator "[ \t]*:[ \t]*")
+         (completion-extra-properties (append completion-extra-properties
+                                              '(:category org-tag)))
+         (tags (or (ensure-list tags)
+                   (completing-read-multiple "Tags: "
+                                             (org-node--get-all-known-tags)
+                                             nil nil nil
+                                             'org-tags-history))))
+    (org-node-set-tags-here
+     (seq-uniq (append (org-node-get-tags-here) tags))))
+  (message "org-node-add-tags: This command will be removed in 2027, use org-node-set-tags"))
 
 
 ;;;; API not used within this package
