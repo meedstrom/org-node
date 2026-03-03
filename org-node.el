@@ -2636,12 +2636,12 @@ from ID links found in `org-mem--target<>links'."
           (org-inhibit-startup t))
       (delay-mode-hooks
         (org-mode))))
-  (let* ((file (pop org-node--lint-remaining-files))
-         (default-directory (file-name-directory file))
-         (inhibit-message t) ;; Muffle spam from `org-lint-invalid-id-link'
-         ;; Prevent an error in `org-attach-check-absolute-path'
-         (org-attach-id-dir (expand-file-name org-attach-id-dir))
-         (warnings (org-lint)))
+  (when-let* ((file (pop org-node--lint-remaining-files))
+              (default-directory (file-name-directory file))
+              (inhibit-message t) ;; Muffle spam from `org-lint-invalid-id-link'
+              ;; Prevent an error in `org-attach-check-absolute-path'
+              (org-attach-id-dir (expand-file-name org-attach-id-dir))
+              (warnings (org-lint)))
     (while warnings
       (push (cons file (pop warnings)) org-node--lint-warnings)))
   nil)
