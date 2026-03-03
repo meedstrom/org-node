@@ -1076,14 +1076,21 @@ transition the files you already have with the Org-roam commands
   :type 'boolean
   :package-version '(org-node . "0.4"))
 
-(defcustom org-node-relocation-hook nil
+(defcustom org-node-relocation-hook '(org-node--poke-org-id)
   "Hook run with point in the newly relocated file or entry.
 
 A relocation is an operation like `org-node-refile' or
 `org-node-extract-subtree', such that some of the node\\='s data was
 already known."
   :type 'hook
-  :package-version '(org-node . "3.2.0"))
+  :package-version '(org-node . "3.18.0"))
+
+(defun org-node--poke-org-id ()
+  "Put ID of entry at point into `org-id-locations'."
+  (require 'org-id)
+  (when-let* ((file (buffer-file-name (buffer-base-buffer)))
+              (id (org-entry-get nil "ID")))
+    (org-id-add-location id file)))
 
 (defcustom org-node-creation-hook nil
   "Hook run with point in the newly created file or entry.
