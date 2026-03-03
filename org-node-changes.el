@@ -58,7 +58,7 @@ may be removed from the package."
 (require 'org-mem-updater)
 
 (if (or (not (boundp 'org-mem-internal-version))
-        (< org-mem-internal-version 42))
+        (< org-mem-internal-version 43))
     (display-warning 'org-node "Update org-mem to use this version of org-node"))
 
 (org-node-changes--def-whiny-alias 'org-node--goto                      'org-node-goto                         "3.8.0 (July 2025)" "May 2026")

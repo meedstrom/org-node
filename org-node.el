@@ -661,6 +661,12 @@ used as INITIAL-INPUT in `completing-read'."
     (cl-assert (cl-every #'null (list require-match initial-input hist def inherit-input-method)))
     (setq initial-input predicate)
     (setq predicate nil))
+  (when (and (hash-table-empty-p org-node--candidate<>entry)
+             (not (featurep 'org)))
+    (when (y-or-n-p "No nodes found, load Org? ")
+      (require 'org)
+      (org-mem-reset t "Resetting org-mem...")
+      (org-mem-await "Resetting org-mem..." 60)))
   (when (and blank-ok org-node-blank-input-hint)
     (puthash (if (bound-and-true-p helm-mode) " " "")
              (make-org-mem-entry)
@@ -778,7 +784,7 @@ takes a long time."
 
 (defcustom org-node-reset-on-org-load t
   "Whether to allow resetting org-mem after Org loads.
-This is the delay you can observe if `org-mem-do-sync-with-org-id' is t
+This is the delay you can observe if `org-mem-do-look-everywhere' is t
 and you jump into an Org file for the first time."
   :type 'boolean)
 
@@ -798,17 +804,16 @@ rather than twice."
     (add-hook 'org-mem-pre-targeted-scan-functions #'org-node--forget-completions-in-results)
     (add-hook 'org-mem-post-full-scan-functions #'org-node--record-completion-candidates-all)
     (add-hook 'org-mem-post-targeted-scan-functions #'org-node--record-completion-candidates-all)
-    (when (and org-mem-do-look-everywhere (not (featurep 'org-id)))
-      (if org-mem-watch-dirs
-          (eval-after-load 'org-id
-            (defun org-node--reset-once ()
-              (when org-node-cache-mode
-                (when org-node-reset-on-org-load
-                  (org-mem-reset t "org-node: Re-caching to include org-id locations..."))
-                (fset 'org-node--reset-once #'ignore))))
-        ;; User depends solely on `org-mem-do-sync-with-org-id', so load Org
-        ;; now to get completions instead of nothing.
-        (require 'org-id)))
+    (when (and org-mem-do-look-everywhere
+               (not (featurep 'org))
+               (not org-mem-watch-dirs)
+               (not (bound-and-true-p recentf-list)))
+      (eval-after-load 'org
+        (defun org-node--reset-once ()
+          (when org-node-cache-mode
+            (when org-node-reset-on-org-load
+              (org-mem-reset t "org-node: Re-caching to include org-id locations..."))
+            (fset 'org-node--reset-once #'ignore)))))
     (org-mem-reset)
     (org-mem-tip-if-empty)
     (org-node-track-modifications-mode))
