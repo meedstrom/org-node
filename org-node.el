@@ -2614,9 +2614,10 @@ from ID links found in `org-mem--target<>links'."
      :format [("File" 30 t) ("Line" 5 t) ("Trust" 5 t) ("Explanation" 0 t)]
      :reverter #'org-node-lint-all-files
      :entries (cl-loop
-               for (file . warning) in org-node--lint-warnings
+               for cell in org-node--lint-warnings
+               as (file . warning) = cell
                collect (let ((array (cadr warning)))
-                         (list (sxhash warning)
+                         (list cell
                                (vector
                                 (buttonize (file-name-nondirectory file)
                                            `(lambda (_button)
