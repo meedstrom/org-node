@@ -58,7 +58,7 @@ may be removed from the package."
 (require 'org-mem-updater)
 
 (if (or (not (boundp 'org-mem-internal-version))
-        (< org-mem-internal-version 39))
+        (< org-mem-internal-version 42))
     (display-warning 'org-node "Update org-mem to use this version of org-node"))
 
 (org-node-changes--def-whiny-alias 'org-node--goto                      'org-node-goto                         "3.8.0 (July 2025)" "May 2026")
@@ -73,6 +73,9 @@ may be removed from the package."
 (org-node-changes--def-whiny-alias 'org-node-sort-by-mtime-cheap        'org-node-sort-by-mtime-property       "3.11.1 (December 2025)" "July 2026")
 (org-node-changes--def-whiny-alias 'org-node--get-filetags              'org-node-get-tags-here                "2026-03-01" "August 2026")
 (org-node-changes--def-whiny-alias 'org-node--kill-blank-unsaved-buffers 'org-node-seq--kill-blank-unsaved-buffers  "2026-03-01" "August 2026")
+
+;;;###autoload
+(defalias 'org-node-list-example #'org-mem-list-example) ; 2026-03-02
 
 (provide 'org-node-changes)
 
