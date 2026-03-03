@@ -2859,6 +2859,7 @@ With ASSUME-SANE, do not verify that ENTRY-BEG begins an entry."
               (and$ (get-buffer-window nil t)
                     (with-selected-window $
                       (org-fold-show-entry)
+                      (redisplay)
                       (when (< entry-beg (window-start))
                         (if (save-window-excursion
                               (recenter -1)
