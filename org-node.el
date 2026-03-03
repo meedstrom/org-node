@@ -11,7 +11,7 @@
 ;;                    (cond-let "0.2")
 ;;                    (llama "1.0")
 ;;                    (magit-section "4.3.0")
-;;                    (org-mem "0.32.0"))
+;;                    (org-mem "0.34.0"))
 
 ;;; Commentary:
 
