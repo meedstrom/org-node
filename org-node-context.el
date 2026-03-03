@@ -534,6 +534,7 @@ No-op if user option `org-node-context-persist-on-disk' is nil."
 ;;                          ("and>"      . "cond-let--and>")
 ;;                          ("and-let"   . "cond-let--and-let")
 ;;                          ("if-let"    . "cond-let--if-let")
+;;                          ("when$"     . "cond-let--when$")
 ;;                          ("when-let"  . "cond-let--when-let")
 ;;                          ("while-let" . "cond-let--while-let"))
 ;; End:
