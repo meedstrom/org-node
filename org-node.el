@@ -871,7 +871,7 @@ something to change the facts on the ground just prior."
 (defcustom org-node-file-timestamp-format ""
   "Passed to `format-time-string' to prepend to filenames.
 
-Beware that this setting is an ``attractive nuisance''.
+Beware that this setting is an \\+`attractive nuisance'.
 Changing it leads to lots of possibly unwanted renames if you have
 `org-node-rename-file-by-title' on a hook, and in any case requires
 manual intervention for pre-existing files.
@@ -919,7 +919,7 @@ A title like \"Löb\\='s Theorem\" becomes \"lob_s_theorem\".
 
 Diacritical marks U+0300 to U+0331 are stripped \(mostly used with Latin
 alphabets).  Also stripped are all glyphs not categorized in Unicode as
-\"alphanumeric\", such as punctuation and emoji.
+\\+`alphanumeric', such as punctuation and emoji.
 
 If you seek to emulate org-roam filenames, you may also want to
 configure `org-node-file-timestamp-format'."
@@ -944,7 +944,7 @@ A title like \"Löb\\='s Theorem\" becomes \"lobs-theorem\".
 
 Diacritical marks U+0300 to U+0331 are stripped \(mostly used with Latin
 alphabets).  Also stripped are all glyphs not categorized in Unicode as
-\"alphanumeric\", such as punctuation and emoji."
+\\+`alphanumeric', such as punctuation and emoji."
   (require 'ol)
   (thread-last title
                (org-link-display-format)
@@ -1264,7 +1264,7 @@ possible workflow:
 Additionally, with (setq org-node-creation-fn #\\='org-capture),
 commands like `org-node-find' will outsource to `org-capture' when you
 type the name of a node that does not exist.  That enables this
-\"inverted\" workflow, familiar to Org-roam users:
+\\+`inverted' workflow, familiar to Org-roam users:
 
 1. Run `org-node-find'
 2. Type name of an unknown node
@@ -1528,7 +1528,7 @@ Argument NOVISIT for use by `org-node-insert-link-novisit'."
          (_ (when (string-blank-p input)
               (setq input (funcall org-node-blank-input-title-generator))))
          (node (gethash input org-node--candidate<>entry))
-         (id (if node (org-mem-id node) (org-id-new)))
+         (id (if node (org-mem-entry-id node) (org-id-new)))
          (link-desc (or region-text
                         (and node
                              org-node-custom-link-format-fn
@@ -1618,7 +1618,7 @@ The result includes NODE\\='s current file name, unfortunately required."
     (insert "\n#+include: \""
             (org-mem-file node)
             "::"
-            (org-mem-id node)
+            (org-mem-entry-id node)
             "\"")
     (backward-char)
     (run-hooks 'org-node-insert-link-hook)))
@@ -1653,7 +1653,7 @@ keywords."
       (when (string-blank-p input)
         (setq input (funcall org-node-blank-input-title-generator)))
       (setq node (gethash input org-node--candidate<>entry)))
-    (let ((id (if node (org-mem-id node) (org-id-new)))
+    (let ((id (if node (org-mem-entry-id node) (org-id-new)))
           (title (if node (org-mem-title node) input))
           (buf (current-buffer))
           (pt (point-marker)))
@@ -1694,7 +1694,7 @@ Prefix argument ARG as in `org-insert-subheading'."
       (when (string-blank-p input)
         (setq input (funcall org-node-blank-input-title-generator)))
       (setq node (gethash input org-node--candidate<>entry)))
-    (let ((id (if node (org-mem-id node) (org-id-new)))
+    (let ((id (if node (org-mem-entry-id node) (org-id-new)))
           (title (if node (org-mem-title node) input))
           (buf (current-buffer))
           (pt (point-marker)))
@@ -1756,7 +1756,7 @@ Works in non-Org buffers."
 If such a drawer is not found in the current entry, create one at the
 end of the entry.
 
-Unlike the BACKLINKS drawer, this drawer is not \"smart\" and will never
+Unlike the BACKLINKS drawer, this drawer is not \\+`smart' and will never
 modify itself other than through this command."
   (interactive "*" org-mode)
   (when-let* ((input (org-node-read-candidate))
@@ -1777,7 +1777,7 @@ modify itself other than through this command."
             (forward-line -1)
             (back-to-indentation))
           (insert (org-node-time-stamp t t) " -> "
-                  (org-link-make-string (concat "id:" (org-mem-id node))
+                  (org-link-make-string (concat "id:" (org-mem-entry-id node))
                                         (org-mem-title node))))))))
 
 
