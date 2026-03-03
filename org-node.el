@@ -2752,100 +2752,118 @@ sequences of your choice, in order of importance:
 
 ;;;; Gotos
 
-(defun org-node-goto (node &optional exact)
-  "Visit file containing NODE, and ensure point is inside NODE.
-EXACT means always move point to NODE top.
+(defcustom org-node-after-exact-goto-hook '(org-node--after-exact-goto)
+  "Hook run after `org-node-goto' was called with EXACT t.
+These functions are not allowed to move point at all."
+  :type 'hook
+  :package-version '(org-node . "3.18.0"))
 
-If NODE lacks an ID, this may not go to the correct buffer position,
-especially if the buffer is unsaved."
-  (cl-assert (org-mem-entry-p node))
+(defcustom org-node-after-lax-goto-hook '(org-node--after-lax-goto)
+  "Hook run after `org-node-goto' was called with EXACT nil or omitted.
+These functions should not move point out of the current entry.
+Please do not even move point to `org-entry-end-position'."
+  :type 'hook
+  :package-version '(org-node . "3.18.0"))
+
+(defun org-node--after-exact-goto ()
+  "Default member of `org-node-after-exact-goto-hook'."
+  (org-node--reveal)
+  (when (org-at-heading-p)
+    (recenter 0)))
+
+(defun org-node--after-lax-goto ()
+  "Default member of `org-node-after-lax-goto-hook'."
+  (org-node--reveal)
+  (when (org-at-heading-p)
+    (recenter 0))
+  (when (bobp)
+    (org-node-full-end-of-meta-data)
+    (when (and (bolp) (org-at-heading-p))
+      (backward-char))))
+
+(defun org-node--reveal ()
+  "Like `org-fold-show-context' but reveal enough to see no ellipses @ BoL.
+Also reveal entry and children even if point is on a headline."
+  (let ((org-fold-show-context-detail t))
+    (org-fold-show-context))
+  (org-fold-show-entry)
+  (org-fold-show-children))
+
+(defun org-node-goto (entry &optional exact assume-sane)
+  "Visit file containing ENTRY, and ensure `point' is inside that entry.
+EXACT t means always move point to the beginning of ENTRY.
+
+EXACT nil effectively lets you try to respect \"save-place\"
+and other reasons that the user may not want point moved frivolously.
+
+An error is signaled if ENTRY lacks an \"ID\" property and its buffer
+has unsaved changes, unless ASSUME-SANE.
+If ASSUME-SANE, this function can go to a very wrong buffer position."
+  (cl-assert (org-mem-entry-p entry))
   (when (numberp exact)
     (error "Function org-node-goto no longer takes a position argument"))
-  (if-let* ((file (org-mem-file-truename node))
-            (buf (or (find-buffer-visiting file)
+  (if-let* ((file (org-mem-entry-file entry))
+            (buf (or (get-truename-buffer file)
+                     (find-buffer-visiting file)
                      (and (file-exists-p file)
                           (find-file-noselect file)))))
-      ;; Prefer ID in case pos has changed
-      (let* ((id (org-mem-id node))
-             (pos (or (and id
-                           (with-current-buffer buf
-                             (without-restriction
-                               (org-node--assert-transclusion-safe)
-                               (org-find-property "ID" id))))
-                      (org-mem-pos node))))
+      (let* ((id (org-mem-entry-id entry))
+             (pos (or (and id (with-current-buffer buf
+                                (without-restriction
+                                  (org-node--assert-transclusion-safe)
+                                  (org-find-property "ID" id))))
+                      (org-mem-entry-pos entry))))
+        (when (and (not assume-sane) (not id) (buffer-modified-p buf))
+          (error "org-node-goto: Cannot know correct position in modified buffer for entry with no ID: %S"
+                 entry))
         (pop-to-buffer-same-window buf)
-        ;; Q: Does pop-to-buffer guarantee this?
-        (cl-assert (eq (current-buffer) buf))
-        (widen)
-        ;; Mainly comes true on first visit to a file node, so that point==pos==1.
-        (when (eq (point) pos)
-          (org-node-full-end-of-meta-data))
-        ;; Point may already be at a desirable position due to any of:
-        ;; - the above
-        ;; - save-place
-        ;; - a buffer was already visiting the file
-        ;; Leave it there if sensible, otherwise move to exact position.
-        (when (or exact
-                  (and id (not (equal id (org-entry-get nil "ID"))))
-                  (not (pos-visible-in-window-p pos))
-                  (org-invisible-p pos))
-          (goto-char pos)
-          (unless (org-before-first-heading-p)
-            (org-fold-show-entry)
-            (org-fold-show-children)
-            (recenter 0))))
+        (org-node--maybe-widen-and-goto pos assume-sane)
+        (if exact (progn
+                    (goto-char pos)
+                    (org-fold-show-context)
+                    (run-hooks 'org-node-after-exact-goto-hook)
+                    (unless (= (point) pos)
+                      (error "A function on org-node-after-exact-goto-hook moved point")))
+          (run-hooks 'org-node-after-lax-goto-hook)))
     (org-mem-reset t "org-node: Didn't find file, resetting...")))
 
-;; TODO: Deprecate or refactor
-(defun org-node-goto-id (id &optional exact buffer)
-  "Go to ID in some buffer, without needing the file to exist yet.
+(defun org-node--maybe-widen-and-goto (entry-beg &optional assume-sane)
+  "Ensure that `point' is inside the Org entry that starts at ENTRY-BEG.
+Also ensure that ENTRY-BEG is visible, by scrolling the window to
+bring it into view, if that is possible without moving point.
 
-This differs from `org-id-goto', which would throw an error.
-That is, if `org-id-locations' has an entry for ID pointing to a
-file-name that may not yet have been written to disk, but a buffer
-visits it, switch to that unsaved buffer and move point to said entry.
+If these requirements cannot be met without moving point,
+move point to ENTRY-BEG.
 
-Optional argument BUFFER is a specific buffer in which to look for ID,
-in which case ID needs not be registered in `org-id-locations' at all.
+This function will also `widen' the buffer if the current narrow region
+excludes any part of the entry.
 
-Optional argument EXACT as in `org-node-goto'."
-  (cl-assert (stringp id))
-  (unless buffer
-    (let ((file (or (gethash id org-id-locations)
-                    (let ((entry (org-mem-entry-by-id id)))
-                      (and entry (org-mem-entry-file-truename entry)))
-                    (error "Unknown ID: %s" id))))
-      (setq buffer
-            (or (find-buffer-visiting file)
-                (and (file-exists-p file)
-                     (find-file-noselect file))
-                (error "File not on disk nor visited by any buffer: %s" file)))))
-  (let (pos)
-    (with-current-buffer buffer
-      (org-node--assert-transclusion-safe)
-      (setq pos (or (org-find-property "ID" id)
-                    (error "Could not find ID \"%s\" in buffer %s" id buffer))))
-    (pop-to-buffer-same-window buffer)
-    ;; Q: Does pop-to-buffer guarantee this?
-    (cl-assert (eq (current-buffer) buffer))
-    (widen)
-    ;; Mainly comes true on first visit to a file node, so that point==pos==1.
-    (when (eq (point) pos)
-      (org-node-full-end-of-meta-data))
-    ;; Point may already be at a desirable position due to any of:
-    ;; - the above
-    ;; - save-place
-    ;; - a buffer was already visiting the file
-    ;; Leave it there if sensible, otherwise move to exact position.
-    (when (or exact
-              (not (equal id (org-entry-get nil "ID")))
-              (not (pos-visible-in-window-p pos))
-              (org-invisible-p pos))
-      (goto-char pos)
-      (unless (org-before-first-heading-p)
-        (org-fold-show-entry)
-        (org-fold-show-children)
-        (recenter 0)))))
+With ASSUME-SANE, do not verify that ENTRY-BEG begins an entry."
+  (let ((entry-end (save-excursion (without-restriction
+                                     (goto-char entry-beg)
+                                     (unless assume-sane
+                                       (cl-assert (or (bobp) (org-at-heading-p)))
+                                       (cl-assert (bolp)))
+                                     (org-entry-end-position))))
+        (here-end (without-restriction
+                    (org-entry-end-position))))
+    (when (or (< entry-beg (point-min)) (> entry-end (point-max)))
+      (widen))
+    (when (or (not (= here-end entry-end)) ;; Same end implies same entry.
+              (org-invisible-p entry-beg) ;; Virtually can't happen, but still.
+              (and$ (get-buffer-window nil t)
+                    (with-selected-window $
+                      (org-fold-show-entry)
+                      (when (< entry-beg (window-start))
+                        (if (save-window-excursion
+                              (recenter -1)
+                              (pos-visible-in-window-p entry-beg))
+                            ;; Just scroll the window, if that would be enough.
+                            (prog1 nil
+                              (scroll-down (count-screen-lines entry-beg (window-start))))
+                          t)))))
+      (goto-char entry-beg)
+      (org-fold-show-context))))
 
 (defun org-node-goto-new-drawer-site ()
   "Go to just after properties drawer.
@@ -2859,7 +2877,8 @@ that follows the file-level properties drawer."
 ;; Keyword lines work as a natural barrier, because Org expects file-level
 ;; :PROPERTIES: to come before #+title and other keyword lines.
 (defun org-node--after-drawers-before-keyword ()
-  "Move point to after all drawers in the file top level."
+  "Move to `point-min', then forward past drawers, comments and whitespace.
+Stops as soon as there is anything else, such as body text or a #+title."
   (goto-char (point-min))
   (let ((case-fold-search t)
         (bound (org-entry-end-position))
@@ -2878,8 +2897,12 @@ that follows the file-level properties drawer."
     (forward-line))
   nil)
 
+;; TODO: Patch upstream `org-end-of-meta-data'.
 (defun org-node-full-end-of-meta-data (&optional _deprecated-arg)
   "Skip properties and other drawers, and at the file-level, skip keywords.
+
+Like `org-end-of-meta-data' with argument FULL, but works even if
+`org-before-first-heading-p'.
 
 As in `org-end-of-meta-data', point always lands on a newline \(or the
 end of buffer).  Since that newline may be the beginning of the next
@@ -2900,6 +2923,7 @@ else do `backward-char' or `open-line' prior to inserting text."
       (org-end-of-meta-data t)))
   (point))
 
+;; TODO: Patch upstream `org-back-to-heading-or-point-min'.
 (defun org-node--back-to-heading-or-point-min (&optional invisible-ok)
   "Alternative to `org-back-to-heading-or-point-min'.
 Argument INVISIBLE-OK as in that function.
@@ -2907,9 +2931,7 @@ Argument INVISIBLE-OK as in that function.
 Like `org-back-to-heading-or-point-min' but should be faster in the case
 that an org-element cache has not been built for the buffer.  This can
 be the case in a buffer spawned by `org-roam-with-temp-buffer'
-or `org-node--work-buffer-for'.
-
-As bonus, do not land on an inlinetask, seek a real heading."
+or `org-node--work-buffer-for'."
   (let ((inlinetask-re (when (fboundp 'org-inlinetask-outline-regexp)
                          (org-inlinetask-outline-regexp))))
     (cl-loop until (and (org-at-heading-p (not invisible-ok))
@@ -3425,6 +3447,31 @@ As a side effect, it can be used without the rest of org-roam."
     (org-node-set-tags-here
      (seq-uniq (append (org-node-get-tags-here) tags))))
   (message "org-node-add-tags: This command will be removed in 2027, use org-node-set-tags"))
+
+;; DEPRECATED 2026-03-02
+(defun org-node-goto-id (id &optional exact buffer)
+  "Go to ID in some buffer, without needing the file to exist yet.
+
+This differs from `org-id-goto', which would throw an error.
+That is, if `org-id-locations' has an entry for ID pointing to a
+file-name that may not yet have been written to disk, but a buffer
+visits it, switch to that unsaved buffer and move point to said entry.
+
+Optional argument BUFFER is a specific buffer in which to look for ID,
+in which case ID needs not be registered in `org-id-locations' at all.
+
+Optional argument EXACT as in `org-node-goto'."
+  (declare (obsolete nil "2026-03-02"))
+  (if (buffer-live-p buffer)
+      (progn
+        (pop-to-buffer-same-window buffer)
+        (if-let* ((pos (without-restriction
+                         (org-node--assert-transclusion-safe)
+                         (org-find-property "ID" id))))
+            (org-node--maybe-widen-and-goto pos exact)
+          (error "Could not find ID %S in buffer %S" id buffer)))
+    (if-let* ((node (org-mem-entry-by-id id)))
+        (org-node-goto node exact))))
 
 
 ;;;; API not used within this package
