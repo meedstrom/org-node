@@ -151,7 +151,7 @@
   (require 'org-fold)
   (require 'org-element))
 
-(defconst org-node-internal-version 11)
+(defconst org-node-internal-version 12)
 
 
 ;;;; Faces
