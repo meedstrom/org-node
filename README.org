@@ -34,7 +34,7 @@ Just searching for Org files is too coarse.  Just searching for any subtree anyw
 
 *Here's what org-roam invented.*  It turns out that if you limit the search-hits to just those files and subtrees you've deigned to assign an org-id -- which roughly maps to /everything you've ever thought it was worth linking to/ -- it filters out the noise excellently.
 
-Once a subtree has an ID you can link to, it's a "node" because it has joined the wider graph, the network of linked nodes.  I wish the English language had more distinct sounds for the words "node" and "note", but to clarify, I'll say "ID-node" when the distinction matters.
+Once a subtree has an ID you can link to, it's a "node" because it has joined the wider graph, the network of linked nodes.  I wish the English language had more distinct sounds for the words "node" and "note", but to clarify, I'll say "ID-node" when the distinction matters (which it rarely does).
 
 ** Benchmarks on my machine
 
@@ -90,12 +90,7 @@ Assuming your package manager knows about [[https://melpa.org/#/getting-started]
 
 #+begin_src elisp
 (use-package org-mem
-  :defer
   :config
-  ;; At least one of these two is needed
-  (setq org-mem-do-sync-with-org-id t)
-  (setq org-mem-watch-dirs
-        (list "~/org")) ;; Configure me
   (org-mem-updater-mode))
 
 (use-package org-node
@@ -113,18 +108,16 @@ If you're coming here from *org-roam*, try this instead:
 
 #+begin_src elisp
 (use-package org-mem
-  :defer
   :config
-  (setq org-mem-do-sync-with-org-id t) ;; Optional
   (setq org-mem-watch-dirs
-        (list "~/org-roam/")) ;; Your org-roam-directory here
+        (list "~/org/")) ;; Your org-roam-directory here
   (org-mem-updater-mode))
 
 (use-package org-node
   :init
   ;; Optional key bindings
   ;; Tip: Try changing these to just "M-o"!
-  (keymap-set global-map "M-o n" org-node-global-prefix-map)
+  (keymap-global-set "M-o n" org-node-global-prefix-map)
   (with-eval-after-load 'org
     (keymap-set org-mode-map "M-o n" org-node-org-prefix-map))
   :config
@@ -528,8 +521,8 @@ API cheatsheet between org-roam and org-node.
 | Get backlink objects                    | =(org-roam-backlinks-get NODE)=   | =(org-mem-id-links-to-entry NODE)=             |
 | Get reflink objects                     | =(org-roam-reflinks-get NODE)=    | =(org-mem-roam-reflinks-to-entry NODE)=        |
 | Get title                               | =(org-roam-node-title NODE)=      | =(org-mem-entry-title NODE)=                   |
-| Get title of file where NODE is         | =(org-roam-node-file-title NODE)= | =(org-mem-entry-file-title NODE)=              |
-| Get title /or/ name of file where NODE is |                                 | =(org-mem-entry-file-title-or-basename NODE)=  |
+| Get title of file where NODE is         | =(org-roam-node-file-title NODE)= | =(org-mem-file-title NODE)=                    |
+| Get title /or/ name of file where NODE is |                                 | =(org-mem-file-title-or-basename NODE)=        |
 | Get full path to file where NODE is     | =(org-roam-node-file NODE)=       | =(org-mem-entry-file NODE)=                    |
 | Get ID                                  | =(org-roam-node-id NODE)=         | =(org-mem-entry-id NODE)=                      |
 | Get tags                                | =(org-roam-node-tags NODE)=       | =(org-mem-entry-tags NODE)=                    |
@@ -542,6 +535,7 @@ API cheatsheet between org-roam and org-node.
 | Get subtree TODO state                  | =(org-roam-node-todo NODE)=       | =(org-mem-entry-todo-state NODE)=              |
 | Get subtree SCHEDULED                   | =(org-roam-node-scheduled NODE)=  | =(org-mem-entry-scheduled NODE)=               |
 | Get subtree DEADLINE                    | =(org-roam-node-deadline NODE)=   | =(org-mem-entry-deadline NODE)=                |
+| Get subtree CLOSED                      |                                 | =(org-mem-entry-closed NODE)=                  |
 | Get subtree priority                    | =(org-roam-node-priority NODE)=   | =(org-mem-entry-priority NODE)=                |
 | Get outline-path                        | =(org-roam-node-olp NODE)=        | =(org-mem-entry-olpath NODE)=                  |
 | Get =ROAM_REFS=                           | =(org-roam-node-refs NODE)=       | =(org-mem-entry-roam-refs NODE)=               |

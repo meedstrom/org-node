@@ -32,6 +32,10 @@
 ;; zettelkasten-inspired software.  In fact, out of the simplicity
 ;; arises something powerful, more to be experienced than explained.
 
+;;   "The fixed address of each note is the alpha and omega of the
+;;   world of Zettelkasten. Everything becomes possible because of it."
+;; -- https://zettelkasten.de/introduction
+
 ;; Compared to Org-roam:
 
 ;;   + Compatible (you can use both packages and compare)
@@ -355,7 +359,7 @@ by typing \\[org-node-list-example]."
                  (delete-dups (mapcar #'file-truename org-mem-watch-dirs)))))))
 
 (defun org-node-all-filtered-nodes ()
-  "All currently cached org-nodes that satisfied `org-node-filter-fn'."
+  "All currently cached ID-nodes that satisfied `org-node-filter-fn'."
   (delete-dups (hash-table-values org-node--candidate<>entry)))
 
 
@@ -575,11 +579,9 @@ Looks bad when you resize the frame, until you call `org-mem-reset'."
                                     ?\s)
                        tags)))))))
 
-;; TODO: Assign a completion category `org-node'/`org-roam-node'/other clever
-;;       name, then add an embark action to embark that can operate on it?
 ;; TODO: Bind a custom exporter to `embark-export'
 ;; TODO: Add user option to set 'group-function
-;; TODO: See consult-org-roam.
+;; TODO: Copy https://github.com/jgru/consult-org-roam
 (defun org-node-collection (str pred action)
   "Custom COLLECTION for `completing-read'.
 
@@ -588,7 +590,7 @@ Ahead of time, org-node takes titles and aliases from all nodes, runs
 `org-node-alter-candidates', it either saves the affixated thing
 directly into `org-node--candidate<>entry', or into a secondary table
 `org-node--title<>affixations'.  Finally, this function then either
-simply reads candidates off the candidates table, or attaches the
+simply reads candidates off the former table, or attaches the
 affixations in realtime.
 
 Regardless of which, all completions are guaranteed to be keys of
@@ -1258,8 +1260,8 @@ See `org-capture-templates' for more info about targets.
 
 In simple terms, let\\='s say you have configured
 `org-capture-templates' so it has a template that
-targets `(function org-node-capture-target)'.  Now here\\='s a
-possible workflow:
+targets `(function org-node-capture-target)'.
+Now here\\='s a possible workflow:
 
 1. Run `org-capture'
 2. Select your template

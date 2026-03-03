@@ -139,7 +139,7 @@ Just searching for Org files is too coarse.  Just searching for any subtree anyw
 
 @strong{Here's what org-roam invented.}  It turns out that if you limit the search-hits to just those files and subtrees you've deigned to assign an org-id -- which roughly maps to @emph{everything you've ever thought it was worth linking to} -- it filters out the noise excellently.
 
-Once a subtree has an ID you can link to@comma{} it's a "node" because it has joined the wider graph@comma{} the network of linked nodes.  I wish the English language had more distinct sounds for the words "node" and "note"@comma{} but to clarify@comma{} I'll say "ID-node" when the distinction matters.
+Once a subtree has an ID you can link to@comma{} it's a "node" because it has joined the wider graph@comma{} the network of linked nodes.  I wish the English language had more distinct sounds for the words "node" and "note"@comma{} but to clarify@comma{} I'll say "ID-node" when the distinction matters (which it rarely does).
 
 @node Benchmarks on my machine
 @section Benchmarks on my machine
@@ -307,12 +307,7 @@ Assuming your package manager knows about @uref{https://melpa.org/#/getting-star
 
 @lisp
 (use-package org-mem
-  :defer
   :config
-  ;; At least one of these two is needed
-  (setq org-mem-do-sync-with-org-id t)
-  (setq org-mem-watch-dirs
-        (list "~/org")) ;; Configure me
   (org-mem-updater-mode))
 
 (use-package org-node
@@ -330,18 +325,16 @@ If you're coming here from @strong{org-roam}@comma{} try this instead:
 
 @lisp
 (use-package org-mem
-  :defer
   :config
-  (setq org-mem-do-sync-with-org-id t) ;; Optional
   (setq org-mem-watch-dirs
-        (list "~/org-roam/")) ;; Your org-roam-directory here
+        (list "~/org/")) ;; Your org-roam-directory here
   (org-mem-updater-mode))
 
 (use-package org-node
   :init
   ;; Optional key bindings
   ;; Tip: Try changing these to just "M-o"!
-  (keymap-set global-map "M-o n" org-node-global-prefix-map)
+  (keymap-global-set "M-o n" org-node-global-prefix-map)
   (with-eval-after-load 'org
     (keymap-set org-mode-map "M-o n" org-node-org-prefix-map))
   :config
@@ -770,7 +763,7 @@ Basic commands:
 @item
 @samp{org-node-add-alias}
 @item
-@samp{org-node-add-refs}
+@samp{org-node-add-ref}
 @item
 @samp{org-node-refile}
 @itemize
@@ -957,10 +950,10 @@ API cheatsheet between org-roam and org-node.
 @tab @samp{(org-mem-entry-title NODE)}
 @item Get title of file where NODE is
 @tab @samp{(org-roam-node-file-title NODE)}
-@tab @samp{(org-mem-entry-file-title NODE)}
+@tab @samp{(org-mem-file-title NODE)}
 @item Get title @emph{or} name of file where NODE is
 @tab 
-@tab @samp{(org-mem-entry-file-title-or-basename NODE)}
+@tab @samp{(org-mem-file-title-or-basename NODE)}
 @item Get full path to file where NODE is
 @tab @samp{(org-roam-node-file NODE)}
 @tab @samp{(org-mem-entry-file NODE)}
@@ -997,6 +990,9 @@ API cheatsheet between org-roam and org-node.
 @item Get subtree DEADLINE
 @tab @samp{(org-roam-node-deadline NODE)}
 @tab @samp{(org-mem-entry-deadline NODE)}
+@item Get subtree CLOSED
+@tab 
+@tab @samp{(org-mem-entry-closed NODE)}
 @item Get subtree priority
 @tab @samp{(org-roam-node-priority NODE)}
 @tab @samp{(org-mem-entry-priority NODE)}
