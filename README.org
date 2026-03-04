@@ -3,7 +3,6 @@
 #+EMAIL: meedstrom91@gmail.com
 #+STARTUP: content
 #+EXPORT_FILE_NAME: org-node.texi
-#+TEXINFO_FILENAME: org-node.info
 #+TEXINFO_DIR_CATEGORY: Emacs
 #+TEXINFO_DIR_TITLE: Org-Node: (org-node).
 #+TEXINFO_DIR_DESC: Link org-id entries into a network.
@@ -14,7 +13,7 @@ I like [[https://github.com/org-roam/org-roam][org-roam]] but found it too slow,
 
 - *If you were using org-roam*, there is nothing to migrate.  You can use both packages.  It's the same on-disk format: "notes" are identified by their org-id.
 
-  In pursuit of being "just org-id", this package has no equivalent setting to =org-roam-directory= -- it just looks up the =org-id-locations= table.  (UPDATE 2025-06-03: this is true if setting =org-mem-do-sync-with-org-id= to t.  Otherwise, you can configure =org-mem-watch-dirs=.)
+  In pursuit of being "just org-id", this package has no equivalent setting to =org-roam-directory= -- it just looks up the =org-id-locations= table.
 
 - *If you were not using org-roam*, maybe think of it as somewhat like [[https://github.com/alphapapa/org-recent-headings][org-recent-headings]] tooled-up to the extent that you won't need other methods of browsing, as long as you give IDs to all objects of interest.
 
@@ -86,7 +85,9 @@ A comparison of three systems that all permit relying on org-id and don't lock y
 * Setup
 ** Install
 
-Assuming your package manager knows about [[https://melpa.org/#/getting-started][MELPA]], add the following initfile snippet.
+Org-node depends on =org-mem-updater-mode= from [[https://github.com/meedstrom/org-mem][org-mem]].
+
+Assuming your package manager gets recipes from [[https://melpa.org/#/getting-started][MELPA]], add the following initfile snippet.
 
 #+begin_src elisp
 (use-package org-mem
@@ -298,6 +299,19 @@ Or you could go with a whitelist approach, to show only nodes from a certain dir
       (lambda (node)
         (string-search "/my-personal-wiki/" (org-mem-file node))))
 #+end_src
+
+** Missing completions?
+
+Since [[https://github.com/meedstrom/org-mem][org-mem]] only looks at saved files on disk, new notes only "appear" after save.  So it can make for a smoother experience to enable =auto-save-visited-mode=.
+
+That is also the usage that I test most -- I've had the following config for years:
+
+#+BEGIN_SRC elisp
+(setq auto-save-visited-interval 2)
+(auto-save-visited-mode)
+#+END_SRC
+
+FWIW, org-node used to try to be smarter and also cache notes in unsaved buffers, but that quickly became difficult to reason about, especially wrt. deciding whether to update a backlink or not.
 
 ** Completion-at-point
 To complete words at point into known node titles:

@@ -67,6 +67,7 @@ Misc
 
 * Org-capture::
 * Exclude uninteresting nodes::
+* Missing completions?::
 * Completion-at-point::
 * Customize appearance::
 * Sort completions::
@@ -110,7 +111,7 @@ I like @uref{https://github.com/org-roam/org-roam, org-roam} but found it too sl
 @item
 @strong{If you were using org-roam}@comma{} there is nothing to migrate.  You can use both packages.  It's the same on-disk format: "notes" are identified by their org-id.
 
-In pursuit of being "just org-id"@comma{} this package has no equivalent setting to @samp{org-roam-directory} -- it just looks up the @samp{org-id-locations} table.  (UPDATE 2025-06-03: this is true if setting @samp{org-mem-do-sync-with-org-id} to t.  Otherwise@comma{} you can configure @samp{org-mem-watch-dirs}.)
+In pursuit of being "just org-id"@comma{} this package has no equivalent setting to @samp{org-roam-directory} -- it just looks up the @samp{org-id-locations} table.
 
 @item
 @strong{If you were not using org-roam}@comma{} maybe think of it as somewhat like @uref{https://github.com/alphapapa/org-recent-headings, org-recent-headings} tooled-up to the extent that you won't need other methods of browsing@comma{} as long as you give IDs to all objects of interest.
@@ -303,7 +304,9 @@ A comparison of three systems that all permit relying on org-id and don't lock y
 @node Install
 @section Install
 
-Assuming your package manager knows about @uref{https://melpa.org/#/getting-started, MELPA}@comma{} add the following initfile snippet.
+Org-node depends on @samp{org-mem-updater-mode} from @uref{https://github.com/meedstrom/org-mem, org-mem}.
+
+Assuming your package manager gets recipes from @uref{https://melpa.org/#/getting-started, MELPA}@comma{} add the following initfile snippet.
 
 @lisp
 (use-package org-mem
@@ -502,6 +505,7 @@ Finally@comma{} lines that contain no Org link such as @samp{[[id:1234][Title]]}
 @menu
 * Org-capture::
 * Exclude uninteresting nodes::
+* Missing completions?::
 * Completion-at-point::
 * Customize appearance::
 * Sort completions::
@@ -579,6 +583,20 @@ Or you could go with a whitelist approach@comma{} to show only nodes from a cert
       (lambda (node)
         (string-search "/my-personal-wiki/" (org-mem-file node))))
 @end lisp
+
+@node Missing completions?
+@section Missing completions?
+
+Since @uref{https://github.com/meedstrom/org-mem, org-mem} only looks at saved files on disk@comma{} new notes only "appear" after save.  So it can make for a smoother experience to enable @samp{auto-save-visited-mode}.
+
+That is also the usage that I test most -- I've had the following config for years:
+
+@lisp
+(setq auto-save-visited-interval 2)
+(auto-save-visited-mode)
+@end lisp
+
+FWIW@comma{} org-node used to try to be smarter and also cache notes in unsaved buffers@comma{} but that quickly became difficult to reason about@comma{} especially wrt. deciding whether to update a backlink or not.
 
 @node Completion-at-point
 @section Completion-at-point

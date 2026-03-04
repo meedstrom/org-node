@@ -1094,6 +1094,17 @@ already known."
   :type 'hook
   :package-version '(org-node . "3.18.0"))
 
+;; 2026-03-04: We used to try to do this sort of thing all the time even in
+;; unsaved buffers and it led to difficulty in reasoning about org-mem (since
+;; it only has data from saved files on disk, which then conflict with what
+;; org-id says about unsaved buffers), but since org-mem 0.32.0 it should at
+;; least not be an issue that pollutes the next reset with wrong file names:
+;; org-mem can handle org-id-locations having wrong file names.
+;;
+;; Interestingly, however, this is not enough to make ID-links send you to the
+;; correct location if a buffer hasn't yet been written to disk.  Org-id may
+;; actually signal error in that case or hang Emacs.  See `org-node-goto-id',
+;; `org-node--ad-org-id-find'.
 (defun org-node--poke-org-id ()
   "Put ID of entry at point into `org-id-locations'."
   (require 'org-id)
@@ -1791,6 +1802,9 @@ modify itself other than through this command."
 
 
 ;;;; Commands 3: Extract and refile
+
+;; TODO: After an extract, add a temporary save hook that saves the other file
+;; as well if two files were involved.
 
 (defcustom org-node-stay-in-source-buffer nil
   "Keep the source buffer current after extract or refile.
