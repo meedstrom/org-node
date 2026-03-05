@@ -2702,6 +2702,74 @@ Sourced from `org-tag-alist' and from looking in many files."
     (org-get-tags nil t)))
 
 
+;;;; Commands 7: "Cards"
+
+(defcustom org-node-card-setup-hook '(org-node--card-setup-default)
+  "Hook run in each window created by `org-node-card-view'."
+  :type 'hook
+  :package-version '(org-node . "3.18.0"))
+
+(defcustom org-node-card-min-width 55
+  "Minimum window width for `org-node-card-view'."
+  :type 'integer
+  :package-version '(org-node . "3.18.0"))
+
+(defcustom org-node-card-min-height 15
+  "Minimum window height for `org-node-card-view'."
+  :type 'integer
+  :package-version '(org-node . "3.18.0"))
+
+(defcustom org-node-card-disable-line-numbers t
+  "Whether to hide line number display in `org-node-card-view' buffers.
+Used by `org-node--card-setup-default'."
+  :type 'boolean
+  :package-version '(org-node . "3.18.0"))
+
+(defun org-node--card-setup-default ()
+  "Default member of `org-node-card-setup-hook'."
+  (org-back-to-heading-or-point-min)
+  (when org-node-card-disable-line-numbers
+    (dolist (mode '(display-line-numbers-mode line-number-mode nlinum-mode))
+      (when (and (boundp mode) (eval mode))
+        (funcall mode 0))))
+  (if (org-before-first-heading-p)
+      (or (search-forward "#+title:" (org-entry-end-position) t)
+          (org-node-full-end-of-meta-data))
+    (org-fold--hide-drawers (point) (org-entry-end-position)))
+  (goto-char (pos-bol))
+  (recenter 0))
+
+;;;###autoload
+(defun org-node-card-view ()
+  "Reconfigure current frame to show an array of random notes.
+Works best in a large frame.
+
+Tries to make many compact windows, obeying user options:
+- `org-node-card-min-width'
+- `org-node-card-min-height'
+
+This command may motivate you to keep notes short,
+per an ideal of zettelkasten.
+
+Also affected by user options:
+- `org-node-card-setup-hook'
+- `org-node-card-disable-line-numbers'"
+  (interactive)
+  (org-node-cache-ensure)
+  (delete-other-windows)
+  (dotimes (_ (- (/ (window-text-height) org-node-card-min-height) 1))
+    (split-window-below))
+  (dolist (win (window-list))
+    (select-window win)
+    (dotimes (_ (- (/ (window-text-width) org-node-card-min-width) 1))
+      (split-window-right)))
+  (balance-windows)
+  (dolist (win (window-list))
+    (select-window win)
+    (org-node-visit-random-1)
+    (run-hooks 'org-node-card-setup-hook)))
+
+
 ;;;; Keymap
 ;; NOTE: Reserve "c" for a possible future capture-related key.
 
@@ -2729,6 +2797,7 @@ sequences of your choice, in order of importance:
   "l r" #'org-node-list-reflinks
   "l t" 'org-mem-list-title-collisions ; l t for "list title..."
   "x a" #'org-node-rename-asset-and-rewrite-links
+  "x c" #'org-node-card-view
   "x h" #'org-node-help
   "x l" #'org-node-rewrite-links-ask
   "x r" #'org-node-visit-random
