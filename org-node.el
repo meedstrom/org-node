@@ -2720,8 +2720,8 @@ Sourced from `org-tag-alist' and from looking in many files."
   :package-version '(org-node . "3.18.0"))
 
 (defcustom org-node-card-disable-line-numbers t
-  "Whether to hide line number display in `org-node-card-view' buffers.
-Used by `org-node--card-setup-default'."
+  "Whether `org-node-card-view' should turn off line number display.
+This setting is used by `org-node--card-setup-default'."
   :type 'boolean
   :package-version '(org-node . "3.18.0"))
 

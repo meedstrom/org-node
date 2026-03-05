@@ -461,6 +461,8 @@ Basic commands:
   - Give an ID to the entry at point, and run the hook =org-node-creation-hook=
 - =org-node-grep=
   - (Requires [[https://github.com/minad/consult][consult]]) Grep across all known Org files.
+- =org-node-card-view=
+  - Try it and, uh, see.
 
 Rarer commands:
 

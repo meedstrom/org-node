@@ -806,6 +806,12 @@ Give an ID to the entry at point@comma{} and run the hook @samp{org-node-creatio
 @item
 (Requires @uref{https://github.com/minad/consult, consult}) Grep across all known Org files.
 @end itemize
+@item
+@samp{org-node-card-view}
+@itemize
+@item
+Try it and@comma{} uh@comma{} see.
+@end itemize
 @end itemize
 
 Rarer commands:
