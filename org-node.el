@@ -1399,9 +1399,9 @@ the text that matched."
   (interactive)
   (org-node-cache-ensure)
   (let* ((input (org-node-read-candidate "Visit or create node: "
-                                         t
-                                         (and org-node-find-use-thing-at-point
-                                              (org-node--try-complete-title-at-pt))))
+                                         t nil nil
+                                         (when org-node-find-use-thing-at-point
+                                           (org-node--try-complete-title-at-pt))))
          (_ (when (string-blank-p input)
               (setq input (funcall org-node-blank-input-title-generator))))
          (node (gethash input org-node--candidate<>entry)))
@@ -1441,8 +1441,8 @@ Actually, it can be named something other than CREATED -- configure
   "Visit a random node."
   (interactive)
   (org-node-cache-ensure)
-  (org-node-goto (seq-random-elt
-                  (hash-table-values org-node--candidate<>entry))))
+  (org-node-goto (seq-random-elt (org-node-all-filtered-nodes)))
+  t)
 
 ;;;###autoload
 (defun org-node-visit-random ()
@@ -2733,10 +2733,10 @@ Used by `org-node--card-setup-default'."
       (when (and (boundp mode) (eval mode))
         (funcall mode 0))))
   (if (org-before-first-heading-p)
-      (or (search-forward "#+title:" (org-entry-end-position) t)
-          (org-node-full-end-of-meta-data))
+      (if (search-forward "#+title:" (org-entry-end-position) t)
+          (goto-char (pos-bol))
+        (org-node-full-end-of-meta-data))
     (org-fold--hide-drawers (point) (org-entry-end-position)))
-  (goto-char (pos-bol))
   (recenter 0))
 
 ;;;###autoload
@@ -2790,7 +2790,7 @@ sequences of your choice, in order of importance:
   "l a" #'org-node-list-feedback-arcs ; l a for "list arcs"
   "l c" 'org-mem-list-db-contents ; l c for "list contents"
   "l d" 'org-mem-list-dead-id-links
-  "l e" #'org-node-list-example
+  "l e" #'org-mem-list-example
   "l f" #'org-node-list-files
   "l l" #'org-node-lint-all-files
   "l p" 'org-mem-list-problems
@@ -2935,11 +2935,11 @@ With ASSUME-SANE, do not verify that ENTRY-BEG begins an entry."
     (when (or (< entry-beg (point-min)) (> entry-end (point-max)))
       (widen))
     (when (or (not (= here-end entry-end)) ;; Same end implies same entry.
-              (org-invisible-p entry-beg) ;; Virtually can't happen, but still.
+              (org-invisible-p entry-beg) ;; In case entire tree is folded.
               (and$ (get-buffer-window nil t)
                     (with-selected-window $
                       (org-fold-show-entry)
-                      (redisplay)
+                      (redisplay) ;; So `window-start' returns correct value.
                       (when (< entry-beg (window-start))
                         (if (save-window-excursion
                               (recenter -1)
