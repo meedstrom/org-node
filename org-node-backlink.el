@@ -292,7 +292,7 @@ Argument KIND controls how to update them."
       (org-mem-reset nil "org-node: Waiting for org-mem...")
       (unless (org-mem-await "org-node: Waiting for org-mem..." 30)
         (error "org-node: Waited weirdly long for org-mem"))
-      (let* ((files (org-mem-all-files))
+      (let* ((files (org-node-all-filtered-files))
              (dirs (org-node--root-dirs files))
              (problematic (seq-filter (##and (boundp %) (symbol-value %))
                                       '(org-node-backlink-mode
