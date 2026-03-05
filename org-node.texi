@@ -111,7 +111,7 @@ I like @uref{https://github.com/org-roam/org-roam, org-roam} but found it too sl
 @item
 @strong{If you were using org-roam}@comma{} there is nothing to migrate.  You can use both packages.  It's the same on-disk format: "notes" are identified by their org-id.
 
-In pursuit of being "just org-id"@comma{} this package has no equivalent setting to @samp{org-roam-directory} -- it just looks up the @samp{org-id-locations} table.
+In pursuit of being "just org-id"@comma{} this package has no equivalent setting to @samp{org-roam-directory} -- it just looks up what @uref{https://github.com/meedstrom/org-mem, org-mem} knows@comma{} which by default includes every file in @samp{org-id-locations} and more.
 
 @item
 @strong{If you were not using org-roam}@comma{} maybe think of it as somewhat like @uref{https://github.com/alphapapa/org-recent-headings, org-recent-headings} tooled-up to the extent that you won't need other methods of browsing@comma{} as long as you give IDs to all objects of interest.
