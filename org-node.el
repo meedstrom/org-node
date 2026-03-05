@@ -2741,7 +2741,7 @@ This setting is used by `org-node--card-setup-default'."
   (recenter 0))
 
 ;;;###autoload
-(defun org-node-card-view ()
+(defun org-node-card-view (&optional only-random no-random)
   "Reconfigure current frame to show an array of random notes.
 Works best in a large frame.
 
@@ -2756,6 +2756,7 @@ Also affected by user options:
 - `org-node-card-setup-hook'
 - `org-node-card-disable-line-numbers'"
   (interactive)
+  (require 'org)
   (org-node-cache-ensure)
   (delete-other-windows)
   (dotimes (_ (- (/ (window-text-height) org-node-card-min-height) 1))
@@ -2765,10 +2766,26 @@ Also affected by user options:
     (dotimes (_ (- (/ (window-text-width) org-node-card-min-width) 1))
       (split-window-right)))
   (balance-windows)
-  (dolist (win (window-list))
-    (select-window win)
-    (org-node-visit-random-1)
-    (run-hooks 'org-node-card-setup-hook)))
+  (let ((bufs (take (length (window-list)) (org-buffer-list)))
+        (blank (unless only-random (generate-new-buffer "*blank*"))))
+    (dolist (win (window-list))
+      (select-window win)
+      (cond (only-random (org-node-visit-random-1))
+            (bufs (pop-to-buffer-same-window (pop bufs)))
+            (no-random (pop-to-buffer-same-window blank))
+            (t (org-node-visit-random-1)))
+      (when (derived-mode-p 'org-mode)
+        (run-hooks 'org-node-card-setup-hook)))))
+
+(defun org-node-card-view-only-random ()
+  "Variant of `org-node-card-view'."
+  (interactive)
+  (org-node-card-view t))
+
+(defun org-node-card-view-no-random ()
+  "Variant of `org-node-card-view'."
+  (interactive)
+  (org-node-card-view nil t))
 
 
 ;;;; Keymap
