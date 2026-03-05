@@ -1784,26 +1784,30 @@ end of the entry.
 Unlike the BACKLINKS drawer, this drawer is not \\+`smart' and will never
 modify itself other than through this command."
   (interactive "*" org-mode)
-  (when-let* ((input (org-node-read-candidate))
-              (node (gethash input org-node--candidate<>entry)))
-    (save-excursion
-      (save-restriction
-        (org-node-narrow-to-drawer-create org-node-name-of-links-drawer
-                                          #'org-entry-end-position)
-        (atomic-change-group
-          ;; TODO: Go to end of drawer.
-          ;;       This should probably be controlled by user option.
-          ;; (goto-char (point-max))
-          ;; (org-node--safe-ensure-blank-line t)
-          (unless (eolp)
-            (let ((col (current-indentation)))
-              (newline)
-              (indent-to col))
-            (forward-line -1)
-            (back-to-indentation))
-          (insert (org-node-time-stamp t t) " -> "
-                  (org-link-make-string (concat "id:" (org-mem-entry-id node))
-                                        (org-mem-title node))))))))
+  (if (derived-mode-p 'org-agenda-mode)
+      ;; Support use from agenda.
+      (org-with-point-at (org-get-at-bol 'org-hd-marker)
+        (org-node-insert-into-related))
+    (when-let* ((input (org-node-read-candidate))
+                (node (gethash input org-node--candidate<>entry)))
+      (save-excursion
+        (save-restriction
+          (org-node-narrow-to-drawer-create org-node-name-of-links-drawer
+                                            #'org-entry-end-position)
+          (atomic-change-group
+            ;; TODO: Go to end of drawer.
+            ;;       This should probably be controlled by user option.
+            ;; (goto-char (point-max))
+            ;; (org-node--safe-ensure-blank-line t)
+            (unless (eolp)
+              (let ((col (current-indentation)))
+                (newline)
+                (indent-to col))
+              (forward-line -1)
+              (back-to-indentation))
+            (insert (org-node-time-stamp t t) " -> "
+                    (org-link-make-string (concat "id:" (org-mem-entry-id node))
+                                          (org-mem-title node)))))))))
 
 
 ;;;; Commands 3: Extract and refile
