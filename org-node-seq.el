@@ -507,7 +507,7 @@ DEF is a seq-def from `org-node-seq-defs'."
               if (functionp elt)
               collect (org-node--ensure-compiled elt)
               else collect elt)
-     (cl-loop for node in (org-mem-all-id-nodes)
+     (cl-loop for node in (org-node-all-filtered-nodes)
               as result = (funcall classifier node)
               if (listp (car result))
               nconc result into items

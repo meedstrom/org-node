@@ -1054,7 +1054,7 @@ substring \"/home/me\" referring to the same location."
 
 (defun org-node-guess-dir ()
   "Return the root level of user\\='s apparently most-used directories."
-  (car (org-node--root-dirs (org-mem-all-files))))
+  (car (org-node--root-dirs (org-node-all-filtered-files))))
 
 ;; TODO: It'd be more user-friendly if the interactive prompt also lets you
 ;;       change the basename.  So, conditionally call `org-node-file-slug-fn'
@@ -1477,14 +1477,14 @@ Repeatable on the last key of a key sequence if
       (if (executable-find "rg")
           (consult--grep "Grep in files known to org-mem: "
                          #'consult--ripgrep-make-builder
-                         (org-node--root-dirs (org-mem-all-files))
+                         (org-node--root-dirs (org-node-all-filtered-files))
                          nil)
         ;; Much slower!  Vanilla grep does not have Ripgrep's --type=org, so
         ;; must target thousands of files and not a handful of dirs, a calling
         ;; pattern that would also slow Ripgrep down.
         (consult--grep "(Ripgrep not found) Grep in files known to org-mem: "
                        #'consult--grep-make-builder
-                       (org-mem-all-files)
+                       (org-node-all-filtered-files)
                        nil)))))
 
 ;;;###autoload
@@ -2178,7 +2178,7 @@ so it matches the destination\\='s current title."
           (inhibit-message t)
           (n-links 0)
           (n-files 0))
-      (dolist (file (or files (cl-sort (org-mem-all-files)
+      (dolist (file (or files (cl-sort (org-node-all-filtered-files)
                                        (lambda (_ _) (natnump (random))))))
         (with-current-buffer (delay-mode-hooks (find-file-noselect file))
           (save-excursion
@@ -2269,7 +2269,7 @@ user quits, do not apply any modifications."
     (user-error "This command requires the wgrep package"))
   (when (and (fboundp 'wgrep-change-to-wgrep-mode)
              (fboundp 'wgrep-finish-edit))
-    (let ((root (car (org-node--root-dirs (org-mem-all-files))))
+    (let ((root (car (org-node--root-dirs (org-node-all-filtered-files))))
           (default-directory default-directory))
       (or (equal default-directory root)
           (if (y-or-n-p (format "Go to folder \"%s\"?" root))
@@ -2362,7 +2362,7 @@ one of them is associated with a ROAM_REFS property."
    :format [("Modified" 11 t) ("Size" 7 t) ("File" 70 t) ("Coding system" 15 t) ("Title" 40 t) ("Properties" 10 t)]
    :entries
    (cl-loop
-    for file in (org-mem-all-files)
+    for file in (org-node-all-filtered-files)
     as props = (org-mem-properties (car (org-mem-entries-in file)))
     as kb = (/ (org-mem-file-size file) 1024.0)
     collect

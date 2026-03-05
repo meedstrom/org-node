@@ -65,7 +65,7 @@ set `org-node-backlink-protect-org-super-links' to nil.")))
   "Warn if `org-node-backlink-do-drawers' is t but properties exist.
 If a warning was not needed, return nil."
   (and org-node-backlink-do-drawers
-       (cl-some (##org-mem-entry-property "BACKLINKS" %) (org-mem-all-id-nodes))
+       (cl-some (##org-mem-entry-property "BACKLINKS" %) (org-node-all-filtered-nodes))
        (display-warning 'org-node-backlink "User option `org-node-backlink-do-drawers' is t,
 but found :BACKLINKS: lines in some property drawers, so doing nothing.
 This is a new default in v2, you probably just need to toggle it.
