@@ -3499,6 +3499,8 @@ As a side effect, it can be used without the rest of org-roam."
 
 ;;;; Deprecated commands
 
+(defvar org-node--warned nil)
+
 ;; Subtly broken & unfixable.  Hard to pick a `crm-separator' since user may
 ;; wish to yank something like [cite:... @key1 ... @key2 ...].
 ;; DEPRECATED 2026-03-01
@@ -3510,7 +3512,9 @@ As a side effect, it can be used without the rest of org-roam."
                 "Add ref(s): " links nil nil nil 'org-node-link-hist)))
     (dolist (ref (mapcar #'string-trim refs))
       (org-node-add-ref ref)))
-  (message "org-node-add-refs: This command will be removed in 2027, use org-node-add-ref"))
+  (unless (memq 'org-node-add-refs org-node--warned)
+    (push 'org-node-add-refs org-node--warned)
+    (message "org-node-add-refs: This command will be removed in 2027, use org-node-add-ref")))
 
 ;; DEPRECATED 2026-03-01
 (defun org-node-add-tags (&optional tags)
@@ -3532,7 +3536,9 @@ As a side effect, it can be used without the rest of org-roam."
                                              'org-tags-history))))
     (org-node-set-tags-here
      (seq-uniq (append (org-node-get-tags-here) tags))))
-  (message "org-node-add-tags: This command will be removed in 2027, use org-node-set-tags"))
+  (unless (memq 'org-node-add-tags org-node--warned)
+    (push 'org-node-add-tags org-node--warned)
+    (message "org-node-add-tags: This command will be removed in 2027, use org-node-set-tags")))
 
 ;; DEPRECATED 2026-03-02
 (defun org-node-goto-id (id &optional exact buffer)
