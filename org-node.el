@@ -130,6 +130,7 @@
 (defvar org-roam-capture-templates)
 (defvar org-roam-preview-function)
 (defvar org-roam-preview-postprocess-functions)
+(defvar zone-programs)
 (require 'cl-lib)
 (require 'fileloop)
 (require 'org-faces)
