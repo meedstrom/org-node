@@ -2464,7 +2464,9 @@ from ID links found in `org-mem--target<>links'."
   (let ((proceed (and (not current-prefix-arg) ;; Let C-u reset the file list.
                       org-node--lint-remaining-files
                       (equal fileloop--scan-function #'org-node--lint-scanner)))
-        (files (mapcar #'car (org-mem--truenames-and-attrs))))
+        (files (if-let ((nodes (org-node-all-filtered-nodes)))
+                   (seq-uniq (mapcar #'org-mem-entry-file nodes))
+                 (mapcar #'car (org-mem--truenames-and-attrs)))))
     (unless proceed
       (when (y-or-n-p (format "Lint %d files?" (length files)))
         (setq org-node--lint-warnings nil)
