@@ -2740,6 +2740,14 @@ This setting is used by `org-node--card-setup-default'."
     (org-fold--hide-drawers (point) (org-entry-end-position)))
   (recenter 0))
 
+(defun org-node--blank-buffer ()
+  "Return a blank buffer."
+  (cl-loop with i = 0
+           as buf = (get-buffer-create (format "*blank-%d*" (cl-incf i)))
+           if (with-current-buffer buf (and (bobp) (eobp)))
+           return buf
+           while t))
+
 ;;;###autoload
 (defun org-node-card-view (&optional only-random no-random)
   "Reconfigure current frame to show an array of random notes.
@@ -2766,13 +2774,12 @@ Also affected by user options:
     (dotimes (_ (- (/ (window-text-width) org-node-card-min-width) 1))
       (split-window-right)))
   (balance-windows)
-  (let ((bufs (take (length (window-list)) (org-buffer-list)))
-        (blank (unless only-random (generate-new-buffer "*blank*"))))
+  (let ((bufs (take (length (window-list)) (org-buffer-list))))
     (dolist (win (window-list))
       (select-window win)
       (cond (only-random (org-node-visit-random-1))
             (bufs (pop-to-buffer-same-window (pop bufs)))
-            (no-random (pop-to-buffer-same-window blank))
+            (no-random (pop-to-buffer-same-window (org-node--blank-buffer)))
             (t (org-node-visit-random-1)))
       (when (derived-mode-p 'org-mode)
         (run-hooks 'org-node-card-setup-hook)))))
