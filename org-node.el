@@ -363,6 +363,10 @@ by typing \\[org-node-list-example]."
   "All currently cached ID-nodes that satisfied `org-node-filter-fn'."
   (delete-dups (hash-table-values org-node--candidate<>entry)))
 
+(defun org-node-all-filtered-files ()
+  "All files containing any of `org-node-all-filtered-nodes'."
+  (delete-dups (mapcar #'org-mem-entry-file (org-node-all-filtered-nodes))))
+
 
 ;;;; Sort
 
@@ -2464,9 +2468,8 @@ from ID links found in `org-mem--target<>links'."
   (let ((proceed (and (not current-prefix-arg) ;; Let C-u reset the file list.
                       org-node--lint-remaining-files
                       (equal fileloop--scan-function #'org-node--lint-scanner)))
-        (files (if-let ((nodes (org-node-all-filtered-nodes)))
-                   (seq-uniq (mapcar #'org-mem-entry-file nodes))
-                 (mapcar #'car (org-mem--truenames-and-attrs)))))
+        (files (or (org-node-all-filtered-files)
+                   (mapcar #'car (org-mem--truenames-and-attrs)))))
     (unless proceed
       (when (y-or-n-p (format "Lint %d files?" (length files)))
         (setq org-node--lint-warnings nil)
