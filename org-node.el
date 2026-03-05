@@ -2762,6 +2762,12 @@ Tries to make many compact windows, obeying user options:
 This command may motivate you to keep notes short,
 per an ideal of zettelkasten.
 
+The notes are in fact not random, but prefers the most recent Org
+buffers.  For a fully random selection, pass ONLY-RANDOM or use
+`org-node-card-view-only-random'.
+To prefer blank windows over random notes, pass NO-RANDOM or use
+`org-node-card-view-no-random'.
+
 Also affected by user options:
 - `org-node-card-setup-hook'
 - `org-node-card-disable-line-numbers'"
