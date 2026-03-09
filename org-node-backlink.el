@@ -1,9 +1,11 @@
-;;; org-node-backlink.el --- Manage :BACKLINKS: properties or drawers -*- lexical-binding: t; -*-
+;;; org-node-backlink.el --- Extension for managing :BACKLINKS: properties or drawers -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2024-2026 Martin Edström
 ;; SPDX-License-Identifier: GPL-3.0-or-later
 
 ;;; Commentary:
+
+;; Strictly an extension (core does not depend on this file).
 
 ;; A mode for ensuring that the Org nodes that should have
 ;; :BACKLINKS: properties (or :BACKLINKS: drawers) have them,

@@ -159,11 +159,11 @@ You can use the org-roam buffer without the rest of org-roam.  Enable the follow
 
 *** Option 1B: Use the org-node-context buffer
 
-Org-node ships a rewrite of the org-roam buffer.
+Org-node ships a rewrite of the org-roam buffer, in the included extension org-node-context.el.
 
 Try the command =org-node-context-dwim= (=M-o n b=).
 
-If you like it, consider binding it to a particularly short key, such as =M-o M-b=.  Or you can let it keep itself updated, reflecting where point is at all times, by enabling this mode:
+If you like it, consider binding it to an easily typed key, such as =M-o M-b=.  Or you can let it keep itself updated, reflecting where point is at all times, by enabling this mode:
 
 #+begin_src elisp
 (org-node-context-follow-mode)
@@ -174,7 +174,9 @@ I rarely have the screen space to display a backlink buffer.  Because it needs m
 
 A complementary solution, which can also stand alone, is to have the backlinks /written into/ the file, on an Org property line or in a drawer.
 
-NOTE: To be clear, this mode never generates new IDs (and neither would Option 1).  That's your own business.  This only adds/edits =:BACKLINKS:= properties or drawers, and only gives it backlinks corresponding to links where the original site already has or inherits some ID.
+The included extension org-node-backlink.el helps you with that.
+
+NOTE: To be clear, this global minor mode never generates new IDs (and neither would Option 1).  That's your own business.  This only adds/edits =:BACKLINKS:= properties or drawers, and only gives it backlinks corresponding to links where the original site already has or inherits some ID.
 
 *** Option 2A: Automatic =:BACKLINKS:= property line
 

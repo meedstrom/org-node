@@ -1,9 +1,11 @@
-;;; org-node-context.el ---  -*- lexical-binding: t; -*-
+;;; org-node-context.el --- Extension for displaying a buffer of backlinks  -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2025-2026 Martin Edström
 ;; SPDX-License-Identifier: GPL-3.0-or-later
 
 ;;; Commentary:
+
+;; Strictly an extension (core does not depend on this file).
 
 ;;; Code:
 

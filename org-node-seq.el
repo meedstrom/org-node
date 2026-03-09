@@ -1,9 +1,11 @@
-;;; org-node-seq.el --- Experimental way to define node sequences -*- lexical-binding: t; -*-
+;;; org-node-seq.el --- Extension for navigating arbitrary node sequences -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2024-2026 Martin Edström
 ;; SPDX-License-Identifier: GPL-3.0-or-later
 
 ;;; Commentary:
+
+;; Strictly an extension (core does not depend on this file).
 
 ;; Support programmatically defining node-sequences, based on such things as
 ;; Org tags, time-stamps and file-names.  Then support easily navigating them.

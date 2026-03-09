@@ -405,11 +405,11 @@ You can use the org-roam buffer without the rest of org-roam.  Enable the follow
 @node Option 1B Use the org-node-context buffer
 @subsection Option 1B: Use the org-node-context buffer
 
-Org-node ships a rewrite of the org-roam buffer.
+Org-node ships a rewrite of the org-roam buffer@comma{} in the included extension org-node-context.el.
 
 Try the command @samp{org-node-context-dwim} (@samp{M-o n b}).
 
-If you like it@comma{} consider binding it to a particularly short key@comma{} such as @samp{M-o M-b}.  Or you can let it keep itself updated@comma{} reflecting where point is at all times@comma{} by enabling this mode:
+If you like it@comma{} consider binding it to an easily typed key@comma{} such as @samp{M-o M-b}.  Or you can let it keep itself updated@comma{} reflecting where point is at all times@comma{} by enabling this mode:
 
 @lisp
 (org-node-context-follow-mode)
@@ -422,7 +422,9 @@ I rarely have the screen space to display a backlink buffer.  Because it needs m
 
 A complementary solution@comma{} which can also stand alone@comma{} is to have the backlinks @emph{written into} the file@comma{} on an Org property line or in a drawer.
 
-NOTE: To be clear@comma{} this mode never generates new IDs (and neither would Option 1).  That's your own business.  This only adds/edits @samp{:BACKLINKS:} properties or drawers@comma{} and only gives it backlinks corresponding to links where the original site already has or inherits some ID@.
+The included extension org-node-backlink.el helps you with that.
+
+NOTE: To be clear@comma{} this global minor mode never generates new IDs (and neither would Option 1).  That's your own business.  This only adds/edits @samp{:BACKLINKS:} properties or drawers@comma{} and only gives it backlinks corresponding to links where the original site already has or inherits some ID@.
 
 @menu
 * Option 2A Automatic @samp{BACKLINKS} property line::
