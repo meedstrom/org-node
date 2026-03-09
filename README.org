@@ -84,7 +84,7 @@ Go to the manual and close this tab.
 - in a web browser: [[https://github.com/meedstrom/org-node/blob/main/org-node.org]]
 - or in Emacs after installation: [[info:org-node]]
 
-* Advice: Start with a paper Zettelkasten
+* Advice: Start with paper
 
 Many people on forums say that you should do *a paper slip-box first* before going digital.
 
@@ -94,11 +94,12 @@ So let me try to bootstrap you:
 
 [[file:README_5745.jpg]]
 
-If you are currently in the EU, you can order the pictured paper slips and box here:
+If you are inside the EU, you can order the pictured box and paper slips here:
 
 - https://www.123ink.se/HAN-kortlada-A6-svart-HA-976-13-i23800-t76314.html
-- https://www.123ink.se/Papper-Fotopapper/Kopieringspapper/A6/80-gram-p165367.html
+- https://www.123ink.se/123inkt-Kopieringspapper-A6-80g-vit-123ink-2-000-ark-3kg-i69137-t165367.html
+  - weirdly rare product
 
-Once these products arrive, take them and a pen with you to the local cafe, if it's a quiet noontime hour (otherwise a library, better in the afternoon).
+Once these presents have arrived, take them and a pen to the local café or library.  (If you're noise-sensitive, keep in mind that cafés are only quiet in the morning.)
 
-Then have a warm coffee, lean back, and read https://zettelkasten.de/introduction/.
+Then lean back, have a warm coffee, and read https://zettelkasten.de/introduction/.
