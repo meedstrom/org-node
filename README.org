@@ -1,8 +1,7 @@
-#+TITLE: org-node
 #+AUTHOR: Martin Edström
 #+EMAIL: meedstrom91@gmail.com
 #+STARTUP: content
-* What's all this
+* org-node
 #+HTML: <a href="https://repology.org/project/emacs%3Aorg-node/versions"> <img src="https://repology.org/badge/vertical-allrepos/emacs%3Aorg-node.svg" alt="Packaging status" align="right"> </a>
 
 I like [[https://github.com/org-roam/org-roam][org-roam]] but found it too slow, so I made [[https://github.com/meedstrom/quickroam][quickroam]].  And that idea spun off into this package, a standalone thing.  It may also be easier to pick up than org-roam.
@@ -82,8 +81,8 @@ A comparison of three systems that all permit relying on org-id and don't lock y
 
 Go to the manual and close this tab.
 
-- in Emacs: [[info:org-node]]
 - in a web browser: [[https://github.com/meedstrom/org-node/blob/main/org-node.org]]
+- or in Emacs after installation: [[info:org-node]]
 
 * Advice: Start with a paper Zettelkasten
 
@@ -102,4 +101,4 @@ If you are currently in the EU, you can order the pictured paper slips and box h
 
 Once these products arrive, take them and a pen with you to the local cafe, if it's a quiet noontime hour (otherwise a library, better in the afternoon).
 
-Have a warm coffee, lean back, and read https://zettelkasten.de/introduction/.
+Then have a warm coffee, lean back, and read https://zettelkasten.de/introduction/.

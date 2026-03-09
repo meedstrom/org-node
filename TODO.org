@@ -12,6 +12,22 @@
 
 * Other
 
+- https://github.com/meedstrom/org-node/issues/172
+
+- https://github.com/meedstrom/org-node/issues/171
+
+- https://github.com/meedstrom/org-node/issues/168
+
+- https://github.com/meedstrom/org-node/issues/161
+
+- https://github.com/meedstrom/org-node/issues/151
+
+- https://github.com/meedstrom/org-node/issues/143
+
+- https://github.com/meedstrom/org-node/issues/130
+
+- https://github.com/meedstrom/org-node/issues/62
+
 - A workflow to allow *untitled nodes*
 
   - [X] Create node without needing to type a title
@@ -19,7 +35,8 @@
   - [ ] Let =org-node-grep= create new nodes
   - [ ] (Rewrite =org-node-grep= so it does not need Consult)
   - [ ] Subroutine for *identifying a node by a grep result*, which could be used to insert/extract/capture/refile while only ever completing against grep results
-  - [ ] See that issue about untitled notes https://github.com/meedstrom/org-node/issues XXX
+  - [ ] See that issue about untitled notes https://github.com/meedstrom/org-node/issues/112
+
     Figure out the helper commands you'd want for embedding human-generated IDs in headings/titles.
 
 - Let =org-node-grep= obey =org-node-filter-fn=
