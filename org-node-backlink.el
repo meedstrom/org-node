@@ -570,7 +570,7 @@ If REMOVE non-nil, remove it instead."
               (dolist (id to-add)
                 (let ((title (org-mem-title-maybe (org-mem-entry-by-id id))))
                   (insert (funcall org-node-backlink-drawer-formatter id title))
-                  (newline)
+                  (insert "\n")
                   (indent-to col)))
               ;; Membership is correct, now re-sort
               (let ((sorted-lines (sort (split-string (buffer-string) "\n" t)
@@ -724,9 +724,9 @@ Designed for use by `org-node-backlink--add-in-target'."
             (let ((col (current-indentation)))
               (insert (funcall org-node-backlink-drawer-formatter id title))
               (unless (eolp)
-                ;; NOTE: Don't use `newline-and-indent' because it may deepen
-                ;;       indentation of a list bullet.
-                (newline)
+                ;; NOTE: Don't use `newline' nor `newline-and-indent'
+                ;; https://github.com/meedstrom/org-node/issues/180
+                (insert "\n")
                 (indent-to col)))
             ;; Re-sort so just-inserted link is placed correct among them
             (let ((lines (sort (split-string (buffer-string) "\n" t)
